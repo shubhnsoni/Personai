@@ -37,3 +37,8 @@ externalPort = 80
 [[ports]]
 localPort = 33287
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+DATABASE_URL = "file:/home/runner/workspace/aiclone/prisma/dev.db"
