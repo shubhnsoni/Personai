@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique // Map to Clerk User ID
+  email     String   @unique
+  name      String?
+  image     String?
+  role      String   @default("CREATOR") // "CREATOR" | "ADMIN"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profiles Profile[]
+}
+
+model Profile {
+  id                    String                 @id @default(cuid())
+  userId                String
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug                  String                 @unique
+  displayName           String
+  headline              String?
+  bio                   String?                // @db.Text removed for sqlite
+  roleTemplate          String                 @default("CUSTOM") // Enum as String
+  primaryGoal           String                 @default("BOOK_CALL") // Enum as String
+  language              String                 @default("en")
+  timezone              String                 @default("UTC")
+  themeColor            String                 @default("#000000")
+  animationStyleId      String?
+  animationStyle        WelcomeAnimationPreset? @relation(fields: [animationStyleId], references: [id])
+  isPublic              Boolean                @default(false)
+  showInDirectory       Boolean                @default(false)
+  welcomeMessageOverride String?
+  contentDisplayMode    String                 @default("POPUP") // "SIDE_PANEL" | "POPUP"
+  personalityConfig     String?                // Json stored as String for sqlite (or Prisma handles Json in sqlite? Yes, Prisma supports Json in sqlite)
+  // Wait, Prisma supports Json in sqlite.
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  documents        ProfileDocument[]
+  serviceOfferings ServiceOffering[]
+  bookings         Booking[]
+  conversations    Conversation[]
+  payments         Payment[]
+  leads            VisitorLead[]
+  availability     AvailabilitySchedule[]
+  workExperiences  WorkExperience[]
+  projects         Project[]
+}
+
+model WorkExperience {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  company     String
+  role        String
+  startDate   String   // e.g. "2022" or "Jan 2022"
+  endDate     String?  // null = Present
+  description String?
+  achievements String? // JSON string array
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  client      String?
+  year        String?
+  imageUrl    String?
+  link        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WelcomeAnimationPreset {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  config      String   // Json stored as String? No, Prisma supports Json type in SQLite since v3.
+  // But let's check if it's safe. Yes.
+  // Actually, let's keep it Json if possible.
+  // "Native type Text is not supported". Json is supported.
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profiles Profile[]
+}
+
+model ProfileDocument {
+  id                String              @id @default(cuid())
+  profileId         String
+  profile           Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  type              String              // Enum
+  title             String
+  sourceType        String              // Enum
+  url               String?
+  filePath          String?
+  rawText           String?             // @db.Text removed
+  embeddingMetadata String?             // Json
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model ServiceOffering {
+  id                String   @id @default(cuid())
+  profileId         String
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  priceCents        Int      @default(0)
+  currency          String   @default("USD")
+  isFree            Boolean  @default(false)
+  durationMinutes   Int      @default(30)
+  isActive          Boolean  @default(true)
+  isRecurring       Boolean  @default(false)
+  maxBookingsPerDay Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  bookings Booking[]
+}
+
+model Booking {
+  id                String        @id @default(cuid())
+  profileId         String
+  profile           Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  visitorId         String?       
+  visitorName       String
+  visitorEmail      String
+  serviceOfferingId String
+  serviceOffering   ServiceOffering @relation(fields: [serviceOfferingId], references: [id])
+  startTime         DateTime
+  endTime           DateTime
+  status            String          @default("PENDING_PAYMENT") // Enum
+  paymentId         String?         @unique
+  payment           Payment?        @relation(fields: [paymentId], references: [id])
+  metadata          String?         // Json
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  profileId         String
+  profile           Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  bookingId         String?         @unique 
+  booking           Booking?
+  amountCents       Int
+  currency          String
+  status            String          @default("PENDING") // Enum
+  provider          String          @default("STRIPE") // Enum
+  providerPaymentId String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model Conversation {
+  id             String             @id @default(cuid())
+  profileId      String
+  profile        Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  visitorId      String?
+  visitorName    String?
+  visitorEmail   String?
+  source         String             @default("PROFILE_PAGE") // Enum
+  leadStatus     String             @default("NEW") // Enum
+  notes          String?            
+  startedAt      DateTime           @default(now())
+  endedAt        DateTime?
+  lastMessageAt  DateTime           @default(now())
+
+  messages     Message[]
+  visitorLeads VisitorLead[]
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderType     String       // Enum
+  text           String       
+  role           String       
+  createdAt      DateTime     @default(now())
+}
+
+model VisitorLead {
+  id             String            @id @default(cuid())
+  profileId      String
+  profile        Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  conversationId String?
+  conversation   Conversation?     @relation(fields: [conversationId], references: [id])
+  name           String
+  email          String
+  company        String?
+  budgetRange    String?
+  status         String            @default("NEW") // Enum
+  tags           String?           // Json
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model AdminSettings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String // Json
+}
+
+model AvailabilitySchedule {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  dayOfWeek Int      // 0-6 (Sun-Sat)
+  startTime String   // "09:00"
+  endTime   String   // "17:00"
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

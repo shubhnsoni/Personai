@@ -1,0 +1,307 @@
+"use client"
+import { useState, useRef, useEffect } from "react"
+import { useChat } from "@ai-sdk/react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Send, ArrowUp, ChevronRight, Sparkles } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { WelcomeOrb } from "@/components/welcome-orb"
+
+interface ChatInterfaceProps {
+    profile: any
+    welcome?: React.ReactNode
+    quickQuestions?: string[]
+    onShowContent?: (type: "about" | "experience" | "projects") => void
+    colors?: string[]
+    animationConfig?: any
+    isPanelOpen?: boolean
+}
+
+function TypingEffect({ text }: { text: string }) {
+    const [displayedText, setDisplayedText] = useState("")
+    const [isComplete, setIsComplete] = useState(false)
+
+    useEffect(() => {
+        let index = 0
+        const interval = setInterval(() => {
+            setDisplayedText((prev) => {
+                if (index >= text.length) {
+                    clearInterval(interval)
+                    setIsComplete(true)
+                    return text
+                }
+                const nextChar = text.charAt(index)
+                index++
+                return prev + nextChar
+            })
+        }, 15) // Adjust speed here
+
+        return () => clearInterval(interval)
+    }, [text])
+
+    return (
+        <span>
+            {displayedText}
+            {!isComplete && <span className="animate-pulse">|</span>}
+        </span>
+    )
+}
+
+export function ChatInterface({ profile, welcome, quickQuestions = [], onShowContent, colors = [], animationConfig = {}, isPanelOpen = false }: ChatInterfaceProps) {
+    const { messages = [], setMessages, isLoading } = useChat({
+        api: "/api/chat",
+        body: { profileId: profile.id },
+        onError: (e) => console.error("Chat error:", e)
+    })
+
+    const [input, setInput] = useState("")
+    const scrollRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+    }, [messages, isLoading])
+
+    // Detect content triggers in AI messages
+    const getRichContent = (content: string) => {
+        const lower = content.toLowerCase()
+        if (lower.includes("experience") || lower.includes("work history")) return "experience"
+        if (lower.includes("project") || lower.includes("portfolio")) return "projects"
+        if (lower.includes("about") || lower.includes("who is")) return "about"
+        return null
+    }
+
+    const handleSubmit = async (e?: React.FormEvent, overrideInput?: string) => {
+        e?.preventDefault()
+        const messageToSend = overrideInput || input
+        if (!messageToSend.trim()) return
+
+        setInput("")
+
+        // Create user message object
+        const userMsg = {
+            id: Date.now().toString(),
+            role: 'user' as const,
+            content: messageToSend
+        }
+
+        // Optimistically update UI with user message
+        const currentMessages = [...messages, userMsg]
+        setMessages(currentMessages)
+
+        // Frontend Mock Logic for Demo
+        const lower = messageToSend.toLowerCase()
+        let mockResponse = ""
+
+        if (lower.includes("work") || lower.includes("history") || lower.includes("experience")) {
+            mockResponse = `Here is ${profile.displayName}'s work experience. He has worked at Parloa as a Principal Product Designer and founded his own agency, SomethingCreative.`
+        } else if (lower.includes("project") || lower.includes("design") || lower.includes("portfolio")) {
+            mockResponse = `Here are some of ${profile.displayName}'s design projects. He focuses on AI interfaces, conversational agents, and clean UX design.`
+        } else if (lower.includes("who") || lower.includes("about")) {
+            mockResponse = `${profile.displayName} is a Product Designer and Engineer based in Berlin. He loves building beautiful software that feels good to use.`
+        } else if (lower.includes("book") || lower.includes("call")) {
+            mockResponse = "I'd love to chat! You can book a call with me directly."
+        }
+
+        if (mockResponse) {
+            // Simulate network delay then append AI message
+            setTimeout(() => {
+                const aiMsg = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant' as const,
+                    content: mockResponse
+                }
+                setMessages([...currentMessages, aiMsg])
+            }, 600)
+        }
+    }
+
+    const hasStarted = messages.length > 0
+
+    return (
+        <div className="flex flex-col h-full w-full max-w-4xl mx-auto relative">
+            {/* Small Header (Visible when chat has started) */}
+            {hasStarted && (
+                <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center gap-3 bg-black/20 backdrop-blur-sm border-b border-white/5 animate-in fade-in slide-in-from-top-2 duration-500">
+                    <div className="relative w-8 h-8">
+                        <WelcomeOrb
+                            size={32}
+                            colors={colors && colors.length >= 2 ? (colors as [string, string]) : undefined}
+                            speed={animationConfig.speed || 1}
+                            intensity={animationConfig.intensity || 1}
+                        />
+                    </div>
+                    <span className="font-semibold text-sm text-zinc-200">
+                        {profile.displayName}&apos;s AI
+                    </span>
+                </div>
+            )}
+
+            <div ref={scrollRef} className={cn(
+                "flex-1 overflow-y-auto p-4 space-y-8 scroll-smooth pb-32 transition-all duration-500",
+                hasStarted ? "pt-20" : ""
+            )}>
+                {!hasStarted && (
+                    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12 animate-in fade-in zoom-in duration-500">
+                        <div className="flex flex-col items-center space-y-8 mt-12">
+                            <div className="relative">
+                                <WelcomeOrb
+                                    size={200}
+                                    colors={colors as [string, string]}
+                                    speed={animationConfig.speed || 1}
+                                    intensity={animationConfig.intensity || 1}
+                                />
+                            </div>
+
+                            <div className="text-center space-y-3">
+                                <h1 className="text-3xl md:text-4xl font-medium tracking-tight bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
+                                    I am {profile.displayName}&apos;s AI.
+                                </h1>
+                                <p className="text-xl text-zinc-400 font-light">
+                                    {profile.welcomeMessageOverride || "Mind telling me who you are?"}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl px-4">
+                            {quickQuestions.map((q, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => handleSubmit(undefined, q)}
+                                    className="text-left p-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-zinc-700 transition-all hover:scale-[1.02] text-sm text-zinc-400 hover:text-zinc-100 shadow-sm group"
+                                >
+                                    <span className="mr-2 group-hover:scale-110 inline-block transition-transform">💬</span> {q}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {messages.map((m) => {
+                    const richContentType = m.role !== 'user' ? getRichContent(m.content) : null
+                    const isUser = m.role === 'user'
+
+                    return (
+                        <div key={m.id} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2 gap-2`}>
+                            <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} max-w-[90%]`}>
+                                {!isUser && (
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mr-3 shrink-0 shadow-lg shadow-purple-500/20 mt-1">
+                                        <Sparkles className="w-4 h-4 text-white" />
+                                    </div>
+                                )}
+                                <div className={cn(
+                                    "px-5 py-3 text-base leading-relaxed",
+                                    isUser
+                                        ? "bg-zinc-800 text-white rounded-2xl rounded-br-sm shadow-md"
+                                        : "text-zinc-300"
+                                )}>
+                                    {isUser ? (
+                                        m.content
+                                    ) : (
+                                        <TypingEffect text={m.content} />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Rich Content Card */}
+                            {richContentType && onShowContent && (
+                                <div className="ml-11 w-full max-w-sm animate-in fade-in slide-in-from-bottom-3 duration-700 delay-300">
+                                    <button
+                                        onClick={() => onShowContent(richContentType)}
+                                        className="w-full flex items-center justify-between p-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 hover:bg-zinc-800/80 transition-all group text-left"
+                                    >
+                                        <div>
+                                            <p className="font-medium text-white text-sm">
+                                                {richContentType === 'experience' && `${profile.displayName}'s Work Experience`}
+                                                {richContentType === 'projects' && `${profile.displayName}'s Design Projects`}
+                                                {richContentType === 'about' && `About ${profile.displayName}`}
+                                            </p>
+                                            <p className="text-xs text-zinc-500 mt-0.5">Click to view details</p>
+                                        </div>
+                                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors">
+                                            <ChevronRight className="w-4 h-4" />
+                                        </div>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )
+                })}
+
+                {isLoading && (
+                    <div className="flex justify-start animate-in fade-in">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mr-3 shrink-0 shadow-lg shadow-purple-500/20 opacity-70">
+                            <Sparkles className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex items-center gap-1 h-10 px-2">
+                            <span className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                            <span className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                            <span className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce"></span>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent pt-32">
+                <div className="max-w-3xl mx-auto relative w-full flex flex-col gap-3">
+                    {/* Suggestions */}
+                    {hasStarted && !isLoading && (
+                        <div className={cn(
+                            "transition-all duration-300 ease-in-out",
+                            isPanelOpen
+                                ? "absolute bottom-full mb-4 left-0 right-0 flex flex-col items-center group/stack"
+                                : "flex gap-2 overflow-x-auto pb-2 mask-fade-right scrollbar-custom-horizontal"
+                        )}>
+                            {[
+                                `How did ${profile.displayName} start his career?`,
+                                `What are ${profile.displayName}'s main achievements?`,
+                                "Dive into another topic"
+                            ].map((suggestion, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => handleSubmit(undefined, suggestion)}
+                                    className={cn(
+                                        "whitespace-nowrap px-4 py-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700 transition-all shadow-sm backdrop-blur-sm",
+                                        isPanelOpen && "absolute bottom-0 w-full max-w-sm origin-bottom transition-all duration-300 ease-out shadow-xl",
+                                        isPanelOpen && i === 0 && "z-30 scale-100 translate-y-0 group-hover/stack:-translate-y-[88px]",
+                                        isPanelOpen && i === 1 && "z-20 scale-[0.98] -translate-y-[8px] group-hover/stack:-translate-y-[44px] group-hover/stack:scale-100",
+                                        isPanelOpen && i === 2 && "z-10 scale-[0.96] -translate-y-[16px] group-hover/stack:translate-y-0 group-hover/stack:scale-100"
+                                    )}
+                                    style={isPanelOpen ? {
+                                        transitionDelay: `${i * 50}ms`
+                                    } : {}}
+                                >
+                                    <span className="mr-1.5">💬</span> {suggestion}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <form
+                        onSubmit={(e) => handleSubmit(e)}
+                        className="relative flex items-center group w-full"
+                    >
+                        <Input
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            placeholder={`Tell me more about...`}
+                            className="w-full h-14 pl-6 pr-14 rounded-full bg-zinc-900/80 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 shadow-2xl backdrop-blur-xl focus-visible:ring-1 focus-visible:ring-purple-500/50 focus-visible:border-purple-500/50 transition-all text-base"
+                        />
+                        <Button
+                            size="icon"
+                            type="submit"
+                            disabled={isLoading || !input.trim()}
+                            className="absolute right-2 h-10 w-10 rounded-full bg-zinc-800 hover:bg-white hover:text-black text-white shadow-lg transition-all disabled:opacity-50 disabled:hover:bg-zinc-800 disabled:hover:text-white"
+                        >
+                            <ArrowUp className="h-5 w-5" />
+                        </Button>
+                    </form>
+                    <div className="text-center">
+                        <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-medium">Powered by PersonaLink</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
