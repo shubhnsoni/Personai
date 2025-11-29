@@ -1,0 +1,2715 @@
+Skip to content
+Chat history
+
+
+
+
+
+You said:
+Uploaded image
+Uploaded image
+Need to create a platform where anyone can create a customised chatbot for them , designers can show their portfolio and , consultants can do their own job, editors can also show their work and get meetings scheduled and basically any service providers or employees can create their own ai chatbot and link in their profile at a basic subscription cost. So that interested users can talk and book and pay directly on the platform. And put links on their social media or cv, 
+Think about this idea more and what you can implement to make it a world class platform easily adaptable, think full scale implementation and easy experience just like this
+ChatGPT said:
+
+Thought for 24s
+Nice, this is basically “Link-in-bio + Calendly + Portfolio, but powered by your AI twin.”
+Let’s design it like a real product.
+
+1. Core concept
+One-line:
+
+Anyone can spin up an AI version of themselves that talks like them, showcases their work, answers questions, and books + collects payments – all from one shareable link.
+
+Target users:
+
+Designers, editors, consultants, coaches, freelancers
+
+Employees who want a “smart CV”
+
+Agencies who want AI profiles for each team member
+
+Target visitors:
+
+Recruiters, clients, collaborators, followers
+
+2. Ideal end-user experience (visitor side)
+Think of the Max screenshot, but generalized:
+
+Visitor clicks a link: maxro.me/shubham (your domain).
+
+Full-screen, minimal UI.
+
+AI bubble greets:
+“Hey, I’m Shubham’s AI. Want to see his work, discuss a project, or schedule a call?”
+
+Quick-action chips:
+
+“See portfolio”
+
+“Ask about rates”
+
+“Book a call”
+
+“Learn about experience”
+
+The chat:
+
+Answers like the person (tone, expertise)
+
+Shows cards: projects, case studies, testimonials
+
+Can ask a few qualifying questions before offering a booking link
+
+Conversion:
+
+“Book a 30-min intro call” → native scheduler
+
+“Pay for a 1-hour consultation” → integrated checkout
+
+“Leave your email” → lead capture
+
+The whole point: no scrolling, no confusion – just “talk to the person’s brain” and convert.
+
+3. Creator experience (the person making their AI)
+The magic must be: create your AI in 5–10 minutes.
+
+Onboarding
+“What do you do?”
+Choose from templates:
+
+Designer
+
+Consultant / Coach
+
+Editor / Writer
+
+Developer
+
+Job-seeker / CV
+
+Custom
+
+Connect sources (optional, but powerful):
+
+Upload CV / resume
+
+Link LinkedIn
+
+Upload portfolio (links, PDFs, Behance, Dribbble, etc.)
+
+Add FAQs and service descriptions
+
+Add pricing, offers, meeting types
+
+Tone & personality:
+
+Sliders: Formal ↔ Casual, Playful ↔ Serious, Short ↔ Detailed
+
+Few example answers: “How do you usually introduce yourself?” (used for style)
+
+Set goals:
+
+“What do you want visitors to do?” (Primary CTA)
+
+Book a call
+
+Hire me for a project
+
+Download my CV
+
+Join my newsletter
+
+Something else
+
+From this, you generate a starter script and system prompt for the AI.
+
+4. Features you should absolutely include
+A. Smart conversational flows (not just generic chat)
+Role-based templates:
+
+Designer AI knows to ask: budget, timeline, style, project scope.
+
+Coach AI asks: current situation, goals, time commitment.
+
+Job-seeker AI: walks through experience, shares portfolio links, collects interest.
+
+Multi-step “mini-forms” inside chat for qualification.
+
+B. Portfolio + case study cards
+Within conversations, the AI can:
+
+Show project cards: image, title, problem, solution, outcome.
+
+Share testimonials as cards.
+
+Open external links in a new tab (Behance, Figma, Notion, etc.)
+
+So the visitor never has to figure out complex navigation.
+
+C. Scheduling & payments
+Native scheduler or integrations (Calendly, Google Calendar, Outlook).
+
+Timezone auto-detection for visitors.
+
+Meeting types:
+
+Free intro call
+
+Paid 1:1 session
+
+Package (e.g., “Landing page design in 2 weeks”)
+
+Payments:
+
+Stripe / Razorpay etc.
+
+One-time and subscriptions (for retainers / coaching).
+
+Flow:
+AI: “Sounds like a good fit. Want to book a 30 min discovery call?”
+→ Suggest time slots → Confirm → Collect payment if required → Email confirmation + calendar invite.
+
+D. Lead capture & follow-up
+Email + phone capture inside chat.
+
+Consent toggles (marketing vs one-off).
+
+Auto-followup:
+
+If someone interacted but didn’t book, send them an email summary + CTA.
+
+“Here’s what we discussed with Shubham’s AI and how to proceed.”
+
+E. Analytics for creators
+Dashboard should show:
+
+Visits, conversations, conversion rate.
+
+Top questions users ask.
+
+Drop-off points in chat.
+
+Revenue & bookings over time.
+
+Which traffic source converts best (UTM tracking).
+
+This gives power users something to optimize.
+
+5. Product structure: Plans & pricing
+Free / Trial
+
+1 AI profile
+
+Limited conversations / month
+
+Basic scheduling (no payments)
+
+“Powered by [Brand]” branding
+
+Pro
+
+Higher conversation limits
+
+Payments enabled
+
+Custom domain or at least vanity URL
+
+Remove branding
+
+More integrations (Notion, Google Drive, Calendly, Zapier)
+
+Business / Agency
+
+Multiple AIs under one org
+
+Shared knowledge base
+
+Team analytics
+
+White-labeling
+
+6. Tech design (high level)
+You don’t need crazy complexity upfront – just a good architecture.
+
+Backend
+Multi-tenant app (each user = workspace).
+
+Knowledge ingestion:
+
+Structured data: profile, services, pricing.
+
+Unstructured: PDFs, CVs, case-study docs → chunking + vector embeddings.
+
+LLM orchestration:
+
+System prompt per bot (role, tone, goals).
+
+Tools:
+
+Knowledge retrieval
+
+Meeting scheduler
+
+Payment link generator
+
+DB:
+
+Users, bots, conversations, bookings, payments, analytics events.
+
+Frontend
+Chat widget + full-page “AI profile” layout.
+
+Mobile-first (most traffic from social links).
+
+Support:
+
+Full-page AI profile (for CV / bio link).
+
+Embeddable widget (for personal website).
+
+Simple link like yourbrand.ai/username.
+
+7. Making it truly world-class (differentiation ideas)
+Setup from CV or LinkedIn link
+Paste your LinkedIn URL → system scrapes, summarizes, and auto-creates your AI twin.
+
+“Interview mode” for recruiters
+Special flow where the AI asks & answers:
+
+Salary expectations, location, availability.
+
+Detailed breakdown of experience.
+Then generates a downloadable summary for recruiters.
+
+Profile directory
+Public marketplace (opt-in):
+
+“Browse AI designers”, “AI growth consultants”, etc.
+
+Builds organic discovery for your users → growth loop.
+
+Content clips from chat
+Turn good Q&A pairs from conversations into:
+
+FAQ snippets for websites
+
+Social media posts
+This makes your platform a mini content engine.
+
+Trust & handoff
+
+“Talk to the real person” button to immediately escalate to live chat (if creator is online).
+
+Clear disclaimers: “I’m their AI assistant, not the actual person.”
+
+Languages + localization
+Allow creators to set language preferences and optionally auto-translate, so one AI can talk to people globally.
+
+8. Suggested MVP scope (realistic first version)
+Phase 1 – Validate
+
+User signup + simple dashboard.
+
+Create 1 AI profile:
+
+Bio, services, FAQs.
+
+Upload 3–5 portfolio links or files.
+
+LLM-powered chat with:
+
+Context from their data.
+
+Simple conversation goals.
+
+Basic CTA:
+
+“Share email” OR
+
+External Calendly link.
+
+Shareable AI profile page.
+
+Phase 2 – Make it sticky
+
+Native scheduling + calendar sync.
+
+Stripe/Razorpay payments.
+
+Proper analytics.
+
+Personality sliders + templates per role.
+
+Phase 3 – Scale & differentiate
+
+Directory / marketplace.
+
+LinkedIn/CV auto-setup.
+
+White-label & agency features.
+
+Multi-language, more integrations.
+
+9. How you could position it
+Taglines you can aim for:
+
+“Your AI twin that books your next client while you sleep.”
+
+“Turn your CV / portfolio into a living, talking experience.”
+
+“DMs, calls, and clients – all from a single AI link in bio.”
+
+If you want, next step we can do:
+
+A concrete user story for “freelance designer onboarding”.
+
+Or a screen-by-screen wireframe description (like the Max UI but with your twist) that you can hand to a dev/designer.
+
+You said:
+Build on this idea further including minute details like customising/choosing their own welcome animation, profile settings, payment and work management , etc, and give me a ready instruction for giving it to cursor 
+ChatGPT said:
+
+Thought for 36s
+Here’s a ready-to-use prompt you can paste into Cursor. It describes the product in enough detail for it to start scaffolding the app:
+
+You are building a full-stack SaaS web application.
+
+PRODUCT NAME (placeholder): “PersonaLink” (you can keep it generic so it’s easy to rename later).
+
+CORE IDEA
+A platform where any service provider (designer, consultant, editor, coach, developer, employee/job-seeker, etc.) can create their own AI-powered profile chatbot. This AI:
+- Talks in their style
+- Shows their portfolio / work
+- Answers questions about their services
+- Qualifies leads
+- Schedules meetings
+- Handles payments for sessions and packages
+
+Users get a **single shareable link** (like /username) they can put on LinkedIn, Instagram, Twitter, CV, email signature, websites, etc.
+
+GENERAL TECH STACK (suggested)
+- Frontend: Next.js (App Router) + TypeScript + Tailwind CSS
+- Backend: Next.js API routes or dedicated backend in same repo
+- DB: PostgreSQL (via Prisma ORM)
+- Auth: Clerk / Auth.js / NextAuth (choose one standard solution)
+- Payments: Stripe integration (abstract so other providers can be added later)
+- File storage: simple (e.g., UploadThing / S3-like provider) for PDFs and images
+- AI: OpenAI-compatible LLM APIs with retrieval (vector DB: use pgvector or a managed vector DB, or a simple local embedding store)
+
+GOAL
+Implement an MVP but with a very polished UX, especially:
+- Full-page AI profile experience similar to “maxro.me”
+- Customizable welcome animation
+- Intuitive onboarding to create an AI profile
+- Simple work & payment management for creators
+
+========================
+HIGH-LEVEL FEATURES
+========================
+
+ROLES
+1. Creator (service provider)
+2. Visitor (prospective client / recruiter)
+3. Platform Admin
+
+CREATOR CAPABILITIES
+- Create and customize AI profile(s)
+- Configure welcome animation / avatar
+- Upload and manage knowledge (CV, portfolio, FAQs, services)
+- Set up schedule and availability
+- Define offerings (free intro call, paid sessions, project packages)
+- Connect payment provider and accept payments
+- See leads, conversations, bookings, and revenue
+- Basic work management (pipeline / status per lead)
+
+VISITOR CAPABILITIES
+- Open a creator’s AI profile via link
+- Chat with the AI
+- View portfolio / work cards
+- Answer qualifying questions
+- Book meeting(s)
+- Pay for sessions / packages
+- Leave contact info
+
+ADMIN CAPABILITIES (MVP)
+- View list of creators, active profiles, and usage
+- See overall metrics (total conversations, bookings, revenue)
+- Ability to disable abusive/spammy accounts
+
+========================
+DATABASE / DATA MODELS
+========================
+
+Design Prisma schema (or equivalent) for at least:
+
+User
+- id
+- name
+- email
+- image (avatar)
+- role: "CREATOR" | "ADMIN"
+- createdAt, updatedAt
+
+Profile (AI profile for a creator)
+- id
+- userId (FK to User)
+- slug (username / unique link)
+- displayName
+- headline (short tagline)
+- bio (longer description)
+- roleTemplate: enum (e.g., "DESIGNER", "CONSULTANT", "EDITOR", "COACH", "DEVELOPER", "JOB_SEEKER", "CUSTOM")
+- primaryGoal: enum (e.g., "BOOK_CALL", "HIRE_ME", "SHOW_PORTFOLIO", "COLLECT_LEADS")
+- language (e.g., "en", "hi", etc.)
+- timezone
+- themeColor (hex)
+- animationStyleId (FK to WelcomeAnimationPreset, see below)
+- isPublic (boolean)
+- showInDirectory (boolean)
+- welcomeMessageOverride (optional custom greeting)
+- personalityConfig JSON (sliders/settings: tone, formality, answer length)
+- createdAt, updatedAt
+
+WelcomeAnimationPreset
+- id
+- name (e.g., "GlowOrb", "LiquidSphere", "SoftPulse")
+- description
+- config JSON (colors, speed, size, etc.)
+- isDefault (boolean)
+
+ProfileDocument
+- id
+- profileId
+- type: enum ("CV", "PORTFOLIO", "CASE_STUDY", "FAQ", "OTHER")
+- title
+- sourceType: enum ("UPLOAD", "URL", "TEXT")
+- url (if from link)
+- filePath (if uploaded)
+- rawText (for pasted text)
+- embeddingMetadata (optional JSON for reference)
+- createdAt, updatedAt
+
+ServiceOffering
+- id
+- profileId
+- name (e.g., "30-min Intro Call", "1-hour Design Consultation", "Landing Page Design Package")
+- description
+- priceCents
+- currency
+- isFree (boolean)
+- durationMinutes
+- isActive
+- isRecurring (for later subscriptions)
+- maxBookingsPerDay (optional)
+- createdAt, updatedAt
+
+Booking
+- id
+- profileId
+- visitorId (nullable; optional if visitor not registered)
+- visitorName
+- visitorEmail
+- serviceOfferingId
+- startTime (datetime)
+- endTime (datetime)
+- status: enum("PENDING_PAYMENT", "CONFIRMED", "CANCELLED", "COMPLETED")
+- paymentId (optional FK to Payment)
+- metadata JSON (for answers to qualifying questions)
+- createdAt, updatedAt
+
+Payment
+- id
+- profileId
+- bookingId
+- amountCents
+- currency
+- status: enum("PENDING", "PAID", "FAILED", "REFUNDED")
+- provider: enum("STRIPE")
+- providerPaymentId
+- createdAt, updatedAt
+
+Conversation
+- id
+- profileId
+- visitorId (nullable)
+- visitorName (optional)
+- visitorEmail (optional)
+- startedAt, endedAt
+- source: enum("PROFILE_PAGE", "EMBED_WIDGET")
+- leadStatus: enum("NEW", "QUALIFIED", "CONTACTED", "BOOKED", "LOST")
+- notes (for creator to add)
+- lastMessageAt
+
+Message
+- id
+- conversationId
+- senderType: enum("VISITOR", "AI", "CREATOR")
+- text
+- role (for AI context: "system" | "user" | "assistant", but store as text)
+- createdAt
+
+VisitorLead
+- id
+- profileId
+- conversationId (nullable)
+- name
+- email
+- company (optional)
+- budgetRange (optional string)
+- status: enum("NEW", "IN_DISCUSSION", "BOOKED", "ARCHIVED")
+- tags (string array or JSON)
+- createdAt, updatedAt
+
+AdminSettings (optional table for platform-wide config)
+- id
+- key
+- value JSON
+
+========================
+KEY EXPERIENCE FLOWS
+========================
+
+1. CREATOR ONBOARDING FLOW
+- Step 1: Sign up / log in with email or OAuth.
+- Step 2: “What do you do?” Select role template.
+- Step 3: Basic profile info:
+  - Name, headline, short bio, language, timezone
+- Step 4: Choose welcome animation:
+  - Show 3–5 presets using the WelcomeAnimationPreset table.
+  - Each preset is a simple animated orb-like element with different color schemes and motion.
+- Step 5: Add content:
+  - Upload CV or portfolio (pdf/doc)
+  - Paste some text (“About me”, “How I work”)
+  - Add service descriptions (name, price, duration)
+- Step 6: Setup actions:
+  - Choose primary goal: (Book a call, Show portfolio, Collect leads)
+  - Connect calendar (for MVP just ask them to enter availability windows; later integrate with Google Calendar)
+  - Connect payments (Stripe onboarding link)
+- Step 7: Preview AI profile:
+  - Show full-page profile with orb animation, greeting, and chat.
+  - Provide copyable profile URL.
+
+2. VISITOR PROFILE EXPERIENCE
+Profile page layout (full screen, mobile-friendly):
+- Background: dark gradient or minimalist color.
+- Center: animated orb (welcome animation) with subtle glow.
+- Text: “I am [Name]’s AI. What are you here for?”
+- Quick action chips/buttons:
+  - “See portfolio”
+  - “Discuss a project”
+  - “Ask about rates”
+  - “Book a call”
+- Below / side panel: chat window.
+- Chat behavior:
+  - Start with quick question: “Are you a recruiter, a potential client, or just exploring?”
+  - Based on selection, load specific conversation instructions.
+  - AI can show portfolio cards:
+    - Title, brief description, thumbnail image.
+  - AI can suggest a CTA:
+    - E.g., “Want to book a 30-min intro call?” and call a booking API route to fetch time slots.
+- Show a floating button or clear section for:
+  - “View services & pricing”
+  - “Book a session”
+
+3. BOOKING & PAYMENT FLOW
+- From chat or from services list, visitor chooses an offering.
+- They see available time slots (simple algorithm based on creator’s availability and timezone).
+- Visitor fills in short form:
+  - Name, email, optional message.
+- If offering is paid:
+  - Redirect to Stripe Checkout.
+  - On success, mark Payment as PAID and Booking status as CONFIRMED.
+- Send:
+  - Email confirmation to visitor.
+  - Email / notification to creator.
+- Display success state + “Add to calendar” button (ICS file or link).
+
+4. CREATOR DASHBOARD
+Pages in the dashboard:
+
+/dashboard/overview
+- Metrics: total conversations, leads, bookings, revenue.
+- Graph over time.
+- “Most asked questions” (based on aggregated conversation messages).
+
+/dashboard/profile
+- Edit profile info: name, headline, bio, language, timezone.
+- Choose welcome animation preset.
+- Theme color picker.
+- Toggle: “Show in public directory”.
+- Preview profile link.
+
+/dashboard/content
+- Manage documents:
+  - List of ProfileDocuments.
+  - Add / upload new document.
+  - Re-ingest or delete documents.
+- Manage FAQ entries:
+  - Q&A pairs that will be added to knowledge base.
+- Manage portfolio items:
+  - Title, description, link, image thumbnail.
+
+(Portfolio items can either be a separate table or a subset of ProfileDocument with type "CASE_STUDY".)
+
+/dashboard/services
+- CRUD for ServiceOffering:
+  - Name, description, price, currency, duration, active toggle, isFree.
+  - Sorting order.
+
+ /dashboard/calendar
+- Simple availability settings:
+  - Days of week + time ranges.
+  - Minimum notice time (e.g., 24 hours).
+- List upcoming bookings with status.
+- Ability to change booking status, add notes, or cancel.
+
+/dashboard/leads
+- List of VisitorLead records.
+- Columns: name, email, source (conversation/booking), status, createdAt.
+- Filter by status and by profile (if multiple profiles later).
+- Ability to open a lead, see associated conversation transcript and bookings.
+- Simple pipeline view (like a Kanban board) using lead status.
+
+/dashboard/conversations
+- List of Conversation records.
+- For each: createdAt, lastMessageAt, visitor info (if provided), leadStatus.
+- Clicking opens full transcript.
+- Allow creator to:
+  - Add notes.
+  - Change lead status.
+  - Trigger manual email (MVP: just copy an email template).
+
+/dashboard/payments
+- Table: date, visitor name, service, amount, status.
+- Link to Stripe dashboard for details.
+
+5. ADMIN AREA
+- /admin (protected)
+- View list of users, profiles, total conversations, and revenue.
+- Toggle: suspend profile or user if needed.
+
+========================
+AI INTEGRATION DETAILS
+========================
+
+For each profile, create a **system prompt** at runtime built from:
+- Creator role template (designer, consultant, etc.)
+- Profile bio and headline.
+- Primary goal (what the AI should optimize for).
+- Personality config (tone, formality, verbosity).
+- Instructions about booking, payments, and lead collection.
+
+For retrieval:
+- Use embeddings over ProfileDocument and FAQ/portfolio text.
+- Implement a simple RAG loop:
+  - Retrieve top-N relevant chunks.
+  - Include them into the LLM context on each answer.
+
+Conversation handling:
+- Store every message in DB (Message table).
+- Maintain a trimmed history (e.g., last N messages) for context.
+- Implement server-side streaming responses if possible for smoother UX.
+
+AI should be instructed to:
+1. Introduce itself as “[Name]’s AI assistant”.
+2. Ask at least 1–2 questions to understand visitor’s goal.
+3. If conversation qualifies as a good lead, explicitly suggest booking a session.
+4. If visitor expresses clear interest, call dedicated booking endpoints (through UI triggers) rather than purely text instructions.
+5. Always collect name + email if visitor is serious, and ensure a Lead is created.
+
+========================
+WELCOME ANIMATION DETAILS
+========================
+
+Create a reusable component: `<WelcomeOrb />` (or similarly named).
+
+Requirements:
+- Supports different presets via props or config:
+  - colorPrimary, colorSecondary, glowIntensity, movementSpeed, size.
+- Animations can be done via CSS animations or canvas/WebGL, but keep MVP simple:
+  - A circular gradient with smooth blob-like movement and subtle glow.
+- Use WelcomeAnimationPreset config to control visual styles.
+- On the profile settings page, show:
+  - A grid of previews of each preset.
+  - Click to select; highlight active preset.
+- Ensure animations are performant on mobile (no heavy computations).
+
+========================
+UX NOTES / POLISH
+========================
+
+- Mobile-first layouts for profile pages.
+- Dark theme by default; allow themeColor accent for each profile.
+- Provide “Copy link” button in dashboard for profile URL.
+- Provide basic SEO:
+  - Each profile has: `<title>{displayName} – AI Profile</title>`.
+  - Meta description from headline/bio.
+- Add simple cookie/consent banner if needed.
+
+========================
+IMPLEMENTATION PRIORITIES (MVP ORDER)
+========================
+
+1. Auth + basic dashboard layout.
+2. Models and migrations.
+3. Creator onboarding: create first Profile with basic fields.
+4. Public profile page with animation + chat (no scheduling/payments yet).
+5. Knowledge ingestion (documents + FAQs) and RAG-based AI chat.
+6. Service offerings + basic booking (without payment).
+7. Stripe integration for paid offerings.
+8. Leads, conversations, and simple Kanban pipeline.
+9. Creator analytics overview.
+10. Admin panel basics.
+
+Please scaffold this project structure, generate the necessary Next.js pages, Tailwind components, Prisma schema, and basic API route handlers for the flows above. Start with a working MVP where:
+- A creator can sign up, create a profile, choose a welcome animation, add some content, and get a shareable AI link.
+- A visitor can chat on that page, have the AI read the profile content, and submit their email as a lead.
+Then iterate to add booking and payments.
+If you want, next step I can help you break this into concrete tasks/issues (like a roadmap) you can paste into Cursor or a project board.
+
+You said:
+yes go ahead
+ChatGPT said:
+
+Thought for 18s
+Nice, let’s turn this into something Cursor can actually execute on.
+
+Below is a task / issue roadmap you can paste into Cursor (or a project board).
+You can either paste the whole thing as context, or copy individual sections as you go.
+
+0. Global project setup
+TASK 0.1 – Bootstrap project
+
+Create a new full-stack SaaS app with:
+
+Next.js (App Router) + TypeScript
+
+Tailwind CSS
+
+Prisma + PostgreSQL
+
+Auth (NextAuth or Clerk – choose one and wire it for email + OAuth)
+
+Basic /dashboard layout for authenticated users and a simple public / landing page.
+
+TASK 0.2 – Configure tooling
+
+Add:
+
+ESLint + Prettier
+
+Env var handling (.env template for DB URL, OpenAI key, Stripe key, etc.)
+
+Simple README explaining how to run migrations, dev server, and how to set envs.
+
+1. Data layer (Prisma schema + migrations)
+TASK 1.1 – Implement Prisma schema
+
+Implement the Prisma schema for:
+
+User
+
+Profile
+
+WelcomeAnimationPreset
+
+ProfileDocument
+
+ServiceOffering
+
+Booking
+
+Payment
+
+Conversation
+
+Message
+
+VisitorLead
+
+(optional) AdminSettings
+
+Use the fields and enums from the previous big specification.
+After schema definition, generate the client and create the initial migration.
+
+TASK 1.2 – Seed basic data
+
+Create a Prisma seed script that:
+
+Creates a few WelcomeAnimationPreset entries (GlowOrb, SoftPulse, LiquidSphere, etc.) with config JSON.
+
+Optionally creates a demo user + profile for local testing.
+
+2. Auth + dashboard shell
+TASK 2.1 – Implement Auth
+
+Wire auth library:
+
+Sign up / sign in page.
+
+Protect all /dashboard/* routes.
+
+Make User records automatically created/linked on first login.
+
+TASK 2.2 – Dashboard layout
+
+Create a main dashboard shell with:
+
+Sidebar nav: Overview, Profile, Content, Services, Calendar, Leads, Conversations, Payments, Settings.
+
+Top bar showing user name & avatar.
+
+Responsive design (mobile/desktop).
+
+3. Creator onboarding flow
+TASK 3.1 – Onboarding wizard UI
+
+Build /onboarding for first-time creators:
+Steps:
+
+Role selection (Designer / Consultant / Editor / Coach / Developer / Job-seeker / Custom).
+
+Basic profile info (name from auth, headline, bio, language, timezone).
+
+Choose welcome animation (pull presets from DB and show previews).
+
+Add one or more ServiceOffering items.
+
+Optionally upload a CV/portfolio document.
+
+Choose primary goal (book call / show portfolio / collect leads).
+
+On completion:
+
+Create a Profile record tied to the user.
+
+Redirect to /dashboard/overview.
+
+TASK 3.2 – “First-run” checks
+
+If a user has no profile and tries to visit /dashboard/*, redirect them to /onboarding.
+
+4. Welcome animation system
+TASK 4.1 – WelcomeOrb component
+
+Implement a <WelcomeOrb /> (or similar) React component that:
+
+Accepts props: size, colorPrimary, colorSecondary, glowIntensity, movementSpeed, etc.
+
+Uses CSS/Framer Motion to render a smooth, blob-like orb with subtle movement and glow.
+
+Is performant on mobile.
+
+TASK 4.2 – Animation presets integration
+
+Create a helper that maps a WelcomeAnimationPreset record’s config JSON → <WelcomeOrb /> props.
+
+In dashboard profile settings, render all presets in a grid, each showing its orb preview and name.
+
+Allow clicking a preset to set profile.animationStyleId.
+
+5. Profile settings & public profile page
+TASK 5.1 – Dashboard: Profile editor
+
+Implement /dashboard/profile:
+
+Editable fields: displayName, headline, bio, language, timezone, themeColor, showInDirectory.
+
+Welcome animation selector (from Task 4.2).
+
+Preview section that shows how the public page will look (mini version).
+
+TASK 5.2 – Public profile route
+
+Create dynamic route /[slug]:
+
+Loads Profile by slug and associated user.
+
+Layout:
+
+Full-screen, mobile-first, dark background.
+
+Center/top: <WelcomeOrb />.
+
+Text: “I am {displayName}’s AI. What are you here for?”
+
+Quick-action chips (buttons): “See portfolio”, “Discuss a project”, “Ask about rates”, “Book a call”.
+
+Chat window below / side.
+
+If profile not found or not public, show appropriate error page.
+
+6. Content / knowledge ingestion (RAG)
+TASK 6.1 – Content management UI
+
+Implement /dashboard/content:
+
+Tabs / sections:
+
+“Documents” (CV, portfolio PDFs, etc.).
+
+“FAQs” (simple Q&A pairs).
+
+(Later) “Portfolio items”.
+
+CRUD:
+
+Upload files (PDF/doc/text) and save as ProfileDocument.
+
+For FAQs: simple fields (question, answer).
+
+TASK 6.2 – Parsing and embedding pipeline
+
+Implement backend utilities to:
+
+Extract text from uploaded files.
+
+Chunk text into segments.
+
+Generate embeddings (via OpenAI-compatible embeddings API).
+
+Store text + metadata (chunk id, doc id) in:
+
+Either pgvector inside PostgreSQL, or a dedicated vector store.
+
+Provide a function getRelevantChunks(profileId, query) that returns top-N relevant chunks.
+
+TASK 6.3 – FAQ & portfolio text ingestion
+
+FAQs: store them as text chunks as well (question + answer).
+
+(Optional) Portfolio items: treat as case-study text embedded similarly.
+
+7. AI chat backend & UI
+TASK 7.1 – System prompt builder
+
+Implement a function buildProfileSystemPrompt(profileId) that:
+
+Fetches profile, user, role template, primary goal, and personality config.
+
+Constructs a stable system message defining:
+
+Who the AI is (e.g., “You are Shubham’s AI assistant…”).
+
+What it should optimize for (book a call, show portfolio, etc.).
+
+Tone and style.
+
+Rules: collect name/email for serious leads, offer booking when appropriate, never pretend to be the real person, etc.
+
+TASK 7.2 – Chat API route
+
+Implement a streaming chat API:
+
+Input: profileId or slug, conversationId (optional), latest user message, quick-action intent (optional).
+
+Process:
+
+Load conversation history (limited window).
+
+Retrieve relevant chunks using getRelevantChunks.
+
+Build messages array: system prompt + context + history + user message.
+
+Call LLM with streaming.
+
+Output:
+
+Stream assistant message chunks.
+
+On completion, persist Conversation and Message records.
+
+TASK 7.3 – Chat UI component
+
+On the public profile page:
+
+Implement chat UI with:
+
+Scrollable messages.
+
+Typing indicator.
+
+Streaming response display.
+
+Show quick-action chips that send seeded prompts like:
+
+“Show me your portfolio.”
+
+“Tell me about your pricing.”
+
+“I want to book a call.”
+
+Ensure messages are stored as they’re sent/received.
+
+8. Lead capture & basic work management
+TASK 8.1 – Lead creation from chat
+
+When AI detects a serious interest (for now, trigger manually from UI:
+
+A small button “Mark as lead” or a “Share your details” form), create a VisitorLead:
+
+Fields: name, email, optional company, budgetRange, profileId, linked conversationId.
+
+Add a simple “Share your contact” mini-form in the chat UI that the AI can suggest and the user can fill.
+
+TASK 8.2 – Leads dashboard
+
+Implement /dashboard/leads:
+
+Table view: name, email, status, createdAt, last interaction.
+
+Filter by status (NEW, IN_DISCUSSION, BOOKED, ARCHIVED).
+
+Detail view:
+
+Show notes, link to conversation transcript, associated bookings.
+
+Allow editing status and notes.
+
+TASK 8.3 – Simple pipeline / Kanban view
+
+Optional but nice:
+
+A board-style view with columns for each lead status.
+
+Drag & drop leads between columns to change status.
+
+9. Services, scheduling & bookings
+TASK 9.1 – Service offerings management
+
+Implement /dashboard/services:
+
+CRUD UI for ServiceOffering.
+
+Fields: name, description, price, currency, duration, isFree, isActive, maxBookingsPerDay.
+
+Toggle active/inactive.
+
+TASK 9.2 – Availability settings
+
+Implement /dashboard/calendar basic availability:
+
+For MVP: static availability:
+
+For each weekday: list of time ranges (e.g., Monday 10:00–13:00, 16:00–19:00).
+
+Store as JSON on Profile or a dedicated availability table.
+
+Helper function to compute available time slots given:
+
+profile availability, existing bookings, and visitor timezone.
+
+TASK 9.3 – Booking API + UI
+
+Backend:
+
+API to create a Booking with status PENDING_PAYMENT or CONFIRMED (for free).
+
+Validate time slot is available.
+
+Frontend:
+
+On public profile page, show:
+
+“Services & pricing” section listing ServiceOfferings.
+
+When visitor chooses one, open a booking modal:
+
+Select date/time from computed slots.
+
+Enter name + email + short message.
+
+On success:
+
+Show confirmation page / modal.
+
+Link booking to a lead + conversation where possible.
+
+10. Payments integration
+TASK 10.1 – Stripe setup
+
+Configure Stripe keys and webhook handling.
+
+Create a backend function to generate a Stripe Checkout Session for:
+
+A given Booking + ServiceOffering.
+
+Redirect visitor to Stripe Checkout and handle success/cancel.
+
+TASK 10.2 – Payment webhook handling
+
+On payment success:
+
+Update Payment record: status → PAID.
+
+Mark associated Booking as CONFIRMED.
+
+Trigger confirmation emails (to both visitor and creator).
+
+Optionally generate calendar event (for now, create ICS link).
+
+TASK 10.3 – Payments dashboard
+
+Implement /dashboard/payments:
+
+Table of all Payments for creator’s profile(s).
+
+Columns: date, visitor name/email, service, amount, status, providerPaymentId.
+
+Link out to Stripe dashboard.
+
+11. Conversations & analytics
+TASK 11.1 – Conversations dashboard
+
+Implement /dashboard/conversations:
+
+List of Conversation records:
+
+Columns: startedAt, lastMessageAt, visitor info, leadStatus, source.
+
+Detail view:
+
+Full transcript (Messages).
+
+Option to add notes or change leadStatus.
+
+TASK 11.2 – Overview analytics
+
+Implement /dashboard/overview:
+
+Cards:
+
+Total conversations (last 30 days).
+
+New leads.
+
+Bookings.
+
+Revenue.
+
+Simple charts:
+
+Conversations over time.
+
+Conversion funnel: conversations → leads → bookings.
+
+“Top questions” list:
+
+Aggregate frequent visitor queries (basic keyword/extraction for MVP).
+
+12. Admin area
+TASK 12.1 – Admin role & guard
+
+Extend User model so some users have role = "ADMIN".
+
+Protect routes under /admin to admin only.
+
+TASK 12.2 – Admin dashboard
+
+Implement /admin:
+
+List all users and profiles.
+
+Columns: user email, role, #profiles, #conversations, total revenue.
+
+Action: suspend a profile (set isPublic = false).
+
+13. Polish & growth features
+These can be later issues, but list them now:
+
+Public directory page: /discover
+
+Filter by role (Designer, Consultant, etc.).
+
+Shows cards for profiles with showInDirectory = true.
+
+SEO improvements for profile pages:
+
+Proper titles, meta descriptions, OG tags.
+
+Multi-language support:
+
+Allow profile language + dynamic translation of UI strings.
+
+Basic email notifications:
+
+New lead, new booking, payment received.
+
+If you’d like, I can now write individual “micro-prompts” for Cursor, e.g.:
+
+“Generate Prisma schema code for these models.”
+
+“Create the /[slug] profile page component with this layout.”
+
+…so you can copy–paste them one by one while you build.
+
+You said:
+generate full workflow with /
+ChatGPT said:
+Got you — I’ll lay this out as a full workflow spec using URL-style paths so you can drop it straight into Cursor as a reference for routing, pages and APIs.
+
+You can paste everything below into a workflow.md or into a Cursor prompt.
+
+FULL APP WORKFLOW (ROUTES + FLOWS)
+
+/ = Landing
+/auth/* = Auth
+/onboarding/* = Creator onboarding
+/dashboard/* = Creator dashboard
+/[slug] = Public AI profile (visitor view)
+/api/* = Backend APIs
+/admin/* = Admin
+
+================================================
+1. PUBLIC + AUTH ROUTES
+================================================
+
+/ 
+- Public marketing site.
+- Sections:
+  - Hero: “Create your AI twin link in minutes.”
+  - How it works: 3 steps.
+  - For creators: designers, consultants, editors, job-seekers.
+  - Pricing.
+  - CTA buttons → /auth/signin or /auth/signup.
+
+/auth/signin
+- Sign in with email + OAuth.
+- After success:
+  - If user has NO profile → redirect /onboarding
+  - Else → redirect /dashboard/overview
+
+/auth/signup
+- Same UI as signin, but explicit copy for “Create your AI profile”.
+- After success → /onboarding
+
+/auth/callback/*
+- Provider callbacks (handled by auth library).
+- On completion, same logic as above.
+
+================================================
+2. CREATOR ONBOARDING FLOW
+================================================
+
+Entry points:
+- /onboarding (only accessible when logged in, first-time users)
+- If user hits /dashboard/* with no profile → redirect /onboarding
+
+/onboarding
+- Stepper wrapper (client component).
+- Internally can be segmented logically as:
+
+/onboarding/role
+- Question: “What best describes you?”
+- Options: Designer / Consultant / Editor / Coach / Developer / Job-seeker / Other
+- Save selected roleTemplate to temp state (and later Profile.roleTemplate).
+- Button: Continue → /onboarding/profile
+
+/onboarding/profile
+- Fields:
+  - displayName (prefilled from User)
+  - headline
+  - short bio
+  - language (dropdown)
+  - timezone (auto-detect but editable)
+- Button: Continue → /onboarding/animation
+
+/onboarding/animation
+- Fetch presets from DB.
+- Show grid of WelcomeOrb previews.
+- Click to select one (highlighted).
+- Button: Continue → /onboarding/services
+
+/onboarding/services
+- Create 1–3 starter `ServiceOffering`s inline:
+  - name, description, isFree toggle, price, currency, durationMinutes.
+- Ability to “Skip for now”.
+- Button: Continue → /onboarding/content
+
+/onboarding/content
+- Optional:
+  - Upload CV/portfolio file.
+  - Paste “About me / How I work” text.
+- Button: Continue → /onboarding/goal
+
+/onboarding/goal
+- Primary goal radio:
+  - BOOK_CALL
+  - HIRE_ME (project)
+  - SHOW_PORTFOLIO
+  - COLLECT_LEADS
+- CTA: “Finish & create my AI profile”.
+- On submit:
+  - POST → /api/onboarding/complete (see API section).
+  - Creates `Profile`, `ServiceOffering`s, `ProfileDocument`s.
+  - Redirect: /dashboard/overview
+
+================================================
+3. CREATOR DASHBOARD ROUTES
+================================================
+
+Authenticated routes; redirect to /auth/signin if not logged in.
+
+/dashboard
+- Redirect → /dashboard/overview
+
+/dashboard/overview
+- Cards:
+  - “Conversations (last 30 days)”
+  - “New leads”
+  - “Bookings”
+  - “Revenue”
+- Simple chart: conversations over time.
+- List of latest 5 conversations + 5 leads.
+
+/dashboard/profile
+- Profile settings:
+  - displayName
+  - headline
+  - bio
+  - language
+  - timezone
+  - primaryGoal
+  - themeColor picker
+  - showInDirectory (toggle)
+- Animation section:
+  - List animation presets (using /api/profile/animations).
+  - Select and save to profile.animationStyleId.
+- Public link:
+  - `https://app.com/{slug}` + “Copy link” button.
+- Live preview card showing how /[slug] looks.
+
+/dashboard/content
+- Tabs:
+
+  /dashboard/content/documents
+  - List `ProfileDocument`s.
+  - “Upload document” → file upload → /api/profile/documents/upload
+  - Show status: “Processing / Embedded / Failed”.
+  - Ability to delete.
+
+  /dashboard/content/faqs
+  - Manage FAQs (Q, A pairs).
+  - CRUD; on save, also write to embedding store.
+
+  /dashboard/content/portfolio (optional)
+  - List of portfolio items:
+    - Title, short summary, external link, image.
+  - CRUD; text available to AI as case-study chunks.
+
+/dashboard/services
+- List `ServiceOffering`s.
+- New / Edit modal:
+  - name
+  - description
+  - priceCents, currency
+  - isFree
+  - durationMinutes
+  - maxBookingsPerDay
+  - isActive toggle.
+
+/dashboard/calendar
+- Availability settings:
+  - For each weekday: on/off + one or more time ranges.
+  - Min notice hours.
+- Upcoming bookings list (future `Booking`s).
+  - Show visitorName, serviceOffering.name, startTime, status.
+  - Actions: mark CANCELLED / COMPLETED.
+
+/dashboard/leads
+- Two views: Table + Kanban.
+
+  Table:
+  - Columns: name, email, status, createdAt, source, tags.
+  - Filters by status.
+
+  Detail view: /dashboard/leads/[id]
+  - Show lead info, notes, tags.
+  - Linked conversation(s).
+  - Linked bookings.
+  - Change status dropdown.
+
+  Kanban:
+  - Columns for NEW, IN_DISCUSSION, BOOKED, ARCHIVED.
+  - Drag-and-drop to change lead.status.
+
+/dashboard/conversations
+- Table:
+  - Columns: createdAt, lastMessageAt, visitorName/email (if known), leadStatus, source.
+- Row click → /dashboard/conversations/[id]
+  - Full transcript of Messages.
+  - Timeline, with roles (VISITOR / AI / CREATOR).
+  - Add notes.
+  - Quick actions:
+    - “Create/Update lead” (opens lead side panel).
+    - “Set lead status”.
+
+/dashboard/bookings
+- Or integrate into `/dashboard/calendar` as tab.
+- Table:
+  - visitorName, service, startTime, status, paymentStatus.
+
+/dashboard/payments
+- Table:
+  - createdAt, amount, currency, status, providerPaymentId.
+  - Links to Stripe dashboard.
+
+/dashboard/settings
+- Account / billing / plan info (future).
+- Toggle email notifications.
+- Delete account (non-MVP).
+
+================================================
+4. PUBLIC VISITOR ROUTES
+================================================
+
+/[slug]
+- Main AI profile page for a creator.
+- Flow:
+
+Section: Hero
+- Center:
+  - `<WelcomeOrb />` using profile.animationStyleId + themeColor.
+- Text:
+  - “I am {displayName}’s AI.”
+  - “How can I help you today?”
+- Quick-action chips (buttons triggering different starter prompts):
+  - “See portfolio”
+  - “Discuss a project”
+  - “Ask about rates”
+  - “Book a call”
+- Chat container component at bottom / on side.
+
+Chat experience:
+- On load:
+  - Show AI greeting message using /api/chat (with a special ‘welcome’ flag) or inline.
+- On user message:
+  - POST → /api/chat
+  - Stream assistant response.
+- AI can request UI actions via simple codes in response metadata (or parse text):
+  - Show portfolio cards.
+  - Open booking modal for a given service.
+  - Show lead form.
+
+Other sections on /[slug] (below or behind tabs):
+- “Services & pricing” list using `ServiceOffering`s.
+- “Selected work” using portfolio items.
+- “About {displayName}” showing headline + bio.
+
+Booking UX from /[slug]:
+- Clicking “Book a call” or “Book” on a service:
+  - Opens `/[slug]/book?service=SERVICE_ID` as modal OR keeps route and opens inline modal.
+  - Inside modal:
+    - Step 1: Pick date & slot (GET → /api/booking/slots).
+    - Step 2: Enter name, email, message.
+    - Step 3:
+      - If service is free:
+        - POST → /api/booking/create (status CONFIRMED).
+      - If paid:
+        - POST → /api/booking/create (status PENDING_PAYMENT) → redirect to Stripe via /api/payment/checkout.
+
+===============================================
+5. BOOKING CONFIRMATION & PAYMENT RETURN ROUTES
+===============================================
+
+/[slug]/booking/success
+- Shown after payment success (Stripe redirect).
+- Query params: bookingId
+- Fetch booking via /api/booking/[id].
+- Show:
+  - “You’re booked!”
+  - summary: date, time, duration, service.
+  - “Add to calendar” (ICS download).
+- Optional: link back to /[slug].
+
+/[slug]/booking/cancel
+- Shown if payment was cancelled.
+- Offer to retry or change service.
+
+================================================
+6. ADMIN ROUTES
+================================================
+
+/admin
+- Only for users with role=ADMIN.
+- Overview: total users, profiles, conversations, revenue.
+
+/admin/users
+- Table of users.
+- Columns: email, createdAt, role, numProfiles, lastLogin.
+- Row → /admin/users/[id]
+  - Show: user data, list of profiles, a “suspend user” action.
+
+/admin/profiles
+- Table:
+  - profile slug, owner email, isPublic, showInDirectory, conversations count, revenue.
+- Row → /admin/profiles/[id]
+  - Toggle: isPublic (if abuse).
+  - View metrics.
+
+================================================
+7. API ROUTES (BACKEND)
+================================================
+
+NOTE: These are conceptual; actual path + HTTP verbs depend on your style (REST vs RPC). Below is REST-style with /api/*.
+
+/api/onboarding/complete  (POST)
+- Body: roleTemplate, profile fields, services, initial documents, primaryGoal.
+- Creates:
+  - Profile
+  - ServiceOffering(s)
+  - ProfileDocument(s)
+- Returns created Profile.
+
+/api/profile/me            (GET)
+- Return current user’s profile(s).
+
+/api/profile/update        (POST/PATCH)
+- Update editable profile fields.
+
+/api/profile/animations    (GET)
+- List `WelcomeAnimationPreset`s.
+
+/api/profile/documents/upload  (POST)
+- Multipart upload.
+- Create `ProfileDocument` with status “PENDING_PROCESSING”.
+- Kick off text extraction + embedding (can be queued or synced for MVP).
+
+/api/profile/documents/:id   (DELETE)
+- Delete document and its chunks from embedding store.
+
+/api/profile/faqs            (GET/POST/PATCH/DELETE)
+- CRUD for FAQ entries (store as their own table or inside ProfileDocument type “FAQ”).
+
+/api/services                (GET/POST)
+- GET: list ServiceOffering for current profile.
+- POST: create.
+
+/api/services/:id            (PATCH/DELETE)
+- Update / delete a service.
+
+/api/availability            (GET/POST)
+- GET: current availability config.
+- POST: update availability JSON or records.
+
+/api/booking/slots           (POST or GET)
+- Input: serviceId, date range, visitorTimezone.
+- Output: list of available time slots.
+
+/api/booking/create          (POST)
+- Input:
+  - profileId, serviceOfferingId, slotStart, visitorName, visitorEmail, message.
+- Logic:
+  - Create Booking with status:
+    - CONFIRMED if service.isFree.
+    - PENDING_PAYMENT if paid.
+  - Create/attach VisitorLead if needed.
+  - If paid:
+    - Call /api/payment/checkout to create Stripe Checkout Session and return URL.
+
+/api/booking/:id             (GET/PATCH)
+- GET: show booking.
+- PATCH: update status (CANCELLED, COMPLETED).
+
+/api/payment/checkout        (POST)
+- Input: bookingId.
+- Output: Stripe Checkout URL.
+- Side-effect:
+  - Create Payment record with status PENDING.
+
+/api/payment/webhook         (POST)
+- Stripe webhook.
+- On successful charge:
+  - Find Payment by providerPaymentId.
+  - Set Payment.status = PAID.
+  - Set Booking.status = CONFIRMED.
+- On refund / failure: adjust accordingly.
+
+/api/chat                    (POST)
+- Input:
+  - profileSlug or profileId
+  - conversationId (optional)
+  - message: string
+  - intent (optional quick-action string)
+- Process:
+  - Load profile, system prompt, conversation history.
+  - Use RAG to fetch relevant chunks.
+  - Call LLM to generate streamed response.
+  - Save Conversation + Message records.
+- Output:
+  - Streamed assistant message (or full text plus metadata).
+
+/api/leads                   (GET/POST)
+- GET: list leads for creator’s profile(s).
+- POST: create new lead (e.g., from chat lead form).
+
+/api/leads/:id               (PATCH/DELETE)
+- Update status, notes, tags or delete.
+
+/api/conversations           (GET)
+- List conversations for creator’s profile(s).
+
+/api/conversations/:id       (GET/PATCH)
+- GET: messages + metadata.
+- PATCH: update leadStatus, add notes, etc.
+
+/api/admin/users             (GET)
+- Admin-only list of users.
+
+/api/admin/users/:id         (PATCH)
+- Change role, suspend, etc.
+
+/api/admin/profiles          (GET)
+- Admin-only list of profiles + metrics.
+
+/api/admin/profiles/:id      (PATCH)
+- Toggle isPublic, showInDirectory, etc.
+
+================================================
+8. HIGH-LEVEL FLOWS (END-TO-END)
+================================================
+
+FLOW A: New creator
+1. Visit `/` → clicks “Get started” → `/auth/signup`.
+2. Sign up → redirected `/onboarding`.
+3. Completes steps `/onboarding/*` → POST `/api/onboarding/complete`.
+4. Redirect `/dashboard/overview`.
+5. Copies profile link from `/dashboard/profile` → shares `/[slug]` in social/CV.
+
+FLOW B: Visitor → Chat → Lead → Booking → Payment
+1. Visitor clicks `/[slug]`.
+2. Sees WelcomeOrb, greeting, quick-action chips.
+3. Starts chatting (calls `/api/chat` repeatedly).
+4. AI suggests booking; visitor clicks “Book a call”.
+5. Booking modal → GET `/api/booking/slots` → choose slot.
+6. Submit form → POST `/api/booking/create`.
+   - If paid:
+     - Response includes redirect URL from `/api/payment/checkout`.
+     - Visitor pays → Stripe → redirect `/[slug]/booking/success?bookingId=...`.
+   - If free:
+     - Goes directly to success page.
+7. webhook `/api/payment/webhook` marks Payment + Booking as confirmed.
+8. Lead & conversation linked; creator sees new booking in `/dashboard/calendar`, lead in `/dashboard/leads`.
+
+FLOW C: Creator managing pipeline
+1. Logs into `/dashboard/leads`.
+2. Filters NEW leads; opens one → sees conversation + booking.
+3. Changes lead status to IN_DISCUSSION or BOOKED.
+4. Adds notes and tags.
+5. Uses `/dashboard/conversations` to review transcripts and refine FAQs.
+
+FLOW D: Admin moderation
+1. Admin logs in, goes `/admin`.
+2. Checks `/admin/profiles` for abuse/spam.
+3. If necessary, sets profile.isPublic = false via `/admin/profiles/:id`.
+4. Can downgrade or suspend user via `/admin/users/:id`.
+
+You can now:
+
+Drop this entire block into Cursor as project context,
+
+Or copy specific sections (e.g. “implement /[slug] flow according to workflow.md”).
+
+If you want, next step I can turn one route (for example /[slug] page + chat UI) into concrete React/Next code you can use as a starting point.
+
+You said:
+Uploaded image
+Uploaded image
+Uploaded image
+Uploaded image
+Uploaded image
+Uploaded image
+Uploaded image
+here are some new screenshots
+based on these you can think and write how the application will work in frontend 
+ChatGPT said:
+
+Thought for 33s
+Nice, these screenshots help a lot. Let’s treat them as the reference and define how our frontend should behave so a dev (or Cursor) can almost directly implement it.
+
+I’ll describe it like a product / UI spec, not just vibes.
+
+1. Overall layout
+Desktop
+
+Split layout:
+
+Left side (~35–40% width): chat + quick reply stack.
+
+Right side (~60–65% width): big “content viewer” surface (CV, projects, images, etc.).
+
+The right side opens as a floating, rounded modal over a subtle background grid, with:
+
+Title at top (“Work Experience”, “Max’s Projects”, etc.).
+
+Multiple sections inside (cards, text, images, tags, etc.).
+
+A close button (X) top-left.
+
+Optional selector on top-right (e.g. CV dropdown or menu icon).
+
+Mobile
+
+Primary view is the chat panel full-screen.
+
+When a big viewer (CV/project) opens, it becomes a full-screen slide-up panel that overlays the chat and can be closed to go back.
+
+2. Core UI objects
+We basically have three “layers”:
+
+Messages layer (chat bubbles).
+
+Quick actions layer (stacked suggestion chips).
+
+Topic cards & content viewers (big right-side panels).
+
+Conceptually:
+
+Topic = Work Experience, Projects, Case Study X, etc.
+
+Card = small clickable bubble in the chat that opens a topic.
+
+Viewer = large panel showing the full topic (CV, gallery, etc.).
+
+3. Chat panel behavior
+3.1 Components
+<ChatPanel />
+
+<MessageList />
+
+<QuickReplyStack />
+
+<TopicContextInput /> (input + current topic chip)
+
+Message types
+
+User message
+
+AI reply
+
+System / status (optional)
+
+“Action” messages that contain a card (e.g. “Max’s Work Experience”).
+
+Each message can include:
+
+type ChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  createdAt: string;
+  actions?: QuickAction[];        // “Show me Max’s projects”
+  topicCards?: TopicCardSummary[]; // “Max’s Work Experience”, “Max’s Projects”
+};
+3.2 Input at the bottom
+Standard input, but with a topic chip above it when a viewer is open:
+
+e.g. [ Work Experience ] Tell me more about ...
+
+When the topic chip exists, we send this context to backend as currentTopic.
+
+User can still “Switch to another topic” via a stacked quick reply, which:
+
+Clears currentTopic.
+
+Closes viewer.
+
+Re-renders generic quick replies (“Show CV”, “Show projects”, etc.).
+
+4. Quick reply stack (the “3D cards”)
+From screenshots:
+
+Every AI reply shows vertical stack of 3–4 suggestion cards.
+
+Each card:
+
+Has a small chat icon.
+
+Shows a natural language sentence (“Show me Max’s projects.”).
+
+On hover: slight lift and glow.
+
+On click: behaves like sending that text as a new user prompt.
+
+We can model them as:
+
+type QuickAction = {
+  id: string;
+  label: string;          // UI text
+  payload: string;        // prompt to send
+  topicId?: string;       // optional topic context
+  variant?: 'primary' | 'ghost';
+};
+Rendering rules
+
+Only one stack visible per last assistant message.
+
+When user clicks an action:
+
+Animate the card as if it becomes a chat bubble (optional).
+
+Call the chat API with payload.
+
+Scroll to the bottom and show streaming response.
+
+Special action: “Switch to another topic.”
+
+Always available when a topic viewer is open.
+
+On click:
+
+currentTopic = null.
+
+Close viewer.
+
+Next AI message should propose high-level entry points (“Show work experience, projects, education…”).
+
+5. Topic cards in the chat
+Example: After you say “Show me Max’s CV”:
+
+AI responds with short summary + one “Max’s Work Experience” card.
+
+That card has:
+
+Title (“Max’s Work Experience”).
+
+Status tag on right (“Opened” when active).
+
+Arrow icon (>).
+
+Clicking it opens the large CV viewer on the right, AND sets:
+
+currentTopic = {
+  id: 'work_experience',
+  type: 'cv',
+  title: "Max's Work Experience",
+};
+In data:
+
+type TopicCardSummary = {
+  id: string;
+  label: string;
+  topicId: string;
+  state?: 'default' | 'opened';
+};
+UI-wise:
+
+Created as a compact, rounded rectangle.
+
+When state = 'opened':
+
+Show pill “Opened”.
+
+Card background slightly brighter.
+
+6. Right-side “content viewer” behavior
+6.1 Component structure
+Top-level:
+
+<ContentViewer /> or <TopicViewer /> mounted at page level.
+
+It receives currentTopic and content data.
+
+type CurrentTopic = {
+  id: string;        // e.g. 'work_experience', 'projects', 'project:xyz'
+  title: string;
+  kind: 'cv' | 'projects' | 'project_detail' | 'image_gallery';
+};
+Inside:
+
+<TopicViewer>
+  <TopicHeader />
+  <TopicBody />
+</TopicViewer>
+TopicHeader
+
+Left: Close button (X).
+
+Center: Title (“Work Experience”, “Max’s Projects”).
+
+Right:
+
+For CV: small pill “CV” + download icon.
+
+For project detail: overflow/menu icon to show sub-sections.
+
+TopicBody can switch:
+
+CV / Work experience
+
+Timeline of roles.
+
+Company tag on right (“Parloa” pill).
+
+Key achievements list.
+
+Dot grid background behind content.
+
+Projects list
+
+Big hero card (screenshot image).
+
+Title & company pill at bottom.
+
+Right side vertical dot navigation (as in screenshot) for multiple items.
+
+When vertical dots clicked, scroll to relevant project.
+
+Project detail
+
+Header with project title, year, tags (chips), company pill.
+
+Sections: “Why this project”, “What I did”, etc.
+
+Large images/boards inside a scrollable panel.
+
+Image-only viewer
+
+Like the Miro board screenshot:
+
+Large image centered, responsive.
+
+Title at top.
+
+Dark overlay background.
+
+6.2 Interaction rules
+When viewer is open:
+
+Chat is still scrollable on left.
+
+Quick replies adjust to the active topic (“Show Max’s projects”, “What are his achievements?” etc.).
+
+Input shows topic chip; anything user asks is interpreted as “within this topic” by backend.
+
+When user clicks X:
+
+currentTopic = null.
+
+Viewer unmounts with fade/slide animation.
+
+Input reverts to generic “Ask about …”.
+
+When a new topic card is clicked (e.g., “Max’s Projects”):
+
+Keep existing history.
+
+Replace currentTopic and viewer content.
+
+Add system-level AI reply summarizing the new topic.
+
+7. Projects flow
+From your screenshots:
+
+Recruiter: “Show me Max’s projects.”
+
+AI: replies with a summary + “Max’s Projects” card.
+
+Clicking the card:
+
+Opens projects gallery on the right:
+
+Large hero image + title “Creating a Studio for Conversational AI Agents”.
+
+Logo pill.
+
+On left chat, quick replies change:
+
+“How can I contact Max?”
+
+“Show Max’s design projects.”
+
+Topic context input: [ Projects ] Tell me more about ...
+
+If user asks to “show design project X”:
+
+AI responds with one project detail card.
+
+Clicking card opens that specific project in the viewer.
+
+Viewer scroll contains:
+
+Title, tags, year, company.
+
+Long text with bullet points.
+
+Screenshots.
+
+Further quick replies: “Dive into another topic”, “Show more projects”, etc.
+
+8. CV / Work experience flow
+Chat message: “Show me Max’s CV.”
+
+AI summarises the CV, then shows “Max’s Work Experience” card.
+
+On click:
+
+Viewer slides with:
+
+Title: “Work Experience”.
+
+A series of role sections:
+
+Role title (Principal Product Designer).
+
+Company pill, date range.
+
+Paragraph text.
+
+“Key achievements” bullet list.
+
+CV pill + download icon top-right (creates file download link).
+
+Quick replies now:
+
+“Show me Max’s projects.”
+
+“What are Max’s achievements?”
+
+“How did Max start?”
+
+“Switch to another topic.”
+
+9. State management sketch
+For front-end dev:
+
+Use a global store (Zustand / Redux / simple context) with:
+
+type UIState = {
+  messages: ChatMessage[];
+  quickActions: QuickAction[];
+  currentTopic: CurrentTopic | null;
+  viewerOpen: boolean;
+};
+Chat API responses must include:
+
+New assistant message.
+
+Next quickActions.
+
+Optional topicCards for that message.
+
+When user clicks:
+
+Quick action → send API request with its payload + maybe topicId.
+
+Topic card → set currentTopic and fetch topic content via /api/topic/:id.
+
+10. Frontend responsibilities vs backend
+Frontend
+
+Render chat log + stacked suggestions.
+
+Handle streaming UI.
+
+Manage currentTopic & open/close viewer.
+
+Fetch topic content (CV, projects, images) from REST endpoints or GraphQL.
+
+Apply animations & layout.
+
+Backend / AI
+
+Produce:
+
+Text response.
+
+Suggested quick actions.
+
+Which topic card(s) to show.
+
+Know how to use currentTopic to answer contextually.
+
+Knows what topic IDs correspond to (e.g., work_experience, projects, project:slug).
+
+If you want, I can now:
+
+Write an actual component tree + file structure for Next.js (app/[slug]/page.tsx, ChatPanel.tsx, TopicViewer.tsx, etc.),
+
+Or a Cursor prompt like “Generate a React component for <TopicViewer> based on this spec.”
+
+You said:
+this was just for designer, what about others?
+ChatGPT said:
+
+Thought for 30s
+Good catch – all the screenshots + flows we talked about look like a “designer CV”, but the frontend pattern should work for any role.
+
+Think of the UI as a generic conversation shell + pluggable topic viewers.
+Each profession just swaps in different topics + quick actions + viewer layouts.
+
+I’ll break it by:
+
+What stays the same for everyone
+
+How each role “skin” works on top: consultant, coach, editor, dev, job-seeker, etc.
+
+1. What’s common for everyone
+Same layout for all roles:
+
+Left: Chat + quick reply stack + topic cards
+
+Right: Big viewer surface (for CV, services, case study, doc, gallery, etc.)
+
+Common topic types (components):
+
+Profile Overview viewer
+
+Role summary, headline, key stats.
+
+Services / Offers viewer
+
+Cards for each paid/free service with pricing & CTA.
+
+Case Studies / Projects viewer
+
+Grid/list of projects or clients, openable to detail.
+
+Testimonials / Results viewer
+
+Quotes, metrics, logos.
+
+Process / Framework viewer
+
+Step-by-step timeline or diagram of “How I work”.
+
+Scheduling / Contact viewer
+
+Email/socials + inline booking form.
+
+Document viewer
+
+CV, proposal, PDF, Notion-export, etc.
+
+The chat just chooses which of these viewers to open and what quick replies to show.
+
+2. Consultants / Strategists
+Primary entry question in chat
+
+“Are you interested in my services, my client results, or how I work?”
+
+Default quick actions
+
+“Show me your services.”
+
+“Show me client results.”
+
+“Explain how you work with clients.”
+
+“Book a strategy call.”
+
+Key viewers
+
+Services viewer
+
+Layout: pricing cards.
+
+Each card:
+
+Name (“90-min Strategy Session”)
+
+Outcome bullets
+
+Price + duration
+
+“Book now” button.
+
+On click → booking modal on right or centered.
+
+Results / Case Studies viewer
+
+Cards with:
+
+Client type / industry
+
+Before → After metrics
+
+Short story.
+
+Quick replies under that:
+
+“Show me more in SaaS.”
+
+“Show me B2C examples.”
+
+Process / Framework viewer
+
+Timeline layout:
+
+Step 1: Discovery
+
+Step 2: Audit
+
+Step 3: Implementation
+
+Step 4: Review
+
+Each step collapsible; can show more details via quick replies.
+
+Contact / Next steps viewer
+
+Simple panel:
+
+Contact form
+
+Calendly-style calendar preview
+
+Social links.
+
+Role-specific tweak
+
+Topic chip might show [ Strategy & Consulting ] or [ Services ] when user is drilling down.
+
+The AI generates suggestions like:
+
+“Which of these packages matches you best?” → shows 3 service cards in chat.
+
+3. Coaches / Mentors
+Structurally very similar to consultants, but content types change.
+
+Quick actions
+
+“Show your coaching programs.”
+
+“What kind of people do you help?”
+
+“What results do your clients get?”
+
+“Can I book a discovery call?”
+
+Viewers
+
+Programs viewer
+
+Each card = program:
+
+Duration (8-week, 12-week)
+
+Format (1:1, group)
+
+Topics covered.
+
+CTAs: “Join waitlist”, “Book intro call”.
+
+Client Stories viewer
+
+Before/after narratives, not just metrics.
+
+Photos/avatars optional.
+
+Schedule viewer
+
+Light calendar view + time slots.
+
+Frameworks viewer
+
+Visual diagrams for methods, e.g., 3-step system, pillars, etc.
+
+Frontend difference
+
+Same components, but copy/labelling change:
+
+Tags like Program, Cohort, 1:1, rather than Project.
+
+4. Editors / Writers / Content people
+Here the star is before–after & samples.
+
+Quick actions
+
+“Show me your editing samples.”
+
+“What type of content do you edit?”
+
+“What’s your pricing?”
+
+“Can you handle my niche?”
+
+Viewers
+
+Samples viewer
+
+Vertical split layout:
+
+Left: “Before editing”
+
+Right: “After editing”
+
+Tabs at top:
+
+Blog, Script, Email, Academic, etc.
+
+Style Guide viewer
+
+Typography + tone guidelines (chips: “Concise”, “Story-driven”, etc.)
+
+Good for agencies/employers to see writing style.
+
+Services viewer
+
+Per-piece pricing or bundle pricing.
+
+Project detail viewer
+
+Long-form text with annotations (highlighted changes) or screenshots of documents.
+
+Chat tie-in
+
+When user says: “I have a 1k word article”, AI:
+
+Opens services viewer with relevant service highlighted.
+
+Quick reply: “Show similar work you’ve done.”
+
+5. Developers / Engineers / Tech freelancers
+Here it’s more repos, tech stack, shipped products.
+
+Quick actions
+
+“Show me your projects.”
+
+“What technologies do you work with?”
+
+“Show me your open-source work.”
+
+“What’s your hourly or project rate?”
+
+Viewers
+
+Tech Stack viewer
+
+Grid of tags: React, Node, Laravel, Python, etc.
+
+“Years of experience” or proficiency level.
+
+Projects viewer
+
+Cards:
+
+Screenshot, title.
+
+Tech stack tags.
+
+Role (solo dev, lead, contributor).
+
+Clicking → project detail viewer.
+
+Project detail viewer
+
+Sections:
+
+Problem
+
+Architecture overview (diagram image)
+
+Contributions
+
+Links (GitHub repo, live demo).
+
+Right side: timeline of commits or features.
+
+Employment history viewer
+
+Similar to designer’s work experience – roles at companies.
+
+Extra
+
+“API Docs / Code snippet viewer”:
+
+For devs who want to show sample code – small code block component with syntax highlighting.
+
+6. Job-seekers / Employees (the CV “AI twin”)
+This is closest to the designer CV you saw, but generic.
+
+Quick actions
+
+“Give me a quick overview of their profile.”
+
+“Walk me through work experience.”
+
+“Show me their skills.”
+
+“Any standout achievements?”
+
+“Would they fit a [role]?” (AI only, no viewer)
+
+Viewers
+
+Work Experience / CV viewer
+
+Exactly like the screenshot: roles stacked, key achievements bullet lists.
+
+Skills viewer
+
+Two sections:
+
+Hard skills (grouped by category).
+
+Soft skills.
+
+Levels via pill tags or progress bars.
+
+Projects viewer
+
+For personal / school / hackathon work.
+
+Education / Certificates viewer
+
+Timeline with logos, degrees, certifications.
+
+Frontend twist
+
+For recruiters, you show a special quick action:
+
+“Summarize their fit for [ROLE]” → only chat response (no viewer) but with structured bullets.
+
+7. Agencies / Teams (multiple people)
+Same shell, but with people selector.
+
+Quick actions
+
+“Talk to the design lead.”
+
+“Show me your engineering team.”
+
+“Show your best recent projects.”
+
+Viewers
+
+Team viewer
+
+Grid of team members (mini cards).
+
+Click a person → switch currentProfile while staying in same chat session or open sub-viewer.
+
+Agency projects viewer
+
+Aggregate case studies, not per-person.
+
+Frontend:
+
+In /[slug], top-right you might get a dropdown:
+
+[ Agency AI ] vs [ Alice – Design ], [ Bob – Engineering ].
+
+Changing that reloads system prompt but keeps UI same.
+
+8. How frontend decides what to show
+From perspective of dev:
+
+Each Profile has a roleTemplate:
+
+'DESIGNER' | 'CONSULTANT' | 'COACH' | 'EDITOR' | 'DEV' | 'JOB_SEEKER' | 'AGENCY' | 'CUSTOM'
+
+On frontend, you map that to:
+
+const TEMPLATE_CONFIG = {
+  DESIGNER: {
+    defaultTopics: ['overview', 'work_experience', 'projects'],
+    defaultQuickActions: [...],
+  },
+  CONSULTANT: {
+    defaultTopics: ['overview', 'services', 'results', 'process'],
+    ...
+  },
+  // etc.
+};
+Chat messages include suggested topic IDs and quick actions.
+
+Topic viewer reads currentTopic.kind and profile role to choose which layout to render:
+
+kind = 'services' → <ServicesViewer />
+
+kind = 'projects' → <ProjectsViewer />
+
+kind = 'cv' → <CVViewer />
+
+kind = 'before_after' → <BeforeAfterViewer /> (for editors)
+
+So you don’t hardcode “designer”; you just pass different props to the same set of UI building blocks.
+
+9. TL;DR for Cursor / dev
+The frontend is role-agnostic: same chat shell, same content viewer.
+Each profession = different topic configs + quick actions + viewer layouts:
+
+Designers & job-seekers → CV, projects, case studies.
+
+Consultants & coaches → services, results, process, programs.
+
+Editors → before/after samples, services, style guide.
+
+Developers → tech stack, repos, project architecture.
+
+Agencies → team viewer + case studies.
+
+All powered by:
+
+currentTopic state
+
+TopicViewer that switches layouts based on kind & roleTemplate
+
+AI deciding which topic to open + which quick action stack to show.
+
+If you want, I can now write a TopicViewer.tsx API design (props + union types) so implementing all these roles is straightforward.
+
+You said:
+this is the current task list of the IDE building this,
+do this needs anything else? what ai model we are using? where is that in task list?
+
+Task List - PersonaLink
+ 0. Global project setup
+0.1 Bootstrap project (Next.js, TS, Tailwind, Prisma, Auth)
+ 0.2 Configure tooling (ESLint, Prettier, Env vars)
+ 1. Data layer (Prisma schema + migrations)
+ 1.1 Implement Prisma schema
+ 1.2 Seed basic data
+ 2. Auth + dashboard shell
+ 2.1 Implement Auth
+ 2.2 Dashboard layout
+ 3. Creator onboarding flow
+ 3.1 Onboarding wizard UI
+ 3.2 "First-run" checks
+ 4. Welcome animation system
+ 4.1 WelcomeOrb component
+ 4.2 Animation presets integration
+ 5. Profile settings & public profile page
+ 5.1 Dashboard: Profile editor
+ 5.2 Public profile route
+ 6. Content / knowledge ingestion (RAG)
+ 6.1 Content management UI
+ 6.2 Parsing and embedding pipeline
+ 6.3 FAQ & portfolio text ingestion
+ 7. AI chat backend & UI
+ 7.1 System prompt builder
+ 7.2 Chat API route
+ 7.3 Chat UI component
+ 8. Lead capture & basic work management
+ 8.1 Lead creation from chat
+ 8.2 Leads dashboard
+ 8.3 Simple pipeline / Kanban view
+ 9. Services, scheduling & bookings
+ 9.1 Service offerings management
+ 9.2 Availability settings
+ 9.3 Booking API + UI
+ 10. Payments integration
+ 10.1 Stripe setup
+ 10.2 Payment webhook handling
+ 10.3 Payments dashboard
+ 11. Conversations & analytics
+ 11.1 Conversations dashboard
+ 11.2 Overview analytics
+ 12. Admin area
+ 12.1 Admin role & guard
+ 12.2 Admin dashboard
+ChatGPT said:
+
+Thought for 15s
+Good question – right now the task list is missing anything explicitly about the AI provider / model.
+It’s implied in:
+
+6.2 Parsing and embedding pipeline
+
+7.2 Chat API route
+
+…but nothing there says “use X model, wire API keys, choose embedding model, cost controls, etc.”
+
+1. What else you should add to the task list
+I’d bolt on a new section just for the AI stack + a tiny one for infra niceties.
+
+13. AI provider, models & abstraction
+13.1 Choose LLM + embedding models
+
+Decide provider (e.g. OpenAI).
+
+Choose:
+
+Chat/completion model – for example:
+
+gpt-4.1 (high quality) or
+
+gpt-4.1-mini / gpt-4o-mini (cheaper, good for most chats).
+
+Embedding model – e.g. text-embedding-3-large or text-embedding-3-small.
+
+Add env vars: OPENAI_API_KEY, OPENAI_API_BASE (or equivalent).
+
+13.2 AI client abstraction
+
+Create a small wrapper module, e.g. lib/aiClient.ts that exposes:
+
+chatWithProfile({ profileId, messages, currentTopic }): Promise<LLMResponse>
+embedText({ profileId, chunks }): Promise<Embedding[]>
+This keeps the rest of the app provider-agnostic if you ever switch to Anthropic, local, etc.
+
+13.3 Safety & cost controls
+
+Max tokens per call; truncate history.
+
+Basic input/output filters (no PII leaks, no policy-violating replies).
+
+Retry + backoff for rate limits.
+
+13.4 Prompt + behavior tests (lightweight)
+
+A few canned test conversations per role (designer, consultant, editor, dev).
+
+Dev script to run them and sanity-check responses after prompt changes.
+
+14. File storage & documents (tiny but important)
+You’re already ingesting docs in 6.x, but I’d make it explicit:
+
+14.1 File storage configuration
+
+Decide provider (S3 / Supabase / UploadThing).
+
+Wire upload + secure URLs.
+
+Clean up files on document delete.
+
+15. Notifications (MVP level)
+Even one simple thing:
+
+15.1 Email notifications
+
+On new booking / payment → email creator.
+
+On booking confirmation → email visitor.
+
+Use something like Resend / Postmark / SendGrid.
+
+2. Answering your direct questions
+What AI model are we using?
+
+Not defined yet in the task list.
+My concrete suggestion (for launch):
+
+Chat model (main brain):
+
+gpt-4.1 for best quality, or
+
+gpt-4.1-mini if you want cheaper, still solid responses.
+
+Embeddings model (for RAG):
+
+text-embedding-3-small for cost-effective general use.
+
+You can later allow per-profile model choice, but for now pick one global default.
+
+Where is that in the task list?
+
+Nowhere explicitly.
+It should live under a new “13. AI provider & models” section, and be referenced by:
+
+6.2 Parsing and embedding pipeline → uses the embedding model.
+
+7.2 Chat API route → uses the chat model through your aiClient.
+
+If you want, I can write a ready-to-paste Cursor prompt like:
+
+“Generate lib/aiClient.ts that wraps OpenAI chat + embeddings using these models and types…”
+
+so you can drop it straight into the repo.
+
+
+
+No file chosenNo file chosen
+ChatGPT can make mistakes. Check important info. See .
