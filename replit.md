@@ -69,7 +69,7 @@ cd aiclone && npx prisma db seed
 
 - Fixed cross-origin request blocking for Replit iframe environment (allowedDevOrigins config)
 - Fixed onboarding aura selection (seeded animation presets)
-- Added mobile responsiveness improvements
+- Dashboard mobile optimization: hamburger menu, slide-out Sheet-based sidebar, responsive breakpoints (hidden on mobile, visible on desktop)
 - Enhanced error handling with toast notifications
 - Fixed TypeScript issues in onboarding wizard
 
