@@ -7,7 +7,6 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { updateAvailability } from "@/app/actions/availability"
-// import { toast } from "sonner"
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
@@ -19,7 +18,6 @@ interface AvailabilitySettingsProps {
 export function AvailabilitySettings({ profileId, schedules }: AvailabilitySettingsProps) {
     const [isPending, startTransition] = useTransition()
 
-    // Initialize state with existing schedules or defaults
     const [localSchedules, setLocalSchedules] = useState(() => {
         return DAYS.map((day, index) => {
             const existing = schedules.find(s => s.dayOfWeek === index)
@@ -27,7 +25,7 @@ export function AvailabilitySettings({ profileId, schedules }: AvailabilitySetti
                 dayOfWeek: index,
                 startTime: existing?.startTime || "09:00",
                 endTime: existing?.endTime || "17:00",
-                isEnabled: existing ? existing.isEnabled : (index >= 1 && index <= 5) // Default M-F enabled
+                isEnabled: existing ? existing.isEnabled : (index >= 1 && index <= 5)
             }
         })
     })
@@ -50,20 +48,20 @@ export function AvailabilitySettings({ profileId, schedules }: AvailabilitySetti
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Availability</h2>
-                    <p className="text-muted-foreground">Set your weekly working hours.</p>
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Availability</h2>
+                    <p className="text-sm text-muted-foreground">Set your weekly working hours.</p>
                 </div>
-                <Button onClick={handleSave} disabled={isPending}>
+                <Button onClick={handleSave} disabled={isPending} className="w-full sm:w-auto">
                     {isPending ? "Saving..." : "Save Changes"}
                 </Button>
             </div>
 
             <div className="border rounded-lg divide-y">
                 {localSchedules.map((schedule, index) => (
-                    <div key={index} className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4 w-40">
+                    <div key={index} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="flex items-center gap-3 sm:gap-4 sm:w-40">
                             <Switch
                                 checked={schedule.isEnabled}
                                 onCheckedChange={(checked) => updateSchedule(index, { isEnabled: checked })}
@@ -74,23 +72,23 @@ export function AvailabilitySettings({ profileId, schedules }: AvailabilitySetti
                         </div>
 
                         {schedule.isEnabled ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 pl-10 sm:pl-0">
                                 <Input
                                     type="time"
-                                    className="w-32"
+                                    className="w-[120px] sm:w-32"
                                     value={schedule.startTime}
                                     onChange={(e) => updateSchedule(index, { startTime: e.target.value })}
                                 />
-                                <span className="text-muted-foreground">-</span>
+                                <span className="text-muted-foreground">to</span>
                                 <Input
                                     type="time"
-                                    className="w-32"
+                                    className="w-[120px] sm:w-32"
                                     value={schedule.endTime}
                                     onChange={(e) => updateSchedule(index, { endTime: e.target.value })}
                                 />
                             </div>
                         ) : (
-                            <div className="text-sm text-muted-foreground italic">Unavailable</div>
+                            <div className="text-sm text-muted-foreground italic pl-10 sm:pl-0">Unavailable</div>
                         )}
                     </div>
                 ))}

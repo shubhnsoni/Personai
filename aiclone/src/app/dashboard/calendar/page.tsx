@@ -25,11 +25,11 @@ export default async function DashboardCalendarPage() {
     const { BookingsList } = await import("@/components/dashboard/bookings-list")
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6 h-full flex flex-col">
+        <div className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 pt-4 sm:pt-6 h-full flex flex-col">
             <Tabs defaultValue="bookings" className="flex-1 flex flex-col space-y-4">
-                <TabsList>
-                    <TabsTrigger value="bookings">Bookings</TabsTrigger>
-                    <TabsTrigger value="availability">Availability</TabsTrigger>
+                <TabsList className="w-full sm:w-auto">
+                    <TabsTrigger value="bookings" className="flex-1 sm:flex-initial">Bookings</TabsTrigger>
+                    <TabsTrigger value="availability" className="flex-1 sm:flex-initial">Availability</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="bookings" className="flex-1 h-full">
