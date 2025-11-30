@@ -67,7 +67,12 @@ cd aiclone && npx prisma db seed
 
 ## Recent Changes
 
+- Fixed cross-origin request blocking for Replit iframe environment (allowedDevOrigins config)
 - Fixed onboarding aura selection (seeded animation presets)
 - Added mobile responsiveness improvements
 - Enhanced error handling with toast notifications
 - Fixed TypeScript issues in onboarding wizard
+
+## Development Notes
+
+The Next.js configuration includes `allowedDevOrigins` to allow cross-origin requests from the Replit proxy environment. This is required for client-side JavaScript to work properly when the app is viewed through the Replit webview.
