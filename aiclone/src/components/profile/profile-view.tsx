@@ -4,7 +4,7 @@ import { useState } from "react"
 import { ChatInterface } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"
 import { BookingModal } from "@/components/booking/booking-modal"
-import { X, Calendar, DollarSign, Briefcase, User } from "lucide-react"
+import { X, Calendar, DollarSign, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ProfileViewProps {
@@ -78,6 +78,22 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                 "flex-1 flex flex-col h-full relative z-10 transition-all duration-500 ease-in-out",
                 activeContent ? "lg:w-[40%] lg:flex-none" : "w-full"
             )}>
+                {!activeContent && (
+                    <div className="absolute top-4 right-4 z-30 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
+                        <QuickActionChip 
+                            icon={<User className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                            label="About"
+                            onClick={() => setActiveContent("about")}
+                        />
+                        <QuickActionChip 
+                            icon={<Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                            label="Book"
+                            onClick={() => setIsBookingOpen(true)}
+                            highlighted
+                        />
+                    </div>
+                )}
+
                 <div className="flex-1 w-full mx-auto relative">
                     <ChatInterface
                         profile={profile}
@@ -93,30 +109,12 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                         ]}
                     />
 
-                    {!activeContent && (
+                    {!activeContent && activeServices.length > 0 && (
                         <div className="absolute bottom-28 left-2 right-2 sm:left-4 sm:right-4 flex flex-wrap justify-center gap-1.5 sm:gap-2 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
                             <QuickActionChip 
-                                icon={<User className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                                label="About"
-                                onClick={() => setActiveContent("about")}
-                            />
-                            <QuickActionChip 
-                                icon={<Briefcase className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                                label="Experience"
-                                onClick={() => setActiveContent("experience")}
-                            />
-                            {activeServices.length > 0 && (
-                                <QuickActionChip 
-                                    icon={<DollarSign className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                                    label="Services"
-                                    onClick={() => setActiveContent("services")}
-                                />
-                            )}
-                            <QuickActionChip 
-                                icon={<Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                                label="Book"
-                                onClick={() => setIsBookingOpen(true)}
-                                highlighted
+                                icon={<DollarSign className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                                label="Services"
+                                onClick={() => setActiveContent("services")}
                             />
                         </div>
                     )}
