@@ -274,15 +274,10 @@ export function ChatInterface({
                 })}
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black via-black/80 to-transparent pt-32 safe-bottom">
+            <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black via-black/80 to-transparent pt-16 safe-bottom">
                 <div className="max-w-3xl mx-auto relative w-full flex flex-col gap-2 sm:gap-3">
                     {hasStarted && !isLoading && (
-                        <div className={cn(
-                            "transition-all duration-300 ease-in-out",
-                            isPanelOpen
-                                ? "absolute bottom-full mb-4 left-0 right-0 flex flex-col items-center group/stack"
-                                : "flex gap-2 overflow-x-auto pb-2 mask-fade-right scrollbar-custom-horizontal"
-                        )}>
+                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                             {[
                                 `How did ${profile.displayName} start his career?`,
                                 `What are ${profile.displayName}'s main achievements?`,
@@ -291,16 +286,7 @@ export function ChatInterface({
                                 <button
                                     key={i}
                                     onClick={() => handleSubmit(undefined, suggestion)}
-                                    className={cn(
-                                        "whitespace-nowrap px-4 py-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700 transition-all shadow-sm backdrop-blur-sm",
-                                        isPanelOpen && "absolute bottom-0 w-full max-w-sm origin-bottom transition-all duration-300 ease-out shadow-xl",
-                                        isPanelOpen && i === 0 && "z-30 scale-100 translate-y-0 group-hover/stack:-translate-y-[88px]",
-                                        isPanelOpen && i === 1 && "z-20 scale-[0.98] -translate-y-[8px] group-hover/stack:-translate-y-[44px] group-hover/stack:scale-100",
-                                        isPanelOpen && i === 2 && "z-10 scale-[0.96] -translate-y-[16px] group-hover/stack:translate-y-0 group-hover/stack:scale-100"
-                                    )}
-                                    style={isPanelOpen ? {
-                                        transitionDelay: `${i * 50}ms`
-                                    } : {}}
+                                    className="whitespace-nowrap px-4 py-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700 transition-all shadow-sm backdrop-blur-sm"
                                 >
                                     <span className="mr-1.5">💬</span> {suggestion}
                                 </button>
@@ -328,9 +314,6 @@ export function ChatInterface({
                             <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" />
                         </Button>
                     </form>
-                    <div className="text-center">
-                        <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-medium">Powered by PersonaLink</p>
-                    </div>
                 </div>
             </div>
         </div>
