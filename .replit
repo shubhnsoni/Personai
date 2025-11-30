@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "postgresql-16"]
+modules = ["nodejs-20"]
 [nix]
 channel = "stable-25_05"
 packages = ["unzip"]
@@ -38,6 +38,10 @@ externalPort = 80
 [[ports]]
 localPort = 36635
 externalPort = 3001
+
+[[ports]]
+localPort = 43427
+externalPort = 3002
 
 [[ports]]
 localPort = 43743
