@@ -94,7 +94,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                     </div>
                 )}
 
-                <div className="flex-1 w-full mx-auto relative">
+                <div className="flex-1 w-full mx-auto relative h-full overflow-hidden">
                     <ChatInterface
                         profile={profile}
                         colors={colors}
