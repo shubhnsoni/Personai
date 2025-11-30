@@ -1,61 +1,45 @@
 "use client"
-import { useState, useRef, useEffect } from "react"
-import { useChat } from "@ai-sdk/react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Send, ArrowUp, ChevronRight, Sparkles } from "lucide-react"
+import { ArrowUp, ChevronRight, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { WelcomeOrb } from "@/components/welcome-orb"
 
+interface ChatMessage {
+    id: string
+    role: "user" | "assistant"
+    content: string
+}
+
 interface ChatInterfaceProps {
-    profile: any
+    profile: {
+        id: string
+        displayName: string
+        welcomeMessageOverride?: string | null
+    }
     welcome?: React.ReactNode
     quickQuestions?: string[]
     onShowContent?: (type: "about" | "experience" | "projects") => void
     colors?: string[]
-    animationConfig?: any
+    animationConfig?: { speed?: number; intensity?: number }
     isPanelOpen?: boolean
 }
 
-function TypingEffect({ text }: { text: string }) {
-    const [displayedText, setDisplayedText] = useState("")
-    const [isComplete, setIsComplete] = useState(false)
-
-    useEffect(() => {
-        let index = 0
-        const interval = setInterval(() => {
-            setDisplayedText((prev) => {
-                if (index >= text.length) {
-                    clearInterval(interval)
-                    setIsComplete(true)
-                    return text
-                }
-                const nextChar = text.charAt(index)
-                index++
-                return prev + nextChar
-            })
-        }, 15) // Adjust speed here
-
-        return () => clearInterval(interval)
-    }, [text])
-
-    return (
-        <span>
-            {displayedText}
-            {!isComplete && <span className="animate-pulse">|</span>}
-        </span>
-    )
-}
-
-export function ChatInterface({ profile, welcome, quickQuestions = [], onShowContent, colors = [], animationConfig = {}, isPanelOpen = false }: ChatInterfaceProps) {
-    const { messages = [], setMessages, isLoading } = useChat({
-        api: "/api/chat",
-        body: { profileId: profile.id },
-        onError: (e) => console.error("Chat error:", e)
-    })
-
+export function ChatInterface({ 
+    profile, 
+    quickQuestions = [], 
+    onShowContent, 
+    colors = [], 
+    animationConfig = {}, 
+    isPanelOpen = false 
+}: ChatInterfaceProps) {
+    const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState("")
+    const [isLoading, setIsLoading] = useState(false)
+    const [conversationId, setConversationId] = useState<string | null>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
+    const abortControllerRef = useRef<AbortController | null>(null)
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -63,8 +47,7 @@ export function ChatInterface({ profile, welcome, quickQuestions = [], onShowCon
         }
     }, [messages, isLoading])
 
-    // Detect content triggers in AI messages
-    const getRichContent = (content: string) => {
+    const getRichContent = (content: string): "experience" | "projects" | "about" | null => {
         const lower = content.toLowerCase()
         if (lower.includes("experience") || lower.includes("work history")) return "experience"
         if (lower.includes("project") || lower.includes("portfolio")) return "projects"
@@ -72,56 +55,111 @@ export function ChatInterface({ profile, welcome, quickQuestions = [], onShowCon
         return null
     }
 
-    const handleSubmit = async (e?: React.FormEvent, overrideInput?: string) => {
+    const sendMessage = useCallback(async (messageContent: string) => {
+        if (!messageContent.trim() || isLoading) return
+
+        abortControllerRef.current?.abort()
+        abortControllerRef.current = new AbortController()
+
+        const userMessage: ChatMessage = {
+            id: Date.now().toString(),
+            role: "user",
+            content: messageContent
+        }
+
+        const newMessages = [...messages, userMessage]
+        setMessages(newMessages)
+        setInput("")
+        setIsLoading(true)
+
+        const assistantMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: ""
+        }
+
+        setMessages([...newMessages, assistantMessage])
+
+        try {
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+                    profileId: profile.id,
+                    conversationId
+                }),
+                signal: abortControllerRef.current.signal
+            })
+
+            if (!response.ok) throw new Error("Chat request failed")
+
+            const newConversationId = response.headers.get("X-Conversation-Id")
+            if (newConversationId && !conversationId) {
+                setConversationId(newConversationId)
+            }
+
+            const reader = response.body?.getReader()
+            if (!reader) throw new Error("No response body")
+
+            const decoder = new TextDecoder()
+            let fullContent = ""
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const chunk = decoder.decode(value, { stream: true })
+                const lines = chunk.split("\n").filter(Boolean)
+
+                for (const line of lines) {
+                    if (line.startsWith('0:"')) {
+                        const content = line.slice(3, -1)
+                            .replace(/\\n/g, "\n")
+                            .replace(/\\"/g, '"')
+                        fullContent += content
+
+                        setMessages(prev => {
+                            const updated = [...prev]
+                            const lastIdx = updated.length - 1
+                            if (updated[lastIdx]?.role === "assistant") {
+                                updated[lastIdx] = { ...updated[lastIdx], content: fullContent }
+                            }
+                            return updated
+                        })
+                    }
+                }
+            }
+        } catch (error) {
+            if ((error as Error).name === "AbortError") return
+            console.error("Chat error:", error)
+            
+            setMessages(prev => {
+                const updated = [...prev]
+                const lastIdx = updated.length - 1
+                if (updated[lastIdx]?.role === "assistant" && !updated[lastIdx].content) {
+                    updated[lastIdx] = { 
+                        ...updated[lastIdx], 
+                        content: "I'm having trouble responding right now. Please try again." 
+                    }
+                }
+                return updated
+            })
+        } finally {
+            setIsLoading(false)
+        }
+    }, [messages, profile.id, conversationId, isLoading])
+
+    const handleSubmit = (e?: React.FormEvent, overrideInput?: string) => {
         e?.preventDefault()
         const messageToSend = overrideInput || input
-        if (!messageToSend.trim()) return
-
-        setInput("")
-
-        // Create user message object
-        const userMsg = {
-            id: Date.now().toString(),
-            role: 'user' as const,
-            content: messageToSend
-        }
-
-        // Optimistically update UI with user message
-        const currentMessages = [...messages, userMsg]
-        setMessages(currentMessages)
-
-        // Frontend Mock Logic for Demo
-        const lower = messageToSend.toLowerCase()
-        let mockResponse = ""
-
-        if (lower.includes("work") || lower.includes("history") || lower.includes("experience")) {
-            mockResponse = `Here is ${profile.displayName}'s work experience. He has worked at Parloa as a Principal Product Designer and founded his own agency, SomethingCreative.`
-        } else if (lower.includes("project") || lower.includes("design") || lower.includes("portfolio")) {
-            mockResponse = `Here are some of ${profile.displayName}'s design projects. He focuses on AI interfaces, conversational agents, and clean UX design.`
-        } else if (lower.includes("who") || lower.includes("about")) {
-            mockResponse = `${profile.displayName} is a Product Designer and Engineer based in Berlin. He loves building beautiful software that feels good to use.`
-        } else if (lower.includes("book") || lower.includes("call")) {
-            mockResponse = "I'd love to chat! You can book a call with me directly."
-        }
-
-        if (mockResponse) {
-            // Simulate network delay then append AI message
-            setTimeout(() => {
-                const aiMsg = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'assistant' as const,
-                    content: mockResponse
-                }
-                setMessages([...currentMessages, aiMsg])
-            }, 600)
-        }
+        sendMessage(messageToSend)
     }
 
     const hasStarted = messages.length > 0
 
     return (
         <div className="flex flex-col h-full w-full max-w-4xl mx-auto relative">
-            {/* Small Header (Visible when chat has started) */}
             {hasStarted && (
                 <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center gap-3 bg-black/20 backdrop-blur-sm border-b border-white/5 animate-in fade-in slide-in-from-top-2 duration-500">
                     <div className="relative w-8 h-8">
@@ -196,16 +234,17 @@ export function ChatInterface({ profile, welcome, quickQuestions = [], onShowCon
                                         ? "bg-zinc-800 text-white rounded-2xl rounded-br-sm shadow-md"
                                         : "text-zinc-300"
                                 )}>
-                                    {isUser ? (
-                                        m.content
-                                    ) : (
-                                        <TypingEffect text={m.content} />
+                                    {m.content || (
+                                        <span className="flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
+                                        </span>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Rich Content Card */}
-                            {richContentType && onShowContent && (
+                            {richContentType && onShowContent && m.content && (
                                 <div className="ml-11 w-full max-w-sm animate-in fade-in slide-in-from-bottom-3 duration-700 delay-300">
                                     <button
                                         onClick={() => onShowContent(richContentType)}
@@ -228,24 +267,10 @@ export function ChatInterface({ profile, welcome, quickQuestions = [], onShowCon
                         </div>
                     )
                 })}
-
-                {isLoading && (
-                    <div className="flex justify-start animate-in fade-in">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mr-3 shrink-0 shadow-lg shadow-purple-500/20 opacity-70">
-                            <Sparkles className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex items-center gap-1 h-10 px-2">
-                            <span className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                            <span className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                            <span className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce"></span>
-                        </div>
-                    </div>
-                )}
             </div>
 
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent pt-32">
                 <div className="max-w-3xl mx-auto relative w-full flex flex-col gap-3">
-                    {/* Suggestions */}
                     {hasStarted && !isLoading && (
                         <div className={cn(
                             "transition-all duration-300 ease-in-out",
@@ -287,6 +312,7 @@ export function ChatInterface({ profile, welcome, quickQuestions = [], onShowCon
                             onChange={(e) => setInput(e.target.value)}
                             placeholder={`Tell me more about...`}
                             className="w-full h-14 pl-6 pr-14 rounded-full bg-zinc-900/80 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 shadow-2xl backdrop-blur-xl focus-visible:ring-1 focus-visible:ring-purple-500/50 focus-visible:border-purple-500/50 transition-all text-base"
+                            disabled={isLoading}
                         />
                         <Button
                             size="icon"

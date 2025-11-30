@@ -1,42 +1,93 @@
 "use client"
 
 import NextImage from "next/image"
-import { X, Download, ArrowUp, ArrowDown } from "lucide-react"
+import { X, Download, ArrowUp, ArrowDown, Clock, DollarSign, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { motion, AnimatePresence } from "framer-motion"
 import { useState } from "react"
+import { cn } from "@/lib/utils"
 
 interface ContentPanelProps {
     isOpen: boolean
     onClose: () => void
-    type: "about" | "experience" | "projects" | null
-    data: any
+    type: "about" | "experience" | "projects" | "services" | null
+    data: {
+        displayName: string
+        headline: string | null
+        bio: string | null
+        contentDisplayMode?: string
+        workExperiences: Array<{
+            id: string
+            company: string
+            role: string
+            startDate: string
+            endDate: string | null
+            description: string | null
+            achievements: string | null
+        }>
+        projects: Array<{
+            id: string
+            title: string
+            description: string | null
+            client: string | null
+            year: string | null
+            imageUrl: string | null
+            link: string | null
+        }>
+        serviceOfferings: Array<{
+            id: string
+            name: string
+            description: string | null
+            priceCents: number
+            isFree: boolean
+            durationMinutes: number
+            isActive: boolean
+        }>
+    }
+    onBookService?: (serviceId: string) => void
 }
 
-export function ContentPanel({ isOpen, onClose, type, data }: ContentPanelProps) {
-    const mode = data.contentDisplayMode || "POPUP"
+export function ContentPanel({ isOpen, onClose, type, data, onBookService }: ContentPanelProps) {
+    const mode = data.contentDisplayMode || "SIDE_PANEL"
+
+    const getTitle = () => {
+        switch (type) {
+            case "experience": return "Work Experience"
+            case "projects": return "Projects"
+            case "about": return `About ${data.displayName}`
+            case "services": return "Services & Pricing"
+            default: return ""
+        }
+    }
 
     const content = (
         <div className="flex-1 relative h-full flex flex-col">
-            {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-zinc-800 bg-zinc-950/50 backdrop-blur-md z-10">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-zinc-800 bg-black/20 backdrop-blur-sm text-white">
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={onClose} 
+                        className="rounded-full hover:bg-zinc-800 bg-black/20 backdrop-blur-sm text-white"
+                    >
                         <X className="h-5 w-5" />
                     </Button>
-                    <h2 className="text-xl font-semibold capitalize text-white drop-shadow-md">{type}</h2>
+                    <h2 className="text-xl font-semibold text-white drop-shadow-md">{getTitle()}</h2>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="gap-2 rounded-full bg-black/20 backdrop-blur-sm border-white/10 text-white hover:bg-white/10 hover:text-white">
+                {type === "experience" && (
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2 rounded-full bg-black/20 backdrop-blur-sm border-white/10 text-white hover:bg-white/10 hover:text-white"
+                    >
                         <Download className="h-4 w-4" />
                         <span className="hidden sm:inline">Download CV</span>
                     </Button>
-                </div>
+                )}
             </div>
 
-            {/* Body */}
             <div className="flex-1 relative overflow-hidden">
                 {type === "experience" && (
                     <ScrollArea className="h-full p-6">
@@ -50,6 +101,13 @@ export function ContentPanel({ isOpen, onClose, type, data }: ContentPanelProps)
                     <ScrollArea className="h-full p-6">
                         <div className="max-w-3xl mx-auto space-y-8 pb-20">
                             <AboutView data={data} />
+                        </div>
+                    </ScrollArea>
+                )}
+                {type === "services" && (
+                    <ScrollArea className="h-full p-6">
+                        <div className="max-w-3xl mx-auto space-y-6 pb-20">
+                            <ServicesView data={data} onBook={onBookService} />
                         </div>
                     </ScrollArea>
                 )}
@@ -67,12 +125,11 @@ export function ContentPanel({ isOpen, onClose, type, data }: ContentPanelProps)
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: "100%", opacity: 0 }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed inset-y-0 right-0 w-full lg:w-1/2 bg-zinc-950 border-l border-zinc-800 shadow-2xl z-50 flex flex-col"
+                            className="fixed inset-y-0 right-0 w-full lg:w-[60%] bg-zinc-950 border-l border-zinc-800 shadow-2xl z-50 flex flex-col"
                         >
                             {content}
                         </motion.div>
                     ) : (
-                        // Popup Mode
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -97,120 +154,134 @@ export function ContentPanel({ isOpen, onClose, type, data }: ContentPanelProps)
     )
 }
 
-function ExperienceView({ data }: { data: any }) {
-    // Use real data if available, otherwise mock for demo/fallback
-    const experiences = data.workExperiences && data.workExperiences.length > 0
+function ExperienceView({ data }: { data: ContentPanelProps["data"] }) {
+    const experiences = data.workExperiences.length > 0
         ? data.workExperiences
         : [
             {
+                id: "mock-1",
                 role: "Principal Product Designer",
                 company: "Parloa",
-                period: "2022–Present",
+                startDate: "2022",
+                endDate: null,
                 description: "Leading design for AI conversational agents. Helped secure Series A, B, and C funding.",
-                achievements: [
+                achievements: JSON.stringify([
                     "Led design of two 0-1 products driving €20M+ revenue",
                     "Created company-wide design system",
                     "Hired and mentored 3 product designers"
-                ]
+                ])
             },
             {
+                id: "mock-2",
                 role: "Co-Founder & Lead Designer",
                 company: "SomethingCreative",
-                period: "2018–2022",
+                startDate: "2018",
+                endDate: "2022",
                 description: "Founded a full-service design agency working with early-stage startups.",
-                achievements: [
+                achievements: JSON.stringify([
                     "Scaled agency to 15 employees",
                     "Delivered 50+ successful client projects",
                     "Won Awwwards Site of the Day"
-                ]
+                ])
             }
         ]
 
     return (
         <div className="space-y-12">
-            {experiences.map((exp: any, i: number) => (
-                <div key={i} className="relative pl-8 border-l border-zinc-800 space-y-4">
-                    <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-purple-500 ring-4 ring-zinc-950" />
+            {experiences.map((exp, i) => {
+                let achievements: string[] = []
+                if (exp.achievements) {
+                    try {
+                        achievements = JSON.parse(exp.achievements)
+                    } catch {
+                        achievements = [exp.achievements]
+                    }
+                }
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                            <h3 className="text-xl font-bold">{exp.role}</h3>
-                            <div className="text-zinc-400 flex items-center gap-2">
-                                <span className="font-medium text-zinc-300">{exp.company}</span>
-                                <span>•</span>
-                                <span>{exp.period || (exp.startDate + (exp.endDate ? ` - ${exp.endDate}` : " - Present"))}</span>
+                return (
+                    <div key={exp.id || i} className="relative pl-8 border-l border-zinc-800 space-y-4">
+                        <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-purple-500 ring-4 ring-zinc-950" />
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <h3 className="text-xl font-bold">{exp.role}</h3>
+                                <div className="text-zinc-400 flex items-center gap-2">
+                                    <span className="font-medium text-zinc-300">{exp.company}</span>
+                                    <span>·</span>
+                                    <span>{exp.startDate} - {exp.endDate || "Present"}</span>
+                                </div>
                             </div>
+                            <Badge variant="secondary" className="w-fit bg-zinc-800 text-zinc-300 hover:bg-zinc-700">
+                                {exp.company}
+                            </Badge>
                         </div>
-                        <Badge variant="secondary" className="w-fit bg-zinc-800 text-zinc-300 hover:bg-zinc-700">
-                            {exp.company}
-                        </Badge>
-                    </div>
 
-                    <p className="text-zinc-400 leading-relaxed">
-                        {exp.description}
-                    </p>
+                        {exp.description && (
+                            <p className="text-zinc-400 leading-relaxed">{exp.description}</p>
+                        )}
 
-                    <div className="space-y-3">
-                        {/* Only show achievements if it's an array (mock) or if we parse it from string (real) */}
-                        {(Array.isArray(exp.achievements) || typeof exp.achievements === 'string') && (
-                            <>
+                        {achievements.length > 0 && (
+                            <div className="space-y-3">
                                 <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider">Key Achievements</h4>
                                 <ul className="space-y-2">
-                                    {(Array.isArray(exp.achievements) ? exp.achievements : (exp.achievements ? [exp.achievements] : [])).map((achievement: string, j: number) => (
+                                    {achievements.map((achievement, j) => (
                                         <li key={j} className="flex items-start gap-3 text-zinc-300 text-sm">
                                             <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
                                             {achievement}
                                         </li>
                                     ))}
                                 </ul>
-                            </>
+                            </div>
                         )}
                     </div>
-                </div>
-            ))}
+                )
+            })}
         </div>
     )
 }
 
-function ProjectsView({ data }: { data: any }) {
+function ProjectsView({ data }: { data: ContentPanelProps["data"] }) {
     const [currentIndex, setCurrentIndex] = useState(0)
     const [showDetail, setShowDetail] = useState(false)
 
-    const projects = data.projects && data.projects.length > 0
+    const projects = data.projects.length > 0
         ? data.projects
         : [
             {
-                id: 1,
+                id: "mock-1",
                 title: "Creating a Studio for Conversational AI Agents",
                 client: "Parloa",
                 year: "2024",
                 description: "A comprehensive design system and studio environment for building complex AI agents.",
-                image: "/placeholder-project-1.jpg"
+                imageUrl: null,
+                link: null
             },
             {
-                id: 2,
+                id: "mock-2",
                 title: "Reimagining E-Commerce Checkout",
                 client: "Shopify",
                 year: "2023",
                 description: "Streamlining the checkout process to increase conversion rates by 15%.",
-                image: "/placeholder-project-2.jpg"
+                imageUrl: null,
+                link: null
             },
             {
-                id: 3,
+                id: "mock-3",
                 title: "Financial Dashboard for Startups",
                 client: "FinTech Co",
                 year: "2022",
                 description: "Visualizing complex financial data in an intuitive and actionable dashboard.",
-                image: "/placeholder-project-3.jpg"
+                imageUrl: null,
+                link: null
             }
         ]
 
-    const nextProject = (e?: any) => {
+    const nextProject = (e?: React.MouseEvent) => {
         e?.stopPropagation()
         setCurrentIndex((prev) => (prev + 1) % projects.length)
     }
 
-    const prevProject = (e?: any) => {
+    const prevProject = (e?: React.MouseEvent) => {
         e?.stopPropagation()
         setCurrentIndex((prev) => (prev - 1 + projects.length) % projects.length)
     }
@@ -219,7 +290,6 @@ function ProjectsView({ data }: { data: any }) {
 
     return (
         <div className="h-full w-full relative bg-zinc-900 flex flex-col group">
-            {/* Main Image Area */}
             <div
                 className="flex-1 relative overflow-hidden cursor-pointer"
                 onClick={() => setShowDetail(true)}
@@ -233,7 +303,6 @@ function ProjectsView({ data }: { data: any }) {
                         transition={{ duration: 0.5 }}
                         className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center"
                     >
-                        {/* Use imageUrl if available, otherwise placeholder */}
                         {currentProject.imageUrl ? (
                             <NextImage
                                 src={currentProject.imageUrl}
@@ -250,10 +319,8 @@ function ProjectsView({ data }: { data: any }) {
                     </motion.div>
                 </AnimatePresence>
 
-                {/* Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none" />
 
-                {/* Content Overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-8 pb-24 sm:pb-12 flex flex-col justify-end h-full pointer-events-none">
                     <motion.div
                         key={currentProject.id}
@@ -287,7 +354,6 @@ function ProjectsView({ data }: { data: any }) {
                 </div>
             </div>
 
-            {/* Navigation Controls - Left Center Vertical */}
             <div className="absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center gap-4 z-20 pointer-events-none">
                 <div className="flex flex-col items-center gap-2 bg-black/40 backdrop-blur-md p-1.5 rounded-full border border-white/10 pointer-events-auto">
                     <Button
@@ -312,7 +378,6 @@ function ProjectsView({ data }: { data: any }) {
                 </div>
             </div>
 
-            {/* Detailed View Modal (Nested) */}
             <AnimatePresence>
                 {showDetail && (
                     <motion.div
@@ -356,9 +421,16 @@ function ProjectsView({ data }: { data: any }) {
                                     <p className="text-xl text-zinc-300 leading-relaxed">
                                         {currentProject.description}
                                     </p>
-                                    <p className="text-zinc-400">
-                                        (More detailed project content would go here in a real implementation, fetched from the database or CMS.)
-                                    </p>
+                                    {currentProject.link && (
+                                        <a 
+                                            href={currentProject.link} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 mt-4"
+                                        >
+                                            View Project <ArrowUp className="w-4 h-4 rotate-45" />
+                                        </a>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -369,17 +441,20 @@ function ProjectsView({ data }: { data: any }) {
     )
 }
 
-function AboutView({ data }: { data: any }) {
+function AboutView({ data }: { data: ContentPanelProps["data"] }) {
     return (
         <div className="space-y-8">
             <div className="flex flex-col items-center text-center space-y-4">
                 <div className="w-32 h-32 rounded-full bg-zinc-800 border-2 border-zinc-700 overflow-hidden">
-                    {/* Placeholder for avatar */}
-                    <div className="w-full h-full bg-gradient-to-br from-zinc-700 to-zinc-900" />
+                    <div className="w-full h-full bg-gradient-to-br from-purple-600/20 to-pink-600/20 flex items-center justify-center">
+                        <span className="text-4xl font-bold text-white/50">
+                            {data.displayName.charAt(0)}
+                        </span>
+                    </div>
                 </div>
                 <div>
                     <h2 className="text-2xl font-bold">I&apos;m {data.displayName} :)</h2>
-                    <p className="text-zinc-400">{data.headline || "Product Designer & Engineer based in Berlin"}</p>
+                    <p className="text-zinc-400">{data.headline || "Product Designer & Engineer"}</p>
                 </div>
             </div>
 
@@ -389,6 +464,61 @@ function AboutView({ data }: { data: any }) {
                     {data.bio || "I like to build useful, beautiful software that feels good to use. I care a lot about the small details, but I also keep the big picture in mind. I love working on hard problems and turning ideas into products that actually make sense and bring joy."}
                 </p>
             </div>
+        </div>
+    )
+}
+
+function ServicesView({ data, onBook }: { data: ContentPanelProps["data"]; onBook?: (serviceId: string) => void }) {
+    const services = data.serviceOfferings.filter(s => s.isActive)
+
+    if (services.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-zinc-500">No services available at the moment.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-4">
+            <p className="text-zinc-400 mb-6">
+                Book a session with {data.displayName}. Choose from the available services below.
+            </p>
+            {services.map((service) => (
+                <div 
+                    key={service.id} 
+                    className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4 hover:border-zinc-700 transition-colors"
+                >
+                    <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-semibold">{service.name}</h3>
+                            {service.description && (
+                                <p className="text-zinc-400 text-sm">{service.description}</p>
+                            )}
+                        </div>
+                        <div className="text-right">
+                            <div className="text-2xl font-bold">
+                                {service.isFree ? "Free" : `$${(service.priceCents / 100).toFixed(0)}`}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-sm text-zinc-500">
+                            <span className="flex items-center gap-1.5">
+                                <Clock className="w-4 h-4" />
+                                {service.durationMinutes} minutes
+                            </span>
+                        </div>
+                        <Button 
+                            onClick={() => onBook?.(service.id)}
+                            className="bg-purple-600 hover:bg-purple-500"
+                        >
+                            <Calendar className="w-4 h-4 mr-2" />
+                            Book Now
+                        </Button>
+                    </div>
+                </div>
+            ))}
         </div>
     )
 }
