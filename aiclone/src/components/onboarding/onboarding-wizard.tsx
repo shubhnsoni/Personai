@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { WelcomeAnimationPreset } from "@prisma/client"
@@ -12,15 +12,15 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { createProfile } from "@/app/actions/onboarding"
+import { toast } from "sonner"
 
-// Define the schema for the wizard
 const onboardingSchema = z.object({
     roleTemplate: z.enum(["DESIGNER", "CONSULTANT", "EDITOR", "COACH", "DEVELOPER", "JOB_SEEKER", "CUSTOM"]),
     displayName: z.string().min(2, "Name must be at least 2 characters"),
     headline: z.string().min(5, "Headline must be at least 5 characters"),
     bio: z.string().optional(),
-    language: z.string().default("en"),
-    timezone: z.string().default("UTC"),
+    language: z.string(),
+    timezone: z.string(),
     animationStyleId: z.string().min(1, "Please select an animation style"),
     primaryGoal: z.enum(["BOOK_CALL", "HIRE_ME", "SHOW_PORTFOLIO", "COLLECT_LEADS"]),
 })
@@ -34,27 +34,36 @@ interface OnboardingWizardProps {
 
 export function OnboardingWizard({ presets, userId }: OnboardingWizardProps) {
     const [step, setStep] = useState(1)
+    const [isCreating, setIsCreating] = useState(false)
     const router = useRouter()
 
-    const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<OnboardingData>({
+    const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<OnboardingData>({
         resolver: zodResolver(onboardingSchema),
         defaultValues: {
             language: "en",
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             primaryGoal: "BOOK_CALL",
-            roleTemplate: "CONSULTANT"
+            roleTemplate: "CONSULTANT",
+            displayName: "",
+            headline: "",
+            bio: "",
+            animationStyleId: ""
         }
     })
 
     const selectedRole = watch("roleTemplate")
     const selectedAnimationId = watch("animationStyleId")
 
-    const onSubmit = async (data: OnboardingData) => {
+    const onSubmit: SubmitHandler<OnboardingData> = async (data) => {
+        setIsCreating(true)
         try {
             await createProfile(userId, data)
+            toast.success("Profile created successfully!")
             router.push("/dashboard")
         } catch (error) {
             console.error("Failed to create profile", error)
+            toast.error("Failed to create profile. Please try again.")
+            setIsCreating(false)
         }
     }
 
@@ -65,7 +74,7 @@ export function OnboardingWizard({ presets, userId }: OnboardingWizardProps) {
         <div className="space-y-8">
             <div className="text-center">
                 <h1 className="text-3xl font-bold">Welcome to PersonaLink</h1>
-                <p className="text-muted-foreground">Let's set up your AI profile in a few steps.</p>
+                <p className="text-muted-foreground">Let&apos;s set up your AI profile in a few steps.</p>
             </div>
 
             <div className="flex justify-center gap-2 mb-8">
@@ -82,8 +91,8 @@ export function OnboardingWizard({ presets, userId }: OnboardingWizardProps) {
                             {["DESIGNER", "CONSULTANT", "EDITOR", "COACH", "DEVELOPER", "JOB_SEEKER", "CUSTOM"].map((role) => (
                                 <div
                                     key={role}
-                                    className={`cursor-pointer rounded-lg border p-4 text-center hover:bg-accent ${selectedRole === role ? 'border-primary bg-accent' : ''}`}
-                                    onClick={() => setValue("roleTemplate", role as any)}
+                                    className={`cursor-pointer rounded-lg border p-4 text-center hover:bg-accent transition-colors ${selectedRole === role ? 'border-primary bg-accent' : ''}`}
+                                    onClick={() => setValue("roleTemplate", role as OnboardingData["roleTemplate"])}
                                 >
                                     <span className="font-medium capitalize">{role.toLowerCase().replace('_', ' ')}</span>
                                 </div>
@@ -120,38 +129,42 @@ export function OnboardingWizard({ presets, userId }: OnboardingWizardProps) {
                 {step === 3 && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
                         <h2 className="text-xl font-semibold">Choose your Aura</h2>
-                        <div className="grid grid-cols-2 gap-4">
-                            {presets.map((preset) => {
-                                let config: any = {}
-                                try {
-                                    config = typeof preset.config === 'string' ? JSON.parse(preset.config) : preset.config
-                                } catch (e) {
-                                    console.error("Failed to parse preset config", e)
-                                }
-                                const colors = config.colors || ["#A855F7", "#EC4899"]
-                                return (
-                                    <div
-                                        key={preset.id}
-                                        className={`cursor-pointer rounded-lg border p-4 text-center hover:bg-accent flex flex-col items-center ${selectedAnimationId === preset.id ? 'border-primary bg-accent' : ''}`}
-                                        onClick={() => setValue("animationStyleId", preset.id)}
-                                    >
-                                        <div className="mb-4">
-                                            <WelcomeOrb
-                                                size={80}
-                                                colors={colors}
-                                                speed={config.speed || 1}
-                                                intensity={config.intensity || 1}
-                                            />
+                        {presets.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-8">Loading auras...</p>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                {presets.map((preset) => {
+                                    let config: { colors?: string[]; speed?: number; intensity?: number } = {}
+                                    try {
+                                        config = typeof preset.config === 'string' ? JSON.parse(preset.config) : preset.config as typeof config
+                                    } catch {
+                                        config = { colors: ["#A855F7", "#EC4899"], speed: 1, intensity: 1 }
+                                    }
+                                    const colors = config.colors || ["#A855F7", "#EC4899"]
+                                    return (
+                                        <div
+                                            key={preset.id}
+                                            className={`cursor-pointer rounded-lg border p-4 text-center hover:bg-accent flex flex-col items-center transition-all ${selectedAnimationId === preset.id ? 'border-primary bg-accent ring-2 ring-primary/50' : ''}`}
+                                            onClick={() => setValue("animationStyleId", preset.id)}
+                                        >
+                                            <div className="mb-4">
+                                                <WelcomeOrb
+                                                    size={80}
+                                                    colors={colors as [string, string]}
+                                                    speed={config.speed || 1}
+                                                    intensity={config.intensity || 1}
+                                                />
+                                            </div>
+                                            <span className="font-medium text-sm">{preset.name}</span>
                                         </div>
-                                        <span className="font-medium text-sm">{preset.name}</span>
-                                    </div>
-                                )
-                            })}
-                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
                         {errors.animationStyleId && <p className="text-sm text-destructive">{errors.animationStyleId.message}</p>}
                         <div className="flex gap-4">
                             <Button type="button" variant="outline" onClick={prevStep} className="w-full">Back</Button>
-                            <Button type="button" onClick={nextStep} className="w-full">Next</Button>
+                            <Button type="button" onClick={nextStep} className="w-full" disabled={!selectedAnimationId}>Next</Button>
                         </div>
                     </div>
                 )}
@@ -168,8 +181,8 @@ export function OnboardingWizard({ presets, userId }: OnboardingWizardProps) {
                             ].map((goal) => (
                                 <div
                                     key={goal.value}
-                                    className={`cursor-pointer rounded-lg border p-4 text-center hover:bg-accent ${watch("primaryGoal") === goal.value ? 'border-primary bg-accent' : ''}`}
-                                    onClick={() => setValue("primaryGoal", goal.value as any)}
+                                    className={`cursor-pointer rounded-lg border p-4 text-center hover:bg-accent transition-colors ${watch("primaryGoal") === goal.value ? 'border-primary bg-accent' : ''}`}
+                                    onClick={() => setValue("primaryGoal", goal.value as OnboardingData["primaryGoal"])}
                                 >
                                     <span className="font-medium">{goal.label}</span>
                                 </div>
@@ -177,8 +190,8 @@ export function OnboardingWizard({ presets, userId }: OnboardingWizardProps) {
                         </div>
                         <div className="flex gap-4">
                             <Button type="button" variant="outline" onClick={prevStep} className="w-full">Back</Button>
-                            <Button type="submit" disabled={isSubmitting} className="w-full">
-                                {isSubmitting ? "Creating Profile..." : "Launch Profile"}
+                            <Button type="submit" disabled={isCreating} className="w-full">
+                                {isCreating ? "Creating Profile..." : "Launch Profile"}
                             </Button>
                         </div>
                     </div>
