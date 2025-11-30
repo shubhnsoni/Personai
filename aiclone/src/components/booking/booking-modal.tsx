@@ -5,9 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, CheckCircle, Clock, DollarSign, ArrowLeft, Calendar } from "lucide-react"
+import { Loader2, CheckCircle, Clock, ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
 
 interface ServiceOffering {
     id: string
@@ -73,9 +74,14 @@ export function BookingModal({ isOpen, onClose, profile, selectedServiceId }: Bo
         try {
             await new Promise(r => setTimeout(r, 1500))
             setIsSuccess(true)
+            toast.success("Booking confirmed!", {
+                description: "Check your email for details.",
+            })
         } catch (error) {
             console.error(error)
-            alert("Failed to book")
+            toast.error("Booking failed", {
+                description: "Please try again or contact support.",
+            })
         } finally {
             setIsSubmitting(false)
         }

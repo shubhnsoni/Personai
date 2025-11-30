@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { ArrowUp, ChevronRight, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { WelcomeOrb } from "@/components/welcome-orb"
+import { toast } from "sonner"
 
 interface ChatMessage {
     id: string
@@ -134,6 +135,10 @@ export function ChatInterface({
             if ((error as Error).name === "AbortError") return
             console.error("Chat error:", error)
             
+            toast.error("Connection issue", {
+                description: "Having trouble connecting. Please try again.",
+            })
+            
             setMessages(prev => {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
@@ -202,14 +207,14 @@ export function ChatInterface({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl px-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 w-full max-w-xl px-2 sm:px-4">
                             {quickQuestions.map((q, i) => (
                                 <button
                                     key={i}
                                     onClick={() => handleSubmit(undefined, q)}
-                                    className="text-left p-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-zinc-700 transition-all hover:scale-[1.02] text-sm text-zinc-400 hover:text-zinc-100 shadow-sm group"
+                                    className="text-left p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-zinc-700 transition-all active:scale-[0.98] hover:scale-[1.02] text-xs sm:text-sm text-zinc-400 hover:text-zinc-100 shadow-sm group touch-manipulation"
                                 >
-                                    <span className="mr-2 group-hover:scale-110 inline-block transition-transform">💬</span> {q}
+                                    <span className="mr-1.5 sm:mr-2 group-hover:scale-110 inline-block transition-transform">💬</span> {q}
                                 </button>
                             ))}
                         </div>
@@ -269,8 +274,8 @@ export function ChatInterface({
                 })}
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent pt-32">
-                <div className="max-w-3xl mx-auto relative w-full flex flex-col gap-3">
+            <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black via-black/80 to-transparent pt-32 safe-bottom">
+                <div className="max-w-3xl mx-auto relative w-full flex flex-col gap-2 sm:gap-3">
                     {hasStarted && !isLoading && (
                         <div className={cn(
                             "transition-all duration-300 ease-in-out",
@@ -311,16 +316,16 @@ export function ChatInterface({
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder={`Tell me more about...`}
-                            className="w-full h-14 pl-6 pr-14 rounded-full bg-zinc-900/80 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 shadow-2xl backdrop-blur-xl focus-visible:ring-1 focus-visible:ring-purple-500/50 focus-visible:border-purple-500/50 transition-all text-base"
+                            className="w-full h-12 sm:h-14 pl-4 sm:pl-6 pr-12 sm:pr-14 rounded-full bg-zinc-900/80 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 shadow-2xl backdrop-blur-xl focus-visible:ring-1 focus-visible:ring-purple-500/50 focus-visible:border-purple-500/50 transition-all text-sm sm:text-base"
                             disabled={isLoading}
                         />
                         <Button
                             size="icon"
                             type="submit"
                             disabled={isLoading || !input.trim()}
-                            className="absolute right-2 h-10 w-10 rounded-full bg-zinc-800 hover:bg-white hover:text-black text-white shadow-lg transition-all disabled:opacity-50 disabled:hover:bg-zinc-800 disabled:hover:text-white"
+                            className="absolute right-1.5 sm:right-2 h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-zinc-800 hover:bg-white hover:text-black text-white shadow-lg transition-all disabled:opacity-50 disabled:hover:bg-zinc-800 disabled:hover:text-white touch-manipulation"
                         >
-                            <ArrowUp className="h-5 w-5" />
+                            <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" />
                         </Button>
                     </form>
                     <div className="text-center">

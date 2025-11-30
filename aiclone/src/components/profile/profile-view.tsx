@@ -94,27 +94,27 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                     />
 
                     {!activeContent && (
-                        <div className="absolute bottom-28 left-4 right-4 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
+                        <div className="absolute bottom-28 left-2 right-2 sm:left-4 sm:right-4 flex flex-wrap justify-center gap-1.5 sm:gap-2 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
                             <QuickActionChip 
-                                icon={<User className="w-3.5 h-3.5" />}
+                                icon={<User className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                                 label="About"
                                 onClick={() => setActiveContent("about")}
                             />
                             <QuickActionChip 
-                                icon={<Briefcase className="w-3.5 h-3.5" />}
+                                icon={<Briefcase className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                                 label="Experience"
                                 onClick={() => setActiveContent("experience")}
                             />
                             {activeServices.length > 0 && (
                                 <QuickActionChip 
-                                    icon={<DollarSign className="w-3.5 h-3.5" />}
+                                    icon={<DollarSign className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                                     label="Services"
                                     onClick={() => setActiveContent("services")}
                                 />
                             )}
                             <QuickActionChip 
-                                icon={<Calendar className="w-3.5 h-3.5" />}
-                                label="Book a Call"
+                                icon={<Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                                label="Book"
                                 onClick={() => setIsBookingOpen(true)}
                                 highlighted
                             />
@@ -156,7 +156,7 @@ function QuickActionChip({ icon, label, onClick, highlighted }: QuickActionChipP
         <button
             onClick={onClick}
             className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all hover:scale-105 shadow-lg backdrop-blur-sm",
+                "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-medium transition-all active:scale-95 hover:scale-105 shadow-lg backdrop-blur-sm touch-manipulation",
                 highlighted 
                     ? "bg-purple-600 hover:bg-purple-500 text-white border border-purple-400/30"
                     : "bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50"

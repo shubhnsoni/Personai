@@ -1,4 +1,4 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "postgresql-16"]
 [nix]
 channel = "stable-25_05"
 packages = ["unzip"]
@@ -34,6 +34,10 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 36635
+externalPort = 3001
 
 [[ports]]
 localPort = 43743
