@@ -28,7 +28,7 @@ model Profile {
   slug                  String                 @unique
   displayName           String
   headline              String?
-  bio                   String?                // @db.Text removed for sqlite
+  bio                   String?
   roleTemplate          String                 @default("CUSTOM") // Enum as String
   primaryGoal           String                 @default("BOOK_CALL") // Enum as String
   language              String                 @default("en")
@@ -40,8 +40,7 @@ model Profile {
   showInDirectory       Boolean                @default(false)
   welcomeMessageOverride String?
   contentDisplayMode    String                 @default("POPUP") // "SIDE_PANEL" | "POPUP"
-  personalityConfig     String?                // Json stored as String for sqlite (or Prisma handles Json in sqlite? Yes, Prisma supports Json in sqlite)
-  // Wait, Prisma supports Json in sqlite.
+  personalityConfig     String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -54,6 +53,12 @@ model Profile {
   availability     AvailabilitySchedule[]
   workExperiences  WorkExperience[]
   projects         Project[]
+  digitalProducts  DigitalProduct[]
+  courses          Course[]
+  events           Event[]
+  communities      Community[]
+  leadMagnets      LeadMagnet[]
+  shortLinks       ShortLink[]
 }
 
 model WorkExperience {
@@ -88,10 +93,7 @@ model WelcomeAnimationPreset {
   id          String   @id @default(cuid())
   name        String
   description String?
-  config      String   // Json stored as String? No, Prisma supports Json type in SQLite since v3.
-  // But let's check if it's safe. Yes.
-  // Actually, let's keep it Json if possible.
-  // "Native type Text is not supported". Json is supported.
+  config      String
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -108,7 +110,7 @@ model ProfileDocument {
   sourceType        String              // Enum
   url               String?
   filePath          String?
-  rawText           String?             // @db.Text removed
+  rawText           String?
   embeddingMetadata String?             // Json
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -227,4 +229,205 @@ model AvailabilitySchedule {
   isEnabled Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ==================== SuperProfile-like Features ====================
+
+model DigitalProduct {
+  id            String   @id @default(cuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  type          String   @default("OTHER") // "PDF" | "VIDEO" | "AUDIO" | "OTHER"
+  fileUrl       String?
+  thumbnailUrl  String?
+  priceCents    Int      @default(0)
+  currency      String   @default("USD")
+  isActive      Boolean  @default(true)
+  downloadCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  purchases ProductPurchase[]
+}
+
+model Course {
+  id            String   @id @default(cuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  thumbnailUrl  String?
+  priceCents    Int      @default(0)
+  currency      String   @default("USD")
+  isActive      Boolean  @default(true)
+  isPublished   Boolean  @default(false)
+  totalModules  Int      @default(0)
+  totalLessons  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  modules     CourseModule[]
+  enrollments CourseEnrollment[]
+}
+
+model CourseModule {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lessons CourseLesson[]
+}
+
+model CourseLesson {
+  id              String   @id @default(cuid())
+  moduleId        String
+  module          CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  contentType     String   @default("VIDEO") // "VIDEO" | "TEXT" | "PDF"
+  contentUrl      String?
+  durationMinutes Int      @default(0)
+  orderIndex      Int      @default(0)
+  isFree          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Event {
+  id            String    @id @default(cuid())
+  profileId     String
+  profile       Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  eventType     String    @default("WEBINAR") // "WEBINAR" | "WORKSHOP" | "MEETUP"
+  thumbnailUrl  String?
+  startTime     DateTime
+  endTime       DateTime
+  timezone      String    @default("UTC")
+  location      String?   // For offline events
+  meetingUrl    String?   // For online events
+  priceCents    Int       @default(0)
+  currency      String    @default("USD")
+  isFree        Boolean   @default(false)
+  maxAttendees  Int?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  registrations EventRegistration[]
+}
+
+model Community {
+  id           String   @id @default(cuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  platform     String   @default("TELEGRAM") // "TELEGRAM" | "DISCORD"
+  inviteLink   String?
+  priceCents   Int      @default(0)
+  currency     String   @default("USD")
+  billingCycle String   @default("MONTHLY") // "MONTHLY" | "YEARLY" | "ONE_TIME"
+  isActive     Boolean  @default(true)
+  memberCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  members CommunityMember[]
+}
+
+model LeadMagnet {
+  id            String   @id @default(cuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  type          String   @default("DOWNLOAD") // "FORM" | "GIVEAWAY" | "DOWNLOAD"
+  fileUrl       String?
+  formFields    String?  // JSON array of form field definitions
+  isActive      Boolean  @default(true)
+  downloadCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  submissions LeadMagnetSubmission[]
+}
+
+model ShortLink {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  code      String   @unique // Unique short code for the link
+  targetUrl String
+  title     String?
+  clicks    Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductPurchase {
+  id           String    @id @default(cuid())
+  productId    String
+  product      DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  visitorEmail String
+  visitorName  String?
+  paymentId    String?
+  status       String    @default("PENDING") // "PENDING" | "COMPLETED" | "REFUNDED"
+  downloadedAt DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model CourseEnrollment {
+  id           String    @id @default(cuid())
+  courseId     String
+  course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  visitorEmail String
+  visitorName  String?
+  paymentId    String?
+  status       String    @default("PENDING") // "PENDING" | "ACTIVE" | "COMPLETED" | "CANCELLED"
+  progress     String?   // JSON object tracking lesson completion
+  enrolledAt   DateTime  @default(now())
+  completedAt  DateTime?
+}
+
+model EventRegistration {
+  id           String    @id @default(cuid())
+  eventId      String
+  event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  visitorEmail String
+  visitorName  String?
+  paymentId    String?
+  status       String    @default("REGISTERED") // "REGISTERED" | "ATTENDED" | "CANCELLED"
+  attendedAt   DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model CommunityMember {
+  id                 String    @id @default(cuid())
+  communityId        String
+  community          Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  visitorEmail       String
+  visitorName        String?
+  paymentId          String?
+  status             String    @default("ACTIVE") // "ACTIVE" | "EXPIRED" | "CANCELLED"
+  subscriptionEndsAt DateTime?
+  createdAt          DateTime  @default(now())
+}
+
+model LeadMagnetSubmission {
+  id           String     @id @default(cuid())
+  leadMagnetId String
+  leadMagnet   LeadMagnet @relation(fields: [leadMagnetId], references: [id], onDelete: Cascade)
+  visitorEmail String
+  visitorName  String?
+  formData     String?    // JSON object with form field values
+  createdAt    DateTime   @default(now())
 }
