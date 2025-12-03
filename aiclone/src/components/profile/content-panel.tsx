@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 interface ContentPanelProps {
     isOpen: boolean
     onClose: () => void
-    type: "about" | "experience" | "projects" | "services" | null
+    type: "about" | "experience" | "projects" | "services" | "products" | "courses" | "events" | "communities" | null
     data: {
         displayName: string
         headline: string | null
@@ -45,11 +45,44 @@ interface ContentPanelProps {
             durationMinutes: number
             isActive: boolean
         }>
+        digitalProducts?: Array<{
+            id: string
+            title: string
+            description: string | null
+            type: string
+            priceCents: number
+        }>
+        courses?: Array<{
+            id: string
+            title: string
+            description: string | null
+            priceCents: number
+            modules: Array<{ lessons: Array<object> }>
+        }>
+        events?: Array<{
+            id: string
+            title: string
+            description: string | null
+            eventType: string
+            startTime: string
+            endTime: string
+            priceCents: number
+            isFree: boolean
+        }>
+        communities?: Array<{
+            id: string
+            name: string
+            description: string | null
+            platform: string
+            priceCents: number
+            billingCycle: string
+        }>
     }
     onBookService?: (serviceId: string) => void
+    onPurchase?: (itemType: string, itemId: string) => void
 }
 
-export function ContentPanel({ isOpen, onClose, type, data, onBookService }: ContentPanelProps) {
+export function ContentPanel({ isOpen, onClose, type, data, onBookService, onPurchase }: ContentPanelProps) {
     const mode = data.contentDisplayMode || "SIDE_PANEL"
 
     const getTitle = () => {
@@ -58,6 +91,10 @@ export function ContentPanel({ isOpen, onClose, type, data, onBookService }: Con
             case "projects": return "Projects"
             case "about": return `About ${data.displayName}`
             case "services": return "Services & Pricing"
+            case "products": return "Digital Products"
+            case "courses": return "Courses"
+            case "events": return "Events"
+            case "communities": return "Communities"
             default: return ""
         }
     }
@@ -108,6 +145,34 @@ export function ContentPanel({ isOpen, onClose, type, data, onBookService }: Con
                     <ScrollArea className="h-full p-6">
                         <div className="max-w-3xl mx-auto space-y-6 pb-20">
                             <ServicesView data={data} onBook={onBookService} />
+                        </div>
+                    </ScrollArea>
+                )}
+                {type === "products" && (
+                    <ScrollArea className="h-full p-6">
+                        <div className="max-w-3xl mx-auto space-y-6 pb-20">
+                            <ProductsView data={data} onPurchase={onPurchase} />
+                        </div>
+                    </ScrollArea>
+                )}
+                {type === "courses" && (
+                    <ScrollArea className="h-full p-6">
+                        <div className="max-w-3xl mx-auto space-y-6 pb-20">
+                            <CoursesView data={data} onPurchase={onPurchase} />
+                        </div>
+                    </ScrollArea>
+                )}
+                {type === "events" && (
+                    <ScrollArea className="h-full p-6">
+                        <div className="max-w-3xl mx-auto space-y-6 pb-20">
+                            <EventsView data={data} onPurchase={onPurchase} />
+                        </div>
+                    </ScrollArea>
+                )}
+                {type === "communities" && (
+                    <ScrollArea className="h-full p-6">
+                        <div className="max-w-3xl mx-auto space-y-6 pb-20">
+                            <CommunitiesView data={data} onPurchase={onPurchase} />
                         </div>
                     </ScrollArea>
                 )}
@@ -515,6 +580,244 @@ function ServicesView({ data, onBook }: { data: ContentPanelProps["data"]; onBoo
                         >
                             <Calendar className="w-4 h-4 mr-2" />
                             Book Now
+                        </Button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+function ProductsView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
+    const products = data.digitalProducts || []
+
+    if (products.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-zinc-500">No products available at the moment.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-4">
+            <p className="text-zinc-400 mb-6">
+                Browse {data.displayName}&apos;s digital products.
+            </p>
+            {products.map((product) => (
+                <div 
+                    key={product.id} 
+                    className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4 hover:border-zinc-700 transition-colors"
+                >
+                    <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-semibold">{product.title}</h3>
+                            {product.description && (
+                                <p className="text-zinc-400 text-sm">{product.description}</p>
+                            )}
+                            <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 mt-2">
+                                {product.type}
+                            </Badge>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-2xl font-bold">
+                                {product.priceCents === 0 ? "Free" : `$${(product.priceCents / 100).toFixed(0)}`}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-end">
+                        <Button 
+                            onClick={() => onPurchase?.("product", product.id)}
+                            className="bg-purple-600 hover:bg-purple-500"
+                        >
+                            <DollarSign className="w-4 h-4 mr-2" />
+                            Purchase
+                        </Button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+function CoursesView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
+    const courses = data.courses || []
+
+    if (courses.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-zinc-500">No courses available at the moment.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-4">
+            <p className="text-zinc-400 mb-6">
+                Enroll in {data.displayName}&apos;s courses.
+            </p>
+            {courses.map((course) => {
+                const totalLessons = course.modules.reduce((acc, mod) => acc + mod.lessons.length, 0)
+                return (
+                    <div 
+                        key={course.id} 
+                        className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4 hover:border-zinc-700 transition-colors"
+                    >
+                        <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                                <h3 className="text-xl font-semibold">{course.title}</h3>
+                                {course.description && (
+                                    <p className="text-zinc-400 text-sm">{course.description}</p>
+                                )}
+                            </div>
+                            <div className="text-right">
+                                <div className="text-2xl font-bold">
+                                    {course.priceCents === 0 ? "Free" : `$${(course.priceCents / 100).toFixed(0)}`}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 text-sm text-zinc-500">
+                                <span className="flex items-center gap-1.5">
+                                    {course.modules.length} modules · {totalLessons} lessons
+                                </span>
+                            </div>
+                            <Button 
+                                onClick={() => onPurchase?.("course", course.id)}
+                                className="bg-purple-600 hover:bg-purple-500"
+                            >
+                                <DollarSign className="w-4 h-4 mr-2" />
+                                Purchase
+                            </Button>
+                        </div>
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+
+function EventsView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
+    const events = data.events || []
+
+    if (events.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-zinc-500">No events available at the moment.</p>
+            </div>
+        )
+    }
+
+    const formatEventDate = (dateStr: string) => {
+        const date = new Date(dateStr)
+        return date.toLocaleDateString('en-US', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        })
+    }
+
+    return (
+        <div className="space-y-4">
+            <p className="text-zinc-400 mb-6">
+                Register for {data.displayName}&apos;s upcoming events.
+            </p>
+            {events.map((event) => (
+                <div 
+                    key={event.id} 
+                    className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4 hover:border-zinc-700 transition-colors"
+                >
+                    <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-semibold">{event.title}</h3>
+                            {event.description && (
+                                <p className="text-zinc-400 text-sm">{event.description}</p>
+                            )}
+                            <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 mt-2">
+                                {event.eventType}
+                            </Badge>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-2xl font-bold">
+                                {event.isFree ? "Free" : `$${(event.priceCents / 100).toFixed(0)}`}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-sm text-zinc-500">
+                            <span className="flex items-center gap-1.5">
+                                <Calendar className="w-4 h-4" />
+                                {formatEventDate(event.startTime)}
+                            </span>
+                        </div>
+                        <Button 
+                            onClick={() => onPurchase?.("event", event.id)}
+                            className="bg-purple-600 hover:bg-purple-500"
+                        >
+                            <Calendar className="w-4 h-4 mr-2" />
+                            Register
+                        </Button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+function CommunitiesView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
+    const communities = data.communities || []
+
+    if (communities.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-zinc-500">No communities available at the moment.</p>
+            </div>
+        )
+    }
+
+    const formatBillingCycle = (cycle: string) => {
+        switch (cycle) {
+            case 'MONTHLY': return '/month'
+            case 'YEARLY': return '/year'
+            case 'ONE_TIME': return ''
+            default: return ''
+        }
+    }
+
+    return (
+        <div className="space-y-4">
+            <p className="text-zinc-400 mb-6">
+                Join {data.displayName}&apos;s communities.
+            </p>
+            {communities.map((community) => (
+                <div 
+                    key={community.id} 
+                    className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4 hover:border-zinc-700 transition-colors"
+                >
+                    <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-semibold">{community.name}</h3>
+                            {community.description && (
+                                <p className="text-zinc-400 text-sm">{community.description}</p>
+                            )}
+                            <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 mt-2">
+                                {community.platform}
+                            </Badge>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-2xl font-bold">
+                                {community.priceCents === 0 ? "Free" : `$${(community.priceCents / 100).toFixed(0)}${formatBillingCycle(community.billingCycle)}`}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-end">
+                        <Button 
+                            onClick={() => onPurchase?.("community", community.id)}
+                            className="bg-purple-600 hover:bg-purple-500"
+                        >
+                            Join
                         </Button>
                     </div>
                 </div>

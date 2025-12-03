@@ -10,9 +10,29 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
         include: {
             user: true,
             animationStyle: true,
-            serviceOfferings: true,
+            serviceOfferings: {
+                where: { isActive: true }
+            },
             workExperiences: true,
             projects: true,
+            digitalProducts: {
+                where: { isActive: true }
+            },
+            courses: {
+                where: { isActive: true, isPublished: true },
+                include: {
+                    modules: {
+                        include: { lessons: true }
+                    }
+                }
+            },
+            events: {
+                where: { isActive: true, startTime: { gte: new Date() } },
+                orderBy: { startTime: 'asc' }
+            },
+            communities: {
+                where: { isActive: true }
+            }
         }
     })
 
@@ -20,7 +40,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
         notFound()
     }
 
-    let animationConfig: any = {}
+    let animationConfig: { speed?: number; intensity?: number; colors?: string[] } = {}
     try {
         animationConfig = typeof profile.animationStyle?.config === 'string'
             ? JSON.parse(profile.animationStyle.config)

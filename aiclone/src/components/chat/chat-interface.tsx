@@ -18,10 +18,11 @@ interface ChatInterfaceProps {
         id: string
         displayName: string
         welcomeMessageOverride?: string | null
+        slug: string
     }
     welcome?: React.ReactNode
     quickQuestions?: string[]
-    onShowContent?: (type: "about" | "experience" | "projects") => void
+    onShowContent?: (type: "about" | "experience" | "projects" | "products" | "courses" | "events" | "communities") => void
     colors?: string[]
     animationConfig?: { speed?: number; intensity?: number }
     isPanelOpen?: boolean
@@ -48,11 +49,15 @@ export function ChatInterface({
         }
     }, [messages, isLoading])
 
-    const getRichContent = (content: string): "experience" | "projects" | "about" | null => {
+    const getRichContent = (content: string): "experience" | "projects" | "about" | "products" | "courses" | "events" | "communities" | null => {
         const lower = content.toLowerCase()
         if (lower.includes("experience") || lower.includes("work history")) return "experience"
         if (lower.includes("project") || lower.includes("portfolio")) return "projects"
         if (lower.includes("about") || lower.includes("who is")) return "about"
+        if (lower.includes("digital products") || lower.includes("would you like to purchase")) return "products"
+        if (lower.includes("courses") || lower.includes("would you like to enroll")) return "courses"
+        if (lower.includes("upcoming events") || lower.includes("would you like to register")) return "events"
+        if (lower.includes("communities") || lower.includes("would you like to join")) return "communities"
         return null
     }
 
@@ -260,8 +265,16 @@ export function ChatInterface({
                                                 {richContentType === 'experience' && `${profile.displayName}'s Work Experience`}
                                                 {richContentType === 'projects' && `${profile.displayName}'s Design Projects`}
                                                 {richContentType === 'about' && `About ${profile.displayName}`}
+                                                {richContentType === 'products' && `${profile.displayName}'s Digital Products`}
+                                                {richContentType === 'courses' && `${profile.displayName}'s Courses`}
+                                                {richContentType === 'events' && `${profile.displayName}'s Events`}
+                                                {richContentType === 'communities' && `${profile.displayName}'s Communities`}
                                             </p>
-                                            <p className="text-xs text-zinc-500 mt-0.5">Click to view details</p>
+                                            <p className="text-xs text-zinc-500 mt-0.5">
+                                                {['products', 'courses', 'events', 'communities'].includes(richContentType) 
+                                                    ? 'View and purchase' 
+                                                    : 'Click to view details'}
+                                            </p>
                                         </div>
                                         <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors">
                                             <ChevronRight className="w-4 h-4" />

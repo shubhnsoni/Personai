@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 interface ProfileViewProps {
     profile: {
         id: string
+        slug: string
         displayName: string
         headline: string | null
         bio: string | null
@@ -42,25 +43,93 @@ interface ProfileViewProps {
             durationMinutes: number
             isActive: boolean
         }>
+        digitalProducts?: Array<{
+            id: string
+            title: string
+            description: string | null
+            type: string
+            priceCents: number
+        }>
+        courses?: Array<{
+            id: string
+            title: string
+            description: string | null
+            priceCents: number
+            modules: Array<{ lessons: Array<object> }>
+        }>
+        events?: Array<{
+            id: string
+            title: string
+            description: string | null
+            eventType: string
+            startTime: string
+            endTime: string
+            priceCents: number
+            isFree: boolean
+        }>
+        communities?: Array<{
+            id: string
+            name: string
+            description: string | null
+            platform: string
+            priceCents: number
+            billingCycle: string
+        }>
     }
     animationConfig: { speed?: number; intensity?: number; colors?: string[] }
     colors: string[]
 }
 
-type ContentType = "about" | "experience" | "projects" | "services" | null
+type ContentType = "about" | "experience" | "projects" | "services" | "products" | "courses" | "events" | "communities" | null
 
 export function ProfileView({ profile, animationConfig, colors }: ProfileViewProps) {
     const [activeContent, setActiveContent] = useState<ContentType>(null)
     const [isBookingOpen, setIsBookingOpen] = useState(false)
     const [selectedService, setSelectedService] = useState<string | null>(null)
+    const [isPurchasing, setIsPurchasing] = useState(false)
 
-    const handleShowContent = (type: "about" | "experience" | "projects") => {
+    const handleShowContent = (type: "about" | "experience" | "projects" | "products" | "courses" | "events" | "communities") => {
         setActiveContent(type)
     }
 
     const handleBookService = (serviceId: string) => {
         setSelectedService(serviceId)
         setIsBookingOpen(true)
+    }
+
+    const handlePurchase = async (itemType: string, itemId: string) => {
+        if (isPurchasing) return
+        
+        try {
+            setIsPurchasing(true)
+            const response = await fetch('/api/stripe/purchase', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    itemType,
+                    itemId,
+                }),
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to create checkout session')
+            }
+
+            if (data.url) {
+                window.location.href = data.url
+            } else if (data.redirectUrl) {
+                window.location.href = data.redirectUrl
+            }
+        } catch (error) {
+            console.error('Purchase error:', error)
+            alert('Failed to process purchase. Please try again.')
+        } finally {
+            setIsPurchasing(false)
+        }
     }
 
     const activeServices = profile.serviceOfferings.filter(s => s.isActive)
@@ -127,6 +196,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                 type={activeContent}
                 data={profile}
                 onBookService={handleBookService}
+                onPurchase={handlePurchase}
             />
 
             <BookingModal
