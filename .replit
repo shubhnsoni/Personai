@@ -1,11 +1,11 @@
-modules = ["nodejs-20", "postgresql-16"]
+modules = ["nodejs-20", "postgresql-16", "python-3.11"]
 [nix]
 channel = "stable-25_05"
 packages = ["unzip"]
 
 [agent]
 expertMode = true
-integrations = ["javascript_openai_ai_integrations:1.0.0"]
+integrations = ["javascript_openai_ai_integrations:1.0.0", "stripe:1.0.0"]
 
 [workflows]
 runButton = "Project"
@@ -62,4 +62,3 @@ externalPort = 5000
 [userenv]
 
 [userenv.shared]
-DATABASE_URL = "file:/home/runner/workspace/aiclone/prisma/dev.db"

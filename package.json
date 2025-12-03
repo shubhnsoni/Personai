@@ -10,6 +10,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "openai": "^6.9.1"
+    "openai": "^6.9.1",
+    "stripe": "^20.0.0",
+    "stripe-replit-sync": "^1.0.0"
   }
 }
