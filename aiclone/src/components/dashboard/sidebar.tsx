@@ -13,6 +13,12 @@ import {
     MessageSquare,
     CreditCard,
     ExternalLink,
+    Package,
+    GraduationCap,
+    CalendarDays,
+    UsersRound,
+    Gift,
+    Link2,
 } from "lucide-react"
 
 export const sidebarItems = [
@@ -20,6 +26,12 @@ export const sidebarItems = [
     { name: "Profile", href: "/dashboard/profile", icon: User },
     { name: "Content", href: "/dashboard/content", icon: FileText },
     { name: "Services", href: "/dashboard/services", icon: Briefcase },
+    { name: "Products", href: "/dashboard/products", icon: Package },
+    { name: "Courses", href: "/dashboard/courses", icon: GraduationCap },
+    { name: "Events", href: "/dashboard/events", icon: CalendarDays },
+    { name: "Community", href: "/dashboard/community", icon: UsersRound },
+    { name: "Lead Magnets", href: "/dashboard/lead-magnets", icon: Gift },
+    { name: "Short Links", href: "/dashboard/links", icon: Link2 },
     { name: "Calendar", href: "/dashboard/calendar", icon: Calendar },
     { name: "Leads", href: "/dashboard/leads", icon: Users },
     { name: "Conversations", href: "/dashboard/conversations", icon: MessageSquare },
@@ -39,7 +51,8 @@ export function SidebarNav({ slug, onLinkClick }: SidebarNavProps) {
             <div className="flex-1 overflow-auto py-4">
                 <nav className="grid gap-1 px-2">
                     {sidebarItems.map((item, index) => {
-                        const isActive = pathname === item.href
+                        const isActive = pathname === item.href || 
+                            (item.href !== "/dashboard" && pathname.startsWith(item.href))
                         return (
                             <Link
                                 key={index}
