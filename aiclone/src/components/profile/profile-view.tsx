@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { ChatInterface } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"
 import { BookingModal } from "@/components/booking/booking-modal"
-import { X, Calendar, DollarSign, User } from "lucide-react"
+import { X, Calendar, DollarSign, User, CheckCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ProfileViewProps {
@@ -87,6 +88,20 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
     const [isBookingOpen, setIsBookingOpen] = useState(false)
     const [selectedService, setSelectedService] = useState<string | null>(null)
     const [isPurchasing, setIsPurchasing] = useState(false)
+    const [showSuccessNotification, setShowSuccessNotification] = useState(false)
+    const searchParams = useSearchParams()
+
+    useEffect(() => {
+        const checkoutStatus = searchParams.get('checkout')
+        if (checkoutStatus === 'success') {
+            setShowSuccessNotification(true)
+            const timer = setTimeout(() => {
+                setShowSuccessNotification(false)
+                window.history.replaceState({}, '', `/${profile.slug}`)
+            }, 5000)
+            return () => clearTimeout(timer)
+        }
+    }, [searchParams, profile.slug])
 
     const handleShowContent = (type: "about" | "experience" | "projects" | "products" | "courses" | "events" | "communities") => {
         setActiveContent(type)
@@ -136,6 +151,24 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
 
     return (
         <div className="flex h-screen w-full bg-black text-foreground overflow-hidden relative">
+            {showSuccessNotification && (
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-green-600/90 text-white rounded-lg shadow-lg backdrop-blur-sm border border-green-500/30">
+                        <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                        <div>
+                            <p className="font-medium">Purchase successful!</p>
+                            <p className="text-sm text-green-100">Thank you for your order. Check your email for details.</p>
+                        </div>
+                        <button 
+                            onClick={() => setShowSuccessNotification(false)}
+                            className="ml-2 p-1 hover:bg-green-500/50 rounded transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+            
             <div
                 className="absolute inset-0 opacity-10 pointer-events-none z-0"
                 style={{

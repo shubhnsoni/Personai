@@ -19,6 +19,7 @@ import {
     UsersRound,
     Gift,
     Link2,
+    ShoppingBag,
 } from "lucide-react"
 
 export const sidebarItems = [
@@ -34,6 +35,7 @@ export const sidebarItems = [
     { name: "Short Links", href: "/dashboard/links", icon: Link2 },
     { name: "Calendar", href: "/dashboard/calendar", icon: Calendar },
     { name: "Leads", href: "/dashboard/leads", icon: Users },
+    { name: "Orders", href: "/dashboard/orders", icon: ShoppingBag },
     { name: "Conversations", href: "/dashboard/conversations", icon: MessageSquare },
     { name: "Payments", href: "/dashboard/payments", icon: CreditCard },
 ]
