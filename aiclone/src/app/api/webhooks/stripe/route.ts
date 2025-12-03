@@ -118,7 +118,7 @@ export async function POST(req: Request) {
                             visitorName: visitorName || undefined,
                             itemType: 'product',
                             itemName: product.title,
-                            priceCents: product.priceCents,
+                            priceCents: session.amount_total || 0,
                             profileDisplayName: product.profile.displayName,
                             downloadUrl: product.fileUrl || undefined
                         })
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
                             creatorName: product.profile.displayName,
                             itemType: 'product',
                             itemName: product.title,
-                            priceCents: product.priceCents,
+                            priceCents: session.amount_total || 0,
                             customerEmail: visitorEmail,
                             customerName: visitorName
                         })
@@ -170,7 +170,7 @@ export async function POST(req: Request) {
                             visitorName: visitorName || undefined,
                             itemType: 'course',
                             itemName: course.title,
-                            priceCents: course.priceCents,
+                            priceCents: session.amount_total || 0,
                             profileDisplayName: course.profile.displayName
                         })
 
@@ -179,7 +179,7 @@ export async function POST(req: Request) {
                             creatorName: course.profile.displayName,
                             itemType: 'course',
                             itemName: course.title,
-                            priceCents: course.priceCents,
+                            priceCents: session.amount_total || 0,
                             customerEmail: visitorEmail,
                             customerName: visitorName
                         })
@@ -220,7 +220,7 @@ export async function POST(req: Request) {
                             visitorName: visitorName || undefined,
                             itemType: 'event',
                             itemName: eventItem.title,
-                            priceCents: eventItem.priceCents,
+                            priceCents: session.amount_total || 0,
                             profileDisplayName: eventItem.profile.displayName,
                             eventDetails: {
                                 startTime: eventItem.startTime,
@@ -234,7 +234,7 @@ export async function POST(req: Request) {
                             creatorName: eventItem.profile.displayName,
                             itemType: 'event',
                             itemName: eventItem.title,
-                            priceCents: eventItem.priceCents,
+                            priceCents: session.amount_total || 0,
                             customerEmail: visitorEmail,
                             customerName: visitorName
                         })
@@ -280,7 +280,7 @@ export async function POST(req: Request) {
                             visitorName: visitorName || undefined,
                             itemType: 'community',
                             itemName: community.name,
-                            priceCents: community.priceCents,
+                            priceCents: session.amount_total || 0,
                             profileDisplayName: community.profile.displayName,
                             accessUrl: community.inviteLink || undefined
                         })
@@ -290,7 +290,7 @@ export async function POST(req: Request) {
                             creatorName: community.profile.displayName,
                             itemType: 'community',
                             itemName: community.name,
-                            priceCents: community.priceCents,
+                            priceCents: session.amount_total || 0,
                             customerEmail: visitorEmail,
                             customerName: visitorName
                         })

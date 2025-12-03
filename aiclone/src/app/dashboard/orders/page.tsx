@@ -14,7 +14,7 @@ export default async function DashboardOrdersPage() {
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
 
-    const [productPurchases, courseEnrollments, eventRegistrations, communityMembers] = await Promise.all([
+    const [productPurchases, courseEnrollments, eventRegistrations, communityMembers, payments] = await Promise.all([
         prisma.productPurchase.findMany({
             where: { product: { profileId: profile.id } },
             include: { product: true },
@@ -34,13 +34,17 @@ export default async function DashboardOrdersPage() {
             where: { community: { profileId: profile.id } },
             include: { community: true },
             orderBy: { createdAt: 'desc' }
+        }),
+        prisma.payment.findMany({
+            where: { 
+                profileId: profile.id,
+                status: 'SUCCEEDED'
+            },
+            orderBy: { createdAt: 'desc' }
         })
     ])
 
-    const totalRevenue = productPurchases.filter(p => p.status === 'COMPLETED').reduce((sum, p) => sum + p.product.priceCents, 0) +
-        courseEnrollments.filter(e => e.status === 'ACTIVE').reduce((sum, e) => sum + e.course.priceCents, 0) +
-        eventRegistrations.filter(r => r.status === 'REGISTERED').reduce((sum, r) => sum + r.event.priceCents, 0) +
-        communityMembers.filter(m => m.status === 'ACTIVE').reduce((sum, m) => sum + m.community.priceCents, 0)
+    const totalRevenue = payments.reduce((sum, p) => sum + p.amountCents, 0)
 
     return (
         <div className="flex-1 space-y-6 p-8 pt-6">
