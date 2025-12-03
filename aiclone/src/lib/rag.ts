@@ -29,6 +29,38 @@ interface ProfileWithRelations {
         isFree: boolean
         durationMinutes: number
     }>
+    digitalProducts?: Array<{
+        title: string
+        description: string | null
+        type: string
+        priceCents: number
+    }>
+    courses?: Array<{
+        title: string
+        description: string | null
+        priceCents: number
+        modules: Array<{ lessons: Array<unknown> }>
+    }>
+    events?: Array<{
+        title: string
+        description: string | null
+        eventType: string
+        startTime: Date
+        priceCents: number
+        isFree: boolean
+    }>
+    communities?: Array<{
+        name: string
+        description: string | null
+        platform: string
+        priceCents: number
+        billingCycle: string
+    }>
+    leadMagnets?: Array<{
+        title: string
+        description: string | null
+        type: string
+    }>
 }
 
 const STOP_WORDS = new Set([
@@ -170,7 +202,54 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
             if (s.description) entry += ` - ${s.description}`
             return entry
         }).join('\n')
-        servicesSection = `\n## Services & Pricing\n${serviceList}`
+        servicesSection = `\n## Consultation Services\n${serviceList}`
+    }
+
+    let productsSection = ""
+    if (profile.digitalProducts && profile.digitalProducts.length > 0) {
+        const productList = profile.digitalProducts.map(p => {
+            return `- ${p.title} (${p.type}): $${(p.priceCents / 100).toFixed(0)}${p.description ? ` - ${p.description}` : ''}`
+        }).join('\n')
+        productsSection = `\n## Digital Products\n${productList}`
+    }
+
+    let coursesSection = ""
+    if (profile.courses && profile.courses.length > 0) {
+        const courseList = profile.courses.map(c => {
+            const lessonCount = c.modules.reduce((sum, m) => sum + m.lessons.length, 0)
+            return `- ${c.title}: $${(c.priceCents / 100).toFixed(0)} (${c.modules.length} modules, ${lessonCount} lessons)${c.description ? ` - ${c.description}` : ''}`
+        }).join('\n')
+        coursesSection = `\n## Courses\n${courseList}`
+    }
+
+    let eventsSection = ""
+    if (profile.events && profile.events.length > 0) {
+        const upcomingEvents = profile.events.filter(e => new Date(e.startTime) > new Date())
+        if (upcomingEvents.length > 0) {
+            const eventList = upcomingEvents.map(e => {
+                const date = new Date(e.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                const price = e.isFree ? 'Free' : `$${(e.priceCents / 100).toFixed(0)}`
+                return `- ${e.title} (${e.eventType}): ${date} - ${price}${e.description ? ` - ${e.description}` : ''}`
+            }).join('\n')
+            eventsSection = `\n## Upcoming Events\n${eventList}`
+        }
+    }
+
+    let communitiesSection = ""
+    if (profile.communities && profile.communities.length > 0) {
+        const communityList = profile.communities.map(c => {
+            const billing = c.billingCycle === 'MONTHLY' ? '/month' : c.billingCycle === 'YEARLY' ? '/year' : ' one-time'
+            return `- ${c.name} (${c.platform}): $${(c.priceCents / 100).toFixed(0)}${billing}${c.description ? ` - ${c.description}` : ''}`
+        }).join('\n')
+        communitiesSection = `\n## Communities\n${communityList}`
+    }
+
+    let leadMagnetsSection = ""
+    if (profile.leadMagnets && profile.leadMagnets.length > 0) {
+        const magnetList = profile.leadMagnets.map(m => {
+            return `- ${m.title} (Free ${m.type.toLowerCase()})${m.description ? ` - ${m.description}` : ''}`
+        }).join('\n')
+        leadMagnetsSection = `\n## Free Resources\n${magnetList}`
     }
 
     let contextSection = ""
@@ -191,6 +270,11 @@ ${profile.bio ? `\nBio: ${profile.bio}` : ''}
 ${experienceSection}
 ${projectsSection}
 ${servicesSection}
+${productsSection}
+${coursesSection}
+${eventsSection}
+${communitiesSection}
+${leadMagnetsSection}
 ${contextSection}
 
 ## Your Behavior Guidelines
@@ -198,20 +282,26 @@ ${contextSection}
 - Your primary goal is to ${goalDescription}
 - Be professional, friendly, and conversational
 - Keep responses concise but informative (2-4 sentences typically)
-- When asked about services or pricing, provide accurate information from the data above
+- When asked about services, products, courses, or events, provide accurate information from the data above
 - When asked about experience or projects, reference specific details from the data
 - If you don't have specific information, say "I don't have that information available, but you can book a call to discuss" 
 - Never make up information that isn't provided
 - Use ${profile.language === 'en' ? 'English' : profile.language}
 - When appropriate, guide the conversation toward the primary goal
+- Help visitors discover products, courses, and events that might interest them
 ${profile.welcomeMessageOverride ? `\nWelcome message style: "${profile.welcomeMessageOverride}"` : ''}
 
 ## Tools Available
 You have access to these functions that you should use when appropriate:
 - collectLead: Use when the visitor shows interest in working together and provides their contact info
-- showServices: Use when asked about rates, pricing, or what services are offered
+- showServices: Use when asked about consultation rates, booking calls, or coaching services
 - showWorkExperience: Use when asked about background, CV, or work history
 - showProjects: Use when asked about portfolio or past projects
+- showProducts: Use when asked about digital products, ebooks, templates, or downloads for sale
+- showCourses: Use when asked about courses, learning, or training programs
+- showEvents: Use when asked about webinars, workshops, or upcoming events
+- showCommunities: Use when asked about community memberships, Telegram, or Discord groups
+- showLeadMagnets: Use when asked about free resources, guides, or giveaways
 
-Remember: You are representing ${profile.displayName} professionally. Create a great first impression!`
+Remember: You are representing ${profile.displayName} professionally. Help visitors discover valuable content and services!`
 }

@@ -18,6 +18,26 @@ export async function POST(req: Request) {
             projects: true,
             serviceOfferings: {
                 where: { isActive: true }
+            },
+            digitalProducts: {
+                where: { isActive: true }
+            },
+            courses: {
+                where: { isActive: true, isPublished: true },
+                include: {
+                    modules: {
+                        include: { lessons: true }
+                    }
+                }
+            },
+            events: {
+                where: { isActive: true }
+            },
+            communities: {
+                where: { isActive: true }
+            },
+            leadMagnets: {
+                where: { isActive: true }
             }
         }
     })
@@ -31,7 +51,12 @@ export async function POST(req: Request) {
         headline: profile.headline,
         serviceOfferings: profile.serviceOfferings,
         workExperiences: profile.workExperiences,
-        projects: profile.projects
+        projects: profile.projects,
+        digitalProducts: profile.digitalProducts,
+        courses: profile.courses,
+        events: profile.events,
+        communities: profile.communities,
+        leadMagnets: profile.leadMagnets
     }
 
     const lastMessage = messages[messages.length - 1]
@@ -89,7 +114,7 @@ export async function POST(req: Request) {
             type: "function",
             function: {
                 name: "showServices",
-                description: "Show available services and pricing when user asks about rates, pricing, or services",
+                description: "Show available services and pricing when user asks about rates, pricing, consultation services, or booking a call",
                 parameters: { type: "object", properties: {} }
             }
         },
@@ -106,6 +131,46 @@ export async function POST(req: Request) {
             function: {
                 name: "showProjects",
                 description: "Show portfolio projects when user asks about work, projects, or portfolio",
+                parameters: { type: "object", properties: {} }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "showProducts",
+                description: "Show digital products (ebooks, templates, videos, courses) when user asks about products, downloads, resources, or things they can buy/purchase",
+                parameters: { type: "object", properties: {} }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "showCourses",
+                description: "Show available courses when user asks about learning, courses, training, or education",
+                parameters: { type: "object", properties: {} }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "showEvents",
+                description: "Show upcoming events and webinars when user asks about events, webinars, workshops, or live sessions",
+                parameters: { type: "object", properties: {} }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "showCommunities",
+                description: "Show community memberships when user asks about community, groups, membership, Telegram, or Discord",
+                parameters: { type: "object", properties: {} }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "showLeadMagnets",
+                description: "Show free resources and lead magnets when user asks about free resources, downloads, giveaways, or guides",
                 parameters: { type: "object", properties: {} }
             }
         }
@@ -146,14 +211,14 @@ export async function POST(req: Request) {
             case "showServices": {
                 const services = profileData.serviceOfferings
                 if (services.length === 0) {
-                    return `${profileData.displayName} hasn't listed specific services yet, but you can book a call to discuss your needs.`
+                    return `${profileData.displayName} hasn't listed specific consultation services yet, but you can reach out to discuss your needs.`
                 }
                 
                 const serviceList = services.map(s => 
-                    `- ${s.name}: ${s.isFree ? 'Free' : `$${(s.priceCents / 100).toFixed(2)}`} (${s.durationMinutes} min)${s.description ? ` - ${s.description}` : ''}`
+                    `- **${s.name}**: ${s.isFree ? 'Free' : `$${(s.priceCents / 100).toFixed(0)}`} (${s.durationMinutes} min)${s.description ? ` - ${s.description}` : ''}`
                 ).join('\n')
                 
-                return `Here are ${profileData.displayName}'s services:\n${serviceList}\n\nWould you like to book any of these?`
+                return `Here are ${profileData.displayName}'s consultation services:\n${serviceList}\n\nWould you like to book any of these?`
             }
             case "showWorkExperience": {
                 const experiences = profileData.workExperiences
@@ -162,7 +227,7 @@ export async function POST(req: Request) {
                 }
                 
                 const expList = experiences.map(e => 
-                    `- ${e.role} at ${e.company} (${e.startDate} - ${e.endDate || 'Present'})${e.description ? `: ${e.description}` : ''}`
+                    `- **${e.role}** at ${e.company} (${e.startDate} - ${e.endDate || 'Present'})${e.description ? `: ${e.description}` : ''}`
                 ).join('\n')
                 
                 return `${profileData.displayName}'s Work Experience:\n${expList}`
@@ -174,10 +239,80 @@ export async function POST(req: Request) {
                 }
                 
                 const projectList = projects.map(p => 
-                    `- ${p.title}${p.client ? ` for ${p.client}` : ''}${p.year ? ` (${p.year})` : ''}${p.description ? `: ${p.description}` : ''}`
+                    `- **${p.title}**${p.client ? ` for ${p.client}` : ''}${p.year ? ` (${p.year})` : ''}${p.description ? `: ${p.description}` : ''}`
                 ).join('\n')
                 
                 return `${profileData.displayName}'s Projects:\n${projectList}`
+            }
+            case "showProducts": {
+                const products = profileData.digitalProducts
+                if (products.length === 0) {
+                    return `${profileData.displayName} doesn't have digital products listed yet. Check out their courses or services instead!`
+                }
+                
+                const productList = products.map(p => {
+                    const typeLabel = p.type === 'PDF' ? '📄' : p.type === 'VIDEO' ? '🎬' : p.type === 'AUDIO' ? '🎧' : '📦'
+                    return `- ${typeLabel} **${p.title}**: $${(p.priceCents / 100).toFixed(0)}${p.description ? ` - ${p.description}` : ''}`
+                }).join('\n')
+                
+                return `Here are ${profileData.displayName}'s digital products:\n${productList}\n\nWould you like to purchase any of these?`
+            }
+            case "showCourses": {
+                const courses = profileData.courses
+                if (courses.length === 0) {
+                    return `${profileData.displayName} doesn't have courses available yet. You might be interested in their consultation services instead!`
+                }
+                
+                const courseList = courses.map(c => {
+                    const lessonCount = c.modules.reduce((sum, m) => sum + m.lessons.length, 0)
+                    return `- 🎓 **${c.title}**: $${(c.priceCents / 100).toFixed(0)} (${c.modules.length} modules, ${lessonCount} lessons)${c.description ? ` - ${c.description}` : ''}`
+                }).join('\n')
+                
+                return `Here are ${profileData.displayName}'s courses:\n${courseList}\n\nWould you like to enroll in any of these?`
+            }
+            case "showEvents": {
+                const events = profileData.events
+                const upcomingEvents = events.filter(e => new Date(e.startTime) > new Date())
+                
+                if (upcomingEvents.length === 0) {
+                    return `${profileData.displayName} doesn't have upcoming events scheduled. Follow them to stay updated!`
+                }
+                
+                const eventList = upcomingEvents.map(e => {
+                    const typeIcon = e.eventType === 'WEBINAR' ? '🎥' : e.eventType === 'WORKSHOP' ? '🛠️' : '👥'
+                    const date = new Date(e.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                    const price = e.isFree ? 'Free' : `$${(e.priceCents / 100).toFixed(0)}`
+                    return `- ${typeIcon} **${e.title}** - ${date} (${price})${e.description ? ` - ${e.description}` : ''}`
+                }).join('\n')
+                
+                return `Here are ${profileData.displayName}'s upcoming events:\n${eventList}\n\nWould you like to register for any of these?`
+            }
+            case "showCommunities": {
+                const communities = profileData.communities
+                if (communities.length === 0) {
+                    return `${profileData.displayName} doesn't have community memberships available yet.`
+                }
+                
+                const communityList = communities.map(c => {
+                    const platformIcon = c.platform === 'TELEGRAM' ? '📱' : '💬'
+                    const billing = c.billingCycle === 'MONTHLY' ? '/month' : c.billingCycle === 'YEARLY' ? '/year' : ' one-time'
+                    return `- ${platformIcon} **${c.name}** (${c.platform}): $${(c.priceCents / 100).toFixed(0)}${billing}${c.description ? ` - ${c.description}` : ''}`
+                }).join('\n')
+                
+                return `Join ${profileData.displayName}'s communities:\n${communityList}\n\nWould you like to join any of these?`
+            }
+            case "showLeadMagnets": {
+                const leadMagnets = profileData.leadMagnets
+                if (leadMagnets.length === 0) {
+                    return `${profileData.displayName} doesn't have free resources available right now. Check out their products or courses!`
+                }
+                
+                const magnetList = leadMagnets.map(m => {
+                    const typeIcon = m.type === 'FORM' ? '📝' : m.type === 'GIVEAWAY' ? '🎁' : '📥'
+                    return `- ${typeIcon} **${m.title}** (${m.type === 'FORM' ? 'Sign up' : 'Free download'})${m.description ? ` - ${m.description}` : ''}`
+                }).join('\n')
+                
+                return `Here are ${profileData.displayName}'s free resources:\n${magnetList}\n\nWould you like to get any of these?`
             }
             default:
                 return "I don't know how to handle that request."
