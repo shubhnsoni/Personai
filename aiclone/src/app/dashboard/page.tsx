@@ -16,45 +16,49 @@ export default async function DashboardPage() {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    const [
-        conversationCount,
-        conversationCountLast30Days,
-        leadCount,
-        leadCountLast7Days,
-        bookingCount,
-        upcomingBookings,
-        paymentSum,
-        recentConversations,
-        recentLeads
-    ] = await Promise.all([
-        prisma.conversation.count({ where: { profileId: profile.id } }),
-        prisma.conversation.count({ 
-            where: { profileId: profile.id, startedAt: { gte: thirtyDaysAgo } } 
-        }),
-        prisma.visitorLead.count({ where: { profileId: profile.id } }),
-        prisma.visitorLead.count({ 
-            where: { profileId: profile.id, createdAt: { gte: sevenDaysAgo } } 
-        }),
-        prisma.booking.count({ where: { profileId: profile.id } }),
-        prisma.booking.count({ 
-            where: { profileId: profile.id, startTime: { gte: now } } 
-        }),
-        prisma.payment.aggregate({
-            where: { profileId: profile.id, status: "SUCCEEDED" },
-            _sum: { amountCents: true }
-        }),
-        prisma.conversation.findMany({
-            where: { profileId: profile.id },
-            orderBy: { lastMessageAt: "desc" },
-            take: 5,
-            include: { messages: { take: 1, orderBy: { createdAt: "desc" } } }
-        }),
-        prisma.visitorLead.findMany({
-            where: { profileId: profile.id },
-            orderBy: { createdAt: "desc" },
-            take: 5
-        })
+    // Batch queries to avoid exhausting connection pool
+    const [batch1, batch2, batch3] = await Promise.all([
+        // Batch 1: Conversation counts
+        Promise.all([
+            prisma.conversation.count({ where: { profileId: profile.id } }),
+            prisma.conversation.count({ 
+                where: { profileId: profile.id, startedAt: { gte: thirtyDaysAgo } } 
+            })
+        ]),
+        // Batch 2: Lead and booking counts
+        Promise.all([
+            prisma.visitorLead.count({ where: { profileId: profile.id } }),
+            prisma.visitorLead.count({ 
+                where: { profileId: profile.id, createdAt: { gte: sevenDaysAgo } } 
+            }),
+            prisma.booking.count({ where: { profileId: profile.id } }),
+            prisma.booking.count({ 
+                where: { profileId: profile.id, startTime: { gte: now } } 
+            })
+        ]),
+        // Batch 3: Payments and recent data
+        Promise.all([
+            prisma.payment.aggregate({
+                where: { profileId: profile.id, status: "SUCCEEDED" },
+                _sum: { amountCents: true }
+            }),
+            prisma.conversation.findMany({
+                where: { profileId: profile.id },
+                orderBy: { lastMessageAt: "desc" },
+                take: 5,
+                include: { messages: { take: 1, orderBy: { createdAt: "desc" } } }
+            }),
+            prisma.visitorLead.findMany({
+                where: { profileId: profile.id },
+                orderBy: { createdAt: "desc" },
+                take: 5
+            })
+        ])
     ])
+
+    const [conversationCount, conversationCountLast30Days] = batch1
+    const [leadCount, leadCountLast7Days, bookingCount, upcomingBookings] = batch2
+    const [paymentSum, recentConversations, recentLeads] = batch3
 
     const baseUrl = process.env.REPLIT_DEV_DOMAIN 
         ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
