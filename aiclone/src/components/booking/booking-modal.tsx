@@ -61,7 +61,7 @@ export function BookingModal({ isOpen, onClose, profile, selectedServiceId }: Bo
 
     const generateMockSlots = async (): Promise<string[]> => {
         await new Promise(r => setTimeout(r, 500))
-        const slots = []
+        const slots: string[] = []
         for (let h = 9; h <= 17; h++) {
             slots.push(`${h.toString().padStart(2, '0')}:00`)
             if (h < 17) slots.push(`${h.toString().padStart(2, '0')}:30`)

@@ -52,7 +52,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
 
     return (
         <ProfileView
-            profile={profile}
+            profile={profile as any}
             animationConfig={animationConfig}
             colors={colors}
         />

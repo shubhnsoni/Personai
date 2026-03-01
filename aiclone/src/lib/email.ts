@@ -1,3 +1,8 @@
+import { Resend } from 'resend'
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
+const FROM_EMAIL = process.env.EMAIL_FROM || 'PersonaLink <noreply@personalink.app>'
+
 interface EmailOptions {
     to: string
     subject: string
@@ -22,27 +27,43 @@ interface PurchaseEmailData {
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-    console.log('[Email] Would send email:', {
-        to: options.to,
-        subject: options.subject,
-        preview: options.text?.substring(0, 100) || options.html.substring(0, 100)
-    })
-    return true
+    if (!resend) {
+        console.log('[Email] RESEND_API_KEY not set. Would send email:', {
+            to: options.to,
+            subject: options.subject,
+            preview: options.text?.substring(0, 100) || options.html.substring(0, 100)
+        })
+        return true
+    }
+
+    try {
+        await resend.emails.send({
+            from: FROM_EMAIL,
+            to: options.to,
+            subject: options.subject,
+            html: options.html,
+            text: options.text,
+        })
+        return true
+    } catch (error) {
+        console.error('[Email] Failed to send:', error)
+        return false
+    }
 }
 
 export async function sendPurchaseConfirmation(data: PurchaseEmailData): Promise<boolean> {
     const { visitorEmail, visitorName, itemType, itemName, priceCents, profileDisplayName, downloadUrl, accessUrl, eventDetails } = data
-    
+
     const formattedPrice = priceCents === 0 ? 'Free' : `$${(priceCents / 100).toFixed(2)}`
     const greeting = visitorName ? `Hi ${visitorName}` : 'Hi there'
-    
+
     let specificContent = ''
     let subjectSuffix = ''
-    
+
     switch (itemType) {
         case 'product':
             subjectSuffix = 'Purchase Confirmed'
-            specificContent = downloadUrl 
+            specificContent = downloadUrl
                 ? `<p>You can download your product here: <a href="${downloadUrl}">${downloadUrl}</a></p>`
                 : `<p>Your product is ready! You can access it in your purchases.</p>`
             break
@@ -71,7 +92,7 @@ export async function sendPurchaseConfirmation(data: PurchaseEmailData): Promise
                 : `<p>Your community access is now active. Welcome aboard!</p>`
             break
     }
-    
+
     const html = `
         <!DOCTYPE html>
         <html>
@@ -105,7 +126,7 @@ export async function sendPurchaseConfirmation(data: PurchaseEmailData): Promise
         </body>
         </html>
     `
-    
+
     const text = `
 ${greeting},
 
@@ -118,7 +139,7 @@ If you have any questions, please reply to this email.
 
 Powered by PersonaLink
     `.trim()
-    
+
     return sendEmail({
         to: visitorEmail,
         subject: `${itemName} - ${subjectSuffix}`,
@@ -137,10 +158,10 @@ export async function sendCreatorNotification(data: {
     customerName?: string
 }): Promise<boolean> {
     const { creatorEmail, creatorName, itemType, itemName, priceCents, customerEmail, customerName } = data
-    
+
     const formattedPrice = priceCents === 0 ? 'Free' : `$${(priceCents / 100).toFixed(2)}`
     const customerDisplay = customerName || customerEmail
-    
+
     const actionText = {
         product: 'purchased',
         course: 'enrolled in',
@@ -148,7 +169,7 @@ export async function sendCreatorNotification(data: {
         community: 'joined',
         booking: 'booked'
     }[itemType]
-    
+
     const html = `
         <!DOCTYPE html>
         <html>
@@ -182,7 +203,7 @@ export async function sendCreatorNotification(data: {
         </body>
         </html>
     `
-    
+
     const text = `
 Hi ${creatorName},
 
@@ -196,7 +217,7 @@ View all your orders in your Dashboard.
 
 Powered by PersonaLink
     `.trim()
-    
+
     return sendEmail({
         to: creatorEmail,
         subject: `New ${itemType}! ${customerDisplay} ${actionText} ${itemName}`,

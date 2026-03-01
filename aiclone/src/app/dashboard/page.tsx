@@ -60,9 +60,7 @@ export default async function DashboardPage() {
     const [leadCount, leadCountLast7Days, bookingCount, upcomingBookings] = batch2
     const [paymentSum, recentConversations, recentLeads] = batch3
 
-    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-        : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:5000')
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
     return (
         <div className="space-y-8 p-8 pt-6">

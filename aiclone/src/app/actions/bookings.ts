@@ -19,7 +19,7 @@ export async function getAvailableSlots(profileId: string, dateStr: string) {
     // Simple implementation: 30 min slots from start to end
     // In real app, check duration of service and existing bookings
 
-    const slots = []
+    const slots: string[] = []
     let current = new Date(`${dateStr}T${schedule.startTime}`)
     const end = new Date(`${dateStr}T${schedule.endTime}`)
 
