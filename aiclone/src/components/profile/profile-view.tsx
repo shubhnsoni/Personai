@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { ChatInterface } from "@/components/chat/chat-interface"
+import { ChatInterface, type ChatChip } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"
 import { BookingModal } from "@/components/booking/booking-modal"
-import { X, Calendar, DollarSign, User, CheckCircle } from "lucide-react"
+import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -18,6 +18,7 @@ interface ProfileViewProps {
         bio: string | null
         welcomeMessageOverride: string | null
         contentDisplayMode: string
+        primaryGoal?: string | null
         workExperiences: Array<{
             id: string
             company: string
@@ -77,12 +78,18 @@ interface ProfileViewProps {
             priceCents: number
             billingCycle: string
         }>
+        leadMagnets?: Array<{
+            id: string
+            title: string
+        }>
     }
     animationConfig: { speed?: number; intensity?: number; colors?: string[] }
     colors: string[]
 }
 
 type ContentType = "about" | "experience" | "projects" | "services" | "products" | "courses" | "events" | "communities" | null
+
+type ChipDef = ChatChip & { available: boolean }
 
 export function ProfileView({ profile, animationConfig, colors }: ProfileViewProps) {
     const [activeContent, setActiveContent] = useState<ContentType>(null)
@@ -121,7 +128,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
             toast.error("Purchases coming soon!", { description: "Payment processing hasn't been set up yet." })
             return
         }
-        
+
         try {
             setIsPurchasing(true)
             const response = await fetch('/api/stripe/purchase', {
@@ -154,10 +161,13 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
         }
     }
 
-    const activeServices = profile.serviceOfferings.filter(s => s.isActive)
+    const chips = buildGoalChips(profile, {
+        openBooking: () => setIsBookingOpen(true),
+        openContent: (type) => setActiveContent(type),
+    })
 
     return (
-        <div className="flex h-screen w-full bg-black text-foreground overflow-hidden relative">
+        <div className="dark flex h-screen w-full bg-profile text-profile-text overflow-hidden relative">
             {showSuccessNotification && (
                 <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
                     <div className="flex items-center gap-3 px-4 py-3 bg-green-600/90 text-white rounded-lg shadow-lg backdrop-blur-sm border border-green-500/30">
@@ -166,7 +176,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                             <p className="font-medium">Purchase successful!</p>
                             <p className="text-sm text-green-100">Thank you for your order. Check your email for details.</p>
                         </div>
-                        <button 
+                        <button
                             onClick={() => setShowSuccessNotification(false)}
                             className="ml-2 p-1 hover:bg-green-500/50 rounded transition-colors"
                         >
@@ -175,7 +185,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                     </div>
                 </div>
             )}
-            
+
             <div
                 className="absolute inset-0 opacity-10 pointer-events-none z-0"
                 style={{
@@ -187,22 +197,6 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                 "flex-1 flex flex-col h-full relative z-10 transition-all duration-500 ease-in-out",
                 activeContent ? "lg:w-[40%] lg:flex-none" : "w-full"
             )}>
-                {!activeContent && (
-                    <div className="absolute top-4 right-4 z-30 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
-                        <QuickActionChip 
-                            icon={<User className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                            label="About"
-                            onClick={() => setActiveContent("about")}
-                        />
-                        <QuickActionChip 
-                            icon={<Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                            label="Book"
-                            onClick={() => setIsBookingOpen(true)}
-                            highlighted
-                        />
-                    </div>
-                )}
-
                 <div className="flex-1 w-full mx-auto relative h-full overflow-hidden">
                     <ChatInterface
                         profile={profile}
@@ -210,23 +204,8 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                         animationConfig={animationConfig}
                         onShowContent={handleShowContent}
                         isPanelOpen={!!activeContent}
-                        quickQuestions={[
-                            `Show me ${profile.displayName}'s work history`,
-                            `Show me ${profile.displayName}'s projects`,
-                            `What services does ${profile.displayName} offer?`,
-                            "Book a call"
-                        ]}
+                        chips={chips}
                     />
-
-                    {!activeContent && activeServices.length > 0 && (
-                        <div className="absolute bottom-28 left-2 right-2 sm:left-4 sm:right-4 flex flex-wrap justify-center gap-1.5 sm:gap-2 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
-                            <QuickActionChip 
-                                icon={<DollarSign className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                                label="Services"
-                                onClick={() => setActiveContent("services")}
-                            />
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -252,26 +231,118 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
     )
 }
 
-interface QuickActionChipProps {
-    icon: React.ReactNode
-    label: string
-    onClick: () => void
-    highlighted?: boolean
-}
+function buildGoalChips(
+    profile: ProfileViewProps["profile"],
+    actions: {
+        openBooking: () => void
+        openContent: (type: Exclude<ContentType, null>) => void
+    }
+): ChatChip[] {
+    const name = profile.displayName
+    const hasServices = profile.serviceOfferings.some(s => s.isActive)
+    const hasProjects = profile.projects.length > 0
+    const hasExperience = profile.workExperiences.length > 0
+    const hasWork = hasProjects || hasExperience
+    const hasLeadMagnets = (profile.leadMagnets?.length ?? 0) > 0
 
-function QuickActionChip({ icon, label, onClick, highlighted }: QuickActionChipProps) {
-    return (
-        <button
-            onClick={onClick}
-            className={cn(
-                "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-medium transition-all active:scale-95 hover:scale-105 shadow-lg backdrop-blur-sm touch-manipulation",
-                highlighted 
-                    ? "bg-purple-600 hover:bg-purple-500 text-white border border-purple-400/30"
-                    : "bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/50"
-            )}
-        >
-            {icon}
-            {label}
-        </button>
-    )
+    const catalog: Record<string, ChipDef> = {
+        book: {
+            id: "book",
+            label: "Book a call",
+            available: hasServices,
+            icon: <Calendar className="w-3.5 h-3.5" />,
+            onSelect: actions.openBooking,
+        },
+        services: {
+            id: "services",
+            label: "See services",
+            available: hasServices,
+            icon: <DollarSign className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent("services"),
+        },
+        rates: {
+            id: "rates",
+            label: "Ask about rates",
+            available: hasServices,
+            icon: <DollarSign className="w-3.5 h-3.5" />,
+            prompt: `What are ${name}'s rates?`,
+        },
+        work: {
+            id: "work",
+            label: "See work",
+            available: hasWork,
+            icon: <Briefcase className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent(hasProjects ? "projects" : "experience"),
+        },
+        portfolio: {
+            id: "portfolio",
+            label: "See portfolio",
+            available: hasProjects,
+            icon: <FolderKanban className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent("projects"),
+        },
+        history: {
+            id: "history",
+            label: "Work history",
+            available: hasExperience,
+            icon: <Briefcase className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent("experience"),
+        },
+        projects: {
+            id: "projects",
+            label: "See projects",
+            available: hasProjects,
+            icon: <FolderKanban className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent("projects"),
+        },
+        cases: {
+            id: "cases",
+            label: "Case studies",
+            available: hasProjects,
+            icon: <FolderKanban className="w-3.5 h-3.5" />,
+            prompt: "Walk me through a case study",
+        },
+        about: {
+            id: "about",
+            label: "About",
+            available: true,
+            icon: <User className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent("about"),
+        },
+        guide: {
+            id: "guide",
+            label: "Get the free guide",
+            available: hasLeadMagnets,
+            icon: <Gift className="w-3.5 h-3.5" />,
+            prompt: "How can I get the free guide?",
+        },
+        ask: {
+            id: "ask",
+            label: "Ask a question",
+            available: true,
+            icon: <MessageCircle className="w-3.5 h-3.5" />,
+        },
+    }
+
+    const orderByGoal: Record<string, string[]> = {
+        BOOK_CALL: ["book", "services", "rates", "work"],
+        HIRE_ME: ["portfolio", "history", "rates", "book"],
+        SHOW_PORTFOLIO: ["projects", "cases", "about", "book"],
+        SHOWCASE_WORK: ["projects", "cases", "about", "book"],
+        COLLECT_LEADS: ["guide", "ask", "work", "book"],
+    }
+
+    const goal = profile.primaryGoal || "BOOK_CALL"
+    const keys = orderByGoal[goal] ?? ["about", "work", "services", "book"]
+    const chips = keys
+        .map((key) => catalog[key])
+        .filter((chip): chip is ChipDef => Boolean(chip?.available))
+        .map(({ available: _available, ...chip }) => chip)
+
+    if (chips.length === 0) {
+        const { available: _available, ...about } = catalog.about
+        chips.push(about)
+    }
+    if (chips[0]) chips[0] = { ...chips[0], highlighted: true }
+    return chips
 }

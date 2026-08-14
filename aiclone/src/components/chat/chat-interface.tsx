@@ -1,9 +1,12 @@
 "use client"
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
+import { Chip } from "@/components/ui/chip"
 import { Input } from "@/components/ui/input"
 import { ArrowUp, ChevronRight, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { fadeUp, scaleIn } from "@/lib/motion"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { toast } from "sonner"
 
@@ -13,6 +16,16 @@ interface ChatMessage {
     content: string
 }
 
+export type ChatChip = {
+    id: string
+    label: string
+    highlighted?: boolean
+    icon?: ReactNode
+    /** Send this as a visitor message. Ignored when onSelect is set. */
+    prompt?: string
+    onSelect?: () => void
+}
+
 interface ChatInterfaceProps {
     profile: {
         id: string
@@ -20,7 +33,8 @@ interface ChatInterfaceProps {
         welcomeMessageOverride?: string | null
         slug: string
     }
-    welcome?: React.ReactNode
+    welcome?: ReactNode
+    chips?: ChatChip[]
     quickQuestions?: string[]
     onShowContent?: (type: "about" | "experience" | "projects" | "products" | "courses" | "events" | "communities") => void
     colors?: string[]
@@ -28,13 +42,15 @@ interface ChatInterfaceProps {
     isPanelOpen?: boolean
 }
 
-export function ChatInterface({ 
-    profile, 
-    quickQuestions = [], 
-    onShowContent, 
-    colors = [], 
-    animationConfig = {}, 
-    isPanelOpen = false 
+type RichContentType = "experience" | "projects" | "about" | "products" | "courses" | "events" | "communities"
+
+export function ChatInterface({
+    profile,
+    chips = [],
+    quickQuestions = [],
+    onShowContent,
+    colors = [],
+    animationConfig = {},
 }: ChatInterfaceProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState("")
@@ -43,7 +59,10 @@ export function ChatInterface({
     const [visitorId, setVisitorId] = useState<string | null>(null)
     const [isLoadingHistory, setIsLoadingHistory] = useState(true)
     const scrollRef = useRef<HTMLDivElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
+
+    const orbColors = colors.length >= 2 ? (colors as [string, string]) : undefined
 
     // Initialize visitor ID and load conversation history
     useEffect(() => {
@@ -74,7 +93,7 @@ export function ChatInterface({
         }
     }, [messages, isLoading])
 
-    const getRichContent = (content: string): "experience" | "projects" | "about" | "products" | "courses" | "events" | "communities" | null => {
+    const getRichContent = (content: string): RichContentType | null => {
         const lower = content.toLowerCase()
         if (lower.includes("experience") || lower.includes("work history")) return "experience"
         if (lower.includes("project") || lower.includes("portfolio")) return "projects"
@@ -174,30 +193,30 @@ export function ChatInterface({
         } catch (error) {
             if ((error as Error).name === "AbortError") return
             console.error("Chat error:", error)
-            
+
             const errorMsg = (error as Error).message
             const isRateLimit = errorMsg === "rate_limit"
             const isAiNotConfigured = errorMsg === "ai_not_configured"
             toast.error(
                 isRateLimit ? "Slow down!" : isAiNotConfigured ? "AI Chat Coming Soon" : "Connection issue",
                 {
-                    description: isRateLimit 
+                    description: isRateLimit
                         ? "Too many messages. Please wait a moment."
                         : isAiNotConfigured
                         ? "AI chat hasn't been set up yet. Check back later!"
                         : "Having trouble connecting. Please try again.",
                 }
             )
-            
+
             setMessages(prev => {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
                 if (updated[lastIdx]?.role === "assistant" && !updated[lastIdx].content) {
-                    updated[lastIdx] = { 
-                        ...updated[lastIdx], 
-                        content: isAiNotConfigured 
+                    updated[lastIdx] = {
+                        ...updated[lastIdx],
+                        content: isAiNotConfigured
                             ? "🚀 AI chat is coming soon! The creator is still setting things up."
-                            : "I'm having trouble responding right now. Please try again." 
+                            : "I'm having trouble responding right now. Please try again."
                     }
                 }
                 return updated
@@ -213,64 +232,109 @@ export function ChatInterface({
         sendMessage(messageToSend)
     }
 
+    const handleChip = (chip: ChatChip) => {
+        if (chip.onSelect) {
+            chip.onSelect()
+            return
+        }
+        if (chip.prompt) {
+            sendMessage(chip.prompt)
+            return
+        }
+        inputRef.current?.focus()
+    }
+
     const hasStarted = messages.length > 0 || isLoadingHistory
+    const lastAssistant = [...messages].reverse().find(m => m.role === "assistant" && m.content)
+    const suggestionPrompts = hasStarted
+        ? contextualSuggestions(profile.displayName, lastAssistant ? getRichContent(lastAssistant.content) : null)
+        : []
+    const primaryChip = chips.find(c => c.highlighted) ?? chips[0]
+    const emptyChips = chips.length > 0
+        ? chips
+        : quickQuestions.map((q, i) => ({ id: `q-${i}`, label: q, prompt: q }))
 
     return (
-        <div className="flex flex-col h-full w-full max-w-4xl mx-auto relative">
+        <div className="flex flex-col h-full w-full max-w-4xl mx-auto relative text-profile-text">
             {hasStarted && (
-                <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center gap-3 bg-black/20 backdrop-blur-sm border-b border-white/5 animate-in fade-in slide-in-from-top-2 duration-500">
+                <div className="shrink-0 z-20 px-4 py-3 flex items-center gap-3 border-b border-white/5">
                     <div className="relative w-8 h-8">
                         <WelcomeOrb
                             size={32}
-                            colors={colors && colors.length >= 2 ? (colors as [string, string]) : undefined}
+                            colors={orbColors}
                             speed={animationConfig.speed || 1}
                             intensity={animationConfig.intensity || 1}
                         />
                     </div>
-                    <span className="font-semibold text-sm text-zinc-200">
+                    <span className="font-semibold text-ui text-profile-text">
                         {profile.displayName}&apos;s AI
                     </span>
+                    {primaryChip && (
+                        <Chip
+                            className="ml-auto"
+                            variant="profile"
+                            size="sm"
+                            highlighted={primaryChip.highlighted}
+                            icon={primaryChip.icon}
+                            label={primaryChip.label}
+                            onClick={() => handleChip(primaryChip)}
+                        />
+                    )}
                 </div>
             )}
 
-            <div ref={scrollRef} className={cn(
-                "flex-1 overflow-y-auto p-4 space-y-8 scroll-smooth pb-32 transition-all duration-500",
-                hasStarted ? "pt-20" : ""
-            )}>
+            <div
+                ref={scrollRef}
+                className={cn(
+                    "flex-1 min-h-0 overflow-y-auto scroll-smooth",
+                    hasStarted ? "p-4 space-y-8" : ""
+                )}
+            >
                 {!hasStarted && (
-                    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12 animate-in fade-in zoom-in duration-500">
-                        <div className="flex flex-col items-center space-y-8 mt-12">
-                            <div className="relative">
-                                <WelcomeOrb
-                                    size={200}
-                                    colors={colors as [string, string]}
-                                    speed={animationConfig.speed || 1}
-                                    intensity={animationConfig.intensity || 1}
-                                />
-                            </div>
+                    <motion.div
+                        className="flex h-full flex-col items-center justify-center gap-8 px-4 py-6"
+                        initial="hidden"
+                        animate="visible"
+                    >
+                        <motion.div variants={scaleIn}>
+                            <WelcomeOrb
+                                size={140}
+                                colors={orbColors}
+                                speed={animationConfig.speed || 1}
+                                intensity={animationConfig.intensity || 1}
+                            />
+                        </motion.div>
 
-                            <div className="text-center space-y-3">
-                                <h1 className="text-3xl md:text-4xl font-medium tracking-tight bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
-                                    I am {profile.displayName}&apos;s AI.
-                                </h1>
-                                <p className="text-xl text-zinc-400 font-light">
-                                    {profile.welcomeMessageOverride || "Mind telling me who you are?"}
+                        <motion.div variants={fadeUp} custom={1} className="text-center space-y-3 max-w-xl">
+                            <h1 className="text-title sm:text-display-sm font-medium tracking-tight text-profile-text">
+                                I am {profile.displayName}&apos;s AI.
+                            </h1>
+                            {profile.welcomeMessageOverride ? (
+                                <p className="text-body text-profile-mute font-light">
+                                    {profile.welcomeMessageOverride}
                                 </p>
-                            </div>
-                        </div>
+                            ) : null}
+                        </motion.div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 w-full max-w-xl px-2 sm:px-4">
-                            {quickQuestions.map((q, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => handleSubmit(undefined, q)}
-                                    className="text-left p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-zinc-700 transition-all active:scale-[0.98] hover:scale-[1.02] text-xs sm:text-sm text-zinc-400 hover:text-zinc-100 shadow-sm group touch-manipulation"
-                                >
-                                    <span className="mr-1.5 sm:mr-2 group-hover:scale-110 inline-block transition-transform">💬</span> {q}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                        {emptyChips.length > 0 && (
+                            <motion.div
+                                variants={fadeUp}
+                                custom={2}
+                                className="flex flex-wrap justify-center gap-2 max-w-xl"
+                            >
+                                {emptyChips.map((chip) => (
+                                    <Chip
+                                        key={chip.id}
+                                        variant="profile"
+                                        highlighted={chip.highlighted}
+                                        icon={chip.icon}
+                                        label={chip.label}
+                                        onClick={() => handleChip(chip)}
+                                    />
+                                ))}
+                            </motion.div>
+                        )}
+                    </motion.div>
                 )}
 
                 {messages.map((m) => {
@@ -281,21 +345,21 @@ export function ChatInterface({
                         <div key={m.id} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2 gap-2`}>
                             <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} max-w-[90%]`}>
                                 {!isUser && (
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mr-3 shrink-0 shadow-lg shadow-purple-500/20 mt-1">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orb-from to-orb-to flex items-center justify-center mr-3 shrink-0 shadow-lg mt-1">
                                         <Sparkles className="w-4 h-4 text-white" />
                                     </div>
                                 )}
                                 <div className={cn(
                                     "px-5 py-3 text-base leading-relaxed",
                                     isUser
-                                        ? "bg-zinc-800 text-white rounded-2xl rounded-br-sm shadow-md"
-                                        : "text-zinc-300"
+                                        ? "bg-profile-elev text-profile-text rounded-2xl rounded-br-sm shadow-md"
+                                        : "text-profile-text/90"
                                 )}>
                                     {m.content || (
                                         <span className="flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"></span>
+                                            <span className="w-1.5 h-1.5 bg-profile-mute rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                            <span className="w-1.5 h-1.5 bg-profile-mute rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                            <span className="w-1.5 h-1.5 bg-profile-mute rounded-full animate-bounce"></span>
                                         </span>
                                     )}
                                 </div>
@@ -305,10 +369,10 @@ export function ChatInterface({
                                 <div className="ml-11 w-full max-w-sm animate-in fade-in slide-in-from-bottom-3 duration-700 delay-300">
                                     <button
                                         onClick={() => onShowContent(richContentType)}
-                                        className="w-full flex items-center justify-between p-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 hover:bg-zinc-800/80 transition-all group text-left"
+                                        className="w-full flex items-center justify-between p-4 rounded-xl bg-profile-elev border border-white/10 hover:border-brand/50 hover:bg-profile-chip transition-all group text-left"
                                     >
                                         <div>
-                                            <p className="font-medium text-white text-sm">
+                                            <p className="font-medium text-profile-text text-sm">
                                                 {richContentType === 'experience' && `${profile.displayName}'s Work Experience`}
                                                 {richContentType === 'projects' && `${profile.displayName}'s Design Projects`}
                                                 {richContentType === 'about' && `About ${profile.displayName}`}
@@ -317,13 +381,13 @@ export function ChatInterface({
                                                 {richContentType === 'events' && `${profile.displayName}'s Events`}
                                                 {richContentType === 'communities' && `${profile.displayName}'s Communities`}
                                             </p>
-                                            <p className="text-xs text-zinc-500 mt-0.5">
-                                                {['products', 'courses', 'events', 'communities'].includes(richContentType) 
-                                                    ? 'View and purchase' 
+                                            <p className="text-xs text-profile-mute mt-0.5">
+                                                {['products', 'courses', 'events', 'communities'].includes(richContentType)
+                                                    ? 'View and purchase'
                                                     : 'Click to view details'}
                                             </p>
                                         </div>
-                                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors">
+                                        <div className="w-8 h-8 rounded-full bg-profile-chip flex items-center justify-center group-hover:bg-brand/20 group-hover:text-brand transition-colors">
                                             <ChevronRight className="w-4 h-4" />
                                         </div>
                                     </button>
@@ -334,22 +398,18 @@ export function ChatInterface({
                 })}
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-black via-black/80 to-transparent pt-16 safe-bottom">
+            <div className="shrink-0 px-2 sm:px-4 pt-3 pb-2 sm:pb-4 bg-gradient-to-t from-profile via-profile/90 to-transparent safe-bottom">
                 <div className="max-w-3xl mx-auto relative w-full flex flex-col gap-2 sm:gap-3">
                     {hasStarted && !isLoading && (
-                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                            {[
-                                `How did ${profile.displayName} start his career?`,
-                                `What are ${profile.displayName}'s main achievements?`,
-                                "Dive into another topic"
-                            ].map((suggestion, i) => (
-                                <button
-                                    key={i}
+                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                            {suggestionPrompts.map((suggestion) => (
+                                <Chip
+                                    key={suggestion}
+                                    variant="profile"
+                                    size="sm"
+                                    label={suggestion}
                                     onClick={() => handleSubmit(undefined, suggestion)}
-                                    className="whitespace-nowrap px-4 py-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700 transition-all shadow-sm backdrop-blur-sm"
-                                >
-                                    <span className="mr-1.5">💬</span> {suggestion}
-                                </button>
+                                />
                             ))}
                         </div>
                     )}
@@ -359,17 +419,18 @@ export function ChatInterface({
                         className="relative flex items-center group w-full"
                     >
                         <Input
+                            ref={inputRef}
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder={`Tell me more about...`}
-                            className="w-full h-12 sm:h-14 pl-4 sm:pl-6 pr-12 sm:pr-14 rounded-full bg-zinc-900/80 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 shadow-2xl backdrop-blur-xl focus-visible:ring-1 focus-visible:ring-purple-500/50 focus-visible:border-purple-500/50 transition-all text-sm sm:text-base"
+                            placeholder="Tell me more about..."
+                            className="w-full h-12 sm:h-14 pl-4 sm:pl-6 pr-12 sm:pr-14 rounded-full bg-profile-elev border-white/10 text-profile-text placeholder:text-profile-mute shadow-2xl backdrop-blur-xl focus-visible:ring-1 focus-visible:ring-profile-ring focus-visible:border-brand/50 transition-all text-sm sm:text-base"
                             disabled={isLoading}
                         />
                         <Button
                             size="icon"
                             type="submit"
                             disabled={isLoading || !input.trim()}
-                            className="absolute right-1.5 sm:right-2 h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-zinc-800 hover:bg-white hover:text-black text-white shadow-lg transition-all disabled:opacity-50 disabled:hover:bg-zinc-800 disabled:hover:text-white touch-manipulation"
+                            className="absolute right-1.5 sm:right-2 h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-profile-chip hover:bg-profile-text hover:text-profile-bg text-profile-text shadow-lg transition-all disabled:opacity-50 disabled:hover:bg-profile-chip disabled:hover:text-profile-text touch-manipulation"
                         >
                             <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" />
                         </Button>
@@ -378,4 +439,57 @@ export function ChatInterface({
             </div>
         </div>
     )
+}
+
+function contextualSuggestions(name: string, topic: RichContentType | null): string[] {
+    switch (topic) {
+        case "experience":
+            return [
+                `What else is in ${name}'s work history?`,
+                `What are ${name}'s main achievements?`,
+                "Dive into another topic",
+            ]
+        case "projects":
+            return [
+                "Walk me through a project",
+                "What else is in the portfolio?",
+                "Dive into another topic",
+            ]
+        case "about":
+            return [
+                `What should I know about ${name}?`,
+                `How did ${name} get started?`,
+                "Dive into another topic",
+            ]
+        case "products":
+            return [
+                `What other products does ${name} offer?`,
+                "Tell me more about pricing",
+                "Dive into another topic",
+            ]
+        case "courses":
+            return [
+                `What courses does ${name} offer?`,
+                "Who are the courses for?",
+                "Dive into another topic",
+            ]
+        case "events":
+            return [
+                "Are there other upcoming events?",
+                "How do I register?",
+                "Dive into another topic",
+            ]
+        case "communities":
+            return [
+                `Tell me about ${name}'s community`,
+                "How do I join?",
+                "Dive into another topic",
+            ]
+        default:
+            return [
+                `What should I know about ${name}?`,
+                `How did ${name} get started?`,
+                "Dive into another topic",
+            ]
+    }
 }

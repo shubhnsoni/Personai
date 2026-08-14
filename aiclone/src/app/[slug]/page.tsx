@@ -34,6 +34,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
             },
             communities: {
                 where: { isActive: true }
+            },
+            leadMagnets: {
+                where: { isActive: true }
             }
         }
     })
