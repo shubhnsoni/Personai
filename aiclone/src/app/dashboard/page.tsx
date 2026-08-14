@@ -5,6 +5,8 @@ import { MessageSquare, Users, Calendar, DollarSign, ExternalLink, TrendingUp } 
 import Link from "next/link"
 import { ProfileLinkActions } from "@/components/dashboard/profile-link-actions"
 import { AnalyticsCharts } from "@/components/dashboard/analytics-charts"
+import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/ui/empty-state"
 
 export const dynamic = 'force-dynamic'
 
@@ -212,9 +214,16 @@ export default async function DashboardPage() {
                     </div>
                     <div className="px-6 pb-6">
                         {recentConversations.length === 0 ? (
-                            <p className="text-sm text-muted-foreground py-8 text-center">
-                                No conversations yet. Share your profile to start chatting!
-                            </p>
+                            <EmptyState
+                                icon={<MessageSquare />}
+                                title="Share your profile to start chatting"
+                                description="Visitors who talk to your AI show up here."
+                                action={
+                                    <Button variant="brand" pill size="sm" asChild>
+                                        <Link href={`/${profile.slug}`}>Share your link</Link>
+                                    </Button>
+                                }
+                            />
                         ) : (
                             <div className="space-y-4">
                                 {recentConversations.map((conv) => (
