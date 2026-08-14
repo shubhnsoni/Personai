@@ -32,6 +32,8 @@ const profileSchema = z.object({
     isPublic: z.boolean(),
     welcomeMessageOverride: z.string().optional(),
     contentDisplayMode: z.string().optional(),
+    personalityConfig: z.string().optional(),
+    aiModel: z.string().optional(),
 })
 
 type ProfileData = z.infer<typeof profileSchema>
@@ -59,8 +61,28 @@ export function ProfileEditor({ profile, presets }: ProfileEditorProps) {
             isPublic: profile.isPublic,
             welcomeMessageOverride: profile.welcomeMessageOverride || "",
             contentDisplayMode: profile.contentDisplayMode || "POPUP",
+            personalityConfig: profile.personalityConfig || "",
+            aiModel: (profile as any).aiModel || "gpt-4o-mini",
         }
     })
+
+    // Parse personality config for individual fields
+    const personalityConfig = (() => {
+        try {
+            return JSON.parse(watch("personalityConfig") || "{}")
+        } catch { return {} }
+    })()
+
+    const updatePersonalityField = (field: string, value: string) => {
+        const current = (() => {
+            try { return JSON.parse(watch("personalityConfig") || "{}") }
+            catch { return {} }
+        })()
+        current[field] = value || undefined
+        // Remove empty keys
+        Object.keys(current).forEach(k => { if (!current[k]) delete current[k] })
+        setValue("personalityConfig", Object.keys(current).length > 0 ? JSON.stringify(current) : "")
+    }
 
     const selectedAnimationId = watch("animationStyleId")
 
@@ -95,6 +117,7 @@ export function ProfileEditor({ profile, presets }: ProfileEditorProps) {
                     <TabsTrigger value="experience">Experience</TabsTrigger>
                     <TabsTrigger value="projects">Projects</TabsTrigger>
                     <TabsTrigger value="appearance">Appearance</TabsTrigger>
+                    <TabsTrigger value="ai">AI Settings</TabsTrigger>
                     <TabsTrigger value="public">Public Page</TabsTrigger>
                 </TabsList>
 
@@ -207,6 +230,93 @@ export function ProfileEditor({ profile, presets }: ProfileEditorProps) {
                                         </div>
                                     )
                                 })}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="ai" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>AI Model</CardTitle>
+                            <CardDescription>Choose which AI model powers your chatbot.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <Select
+                                defaultValue={(profile as any).aiModel || "gpt-4o-mini"}
+                                onValueChange={(val) => setValue("aiModel", val)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select AI model" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="gpt-4o-mini">GPT-4o Mini (Faster & Cheaper)</SelectItem>
+                                    <SelectItem value="gpt-4o">GPT-4o (Higher Quality)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Personality</CardTitle>
+                            <CardDescription>Customize how your AI assistant communicates.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Tone</Label>
+                                <Select
+                                    defaultValue={personalityConfig.tone || ""}
+                                    onValueChange={(val) => updatePersonalityField("tone", val)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Default (professional & friendly)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="professional">Professional</SelectItem>
+                                        <SelectItem value="casual">Casual</SelectItem>
+                                        <SelectItem value="friendly">Friendly</SelectItem>
+                                        <SelectItem value="witty">Witty</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Response Length</Label>
+                                <Select
+                                    defaultValue={personalityConfig.responseLength || ""}
+                                    onValueChange={(val) => updatePersonalityField("responseLength", val)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Default (medium)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="short">Short (1-2 sentences)</SelectItem>
+                                        <SelectItem value="medium">Medium (2-4 sentences)</SelectItem>
+                                        <SelectItem value="long">Long (detailed paragraphs)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Response Language</Label>
+                                <Input
+                                    placeholder="e.g. English, Spanish, Hindi..."
+                                    defaultValue={personalityConfig.language || ""}
+                                    onChange={(e) => updatePersonalityField("language", e.target.value)}
+                                />
+                                <p className="text-xs text-muted-foreground">Override the default language for AI responses.</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Custom Instructions</Label>
+                                <Textarea
+                                    placeholder="e.g. Always mention my free consultation offer. Never discuss pricing over $5000..."
+                                    defaultValue={personalityConfig.customInstructions || ""}
+                                    onChange={(e) => updatePersonalityField("customInstructions", e.target.value)}
+                                    rows={4}
+                                />
+                                <p className="text-xs text-muted-foreground">Additional instructions for your AI. These are injected into the system prompt.</p>
                             </div>
                         </CardContent>
                     </Card>

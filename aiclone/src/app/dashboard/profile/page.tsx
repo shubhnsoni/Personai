@@ -3,6 +3,8 @@ import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
 import { ProfileEditor } from "@/components/dashboard/profile-editor"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardProfilePage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

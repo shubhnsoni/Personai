@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { AvailabilitySettings } from "@/components/dashboard/availability-settings"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardCalendarPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

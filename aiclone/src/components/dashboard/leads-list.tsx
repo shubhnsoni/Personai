@@ -3,7 +3,6 @@
 import { VisitorLead } from "@prisma/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { formatDistanceToNow } from "date-fns" // I don't have date-fns, I'll use Intl or install it. I'll use Intl.
 
 interface LeadsListProps {
     leads: VisitorLead[]

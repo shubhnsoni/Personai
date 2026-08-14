@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { EventForm } from "@/components/dashboard/event-form"
 
+export const dynamic = 'force-dynamic'
+
 export default async function NewEventPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

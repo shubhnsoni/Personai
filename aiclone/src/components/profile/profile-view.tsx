@@ -7,6 +7,7 @@ import { ContentPanel } from "@/components/profile/content-panel"
 import { BookingModal } from "@/components/booking/booking-modal"
 import { X, Calendar, DollarSign, User, CheckCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 interface ProfileViewProps {
     profile: {
@@ -112,8 +113,14 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
         setIsBookingOpen(true)
     }
 
+    const stripeEnabled = !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+
     const handlePurchase = async (itemType: string, itemId: string) => {
         if (isPurchasing) return
+        if (!stripeEnabled) {
+            toast.error("Purchases coming soon!", { description: "Payment processing hasn't been set up yet." })
+            return
+        }
         
         try {
             setIsPurchasing(true)

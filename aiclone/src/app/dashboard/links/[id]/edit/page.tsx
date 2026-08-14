@@ -2,6 +2,8 @@ import { redirect, notFound } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { ShortLinkForm } from "@/components/dashboard/short-link-form"
 
+export const dynamic = 'force-dynamic'
+
 interface EditShortLinkPageProps {
     params: Promise<{ id: string }>
 }

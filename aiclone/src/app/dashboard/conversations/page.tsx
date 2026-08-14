@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { ConversationsList } from "@/components/dashboard/conversations-list"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardConversationsPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

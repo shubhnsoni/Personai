@@ -2,6 +2,8 @@ import { redirect, notFound } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { ProductForm } from "@/components/dashboard/product-form"
 
+export const dynamic = 'force-dynamic'
+
 interface EditProductPageProps {
     params: Promise<{ id: string }>
 }

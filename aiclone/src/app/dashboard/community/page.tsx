@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { CommunitiesList } from "@/components/dashboard/communities-list"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardCommunityPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

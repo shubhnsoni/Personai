@@ -2,6 +2,8 @@ import { redirect, notFound } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { LeadMagnetForm } from "@/components/dashboard/lead-magnet-form"
 
+export const dynamic = 'force-dynamic'
+
 interface EditLeadMagnetPageProps {
     params: Promise<{ id: string }>
 }

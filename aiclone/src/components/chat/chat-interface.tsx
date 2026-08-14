@@ -40,8 +40,33 @@ export function ChatInterface({
     const [input, setInput] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [conversationId, setConversationId] = useState<string | null>(null)
+    const [visitorId, setVisitorId] = useState<string | null>(null)
+    const [isLoadingHistory, setIsLoadingHistory] = useState(true)
     const scrollRef = useRef<HTMLDivElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
+
+    // Initialize visitor ID and load conversation history
+    useEffect(() => {
+        const stored = localStorage.getItem(`personalink_visitor_${profile.id}`)
+        let vid = stored
+        if (!vid) {
+            vid = `visitor_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+            localStorage.setItem(`personalink_visitor_${profile.id}`, vid)
+        }
+        setVisitorId(vid)
+
+        // Load previous conversation
+        fetch(`/api/conversations?profileId=${profile.id}&visitorId=${vid}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.messages && data.messages.length > 0) {
+                    setMessages(data.messages)
+                    setConversationId(data.conversationId)
+                }
+            })
+            .catch(() => {})
+            .finally(() => setIsLoadingHistory(false))
+    }, [profile.id])
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -93,11 +118,21 @@ export function ChatInterface({
                 body: JSON.stringify({
                     messages: newMessages.map(m => ({ role: m.role, content: m.content })),
                     profileId: profile.id,
-                    conversationId
+                    conversationId,
+                    visitorId
                 }),
                 signal: abortControllerRef.current.signal
             })
 
+            if (response.status === 429) {
+                throw new Error("rate_limit")
+            }
+            if (response.status === 503) {
+                const data = await response.json()
+                if (data.error === "ai_not_configured") {
+                    throw new Error("ai_not_configured")
+                }
+            }
             if (!response.ok) throw new Error("Chat request failed")
 
             const newConversationId = response.headers.get("X-Conversation-Id")
@@ -140,9 +175,19 @@ export function ChatInterface({
             if ((error as Error).name === "AbortError") return
             console.error("Chat error:", error)
             
-            toast.error("Connection issue", {
-                description: "Having trouble connecting. Please try again.",
-            })
+            const errorMsg = (error as Error).message
+            const isRateLimit = errorMsg === "rate_limit"
+            const isAiNotConfigured = errorMsg === "ai_not_configured"
+            toast.error(
+                isRateLimit ? "Slow down!" : isAiNotConfigured ? "AI Chat Coming Soon" : "Connection issue",
+                {
+                    description: isRateLimit 
+                        ? "Too many messages. Please wait a moment."
+                        : isAiNotConfigured
+                        ? "AI chat hasn't been set up yet. Check back later!"
+                        : "Having trouble connecting. Please try again.",
+                }
+            )
             
             setMessages(prev => {
                 const updated = [...prev]
@@ -150,7 +195,9 @@ export function ChatInterface({
                 if (updated[lastIdx]?.role === "assistant" && !updated[lastIdx].content) {
                     updated[lastIdx] = { 
                         ...updated[lastIdx], 
-                        content: "I'm having trouble responding right now. Please try again." 
+                        content: isAiNotConfigured 
+                            ? "🚀 AI chat is coming soon! The creator is still setting things up."
+                            : "I'm having trouble responding right now. Please try again." 
                     }
                 }
                 return updated
@@ -158,7 +205,7 @@ export function ChatInterface({
         } finally {
             setIsLoading(false)
         }
-    }, [messages, profile.id, conversationId, isLoading])
+    }, [messages, profile.id, conversationId, visitorId, isLoading])
 
     const handleSubmit = (e?: React.FormEvent, overrideInput?: string) => {
         e?.preventDefault()
@@ -166,7 +213,7 @@ export function ChatInterface({
         sendMessage(messageToSend)
     }
 
-    const hasStarted = messages.length > 0
+    const hasStarted = messages.length > 0 || isLoadingHistory
 
     return (
         <div className="flex flex-col h-full w-full max-w-4xl mx-auto relative">

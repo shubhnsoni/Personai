@@ -4,6 +4,8 @@ import { LeadsList } from "@/components/dashboard/leads-list"
 import { LeadsKanban } from "@/components/dashboard/leads-kanban"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardLeadsPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

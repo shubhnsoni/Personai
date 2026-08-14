@@ -28,6 +28,9 @@ export async function updateProfile(profileId: string, data: any) {
             animationStyleId: data.animationStyleId,
             isPublic: data.isPublic,
             welcomeMessageOverride: data.welcomeMessageOverride,
+            contentDisplayMode: data.contentDisplayMode,
+            personalityConfig: data.personalityConfig,
+            aiModel: data.aiModel,
         },
     })
 

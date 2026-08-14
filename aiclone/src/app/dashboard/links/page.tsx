@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { ShortLinksList } from "@/components/dashboard/short-links-list"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardLinksPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

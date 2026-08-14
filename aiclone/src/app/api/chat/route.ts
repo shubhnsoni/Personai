@@ -1,13 +1,35 @@
 import OpenAI from "openai"
 import { prisma } from "@/lib/prisma"
-import { simpleRetrieval, buildSystemPrompt } from "@/lib/rag"
+import { vectorRetrieval, buildSystemPrompt } from "@/lib/rag"
+import { checkRateLimit } from "@/lib/rate-limit"
+
+export const dynamic = 'force-dynamic'
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 })
 
 export async function POST(req: Request) {
-    const { messages, profileId, conversationId: existingConversationId } = await req.json()
+    // Check if OpenAI is configured
+    if (!process.env.OPENAI_API_KEY) {
+        return new Response(
+            JSON.stringify({ error: "ai_not_configured", message: "AI chat is coming soon! The creator hasn't set up AI yet." }),
+            { status: 503, headers: { "Content-Type": "application/json" } }
+        )
+    }
+
+    // Rate limiting
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+               req.headers.get("x-real-ip") || "unknown"
+    const { allowed, remaining } = checkRateLimit(ip)
+    if (!allowed) {
+        return new Response("Too many requests. Please wait a moment before sending more messages.", {
+            status: 429,
+            headers: { "Retry-After": "60", "X-RateLimit-Remaining": "0" }
+        })
+    }
+
+    const { messages, profileId, conversationId: existingConversationId, visitorId } = await req.json()
 
     const profile = await prisma.profile.findUnique({
         where: { id: profileId },
@@ -61,7 +83,7 @@ export async function POST(req: Request) {
     const lastMessage = messages[messages.length - 1]
     const query = lastMessage.content
 
-    const contextDocs = simpleRetrieval(query, profile.documents)
+    const contextDocs = await vectorRetrieval(query, profile.documents)
     const systemPrompt = buildSystemPrompt(profile, contextDocs)
 
     let conversationId = existingConversationId
@@ -70,6 +92,7 @@ export async function POST(req: Request) {
         const conversation = await prisma.conversation.create({
             data: {
                 profileId,
+                visitorId: visitorId || null,
                 source: "PROFILE_PAGE",
                 leadStatus: "NEW"
             }
@@ -326,9 +349,11 @@ export async function POST(req: Request) {
         }))
     ]
 
+    const aiModel = profile.aiModel || "gpt-4o-mini"
+
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-4o",
+            model: aiModel,
             messages: openaiMessages,
             tools,
             stream: true
@@ -375,7 +400,7 @@ export async function POST(req: Request) {
                                 ]
 
                                 const followUpResponse = await openai.chat.completions.create({
-                                    model: "gpt-4o",
+                                    model: aiModel,
                                     messages: followUpMessages,
                                     stream: true
                                 })

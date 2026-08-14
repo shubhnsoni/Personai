@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { ProfileView } from "@/components/profile/profile-view"
 import { Metadata } from "next"
 
+export const dynamic = 'force-dynamic'
+
 export default async function ProfilePage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params
     const profile = await prisma.profile.findUnique({
@@ -63,7 +65,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     const { slug } = await params
     const profile = await prisma.profile.findUnique({
         where: { slug },
-        select: { displayName: true, headline: true, bio: true }
+        select: { displayName: true, headline: true, bio: true, slug: true }
     })
 
     if (!profile) {
@@ -72,8 +74,27 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
         }
     }
 
+    const description = profile.headline || profile.bio || `Chat with ${profile.displayName}'s AI clone on PersonaLink.`
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const profileUrl = `${baseUrl}/${profile.slug}`
+
     return {
         title: `${profile.displayName} | PersonaLink`,
-        description: profile.headline || profile.bio || "Check out my AI-powered profile.",
+        description,
+        openGraph: {
+            title: `${profile.displayName} — PersonaLink`,
+            description,
+            url: profileUrl,
+            siteName: "PersonaLink",
+            type: "profile",
+        },
+        twitter: {
+            card: "summary_large_image",
+            title: `${profile.displayName} — PersonaLink`,
+            description,
+        },
+        alternates: {
+            canonical: profileUrl,
+        },
     }
 }

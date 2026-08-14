@@ -1,4 +1,12 @@
 import { ProfileDocument } from "@prisma/client"
+import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings"
+
+export interface PersonalityConfig {
+    tone?: "professional" | "casual" | "friendly" | "witty"
+    customInstructions?: string
+    responseLength?: "short" | "medium" | "long"
+    language?: string
+}
 
 interface ProfileWithRelations {
     displayName: string
@@ -8,6 +16,8 @@ interface ProfileWithRelations {
     primaryGoal: string
     language: string
     welcomeMessageOverride: string | null
+    personalityConfig?: string | null
+    aiModel?: string
     workExperiences: Array<{
         company: string
         role: string
@@ -116,6 +126,36 @@ function calculateBM25Score(
     return score
 }
 
+/**
+ * Vector-based retrieval using OpenAI embeddings with cosine similarity.
+ * Falls back to BM25 if embeddings are not available.
+ */
+export async function vectorRetrieval(query: string, documents: ProfileDocument[], topK: number = 3): Promise<ProfileDocument[]> {
+    if (!query || documents.length === 0) return []
+
+    // Check if any documents have embeddings
+    const docsWithEmbeddings = documents.filter(d => d.embedding && d.embedding.length > 0)
+    if (docsWithEmbeddings.length === 0) {
+        // Fallback to BM25
+        return simpleRetrieval(query, documents, topK)
+    }
+
+    try {
+        const queryEmbedding = await generateEmbedding(query)
+
+        const scored = docsWithEmbeddings.map(doc => ({
+            doc,
+            score: cosineSimilarity(queryEmbedding, doc.embedding)
+        }))
+
+        scored.sort((a, b) => b.score - a.score)
+        return scored.filter(d => d.score > 0.3).slice(0, topK).map(d => d.doc)
+    } catch (error) {
+        console.error("Vector retrieval failed, falling back to BM25:", error)
+        return simpleRetrieval(query, documents, topK)
+    }
+}
+
 export function simpleRetrieval(query: string, documents: ProfileDocument[], topK: number = 3): ProfileDocument[] {
     if (!query || documents.length === 0) return []
 
@@ -156,6 +196,46 @@ function formatRoleTemplate(role: string): string {
         'CUSTOM': 'Professional'
     }
     return roleMap[role] || 'Professional'
+}
+
+function buildPersonalitySection(personalityConfigStr?: string | null): string {
+    if (!personalityConfigStr) return ""
+    try {
+        const config: PersonalityConfig = JSON.parse(personalityConfigStr)
+        const parts: string[] = []
+
+        if (config.tone) {
+            const toneMap: Record<string, string> = {
+                professional: "Maintain a professional and polished tone.",
+                casual: "Be casual and relaxed in conversation, like talking to a friend.",
+                friendly: "Be warm, approachable, and friendly in all responses.",
+                witty: "Be clever, witty, and occasionally humorous while staying helpful."
+            }
+            parts.push(toneMap[config.tone] || "")
+        }
+
+        if (config.responseLength) {
+            const lengthMap: Record<string, string> = {
+                short: "Keep responses brief — 1-2 sentences when possible.",
+                medium: "Keep responses moderate — 2-4 sentences typically.",
+                long: "Provide detailed, thorough responses with multiple paragraphs when relevant."
+            }
+            parts.push(lengthMap[config.responseLength] || "")
+        }
+
+        if (config.language) {
+            parts.push(`Respond in ${config.language}.`)
+        }
+
+        if (config.customInstructions) {
+            parts.push(`\nAdditional instructions from the creator: ${config.customInstructions}`)
+        }
+
+        if (parts.length === 0) return ""
+        return `\n## Personality & Style\n${parts.join("\n")}`
+    } catch {
+        return ""
+    }
 }
 
 export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: ProfileDocument[]): string {
@@ -290,6 +370,7 @@ ${contextSection}
 - When appropriate, guide the conversation toward the primary goal
 - Help visitors discover products, courses, and events that might interest them
 ${profile.welcomeMessageOverride ? `\nWelcome message style: "${profile.welcomeMessageOverride}"` : ''}
+${buildPersonalitySection(profile.personalityConfig)}
 
 ## Tools Available
 You have access to these functions that you should use when appropriate:

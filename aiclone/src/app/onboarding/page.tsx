@@ -3,6 +3,8 @@ import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard"
 
+export const dynamic = 'force-dynamic'
+
 export default async function OnboardingPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

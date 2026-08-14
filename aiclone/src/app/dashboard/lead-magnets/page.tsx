@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { LeadMagnetsList } from "@/components/dashboard/lead-magnets-list"
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardLeadMagnetsPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

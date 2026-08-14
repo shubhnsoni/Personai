@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { CourseForm } from "@/components/dashboard/course-form"
 
+export const dynamic = 'force-dynamic'
+
 export default async function NewCoursePage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")

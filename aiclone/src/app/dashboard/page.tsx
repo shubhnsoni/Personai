@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
-import { MessageSquare, Users, Calendar, DollarSign, ExternalLink } from "lucide-react"
+import { MessageSquare, Users, Calendar, DollarSign, ExternalLink, TrendingUp } from "lucide-react"
 import Link from "next/link"
 import { ProfileLinkActions } from "@/components/dashboard/profile-link-actions"
+import { AnalyticsCharts } from "@/components/dashboard/analytics-charts"
+
+export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
     const user = await syncUser()
@@ -16,49 +19,113 @@ export default async function DashboardPage() {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    // Batch queries to avoid exhausting connection pool
-    const [batch1, batch2, batch3] = await Promise.all([
-        // Batch 1: Conversation counts
-        Promise.all([
-            prisma.conversation.count({ where: { profileId: profile.id } }),
-            prisma.conversation.count({ 
-                where: { profileId: profile.id, startedAt: { gte: thirtyDaysAgo } } 
-            })
-        ]),
-        // Batch 2: Lead and booking counts
-        Promise.all([
-            prisma.visitorLead.count({ where: { profileId: profile.id } }),
-            prisma.visitorLead.count({ 
-                where: { profileId: profile.id, createdAt: { gte: sevenDaysAgo } } 
-            }),
-            prisma.booking.count({ where: { profileId: profile.id } }),
-            prisma.booking.count({ 
-                where: { profileId: profile.id, startTime: { gte: now } } 
-            })
-        ]),
-        // Batch 3: Payments and recent data
-        Promise.all([
-            prisma.payment.aggregate({
-                where: { profileId: profile.id, status: "SUCCEEDED" },
-                _sum: { amountCents: true }
-            }),
-            prisma.conversation.findMany({
-                where: { profileId: profile.id },
-                orderBy: { lastMessageAt: "desc" },
-                take: 5,
-                include: { messages: { take: 1, orderBy: { createdAt: "desc" } } }
-            }),
-            prisma.visitorLead.findMany({
-                where: { profileId: profile.id },
-                orderBy: { createdAt: "desc" },
-                take: 5
-            })
-        ])
+    const [
+        conversationCount,
+        conversationCountLast30Days,
+        leadCount,
+        leadCountLast7Days,
+        bookingCount,
+        upcomingBookings,
+        paymentSum,
+        recentConversations,
+        recentLeads,
+        // Analytics data
+        dailyConversations,
+        dailyLeads,
+        dailyRevenue,
+        productPurchaseCount,
+        courseEnrollmentCount,
+    ] = await Promise.all([
+        prisma.conversation.count({ where: { profileId: profile.id } }),
+        prisma.conversation.count({ where: { profileId: profile.id, startedAt: { gte: thirtyDaysAgo } } }),
+        prisma.visitorLead.count({ where: { profileId: profile.id } }),
+        prisma.visitorLead.count({ where: { profileId: profile.id, createdAt: { gte: sevenDaysAgo } } }),
+        prisma.booking.count({ where: { profileId: profile.id } }),
+        prisma.booking.count({ where: { profileId: profile.id, startTime: { gte: now } } }),
+        prisma.payment.aggregate({
+            where: { profileId: profile.id, status: "SUCCEEDED" },
+            _sum: { amountCents: true }
+        }),
+        prisma.conversation.findMany({
+            where: { profileId: profile.id },
+            orderBy: { lastMessageAt: "desc" },
+            take: 5,
+            include: { messages: { take: 1, orderBy: { createdAt: "desc" } } }
+        }),
+        prisma.visitorLead.findMany({
+            where: { profileId: profile.id },
+            orderBy: { createdAt: "desc" },
+            take: 5
+        }),
+        // Daily conversations for last 30 days
+        prisma.conversation.findMany({
+            where: { profileId: profile.id, startedAt: { gte: thirtyDaysAgo } },
+            select: { startedAt: true },
+            orderBy: { startedAt: 'asc' }
+        }),
+        // Daily leads for last 30 days
+        prisma.visitorLead.findMany({
+            where: { profileId: profile.id, createdAt: { gte: thirtyDaysAgo } },
+            select: { createdAt: true },
+            orderBy: { createdAt: 'asc' }
+        }),
+        // Daily revenue for last 30 days
+        prisma.payment.findMany({
+            where: { profileId: profile.id, status: "SUCCEEDED", createdAt: { gte: thirtyDaysAgo } },
+            select: { amountCents: true, createdAt: true },
+            orderBy: { createdAt: 'asc' }
+        }),
+        // Total purchases
+        prisma.productPurchase.count({
+            where: { product: { profileId: profile.id }, status: 'COMPLETED' }
+        }),
+        // Total enrollments
+        prisma.courseEnrollment.count({
+            where: { course: { profileId: profile.id }, status: { in: ['ACTIVE', 'COMPLETED'] } }
+        }),
     ])
 
-    const [conversationCount, conversationCountLast30Days] = batch1
-    const [leadCount, leadCountLast7Days, bookingCount, upcomingBookings] = batch2
-    const [paymentSum, recentConversations, recentLeads] = batch3
+    // Aggregate daily data
+    function aggregateByDay(items: { startedAt?: Date; createdAt?: Date }[]): Record<string, number> {
+        const result: Record<string, number> = {}
+        for (const item of items) {
+            const date = (item.startedAt || item.createdAt)!
+            const key = new Date(date).toISOString().split('T')[0]
+            result[key] = (result[key] || 0) + 1
+        }
+        return result
+    }
+
+    function aggregateRevenueByDay(items: { amountCents: number; createdAt: Date }[]): Record<string, number> {
+        const result: Record<string, number> = {}
+        for (const item of items) {
+            const key = new Date(item.createdAt).toISOString().split('T')[0]
+            result[key] = (result[key] || 0) + item.amountCents / 100
+        }
+        return result
+    }
+
+    // Build chart data for last 30 days
+    const chartDays: string[] = []
+    for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
+        chartDays.push(d.toISOString().split('T')[0])
+    }
+
+    const convByDay = aggregateByDay(dailyConversations.map(c => ({ startedAt: c.startedAt })))
+    const leadsByDay = aggregateByDay(dailyLeads.map(l => ({ createdAt: l.createdAt })))
+    const revByDay = aggregateRevenueByDay(dailyRevenue)
+
+    const chartData = chartDays.map(day => ({
+        date: day,
+        conversations: convByDay[day] || 0,
+        leads: leadsByDay[day] || 0,
+        revenue: revByDay[day] || 0,
+    }))
+
+    // Conversion funnel
+    const totalRevenue = (paymentSum._sum.amountCents || 0) / 100
+    const totalPurchases = productPurchaseCount + courseEnrollmentCount
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
@@ -73,14 +140,14 @@ export default async function DashboardPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard 
+                <StatCard
                     title="Conversations"
                     value={conversationCount}
                     subtitle={`${conversationCountLast30Days} in last 30 days`}
                     icon={<MessageSquare className="h-4 w-4 text-muted-foreground" />}
                     href="/dashboard/conversations"
                 />
-                <StatCard 
+                <StatCard
                     title="Leads"
                     value={leadCount}
                     subtitle={`${leadCountLast7Days} new this week`}
@@ -88,20 +155,51 @@ export default async function DashboardPage() {
                     href="/dashboard/leads"
                     highlight={leadCountLast7Days > 0}
                 />
-                <StatCard 
+                <StatCard
                     title="Bookings"
                     value={bookingCount}
                     subtitle={`${upcomingBookings} upcoming`}
                     icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
                     href="/dashboard/calendar"
                 />
-                <StatCard 
+                <StatCard
                     title="Revenue"
-                    value={`$${((paymentSum._sum.amountCents || 0) / 100).toFixed(0)}`}
-                    subtitle="Total earned"
+                    value={`$${totalRevenue.toFixed(0)}`}
+                    subtitle={`${totalPurchases} purchases`}
                     icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
                     href="/dashboard/payments"
                 />
+            </div>
+
+            {/* Analytics Charts */}
+            <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
+                <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="font-semibold">30-Day Trends</h3>
+                </div>
+                <AnalyticsCharts data={chartData} />
+            </div>
+
+            {/* Conversion Funnel */}
+            <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
+                <h3 className="font-semibold mb-4">Conversion Funnel</h3>
+                <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                    <FunnelStep label="Conversations" value={conversationCount} color="bg-blue-500" widthPct={100} />
+                    <FunnelArrow />
+                    <FunnelStep label="Leads" value={leadCount} color="bg-yellow-500" widthPct={conversationCount > 0 ? Math.max(10, (leadCount / conversationCount) * 100) : 10} />
+                    <FunnelArrow />
+                    <FunnelStep label="Purchases" value={totalPurchases} color="bg-green-500" widthPct={leadCount > 0 ? Math.max(10, (totalPurchases / leadCount) * 100) : 10} />
+                    <FunnelArrow />
+                    <FunnelStep label="Revenue" value={`$${totalRevenue.toFixed(0)}`} color="bg-purple-500" widthPct={50} />
+                </div>
+                <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
+                    {conversationCount > 0 && (
+                        <span>Chat→Lead: {((leadCount / conversationCount) * 100).toFixed(1)}%</span>
+                    )}
+                    {leadCount > 0 && (
+                        <span>Lead→Purchase: {((totalPurchases / leadCount) * 100).toFixed(1)}%</span>
+                    )}
+                </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -186,46 +284,18 @@ export default async function DashboardPage() {
             <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
                 <h3 className="font-semibold mb-4">Quick Actions</h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <QuickAction 
-                        title="Edit Profile"
-                        description="Update your bio, headline, and settings"
-                        href="/dashboard/profile"
-                    />
-                    <QuickAction 
-                        title="Manage Services"
-                        description="Add or edit your service offerings"
-                        href="/dashboard/services"
-                    />
-                    <QuickAction 
-                        title="View Calendar"
-                        description="Check your upcoming bookings"
-                        href="/dashboard/calendar"
-                    />
-                    <QuickAction 
-                        title="Content Library"
-                        description="Upload documents for your AI to learn"
-                        href="/dashboard/content"
-                    />
+                    <QuickAction title="Edit Profile" description="Update your bio, headline, and settings" href="/dashboard/profile" />
+                    <QuickAction title="Manage Services" description="Add or edit your service offerings" href="/dashboard/services" />
+                    <QuickAction title="View Calendar" description="Check your upcoming bookings" href="/dashboard/calendar" />
+                    <QuickAction title="Content Library" description="Upload documents for your AI to learn" href="/dashboard/content" />
                 </div>
             </div>
         </div>
     )
 }
 
-function StatCard({ 
-    title, 
-    value, 
-    subtitle, 
-    icon, 
-    href,
-    highlight = false 
-}: { 
-    title: string
-    value: string | number
-    subtitle: string
-    icon: React.ReactNode
-    href: string
-    highlight?: boolean
+function StatCard({ title, value, subtitle, icon, href, highlight = false }: {
+    title: string; value: string | number; subtitle: string; icon: React.ReactNode; href: string; highlight?: boolean
 }) {
     return (
         <Link href={href} className="block">
@@ -260,11 +330,24 @@ function StatusBadge({ status }: { status: string }) {
         CONVERTED: "bg-purple-500/10 text-purple-500",
         LOST: "bg-red-500/10 text-red-500"
     }
+    return <span className={`text-xs px-2 py-0.5 rounded-full ${colors[status] || "bg-muted text-muted-foreground"}`}>{status.toLowerCase()}</span>
+}
+
+function FunnelStep({ label, value, color, widthPct }: { label: string; value: string | number; color: string; widthPct: number }) {
     return (
-        <span className={`text-xs px-2 py-0.5 rounded-full ${colors[status] || "bg-muted text-muted-foreground"}`}>
-            {status.toLowerCase()}
-        </span>
+        <div className="flex-1 flex flex-col items-center">
+            <span className="text-xs text-muted-foreground mb-1">{label}</span>
+            <div className="w-full flex justify-center">
+                <div className={`${color} text-white rounded-lg py-3 text-center font-bold transition-all`} style={{ width: `${widthPct}%`, minWidth: '60px' }}>
+                    {value}
+                </div>
+            </div>
+        </div>
     )
+}
+
+function FunnelArrow() {
+    return <div className="flex items-center justify-center text-muted-foreground text-lg sm:rotate-0 rotate-90">→</div>
 }
 
 function formatRelativeTime(date: Date): string {
