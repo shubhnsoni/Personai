@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUncachableStripeClient } from '@/lib/stripe'
+import { getUncachableStripeClient, StripeNotConfiguredError } from '@/lib/stripe'
+import { syncUser } from '@/lib/auth-sync'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
@@ -67,6 +68,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        const user = await syncUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const body = await request.json()
         const { 
             name, 
@@ -98,6 +104,9 @@ export async function POST(request: NextRequest) {
             priceId: price.id
         })
     } catch (error) {
+        if (error instanceof StripeNotConfiguredError) {
+            return NextResponse.json({ error: 'payments_not_configured' }, { status: 503 })
+        }
         console.error('Error creating Stripe product:', error)
         return NextResponse.json(
             { error: 'Failed to create product in Stripe' },

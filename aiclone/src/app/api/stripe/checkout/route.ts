@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUncachableStripeClient, getStripePublishableKey } from '@/lib/stripe'
+import { getUncachableStripeClient, getStripePublishableKey, StripeNotConfiguredError } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import { headers } from 'next/headers'
 
@@ -65,6 +65,9 @@ export async function POST(request: NextRequest) {
             url: session.url
         })
     } catch (error) {
+        if (error instanceof StripeNotConfiguredError) {
+            return NextResponse.json({ error: 'payments_not_configured' }, { status: 503 })
+        }
         console.error('Checkout session error:', error)
         return NextResponse.json(
             { error: 'Failed to create checkout session' },
@@ -78,6 +81,9 @@ export async function GET() {
         const publishableKey = await getStripePublishableKey()
         return NextResponse.json({ publishableKey })
     } catch (error) {
+        if (error instanceof StripeNotConfiguredError) {
+            return NextResponse.json({ error: 'payments_not_configured' }, { status: 503 })
+        }
         console.error('Error getting publishable key:', error)
         return NextResponse.json(
             { error: 'Failed to get Stripe publishable key' },

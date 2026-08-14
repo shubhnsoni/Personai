@@ -1,18 +1,37 @@
 import { headers } from "next/headers"
-import { getUncachableStripeClient } from "@/lib/stripe"
+import { NextResponse } from "next/server"
+import { getUncachableStripeClient, requireStripeWebhookSecret, StripeNotConfiguredError } from "@/lib/stripe"
 import { prisma } from "@/lib/prisma"
 import { sendPurchaseConfirmation, sendCreatorNotification } from "@/lib/email"
 import Stripe from "stripe"
 
 export async function POST(req: Request) {
+    let webhookSecret: string
+    try {
+        webhookSecret = requireStripeWebhookSecret()
+    } catch (error) {
+        if (error instanceof StripeNotConfiguredError) {
+            return NextResponse.json({ error: "payments_not_configured" }, { status: 503 })
+        }
+        throw error
+    }
+
     const body = await req.text()
-    const signature = (await headers()).get("Stripe-Signature") as string
+    const signature = (await headers()).get("Stripe-Signature")
 
     if (!signature) {
         return new Response("Missing signature", { status: 400 })
     }
 
-    const stripe = await getUncachableStripeClient()
+    let stripe: Stripe
+    try {
+        stripe = await getUncachableStripeClient()
+    } catch (error) {
+        if (error instanceof StripeNotConfiguredError) {
+            return NextResponse.json({ error: "payments_not_configured" }, { status: 503 })
+        }
+        throw error
+    }
     
     let event: Stripe.Event
 
@@ -20,7 +39,7 @@ export async function POST(req: Request) {
         event = stripe.webhooks.constructEvent(
             body,
             signature,
-            process.env.STRIPE_WEBHOOK_SECRET!
+            webhookSecret
         )
     } catch (error) {
         console.error("Webhook signature verification failed:", error)

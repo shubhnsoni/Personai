@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUncachableStripeClient } from '@/lib/stripe'
+import { getUncachableStripeClient, StripeNotConfiguredError } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import { headers } from 'next/headers'
 
@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const stripe = await getUncachableStripeClient()
         const headersList = await headers()
         const host = headersList.get('host') || ''
         const protocol = host.includes('localhost') ? 'http' : 'https'
@@ -114,6 +113,8 @@ export async function POST(request: NextRequest) {
             })
         }
 
+        const stripe = await getUncachableStripeClient()
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
@@ -146,6 +147,9 @@ export async function POST(request: NextRequest) {
             url: session.url
         })
     } catch (error) {
+        if (error instanceof StripeNotConfiguredError) {
+            return NextResponse.json({ error: 'payments_not_configured' }, { status: 503 })
+        }
         console.error('Purchase session error:', error)
         return NextResponse.json(
             { error: 'Failed to create checkout session' },
