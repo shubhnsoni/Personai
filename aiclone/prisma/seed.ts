@@ -85,6 +85,85 @@ async function main() {
     })
     console.log(`Created/found demo profile: ${demoProfile.slug}`)
 
+    // Work Experiences
+    const existingExp = await prisma.workExperience.findFirst({
+        where: { profileId: demoProfile.id }
+    })
+    if (!existingExp) {
+        await prisma.workExperience.createMany({
+            data: [
+                {
+                    profileId: demoProfile.id,
+                    company: 'Parloa',
+                    role: 'Principal Product Designer',
+                    startDate: '2022',
+                    endDate: null,
+                    description: 'Leading design for AI conversational agents. Helped secure Series A, B, and C funding.',
+                    achievements: JSON.stringify([
+                        'Led design of two 0-1 products driving €20M+ revenue',
+                        'Created company-wide design system',
+                        'Hired and mentored 3 product designers'
+                    ]),
+                },
+                {
+                    profileId: demoProfile.id,
+                    company: 'SomethingCreative',
+                    role: 'Co-Founder & Lead Designer',
+                    startDate: '2018',
+                    endDate: '2022',
+                    description: 'Founded a full-service design agency working with early-stage startups.',
+                    achievements: JSON.stringify([
+                        'Scaled agency to 15 employees',
+                        'Delivered 50+ successful client projects',
+                        'Won Awwwards Site of the Day'
+                    ]),
+                },
+                {
+                    profileId: demoProfile.id,
+                    company: 'Freelance',
+                    role: 'UI/UX Designer',
+                    startDate: '2016',
+                    endDate: '2018',
+                    description: 'Worked with various clients on branding, web design, and mobile apps.',
+                },
+            ]
+        })
+        console.log('Created demo work experiences')
+    }
+
+    // Projects
+    const existingProject = await prisma.project.findFirst({
+        where: { profileId: demoProfile.id }
+    })
+    if (!existingProject) {
+        await prisma.project.createMany({
+            data: [
+                {
+                    profileId: demoProfile.id,
+                    title: 'AI Agent Studio',
+                    description: 'A comprehensive design system and studio environment for building complex AI conversational agents.',
+                    client: 'Parloa',
+                    year: '2024',
+                },
+                {
+                    profileId: demoProfile.id,
+                    title: 'E-Commerce Redesign',
+                    description: 'Complete checkout flow redesign that increased conversion rates by 15%.',
+                    client: 'Shopify',
+                    year: '2023',
+                },
+                {
+                    profileId: demoProfile.id,
+                    title: 'Financial Dashboard',
+                    description: 'Intuitive dashboard for visualizing complex financial data for startups.',
+                    client: 'FinTech Co',
+                    year: '2022',
+                },
+            ]
+        })
+        console.log('Created demo projects')
+    }
+
     const existingService = await prisma.serviceOffering.findFirst({
         where: { profileId: demoProfile.id }
     })

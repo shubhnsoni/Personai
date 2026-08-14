@@ -15,6 +15,7 @@ model User {
   name      String?
   image     String?
   role      String   @default("CREATOR") // "CREATOR" | "ADMIN"
+  stripeConnectAccountId String? // Stripe Connect account for payouts
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -40,7 +41,8 @@ model Profile {
   showInDirectory       Boolean                @default(false)
   welcomeMessageOverride String?
   contentDisplayMode    String                 @default("POPUP") // "SIDE_PANEL" | "POPUP"
-  personalityConfig     String?
+  personalityConfig     String?                // JSON: {tone, customInstructions, responseLength, language}
+  aiModel               String                 @default("gpt-4o-mini") // "gpt-4o-mini" | "gpt-4o"
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -111,6 +113,7 @@ model ProfileDocument {
   url               String?
   filePath          String?
   rawText           String?
+  embedding         Float[]             // OpenAI embedding vector
   embeddingMetadata String?             // Json
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -381,6 +384,8 @@ model ProductPurchase {
   visitorName  String?
   paymentId    String?
   status       String    @default("PENDING") // "PENDING" | "COMPLETED" | "REFUNDED"
+  downloadToken  String?   @unique
+  downloadExpiry DateTime?
   downloadedAt DateTime?
   createdAt    DateTime  @default(now())
 }
@@ -396,6 +401,18 @@ model CourseEnrollment {
   progress     String?   // JSON object tracking lesson completion
   enrolledAt   DateTime  @default(now())
   completedAt  DateTime?
+
+  lessonCompletions LessonCompletion[]
+}
+
+model LessonCompletion {
+  id           String   @id @default(cuid())
+  enrollmentId String
+  enrollment   CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lessonId     String
+  completedAt  DateTime @default(now())
+
+  @@unique([enrollmentId, lessonId])
 }
 
 model EventRegistration {

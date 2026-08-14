@@ -8,7 +8,7 @@ export const env = {
     return !!process.env.DATABASE_URL
   },
   get hasOpenAI() {
-    return !!(process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY)
+    return !!process.env.OPENAI_API_KEY
   },
   get hasStripe() {
     return !!(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
