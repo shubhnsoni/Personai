@@ -32,7 +32,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      appearance={{
+        variables: {
+          colorPrimary: "#A855F7",
+          colorBackground: "#141118",
+          colorInputBackground: "#1f1a24",
+          colorInputText: "#f5f2f7",
+          colorText: "#f5f2f7",
+          colorTextSecondary: "#b4aebb",
+          colorTextOnPrimaryBackground: "#fafafa",
+          borderRadius: "0.625rem",
+          fontFamily: "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+        },
+      }}
+    >
       <html lang="en" suppressHydrationWarning>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
@@ -44,7 +58,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            <Toaster />
+            <Toaster theme="system" />
           </ThemeProvider>
         </body>
       </html>

@@ -1,6 +1,7 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
+import { duration, reducedMotionDuration } from "@/lib/motion"
 
 interface WelcomeOrbProps {
     size?: number
@@ -10,16 +11,21 @@ interface WelcomeOrbProps {
     className?: string
 }
 
+const midMorph = "30% 60% 70% 40% / 50% 60% 30% 60%"
+
 export function WelcomeOrb({
     size = 200,
-    colors = ["#A855F7", "#EC4899"],
+    colors = ["var(--pl-orb-from)", "var(--pl-orb-to)"],
     speed = 1,
     intensity = 1,
     className,
 }: WelcomeOrbProps) {
+    const reduceMotion = useReducedMotion()
+
     return (
         <div
             className={className}
+            aria-hidden="true"
             style={{
                 width: size,
                 height: size,
@@ -33,44 +39,60 @@ export function WelcomeOrb({
                 style={{
                     width: "100%",
                     height: "100%",
-                    borderRadius: "50%",
+                    borderRadius: reduceMotion ? midMorph : "50%",
                     background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`,
                     filter: `blur(${20 * intensity}px)`,
                 }}
-                animate={{
-                    scale: [1, 1.1 * intensity, 1],
-                    rotate: [0, 90 * speed, 0],
-                    borderRadius: [
-                        "60% 40% 30% 70% / 60% 30% 70% 40%",
-                        "30% 60% 70% 40% / 50% 60% 30% 60%",
-                        "60% 40% 30% 70% / 60% 30% 70% 40%",
-                    ],
-                }}
-                transition={{
-                    duration: 8 / speed,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                }}
+                animate={
+                    reduceMotion
+                        ? { scale: 1.1 * intensity, rotate: 90 * speed }
+                        : {
+                            scale: [1, 1.1 * intensity, 1],
+                            rotate: [0, 90 * speed, 0],
+                            borderRadius: [
+                                "60% 40% 30% 70% / 60% 30% 70% 40%",
+                                midMorph,
+                                "60% 40% 30% 70% / 60% 30% 70% 40%",
+                            ],
+                        }
+                }
+                transition={
+                    reduceMotion
+                        ? { duration: reducedMotionDuration }
+                        : {
+                            duration: duration.orb / speed,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                        }
+                }
             />
-            {/* Core glow */}
+            {/* Core glow — tighter than the outer wash */}
             <motion.div
                 style={{
                     position: "absolute",
-                    width: "80%",
-                    height: "80%",
+                    width: "68%",
+                    height: "68%",
                     borderRadius: "50%",
-                    background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%)`,
-                    filter: "blur(10px)",
+                    background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), transparent 55%)`,
+                    filter: "blur(8px)",
                 }}
-                animate={{
-                    scale: [0.8, 1, 0.8],
-                    opacity: [0.5, 0.8, 0.5],
-                }}
-                transition={{
-                    duration: 4 / speed,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                }}
+                animate={
+                    reduceMotion
+                        ? { scale: 1, opacity: 0.7 }
+                        : {
+                            scale: [0.8, 1, 0.8],
+                            opacity: [0.5, 0.8, 0.5],
+                        }
+                }
+                transition={
+                    reduceMotion
+                        ? { duration: reducedMotionDuration }
+                        : {
+                            duration: duration.orb / 2 / speed,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                        }
+                }
             />
         </div>
     )
