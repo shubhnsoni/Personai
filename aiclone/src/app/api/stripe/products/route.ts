@@ -73,19 +73,36 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        if (!user.profiles.length) {
+            return NextResponse.json({ error: 'Profile required' }, { status: 403 })
+        }
+
         const body = await request.json()
         const { 
             name, 
             description, 
             priceCents, 
             productType,
-            metadata 
+            metadata,
+            profileId,
         } = body
+
+        if (typeof profileId === 'string' && !user.profiles.some((p) => p.id === profileId)) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        if (typeof name !== 'string' || !name.trim()) {
+            return NextResponse.json({ error: 'Invalid name' }, { status: 400 })
+        }
+
+        if (typeof priceCents !== 'number' || !Number.isFinite(priceCents) || priceCents < 0) {
+            return NextResponse.json({ error: 'Invalid priceCents' }, { status: 400 })
+        }
 
         const stripe = await getUncachableStripeClient()
 
         const product = await stripe.products.create({
-            name,
+            name: name.trim(),
             description,
             metadata: {
                 ...metadata,

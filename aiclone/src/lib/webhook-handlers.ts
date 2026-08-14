@@ -1,14 +1,11 @@
 import Stripe from 'stripe'
-import { getUncachableStripeClient, getStripeSecretKey } from './stripe'
+import { getUncachableStripeClient, requireStripeWebhookSecret } from './stripe'
 import { prisma } from './prisma'
 import { sendPurchaseConfirmation, sendCreatorNotification } from './email'
 
 export class WebhookHandlers {
     static async processWebhook(payload: Buffer, signature: string, _uuid?: string): Promise<void> {
-        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
-        if (!webhookSecret) {
-            throw new Error('STRIPE_WEBHOOK_SECRET not configured')
-        }
+        const webhookSecret = requireStripeWebhookSecret()
 
         const stripe = await getUncachableStripeClient()
         const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret)

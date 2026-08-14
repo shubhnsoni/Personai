@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { WebhookHandlers } from '@/lib/webhook-handlers'
+import { requireStripeWebhookSecret, StripeNotConfiguredError } from '@/lib/stripe'
 
 export async function POST(
     request: NextRequest,
@@ -13,13 +14,25 @@ export async function POST(
     }
 
     try {
+        requireStripeWebhookSecret()
+    } catch (error) {
+        if (error instanceof StripeNotConfiguredError) {
+            return NextResponse.json({ error: 'payments_not_configured' }, { status: 503 })
+        }
+        throw error
+    }
+
+    try {
         const rawBody = await request.arrayBuffer()
         const payload = Buffer.from(rawBody)
-        
+
         await WebhookHandlers.processWebhook(payload, signature, uuid)
 
         return NextResponse.json({ received: true }, { status: 200 })
     } catch (error) {
+        if (error instanceof StripeNotConfiguredError) {
+            return NextResponse.json({ error: 'payments_not_configured' }, { status: 503 })
+        }
         console.error('Webhook error:', error)
         return NextResponse.json({ error: 'Webhook processing error' }, { status: 400 })
     }
