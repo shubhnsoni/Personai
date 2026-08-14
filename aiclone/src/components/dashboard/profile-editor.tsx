@@ -345,7 +345,7 @@ export function ProfileEditor({ profile, presets }: ProfileEditorProps) {
                             <div className="space-y-2">
                                 <Label htmlFor="slug">Profile URL Slug</Label>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground text-sm">personalink.ai/</span>
+                                    <span className="text-muted-foreground text-sm">personalink.com/</span>
                                     <Input id="slug" {...register("slug")} />
                                 </div>
                                 {errors.slug && <p className="text-sm text-destructive">{errors.slug.message}</p>}

@@ -11,9 +11,9 @@ export default function NotFound() {
           404
         </div>
         <div>
-          <h2 className="text-2xl font-bold mb-2">Page not found</h2>
+          <h2 className="text-2xl font-bold mb-2">This PersonaLink is missing</h2>
           <p className="text-zinc-400">
-            The page you&apos;re looking for doesn&apos;t exist or has been moved.
+            That page doesn&apos;t exist or the profile is no longer public.
           </p>
         </div>
         <Link href="/">

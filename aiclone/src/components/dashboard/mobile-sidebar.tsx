@@ -1,12 +1,12 @@
 "use client"
 
-import Link from "next/link"
 import {
     Sheet,
     SheetContent,
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet"
+import { Logo } from "@/components/brand/logo"
 import { SidebarNav } from "./sidebar"
 
 interface MobileSidebarProps {
@@ -25,11 +25,8 @@ export function MobileSidebar({ slug, open, onOpenChange }: MobileSidebarProps) 
             <SheetContent side="left" className="w-64 p-0">
                 <SheetHeader className="border-b p-0">
                     <div className="flex h-14 items-center px-4">
-                        <Link href="/" className="flex items-center gap-2 font-semibold">
-                            <SheetTitle className="text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
-                                PersonaLink
-                            </SheetTitle>
-                        </Link>
+                        <SheetTitle className="sr-only">PersonaLink</SheetTitle>
+                        <Logo />
                     </div>
                 </SheetHeader>
                 <div className="flex flex-col h-[calc(100%-3.5rem)]">

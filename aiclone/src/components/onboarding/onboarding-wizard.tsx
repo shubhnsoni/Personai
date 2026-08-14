@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Logo } from "@/components/brand/logo"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { createProfile } from "@/app/actions/onboarding"
 import { toast } from "sonner"
@@ -72,7 +73,8 @@ export function OnboardingWizard({ presets, userId }: OnboardingWizardProps) {
 
     return (
         <div className="space-y-8">
-            <div className="text-center">
+            <div className="text-center space-y-3">
+                <Logo href="/" />
                 <h1 className="text-3xl font-bold">Welcome to PersonaLink</h1>
                 <p className="text-muted-foreground">Let&apos;s set up your AI profile in a few steps.</p>
             </div>

@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PersonaLink
 
-## Getting Started
+AI-powered professional profile. Visitors chat with your clone, book calls, and buy from one link.
 
-First, run the development server:
+Marketing copy may say `personalink.com/{slug}` — that host is **brand fiction**. The real app URL until a domain is bought is [http://localhost:3000](http://localhost:3000). Repo/folder names stay `personai` / `aiclone`.
+
+## Stack
+
+- Next.js 16 (App Router) + React 19 + TypeScript
+- Prisma 5 + PostgreSQL
+- Clerk (auth)
+- OpenAI (chat + embeddings)
+- Stripe (Connect + Checkout)
+- Resend (optional; console fallback if unset)
+- Tailwind CSS 4 + Radix UI + Framer Motion
+
+App lives in this `aiclone/` folder.
+
+## Scripts
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev      # http://localhost:3000
+npm run build
+npm run start
+npm run lint
+npx prisma migrate dev
+npx prisma db seed
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Copy `.env.example` to `.env` and fill the named vars. **Never commit `.env`.**
+2. `npm install`
+3. `npx prisma migrate dev`
+4. `npx prisma db seed`
+5. `npm run dev` → [http://localhost:3000](http://localhost:3000)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment (names only)
 
-## Learn More
+Set these in `.env`. Do not put real secrets in `.env.example` or the README.
 
-To learn more about Next.js, take a look at the following resources:
+| Name | Notes |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
+| `CLERK_SECRET_KEY` | Clerk secret key |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/sign-in` |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/sign-up` |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | `/dashboard` |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | `/onboarding` |
+| `OPENAI_API_KEY` | Chat + embeddings |
+| `STRIPE_SECRET_KEY` | Required for any payment path |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Required with the secret |
+| `STRIPE_WEBHOOK_SECRET` | Required to verify webhooks |
+| `RESEND_API_KEY` | Optional. Unset → mail logs to the console |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` locally |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Leave `FROM_EMAIL` / `EMAIL_FROM` **unset**. Do not send real Resend mail in local/dev.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Seed
 
-## Deploy on Vercel
+`npx prisma db seed` (configured in `package.json`) upserts welcome-animation presets and a `/demo` profile so you can open [http://localhost:3000/demo](http://localhost:3000/demo).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## One-shot ADMIN bootstrap
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`User.role` defaults to `CREATOR`. `syncUser()` never promotes anyone. There is no in-app “make admin” UI.
+
+Sign in once so the Clerk user has a `User` row, then promote that known Clerk user id (`user_…` from the Clerk dashboard):
+
+```bash
+# from aiclone/, with DATABASE_URL in the environment
+printf '%s\n' "UPDATE \"User\" SET role = 'ADMIN' WHERE \"clerkId\" = 'user_XXXX';" | npx prisma db execute --stdin
+```
+
+PowerShell:
+
+```powershell
+'UPDATE "User" SET role = ''ADMIN'' WHERE "clerkId" = ''user_XXXX'';' | npx prisma db execute --stdin
+```
+
+Replace `user_XXXX` with the real Clerk user id. Then open `/admin`.

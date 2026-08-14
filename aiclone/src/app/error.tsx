@@ -22,7 +22,7 @@ export default function GlobalError({
           <AlertTriangle className="w-8 h-8 text-red-400" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold mb-2">Something went wrong</h2>
+          <h2 className="text-2xl font-bold mb-2">PersonaLink hit a snag</h2>
           <p className="text-zinc-400">
             {error.message || "An unexpected error occurred. Please try again."}
           </p>

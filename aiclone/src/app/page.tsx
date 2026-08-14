@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Logo } from "@/components/brand/logo"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { ArrowRight, MessageSquare, Zap, DollarSign, Calendar, Users, BarChart3, Sparkles, Check } from "lucide-react"
 import { motion, type Variants } from "framer-motion"
@@ -21,9 +22,7 @@ export default function Home() {
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-black/60 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            PersonaLink
-          </span>
+          <Logo />
           <div className="flex items-center gap-3">
             <Link href="/sign-in">
               <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white">
@@ -87,7 +86,7 @@ export default function Home() {
         >
           <Link href="/sign-up">
             <Button size="lg" className="bg-purple-600 hover:bg-purple-500 rounded-full px-8 h-14 text-base gap-2 w-full sm:w-auto">
-              Create Your AI Clone <ArrowRight className="w-4 h-4" />
+              Create Your PersonaLink <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
           <Link href="#how-it-works">
@@ -281,9 +280,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-white/5 py-8 px-4">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-600">
-          <span className="font-medium bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            PersonaLink
-          </span>
+          <Logo href={null} />
           <span>&copy; {new Date().getFullYear()} PersonaLink. All rights reserved.</span>
         </div>
       </footer>

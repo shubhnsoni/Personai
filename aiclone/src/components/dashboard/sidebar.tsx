@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { Logo } from "@/components/brand/logo"
 import { cn } from "@/lib/utils"
 import {
     LayoutDashboard,
@@ -91,11 +92,7 @@ export function Sidebar({ slug }: { slug: string }) {
     return (
         <div className="hidden md:flex h-full w-64 flex-col border-r bg-card text-card-foreground">
             <div className="flex h-14 items-center border-b px-4">
-                <Link href="/" className="flex items-center gap-2 font-semibold">
-                    <span className="text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
-                        PersonaLink
-                    </span>
-                </Link>
+                <Logo />
             </div>
             <SidebarNav slug={slug} />
         </div>

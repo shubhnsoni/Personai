@@ -18,8 +18,12 @@ const geistMono = Geist_Mono({
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: "PersonaLink",
-  description: "Your AI-powered professional profile",
+  title: {
+    default: "PersonaLink",
+    template: "%s · PersonaLink",
+  },
+  description:
+    "Your AI-powered professional profile. Chat with visitors, book calls, and sell from one link.",
 };
 
 export default function RootLayout({
