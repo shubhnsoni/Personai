@@ -59,7 +59,7 @@ Leave `FROM_EMAIL` / `EMAIL_FROM` **unset**. Do not send real Resend mail in loc
 
 ## Seed
 
-`npx prisma db seed` (configured in `package.json`) upserts welcome-animation presets and a `/demo` profile so you can open [http://localhost:3000/demo](http://localhost:3000/demo).
+`npx prisma db seed` (configured in `package.json`) upserts welcome-animation presets and the branded `/demo` profile (Riley Vale) so you can open [http://localhost:3000/demo](http://localhost:3000/demo). Marketing `/` links there.
 
 ## One-shot ADMIN bootstrap
 
