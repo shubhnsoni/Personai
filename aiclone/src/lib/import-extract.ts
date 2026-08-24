@@ -425,7 +425,7 @@ function decodePdfHex(raw: string) {
 }
 
 export async function extractPdfText(buffer: Buffer): Promise<string> {
-    return extractPdfStrings(buffer)
+    return sanitizeDbText(extractPdfStrings(buffer))
 }
 
 export function parseCsv(raw: string): ImportItem[] {
@@ -1582,4 +1582,25 @@ function omitEmpty(fields: ImportFields): ImportFields {
         ;(out as Record<string, unknown>)[k] = v
     }
     return out
+}
+
+
+/**
+ * Strips bytes Postgres refuses to store in a text column.
+ *
+ * PDF text is recovered from raw latin1 bytes and CID glyph maps, so NUL (0x00)
+ * and other C0 control characters can survive into the extracted string. Writing
+ * one through Prisma fails the whole query with:
+ *   22021 invalid byte sequence for encoding "UTF8": 0x00
+ * Lone surrogates are dropped for the same reason — they cannot be encoded as
+ * valid UTF-8. Newlines and tabs are kept because extracted text relies on them.
+ */
+export function sanitizeDbText(value: string): string {
+    return value
+        .replace(/\u0000/g, "")
+        // C0 controls except \t (09) and \n (0A), plus DEL
+        .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+        // unpaired surrogates cannot be encoded to UTF-8
+        .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "")
+        .replace(/(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "$1")
 }

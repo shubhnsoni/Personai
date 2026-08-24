@@ -14,6 +14,7 @@ import {
     mergeModelItems,
     parseCsv,
     parseIcs,
+    sanitizeDbText,
     type ImportBundle,
     type ImportItem,
     type ImportKind,
@@ -163,8 +164,28 @@ export async function ingestFile(formData: FormData, hint: SourceHint = "auto"):
     return ingestText(text, hint)
 }
 
+/**
+ * Deep-sanitises every string in a value received from the client.
+ *
+ * applyImportBundle is a server action: the reviewed items come back from the
+ * browser and are written straight to Postgres. serializeBundle only sanitises
+ * the flat fields it enumerates, so nested structures like
+ * fields.modules[].lessons[].title slipped through and a NUL byte from PDF text
+ * failed the insert with 22021 invalid byte sequence for encoding "UTF8".
+ */
+function sanitizeDeep<T>(value: T): T {
+    if (typeof value === "string") return sanitizeDbText(value) as unknown as T
+    if (Array.isArray(value)) return value.map((v) => sanitizeDeep(v)) as unknown as T
+    if (value && typeof value === "object") {
+        const out: Record<string, unknown> = {}
+        for (const [k, v] of Object.entries(value)) out[k] = sanitizeDeep(v)
+        return out as unknown as T
+    }
+    return value
+}
+
 export async function applyImportBundle(profileId: string, items: ImportItem[]): Promise<ApplyResult> {
-    const selected = items.filter((i) => i.selected)
+    const selected = sanitizeDeep(items).filter((i) => i.selected)
     if (!selected.length) throw new Error("Select at least one item.")
 
     const profile = await prisma.profile.findUnique({
@@ -424,7 +445,7 @@ function serializeBundle(bundle: ImportBundle): ImportBundle {
     const items = (bundle.items || []).slice(0, 60).map((it) => ({
         id: String(it.id || ""),
         kind: it.kind,
-        title: String(it.title || "Untitled").slice(0, 160),
+        title: sanitizeDbText(String(it.title || "Untitled")).slice(0, 160),
         confidence: Number(it.confidence) || 0.5,
         selected: Boolean(it.selected),
         fields: {
@@ -470,7 +491,7 @@ function serializeBundle(bundle: ImportBundle): ImportBundle {
 
 function strField(v: unknown) {
     if (typeof v !== "string") return undefined
-    const s = v.trim()
+    const s = sanitizeDbText(v).trim()
     return s ? s.slice(0, 4000) : undefined
 }
 
