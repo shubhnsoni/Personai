@@ -1,50 +1,66 @@
 "use client"
 
+import { useTransition } from "react"
 import { Booking, ServiceOffering } from "@prisma/client"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { BookingRow, type CalBooking } from "@/components/dashboard/calendar-week"
+import { setBookingStatus } from "@/app/actions/bookings"
+import { toast } from "sonner"
+import { EmptyState } from "@/components/ui/empty-state"
+import { CalendarDays } from "lucide-react"
 
 interface BookingsListProps {
     bookings: (Booking & { serviceOffering: ServiceOffering })[]
 }
 
-export function BookingsList({ bookings }: BookingsListProps) {
-    return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold tracking-tight">Bookings</h2>
-            </div>
+function toCal(booking: Booking & { serviceOffering: ServiceOffering }): CalBooking {
+    return {
+        id: booking.id,
+        visitorName: booking.visitorName,
+        visitorEmail: booking.visitorEmail,
+        service: booking.serviceOffering.name,
+        startTime: new Date(booking.startTime).toISOString(),
+        endTime: new Date(booking.endTime).toISOString(),
+        status: booking.status,
+        metadata: booking.metadata,
+    }
+}
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {bookings.map((booking) => (
-                    <Card key={booking.id}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                {booking.visitorName}
-                            </CardTitle>
-                            <Badge variant={booking.status === "CONFIRMED" ? "default" : "secondary"}>
-                                {booking.status}
-                            </Badge>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-sm font-medium mb-1">
-                                {booking.serviceOffering.name}
-                            </div>
-                            <div className="text-xs text-muted-foreground mb-4">
-                                {new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeStyle: 'short' }).format(new Date(booking.startTime))}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                {booking.visitorEmail}
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-                {bookings.length === 0 && (
-                    <div className="col-span-full text-center py-12 border rounded-lg border-dashed text-muted-foreground">
-                        No bookings yet.
-                    </div>
-                )}
+export function BookingsList({ bookings }: BookingsListProps) {
+    const [pending, startTransition] = useTransition()
+
+    const onStatus = (id: string, status: "CONFIRMED" | "CANCELLED") => {
+        startTransition(async () => {
+            try {
+                await setBookingStatus(id, status)
+                toast.success(status === "CONFIRMED" ? "Confirmed" : "Cancelled")
+            } catch {
+                toast.error("Could not update booking")
+            }
+        })
+    }
+
+    if (bookings.length === 0) {
+        return (
+            <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+                <EmptyState
+                    icon={<CalendarDays />}
+                    title="No bookings yet"
+                    description="When someone books a table or a call, it shows up here."
+                />
             </div>
+        )
+    }
+
+    return (
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+            {bookings.map((booking) => (
+                <BookingRow
+                    key={booking.id}
+                    booking={toCal(booking)}
+                    pending={pending}
+                    onStatus={onStatus}
+                />
+            ))}
         </div>
     )
 }

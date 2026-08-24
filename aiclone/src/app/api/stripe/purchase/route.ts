@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUncachableStripeClient, StripeNotConfiguredError } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import { headers } from 'next/headers'
+import { convertUsdCents, stripeCurrency } from '@/lib/pricing'
+import { getRequestCurrency } from '@/lib/request-currency'
 
 export async function POST(request: NextRequest) {
     try {
@@ -19,11 +21,15 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             )
         }
+        if (!visitorEmail || !String(visitorEmail).includes("@")) {
+            return NextResponse.json({ error: "Email is required" }, { status: 400 })
+        }
 
         const headersList = await headers()
-        const host = headersList.get('host') || ''
-        const protocol = host.includes('localhost') ? 'http' : 'https'
-        const baseUrl = `${protocol}://${host}`
+        const host = headersList.get("x-forwarded-host") || headersList.get("host") || ""
+        const proto = headersList.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https")
+        const baseUrl = `${proto}://${host}`
+        const { fulfillPurchase } = await import("@/lib/members")
 
         let itemName = ''
         let priceCents = 0
@@ -65,19 +71,18 @@ export async function POST(request: NextRequest) {
                 if (!event) {
                     return NextResponse.json({ error: 'Event not found' }, { status: 404 })
                 }
-                if (event.isFree) {
-                    await prisma.eventRegistration.create({
-                        data: {
-                            eventId: event.id,
-                            visitorEmail: visitorEmail || 'anonymous@example.com',
-                            visitorName,
-                            status: 'REGISTERED'
-                        }
+                if (event.isFree || event.priceCents === 0) {
+                    const result = await fulfillPurchase({
+                        itemType: "event",
+                        itemId: event.id,
+                        visitorEmail,
+                        visitorName,
+                        amountCents: 0,
+                        baseUrl,
                     })
-                    return NextResponse.json({ 
-                        success: true, 
-                        message: 'Registered for free event',
-                        redirectUrl: `${baseUrl}/${profileSlug}?checkout=success` 
+                    return NextResponse.json({
+                        success: true,
+                        libraryUrl: result.libraryUrl,
                     })
                 }
                 itemName = event.title
@@ -106,25 +111,34 @@ export async function POST(request: NextRequest) {
         }
 
         if (priceCents === 0) {
-            return NextResponse.json({ 
-                success: true, 
-                message: 'Item is free',
-                redirectUrl: `${baseUrl}/${profileSlug}?checkout=success` 
+            const result = await fulfillPurchase({
+                itemType,
+                itemId,
+                visitorEmail,
+                visitorName,
+                amountCents: 0,
+                baseUrl,
+            })
+            return NextResponse.json({
+                success: true,
+                libraryUrl: result.libraryUrl,
             })
         }
 
         const stripe = await getUncachableStripeClient()
+        const displayCurrency = await getRequestCurrency()
+        const chargeAmount = convertUsdCents(priceCents, displayCurrency)
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
                 {
                     price_data: {
-                        currency: 'usd',
+                        currency: stripeCurrency(displayCurrency),
                         product_data: {
                             name: itemName,
                         },
-                        unit_amount: priceCents,
+                        unit_amount: chargeAmount,
                         ...(mode === 'subscription' ? { recurring: { interval: 'month' } } : {})
                     },
                     quantity: 1
@@ -138,7 +152,8 @@ export async function POST(request: NextRequest) {
                 itemType,
                 itemId,
                 visitorName: visitorName || '',
-                profileSlug
+                profileSlug,
+                displayCurrency,
             }
         })
 

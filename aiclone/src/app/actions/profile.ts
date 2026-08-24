@@ -31,6 +31,16 @@ export async function updateProfile(profileId: string, data: any) {
             contentDisplayMode: data.contentDisplayMode,
             personalityConfig: data.personalityConfig,
             aiModel: data.aiModel,
+            imageUrl: data.imageUrl || null,
+            shopLogoUrl: data.shopLogoUrl || null,
+            chatAvatarMode: data.chatAvatarMode === "IMAGE" ? "IMAGE" : "ORB",
+            autoMemoryEnabled: Boolean(data.autoMemoryEnabled),
+            liveChatEnabled: Boolean(data.liveChatEnabled),
+            liveChatSlaMinutes: Number(data.liveChatSlaMinutes) || 10,
+            whatsapp: data.whatsapp?.trim() || null,
+            upiId: data.upiId?.trim() || null,
+            gstin: data.gstin?.trim() || null,
+            deliveryNote: data.deliveryNote?.trim() || null,
         },
     })
 
@@ -46,7 +56,7 @@ export async function createWorkExperience(profileId: string, data: any) {
             company: data.company,
             role: data.role,
             startDate: data.startDate,
-            endDate: data.endDate,
+            endDate: data.endDate || null,
             description: data.description,
             achievements: data.achievements, // Assuming string or JSON string
         }
@@ -61,7 +71,7 @@ export async function updateWorkExperience(id: string, data: any) {
             company: data.company,
             role: data.role,
             startDate: data.startDate,
-            endDate: data.endDate,
+            endDate: data.endDate || null,
             description: data.description,
             achievements: data.achievements,
         }

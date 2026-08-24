@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { lessonBody, lessonFile, lessonVideo } from "@/lib/lesson-content"
 
 interface Lesson {
     id: string
@@ -8,6 +9,9 @@ interface Lesson {
     description: string | null
     contentType: string
     contentUrl: string | null
+    videoUrl?: string | null
+    body?: string | null
+    fileUrl?: string | null
     durationMinutes: number
     isFree: boolean
 }
@@ -126,45 +130,48 @@ export function CourseViewer({
                 {activeLesson ? (
                     <div>
                         <h2 className="text-2xl font-bold mb-2">{activeLesson.title}</h2>
-                        {activeLesson.description && (
-                            <p className="text-muted-foreground mb-6">{activeLesson.description}</p>
-                        )}
-
-                        {/* Video embed */}
-                        {activeLesson.contentType === 'VIDEO' && activeLesson.contentUrl && (
+                        {(() => {
+                            const video = lessonVideo(activeLesson)
+                            const notes = lessonBody(activeLesson)
+                            const file = lessonFile(activeLesson)
+                            return (
+                                <>
+                        {video ? (
                             <div className="aspect-video bg-black rounded-xl overflow-hidden mb-6">
-                                {activeLesson.contentUrl.includes('youtube.com') || activeLesson.contentUrl.includes('youtu.be') ? (
+                                {video.includes('youtube.com') || video.includes('youtu.be') ? (
                                     <iframe
-                                        src={getYouTubeEmbedUrl(activeLesson.contentUrl)}
+                                        src={getYouTubeEmbedUrl(video)}
                                         className="w-full h-full"
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                         allowFullScreen
                                     />
-                                ) : activeLesson.contentUrl.includes('vimeo.com') ? (
+                                ) : video.includes('vimeo.com') ? (
                                     <iframe
-                                        src={getVimeoEmbedUrl(activeLesson.contentUrl)}
+                                        src={getVimeoEmbedUrl(video)}
                                         className="w-full h-full"
                                         allow="autoplay; fullscreen; picture-in-picture"
                                         allowFullScreen
                                     />
                                 ) : (
-                                    <video src={activeLesson.contentUrl} controls className="w-full h-full" />
+                                    <video src={video} controls className="w-full h-full" />
                                 )}
                             </div>
-                        )}
-
-                        {/* Text/markdown content */}
-                        {activeLesson.contentType === 'TEXT' && activeLesson.contentUrl && (
-                            <div className="prose prose-sm dark:prose-invert max-w-none bg-card rounded-xl p-6 border">
-                                <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(activeLesson.contentUrl) }} />
+                        ) : (
+                            <div className="aspect-video mb-6 flex items-center justify-center rounded-xl border bg-muted text-sm text-muted-foreground">
+                                Add a video URL in the course studio
                             </div>
                         )}
 
-                        {/* PDF */}
-                        {activeLesson.contentType === 'PDF' && activeLesson.contentUrl && (
-                            <div className="bg-card rounded-xl border p-6">
+                        {notes && (
+                            <div className="prose prose-sm dark:prose-invert max-w-none bg-card rounded-xl p-6 border mb-6">
+                                <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(notes) }} />
+                            </div>
+                        )}
+
+                        {file && (
+                            <div className="bg-card rounded-xl border p-6 mb-6">
                                 <a
-                                    href={activeLesson.contentUrl}
+                                    href={file}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary hover:underline"
@@ -173,6 +180,9 @@ export function CourseViewer({
                                 </a>
                             </div>
                         )}
+                                </>
+                            )
+                        })()}
 
                         {/* Complete button */}
                         {enrolled && enrollmentId && (

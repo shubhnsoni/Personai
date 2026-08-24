@@ -7,16 +7,41 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { updateAvailability } from "@/app/actions/availability"
+import { StudioDock } from "@/components/dashboard/studio-dock"
+import { toast } from "sonner"
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+const ZONES = [
+    "UTC",
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "Europe/London",
+    "Europe/Paris",
+    "Asia/Kolkata",
+    "Asia/Tokyo",
+    "Australia/Sydney",
+]
 
 interface AvailabilitySettingsProps {
     profileId: string
     schedules: AvailabilitySchedule[]
+    timezone?: string
+    bufferMinutes?: number
+    compact?: boolean
 }
 
-export function AvailabilitySettings({ profileId, schedules }: AvailabilitySettingsProps) {
+export function AvailabilitySettings({
+    profileId,
+    schedules,
+    timezone = "UTC",
+    bufferMinutes = 0,
+    compact,
+}: AvailabilitySettingsProps) {
     const [isPending, startTransition] = useTransition()
+    const [tz, setTz] = useState(timezone)
+    const [buffer, setBuffer] = useState(bufferMinutes)
 
     const [localSchedules, setLocalSchedules] = useState(() => {
         return DAYS.map((day, index) => {
@@ -33,11 +58,11 @@ export function AvailabilitySettings({ profileId, schedules }: AvailabilitySetti
     const handleSave = () => {
         startTransition(async () => {
             try {
-                await updateAvailability(profileId, localSchedules)
-                alert("Availability updated")
+                await updateAvailability(profileId, localSchedules, { timezone: tz, bufferMinutes: buffer })
+                toast.success("Hours saved")
             } catch (error) {
                 console.error(error)
-                alert("Failed to update availability")
+                toast.error("Could not save hours")
             }
         })
     }
@@ -47,16 +72,34 @@ export function AvailabilitySettings({ profileId, schedules }: AvailabilitySetti
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                <div>
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Availability</h2>
-                    <p className="text-sm text-muted-foreground">Set your weekly working hours.</p>
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                    <Label>Timezone</Label>
+                    <select
+                        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                        value={tz}
+                        onChange={(e) => setTz(e.target.value)}
+                    >
+                        {ZONES.map((z) => (
+                            <option key={z} value={z}>{z.replace(/_/g, " ")}</option>
+                        ))}
+                    </select>
                 </div>
-                <Button onClick={handleSave} disabled={isPending} className="w-full sm:w-auto">
-                    {isPending ? "Saving..." : "Save Changes"}
-                </Button>
+                <div className="space-y-1.5">
+                    <Label>Buffer</Label>
+                    <select
+                        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                        value={buffer}
+                        onChange={(e) => setBuffer(Number(e.target.value))}
+                    >
+                        {[0, 10, 15, 30].map((n) => (
+                            <option key={n} value={n}>{n === 0 ? "None" : `${n} min`}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
+            <p className="text-xs text-muted-foreground">Weekly hours</p>
 
             <div className="border rounded-lg divide-y">
                 {localSchedules.map((schedule, index) => (
@@ -93,6 +136,17 @@ export function AvailabilitySettings({ profileId, schedules }: AvailabilitySetti
                     </div>
                 ))}
             </div>
+            {compact ? (
+                <Button className="w-full rounded-full" onClick={handleSave} disabled={isPending}>
+                    {isPending ? "Saving..." : "Save hours"}
+                </Button>
+            ) : (
+                <StudioDock>
+                    <Button className="w-full md:w-auto" onClick={handleSave} disabled={isPending}>
+                        {isPending ? "Saving..." : "Save hours"}
+                    </Button>
+                </StudioDock>
+            )}
         </div>
     )
 }

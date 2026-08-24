@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 interface ChartDataPoint {
     date: string
+    visits?: number
     conversations: number
     leads: number
     revenue: number
@@ -13,23 +14,25 @@ interface AnalyticsChartsProps {
     data: ChartDataPoint[]
 }
 
-type MetricKey = 'conversations' | 'leads' | 'revenue'
+type MetricKey = 'visits' | 'conversations' | 'leads' | 'revenue'
 
 const METRICS: { key: MetricKey; label: string; color: string }[] = [
+    { key: 'visits', label: 'Visits', color: '#00D7FF' },
     { key: 'conversations', label: 'Conversations', color: '#3b82f6' },
     { key: 'leads', label: 'Leads', color: '#eab308' },
     { key: 'revenue', label: 'Revenue ($)', color: '#22c55e' },
 ]
 
-export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
+export function AnalyticsCharts({ data, hideLeads, hideSales }: AnalyticsChartsProps & { hideLeads?: boolean; hideSales?: boolean }) {
+    const metrics = METRICS.filter((m) => !(m.key === "leads" && hideLeads) && !(m.key === "revenue" && hideSales))
     const [activeMetric, setActiveMetric] = useState<MetricKey>('conversations')
     const [period, setPeriod] = useState<'7d' | '14d' | '30d'>('30d')
 
     const periodDays = period === '7d' ? 7 : period === '14d' ? 14 : 30
     const filtered = data.slice(-periodDays)
 
-    const metric = METRICS.find(m => m.key === activeMetric)!
-    const values = filtered.map(d => d[activeMetric])
+    const metric = metrics.find(m => m.key === activeMetric) || metrics[0]
+    const values = filtered.map(d => d[activeMetric] || 0)
     const maxVal = Math.max(...values, 1)
 
     const chartWidth = 600
@@ -39,14 +42,14 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
     return (
         <div>
             {/* Controls */}
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-                <div className="flex gap-1 bg-muted rounded-lg p-1">
-                    {METRICS.map(m => (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="flex gap-0.5 bg-muted/70 rounded-full p-0.5">
+                    {metrics.map(m => (
                         <button
                             key={m.key}
                             onClick={() => setActiveMetric(m.key)}
-                            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                                activeMetric === m.key ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                                activeMetric === m.key ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
                             }`}
                         >
                             {m.label}

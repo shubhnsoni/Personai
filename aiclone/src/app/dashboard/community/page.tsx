@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { CommunitiesList } from "@/components/dashboard/communities-list"
+import { requireSurface } from "@/lib/require-surface"
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,7 @@ export default async function DashboardCommunityPage() {
 
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
+    requireSurface(profile.roleTemplate, "events", profile)
 
     const { prisma } = await import("@/lib/prisma")
     const communities = await prisma.community.findMany({
@@ -23,8 +25,8 @@ export default async function DashboardCommunityPage() {
     })
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
-            <CommunitiesList profileId={profile.id} communities={communities} />
+        <div className="flex-1 space-y-4">
+            <CommunitiesList profileId={profile.id} slug={profile.slug} communities={communities} />
         </div>
     )
 }

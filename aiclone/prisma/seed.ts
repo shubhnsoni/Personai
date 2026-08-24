@@ -18,49 +18,96 @@ async function main() {
 
     const presets = [
         {
-            name: 'GlowOrb',
-            description: 'A soft, glowing orb that pulses gently.',
-            config: JSON.stringify({
-                type: 'orb',
-                colors: ['#A855F7', '#EC4899'],
-                speed: 1,
-                intensity: 1,
-            }),
+            aliases: ['GlowOrb', 'Aqua'],
+            name: 'Aqua',
+            description: 'Navy-to-cyan glass orb. Slow drift.',
+            config: JSON.stringify({ variant: 'aqua', colors: ['#00D7FF', '#07104D'], speed: 1, intensity: 1 }),
+            isDefault: false,
+        },
+        {
+            aliases: ['LiquidSphere', 'Forest'],
+            name: 'Forest',
+            description: 'Deep green core that breathes.',
+            config: JSON.stringify({ variant: 'forest', colors: ['#34D399', '#052E1A'], speed: 0.9, intensity: 1 }),
+            isDefault: false,
+        },
+        {
+            aliases: ['SoftPulse', 'Ember'],
+            name: 'Ember',
+            description: 'Warm fireglass with a flicker.',
+            config: JSON.stringify({ variant: 'ember', colors: ['#FFB020', '#3A0A08'], speed: 1.15, intensity: 1.1 }),
+            isDefault: false,
+        },
+        {
+            aliases: ['Violet'],
+            name: 'Violet',
+            description: 'Aurora sweep through amethyst.',
+            config: JSON.stringify({ variant: 'violet', colors: ['#C084FC', '#1E0B3A'], speed: 1, intensity: 1 }),
+            isDefault: false,
+        },
+        {
+            aliases: ['Sunrise'],
+            name: 'Sunrise',
+            description: 'Rose and coral, a warm pulse.',
+            config: JSON.stringify({ variant: 'sunrise', colors: ['#FB7185', '#431407'], speed: 1.05, intensity: 1 }),
+            isDefault: false,
+        },
+        {
+            aliases: ['Ice'],
+            name: 'Ice',
+            description: 'Pale crystal with a bright shimmer.',
+            config: JSON.stringify({ variant: 'ice', colors: ['#E0F2FE', '#0C1929'], speed: 0.85, intensity: 1.05 }),
+            isDefault: false,
+        },
+        {
+            aliases: ['8-Bit Slime', 'Bit Slime', '8-Bit'],
+            name: '8-Bit',
+            description: 'Two rectangle eyes. No orb.',
+            config: JSON.stringify({ look: 'pixel', skin: 'bit', variant: 'forest', colors: ['#34D399', '#052E1A'], speed: 0.95, intensity: 1 }),
+            isDefault: false,
+        },
+        {
+            aliases: ['CRT', 'Phosphor'],
+            name: 'CRT',
+            description: 'Scanline phosphor eyes.',
+            config: JSON.stringify({ look: 'pixel', skin: 'crt', variant: 'aqua', colors: ['#00D7FF', '#07104D'], speed: 1, intensity: 1.1 }),
+            isDefault: false,
+        },
+        {
+            aliases: ['Spark', 'Pixel Spark'],
+            name: 'Spark',
+            description: 'Twin pixel stars.',
+            config: JSON.stringify({ look: 'pixel', skin: 'spark', variant: 'ember', colors: ['#FFB020', '#3A0A08'], speed: 1.05, intensity: 1.1 }),
+            isDefault: false,
+        },
+        {
+            aliases: ['Blob', 'Bloub'],
+            name: 'Blob',
+            description: 'Morphing blob with 8 shapes and 16 faces.',
+            config: JSON.stringify({ look: 'bloub', shape: 'cercle', expression: 'surpris', color: 'blanc', variant: 'aqua', colors: ['#f7f7f8', '#d8d8dc'], speed: 1, intensity: 1 }),
             isDefault: true,
-        },
-        {
-            name: 'LiquidSphere',
-            description: 'A fluid-like sphere with organic movement.',
-            config: JSON.stringify({
-                type: 'liquid',
-                colors: ['#3B82F6', '#10B981'],
-                speed: 1.5,
-                intensity: 1.2,
-            }),
-            isDefault: false,
-        },
-        {
-            name: 'SoftPulse',
-            description: 'A minimal, breathing circle.',
-            config: JSON.stringify({
-                type: 'pulse',
-                colors: ['#F59E0B', '#EF4444'],
-                speed: 0.8,
-                intensity: 0.8,
-            }),
-            isDefault: false,
         },
     ]
 
     for (const preset of presets) {
         const existing = await prisma.welcomeAnimationPreset.findFirst({
-            where: { name: preset.name }
+            where: { name: { in: preset.aliases } }
         })
+        const data = {
+            name: preset.name,
+            description: preset.description,
+            config: preset.config,
+            isDefault: preset.isDefault,
+        }
         if (!existing) {
-            await prisma.welcomeAnimationPreset.create({ data: preset })
+            await prisma.welcomeAnimationPreset.create({ data })
             console.log(`Created preset: ${preset.name}`)
         } else {
-            console.log(`Preset already exists: ${preset.name}`)
+            await prisma.welcomeAnimationPreset.update({
+                where: { id: existing.id },
+                data,
+            })
+            console.log(`Updated preset: ${preset.name}`)
         }
     }
 

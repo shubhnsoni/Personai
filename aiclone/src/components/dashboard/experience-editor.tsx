@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Trash2, Pencil } from "lucide-react"
 import { createWorkExperience, updateWorkExperience, deleteWorkExperience } from "@/app/actions/profile"
 
 interface ExperienceEditorProps {
     profileId: string
-    experiences: any[] // Using any until prisma client is regenerated
+    experiences: any[]
 }
 
 export function ExperienceEditor({ profileId, experiences }: ExperienceEditorProps) {
@@ -19,72 +19,90 @@ export function ExperienceEditor({ profileId, experiences }: ExperienceEditorPro
     const [isCreating, setIsCreating] = useState(false)
 
     return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Work Experience</h3>
-                <Button onClick={() => setIsCreating(true)} size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" /> Add Experience
-                </Button>
-            </div>
+        <Card className="gap-4 py-4 shadow-none">
+            <CardHeader className="px-4">
+                <CardTitle className="text-sm font-medium">Experience</CardTitle>
+                <CardDescription>Roles the chat can talk about.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 px-4">
+                {isCreating && (
+                    <ExperienceForm
+                        profileId={profileId}
+                        onCancel={() => setIsCreating(false)}
+                        onSave={() => setIsCreating(false)}
+                    />
+                )}
 
-            {isCreating && (
-                <ExperienceForm
-                    profileId={profileId}
-                    onCancel={() => setIsCreating(false)}
-                    onSave={() => setIsCreating(false)}
-                />
-            )}
+                {experiences.length > 0 ? (
+                    <div className="divide-y overflow-hidden rounded-xl border">
+                        {experiences.map((exp) => (
+                            <div key={exp.id} className="p-3">
+                                {isEditing === exp.id ? (
+                                    <ExperienceForm
+                                        profileId={profileId}
+                                        initialData={exp}
+                                        onCancel={() => setIsEditing(null)}
+                                        onSave={() => setIsEditing(null)}
+                                    />
+                                ) : (
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0 space-y-1">
+                                            <p className="text-sm font-medium">{exp.role}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {exp.company} · {exp.startDate} – {exp.endDate || "Present"}
+                                            </p>
+                                            {exp.description ? (
+                                                <p className="line-clamp-2 text-xs text-muted-foreground">{exp.description}</p>
+                                            ) : null}
+                                        </div>
+                                        <div className="flex shrink-0">
+                                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsEditing(exp.id)}>
+                                                <Pencil className="h-3.5 w-3.5" />
+                                            </Button>
+                                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteWorkExperience(exp.id)}>
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ) : !isCreating ? (
+                    <p className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
+                        No roles yet.
+                    </p>
+                ) : null}
 
-            <div className="grid gap-4">
-                {experiences.map((exp) => (
-                    <Card key={exp.id}>
-                        <CardContent className="p-4">
-                            {isEditing === exp.id ? (
-                                <ExperienceForm
-                                    profileId={profileId}
-                                    initialData={exp}
-                                    onCancel={() => setIsEditing(null)}
-                                    onSave={() => setIsEditing(null)}
-                                />
-                            ) : (
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h4 className="font-bold">{exp.role}</h4>
-                                        <p className="text-sm text-muted-foreground">{exp.company} • {exp.startDate} - {exp.endDate || "Present"}</p>
-                                        {exp.description && <p className="text-sm mt-2">{exp.description}</p>}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button variant="ghost" size="icon" onClick={() => setIsEditing(exp.id)}>
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteWorkExperience(exp.id)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-        </div>
+                {!isCreating && (
+                    <Button type="button" variant="outline" className="h-9 w-full rounded-full" onClick={() => setIsCreating(true)}>
+                        <Plus className="mr-1 h-4 w-4" /> Add experience
+                    </Button>
+                )}
+            </CardContent>
+        </Card>
     )
 }
 
 function ExperienceForm({ profileId, initialData, onCancel, onSave }: { profileId: string, initialData?: any, onCancel: () => void, onSave: () => void }) {
     const [isLoading, setIsLoading] = useState(false)
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
+    const handleSubmit = async (root: HTMLElement) => {
         setIsLoading(true)
-        const formData = new FormData(e.currentTarget)
+        const val = (name: string) =>
+            (root.querySelector(`[name="${name}"]`) as HTMLInputElement | HTMLTextAreaElement | null)?.value ?? ""
         const data = {
-            company: formData.get("company"),
-            role: formData.get("role"),
-            startDate: formData.get("startDate"),
-            endDate: formData.get("endDate"),
-            description: formData.get("description"),
-            achievements: formData.get("achievements"),
+            company: val("company"),
+            role: val("role"),
+            startDate: val("startDate"),
+            endDate: val("endDate").trim() || null,
+            description: val("description"),
+            achievements: (() => {
+                const raw = val("achievements").trim()
+                if (!raw) return null
+                const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+                return lines.length ? JSON.stringify(lines) : null
+            })(),
         }
 
         try {
@@ -103,39 +121,63 @@ function ExperienceForm({ profileId, initialData, onCancel, onSave }: { profileI
     }
 
     return (
-        <Card className="border-dashed">
-            <CardContent className="p-4">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Role</Label>
-                            <Input name="role" defaultValue={initialData?.role} required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Company</Label>
-                            <Input name="company" defaultValue={initialData?.company} required />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Start Date</Label>
-                            <Input name="startDate" defaultValue={initialData?.startDate} placeholder="e.g. 2022" required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>End Date</Label>
-                            <Input name="endDate" defaultValue={initialData?.endDate} placeholder="Leave empty for Present" />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Textarea name="description" defaultValue={initialData?.description} />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>Cancel</Button>
-                        <Button type="submit" disabled={isLoading}>{isLoading ? "Saving..." : "Save"}</Button>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
+        <div className="space-y-3 rounded-xl border border-dashed p-3" data-exp-form>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                    <Label>Role</Label>
+                    <Input name="role" defaultValue={initialData?.role} required />
+                </div>
+                <div className="space-y-1.5">
+                    <Label>Company</Label>
+                    <Input name="company" defaultValue={initialData?.company} required />
+                </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                    <Label>Start</Label>
+                    <Input name="startDate" defaultValue={initialData?.startDate} placeholder="2022" required />
+                </div>
+                <div className="space-y-1.5">
+                    <Label>End</Label>
+                    <Input name="endDate" defaultValue={initialData?.endDate} placeholder="Leave empty for present" />
+                </div>
+            </div>
+            <div className="space-y-1.5">
+                <Label>Description</Label>
+                <Textarea name="description" defaultValue={initialData?.description} rows={3} />
+            </div>
+            <div className="space-y-1.5">
+                <Label>Achievements</Label>
+                <Textarea
+                    name="achievements"
+                    rows={3}
+                    defaultValue={(() => {
+                        if (!initialData?.achievements) return ""
+                        try {
+                            const parsed = JSON.parse(initialData.achievements)
+                            return Array.isArray(parsed) ? parsed.join("\n") : String(initialData.achievements)
+                        } catch {
+                            return String(initialData.achievements)
+                        }
+                    })()}
+                    placeholder="One per line"
+                />
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={onCancel} disabled={isLoading}>Cancel</Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    className="rounded-full"
+                    disabled={isLoading}
+                    onClick={(e) => {
+                        const root = e.currentTarget.closest("[data-exp-form]") as HTMLElement | null
+                        if (root) void handleSubmit(root)
+                    }}
+                >
+                    {isLoading ? "Saving..." : "Save"}
+                </Button>
+            </div>
+        </div>
     )
 }

@@ -1,52 +1,54 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Community } from "@prisma/client"
-import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import type { Community } from "@prisma/client"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 import { createCommunity, updateCommunity, type CommunityData } from "@/app/actions/communities"
+import { OfferFooter, OfferSheet, LiveRow, MoreToggle, PillRow } from "@/components/dashboard/offer-sheet"
 
-interface CommunityFormProps {
+export function CommunityForm({
+    profileId,
+    community,
+    open,
+    onOpenChange,
+    embedded,
+}: {
     profileId: string
-    community?: Community
-}
-
-export function CommunityForm({ profileId, community }: CommunityFormProps) {
+    community?: Community | null
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+    embedded?: boolean
+}) {
     const router = useRouter()
-    const isEditing = !!community
+    const editing = !!community
+    const [more, setMore] = useState(Boolean(embedded))
+    const [name, setName] = useState("")
+    const [platform, setPlatform] = useState<CommunityData["platform"]>("TELEGRAM")
+    const [inviteLink, setInviteLink] = useState("")
+    const [price, setPrice] = useState("")
+    const [billingCycle, setBillingCycle] = useState<CommunityData["billingCycle"]>("MONTHLY")
+    const [description, setDescription] = useState("")
+    const [live, setLive] = useState(true)
+    const [busy, setBusy] = useState(false)
 
-    const [name, setName] = useState(community?.name || "")
-    const [description, setDescription] = useState(community?.description || "")
-    const [platform, setPlatform] = useState<CommunityData["platform"]>(
-        (community?.platform as CommunityData["platform"]) || "TELEGRAM"
-    )
-    const [inviteLink, setInviteLink] = useState(community?.inviteLink || "")
-    const [price, setPrice] = useState(
-        community ? (community.priceCents / 100).toString() : ""
-    )
-    const [billingCycle, setBillingCycle] = useState<CommunityData["billingCycle"]>(
-        (community?.billingCycle as CommunityData["billingCycle"]) || "MONTHLY"
-    )
-    const [isActive, setIsActive] = useState(community?.isActive ?? true)
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    useEffect(() => {
+        if (!embedded && !open) return
+        setMore(Boolean(embedded) || Boolean(community))
+        setName(community?.name || "")
+        setPlatform((community?.platform as CommunityData["platform"]) || "TELEGRAM")
+        setInviteLink(community?.inviteLink || "")
+        setPrice(community ? String(community.priceCents / 100) : "")
+        setBillingCycle((community?.billingCycle as CommunityData["billingCycle"]) || "MONTHLY")
+        setDescription(community?.description || "")
+        setLive(community?.isActive ?? true)
+    }, [open, community, embedded])
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    async function save() {
         if (!name.trim()) return
-
-        setIsSubmitting(true)
+        setBusy(true)
         try {
             const data: CommunityData = {
                 name: name.trim(),
@@ -55,154 +57,87 @@ export function CommunityForm({ profileId, community }: CommunityFormProps) {
                 inviteLink: inviteLink.trim() || undefined,
                 price: parseFloat(price) || 0,
                 billingCycle,
-                isActive,
+                isActive: live,
             }
-
-            if (isEditing && community) {
-                await updateCommunity(community.id, data)
-            } else {
-                await createCommunity(profileId, data)
-            }
-
-            router.push("/dashboard/community")
+            if (editing && community) await updateCommunity(community.id, data)
+            else await createCommunity(profileId, data)
+            toast.success(editing ? "Saved" : "Community live")
+            onOpenChange?.(false)
             router.refresh()
-        } catch (error) {
-            console.error("Failed to save community:", error)
+            if (embedded) router.push("/dashboard/community")
+        } catch {
+            toast.error("Could not save")
         } finally {
-            setIsSubmitting(false)
+            setBusy(false)
         }
     }
 
-    const handleCancel = () => {
-        router.push("/dashboard/community")
+    const fields = (
+        <>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name" autoFocus={!embedded} className="h-12 rounded-2xl border-border/70 text-base" />
+            <PillRow
+                value={platform}
+                onChange={setPlatform}
+                options={[
+                    { id: "TELEGRAM", label: "Telegram" },
+                    { id: "DISCORD", label: "Discord" },
+                ]}
+            />
+            <Input
+                value={inviteLink}
+                onChange={(e) => setInviteLink(e.target.value)}
+                placeholder={platform === "TELEGRAM" ? "https://t.me/…" : "https://discord.gg/…"}
+                className="h-12 rounded-2xl border-border/70 text-base"
+            />
+            <Input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (0 = free)" className="h-12 rounded-2xl border-border/70 text-base" />
+            <LiveRow checked={live} onChange={setLive} />
+            <MoreToggle open={more} onClick={() => setMore((v) => !v)} />
+            {more ? (
+                <div className="space-y-3 pb-2">
+                    <PillRow
+                        value={billingCycle}
+                        onChange={setBillingCycle}
+                        options={[
+                            { id: "MONTHLY", label: "Monthly" },
+                            { id: "YEARLY", label: "Yearly" },
+                            { id: "ONE_TIME", label: "Once" },
+                        ]}
+                    />
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What members get" rows={3} className="rounded-2xl" />
+                </div>
+            ) : null}
+        </>
+    )
+
+    const footer = (
+        <OfferFooter
+            onCancel={() => (embedded ? router.push("/dashboard/community") : onOpenChange?.(false))}
+            busy={busy}
+            disabled={!name.trim()}
+            label={editing ? "Save" : "Add community"}
+        />
+    )
+
+    if (embedded) {
+        return (
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save() }}>
+                {fields}
+                {footer}
+            </form>
+        )
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{isEditing ? "Edit Community" : "Create New Community"}</CardTitle>
-                <CardDescription>
-                    {isEditing
-                        ? "Update your community details."
-                        : "Set up a paid community on Telegram or Discord to engage with your audience."}
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Name *</Label>
-                        <Input
-                            id="name"
-                            placeholder="e.g. VIP Mastermind Group"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                            id="description"
-                            placeholder="Describe what members get access to..."
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows={4}
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="platform">Platform</Label>
-                            <Select value={platform} onValueChange={(val) => setPlatform(val as CommunityData["platform"])}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select platform" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="TELEGRAM">Telegram</SelectItem>
-                                    <SelectItem value="DISCORD">Discord</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="billingCycle">Billing Cycle</Label>
-                            <Select value={billingCycle} onValueChange={(val) => setBillingCycle(val as CommunityData["billingCycle"])}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select billing cycle" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="MONTHLY">Monthly</SelectItem>
-                                    <SelectItem value="YEARLY">Yearly</SelectItem>
-                                    <SelectItem value="ONE_TIME">One-time</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="inviteLink">Invite Link</Label>
-                        <Input
-                            id="inviteLink"
-                            type="url"
-                            placeholder={platform === "TELEGRAM" ? "https://t.me/..." : "https://discord.gg/..."}
-                            value={inviteLink}
-                            onChange={(e) => setInviteLink(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            The invite link members will receive after payment
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="price">Price (USD)</Label>
-                        <Input
-                            id="price"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={price}
-                            onChange={(e) => setPrice(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Set to 0 for a free community
-                        </p>
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                            <Label htmlFor="isActive">Active</Label>
-                            <p className="text-sm text-muted-foreground">
-                                Make this community visible and available for new members
-                            </p>
-                        </div>
-                        <Switch
-                            id="isActive"
-                            checked={isActive}
-                            onCheckedChange={setIsActive}
-                        />
-                    </div>
-
-                    <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleCancel}
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting || !name.trim()}>
-                            {isSubmitting
-                                ? "Saving..."
-                                : isEditing
-                                ? "Update Community"
-                                : "Create Community"}
-                        </Button>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
+        <OfferSheet
+            open={Boolean(open)}
+            onOpenChange={(next) => onOpenChange?.(next)}
+            title={editing ? "Edit community" : "Add community"}
+            description="Name, platform, invite. Price can be zero."
+            footer={<form onSubmit={(e) => { e.preventDefault(); void save() }}>{footer}</form>}
+        >
+            <form className="space-y-4 pb-2" onSubmit={(e) => { e.preventDefault(); void save() }}>
+                {fields}
+            </form>
+        </OfferSheet>
     )
 }

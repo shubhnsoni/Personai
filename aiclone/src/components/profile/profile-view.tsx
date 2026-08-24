@@ -1,13 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { animate, motion, useMotionTemplate, useMotionValue } from "framer-motion"
 import { useSearchParams } from "next/navigation"
 import { ChatInterface, type ChatChip } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"
 import { BookingModal } from "@/components/booking/booking-modal"
-import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { ReserveSheet } from "@/components/booking/reserve-sheet"
+import { isRestaurant } from "@/lib/menu"
+import { extrasOf, publicChipAllowed } from "@/lib/surfaces"
+import { CheckoutSheet, type CheckoutItem } from "@/components/checkout/checkout-sheet"
+import { TipSheet } from "@/components/profile/tip-sheet"
+import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound } from "lucide-react"
+import { ModeToggle } from "@/components/mode-toggle"
 import { toast } from "sonner"
+import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
+import { Tracker, track } from "@/components/profile/tracker"
 
 interface ProfileViewProps {
     profile: {
@@ -18,7 +26,11 @@ interface ProfileViewProps {
         bio: string | null
         welcomeMessageOverride: string | null
         contentDisplayMode: string
+        roleTemplate?: string | null
         primaryGoal?: string | null
+        personalityConfig?: string | null
+        imageUrl?: string | null
+        chatAvatarMode?: string | null
         workExperiences: Array<{
             id: string
             company: string
@@ -45,20 +57,35 @@ interface ProfileViewProps {
             isFree: boolean
             durationMinutes: number
             isActive: boolean
+            kind?: string | null
+            covers?: number | null
         }>
+        whatsapp?: string | null
+        upiId?: string | null
+        gstin?: string | null
         digitalProducts?: Array<{
             id: string
             title: string
             description: string | null
             type: string
             priceCents: number
+            thumbnailUrl?: string | null
+            fulfillment?: string | null
+            allowCod?: boolean
+            stock?: number | null
+            shipMode?: string | null
+            shipFeeCents?: number
         }>
         courses?: Array<{
             id: string
             title: string
             description: string | null
             priceCents: number
-            modules: Array<{ lessons: Array<object> }>
+            thumbnailUrl?: string | null
+            modules: Array<{
+                title?: string
+                lessons: Array<{ title?: string; durationMinutes?: number; isFree?: boolean }>
+            }>
         }>
         events?: Array<{
             id: string
@@ -69,6 +96,7 @@ interface ProfileViewProps {
             endTime: string
             priceCents: number
             isFree: boolean
+            thumbnailUrl?: string | null
         }>
         communities?: Array<{
             id: string
@@ -83,7 +111,7 @@ interface ProfileViewProps {
             title: string
         }>
     }
-    animationConfig: { speed?: number; intensity?: number; colors?: string[] }
+    animationConfig: { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string }
     colors: string[]
 }
 
@@ -95,8 +123,10 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
     const [activeContent, setActiveContent] = useState<ContentType>(null)
     const [isBookingOpen, setIsBookingOpen] = useState(false)
     const [selectedService, setSelectedService] = useState<string | null>(null)
-    const [isPurchasing, setIsPurchasing] = useState(false)
+    const [checkoutItem, setCheckoutItem] = useState<CheckoutItem | null>(null)
+    const [tipOpen, setTipOpen] = useState(false)
     const [showSuccessNotification, setShowSuccessNotification] = useState(false)
+    const [introStage, setIntroStage] = useState<"hi" | "type" | "orb" | "ready">("hi")
     const searchParams = useSearchParams()
 
     useEffect(() => {
@@ -111,7 +141,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
         }
     }, [searchParams, profile.slug])
 
-    const handleShowContent = (type: "about" | "experience" | "projects" | "products" | "courses" | "events" | "communities") => {
+    const handleShowContent = (type: Exclude<ContentType, null>) => {
         setActiveContent(type)
     }
 
@@ -120,61 +150,47 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
         setIsBookingOpen(true)
     }
 
-    const stripeEnabled = !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-
-    const handlePurchase = async (itemType: string, itemId: string) => {
-        if (isPurchasing) return
-        if (!stripeEnabled) {
-            toast.error("Purchases coming soon!", { description: "Payment processing hasn't been set up yet." })
+    const handlePurchase = (itemType: string, itemId: string) => {
+        const item = resolveCheckoutItem(profile, itemType, itemId)
+        if (!item) {
+            toast.error("That item is no longer available.")
             return
         }
-
-        try {
-            setIsPurchasing(true)
-            const response = await fetch('/api/stripe/purchase', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    itemType,
-                    itemId,
-                }),
-            })
-
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to create checkout session')
-            }
-
-            if (data.url) {
-                window.location.href = data.url
-            } else if (data.redirectUrl) {
-                window.location.href = data.redirectUrl
-            }
-        } catch (error) {
-            console.error('Purchase error:', error)
-            alert('Failed to process purchase. Please try again.')
-        } finally {
-            setIsPurchasing(false)
-        }
+        setCheckoutItem(item)
     }
 
     const chips = buildGoalChips(profile, {
         openBooking: () => setIsBookingOpen(true),
         openContent: (type) => setActiveContent(type),
-    })
+        openTip: () => setTipOpen(true),
+    }).map((chip) => ({
+        ...chip,
+        onSelect: () => {
+            track(profile.slug, chip.id === "wa" ? "wa_tap" : "chip", { chip: chip.id })
+            chip.onSelect?.()
+        },
+    }))
+    const theme = ORB_THEMES[resolveOrbVariant(colors, animationConfig.variant)]
 
     return (
-        <div className="dark flex h-screen w-full bg-profile text-profile-text overflow-hidden relative">
+        <div
+            className="flex h-screen w-full bg-profile text-profile-text overflow-hidden relative"
+            style={{
+                ["--pl-orb-from" as string]: theme.bright,
+                ["--pl-orb-to" as string]: theme.deep,
+                ["--pl-aurora" as string]: theme.accent,
+                ["--pl-brand-foreground" as string]: theme.onAccent,
+            }}
+        >
             {showSuccessNotification && (
                 <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
                     <div className="flex items-center gap-3 px-4 py-3 bg-green-600/90 text-white rounded-lg shadow-lg backdrop-blur-sm border border-green-500/30">
                         <CheckCircle className="w-5 h-5 flex-shrink-0" />
                         <div>
-                            <p className="font-medium">Purchase successful!</p>
-                            <p className="text-sm text-green-100">Thank you for your order. Check your email for details.</p>
+                            <p className="font-medium">You&apos;re in</p>
+                            <p className="text-sm text-green-100">
+                                Check your email, or <a href="/library/login" className="underline">open your library</a>.
+                            </p>
                         </div>
                         <button
                             onClick={() => setShowSuccessNotification(false)}
@@ -187,24 +203,31 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
             )}
 
             <div
-                className="absolute inset-0 opacity-10 pointer-events-none z-0"
+                className="absolute inset-0 pointer-events-none z-0 transition-opacity duration-[1600ms] ease-out"
                 style={{
-                    background: `radial-gradient(circle at 30% 30%, ${colors[0]}, transparent 60%), radial-gradient(circle at 70% 70%, ${colors[1] || colors[0]}, transparent 60%)`
+                    opacity: introStage === "hi" || introStage === "type" ? 0 : 0.1,
+                    background: `radial-gradient(circle at 30% 30%, ${theme.bright}, transparent 60%), radial-gradient(circle at 70% 70%, ${theme.deep}, transparent 60%)`
                 }}
             />
 
-            <div className={cn(
-                "flex-1 flex flex-col h-full relative z-10 transition-all duration-500 ease-in-out",
-                activeContent ? "lg:w-[40%] lg:flex-none" : "w-full"
-            )}>
-                <div className="flex-1 w-full mx-auto relative h-full overflow-hidden">
+            <div className="absolute right-3 top-3 z-30">
+                <ModeToggle />
+            </div>
+
+            <Tracker slug={profile.slug} />
+            <IntroVeil stage={introStage} />
+
+            <div className="relative z-10 flex h-full min-w-0 w-full flex-1 flex-col">
+                <div className="relative mx-auto h-full w-full flex-1 overflow-hidden">
                     <ChatInterface
                         profile={profile}
                         colors={colors}
                         animationConfig={animationConfig}
                         onShowContent={handleShowContent}
-                        isPanelOpen={!!activeContent}
+                        isPanelOpen={false}
                         chips={chips}
+                        topics={welcomeTopics(profile)}
+                        onIntroStage={setIntroStage}
                     />
                 </div>
             </div>
@@ -218,17 +241,132 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                 onPurchase={handlePurchase}
             />
 
-            <BookingModal
-                isOpen={isBookingOpen}
-                onClose={() => {
-                    setIsBookingOpen(false)
-                    setSelectedService(null)
-                }}
-                profile={profile}
-                selectedServiceId={selectedService}
-            />
+            {profile.serviceOfferings.some((s) => s.kind === "TABLE") ? (
+                <ReserveSheet
+                    open={isBookingOpen}
+                    onClose={() => {
+                        setIsBookingOpen(false)
+                        setSelectedService(null)
+                    }}
+                    profile={profile}
+                    service={
+                        profile.serviceOfferings.find((s) => s.id === selectedService && s.kind === "TABLE")
+                        || profile.serviceOfferings.find((s) => s.kind === "TABLE")
+                        || null
+                    }
+                />
+            ) : (
+                <BookingModal
+                    isOpen={isBookingOpen}
+                    onClose={() => {
+                        setIsBookingOpen(false)
+                        setSelectedService(null)
+                    }}
+                    profile={profile}
+                    selectedServiceId={selectedService}
+                />
+            )}
+
+            {checkoutItem && (
+                <CheckoutSheet item={checkoutItem} onClose={() => setCheckoutItem(null)} />
+            )}
+            {tipOpen ? (
+                <TipSheet
+                    profileId={profile.id}
+                    displayName={profile.displayName}
+                    upiId={profile.upiId}
+                    whatsapp={profile.whatsapp}
+                    onClose={() => setTipOpen(false)}
+                />
+            ) : null}
         </div>
     )
+}
+
+function IntroVeil({ stage }: { stage: "hi" | "type" | "orb" | "ready" }) {
+    const holeMv = useMotionValue(0)
+    const veilOp = useMotionValue(1)
+    const veilBg = useMotionTemplate`radial-gradient(circle at 50% 40%, transparent ${holeMv}%, #020308 calc(${holeMv}% + 36%))`
+
+    useEffect(() => {
+        const holeTo = stage === "hi" || stage === "type" ? 0 : stage === "orb" ? 36 : 130
+        const opTo = stage === "ready" ? 0 : 1
+        const h = animate(holeMv, holeTo, { duration: 1.6, ease: [0.16, 1, 0.3, 1] })
+        const o = animate(veilOp, opTo, { duration: 1.6, ease: [0.22, 1, 0.36, 1] })
+        return () => {
+            h.stop()
+            o.stop()
+        }
+    }, [stage, holeMv, veilOp])
+
+    return (
+        <motion.div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-[1]"
+            style={{ opacity: veilOp, background: veilBg }}
+        />
+    )
+}
+
+function resolveCheckoutItem(
+    profile: ProfileViewProps["profile"],
+    itemType: string,
+    itemId: string
+): CheckoutItem | null {
+    if (itemType === "product") {
+        const p = profile.digitalProducts?.find((x) => x.id === itemId)
+        return p
+            ? {
+                itemType: "product",
+                itemId,
+                title: p.title,
+                priceCents: p.priceCents,
+                description: p.description,
+                fulfillment: p.fulfillment,
+                allowCod: p.allowCod,
+                upiId: profile.upiId,
+                whatsapp: profile.whatsapp,
+                shipMode: p.shipMode,
+                shipFeeCents: p.shipFeeCents,
+                gstin: profile.gstin,
+                soldOut: p.stock != null && p.stock <= 0,
+            }
+            : null
+    }
+    if (itemType === "course") {
+        const c = profile.courses?.find((x) => x.id === itemId)
+        return c ? { itemType: "course", itemId, title: c.title, priceCents: c.priceCents, description: c.description } : null
+    }
+    if (itemType === "event") {
+        const e = profile.events?.find((x) => x.id === itemId)
+        return e ? { itemType: "event", itemId, title: e.title, priceCents: e.priceCents, description: e.description } : null
+    }
+    if (itemType === "community") {
+        const c = profile.communities?.find((x) => x.id === itemId)
+        return c ? { itemType: "community", itemId, title: c.name, priceCents: c.priceCents, description: c.description } : null
+    }
+    return null
+}
+
+function welcomeTopics(profile: ProfileViewProps["profile"]) {
+    const raw = [
+        ...profile.serviceOfferings.filter((s) => s.isActive).map((s) => s.name),
+        ...(profile.digitalProducts || []).map((p) => p.title),
+        ...(profile.courses || []).map((c) => c.title),
+        ...profile.projects.map((p) => p.title),
+        ...(profile.events || []).map((e) => e.title),
+    ]
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const item of raw) {
+        const title = item.replace(/\s+/g, " ").trim()
+        const key = title.toLowerCase()
+        if (!title || title.length < 2 || /^project\s*\d*$/i.test(title) || seen.has(key)) continue
+        seen.add(key)
+        out.push(title.slice(0, 36))
+        if (out.length >= 5) break
+    }
+    return out
 }
 
 function buildGoalChips(
@@ -236,6 +374,7 @@ function buildGoalChips(
     actions: {
         openBooking: () => void
         openContent: (type: Exclude<ContentType, null>) => void
+        openTip: () => void
     }
 ): ChatChip[] {
     const name = profile.displayName
@@ -248,7 +387,7 @@ function buildGoalChips(
     const catalog: Record<string, ChipDef> = {
         book: {
             id: "book",
-            label: "Book a call",
+            label: profile.roleTemplate === "RESTAURANT" || profile.primaryGoal === "BOOK_TABLE" ? "Reserve a table" : "Book a call",
             available: hasServices,
             icon: <Calendar className="w-3.5 h-3.5" />,
             onSelect: actions.openBooking,
@@ -322,6 +461,57 @@ function buildGoalChips(
             available: true,
             icon: <MessageCircle className="w-3.5 h-3.5" />,
         },
+        products: {
+            id: "products",
+            label: profile.roleTemplate === "RESTAURANT" ? "Menu" : "Shop",
+            available: (profile.digitalProducts?.length ?? 0) > 0,
+            icon: <DollarSign className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent("products"),
+        },
+        shop: {
+            id: "shop",
+            label: profile.roleTemplate === "RESTAURANT" ? "Menu" : "Open shop",
+            available: (profile.digitalProducts?.length ?? 0) > 0,
+            icon: <DollarSign className="w-3.5 h-3.5" />,
+            href: profile.roleTemplate === "RESTAURANT" ? `/${profile.slug}/menu` : `/${profile.slug}/shop`,
+        },
+        wa: {
+            id: "wa",
+            label: "WhatsApp",
+            available: Boolean(profile.whatsapp),
+            icon: <MessageCircle className="w-3.5 h-3.5" />,
+            href: profile.whatsapp
+                ? `https://wa.me/${profile.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${profile.displayName}`)}`
+                : undefined,
+        },
+        tip: {
+            id: "tip",
+            label: "Send a tip",
+            available: Boolean(profile.upiId || profile.whatsapp),
+            icon: <Gift className="w-3.5 h-3.5" />,
+            onSelect: actions.openTip,
+        },
+        courses: {
+            id: "courses",
+            label: "Courses",
+            available: (profile.courses?.length ?? 0) > 0,
+            icon: <GraduationCap className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent("courses"),
+        },
+        events: {
+            id: "events",
+            label: "Events",
+            available: (profile.events?.length ?? 0) > 0,
+            icon: <Calendar className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent("events"),
+        },
+        communities: {
+            id: "communities",
+            label: "Community",
+            available: (profile.communities?.length ?? 0) > 0,
+            icon: <UsersRound className="w-3.5 h-3.5" />,
+            onSelect: () => actions.openContent("communities"),
+        },
     }
 
     const orderByGoal: Record<string, string[]> = {
@@ -330,11 +520,16 @@ function buildGoalChips(
         SHOW_PORTFOLIO: ["projects", "cases", "about", "book"],
         SHOWCASE_WORK: ["projects", "cases", "about", "book"],
         COLLECT_LEADS: ["guide", "ask", "work", "book"],
+        SELL_PRODUCTS: ["products", "shop", "wa", "tip"],
+        TAKE_APPOINTMENTS: ["book", "services", "rates", "about"],
+        BOOK_TABLE: ["shop", "book", "wa", "products"],
     }
 
     const goal = profile.primaryGoal || "BOOK_CALL"
     const keys = orderByGoal[goal] ?? ["about", "work", "services", "book"]
-    const chips = keys
+    const extras = ["products", "shop", "wa", "tip", "courses", "events", "communities"].filter((k) => !keys.includes(k))
+    const allowed = [...keys, ...extras].filter((k) => publicChipAllowed(profile.roleTemplate, k, extrasOf(profile)))
+    const chips = allowed
         .map((key) => catalog[key])
         .filter((chip): chip is ChipDef => Boolean(chip?.available))
         .map(({ available: _available, ...chip }) => chip)

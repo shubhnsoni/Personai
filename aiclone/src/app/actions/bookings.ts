@@ -2,56 +2,90 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { syncUser } from "@/lib/auth-sync"
 
-export async function getAvailableSlots(profileId: string, dateStr: string) {
-    // dateStr is YYYY-MM-DD
-    const date = new Date(dateStr)
-    const dayOfWeek = date.getDay() // 0-6
+export async function getAvailableSlots(
+    profileId: string,
+    dateStr: string,
+    durationMinutes = 30,
+    opts?: { partySize?: number; serviceId?: string },
+) {
+    const date = new Date(`${dateStr}T00:00:00`)
+    const { generateSlots } = await import("@/lib/slots")
+    const { parsePartySize, isHoldBooking } = await import("@/lib/menu")
 
-    // Get schedule for this day
-    const schedule = await prisma.availabilitySchedule.findFirst({
-        where: { profileId, dayOfWeek, isEnabled: true }
+    const [weekly, profile, bookings, overrides, service] = await Promise.all([
+        prisma.availabilitySchedule.findMany({ where: { profileId } }),
+        prisma.profile.findUnique({ where: { id: profileId }, select: { id: true, timezone: true } }),
+        prisma.booking.findMany({
+            where: {
+                profileId,
+                status: { not: "CANCELLED" },
+                startTime: { gte: date, lt: new Date(date.getTime() + 86400000) },
+            },
+        }),
+        (prisma as any).calendarOverride?.findMany?.({
+            where: {
+                profileId,
+                date: { gte: date, lt: new Date(date.getTime() + 86400000) },
+            },
+        }).catch(() => []) ?? Promise.resolve([]),
+        opts?.serviceId
+            ? prisma.serviceOffering.findUnique({ where: { id: opts.serviceId } })
+            : Promise.resolve(null),
+    ])
+
+    if (!profile) return []
+
+    const bufferMinutes = Number((profile as { bufferMinutes?: number }).bufferMinutes || 0)
+    const table = service && (service as { kind?: string }).kind === "TABLE"
+    const covers = table
+        ? Number((service as { covers?: number | null }).covers || (service as { maxBookingsPerDay?: number | null }).maxBookingsPerDay || 20)
+        : null
+
+    const slots = generateSlots({
+        date,
+        weekly,
+        overrides: (overrides || []).map((o: { date: Date; isBlocked: boolean; startTime: string | null; endTime: string | null }) => ({
+            date: o.date.toISOString(),
+            isBlocked: o.isBlocked,
+            startTime: o.startTime,
+            endTime: o.endTime,
+        })),
+        durationMinutes,
+        bufferMinutes,
+        coverLimit: covers,
+        partySize: opts?.partySize,
+        busy: bookings.map((b) => ({
+            start: b.startTime,
+            end: b.endTime,
+            covers: isHoldBooking(b.metadata, b.visitorEmail) ? (covers || 999) : parsePartySize(b.metadata),
+        })),
     })
+    const { filterPastSlots } = await import("@/lib/menu")
+    return filterPastSlots(dateStr, slots)
+}
 
-    if (!schedule) return []
-
-    // Generate slots
-    // Simple implementation: 30 min slots from start to end
-    // In real app, check duration of service and existing bookings
-
-    const slots: string[] = []
-    let current = new Date(`${dateStr}T${schedule.startTime}`)
-    const end = new Date(`${dateStr}T${schedule.endTime}`)
-
-    // Get existing bookings for this day
-    const startOfDay = new Date(dateStr)
-    const endOfDay = new Date(dateStr)
-    endOfDay.setDate(endOfDay.getDate() + 1)
-
-    const bookings = await prisma.booking.findMany({
-        where: {
+export async function ensureTableService(profileId: string) {
+    const existing = await prisma.serviceOffering.findFirst({
+        where: { profileId, kind: "TABLE", isActive: true },
+        orderBy: { createdAt: "asc" },
+    })
+    if (existing) return existing
+    return prisma.serviceOffering.create({
+        data: {
             profileId,
-            startTime: { gte: startOfDay, lt: endOfDay }
-        }
+            name: "Reserve a table",
+            description: "Dine-in seating",
+            priceCents: 0,
+            isFree: true,
+            durationMinutes: 90,
+            currency: "USD",
+            isActive: true,
+            kind: "TABLE",
+            covers: 20,
+        },
     })
-
-    while (current < end) {
-        // Check if slot overlaps with any booking
-        const slotEnd = new Date(current.getTime() + 30 * 60000) // 30 mins
-
-        const isTaken = bookings.some(b => {
-            return (current >= b.startTime && current < b.endTime) ||
-                (slotEnd > b.startTime && slotEnd <= b.endTime)
-        })
-
-        if (!isTaken) {
-            slots.push(current.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
-        }
-
-        current = slotEnd
-    }
-
-    return slots
 }
 
 export async function createBooking(data: {
@@ -59,7 +93,10 @@ export async function createBooking(data: {
     serviceOfferingId: string,
     startTime: string, // ISO string
     visitorName: string,
-    visitorEmail: string
+    visitorEmail?: string
+    partySize?: number
+    visitorPhone?: string
+    notes?: string
 }) {
     // Calculate end time based on service duration
     const service = await prisma.serviceOffering.findUnique({
@@ -70,19 +107,109 @@ export async function createBooking(data: {
 
     const start = new Date(data.startTime)
     const end = new Date(start.getTime() + service.durationMinutes * 60000)
+    const table = (service as { kind?: string }).kind === "TABLE"
+    const partySize = Math.max(1, Math.min(24, Math.floor(data.partySize || 1)))
+
+    if (table) {
+        const dateStr = data.startTime.slice(0, 10)
+        const time = data.startTime.slice(11, 16)
+        const slots = await getAvailableSlots(data.profileId, dateStr, service.durationMinutes, {
+            partySize,
+            serviceId: service.id,
+        })
+        if (!slots.includes(time)) throw new Error("That table time is full")
+    }
+
+    const digits = (data.visitorPhone || "").replace(/\D/g, "")
+    const visitorEmail = data.visitorEmail?.trim() || (digits ? `guest.${digits}@guest.local` : "guest@local")
+
+    let memberId: string | undefined
+    try {
+        const { upsertMember } = await import("@/lib/members")
+        const member = await upsertMember(visitorEmail, data.visitorName)
+        memberId = member.id
+    } catch {}
+
+    const metadata = table || data.visitorPhone || data.notes
+        ? JSON.stringify({
+            partySize: table ? partySize : undefined,
+            phone: data.visitorPhone || undefined,
+            notes: data.notes || undefined,
+        })
+        : undefined
 
     const booking = await prisma.booking.create({
         data: {
             profileId: data.profileId,
             serviceOfferingId: data.serviceOfferingId,
             visitorName: data.visitorName,
-            visitorEmail: data.visitorEmail,
+            visitorEmail,
+            memberId,
             startTime: start,
             endTime: end,
-            status: "PENDING_PAYMENT" // Or CONFIRMED if free
+            status: service.isFree || service.priceCents === 0 ? "CONFIRMED" : "PENDING_PAYMENT",
+            metadata: metadata || undefined,
         }
     })
 
-    // revalidatePath(`/${data.slug}`) // We don't have slug here, but it's fine
+    revalidatePath("/dashboard/calendar")
+    revalidatePath("/dashboard/inbox")
     return booking
+}
+
+export async function setBookingStatus(bookingId: string, status: "CONFIRMED" | "CANCELLED") {
+    const user = await syncUser()
+    const profileId = user?.profiles[0]?.id
+    if (!profileId) throw new Error("Unauthorized")
+
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
+    if (!booking || booking.profileId !== profileId) throw new Error("Not found")
+
+    await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status },
+    })
+    revalidatePath("/dashboard/calendar")
+    revalidatePath("/dashboard/inbox")
+    revalidatePath("/dashboard/money")
+}
+
+export async function createHold(startIso: string, minutes = 30, note = "Blocked") {
+    const user = await syncUser()
+    const profile = user?.profiles[0]
+    if (!profile) throw new Error("Unauthorized")
+
+    const start = new Date(startIso)
+    const end = new Date(start.getTime() + minutes * 60000)
+    let service = await prisma.serviceOffering.findFirst({
+        where: { profileId: profile.id },
+        orderBy: { createdAt: "asc" },
+    })
+    if (!service) {
+        service = await prisma.serviceOffering.create({
+            data: {
+                profileId: profile.id,
+                name: "Hold",
+                description: "Blocked time",
+                priceCents: 0,
+                isFree: true,
+                durationMinutes: minutes,
+                isActive: false,
+            },
+        })
+    }
+
+    await prisma.booking.create({
+        data: {
+            profileId: profile.id,
+            serviceOfferingId: service.id,
+            visitorName: note,
+            visitorEmail: "hold@local",
+            startTime: start,
+            endTime: end,
+            status: "CONFIRMED",
+            metadata: JSON.stringify({ hold: true }),
+        },
+    })
+    revalidatePath("/dashboard/calendar")
 }

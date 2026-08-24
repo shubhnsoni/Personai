@@ -5,7 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatDistanceToNow } from "date-fns"
-import { Package, GraduationCap, Calendar, Users, DollarSign } from "lucide-react"
+import { Package, GraduationCap, Calendar, Users } from "lucide-react"
+import { ResendLibraryLink } from "@/components/dashboard/resend-library-link"
+import { ConfirmOrderButton } from "@/components/dashboard/confirm-order-button"
+import { requireSurface } from "@/lib/require-surface"
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +18,7 @@ export default async function DashboardOrdersPage() {
 
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
+    requireSurface(profile.roleTemplate, "shop", profile)
 
     const [productPurchases, courseEnrollments, eventRegistrations, communityMembers, payments] = await Promise.all([
         prisma.productPurchase.findMany({
@@ -49,9 +53,9 @@ export default async function DashboardOrdersPage() {
     const totalRevenue = payments.reduce((sum, p) => sum + p.amountCents, 0)
 
     return (
-        <div className="flex-1 space-y-6 p-8 pt-6">
+        <div className="flex-1 space-y-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-bold tracking-tight">Orders & Enrollments</h2>
+                <p className="text-sm text-muted-foreground">Orders and enrollments</p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -104,10 +108,10 @@ export default async function DashboardOrdersPage() {
 
             <Tabs defaultValue="products" className="space-y-4">
                 <TabsList>
-                    <TabsTrigger value="products">Products ({productPurchases.length})</TabsTrigger>
-                    <TabsTrigger value="courses">Courses ({courseEnrollments.length})</TabsTrigger>
-                    <TabsTrigger value="events">Events ({eventRegistrations.length})</TabsTrigger>
-                    <TabsTrigger value="communities">Communities ({communityMembers.length})</TabsTrigger>
+                    <TabsTrigger value="products"><Package /><span>Products {productPurchases.length}</span></TabsTrigger>
+                    <TabsTrigger value="courses"><GraduationCap /><span>Courses {courseEnrollments.length}</span></TabsTrigger>
+                    <TabsTrigger value="events"><Calendar /><span>Events {eventRegistrations.length}</span></TabsTrigger>
+                    <TabsTrigger value="communities"><Users /><span>Communities {communityMembers.length}</span></TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="products">
@@ -127,15 +131,20 @@ export default async function DashboardOrdersPage() {
                                                 <div>
                                                     <p className="font-medium">{purchase.product.title}</p>
                                                     <p className="text-sm text-muted-foreground">{purchase.visitorEmail}</p>
+                                                    <ResendLibraryLink email={purchase.visitorEmail} />
                                                 </div>
                                             </div>
                                             <div className="text-right">
                                                 <Badge variant={purchase.status === 'COMPLETED' ? 'default' : 'secondary'}>
-                                                    {purchase.status}
+                                                    {purchase.status}{purchase.payMethod ? ` · ${purchase.payMethod}` : ""}
                                                 </Badge>
                                                 <p className="text-sm text-muted-foreground mt-1">
                                                     {formatDistanceToNow(new Date(purchase.createdAt), { addSuffix: true })}
                                                 </p>
+                                                {purchase.status === "PENDING" ? <ConfirmOrderButton purchaseId={purchase.id} /> : null}
+                                                <a href={`/dashboard/orders/${purchase.id}/receipt`} className="mt-2 block text-[11px] text-muted-foreground underline">
+                                                    Receipt
+                                                </a>
                                             </div>
                                         </div>
                                     ))}
@@ -162,6 +171,7 @@ export default async function DashboardOrdersPage() {
                                                 <div>
                                                     <p className="font-medium">{enrollment.course.title}</p>
                                                     <p className="text-sm text-muted-foreground">{enrollment.visitorEmail}</p>
+                                                    <ResendLibraryLink email={enrollment.visitorEmail} />
                                                 </div>
                                             </div>
                                             <div className="text-right">

@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { getMemberFromSession } from "@/lib/members"
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 const VISITOR_COOKIE = "pl_vid"
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
@@ -26,10 +27,6 @@ function withVisitorCookie(res: NextResponse, visitorId: string, setCookie: bool
     return res
 }
 
-/**
- * GET /api/conversations?profileId=xxx&visitorId=yyy
- * Cookie-bound visitor threads only. Query visitorId must match httpOnly pl_vid.
- */
 export async function GET(req: NextRequest) {
     const { allowed } = checkRateLimit(clientIp(req))
     if (!allowed) {
@@ -39,22 +36,13 @@ export async function GET(req: NextRequest) {
     const existingCookie = req.cookies.get(VISITOR_COOKIE)?.value
     const visitorId = existingCookie || crypto.randomUUID()
     const setCookie = !existingCookie
-
     const { searchParams } = req.nextUrl
     const profileId = searchParams.get("profileId")
-    const queryVisitorId = searchParams.get("visitorId")
-
-    if (queryVisitorId && queryVisitorId !== visitorId) {
-        return withVisitorCookie(
-            NextResponse.json({ error: "Forbidden" }, { status: 403 }),
-            visitorId,
-            setCookie,
-        )
-    }
+    const member = await getMemberFromSession().catch(() => null)
 
     if (!profileId) {
         return withVisitorCookie(
-            NextResponse.json({ messages: [], conversationId: null }),
+            NextResponse.json({ messages: [], conversationId: null, visitorId, mode: "AI" }),
             visitorId,
             setCookie,
         )
@@ -63,33 +51,77 @@ export async function GET(req: NextRequest) {
     const conversation = await prisma.conversation.findFirst({
         where: {
             profileId,
-            visitorId,
+            OR: [
+                { visitorId },
+                ...(member?.id ? [{ memberId: member.id }] : []),
+                ...(member?.email ? [{ visitorEmail: member.email }] : []),
+            ],
         },
         orderBy: { lastMessageAt: "desc" },
         include: {
-            messages: {
-                orderBy: { createdAt: "asc" },
-                take: 50,
-            }
-        }
+            profile: { select: { liveChatEnabled: true, liveChatSlaMinutes: true, displayName: true } },
+            messages: { orderBy: { createdAt: "asc" }, take: 80 },
+        },
     })
 
     if (!conversation) {
+        const profile = await prisma.profile.findUnique({
+            where: { id: profileId },
+            select: { liveChatEnabled: true, liveChatSlaMinutes: true },
+        })
         return withVisitorCookie(
-            NextResponse.json({ messages: [], conversationId: null }),
+            NextResponse.json({
+                messages: [],
+                conversationId: null,
+                visitorId,
+                mode: "AI",
+                liveChatEnabled: Boolean(profile?.liveChatEnabled),
+                isMember: Boolean(member),
+                slaMinutes: profile?.liveChatSlaMinutes || 10,
+            }),
             visitorId,
             setCookie,
         )
     }
 
+    if (conversation.mode === "LIVE_REQUESTED" && conversation.liveRequestedAt) {
+        const age = Date.now() - conversation.liveRequestedAt.getTime()
+        const sla = (conversation.profile.liveChatSlaMinutes || 10) * 60 * 1000
+        if (age > sla) {
+            await prisma.conversation.update({
+                where: { id: conversation.id },
+                data: { mode: "AI", liveRespondedAt: new Date() },
+            })
+            conversation.mode = "AI"
+        }
+    }
+
+    const waitingAhead = conversation.mode === "LIVE_REQUESTED"
+        ? await prisma.conversation.count({
+            where: {
+                profileId,
+                mode: { in: ["LIVE_REQUESTED", "LIVE"] },
+                liveRequestedAt: { lt: conversation.liveRequestedAt || new Date() },
+            },
+        })
+        : 0
+
     return withVisitorCookie(
         NextResponse.json({
             conversationId: conversation.id,
-            messages: conversation.messages.map(m => ({
+            visitorId,
+            mode: conversation.mode,
+            liveRequestedAt: conversation.liveRequestedAt,
+            liveChatEnabled: conversation.profile.liveChatEnabled,
+            isMember: Boolean(member),
+            slaMinutes: conversation.profile.liveChatSlaMinutes || 10,
+            queuePosition: waitingAhead + 1,
+            messages: conversation.messages.map((m) => ({
                 id: m.id,
                 role: m.role as "user" | "assistant",
                 content: m.text,
-            }))
+                senderType: m.senderType,
+            })),
         }),
         visitorId,
         setCookie,

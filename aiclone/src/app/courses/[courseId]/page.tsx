@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { CourseViewer } from '@/components/courses/course-viewer'
 
@@ -12,6 +12,10 @@ interface Props {
 export default async function CoursePage({ params, searchParams }: Props) {
     const { courseId } = await params
     const { email, lesson: activeLessonId } = await searchParams
+
+    const { getMemberFromSession } = await import("@/lib/members")
+    const member = await getMemberFromSession()
+    if (member) redirect(`/library/courses/${courseId}`)
 
     const course = await prisma.course.findUnique({
         where: { id: courseId, isActive: true, isPublished: true },

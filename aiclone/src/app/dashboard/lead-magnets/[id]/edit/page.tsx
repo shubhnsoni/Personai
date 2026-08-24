@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { LeadMagnetForm } from "@/components/dashboard/lead-magnet-form"
+import { requireShopDigital } from "@/lib/require-surface"
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,7 @@ export default async function EditLeadMagnetPage({ params }: EditLeadMagnetPageP
 
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
+    requireShopDigital(profile.roleTemplate, profile)
 
     const { prisma } = await import("@/lib/prisma")
     const leadMagnet = await prisma.leadMagnet.findUnique({
@@ -26,9 +28,9 @@ export default async function EditLeadMagnetPage({ params }: EditLeadMagnetPageP
     }
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex-1 space-y-4">
             <div className="max-w-2xl mx-auto">
-                <LeadMagnetForm profileId={profile.id} leadMagnet={leadMagnet} />
+                <LeadMagnetForm profileId={profile.id} leadMagnet={leadMagnet} embedded />
             </div>
         </div>
     )

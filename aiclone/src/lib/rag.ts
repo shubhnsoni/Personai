@@ -1,5 +1,7 @@
 import { ProfileDocument } from "@prisma/client"
 import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings"
+import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
+import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 
 export interface PersonalityConfig {
     tone?: "professional" | "casual" | "friendly" | "witty"
@@ -44,7 +46,15 @@ interface ProfileWithRelations {
         description: string | null
         type: string
         priceCents: number
+        fulfillment?: string | null
+        stock?: number | null
+        category?: string | null
+        diet?: string | null
+        spiceLevel?: number | null
+        serveWindow?: string | null
     }>
+    whatsapp?: string | null
+    upiId?: string | null
     courses?: Array<{
         title: string
         description: string | null
@@ -130,6 +140,13 @@ function calculateBM25Score(
  * Vector-based retrieval using OpenAI embeddings with cosine similarity.
  * Falls back to BM25 if embeddings are not available.
  */
+export function scopeDocuments(documents: ProfileDocument[], visitorKey?: string | null) {
+    return documents.filter((d) => {
+        if (d.type === "VISITOR_MEMORY") return Boolean(visitorKey) && d.visitorKey === visitorKey
+        return true
+    })
+}
+
 export async function vectorRetrieval(query: string, documents: ProfileDocument[], topK: number = 3): Promise<ProfileDocument[]> {
     if (!query || documents.length === 0) return []
 
@@ -180,6 +197,11 @@ function formatGoal(goal: string): string {
         'BOOK_CALL': 'help visitors book a call with me',
         'COLLECT_LEADS': 'collect contact information from interested visitors',
         'SHOWCASE_WORK': 'showcase my work and portfolio',
+        'SHOW_PORTFOLIO': 'showcase my work and portfolio',
+        'HIRE_ME': 'help the visitor hire me or get an intro',
+        'SELL_PRODUCTS': 'help visitors buy what is in stock',
+        'TAKE_APPOINTMENTS': 'help visitors book an appointment',
+        'BOOK_TABLE': 'help them reserve a table or pick from the menu',
         'ANSWER_QUESTIONS': 'answer questions about my expertise and services'
     }
     return goalMap[goal] || 'engage visitors and provide helpful information'
@@ -193,6 +215,10 @@ function formatRoleTemplate(role: string): string {
         'EDITOR': 'Editor',
         'DEVELOPER': 'Developer',
         'JOB_SEEKER': 'Professional',
+        'SHOP': 'Shopkeeper',
+        'RESTAURANT': 'Restaurant',
+        'CA': 'Chartered Accountant',
+        'CREATOR': 'Creator',
         'CUSTOM': 'Professional'
     }
     return roleMap[role] || 'Professional'
@@ -238,12 +264,19 @@ function buildPersonalitySection(personalityConfigStr?: string | null): string {
     }
 }
 
-export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: ProfileDocument[]): string {
+export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: ProfileDocument[], currency: DisplayCurrency = "USD"): string {
     const roleDescription = formatRoleTemplate(profile.roleTemplate)
     const goalDescription = formatGoal(profile.primaryGoal)
+    const role = profile.roleTemplate
+    const extras = extrasOf(profile)
+    const showServices = hasSurface(role, "services", extras)
+    const showShop = hasSurface(role, "shop", extras)
+    const showCourses = hasSurface(role, "courses", extras)
+    const showEvents = hasSurface(role, "events", extras)
+    const showPortfolio = fieldOn(role, "portfolio", extras) || role === "CUSTOM"
 
     let experienceSection = ""
-    if (profile.workExperiences && profile.workExperiences.length > 0) {
+    if (showPortfolio && profile.workExperiences && profile.workExperiences.length > 0) {
         const expList = profile.workExperiences.map(e => {
             let entry = `- ${e.role} at ${e.company} (${e.startDate} - ${e.endDate || 'Present'})`
             if (e.description) entry += `\n  ${e.description}`
@@ -263,7 +296,7 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
     }
 
     let projectsSection = ""
-    if (profile.projects && profile.projects.length > 0) {
+    if (showPortfolio && profile.projects && profile.projects.length > 0) {
         const projectList = profile.projects.map(p => {
             let entry = `- ${p.title}`
             if (p.client) entry += ` for ${p.client}`
@@ -275,9 +308,9 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
     }
 
     let servicesSection = ""
-    if (profile.serviceOfferings && profile.serviceOfferings.length > 0) {
+    if (showServices && profile.serviceOfferings && profile.serviceOfferings.length > 0) {
         const serviceList = profile.serviceOfferings.map(s => {
-            const price = s.isFree ? 'Free' : `$${(s.priceCents / 100).toFixed(0)}`
+            const price = s.isFree ? 'Free' : formatMoney(s.priceCents, currency)
             let entry = `- ${s.name}: ${price} (${s.durationMinutes} min)`
             if (s.description) entry += ` - ${s.description}`
             return entry
@@ -286,29 +319,41 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
     }
 
     let productsSection = ""
-    if (profile.digitalProducts && profile.digitalProducts.length > 0) {
+    if (showShop && profile.digitalProducts && profile.digitalProducts.length > 0) {
+        const restaurant = profile.roleTemplate === "RESTAURANT"
         const productList = profile.digitalProducts.map(p => {
-            return `- ${p.title} (${p.type}): $${(p.priceCents / 100).toFixed(0)}${p.description ? ` - ${p.description}` : ''}`
+            const kind = p.fulfillment === "PHYSICAL" ? "physical" : p.fulfillment === "BOTH" ? "physical+digital" : p.type
+            const stock =
+                p.stock == null ? "" : p.stock <= 0 ? " — SOLD OUT" : ` — ${p.stock} in stock`
+            const cat = p.category ? ` [${p.category}]` : ""
+            const diet = p.diet ? ` · ${p.diet}` : ""
+            const spice = p.spiceLevel ? ` · spice ${p.spiceLevel}/3` : ""
+            const when = p.serveWindow && p.serveWindow !== "ALL" ? ` · ${p.serveWindow}` : ""
+            return `- ${p.title}${cat} (${restaurant ? "dish" : kind}${diet}${spice}${when}): ${formatMoney(p.priceCents, currency)}${stock}${p.description ? ` - ${p.description}` : ""}`
         }).join('\n')
-        productsSection = `\n## Digital Products\n${productList}`
+        productsSection = restaurant
+            ? `\n## Menu\nNever invent a dish, price, or sold-out status. If they want to order, send them to the menu or WhatsApp. If they want a table, book it with bookTable after you have party size, date, and time.\n${productList}`
+            : `\n## Shop\nNever invent stock. If sold out, say so. If they want to buy, send them to the shop or WhatsApp.\n${productList}`
+        if (profile.whatsapp) productsSection += `\nWhatsApp: ${profile.whatsapp}`
+        if (profile.upiId) productsSection += `\nUPI: ${profile.upiId}`
     }
 
     let coursesSection = ""
-    if (profile.courses && profile.courses.length > 0) {
+    if (showCourses && profile.courses && profile.courses.length > 0) {
         const courseList = profile.courses.map(c => {
             const lessonCount = c.modules.reduce((sum, m) => sum + m.lessons.length, 0)
-            return `- ${c.title}: $${(c.priceCents / 100).toFixed(0)} (${c.modules.length} modules, ${lessonCount} lessons)${c.description ? ` - ${c.description}` : ''}`
+            return `- ${c.title}: ${formatMoney(c.priceCents, currency)} (${c.modules.length} modules, ${lessonCount} lessons)${c.description ? ` - ${c.description}` : ''}`
         }).join('\n')
         coursesSection = `\n## Courses\n${courseList}`
     }
 
     let eventsSection = ""
-    if (profile.events && profile.events.length > 0) {
+    if (showEvents && profile.events && profile.events.length > 0) {
         const upcomingEvents = profile.events.filter(e => new Date(e.startTime) > new Date())
         if (upcomingEvents.length > 0) {
             const eventList = upcomingEvents.map(e => {
                 const date = new Date(e.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                const price = e.isFree ? 'Free' : `$${(e.priceCents / 100).toFixed(0)}`
+                const price = e.isFree ? 'Free' : formatMoney(e.priceCents, currency)
                 return `- ${e.title} (${e.eventType}): ${date} - ${price}${e.description ? ` - ${e.description}` : ''}`
             }).join('\n')
             eventsSection = `\n## Upcoming Events\n${eventList}`
@@ -316,25 +361,32 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
     }
 
     let communitiesSection = ""
-    if (profile.communities && profile.communities.length > 0) {
+    if (showEvents && profile.communities && profile.communities.length > 0) {
         const communityList = profile.communities.map(c => {
             const billing = c.billingCycle === 'MONTHLY' ? '/month' : c.billingCycle === 'YEARLY' ? '/year' : ' one-time'
-            return `- ${c.name} (${c.platform}): $${(c.priceCents / 100).toFixed(0)}${billing}${c.description ? ` - ${c.description}` : ''}`
+            return `- ${c.name} (${c.platform}): ${formatMoney(c.priceCents, currency)}${billing}${c.description ? ` - ${c.description}` : ''}`
         }).join('\n')
         communitiesSection = `\n## Communities\n${communityList}`
     }
 
     let leadMagnetsSection = ""
-    if (profile.leadMagnets && profile.leadMagnets.length > 0) {
+    if (fieldOn(role, "shopDigital", extras) && profile.leadMagnets && profile.leadMagnets.length > 0) {
         const magnetList = profile.leadMagnets.map(m => {
             return `- ${m.title} (Free ${m.type.toLowerCase()})${m.description ? ` - ${m.description}` : ''}`
         }).join('\n')
         leadMagnetsSection = `\n## Free Resources\n${magnetList}`
     }
 
+    const visitorMemory = contextDocs.filter((d) => d.type === "VISITOR_MEMORY" && d.rawText)
+    const otherDocs = contextDocs.filter((d) => d.type !== "VISITOR_MEMORY")
+    let visitorSection = ""
+    if (visitorMemory.length > 0) {
+        visitorSection = `\n## What you already know about this visitor\n${visitorMemory.map((d) => d.rawText).join("\n")}\nUse this only for this visitor. Do not mention that you stored notes unless asked.`
+    }
+
     let contextSection = ""
-    if (contextDocs.length > 0) {
-        const contextText = contextDocs.map(d => {
+    if (otherDocs.length > 0) {
+        const contextText = otherDocs.map(d => {
             if (d.rawText) return `### ${d.title}\n${d.rawText}`
             if (d.url) return `### ${d.title}\nLink: ${d.url}`
             return `### ${d.title}`
@@ -355,13 +407,22 @@ ${coursesSection}
 ${eventsSection}
 ${communitiesSection}
 ${leadMagnetsSection}
+${visitorSection}
 ${contextSection}
+
+## How you format every reply
+- Always write markdown a chat bubble can render. Never dump several items into one paragraph.
+- Short paragraphs (1–2 sentences). Put a blank line between paragraphs.
+- If you mention more than one service, product, course, price, or option, use a bullet list.
+- Bold the name of each item, then price and one line of what it is:
+  - **Fit call**: Free · 25 min — see if coaching is the right next step
+- End with one clear next question on its own line.
+- Do not use headings (#) or tables.
 
 ## Your Behavior Guidelines
 - You speak in first person as ${profile.displayName}'s AI representative
 - Your primary goal is to ${goalDescription}
 - Be professional, friendly, and conversational
-- Keep responses concise but informative (2-4 sentences typically)
 - When asked about services, products, courses, or events, provide accurate information from the data above
 - When asked about experience or projects, reference specific details from the data
 - If you don't have specific information, say "I don't have that information available, but you can book a call to discuss" 
@@ -374,15 +435,8 @@ ${buildPersonalitySection(profile.personalityConfig)}
 
 ## Tools Available
 You have access to these functions that you should use when appropriate:
-- collectLead: Use when the visitor shows interest in working together and provides their contact info
-- showServices: Use when asked about consultation rates, booking calls, or coaching services
-- showWorkExperience: Use when asked about background, CV, or work history
-- showProjects: Use when asked about portfolio or past projects
-- showProducts: Use when asked about digital products, ebooks, templates, or downloads for sale
-- showCourses: Use when asked about courses, learning, or training programs
-- showEvents: Use when asked about webinars, workshops, or upcoming events
-- showCommunities: Use when asked about community memberships, Telegram, or Discord groups
-- showLeadMagnets: Use when asked about free resources, guides, or giveaways
+- collectLead: Use when the visitor shows interest and provides their contact info
+${showServices ? "- showServices: Use when asked about rates, booking, or sessions\n" : ""}${showPortfolio ? "- showWorkExperience: Use when asked about background, CV, or work history\n- showProjects: Use when asked about portfolio or past projects\n" : ""}${showShop && role === "RESTAURANT" ? "- showMenu: Use when asked about the menu or dishes\n- bookTable: Use when they want to reserve a table. Never invent an empty table.\n" : ""}${showShop && role !== "RESTAURANT" ? "- showProducts: Use when asked about products or the shop\n" : ""}${showCourses ? "- showCourses: Use when asked about courses or training\n" : ""}${showEvents ? "- showEvents: Use when asked about events\n- showCommunities: Use when asked about groups\n" : ""}- showLeadMagnets: Use when asked about free resources, guides, or giveaways
 
 Remember: You are representing ${profile.displayName} professionally. Help visitors discover valuable content and services!`
 }

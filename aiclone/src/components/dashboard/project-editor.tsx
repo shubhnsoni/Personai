@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Trash2, Pencil } from "lucide-react"
 import { createProject, updateProject, deleteProject } from "@/app/actions/profile"
 
 interface ProjectEditorProps {
     profileId: string
-    projects: any[] // Using any until prisma client is regenerated
+    projects: any[]
 }
 
 export function ProjectEditor({ profileId, projects }: ProjectEditorProps) {
@@ -19,72 +19,85 @@ export function ProjectEditor({ profileId, projects }: ProjectEditorProps) {
     const [isCreating, setIsCreating] = useState(false)
 
     return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Projects</h3>
-                <Button onClick={() => setIsCreating(true)} size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" /> Add Project
-                </Button>
-            </div>
+        <Card className="gap-4 py-4 shadow-none">
+            <CardHeader className="px-4">
+                <CardTitle className="text-sm font-medium">Projects</CardTitle>
+                <CardDescription>Work the chat can walk through.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 px-4">
+                {isCreating && (
+                    <ProjectForm
+                        profileId={profileId}
+                        onCancel={() => setIsCreating(false)}
+                        onSave={() => setIsCreating(false)}
+                    />
+                )}
 
-            {isCreating && (
-                <ProjectForm
-                    profileId={profileId}
-                    onCancel={() => setIsCreating(false)}
-                    onSave={() => setIsCreating(false)}
-                />
-            )}
+                {projects.length > 0 ? (
+                    <div className="divide-y overflow-hidden rounded-xl border">
+                        {projects.map((proj) => (
+                            <div key={proj.id} className="p-3">
+                                {isEditing === proj.id ? (
+                                    <ProjectForm
+                                        profileId={profileId}
+                                        initialData={proj}
+                                        onCancel={() => setIsEditing(null)}
+                                        onSave={() => setIsEditing(null)}
+                                    />
+                                ) : (
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0 space-y-1">
+                                            <p className="text-sm font-medium">{proj.title}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {[proj.client, proj.year].filter(Boolean).join(" · ")}
+                                            </p>
+                                            {proj.description ? (
+                                                <p className="line-clamp-2 text-xs text-muted-foreground">{proj.description}</p>
+                                            ) : null}
+                                        </div>
+                                        <div className="flex shrink-0">
+                                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsEditing(proj.id)}>
+                                                <Pencil className="h-3.5 w-3.5" />
+                                            </Button>
+                                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteProject(proj.id)}>
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ) : !isCreating ? (
+                    <p className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
+                        No projects yet.
+                    </p>
+                ) : null}
 
-            <div className="grid gap-4">
-                {projects.map((proj) => (
-                    <Card key={proj.id}>
-                        <CardContent className="p-4">
-                            {isEditing === proj.id ? (
-                                <ProjectForm
-                                    profileId={profileId}
-                                    initialData={proj}
-                                    onCancel={() => setIsEditing(null)}
-                                    onSave={() => setIsEditing(null)}
-                                />
-                            ) : (
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h4 className="font-bold">{proj.title}</h4>
-                                        <p className="text-sm text-muted-foreground">{proj.client} • {proj.year}</p>
-                                        {proj.description && <p className="text-sm mt-2 line-clamp-2">{proj.description}</p>}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button variant="ghost" size="icon" onClick={() => setIsEditing(proj.id)}>
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteProject(proj.id)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-        </div>
+                {!isCreating && (
+                    <Button type="button" variant="outline" className="h-9 w-full rounded-full" onClick={() => setIsCreating(true)}>
+                        <Plus className="mr-1 h-4 w-4" /> Add project
+                    </Button>
+                )}
+            </CardContent>
+        </Card>
     )
 }
 
 function ProjectForm({ profileId, initialData, onCancel, onSave }: { profileId: string, initialData?: any, onCancel: () => void, onSave: () => void }) {
     const [isLoading, setIsLoading] = useState(false)
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
+    const handleSubmit = async (root: HTMLElement) => {
         setIsLoading(true)
-        const formData = new FormData(e.currentTarget)
+        const val = (name: string) =>
+            (root.querySelector(`[name="${name}"]`) as HTMLInputElement | HTMLTextAreaElement | null)?.value ?? ""
         const data = {
-            title: formData.get("title"),
-            client: formData.get("client"),
-            year: formData.get("year"),
-            description: formData.get("description"),
-            link: formData.get("link"),
-            imageUrl: formData.get("imageUrl"),
+            title: val("title"),
+            client: val("client"),
+            year: val("year"),
+            description: val("description"),
+            link: val("link"),
+            imageUrl: val("imageUrl"),
         }
 
         try {
@@ -103,39 +116,50 @@ function ProjectForm({ profileId, initialData, onCancel, onSave }: { profileId: 
     }
 
     return (
-        <Card className="border-dashed">
-            <CardContent className="p-4">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Title</Label>
-                            <Input name="title" defaultValue={initialData?.title} required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Client</Label>
-                            <Input name="client" defaultValue={initialData?.client} />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Year</Label>
-                            <Input name="year" defaultValue={initialData?.year} placeholder="e.g. 2024" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Link</Label>
-                            <Input name="link" defaultValue={initialData?.link} placeholder="https://..." />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Textarea name="description" defaultValue={initialData?.description} />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>Cancel</Button>
-                        <Button type="submit" disabled={isLoading}>{isLoading ? "Saving..." : "Save"}</Button>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
+        <div className="space-y-3 rounded-xl border border-dashed p-3" data-proj-form>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                    <Label>Title</Label>
+                    <Input name="title" defaultValue={initialData?.title} required />
+                </div>
+                <div className="space-y-1.5">
+                    <Label>Client</Label>
+                    <Input name="client" defaultValue={initialData?.client} />
+                </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                    <Label>Year</Label>
+                    <Input name="year" defaultValue={initialData?.year} placeholder="2024" />
+                </div>
+                <div className="space-y-1.5">
+                    <Label>Link</Label>
+                    <Input name="link" defaultValue={initialData?.link} placeholder="https://" />
+                </div>
+            </div>
+            <div className="space-y-1.5">
+                <Label>Image URL</Label>
+                <Input name="imageUrl" defaultValue={initialData?.imageUrl} placeholder="https://" />
+            </div>
+            <div className="space-y-1.5">
+                <Label>Description</Label>
+                <Textarea name="description" defaultValue={initialData?.description} rows={3} />
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={onCancel} disabled={isLoading}>Cancel</Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    className="rounded-full"
+                    disabled={isLoading}
+                    onClick={(e) => {
+                        const root = e.currentTarget.closest("[data-proj-form]") as HTMLElement | null
+                        if (root) void handleSubmit(root)
+                    }}
+                >
+                    {isLoading ? "Saving..." : "Save"}
+                </Button>
+            </div>
+        </div>
     )
 }

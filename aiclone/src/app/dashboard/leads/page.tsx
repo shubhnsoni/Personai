@@ -1,44 +1,76 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
-import { LeadsList } from "@/components/dashboard/leads-list"
-import { LeadsKanban } from "@/components/dashboard/leads-kanban"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { prisma } from "@/lib/prisma"
+import { LeadsStudio, type StudioLead } from "@/components/dashboard/leads-studio"
+import { parseLeadTags } from "@/lib/lead-meta"
+import { requireSurface } from "@/lib/require-surface"
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 export default async function DashboardLeadsPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")
-
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
+    requireSurface(profile.roleTemplate, "leads", profile)
 
-    const { prisma } = await import("@/lib/prisma")
-    const leads = await prisma.visitorLead.findMany({
-        where: { profileId: profile.id },
-        orderBy: { createdAt: 'desc' }
+    const [leads, conversations, purchases, enrollments, bookings] = await Promise.all([
+        prisma.visitorLead.findMany({
+            where: { profileId: profile.id },
+            orderBy: { createdAt: "desc" },
+        }),
+        prisma.conversation.findMany({
+            where: { profileId: profile.id },
+            include: { messages: { orderBy: { createdAt: "desc" }, take: 1 } },
+            orderBy: { lastMessageAt: "desc" },
+        }),
+        prisma.productPurchase.findMany({
+            where: { product: { profileId: profile.id } },
+            include: { product: { select: { title: true } } },
+        }),
+        prisma.courseEnrollment.findMany({
+            where: { course: { profileId: profile.id } },
+            include: { course: { select: { title: true } } },
+        }),
+        prisma.booking.findMany({
+            where: { profileId: profile.id },
+            select: { visitorEmail: true },
+        }),
+    ])
+
+    const convById = new Map(conversations.map((c) => [c.id, c]))
+    const convByEmail = new Map<string, (typeof conversations)[0]>()
+    for (const c of conversations) {
+        if (c.visitorEmail) {
+            const k = c.visitorEmail.toLowerCase()
+            if (!convByEmail.has(k)) convByEmail.set(k, c)
+        }
+    }
+
+    const rows: StudioLead[] = leads.map((l) => {
+        const email = l.email.toLowerCase()
+        const chat = (l.conversationId && convById.get(l.conversationId)) || convByEmail.get(email) || null
+        const tags = parseLeadTags(l.tags)
+        const last = chat?.messages[0]
+        return {
+            id: l.id,
+            name: l.name,
+            email: l.email,
+            company: l.company,
+            budgetRange: l.budgetRange,
+            status: l.status,
+            note: tags.note || "",
+            followUpAt: tags.followUpAt || null,
+            activity: tags.activity || [],
+            createdAt: l.createdAt.toISOString(),
+            chatId: chat?.id || null,
+            lastChat: last?.text || null,
+            waitingOnYou: Boolean(last && last.role === "user"),
+            purchases: purchases.filter((p) => p.visitorEmail.toLowerCase() === email).map((p) => p.product.title),
+            courses: enrollments.filter((e) => e.visitorEmail.toLowerCase() === email).map((e) => e.course.title),
+            bookings: bookings.filter((b) => b.visitorEmail.toLowerCase() === email).length,
+        }
     })
 
-    return (
-        <div className="flex-1 space-y-4 p-8 pt-6 h-full flex flex-col">
-            <div className="flex items-center justify-between space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight">Leads</h2>
-            </div>
-
-            <Tabs defaultValue="board" className="flex-1 flex flex-col space-y-4">
-                <TabsList>
-                    <TabsTrigger value="board">Board</TabsTrigger>
-                    <TabsTrigger value="list">List</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="board" className="flex-1 h-full">
-                    <LeadsKanban leads={leads} />
-                </TabsContent>
-
-                <TabsContent value="list" className="h-full">
-                    <LeadsList leads={leads} />
-                </TabsContent>
-            </Tabs>
-        </div>
-    )
+    return <LeadsStudio leads={rows} slug={profile.slug} displayName={profile.displayName} />
 }

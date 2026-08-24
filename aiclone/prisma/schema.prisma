@@ -19,7 +19,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  profiles Profile[]
+  profiles      Profile[]
+  notifications Notification[]
 }
 
 model Profile {
@@ -35,6 +36,13 @@ model Profile {
   language              String                 @default("en")
   timezone              String                 @default("UTC")
   themeColor            String                 @default("#000000")
+  imageUrl              String?
+  shopLogoUrl           String?
+  whatsapp              String?
+  upiId                 String?
+  gstin                 String?
+  deliveryNote          String?
+  chatAvatarMode        String                 @default("ORB") // "ORB" | "IMAGE"
   animationStyleId      String?
   animationStyle        WelcomeAnimationPreset? @relation(fields: [animationStyleId], references: [id])
   isPublic              Boolean                @default(false)
@@ -43,6 +51,11 @@ model Profile {
   contentDisplayMode    String                 @default("POPUP") // "SIDE_PANEL" | "POPUP"
   personalityConfig     String?                // JSON: {tone, customInstructions, responseLength, language}
   aiModel               String                 @default("gpt-4o-mini") // "gpt-4o-mini" | "gpt-4o"
+  autoMemoryEnabled     Boolean                @default(false)
+  liveChatEnabled       Boolean                @default(false)
+  liveChatSlaMinutes    Int                    @default(10)
+  bufferMinutes         Int                    @default(0)
+  calendarToken         String?                @unique
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -53,6 +66,7 @@ model Profile {
   payments         Payment[]
   leads            VisitorLead[]
   availability     AvailabilitySchedule[]
+  calendarOverrides CalendarOverride[]
   workExperiences  WorkExperience[]
   projects         Project[]
   digitalProducts  DigitalProduct[]
@@ -61,6 +75,22 @@ model Profile {
   communities      Community[]
   leadMagnets      LeadMagnet[]
   shortLinks       ShortLink[]
+  analyticsEvents  ProfileEvent[]
+}
+
+model ProfileEvent {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name      String
+  path      String?
+  ref       String?
+  visitor   String?
+  meta      String?
+  createdAt DateTime @default(now())
+
+  @@index([profileId, createdAt])
+  @@index([profileId, name, createdAt])
 }
 
 model WorkExperience {
@@ -115,8 +145,13 @@ model ProfileDocument {
   rawText           String?
   embedding         Float[]             // OpenAI embedding vector
   embeddingMetadata String?             // Json
+  visitorKey        String?
+  memberId          String?
+  conversationId    String?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+
+  @@index([profileId, visitorKey])
 }
 
 model ServiceOffering {
@@ -131,7 +166,10 @@ model ServiceOffering {
   durationMinutes   Int      @default(30)
   isActive          Boolean  @default(true)
   isRecurring       Boolean  @default(false)
+  packageSessions   Int      @default(1)
   maxBookingsPerDay Int?
+  kind              String   @default("SESSION") // "SESSION" | "TABLE"
+  covers            Int?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -145,6 +183,8 @@ model Booking {
   visitorId         String?       
   visitorName       String
   visitorEmail      String
+  memberId          String?
+  member            Member?         @relation(fields: [memberId], references: [id])
   serviceOfferingId String
   serviceOffering   ServiceOffering @relation(fields: [serviceOfferingId], references: [id])
   startTime         DateTime
@@ -179,15 +219,24 @@ model Conversation {
   visitorId      String?
   visitorName    String?
   visitorEmail   String?
+  memberId       String?
+  member         Member?            @relation(fields: [memberId], references: [id])
   source         String             @default("PROFILE_PAGE") // Enum
   leadStatus     String             @default("NEW") // Enum
-  notes          String?            
+  notes          String?
+  mode           String             @default("AI") // "AI" | "LIVE_REQUESTED" | "LIVE"
+  liveRequestedAt DateTime?
+  liveRespondedAt DateTime?
+  lastSummarizedMsgId String?
   startedAt      DateTime           @default(now())
   endedAt        DateTime?
   lastMessageAt  DateTime           @default(now())
 
   messages     Message[]
   visitorLeads VisitorLead[]
+
+  @@index([profileId, visitorId])
+  @@index([profileId, mode])
 }
 
 model Message {
@@ -234,6 +283,21 @@ model AvailabilitySchedule {
   updatedAt DateTime @updatedAt
 }
 
+model CalendarOverride {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date      DateTime
+  isBlocked Boolean  @default(true)
+  startTime String?
+  endTime   String?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId, date])
+}
+
 // ==================== SuperProfile-like Features ====================
 
 model DigitalProduct {
@@ -242,9 +306,28 @@ model DigitalProduct {
   profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
   title         String
   description   String?
-  type          String   @default("OTHER") // "PDF" | "VIDEO" | "AUDIO" | "OTHER"
+  type          String   @default("OTHER") // "PDF" | "VIDEO" | "AUDIO" | "OTHER" | "PHYSICAL"
   fileUrl       String?
   thumbnailUrl  String?
+  subtitle      String?
+  body          String?
+  compareAtCents Int?
+  highlights    String?
+  galleryUrls   String?
+  fulfillment   String   @default("DIGITAL") // "DIGITAL" | "PHYSICAL" | "BOTH"
+  stock         Int?
+  sku           String?
+  weightGrams   Int?
+  allowCod      Boolean  @default(false)
+  category      String?
+  diet          String?
+  spiceLevel    Int?
+  serveWindow   String?
+  arModelUrl    String?
+  arUsdzUrl     String?
+  variantsJson  String?
+  shipMode      String   @default("NONE") // "NONE" | "PICKUP" | "DELIVER" | "BOTH"
+  shipFeeCents  Int      @default(0)
   priceCents    Int      @default(0)
   currency      String   @default("USD")
   isActive      Boolean  @default(true)
@@ -253,6 +336,7 @@ model DigitalProduct {
   updatedAt     DateTime @updatedAt
 
   purchases ProductPurchase[]
+  reviews   OfferReview[]
 }
 
 model Course {
@@ -262,6 +346,11 @@ model Course {
   title         String
   description   String?
   thumbnailUrl  String?
+  subtitle      String?
+  body          String?
+  outcomes      String?
+  level         String   @default("ALL")
+  compareAtCents Int?
   priceCents    Int      @default(0)
   currency      String   @default("USD")
   isActive      Boolean  @default(true)
@@ -296,6 +385,9 @@ model CourseLesson {
   description     String?
   contentType     String   @default("VIDEO") // "VIDEO" | "TEXT" | "PDF"
   contentUrl      String?
+  videoUrl        String?
+  body            String?
+  fileUrl         String?
   durationMinutes Int      @default(0)
   orderIndex      Int      @default(0)
   isFree          Boolean  @default(false)
@@ -376,24 +468,81 @@ model ShortLink {
   updatedAt DateTime @updatedAt
 }
 
+model Member {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  name       String?
+  imageUrl   String?
+  clerkId    String?  @unique
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sessions     MemberSession[]
+  libraryLinks LibraryLink[]
+  purchases    ProductPurchase[]
+  enrollments  CourseEnrollment[]
+  events       EventRegistration[]
+  communities  CommunityMember[]
+  bookings     Booking[]
+  conversations Conversation[]
+}
+
+model MemberSession {
+  id        String   @id @default(cuid())
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model LibraryLink {
+  id        String    @id @default(cuid())
+  memberId  String
+  member    Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
 model ProductPurchase {
   id           String    @id @default(cuid())
   productId    String
   product      DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  memberId     String?
+  member       Member?   @relation(fields: [memberId], references: [id])
   visitorEmail String
   visitorName  String?
   paymentId    String?
   status       String    @default("PENDING") // "PENDING" | "COMPLETED" | "REFUNDED"
+  payMethod    String?
+  buyerNote    String?
+  address      String?
+  confirmedAt  DateTime?
   downloadToken  String?   @unique
   downloadExpiry DateTime?
   downloadedAt DateTime?
   createdAt    DateTime  @default(now())
 }
 
+model OfferReview {
+  id          String         @id @default(cuid())
+  productId   String
+  product     DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating      Int
+  text        String?
+  visitorName String
+  createdAt   DateTime       @default(now())
+}
+
 model CourseEnrollment {
   id           String    @id @default(cuid())
   courseId     String
   course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  memberId     String?
+  member       Member?   @relation(fields: [memberId], references: [id])
   visitorEmail String
   visitorName  String?
   paymentId    String?
@@ -419,6 +568,8 @@ model EventRegistration {
   id           String    @id @default(cuid())
   eventId      String
   event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  memberId     String?
+  member       Member?   @relation(fields: [memberId], references: [id])
   visitorEmail String
   visitorName  String?
   paymentId    String?
@@ -431,12 +582,28 @@ model CommunityMember {
   id                 String    @id @default(cuid())
   communityId        String
   community          Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  memberId           String?
+  member             Member?   @relation(fields: [memberId], references: [id])
   visitorEmail       String
   visitorName        String?
   paymentId          String?
   status             String    @default("ACTIVE") // "ACTIVE" | "EXPIRED" | "CANCELLED"
   subscriptionEndsAt DateTime?
   createdAt          DateTime  @default(now())
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
 }
 
 model LeadMagnetSubmission {

@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { ProductForm } from "@/components/dashboard/product-form"
+import { requireSurface } from "@/lib/require-surface"
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
 
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
+    requireSurface(profile.roleTemplate, "shop", profile)
 
     const { id } = await params
 
@@ -30,7 +32,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     }
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex-1 space-y-4">
             <div className="max-w-2xl mx-auto">
                 <ProductForm profileId={profile.id} product={product} />
             </div>

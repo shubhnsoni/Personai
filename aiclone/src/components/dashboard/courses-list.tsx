@@ -1,170 +1,216 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { Course } from "@prisma/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import {
-    Plus,
-    Pencil,
-    Trash2,
-    BookOpen,
-    Users,
-    Layers,
-    FileText,
-} from "lucide-react"
-import { deleteCourse } from "@/app/actions/courses"
+import { Switch } from "@/components/ui/switch"
+import { EmptyState } from "@/components/ui/empty-state"
+import { BookOpen, Copy, ExternalLink, Plus, Trash2, Upload } from "lucide-react"
+import { deleteCourse, setCoursePublished } from "@/app/actions/courses"
+import { StudioDock } from "@/components/dashboard/studio-dock"
+import { DockTabs } from "@/components/dashboard/dock-tabs"
+import { CatalogSearch, FilterChips, ViewToggle, useCatalogView } from "@/components/dashboard/catalog-chrome"
+import { OfferCover } from "@/components/dashboard/offer-cover"
+import { CourseForm } from "@/components/dashboard/course-form"
+import { useMoney } from "@/components/pricing-provider"
+import { toast } from "sonner"
 
 interface CourseWithCounts extends Course {
-    _count: {
-        modules: number
-        enrollments: number
-    }
+    _count: { modules: number; enrollments: number }
     totalLessonCount: number
 }
 
-interface CoursesListProps {
-    profileId: string
-    courses: CourseWithCounts[]
-}
-
-export function CoursesList({ profileId, courses }: CoursesListProps) {
+export function CoursesList({ slug, profileId, courses }: { slug: string; profileId: string; courses: CourseWithCounts[] }) {
+    const [view, setView] = useCatalogView("pl-courses-view")
+    const [q, setQ] = useState("")
+    const [filter, setFilter] = useState<"all" | "live" | "draft" | "free">("all")
     const [deletingId, setDeletingId] = useState<string | null>(null)
+    const [pending, startTransition] = useTransition()
+    const [adding, setAdding] = useState(false)
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this course? This will also delete all modules and lessons.")) return
+    const live = courses.filter((c) => c.isPublished && c.isActive).length
+    const enrolled = courses.reduce((s, c) => s + (c._count.enrollments || 0), 0)
 
+    const rows = useMemo(() => {
+        return courses.filter((c) => {
+            const isLive = c.isPublished && c.isActive
+            if (filter === "live" && !isLive) return false
+            if (filter === "draft" && isLive) return false
+            if (filter === "free" && c.priceCents > 0) return false
+            if (!q.trim()) return true
+            const hay = `${c.title} ${c.subtitle || ""} ${c.description || ""}`.toLowerCase()
+            return hay.includes(q.trim().toLowerCase())
+        })
+    }, [courses, filter, q])
+
+    const remove = async (id: string) => {
+        if (!confirm("Delete this course? Modules and lessons go with it.")) return
         setDeletingId(id)
         try {
             await deleteCourse(id)
-        } catch (error) {
-            console.error("Failed to delete course:", error)
         } finally {
             setDeletingId(null)
         }
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Courses</h2>
-                    <p className="text-muted-foreground">
-                        Create and manage courses with modules and lessons for your students.
-                    </p>
-                </div>
-                <Link href="/dashboard/courses/new">
-                    <Button>
-                        <Plus className="mr-2 h-4 w-4" /> Create Course
-                    </Button>
-                </Link>
+        <div className="space-y-3">
+            <div className="flex items-center gap-2">
+                <CatalogSearch value={q} onChange={setQ} />
+                <ViewToggle view={view} onChange={setView} />
             </div>
+            <FilterChips
+                value={filter}
+                onChange={setFilter}
+                count={`${live} live · ${enrolled} enrolled`}
+                items={[
+                    { id: "all", label: "All" },
+                    { id: "live", label: "Live" },
+                    { id: "draft", label: "Draft" },
+                    { id: "free", label: "Free" },
+                ]}
+            />
 
-            {courses.length === 0 ? (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                        <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No courses yet</h3>
-                        <p className="text-muted-foreground text-center mb-4 max-w-sm">
-                            Start teaching by creating your first course. Add modules and lessons
-                            to build a structured learning experience.
-                        </p>
-                        <Link href="/dashboard/courses/new">
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" /> Create Your First Course
-                            </Button>
-                        </Link>
-                    </CardContent>
-                </Card>
+            {rows.length === 0 ? (
+                <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+                    <EmptyState
+                        icon={<BookOpen />}
+                        title={courses.length === 0 ? "Nothing to teach yet" : "Nothing matches"}
+                        description={courses.length === 0 ? "Add a course people can enroll in from chat or your catalog." : "Try another search or filter."}
+                    />
+                </div>
+            ) : view === "list" ? (
+                <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+                    {rows.map((course) => (
+                        <CourseRow
+                            key={course.id}
+                            course={course}
+                            deleting={deletingId === course.id}
+                            pending={pending}
+                            onToggle={(on) => startTransition(async () => { await setCoursePublished(course.id, on) })}
+                            onDelete={() => remove(course.id)}
+                        />
+                    ))}
+                </div>
             ) : (
-                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    {courses.map((course) => {
-                        const isDeleting = deletingId === course.id
-
-                        return (
-                            <Card key={course.id} className="relative overflow-hidden">
-                                {course.thumbnailUrl ? (
-                                    <div className="aspect-video w-full overflow-hidden bg-muted">
-                                        <img
-                                            src={course.thumbnailUrl}
-                                            alt={course.title}
-                                            className="h-full w-full object-cover"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="aspect-video w-full bg-muted flex items-center justify-center">
-                                        <BookOpen className="h-12 w-12 text-muted-foreground" />
-                                    </div>
-                                )}
-
-                                <CardHeader className="pb-2">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <CardTitle className="text-base font-medium line-clamp-2">
-                                            {course.title}
-                                        </CardTitle>
-                                    </div>
-                                </CardHeader>
-
-                                <CardContent className="space-y-4">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <div className="font-bold text-lg">
-                                            {course.priceCents === 0
-                                                ? "Free"
-                                                : `$${(course.priceCents / 100).toFixed(2)}`}
-                                        </div>
-                                        <div className="flex items-center text-muted-foreground">
-                                            <Users className="mr-1 h-3 w-3" />
-                                            {course._count.enrollments} enrolled
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                        <div className="flex items-center">
-                                            <Layers className="mr-1 h-3 w-3" />
-                                            {course._count.modules} modules
-                                        </div>
-                                        <div className="flex items-center">
-                                            <FileText className="mr-1 h-3 w-3" />
-                                            {course.totalLessonCount} lessons
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant={course.isActive ? "default" : "secondary"}>
-                                            {course.isActive ? "Active" : "Inactive"}
-                                        </Badge>
-                                        <Badge variant={course.isPublished ? "default" : "outline"}>
-                                            {course.isPublished ? "Published" : "Draft"}
-                                        </Badge>
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        <Link
-                                            href={`/dashboard/courses/${course.id}/edit`}
-                                            className="flex-1"
-                                        >
-                                            <Button variant="outline" size="sm" className="w-full">
-                                                <Pencil className="mr-2 h-4 w-4" /> Edit
-                                            </Button>
-                                        </Link>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                            onClick={() => handleDelete(course.id)}
-                                            disabled={isDeleting}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
+                <div className="grid grid-cols-2 gap-3">
+                    {rows.map((course) => (
+                        <CourseTile
+                            key={course.id}
+                            course={course}
+                            deleting={deletingId === course.id}
+                            pending={pending}
+                            onToggle={(on) => startTransition(async () => { await setCoursePublished(course.id, on) })}
+                            onDelete={() => remove(course.id)}
+                        />
+                    ))}
                 </div>
             )}
+
+            <StudioDock>
+                <DockTabs
+                    tabs={[
+                        {
+                            id: "copy",
+                            label: "Copy",
+                            icon: <Copy />,
+                            onClick: async () => {
+                                const url = `${window.location.origin}/${slug}/courses`
+                                try {
+                                    await navigator.clipboard.writeText(url)
+                                    toast.success("Courses link copied")
+                                } catch {
+                                    toast.error(url)
+                                }
+                            },
+                        },
+                        { id: "import", label: "Import", icon: <Upload />, href: "/dashboard/import" },
+                        { id: "live", label: "Live", icon: <ExternalLink />, href: `/${slug}/courses`, target: "_blank" },
+                    ]}
+                />
+                <Button className="shrink-0 rounded-full" onClick={() => setAdding(true)}>
+                    <Plus className="mr-1 h-4 w-4" /> Add
+                </Button>
+            </StudioDock>
+            <CourseForm open={adding} onOpenChange={setAdding} profileId={profileId} />
+        </div>
+    )
+}
+
+function meta(course: CourseWithCounts, money: (cents: number) => string) {
+    const live = course.isPublished && course.isActive
+    return [
+        money(course.priceCents),
+        `${course.totalLessonCount} lessons`,
+        live ? null : "Draft",
+    ].filter(Boolean).join(" · ")
+}
+
+function CourseRow({
+    course,
+    deleting,
+    pending,
+    onToggle,
+    onDelete,
+}: {
+    course: CourseWithCounts
+    deleting: boolean
+    pending: boolean
+    onToggle: (on: boolean) => void
+    onDelete: () => void
+}) {
+    const live = course.isPublished && course.isActive
+    const money = useMoney()
+    return (
+        <div className="flex items-center gap-2.5 border-b border-border/50 px-2.5 py-2 last:border-b-0">
+            <Link href={`/dashboard/courses/${course.id}/edit`} className="shrink-0">
+                <OfferCover src={course.thumbnailUrl} kind={course.level || "COURSE"} title={course.title} hideIcon className="h-12 w-12 rounded-xl" />
+            </Link>
+            <Link href={`/dashboard/courses/${course.id}/edit`} className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{course.title}</p>
+                <p className="truncate text-[11px] text-muted-foreground">{meta(course, money)}</p>
+            </Link>
+            <Switch checked={live} disabled={pending} onCheckedChange={onToggle} />
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={onDelete} disabled={deleting}>
+                <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+        </div>
+    )
+}
+
+function CourseTile({
+    course,
+    deleting,
+    pending,
+    onToggle,
+    onDelete,
+}: {
+    course: CourseWithCounts
+    deleting: boolean
+    pending: boolean
+    onToggle: (on: boolean) => void
+    onDelete: () => void
+}) {
+    const live = course.isPublished && course.isActive
+    const money = useMoney()
+    return (
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+            <Link href={`/dashboard/courses/${course.id}/edit`} className="block">
+                <OfferCover src={course.thumbnailUrl} kind={course.level || "COURSE"} title={course.title} className="aspect-square w-full" />
+            </Link>
+            <div className="flex flex-col gap-3 p-3">
+                <Link href={`/dashboard/courses/${course.id}/edit`} className="min-h-[2.75rem]">
+                    <p className="line-clamp-2 text-sm font-medium leading-5">{course.title}</p>
+                    <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{meta(course, money)}</p>
+                </Link>
+                <div className="flex items-center justify-between pt-0.5">
+                    <Switch checked={live} disabled={pending} onCheckedChange={onToggle} />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-destructive" onClick={onDelete} disabled={deleting}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
+            </div>
         </div>
     )
 }

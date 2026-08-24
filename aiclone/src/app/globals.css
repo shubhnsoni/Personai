@@ -87,91 +87,97 @@
 }
 
 :root {
-  /* Brand — do not use raw purple-600 in product surfaces after Phase 1 */
-  --pl-orb-from: #A855F7;
-  --pl-orb-to: #EC4899;
-  --pl-aurora: oklch(0.62 0.24 312);
-  --pl-aurora-2: oklch(0.68 0.22 350);
-  --pl-ink: oklch(0.145 0.02 300);
-  --pl-fog: oklch(0.97 0.01 300);
+  /* Brand — Octagos-inspired cyan / electric blue, not pink */
+  --pl-orb-from: #52E8FF;
+  --pl-orb-to: #1A4DFF;
+  --pl-aurora: oklch(0.74 0.13 210);
+  --pl-aurora-2: oklch(0.52 0.22 265);
+  --pl-ink: oklch(0.145 0.025 250);
+  --pl-fog: oklch(0.975 0.008 240);
   --pl-brand-foreground: oklch(0.99 0 0);
   --pl-success: oklch(0.72 0.17 155);
   --pl-warning: oklch(0.8 0.16 85);
   --pl-info: oklch(0.7 0.12 240);
 
-  /* Public profile surface (always dark, even if dashboard is light) */
-  --profile-bg: oklch(0.08 0.02 300);
-  --profile-elev: oklch(0.16 0.02 300);
-  --profile-text: oklch(0.96 0.01 300);
-  --profile-mute: oklch(0.72 0.02 300);
-  --profile-chip: oklch(0.18 0.02 300 / 80%);
-  --profile-ring: oklch(0.62 0.24 312 / 50%);
+  /* Public chat — follows site theme */
+  --profile-bg: oklch(0.97 0.008 240);
+  --profile-elev: oklch(1 0.004 240);
+  --profile-text: oklch(0.2 0.02 250);
+  --profile-mute: oklch(0.48 0.02 240);
+  --profile-chip: oklch(0.94 0.012 240 / 90%);
+  --profile-ring: oklch(0.55 0.12 210 / 45%);
 
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   --background: var(--pl-fog);
   --foreground: var(--pl-ink);
-  --card: oklch(0.995 0.005 300);
+  --card: oklch(0.995 0.004 240);
   --card-foreground: var(--pl-ink);
-  --popover: oklch(0.995 0.005 300);
+  --popover: oklch(0.995 0.004 240);
   --popover-foreground: var(--pl-ink);
-  --primary: oklch(0.205 0.02 300);
-  --primary-foreground: oklch(0.985 0.01 300);
-  --secondary: oklch(0.94 0.01 300);
-  --secondary-foreground: oklch(0.205 0.02 300);
-  --muted: oklch(0.94 0.01 300);
-  --muted-foreground: oklch(0.45 0.02 300);
-  --accent: oklch(0.94 0.015 312);
-  --accent-foreground: oklch(0.205 0.02 300);
+  --primary: oklch(0.205 0.03 250);
+  --primary-foreground: oklch(0.985 0.01 230);
+  --secondary: oklch(0.945 0.012 240);
+  --secondary-foreground: oklch(0.205 0.03 250);
+  --muted: oklch(0.945 0.01 240);
+  --muted-foreground: oklch(0.45 0.03 250);
+  --accent: oklch(0.945 0.02 220);
+  --accent-foreground: oklch(0.205 0.03 250);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.90 0.01 300);
-  --input: oklch(0.90 0.01 300);
+  --border: oklch(0.90 0.012 240);
+  --input: oklch(0.90 0.012 240);
   --ring: var(--pl-aurora);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0.008 300);
+  --chart-1: oklch(0.72 0.13 210);
+  --chart-2: oklch(0.55 0.18 250);
+  --chart-3: oklch(0.62 0.12 180);
+  --chart-4: oklch(0.7 0.1 80);
+  --chart-5: oklch(0.6 0.16 265);
+  --sidebar: oklch(0.985 0.008 240);
   --sidebar-foreground: var(--pl-ink);
   --sidebar-primary: var(--pl-aurora);
   --sidebar-primary-foreground: var(--pl-brand-foreground);
-  --sidebar-accent: oklch(0.94 0.01 300);
-  --sidebar-accent-foreground: oklch(0.205 0.02 300);
-  --sidebar-border: oklch(0.90 0.01 300);
+  --sidebar-accent: oklch(0.945 0.012 240);
+  --sidebar-accent-foreground: oklch(0.205 0.03 250);
+  --sidebar-border: oklch(0.90 0.012 240);
   --sidebar-ring: var(--pl-aurora);
 }
 
 .dark {
+  --profile-bg: oklch(0.08 0.02 250);
+  --profile-elev: oklch(0.16 0.025 250);
+  --profile-text: oklch(0.96 0.01 230);
+  --profile-mute: oklch(0.72 0.02 230);
+  --profile-chip: oklch(0.18 0.025 250 / 80%);
+  --profile-ring: oklch(0.74 0.13 210 / 50%);
   --background: var(--pl-ink);
-  --foreground: oklch(0.985 0.01 300);
-  --card: oklch(0.205 0.02 300);
-  --card-foreground: oklch(0.985 0.01 300);
-  --popover: oklch(0.205 0.02 300);
-  --popover-foreground: oklch(0.985 0.01 300);
-  --primary: oklch(0.922 0.01 300);
-  --primary-foreground: oklch(0.205 0.02 300);
-  --secondary: oklch(0.269 0.02 300);
-  --secondary-foreground: oklch(0.985 0.01 300);
-  --muted: oklch(0.269 0.02 300);
-  --muted-foreground: oklch(0.72 0.02 300);
-  --accent: oklch(0.269 0.03 312);
-  --accent-foreground: oklch(0.985 0.01 300);
+  --foreground: oklch(0.985 0.01 230);
+  --card: oklch(0.20 0.03 250);
+  --card-foreground: oklch(0.985 0.01 230);
+  --popover: oklch(0.20 0.03 250);
+  --popover-foreground: oklch(0.985 0.01 230);
+  --primary: oklch(0.92 0.02 220);
+  --primary-foreground: oklch(0.18 0.03 250);
+  --secondary: oklch(0.26 0.03 250);
+  --secondary-foreground: oklch(0.985 0.01 230);
+  --muted: oklch(0.26 0.03 250);
+  --muted-foreground: oklch(0.72 0.03 230);
+  --accent: oklch(0.26 0.04 230);
+  --accent-foreground: oklch(0.985 0.01 230);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0.01 300 / 10%);
-  --input: oklch(1 0.01 300 / 15%);
+  --border: oklch(1 0.02 230 / 10%);
+  --input: oklch(1 0.02 230 / 15%);
   --ring: var(--pl-aurora);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0.02 300);
-  --sidebar-foreground: oklch(0.985 0.01 300);
+  --chart-1: oklch(0.72 0.14 210);
+  --chart-2: oklch(0.62 0.16 250);
+  --chart-3: oklch(0.7 0.12 180);
+  --chart-4: oklch(0.75 0.1 80);
+  --chart-5: oklch(0.58 0.18 265);
+  --sidebar: oklch(0.18 0.03 250);
+  --sidebar-foreground: oklch(0.985 0.01 230);
   --sidebar-primary: var(--pl-aurora);
   --sidebar-primary-foreground: var(--pl-brand-foreground);
-  --sidebar-accent: oklch(0.269 0.02 300);
-  --sidebar-accent-foreground: oklch(0.985 0.01 300);
-  --sidebar-border: oklch(1 0.01 300 / 10%);
+  --sidebar-accent: oklch(0.26 0.03 250);
+  --sidebar-accent-foreground: oklch(0.985 0.01 230);
+  --sidebar-border: oklch(1 0.02 230 / 10%);
   --sidebar-ring: var(--pl-aurora);
 }
 
@@ -257,4 +263,243 @@
   .min-h-screen {
     min-height: 100dvh;
   }
+}
+
+@keyframes pl-page-scan {
+  0% { transform: translateY(-20%); opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateY(420%); opacity: 0; }
+}
+
+@keyframes pl-page-line {
+  0%, 18% { opacity: 0.18; }
+  28%, 42% { opacity: 0.9; }
+  58%, 100% { opacity: 0.28; }
+}
+
+.pl-scan-beam {
+  animation: pl-page-scan 1.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.pl-scan-line {
+  animation: pl-page-line 1.7s ease-in-out infinite;
+}
+
+.auth-scene {
+  background:
+    radial-gradient(ellipse 62% 34% at 50% -6%, rgba(0, 215, 255, 0.1), transparent 58%),
+    radial-gradient(ellipse 40% 22% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 60%),
+    #050506;
+}
+
+.auth-scene::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  background-image: radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 80px 120px, rgba(255, 255, 255, 0.22), transparent),
+    radial-gradient(1px 1px at 160px 70px, rgba(255, 255, 255, 0.28), transparent),
+    radial-gradient(1.4px 1.4px at 240px 180px, rgba(255, 255, 255, 0.18), transparent),
+    radial-gradient(1px 1px at 300px 40px, rgba(255, 255, 255, 0.24), transparent),
+    radial-gradient(1px 1px at 60px 220px, rgba(255, 255, 255, 0.16), transparent),
+    radial-gradient(1.2px 1.2px at 200px 260px, rgba(255, 255, 255, 0.14), transparent);
+  background-size: 340px 300px;
+}
+
+.auth-scene::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.auth-glass {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 28%, rgba(12, 14, 16, 0.28) 100%),
+    rgba(32, 34, 38, 0.82);
+  box-shadow:
+    0 40px 90px -28px rgba(0, 0, 0, 0.92),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(28px) saturate(155%);
+  -webkit-backdrop-filter: blur(28px) saturate(155%);
+}
+
+.auth-glass::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse 16rem 13rem at -6% -10%, rgba(0, 215, 255, 0.34), transparent 74%),
+    radial-gradient(ellipse 12rem 10rem at 22% -8%, rgba(9, 135, 237, 0.16), transparent 72%),
+    radial-gradient(ellipse 9rem 8rem at -2% 18%, rgba(7, 16, 77, 0.28), transparent 76%);
+}
+
+.auth-glass::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse 14rem 10rem at 0% 0%, rgba(255, 255, 255, 0.1), transparent 76%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.auth-clerk .cl-header,
+.auth-clerk .cl-headerTitle,
+.auth-clerk .cl-headerSubtitle,
+.auth-clerk .cl-logoBox,
+.auth-clerk [class*="cl-header"] {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.auth-clerk .cl-card,
+.auth-clerk .cl-cardBox {
+  gap: 0 !important;
+}
+
+.auth-clerk .cl-main,
+.auth-clerk form {
+  gap: 0.5rem !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  text-align: center;
+}
+
+.auth-clerk .cl-socialButtonsRoot,
+.auth-clerk .cl-socialButtons {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.auth-clerk .cl-formFieldLabel,
+.auth-clerk label {
+  display: none !important;
+}
+
+.auth-clerk .cl-socialButtonsBlockButton {
+  justify-content: center !important;
+}
+
+.auth-clerk input,
+.auth-clerk .cl-formFieldInput,
+.auth-clerk .cl-socialButtonsBlockButton {
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+  padding-left: 1.15rem !important;
+  padding-right: 1.15rem !important;
+  background: #050607 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+.auth-clerk .cl-formButtonPrimary {
+  background: #00d7ff !important;
+  color: #061018 !important;
+  box-shadow: 0 10px 22px -12px rgba(0, 215, 255, 0.75) !important;
+}
+
+.auth-clerk .cl-socialButtons,
+.auth-clerk .cl-socialButtonsBlockButton {
+  overflow: visible !important;
+}
+
+.auth-clerk .cl-socialButtonsBlockButton {
+  height: auto !important;
+  min-height: 2.75rem;
+  padding-top: 0.65rem !important;
+  padding-bottom: 0.65rem !important;
+}
+
+.auth-clerk [class*="lastUsed"],
+.auth-clerk [class*="LastUsed"],
+.auth-clerk .cl-buttonBadge,
+.auth-clerk .cl-badge,
+.auth-clerk .cl-lastAuthenticationStrategyBadge {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.auth-clerk,
+.auth-clerk .cl-rootBox,
+.auth-clerk .cl-cardBox,
+.auth-clerk .cl-card,
+.auth-clerk .cl-main,
+.auth-clerk .cl-form,
+.auth-clerk .cl-socialButtons,
+.auth-clerk .cl-formFieldRow,
+.auth-clerk .cl-formField,
+.auth-clerk .cl-formFieldInputGroup {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.auth-clerk .cl-card,
+.auth-clerk .cl-cardBox,
+.auth-clerk .cl-rootBox {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
+.auth-clerk .cl-socialButtonsBlockButton,
+.auth-clerk .cl-formButtonPrimary,
+.auth-clerk .cl-formFieldInput,
+.auth-clerk input,
+.auth-clerk button[type="submit"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 999px !important;
+}
+
+.auth-clerk input,
+.auth-clerk .cl-formFieldInput {
+  caret-color: #00d7ff;
+}
+
+.auth-clerk .cl-socialButtonsBlockButtonText {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+/* Clerk keyless helper sits over mobile chat / login */
+[data-clerk-keyless],
+[data-clerk-keyless-prompt],
+iframe[title="Clerk Keyless Prompt"],
+.cl-internal-b3fm6y,
+.cl-footer,
+.cl-logoBox {
+  display: none !important;
 }

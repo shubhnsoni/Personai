@@ -1,7 +1,13 @@
 import OpenAI from "openai"
+import { cookies } from "next/headers"
 import { prisma } from "@/lib/prisma"
-import { vectorRetrieval, buildSystemPrompt } from "@/lib/rag"
+import { vectorRetrieval, buildSystemPrompt, scopeDocuments } from "@/lib/rag"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { getMemberFromSession } from "@/lib/members"
+import { generateSuggestions } from "@/lib/suggestions"
+import { maybeSummarizeConversation, visitorKeyFrom } from "@/lib/memory"
+import { formatMoney } from "@/lib/pricing"
+import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +35,11 @@ export async function POST(req: Request) {
         })
     }
 
-    const { messages, profileId, conversationId: existingConversationId, visitorId } = await req.json()
+    const { messages, profileId, conversationId: existingConversationId, visitorId: bodyVisitorId } = await req.json()
+    const jar = await cookies()
+    const cookieVid = jar.get("pl_vid")?.value
+    const visitorId = cookieVid || bodyVisitorId || null
+    const member = await getMemberFromSession().catch(() => null)
 
     const profile = await prisma.profile.findUnique({
         where: { id: profileId },
@@ -70,10 +80,15 @@ export async function POST(req: Request) {
     const profileData = {
         displayName: profile.displayName,
         headline: profile.headline,
+        bio: profile.bio,
+        roleTemplate: profile.roleTemplate,
+        primaryGoal: profile.primaryGoal,
         serviceOfferings: profile.serviceOfferings,
         workExperiences: profile.workExperiences,
         projects: profile.projects,
         digitalProducts: profile.digitalProducts,
+        whatsapp: profile.whatsapp,
+        upiId: profile.upiId,
         courses: profile.courses,
         events: profile.events,
         communities: profile.communities,
@@ -83,21 +98,51 @@ export async function POST(req: Request) {
     const lastMessage = messages[messages.length - 1]
     const query = lastMessage.content
 
-    const contextDocs = await vectorRetrieval(query, profile.documents)
-    const systemPrompt = buildSystemPrompt(profile, contextDocs)
+    const visitorKey = visitorKeyFrom(member?.email, visitorId)
+    const contextDocs = await vectorRetrieval(query, scopeDocuments(profile.documents, visitorKey))
+    const { getRequestCurrency } = await import("@/lib/request-currency")
+    const currency = await getRequestCurrency()
+    const systemPrompt = buildSystemPrompt(profile, contextDocs, currency)
 
     let conversationId = existingConversationId
+    let liveMode = "AI"
+
+    if (conversationId) {
+        const existing = await prisma.conversation.findUnique({ where: { id: conversationId } })
+        if (existing) liveMode = existing.mode
+    }
 
     if (!conversationId) {
+        const ref = (jar.get("pl_ref")?.value || "").slice(0, 40)
         const conversation = await prisma.conversation.create({
             data: {
                 profileId,
                 visitorId: visitorId || null,
-                source: "PROFILE_PAGE",
+                memberId: member?.id || null,
+                visitorName: member?.name || null,
+                visitorEmail: member?.email || null,
+                source: ref || "PROFILE_PAGE",
                 leadStatus: "NEW"
             }
         })
+        void prisma.profileEvent.create({
+            data: {
+                profileId,
+                name: "chat_open",
+                ref: ref || null,
+                visitor: visitorId?.slice(0, 80) || null,
+            },
+        }).catch(() => {})
         conversationId = conversation.id
+    } else if (member?.id) {
+        await prisma.conversation.update({
+            where: { id: conversationId },
+            data: {
+                memberId: member.id,
+                visitorEmail: member.email,
+                visitorName: member.name || undefined,
+            },
+        }).catch(() => {})
     }
 
     await prisma.message.create({
@@ -114,7 +159,22 @@ export async function POST(req: Request) {
         data: { lastMessageAt: new Date() }
     })
 
-    const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+    if (liveMode === "LIVE" || liveMode === "LIVE_REQUESTED") {
+        const notice = liveMode === "LIVE"
+            ? "I'm with you now — give me a moment to reply."
+            : `${profile.displayName} has been notified. Hang tight.`
+        const encoder = new TextEncoder()
+        return new Response(encoder.encode(`0:${JSON.stringify(notice)}\n`), {
+            headers: {
+                "Content-Type": "text/plain; charset=utf-8",
+                "X-Vercel-AI-Data-Stream": "v1",
+                "X-Conversation-Id": conversationId,
+                "X-Chat-Mode": liveMode,
+            },
+        })
+    }
+
+    const allTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         {
             type: "function",
             function: {
@@ -160,8 +220,36 @@ export async function POST(req: Request) {
             type: "function",
             function: {
                 name: "showProducts",
-                description: "Show digital products (ebooks, templates, videos, courses) when user asks about products, downloads, resources, or things they can buy/purchase",
+                description: "Show products or shop items when the user asks about products, downloads, or things they can buy",
                 parameters: { type: "object", properties: {} }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "showMenu",
+                description: "Show the restaurant menu when the user asks about dishes, veg/non-veg, spice, or what to eat",
+                parameters: { type: "object", properties: {} }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "bookTable",
+                description: "Reserve a table after you have the guest name, party size, date (YYYY-MM-DD), and time (HH:MM). Never invent an empty table.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        visitorName: { type: "string" },
+                        visitorEmail: { type: "string" },
+                        visitorPhone: { type: "string" },
+                        partySize: { type: "number" },
+                        date: { type: "string", description: "YYYY-MM-DD" },
+                        time: { type: "string", description: "HH:MM 24h" },
+                        notes: { type: "string" },
+                    },
+                    required: ["visitorName", "partySize", "date", "time"],
+                }
             }
         },
         {
@@ -197,6 +285,25 @@ export async function POST(req: Request) {
             }
         }
     ]
+
+    const role = profile.roleTemplate
+    const extras = extrasOf(profile)
+    const allowedTools = new Set<string>(["collectLead"])
+    if (fieldOn(role, "shopDigital", extras)) allowedTools.add("showLeadMagnets")
+    if (hasSurface(role, "services", extras)) allowedTools.add("showServices")
+    if (fieldOn(role, "portfolio", extras) || role === "CUSTOM") {
+        allowedTools.add("showWorkExperience")
+        allowedTools.add("showProjects")
+    }
+    if (hasSurface(role, "shop", extras) && (role === "RESTAURANT" || extras?.packs?.includes("menuDish") || role === "CUSTOM")) allowedTools.add("showMenu")
+    if (hasSurface(role, "shop", extras) && role !== "RESTAURANT") allowedTools.add("showProducts")
+    if (fieldOn(role, "tableBook", extras)) allowedTools.add("bookTable")
+    if (hasSurface(role, "courses", extras)) allowedTools.add("showCourses")
+    if (hasSurface(role, "events", extras)) {
+        allowedTools.add("showEvents")
+        allowedTools.add("showCommunities")
+    }
+    const tools = allTools.filter((t) => t.type === "function" && allowedTools.has(t.function.name))
 
     async function executeTool(toolName: string, args: Record<string, unknown>): Promise<string> {
         switch (toolName) {
@@ -237,7 +344,7 @@ export async function POST(req: Request) {
                 }
                 
                 const serviceList = services.map(s => 
-                    `- **${s.name}**: ${s.isFree ? 'Free' : `$${(s.priceCents / 100).toFixed(0)}`} (${s.durationMinutes} min)${s.description ? ` - ${s.description}` : ''}`
+                    `- **${s.name}**: ${s.isFree ? 'Free' : formatMoney(s.priceCents, currency)} (${s.durationMinutes} min)${s.description ? ` - ${s.description}` : ''}`
                 ).join('\n')
                 
                 return `Here are ${profileData.displayName}'s consultation services:\n${serviceList}\n\nWould you like to book any of these?`
@@ -266,18 +373,70 @@ export async function POST(req: Request) {
                 
                 return `${profileData.displayName}'s Projects:\n${projectList}`
             }
-            case "showProducts": {
+            case "showProducts":
+            case "showMenu": {
                 const products = profileData.digitalProducts
+                const restaurant = profileData.roleTemplate === "RESTAURANT" || toolName === "showMenu"
                 if (products.length === 0) {
-                    return `${profileData.displayName} doesn't have digital products listed yet. Check out their courses or services instead!`
+                    return restaurant
+                        ? `${profileData.displayName} hasn't published a menu yet. Ask to book a table or WhatsApp them.`
+                        : `${profileData.displayName} doesn't have products listed yet. Check out their courses or services instead!`
                 }
-                
                 const productList = products.map(p => {
-                    const typeLabel = p.type === 'PDF' ? '📄' : p.type === 'VIDEO' ? '🎬' : p.type === 'AUDIO' ? '🎧' : '📦'
-                    return `- ${typeLabel} **${p.title}**: $${(p.priceCents / 100).toFixed(0)}${p.description ? ` - ${p.description}` : ''}`
+                    const extras = [
+                        p.diet,
+                        p.category,
+                        p.spiceLevel ? `spice ${p.spiceLevel}/3` : "",
+                        p.stock != null && p.stock <= 0 ? "sold out" : "",
+                    ].filter(Boolean).join(" · ")
+                    return `- **${p.title}**: ${formatMoney(p.priceCents, currency)}${extras ? ` · ${extras}` : ""}${p.description ? ` — ${p.description}` : ""}`
                 }).join('\n')
-                
-                return `Here are ${profileData.displayName}'s digital products:\n${productList}\n\nWould you like to purchase any of these?`
+                return restaurant
+                    ? `Here's the menu at ${profileData.displayName}:\n${productList}\n\nWant a table, or should I pick something?`
+                    : `Here are ${profileData.displayName}'s products:\n${productList}\n\nWould you like to purchase any of these?`
+            }
+            case "bookTable": {
+                const { createBooking, getAvailableSlots } = await import("@/app/actions/bookings")
+                const visitorName = String(args.visitorName || "").trim()
+                const partySize = Math.max(1, Math.min(24, Number(args.partySize) || 1))
+                const date = String(args.date || "").slice(0, 10)
+                const time = String(args.time || "").slice(0, 5)
+                const visitorEmail = String(args.visitorEmail || "").trim() || `${visitorName.replace(/\s+/g, ".").toLowerCase() || "guest"}@guest.local`
+                const visitorPhone = args.visitorPhone ? String(args.visitorPhone) : undefined
+                if (!visitorName || !date || !time) {
+                    return "I need a name, party size, date, and time to hold a table."
+                }
+                const tableService = profileData.serviceOfferings.find((s: { kind?: string }) => s.kind === "TABLE")
+                    || profileData.serviceOfferings[0]
+                if (!tableService) {
+                    return `I don't have table bookings open yet. ${profileData.whatsapp ? "WhatsApp us and we'll seat you." : "Ask the restaurant directly."}`
+                }
+                try {
+                    const slots = await getAvailableSlots(profileId, date, tableService.durationMinutes, {
+                        partySize,
+                        serviceId: tableService.id,
+                    })
+                    if (!slots.includes(time)) {
+                        const next = slots.slice(0, 4).join(", ")
+                        return next
+                            ? `That time is full for ${partySize}. Open slots: ${next}. Or WhatsApp us.`
+                            : `No tables left on ${date} for ${partySize}. Try another day or WhatsApp us.`
+                    }
+                    await createBooking({
+                        profileId,
+                        serviceOfferingId: tableService.id,
+                        startTime: `${date}T${time}:00`,
+                        visitorName,
+                        visitorEmail,
+                        partySize,
+                        visitorPhone,
+                        notes: args.notes ? String(args.notes) : undefined,
+                    })
+                    return `Booked a table for ${partySize} on ${date} at ${time} under ${visitorName}. See you then.`
+                } catch (e) {
+                    console.error("bookTable failed", e)
+                    return "I couldn't hold that table. Try another time or WhatsApp us."
+                }
             }
             case "showCourses": {
                 const courses = profileData.courses
@@ -287,7 +446,7 @@ export async function POST(req: Request) {
                 
                 const courseList = courses.map(c => {
                     const lessonCount = c.modules.reduce((sum, m) => sum + m.lessons.length, 0)
-                    return `- 🎓 **${c.title}**: $${(c.priceCents / 100).toFixed(0)} (${c.modules.length} modules, ${lessonCount} lessons)${c.description ? ` - ${c.description}` : ''}`
+                    return `- 🎓 **${c.title}**: ${formatMoney(c.priceCents, currency)} (${c.modules.length} modules, ${lessonCount} lessons)${c.description ? ` - ${c.description}` : ''}`
                 }).join('\n')
                 
                 return `Here are ${profileData.displayName}'s courses:\n${courseList}\n\nWould you like to enroll in any of these?`
@@ -303,7 +462,7 @@ export async function POST(req: Request) {
                 const eventList = upcomingEvents.map(e => {
                     const typeIcon = e.eventType === 'WEBINAR' ? '🎥' : e.eventType === 'WORKSHOP' ? '🛠️' : '👥'
                     const date = new Date(e.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                    const price = e.isFree ? 'Free' : `$${(e.priceCents / 100).toFixed(0)}`
+                    const price = e.isFree ? 'Free' : formatMoney(e.priceCents, currency)
                     return `- ${typeIcon} **${e.title}** - ${date} (${price})${e.description ? ` - ${e.description}` : ''}`
                 }).join('\n')
                 
@@ -318,7 +477,7 @@ export async function POST(req: Request) {
                 const communityList = communities.map(c => {
                     const platformIcon = c.platform === 'TELEGRAM' ? '📱' : '💬'
                     const billing = c.billingCycle === 'MONTHLY' ? '/month' : c.billingCycle === 'YEARLY' ? '/year' : ' one-time'
-                    return `- ${platformIcon} **${c.name}** (${c.platform}): $${(c.priceCents / 100).toFixed(0)}${billing}${c.description ? ` - ${c.description}` : ''}`
+                    return `- ${platformIcon} **${c.name}** (${c.platform}): ${formatMoney(c.priceCents, currency)}${billing}${c.description ? ` - ${c.description}` : ''}`
                 }).join('\n')
                 
                 return `Join ${profileData.displayName}'s communities:\n${communityList}\n\nWould you like to join any of these?`
@@ -425,6 +584,9 @@ export async function POST(req: Request) {
                                 role: "assistant"
                             }
                         })
+                        const suggestions = generateSuggestions(fullResponse, profile.displayName)
+                        controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions })}\n`))
+                        maybeSummarizeConversation(conversationId).catch(() => {})
                     }
 
                     controller.close()

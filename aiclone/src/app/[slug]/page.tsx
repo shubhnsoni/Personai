@@ -45,7 +45,13 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
         notFound()
     }
 
-    let animationConfig: { speed?: number; intensity?: number; colors?: string[] } = {}
+    if (profile.roleTemplate === "RESTAURANT" && !profile.serviceOfferings.some((s) => (s as { kind?: string }).kind === "TABLE")) {
+        const { ensureTableService } = await import("@/app/actions/bookings")
+        const table = await ensureTableService(profile.id)
+        profile.serviceOfferings = [table, ...profile.serviceOfferings]
+    }
+
+    let animationConfig: { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string } = {}
     try {
         animationConfig = typeof profile.animationStyle?.config === 'string'
             ? JSON.parse(profile.animationStyle.config)
@@ -53,7 +59,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
     } catch (e) {
         console.error("Failed to parse animation config", e)
     }
-    const colors = animationConfig.colors || ["#A855F7", "#EC4899"]
+    try {
+        const bag = JSON.parse(profile.personalityConfig || "{}") as { orb?: { shape?: string; expression?: string; color?: string } }
+        if (bag.orb) animationConfig = { ...animationConfig, ...bag.orb }
+    } catch { /* keep preset config */ }
+    const colors = animationConfig.colors || ["#00D7FF", "#07104D"]
 
     return (
         <ProfileView

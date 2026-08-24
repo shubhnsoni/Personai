@@ -70,3 +70,11 @@ export async function deleteEvent(eventId: string) {
     })
     revalidatePath("/dashboard/events")
 }
+
+export async function setEventActive(eventId: string, isActive: boolean) {
+    await prisma.event.update({
+        where: { id: eventId },
+        data: { isActive },
+    })
+    revalidatePath("/dashboard/events")
+}

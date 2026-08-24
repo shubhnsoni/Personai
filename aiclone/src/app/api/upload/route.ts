@@ -10,7 +10,11 @@ const ALLOWED_TYPES = [
   "application/pdf",
   "video/mp4", "video/webm",
   "audio/mpeg", "audio/wav",
+  "model/gltf-binary", "model/gltf+json", "model/vnd.usdz+zip",
+  "application/octet-stream",
 ]
+
+const ALLOWED_EXT = /\.(jpe?g|png|webp|gif|pdf|mp4|webm|mp3|wav|glb|gltf|usdz)$/i
 
 const MAX_SIZE = 50 * 1024 * 1024 // 50MB
 
@@ -23,7 +27,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!ALLOWED_TYPES.includes(file.type) && !ALLOWED_EXT.test(file.name)) {
       return NextResponse.json({ error: "File type not allowed" }, { status: 400 })
     }
 

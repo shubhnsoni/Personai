@@ -30,9 +30,9 @@ export default async function EditShortLinkPage({ params }: EditShortLinkPagePro
     }
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex-1 space-y-4">
             <div className="max-w-2xl mx-auto">
-                <ShortLinkForm profileId={profile.id} shortLink={shortLink} />
+                <ShortLinkForm profileId={profile.id} shortLink={shortLink} embedded />
             </div>
         </div>
     )

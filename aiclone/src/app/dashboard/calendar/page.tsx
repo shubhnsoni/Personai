@@ -1,8 +1,13 @@
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
 import { syncUser } from "@/lib/auth-sync"
-import { AvailabilitySettings } from "@/components/dashboard/availability-settings"
+import { prisma } from "@/lib/prisma"
+import { CalendarStudio } from "@/components/dashboard/calendar-studio"
+import { ensureCalendarToken } from "@/app/actions/calendar-sync"
+import { requireSurface } from "@/lib/require-surface"
+import { calendarNoun } from "@/lib/surfaces"
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 export default async function DashboardCalendarPage() {
     const user = await syncUser()
@@ -10,38 +15,56 @@ export default async function DashboardCalendarPage() {
 
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
+    requireSurface(profile.roleTemplate, "calendar", profile)
 
-    const { prisma } = await import("@/lib/prisma")
-    const schedules = await prisma.availabilitySchedule.findMany({
-        where: { profileId: profile.id },
-        orderBy: { dayOfWeek: 'asc' }
-    })
+    const from = new Date()
+    from.setMonth(from.getMonth() - 1)
+    from.setDate(1)
+    from.setHours(0, 0, 0, 0)
+    const to = new Date()
+    to.setMonth(to.getMonth() + 3)
+    to.setDate(1)
 
-    const bookings = await prisma.booking.findMany({
-        where: { profileId: profile.id },
-        include: { serviceOffering: true },
-        orderBy: { startTime: 'desc' }
-    })
+    const h = await headers()
+    const host = h.get("x-forwarded-host") || h.get("host") || "localhost:3000"
+    const proto = h.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https")
+    const token = await ensureCalendarToken()
 
-    const { Tabs, TabsContent, TabsList, TabsTrigger } = await import("@/components/ui/tabs")
-    const { BookingsList } = await import("@/components/dashboard/bookings-list")
+    const [schedules, bookings] = await Promise.all([
+        prisma.availabilitySchedule.findMany({
+            where: { profileId: profile.id },
+            orderBy: { dayOfWeek: "asc" },
+        }),
+        prisma.booking.findMany({
+            where: {
+                profileId: profile.id,
+                startTime: { gte: from, lt: to },
+            },
+            include: { serviceOffering: true },
+            orderBy: { startTime: "asc" },
+        }),
+    ])
 
     return (
-        <div className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 pt-4 sm:pt-6 h-full flex flex-col">
-            <Tabs defaultValue="bookings" className="flex-1 flex flex-col space-y-4">
-                <TabsList className="w-full sm:w-auto">
-                    <TabsTrigger value="bookings" className="flex-1 sm:flex-initial">Bookings</TabsTrigger>
-                    <TabsTrigger value="availability" className="flex-1 sm:flex-initial">Availability</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="bookings" className="flex-1 h-full">
-                    <BookingsList bookings={bookings} />
-                </TabsContent>
-
-                <TabsContent value="availability" className="h-full">
-                    <AvailabilitySettings profileId={profile.id} schedules={schedules} />
-                </TabsContent>
-            </Tabs>
+        <div className="flex min-h-0 flex-1 flex-col">
+            <CalendarStudio
+                profileId={profile.id}
+                timezone={profile.timezone || "UTC"}
+                bufferMinutes={Number((profile as { bufferMinutes?: number }).bufferMinutes || 0)}
+                icsUrl={`${proto}://${host}/api/calendar/${token}`}
+                noun={calendarNoun(profile.roleTemplate)}
+                schedules={schedules}
+                bookings={bookings.map((b) => ({
+                    id: b.id,
+                    visitorName: b.visitorName,
+                    visitorEmail: b.visitorEmail,
+                    service: b.serviceOffering.name,
+                    startTime: b.startTime.toISOString(),
+                    endTime: b.endTime.toISOString(),
+                    status: b.status,
+                    metadata: b.metadata,
+                }))}
+            />
         </div>
     )
 }

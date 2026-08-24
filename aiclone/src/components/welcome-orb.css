@@ -1,0 +1,740 @@
+.pl-orb-scene.is-bloub {
+  overflow: visible;
+}
+
+.pl-orb-scene {
+  --orb-s: 200px;
+  --orb-speed: 1;
+  --c-deep: #07104d;
+  --c-mid: #1522a5;
+  --c-bright: #00d7ff;
+  --c-mid2: #0987ed;
+  --c-fill: #2349d2;
+  --c-fill2: #072580;
+  --c-pupil-a: #101852;
+  --c-pupil-b: #031444;
+  --c-pupil-c: #087acd;
+  --c-shadow: rgba(26, 61, 130, 0.28);
+  --c-glow: rgba(68, 190, 255, 0.45);
+  position: relative;
+  width: var(--orb-s);
+  height: var(--orb-s);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pl-orb-scene[data-variant="aqua"] {
+  --c-deep: #07104d;
+  --c-mid: #1522a5;
+  --c-bright: #00d7ff;
+  --c-mid2: #0987ed;
+  --c-fill: #2349d2;
+  --c-fill2: #072580;
+  --c-pupil-a: #101852;
+  --c-pupil-b: #031444;
+  --c-pupil-c: #087acd;
+  --c-shadow: rgba(26, 61, 130, 0.28);
+  --c-glow: rgba(68, 190, 255, 0.45);
+}
+
+.pl-orb-scene[data-variant="ember"] {
+  --c-deep: #9a2a0c;
+  --c-mid: #e05a12;
+  --c-bright: #ffd166;
+  --c-mid2: #ff8a2a;
+  --c-fill: #ff6a1a;
+  --c-fill2: #c2410c;
+  --c-pupil-a: #5a1808;
+  --c-pupil-b: #2a0a04;
+  --c-pupil-c: #ff9a3a;
+  --c-shadow: rgba(180, 70, 20, 0.28);
+  --c-glow: rgba(255, 180, 60, 0.55);
+}
+
+.pl-orb-scene[data-variant="violet"] {
+  --c-deep: #6d28d9;
+  --c-mid: #a855f7;
+  --c-bright: #f0abfc;
+  --c-mid2: #d946ef;
+  --c-fill: #c084fc;
+  --c-fill2: #7c3aed;
+  --c-pupil-a: #4c1d95;
+  --c-pupil-b: #2e1065;
+  --c-pupil-c: #e879f9;
+  --c-shadow: rgba(140, 60, 200, 0.28);
+  --c-glow: rgba(232, 121, 249, 0.5);
+}
+
+.pl-orb-scene[data-variant="forest"] {
+  --c-deep: #047857;
+  --c-mid: #10b981;
+  --c-bright: #a7f3d0;
+  --c-mid2: #34d399;
+  --c-fill: #2dd4bf;
+  --c-fill2: #059669;
+  --c-pupil-a: #065f46;
+  --c-pupil-b: #022c22;
+  --c-pupil-c: #6ee7b7;
+  --c-shadow: rgba(16, 140, 90, 0.28);
+  --c-glow: rgba(110, 231, 183, 0.5);
+}
+
+.pl-orb-scene[data-variant="sunrise"] {
+  --c-deep: #e11d48;
+  --c-mid: #fb7185;
+  --c-bright: #fecdd3;
+  --c-mid2: #fda4af;
+  --c-fill: #fb7185;
+  --c-fill2: #be123c;
+  --c-pupil-a: #9f1239;
+  --c-pupil-b: #4c0519;
+  --c-pupil-c: #fda4af;
+  --c-shadow: rgba(190, 40, 70, 0.28);
+  --c-glow: rgba(253, 164, 175, 0.5);
+}
+
+.pl-orb-scene[data-variant="ice"] {
+  --c-deep: #0284c7;
+  --c-mid: #38bdf8;
+  --c-bright: #f0f9ff;
+  --c-mid2: #7dd3fc;
+  --c-fill: #bae6fd;
+  --c-fill2: #0ea5e9;
+  --c-pupil-a: #0369a1;
+  --c-pupil-b: #0c4a6e;
+  --c-pupil-c: #e0f2fe;
+  --c-shadow: rgba(14, 140, 200, 0.26);
+  --c-glow: rgba(186, 230, 253, 0.6);
+}
+
+.pl-orb {
+  position: relative;
+  width: var(--orb-s);
+  height: var(--orb-s);
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 35% 20%,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.34) 13%,
+      rgba(255, 255, 255, 0.08) 31%,
+      rgba(255, 255, 255, 0.02) 58%,
+      rgba(255, 255, 255, 0.25) 100%
+    );
+  border: none;
+  box-shadow:
+    inset 0 calc(var(--orb-s) * -0.05) calc(var(--orb-s) * 0.1) color-mix(in srgb, var(--c-bright) 18%, transparent),
+    0 calc(var(--orb-s) * 0.025) calc(var(--orb-s) * 0.08) color-mix(in srgb, var(--c-deep) 18%, transparent);
+  overflow: hidden;
+  animation:
+    pl-orb-float calc(4.2s / var(--orb-speed)) ease-in-out infinite,
+    pl-orb-tilt calc(6.4s / var(--orb-speed)) ease-in-out infinite;
+  z-index: 1;
+}
+
+.pl-orb-core {
+  position: absolute;
+  inset: calc(var(--orb-s) * 0.13);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 30%, var(--c-deep) 0 12%, transparent 46%),
+    radial-gradient(circle at 48% 42%, var(--c-mid) 0 28%, transparent 62%),
+    radial-gradient(circle at 72% 66%, var(--c-bright) 0%, var(--c-mid2) 34%, transparent 68%),
+    radial-gradient(circle, var(--c-fill), var(--c-fill2) 78%);
+  background-size: 130% 130%;
+  background-position: 40% 40%;
+  filter: blur(calc(var(--orb-s) * 0.044));
+  transform: scale(1.05);
+  opacity: 0.98;
+  animation:
+    pl-orb-drift calc(10s / var(--orb-speed)) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+    pl-orb-core-glow calc(4.8s / var(--orb-speed)) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+  transition: transform 0.45s ease, filter 0.45s ease, opacity 0.45s ease;
+}
+
+.pl-orb-core::before {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 46%,
+    color-mix(in srgb, var(--c-bright) 72%, transparent) 0%,
+    color-mix(in srgb, var(--c-mid) 38%, transparent) 38%,
+    transparent 70%
+  );
+  animation: pl-orb-inner-pulse calc(4.8s / var(--orb-speed)) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+  pointer-events: none;
+}
+
+.pl-orb-core::after {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 28% 70%, color-mix(in srgb, var(--c-bright) 55%, transparent), transparent 42%),
+    radial-gradient(circle at 78% 24%, color-mix(in srgb, var(--c-mid2) 40%, transparent), transparent 38%);
+  animation: pl-orb-color-wash calc(12.5s / var(--orb-speed)) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  pointer-events: none;
+}
+
+.pl-orb-face {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 50%;
+  height: 28%;
+  transform: translate(-50%, -50%) translateY(var(--gaze-y, 0px)) translateX(var(--gaze-x, 0px));
+  z-index: 4;
+  pointer-events: none;
+  transition: transform 0.16s ease-out;
+}
+
+.pl-orb-eye {
+  position: absolute;
+  top: 0;
+  width: 38.75%;
+  height: 69%;
+  border-radius: 50%;
+  border: calc(var(--orb-s) * 0.022) solid #fff;
+  box-shadow:
+    0 0 calc(var(--orb-s) * 0.025) rgba(255, 255, 255, 0.8),
+    0 0 calc(var(--orb-s) * 0.056) var(--c-glow);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  transform-origin: center;
+}
+
+.pl-orb-eye:first-child {
+  left: 0;
+}
+
+.pl-orb-eye:nth-child(2) {
+  right: 0;
+}
+
+.pl-orb-pupil {
+  position: absolute;
+  width: 53%;
+  height: 63%;
+  border-radius: 50%;
+  left: 50%;
+  top: 51%;
+  background: linear-gradient(to bottom, var(--c-pupil-a), var(--c-pupil-b) 65%, var(--c-pupil-c));
+  transition: transform 0.12s ease-out;
+}
+
+.pl-orb-spark {
+  position: absolute;
+  width: 21%;
+  height: 21%;
+  border-radius: 50%;
+  background: #fff;
+  right: 18%;
+  top: 16%;
+  box-shadow: 0 0 calc(var(--orb-s) * 0.016) rgba(255, 255, 255, 0.9);
+  z-index: 2;
+  animation: pl-orb-twinkle calc(2.8s / var(--orb-speed)) ease-in-out infinite;
+}
+
+.pl-orb-smile {
+  position: absolute;
+  left: 50%;
+  top: 64%;
+  width: 40%;
+  height: 26%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  overflow: visible;
+  filter: drop-shadow(0 0 calc(var(--orb-s) * 0.016) rgba(255, 255, 255, 0.72));
+}
+
+.pl-orb-mouth-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform-origin: 50% 38%;
+}
+
+.pl-orb-mouth {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 54;
+  stroke-dashoffset: 0;
+}
+
+.pl-orb-highlight {
+  position: absolute;
+  width: 45%;
+  height: 24%;
+  left: 12.5%;
+  top: 7.8%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.76),
+    rgba(255, 255, 255, 0.2) 55%,
+    transparent 72%
+  );
+  transform: rotate(-24deg);
+  filter: blur(calc(var(--orb-s) * 0.009));
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 5;
+  animation: pl-orb-shimmer calc(5.5s / var(--orb-speed)) ease-in-out infinite;
+}
+
+.pl-orb-rim {
+  position: absolute;
+  inset: 2.5%;
+  border-radius: 50%;
+  border: calc(var(--orb-s) * 0.006) solid rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset calc(var(--orb-s) * 0.03) calc(var(--orb-s) * 0.037) calc(var(--orb-s) * 0.078) rgba(255, 255, 255, 0.16),
+    inset calc(var(--orb-s) * -0.037) calc(var(--orb-s) * -0.03) calc(var(--orb-s) * 0.07) color-mix(in srgb, var(--c-bright) 12%, transparent);
+  pointer-events: none;
+  z-index: 6;
+}
+
+.pl-orb-shadow {
+  position: absolute;
+  width: 59%;
+  height: 7.8%;
+  left: 50%;
+  bottom: -1%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--c-shadow);
+  filter: blur(calc(var(--orb-s) * 0.047));
+  animation: pl-orb-shadow calc(4.2s / var(--orb-speed)) ease-in-out infinite;
+  z-index: 0;
+}
+
+/* Variant personalities */
+.pl-orb-scene[data-variant="ember"] .pl-orb-core {
+  animation:
+    pl-orb-drift calc(10s / var(--orb-speed)) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+    pl-orb-core-glow calc(4.8s / var(--orb-speed)) cubic-bezier(0.37, 0, 0.63, 1) infinite,
+    pl-orb-flicker calc(2.4s / var(--orb-speed)) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+.pl-orb-scene[data-variant="violet"] .pl-orb-core {
+  animation:
+    pl-orb-drift calc(11s / var(--orb-speed)) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+    pl-orb-aurora calc(6.4s / var(--orb-speed)) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+.pl-orb-scene[data-variant="forest"] .pl-orb-core {
+  animation:
+    pl-orb-breathe calc(5.6s / var(--orb-speed)) cubic-bezier(0.37, 0, 0.63, 1) infinite,
+    pl-orb-core-glow calc(4.8s / var(--orb-speed)) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+.pl-orb-scene[data-variant="sunrise"] .pl-orb-core {
+  animation:
+    pl-orb-drift calc(9s / var(--orb-speed)) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+    pl-orb-warm calc(5.2s / var(--orb-speed)) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+.pl-orb-scene[data-variant="ice"] .pl-orb-core {
+  animation:
+    pl-orb-drift calc(11s / var(--orb-speed)) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+    pl-orb-crystal calc(5.6s / var(--orb-speed)) cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+/* Moods */
+.pl-orb.is-listening .pl-orb-core {
+  transform: scale(1.12);
+  filter: blur(calc(var(--orb-s) * 0.038)) saturate(1.25) brightness(1.12);
+}
+
+.pl-orb.is-listening .pl-orb-mouth-svg {
+  transform: scaleX(1.08) scaleY(1.12);
+}
+
+.pl-orb.is-greeting .pl-orb-mouth {
+  animation: pl-orb-mouth-draw 0.68s 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pl-orb.is-greeting .pl-orb-mouth-svg {
+  animation:
+    pl-orb-mouth-appear 0.76s 0.38s cubic-bezier(0.16, 1, 0.3, 1) both,
+    pl-orb-mouth-breathe 3.6s 1.25s ease-in-out infinite;
+}
+
+.pl-orb.is-delighted .pl-orb-mouth {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+
+.pl-orb.is-delighted .pl-orb-mouth-svg {
+  animation: pl-orb-mouth-delight 0.68s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pl-orb.is-delighted .pl-orb-eye {
+  animation: pl-orb-eye-happy 0.68s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pl-orb.is-thinking .pl-orb-core {
+  animation: pl-orb-swirl calc(6s / var(--orb-speed)) linear infinite;
+}
+
+.pl-orb.is-speaking .pl-orb-core {
+  animation: pl-orb-pulse calc(1.05s / var(--orb-speed)) ease-in-out infinite;
+}
+
+.pl-orb.is-speaking .pl-orb-mouth-svg {
+  animation: pl-orb-talk 0.35s ease-in-out infinite;
+}
+
+.pl-orb.is-success .pl-orb-core {
+  filter: blur(calc(var(--orb-s) * 0.04)) brightness(1.35) saturate(1.2);
+  box-shadow: 0 0 calc(var(--orb-s) * 0.2) var(--c-glow);
+}
+
+.pl-orb.is-error .pl-orb-core {
+  filter: blur(calc(var(--orb-s) * 0.044)) hue-rotate(40deg) saturate(1.3);
+}
+
+.pl-orb.is-error .pl-orb-mouth-svg {
+  transform: scaleY(-1) translateY(-20%);
+}
+
+.pl-orb.is-blinking:not(.is-delighted) .pl-orb-eye,
+.pl-orb.is-wink-left:not(.is-delighted) .pl-orb-eye:first-child,
+.pl-orb.is-wink-right:not(.is-delighted) .pl-orb-eye:nth-child(2) {
+  transform: scaleY(0.08);
+  border-width: calc(var(--orb-s) * 0.01);
+}
+
+.pl-orb-scene.is-compact .pl-orb-smile {
+  width: 46%;
+  height: 22%;
+  top: 68%;
+}
+
+.pl-orb-scene.is-compact .pl-orb-mouth {
+  stroke-width: 3.1;
+}
+
+.pl-orb-scene.is-compact .pl-orb-eye {
+  border-width: calc(var(--orb-s) * 0.03);
+}
+
+.pl-orb-scene.is-compact .pl-orb-core {
+  filter: blur(calc(var(--orb-s) * 0.055));
+}
+
+@keyframes pl-orb-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(calc(var(--orb-s) * -0.034));
+  }
+}
+
+@keyframes pl-orb-tilt {
+  0%,
+  100% {
+    rotate: -1.6deg;
+  }
+  50% {
+    rotate: 1.8deg;
+  }
+}
+
+@keyframes pl-orb-shadow {
+  0%,
+  100% {
+    transform: translateX(-50%) scaleX(1);
+    opacity: 0.26;
+  }
+  50% {
+    transform: translateX(-50%) scaleX(0.86);
+    opacity: 0.16;
+  }
+}
+
+@keyframes pl-orb-drift {
+  0% {
+    background-position: 30% 36%;
+    transform: scale(1.04) rotate(0deg);
+  }
+  25% {
+    background-position: 54% 28%;
+    transform: scale(1.065) rotate(3deg);
+  }
+  50% {
+    background-position: 70% 58%;
+    transform: scale(1.09) rotate(6deg);
+  }
+  75% {
+    background-position: 40% 64%;
+    transform: scale(1.055) rotate(2deg);
+  }
+  100% {
+    background-position: 30% 36%;
+    transform: scale(1.04) rotate(0deg);
+  }
+}
+
+@keyframes pl-orb-core-glow {
+  0%,
+  100% {
+    filter: blur(calc(var(--orb-s) * 0.046)) brightness(0.94) saturate(0.96);
+  }
+  50% {
+    filter: blur(calc(var(--orb-s) * 0.038)) brightness(1.16) saturate(1.12);
+  }
+}
+
+@keyframes pl-orb-inner-pulse {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.62;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes pl-orb-color-wash {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.38;
+  }
+  25% {
+    transform: translate(5%, -4%) scale(1.05);
+    opacity: 0.58;
+  }
+  50% {
+    transform: translate(3%, 5%) scale(1.1);
+    opacity: 0.76;
+  }
+  75% {
+    transform: translate(-5%, 2%) scale(1.04);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.38;
+  }
+}
+
+@keyframes pl-orb-swirl {
+  from {
+    transform: scale(1.05) rotate(0deg);
+  }
+  to {
+    transform: scale(1.05) rotate(360deg);
+  }
+}
+
+@keyframes pl-orb-pulse {
+  0%,
+  100% {
+    transform: scale(1.02);
+    opacity: 0.94;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+@keyframes pl-orb-flicker {
+  0%,
+  100% {
+    opacity: 0.94;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pl-orb-aurora {
+  0%,
+  100% {
+    filter: blur(calc(var(--orb-s) * 0.046)) brightness(0.94) saturate(0.96) hue-rotate(0deg);
+  }
+  50% {
+    filter: blur(calc(var(--orb-s) * 0.038)) brightness(1.16) saturate(1.12) hue-rotate(16deg);
+  }
+}
+
+@keyframes pl-orb-breathe {
+  0%,
+  100% {
+    transform: scale(1.03);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes pl-orb-warm {
+  0%,
+  100% {
+    filter: blur(calc(var(--orb-s) * 0.046)) saturate(1) brightness(0.96);
+  }
+  50% {
+    filter: blur(calc(var(--orb-s) * 0.038)) saturate(1.22) brightness(1.14);
+  }
+}
+
+@keyframes pl-orb-crystal {
+  0%,
+  100% {
+    filter: blur(calc(var(--orb-s) * 0.046)) brightness(0.96);
+  }
+  50% {
+    filter: blur(calc(var(--orb-s) * 0.034)) brightness(1.18);
+  }
+}
+
+@keyframes pl-orb-twinkle {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes pl-orb-shimmer {
+  0%,
+  100% {
+    opacity: 0.55;
+    left: 12%;
+  }
+  50% {
+    opacity: 0.85;
+    left: 16%;
+  }
+}
+
+@keyframes pl-orb-face-bob {
+  0%,
+  100% {
+    top: 55%;
+  }
+  50% {
+    top: 53.5%;
+  }
+}
+
+@keyframes pl-orb-mouth-draw {
+  0% {
+    stroke-dashoffset: 54;
+    opacity: 0;
+  }
+  24% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes pl-orb-mouth-appear {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.22) scaleY(0.1);
+  }
+  58% {
+    opacity: 1;
+    transform: scaleX(1.12) scaleY(1.24);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
+  }
+}
+
+@keyframes pl-orb-mouth-breathe {
+  0%,
+  100% {
+    transform: scaleX(1) scaleY(1);
+  }
+  50% {
+    transform: scaleX(1.07) scaleY(1.14);
+  }
+}
+
+@keyframes pl-orb-mouth-delight {
+  0% {
+    transform: scaleX(1) scaleY(1);
+  }
+  32% {
+    transform: scaleX(1.08) scaleY(0.55);
+  }
+  58% {
+    transform: scaleX(1.32) scaleY(1.48);
+  }
+  78% {
+    transform: scaleX(1.16) scaleY(1.12);
+  }
+  100% {
+    transform: scaleX(1.22) scaleY(1.28);
+  }
+}
+
+@keyframes pl-orb-eye-happy {
+  0% {
+    transform: scaleY(1);
+  }
+  34% {
+    transform: scaleY(0.55);
+  }
+  70% {
+    transform: scaleY(0.85);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes pl-orb-talk {
+  0%,
+  100% {
+    transform: scaleX(0.94) scaleY(0.72);
+  }
+  50% {
+    transform: scaleX(1.14) scaleY(1.32);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-orb,
+  .pl-orb-shadow,
+  .pl-orb-core,
+  .pl-orb-core::before,
+  .pl-orb-core::after,
+  .pl-orb-face,
+  .pl-orb-spark,
+  .pl-orb-highlight,
+  .pl-orb-smile,
+  .pl-orb-mouth,
+  .pl-orb-mouth-svg,
+  .pl-orb.is-thinking .pl-orb-core,
+  .pl-orb.is-delighted .pl-orb-mouth-svg,
+  .pl-orb.is-delighted .pl-orb-eye,
+  .pl-orb.is-speaking .pl-orb-core,
+  .pl-orb.is-speaking .pl-orb-mouth-svg {
+    animation: none;
+  }
+}

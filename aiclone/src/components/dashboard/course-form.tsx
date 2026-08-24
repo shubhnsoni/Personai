@@ -1,180 +1,197 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Course } from "@prisma/client"
-import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import type { Course } from "@prisma/client"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
+import { PhotoStage } from "@/components/shop/photo-stage"
 import { createCourse, updateCourse, type CourseData } from "@/app/actions/courses"
+import { OfferFooter, OfferSheet, LiveRow, MoreToggle, PillRow, uploadOne } from "@/components/dashboard/offer-sheet"
 
-interface CourseFormProps {
+export function CourseForm({
+    profileId,
+    course,
+    open,
+    onOpenChange,
+    embedded,
+}: {
     profileId: string
-    course?: Course
-}
-
-export function CourseForm({ profileId, course }: CourseFormProps) {
+    course?: Course | null
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+    embedded?: boolean
+}) {
     const router = useRouter()
-    const isEditing = !!course
+    const editing = !!course
+    const [more, setMore] = useState(Boolean(embedded))
+    const [title, setTitle] = useState("")
+    const [price, setPrice] = useState("")
+    const [photo, setPhoto] = useState<string | null>(null)
+    const [subtitle, setSubtitle] = useState("")
+    const [description, setDescription] = useState("")
+    const [body, setBody] = useState("")
+    const [outcomes, setOutcomes] = useState("")
+    const [level, setLevel] = useState("ALL")
+    const [compareAt, setCompareAt] = useState("")
+    const [live, setLive] = useState(true)
+    const [busy, setBusy] = useState(false)
+    const [uploading, setUploading] = useState(false)
 
-    const [title, setTitle] = useState(course?.title || "")
-    const [description, setDescription] = useState(course?.description || "")
-    const [price, setPrice] = useState(
-        course ? (course.priceCents / 100).toString() : ""
-    )
-    const [thumbnailUrl, setThumbnailUrl] = useState(course?.thumbnailUrl || "")
-    const [isActive, setIsActive] = useState(course?.isActive ?? true)
-    const [isPublished, setIsPublished] = useState(course?.isPublished ?? false)
-    const [isSubmitting, setIsSubmitting] = useState(false)
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!title.trim()) return
-
-        setIsSubmitting(true)
+    useEffect(() => {
+        if (!embedded && !open) return
+        setMore(Boolean(embedded) || Boolean(course))
+        setTitle(course?.title || "")
+        setPrice(course ? String(course.priceCents / 100) : "")
+        setPhoto(course?.thumbnailUrl || null)
+        setSubtitle((course as { subtitle?: string | null } | null)?.subtitle || "")
+        setDescription(course?.description || "")
+        setBody((course as { body?: string | null } | null)?.body || "")
+        const raw = (course as { outcomes?: string | null } | null)?.outcomes
         try {
+            const parsed = raw ? JSON.parse(raw) : []
+            setOutcomes(Array.isArray(parsed) ? parsed.join("\n") : raw || "")
+        } catch {
+            setOutcomes(raw || "")
+        }
+        setLevel((course as { level?: string | null } | null)?.level || "ALL")
+        setCompareAt((course as { compareAtCents?: number | null } | null)?.compareAtCents ? String(((course as { compareAtCents?: number }).compareAtCents || 0) / 100) : "")
+        setLive(course ? Boolean(course.isPublished && course.isActive) : true)
+    }, [open, course, embedded])
+
+    async function save() {
+        if (!title.trim()) return
+        setBusy(true)
+        try {
+            const lines = outcomes.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
             const data: CourseData = {
                 title: title.trim(),
                 description: description.trim() || undefined,
+                subtitle: subtitle.trim() || undefined,
+                body: body.trim() || undefined,
+                outcomes: lines.length ? JSON.stringify(lines) : undefined,
+                level,
+                compareAtCents: compareAt ? Math.round(parseFloat(compareAt) * 100) : undefined,
                 price: parseFloat(price) || 0,
-                thumbnailUrl: thumbnailUrl.trim() || undefined,
-                isActive,
-                isPublished,
+                thumbnailUrl: photo || undefined,
+                isActive: live,
+                isPublished: live,
             }
-
-            if (isEditing && course) {
+            if (editing && course) {
                 await updateCourse(course.id, data)
+                toast.success("Saved")
             } else {
-                await createCourse(profileId, data)
+                const created = await createCourse(profileId, data)
+                toast.success("Course live — tap it to add lessons")
+                onOpenChange?.(false)
+                router.push(`/dashboard/courses/${created.id}/edit?tab=curriculum`)
+                return
             }
-
-            router.push("/dashboard/courses")
+            onOpenChange?.(false)
             router.refresh()
-        } catch (error) {
-            console.error("Failed to save course:", error)
+        } catch {
+            toast.error("Could not save")
         } finally {
-            setIsSubmitting(false)
+            setBusy(false)
         }
     }
 
-    const handleCancel = () => {
-        router.push("/dashboard/courses")
+    const fields = (
+        <>
+            <PhotoStage
+                photos={photo ? [photo] : []}
+                active={0}
+                onSelect={() => {}}
+                onRemove={() => setPhoto(null)}
+                uploading={uploading}
+                emptyLabel="Cover"
+                onAdd={async (files) => {
+                    setUploading(true)
+                    try {
+                        const url = files[0] ? await uploadOne(files[0]) : null
+                        if (url) setPhoto(url)
+                        else toast.error("Upload failed")
+                    } finally {
+                        setUploading(false)
+                    }
+                }}
+            />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Course name" autoFocus={!embedded} className="h-12 rounded-2xl border-border/70 text-base" />
+            <Input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (0 = free)" className="h-12 rounded-2xl border-border/70 text-base" />
+            <LiveRow checked={live} onChange={setLive} label="Open for enroll" />
+            <MoreToggle open={more} onClick={() => setMore((v) => !v)} />
+            {more ? (
+                <div className="space-y-3 pb-2">
+                    <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="One-line pitch" className="h-11 rounded-2xl" />
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short pitch for cards and chat" rows={3} className="rounded-2xl" />
+                    <PillRow
+                        value={level}
+                        onChange={setLevel}
+                        options={[
+                            { id: "ALL", label: "All" },
+                            { id: "BEGINNER", label: "Beginner" },
+                            { id: "INTERMEDIATE", label: "Intermediate" },
+                        ]}
+                    />
+                    <Input type="number" min="0" step="0.01" value={compareAt} onChange={(e) => setCompareAt(e.target.value)} placeholder="Compare-at price" className="h-11 rounded-2xl" />
+                    <Textarea value={outcomes} onChange={(e) => setOutcomes(e.target.value)} placeholder={"What they learn, one per line"} rows={3} className="rounded-2xl" />
+                    <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Longer landing copy (optional)" rows={4} className="rounded-2xl" />
+                </div>
+            ) : null}
+        </>
+    )
+
+    const footer = (
+        <OfferFooter
+            onCancel={() => (embedded ? router.push("/dashboard/courses") : onOpenChange?.(false))}
+            busy={busy}
+            disabled={!title.trim()}
+            label={editing ? "Save" : "Add course"}
+        />
+    )
+
+    if (embedded) {
+        return (
+            <form
+                className="space-y-4"
+                onSubmit={(e) => {
+                    e.preventDefault()
+                    void save()
+                }}
+            >
+                {fields}
+                {footer}
+            </form>
+        )
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{isEditing ? "Edit Course" : "Create New Course"}</CardTitle>
-                <CardDescription>
-                    {isEditing
-                        ? "Update your course details."
-                        : "Add a new course for your students to enroll in."}
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="title">Title *</Label>
-                        <Input
-                            id="title"
-                            placeholder="e.g. Complete Web Development Bootcamp"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            required
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                            id="description"
-                            placeholder="Describe your course content, what students will learn..."
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows={4}
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="price">Price (USD)</Label>
-                        <Input
-                            id="price"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={price}
-                            onChange={(e) => setPrice(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Set to 0 for a free course
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="thumbnailUrl">Thumbnail URL</Label>
-                        <Input
-                            id="thumbnailUrl"
-                            type="url"
-                            placeholder="https://example.com/course-thumbnail.jpg"
-                            value={thumbnailUrl}
-                            onChange={(e) => setThumbnailUrl(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Cover image for your course
-                        </p>
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                            <Label htmlFor="isActive">Active</Label>
-                            <p className="text-sm text-muted-foreground">
-                                Make this course visible to your audience
-                            </p>
-                        </div>
-                        <Switch
-                            id="isActive"
-                            checked={isActive}
-                            onCheckedChange={setIsActive}
-                        />
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                            <Label htmlFor="isPublished">Published</Label>
-                            <p className="text-sm text-muted-foreground">
-                                Allow students to enroll in this course
-                            </p>
-                        </div>
-                        <Switch
-                            id="isPublished"
-                            checked={isPublished}
-                            onCheckedChange={setIsPublished}
-                        />
-                    </div>
-
-                    <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleCancel}
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting || !title.trim()}>
-                            {isSubmitting
-                                ? "Saving..."
-                                : isEditing
-                                ? "Update Course"
-                                : "Create Course"}
-                        </Button>
-                    </div>
+        <OfferSheet
+            open={Boolean(open)}
+            onOpenChange={(next) => onOpenChange?.(next)}
+            title={editing ? "Edit course" : "Add course"}
+            description={more ? "Extra detail. Name and price is enough to start." : "Name, price, cover. Tap More if you need it."}
+            footer={
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault()
+                        void save()
+                    }}
+                >
+                    {footer}
                 </form>
-            </CardContent>
-        </Card>
+            }
+        >
+            <form
+                className="space-y-4 pb-2"
+                onSubmit={(e) => {
+                    e.preventDefault()
+                    void save()
+                }}
+            >
+                {fields}
+            </form>
+        </OfferSheet>
     )
 }

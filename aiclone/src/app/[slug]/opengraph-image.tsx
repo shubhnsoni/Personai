@@ -80,8 +80,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
                         width: 148,
                         height: 148,
                         borderRadius: 9999,
-                        background: "linear-gradient(135deg, #A855F7 0%, #EC4899 100%)",
-                        boxShadow: "0 0 90px rgba(168,85,247,0.55)",
+                        background: "linear-gradient(135deg, #52E8FF 0%, #1A4DFF 100%)",
+                        boxShadow: "0 0 90px rgba(82,232,255,0.45)",
                         display: "flex",
                     }}
                 />

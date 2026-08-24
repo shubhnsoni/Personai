@@ -1,9 +1,17 @@
-import { SignIn } from "@clerk/nextjs";
+import { SignIn } from "@clerk/nextjs"
+import { AuthShell } from "@/components/auth/auth-shell"
+import { clerkAppearance } from "@/lib/clerk-appearance"
 
 export default function SignInPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <SignIn afterSignInUrl="/dashboard" signUpUrl="/sign-up" />
-    </div>
-  );
+    return (
+        <AuthShell
+            title="Welcome back"
+            subtitle="Sign in to your account"
+            altHref="/sign-up"
+            altHint="Don't have an account?"
+            altLabel="Sign up"
+        >
+            <SignIn appearance={clerkAppearance} fallbackRedirectUrl="/dashboard" signUpUrl="/sign-up" />
+        </AuthShell>
+    )
 }

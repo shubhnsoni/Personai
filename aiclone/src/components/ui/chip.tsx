@@ -16,7 +16,7 @@ const chipVariants = cva(
         outline:
           "border-border bg-transparent text-foreground hover:bg-muted",
         profile:
-          "border-white/10 bg-profile-chip text-profile-text backdrop-blur-sm hover:bg-profile-elev hover:text-profile-text focus-visible:ring-profile-ring",
+          "border-black/10 bg-profile-chip text-profile-text backdrop-blur-sm hover:bg-profile-elev hover:text-profile-text focus-visible:ring-profile-ring dark:border-white/10",
         "profile-brand":
           "border-brand/30 bg-brand text-brand-foreground hover:bg-brand/90 focus-visible:ring-profile-ring",
       },

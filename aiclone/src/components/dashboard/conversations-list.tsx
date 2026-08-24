@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 // import { ScrollArea } from "@/components/ui/scroll-area"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { ChatMarkdown } from "@/components/chat/chat-markdown"
 
 interface ConversationsListProps {
     conversations: (Conversation & { messages: Message[] })[]
@@ -16,8 +17,8 @@ export function ConversationsList({ conversations }: ConversationsListProps) {
     const selectedConversation = conversations.find(c => c.id === selectedId)
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[600px]">
-            <Card className="col-span-1 flex flex-col">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 h-[min(70dvh,600px)]">
+            <Card className={cn("col-span-1 flex flex-col", selectedId && "hidden md:flex")}>
                 <CardHeader className="pb-3">
                     <CardTitle>History</CardTitle>
                 </CardHeader>
@@ -58,10 +59,21 @@ export function ConversationsList({ conversations }: ConversationsListProps) {
                 </CardContent>
             </Card>
 
-            <Card className="col-span-1 md:col-span-2 flex flex-col">
+            <Card className={cn("col-span-1 md:col-span-2 flex flex-col", !selectedId && "hidden md:flex")}>
                 <CardHeader className="pb-3 border-b">
-                    <CardTitle>
-                        {selectedConversation ? (selectedConversation.visitorName || "Anonymous") : "Select a conversation"}
+                    <CardTitle className="flex items-center gap-2">
+                        {selectedId && (
+                            <button
+                                type="button"
+                                className="md:hidden text-sm text-muted-foreground"
+                                onClick={() => setSelectedId(null)}
+                            >
+                                Back
+                            </button>
+                        )}
+                        <span>
+                            {selectedConversation ? (selectedConversation.visitorName || "Anonymous") : "Select a conversation"}
+                        </span>
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden p-0">
@@ -74,7 +86,11 @@ export function ConversationsList({ conversations }: ConversationsListProps) {
                                             ? 'bg-primary text-primary-foreground'
                                             : 'bg-muted text-foreground'
                                             }`}>
-                                            {m.text}
+                                            {m.role === "user" ? (
+                                                <span className="whitespace-pre-wrap">{m.text}</span>
+                                            ) : (
+                                                <ChatMarkdown text={m.text} />
+                                            )}
                                         </div>
                                     </div>
                                 ))}

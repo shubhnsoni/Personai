@@ -1,331 +1,193 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Event } from "@prisma/client"
-import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import type { Event } from "@prisma/client"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
+import { PhotoStage } from "@/components/shop/photo-stage"
 import { createEvent, updateEvent, type EventData } from "@/app/actions/events"
+import { OfferFooter, OfferSheet, LiveRow, MoreToggle, PillRow, uploadOne } from "@/components/dashboard/offer-sheet"
 
-interface EventFormProps {
-    profileId: string
-    event?: Event
-}
-
-const eventTypes = [
-    { value: "WEBINAR", label: "Webinar" },
-    { value: "WORKSHOP", label: "Workshop" },
-    { value: "MEETUP", label: "Meetup" },
-]
-
-const timezones = [
-    { value: "UTC", label: "UTC" },
-    { value: "America/New_York", label: "Eastern Time (ET)" },
-    { value: "America/Chicago", label: "Central Time (CT)" },
-    { value: "America/Denver", label: "Mountain Time (MT)" },
-    { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
-    { value: "America/Anchorage", label: "Alaska Time (AKT)" },
-    { value: "Pacific/Honolulu", label: "Hawaii Time (HT)" },
-    { value: "Europe/London", label: "London (GMT/BST)" },
-    { value: "Europe/Paris", label: "Paris (CET/CEST)" },
-    { value: "Europe/Berlin", label: "Berlin (CET/CEST)" },
-    { value: "Asia/Tokyo", label: "Tokyo (JST)" },
-    { value: "Asia/Shanghai", label: "Shanghai (CST)" },
-    { value: "Asia/Kolkata", label: "India (IST)" },
-    { value: "Australia/Sydney", label: "Sydney (AEST)" },
-]
-
-function formatDateTimeLocal(date: Date | string | undefined): string {
+function toLocal(date?: Date | string) {
     if (!date) return ""
     const d = new Date(date)
-    const pad = (n: number) => n.toString().padStart(2, "0")
+    const pad = (n: number) => String(n).padStart(2, "0")
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-export function EventForm({ profileId, event }: EventFormProps) {
+function plusHour(start: string) {
+    if (!start) return ""
+    const d = new Date(start)
+    if (Number.isNaN(d.getTime())) return ""
+    d.setHours(d.getHours() + 1)
+    return toLocal(d)
+}
+
+export function EventForm({
+    profileId,
+    event,
+    open,
+    onOpenChange,
+    embedded,
+}: {
+    profileId: string
+    event?: Event | null
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+    embedded?: boolean
+}) {
     const router = useRouter()
-    const isEditing = !!event
+    const editing = !!event
+    const [more, setMore] = useState(Boolean(embedded))
+    const [title, setTitle] = useState("")
+    const [eventType, setEventType] = useState<"WEBINAR" | "WORKSHOP" | "MEETUP">("WEBINAR")
+    const [startTime, setStartTime] = useState("")
+    const [endTime, setEndTime] = useState("")
+    const [timezone, setTimezone] = useState("Asia/Kolkata")
+    const [price, setPrice] = useState("")
+    const [photo, setPhoto] = useState<string | null>(null)
+    const [description, setDescription] = useState("")
+    const [location, setLocation] = useState("")
+    const [meetingUrl, setMeetingUrl] = useState("")
+    const [maxAttendees, setMaxAttendees] = useState("")
+    const [live, setLive] = useState(true)
+    const [busy, setBusy] = useState(false)
+    const [uploading, setUploading] = useState(false)
 
-    const [title, setTitle] = useState(event?.title || "")
-    const [description, setDescription] = useState(event?.description || "")
-    const [eventType, setEventType] = useState<"WEBINAR" | "WORKSHOP" | "MEETUP">(
-        (event?.eventType as "WEBINAR" | "WORKSHOP" | "MEETUP") || "WEBINAR"
-    )
-    const [startTime, setStartTime] = useState(formatDateTimeLocal(event?.startTime))
-    const [endTime, setEndTime] = useState(formatDateTimeLocal(event?.endTime))
-    const [timezone, setTimezone] = useState(event?.timezone || "UTC")
-    const [location, setLocation] = useState(event?.location || "")
-    const [meetingUrl, setMeetingUrl] = useState(event?.meetingUrl || "")
-    const [price, setPrice] = useState(
-        event ? (event.priceCents / 100).toString() : ""
-    )
-    const [isFree, setIsFree] = useState(event?.isFree ?? true)
-    const [maxAttendees, setMaxAttendees] = useState(
-        event?.maxAttendees?.toString() || ""
-    )
-    const [thumbnailUrl, setThumbnailUrl] = useState(event?.thumbnailUrl || "")
-    const [isActive, setIsActive] = useState(event?.isActive ?? true)
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    useEffect(() => {
+        if (!embedded && !open) return
+        setMore(Boolean(embedded) || Boolean(event))
+        setTitle(event?.title || "")
+        setEventType((event?.eventType as "WEBINAR" | "WORKSHOP" | "MEETUP") || "WEBINAR")
+        setStartTime(toLocal(event?.startTime))
+        setEndTime(toLocal(event?.endTime))
+        setTimezone(event?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata")
+        setPrice(event && !event.isFree ? String(event.priceCents / 100) : "")
+        setPhoto(event?.thumbnailUrl || null)
+        setDescription(event?.description || "")
+        setLocation(event?.location || "")
+        setMeetingUrl(event?.meetingUrl || "")
+        setMaxAttendees(event?.maxAttendees != null ? String(event.maxAttendees) : "")
+        setLive(event?.isActive ?? true)
+    }, [open, event, embedded])
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!title.trim() || !startTime || !endTime) return
-
-        setIsSubmitting(true)
+    async function save() {
+        if (!title.trim() || !startTime) return
+        setBusy(true)
         try {
             const data: EventData = {
                 title: title.trim(),
                 description: description.trim() || undefined,
                 eventType,
                 startTime,
-                endTime,
+                endTime: endTime || plusHour(startTime),
                 timezone,
                 location: location.trim() || undefined,
                 meetingUrl: meetingUrl.trim() || undefined,
                 price: parseFloat(price) || 0,
-                isFree,
-                maxAttendees: maxAttendees ? parseInt(maxAttendees) : undefined,
-                thumbnailUrl: thumbnailUrl.trim() || undefined,
-                isActive,
+                isFree: !price || parseFloat(price) === 0,
+                maxAttendees: maxAttendees ? parseInt(maxAttendees, 10) : undefined,
+                thumbnailUrl: photo || undefined,
+                isActive: live,
             }
-
-            if (isEditing && event) {
-                await updateEvent(event.id, data)
-            } else {
-                await createEvent(profileId, data)
-            }
-
-            router.push("/dashboard/events")
+            if (editing && event) await updateEvent(event.id, data)
+            else await createEvent(profileId, data)
+            toast.success(editing ? "Saved" : "Event live")
+            onOpenChange?.(false)
             router.refresh()
-        } catch (error) {
-            console.error("Failed to save event:", error)
+            if (embedded) router.push("/dashboard/events")
+        } catch {
+            toast.error("Could not save")
         } finally {
-            setIsSubmitting(false)
+            setBusy(false)
         }
     }
 
-    const handleCancel = () => {
-        router.push("/dashboard/events")
+    const fields = (
+        <>
+            <PhotoStage
+                photos={photo ? [photo] : []}
+                active={0}
+                onSelect={() => {}}
+                onRemove={() => setPhoto(null)}
+                uploading={uploading}
+                emptyLabel="Cover"
+                onAdd={async (files) => {
+                    setUploading(true)
+                    try {
+                        const url = files[0] ? await uploadOne(files[0]) : null
+                        if (url) setPhoto(url)
+                    } finally {
+                        setUploading(false)
+                    }
+                }}
+            />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" autoFocus={!embedded} className="h-12 rounded-2xl border-border/70 text-base" />
+            <PillRow
+                value={eventType}
+                onChange={setEventType}
+                options={[
+                    { id: "WEBINAR", label: "Webinar" },
+                    { id: "WORKSHOP", label: "Workshop" },
+                    { id: "MEETUP", label: "Meetup" },
+                ]}
+            />
+            <Input
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) => {
+                    setStartTime(e.target.value)
+                    if (!endTime) setEndTime(plusHour(e.target.value))
+                }}
+                className="h-12 rounded-2xl border-border/70 text-base"
+            />
+            <Input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (0 = free)" className="h-12 rounded-2xl border-border/70 text-base" />
+            <LiveRow checked={live} onChange={setLive} />
+            <MoreToggle open={more} onClick={() => setMore((v) => !v)} />
+            {more ? (
+                <div className="space-y-3 pb-2">
+                    <Input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-11 rounded-2xl" />
+                    <Input value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Timezone" className="h-11 rounded-2xl" />
+                    <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Place (optional)" className="h-11 rounded-2xl" />
+                    <Input value={meetingUrl} onChange={(e) => setMeetingUrl(e.target.value)} placeholder="Zoom / Meet link" className="h-11 rounded-2xl" />
+                    <Input type="number" min="1" value={maxAttendees} onChange={(e) => setMaxAttendees(e.target.value)} placeholder="Max seats (optional)" className="h-11 rounded-2xl" />
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What happens" rows={3} className="rounded-2xl" />
+                </div>
+            ) : null}
+        </>
+    )
+
+    const footer = (
+        <OfferFooter
+            onCancel={() => (embedded ? router.push("/dashboard/events") : onOpenChange?.(false))}
+            busy={busy}
+            disabled={!title.trim() || !startTime}
+            label={editing ? "Save" : "Add event"}
+        />
+    )
+
+    if (embedded) {
+        return (
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save() }}>
+                {fields}
+                {footer}
+            </form>
+        )
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{isEditing ? "Edit Event" : "Create New Event"}</CardTitle>
-                <CardDescription>
-                    {isEditing
-                        ? "Update your event details."
-                        : "Set up a new webinar, workshop, or meetup for your audience."}
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="title">Title *</Label>
-                        <Input
-                            id="title"
-                            placeholder="e.g. Live Q&A: Building Your Personal Brand"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            required
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                            id="description"
-                            placeholder="Describe what attendees will learn or experience..."
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows={4}
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="eventType">Event Type *</Label>
-                        <Select value={eventType} onValueChange={(v) => setEventType(v as "WEBINAR" | "WORKSHOP" | "MEETUP")}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select event type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {eventTypes.map((type) => (
-                                    <SelectItem key={type.value} value={type.value}>
-                                        {type.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="startTime">Start Date & Time *</Label>
-                            <Input
-                                id="startTime"
-                                type="datetime-local"
-                                value={startTime}
-                                onChange={(e) => setStartTime(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="endTime">End Date & Time *</Label>
-                            <Input
-                                id="endTime"
-                                type="datetime-local"
-                                value={endTime}
-                                onChange={(e) => setEndTime(e.target.value)}
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="timezone">Timezone *</Label>
-                        <Select value={timezone} onValueChange={setTimezone}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select timezone" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {timezones.map((tz) => (
-                                    <SelectItem key={tz.value} value={tz.value}>
-                                        {tz.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="location">Location (for in-person events)</Label>
-                        <Input
-                            id="location"
-                            placeholder="e.g. 123 Main St, New York, NY"
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Leave empty for online-only events
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="meetingUrl">Meeting URL (for online events)</Label>
-                        <Input
-                            id="meetingUrl"
-                            type="url"
-                            placeholder="e.g. https://zoom.us/j/123456789"
-                            value={meetingUrl}
-                            onChange={(e) => setMeetingUrl(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Add a Zoom, Google Meet, or other video conferencing link
-                        </p>
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                            <Label htmlFor="isFree">Free Event</Label>
-                            <p className="text-sm text-muted-foreground">
-                                Toggle off to set a price for this event
-                            </p>
-                        </div>
-                        <Switch
-                            id="isFree"
-                            checked={isFree}
-                            onCheckedChange={setIsFree}
-                        />
-                    </div>
-
-                    {!isFree && (
-                        <div className="space-y-2">
-                            <Label htmlFor="price">Price (USD)</Label>
-                            <Input
-                                id="price"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="0.00"
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                            />
-                        </div>
-                    )}
-
-                    <div className="space-y-2">
-                        <Label htmlFor="maxAttendees">Max Attendees</Label>
-                        <Input
-                            id="maxAttendees"
-                            type="number"
-                            min="1"
-                            placeholder="Unlimited"
-                            value={maxAttendees}
-                            onChange={(e) => setMaxAttendees(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Leave empty for unlimited attendees
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="thumbnailUrl">Thumbnail URL</Label>
-                        <Input
-                            id="thumbnailUrl"
-                            type="url"
-                            placeholder="https://example.com/event-thumbnail.jpg"
-                            value={thumbnailUrl}
-                            onChange={(e) => setThumbnailUrl(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Cover image for your event
-                        </p>
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                            <Label htmlFor="isActive">Active</Label>
-                            <p className="text-sm text-muted-foreground">
-                                Make this event visible and open for registration
-                            </p>
-                        </div>
-                        <Switch
-                            id="isActive"
-                            checked={isActive}
-                            onCheckedChange={setIsActive}
-                        />
-                    </div>
-
-                    <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleCancel}
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting || !title.trim() || !startTime || !endTime}>
-                            {isSubmitting
-                                ? "Saving..."
-                                : isEditing
-                                ? "Update Event"
-                                : "Create Event"}
-                        </Button>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
+        <OfferSheet
+            open={Boolean(open)}
+            onOpenChange={(next) => onOpenChange?.(next)}
+            title={editing ? "Edit event" : "Add event"}
+            description="Name, when, price. Tap More for place and link."
+            footer={<form onSubmit={(e) => { e.preventDefault(); void save() }}>{footer}</form>}
+        >
+            <form className="space-y-4 pb-2" onSubmit={(e) => { e.preventDefault(); void save() }}>
+                {fields}
+            </form>
+        </OfferSheet>
     )
 }

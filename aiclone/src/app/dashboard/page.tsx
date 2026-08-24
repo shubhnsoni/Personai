@@ -1,14 +1,16 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
-import { MessageSquare, Users, Calendar, DollarSign, ExternalLink, TrendingUp } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 import Link from "next/link"
-import { ProfileLinkActions } from "@/components/dashboard/profile-link-actions"
-import { AnalyticsCharts } from "@/components/dashboard/analytics-charts"
+import { ShareSheet } from "@/components/dashboard/share-sheet"
+import { HomePulse } from "@/components/dashboard/home-pulse"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
+import { extrasOf, hasSurface } from "@/lib/surfaces"
+import { buildHomeStats } from "@/lib/analytics"
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 export default async function DashboardPage() {
     const user = await syncUser()
@@ -17,346 +19,131 @@ export default async function DashboardPage() {
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
 
-    const now = new Date()
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const extras = extrasOf(profile)
+    const stats = await buildHomeStats(profile)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
-    const [
-        conversationCount,
-        conversationCountLast30Days,
-        leadCount,
-        leadCountLast7Days,
-        bookingCount,
-        upcomingBookings,
-        paymentSum,
-        recentConversations,
-        recentLeads,
-        // Analytics data
-        dailyConversations,
-        dailyLeads,
-        dailyRevenue,
-        productPurchaseCount,
-        courseEnrollmentCount,
-    ] = await Promise.all([
-        prisma.conversation.count({ where: { profileId: profile.id } }),
-        prisma.conversation.count({ where: { profileId: profile.id, startedAt: { gte: thirtyDaysAgo } } }),
-        prisma.visitorLead.count({ where: { profileId: profile.id } }),
-        prisma.visitorLead.count({ where: { profileId: profile.id, createdAt: { gte: sevenDaysAgo } } }),
-        prisma.booking.count({ where: { profileId: profile.id } }),
-        prisma.booking.count({ where: { profileId: profile.id, startTime: { gte: now } } }),
-        prisma.payment.aggregate({
-            where: { profileId: profile.id, status: "SUCCEEDED" },
-            _sum: { amountCents: true }
-        }),
+    const [liveRequests, recentConversations, recentLeads] = await Promise.all([
+        prisma.conversation.findMany({
+            where: { profileId: profile.id, mode: "LIVE_REQUESTED" },
+            orderBy: { liveRequestedAt: "asc" },
+            take: 5,
+            select: { id: true, visitorName: true, visitorEmail: true },
+        }).catch(() => [] as { id: string; visitorName: string | null; visitorEmail: string | null }[]),
         prisma.conversation.findMany({
             where: { profileId: profile.id },
             orderBy: { lastMessageAt: "desc" },
             take: 5,
-            include: { messages: { take: 1, orderBy: { createdAt: "desc" } } }
+            include: { messages: { take: 1, orderBy: { createdAt: "desc" } } },
         }),
-        prisma.visitorLead.findMany({
-            where: { profileId: profile.id },
-            orderBy: { createdAt: "desc" },
-            take: 5
-        }),
-        // Daily conversations for last 30 days
-        prisma.conversation.findMany({
-            where: { profileId: profile.id, startedAt: { gte: thirtyDaysAgo } },
-            select: { startedAt: true },
-            orderBy: { startedAt: 'asc' }
-        }),
-        // Daily leads for last 30 days
-        prisma.visitorLead.findMany({
-            where: { profileId: profile.id, createdAt: { gte: thirtyDaysAgo } },
-            select: { createdAt: true },
-            orderBy: { createdAt: 'asc' }
-        }),
-        // Daily revenue for last 30 days
-        prisma.payment.findMany({
-            where: { profileId: profile.id, status: "SUCCEEDED", createdAt: { gte: thirtyDaysAgo } },
-            select: { amountCents: true, createdAt: true },
-            orderBy: { createdAt: 'asc' }
-        }),
-        // Total purchases
-        prisma.productPurchase.count({
-            where: { product: { profileId: profile.id }, status: 'COMPLETED' }
-        }),
-        // Total enrollments
-        prisma.courseEnrollment.count({
-            where: { course: { profileId: profile.id }, status: { in: ['ACTIVE', 'COMPLETED'] } }
-        }),
+        hasSurface(profile.roleTemplate, "leads", extras)
+            ? prisma.visitorLead.findMany({
+                where: { profileId: profile.id },
+                orderBy: { createdAt: "desc" },
+                take: 5,
+            })
+            : Promise.resolve([]),
     ])
 
-    // Aggregate daily data
-    function aggregateByDay(items: { startedAt?: Date; createdAt?: Date }[]): Record<string, number> {
-        const result: Record<string, number> = {}
-        for (const item of items) {
-            const date = (item.startedAt || item.createdAt)!
-            const key = new Date(date).toISOString().split('T')[0]
-            result[key] = (result[key] || 0) + 1
-        }
-        return result
-    }
-
-    function aggregateRevenueByDay(items: { amountCents: number; createdAt: Date }[]): Record<string, number> {
-        const result: Record<string, number> = {}
-        for (const item of items) {
-            const key = new Date(item.createdAt).toISOString().split('T')[0]
-            result[key] = (result[key] || 0) + item.amountCents / 100
-        }
-        return result
-    }
-
-    // Build chart data for last 30 days
-    const chartDays: string[] = []
-    for (let i = 29; i >= 0; i--) {
-        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-        chartDays.push(d.toISOString().split('T')[0])
-    }
-
-    const convByDay = aggregateByDay(dailyConversations.map(c => ({ startedAt: c.startedAt })))
-    const leadsByDay = aggregateByDay(dailyLeads.map(l => ({ createdAt: l.createdAt })))
-    const revByDay = aggregateRevenueByDay(dailyRevenue)
-
-    const chartData = chartDays.map(day => ({
-        date: day,
-        conversations: convByDay[day] || 0,
-        leads: leadsByDay[day] || 0,
-        revenue: revByDay[day] || 0,
-    }))
-
-    // Conversion funnel
-    const totalRevenue = (paymentSum._sum.amountCents || 0) / 100
-    const totalPurchases = productPurchaseCount + courseEnrollmentCount
-
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
     return (
-        <div className="space-y-8 p-8 pt-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Welcome back, {profile.displayName}</h2>
-                    <p className="text-muted-foreground mt-1">Here&apos;s what&apos;s happening with your profile</p>
-                </div>
-                <ProfileLinkActions slug={profile.slug} baseUrl={baseUrl} />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard
-                    title="Conversations"
-                    value={conversationCount}
-                    subtitle={`${conversationCountLast30Days} in last 30 days`}
-                    icon={<MessageSquare className="h-4 w-4 text-muted-foreground" />}
-                    href="/dashboard/conversations"
-                />
-                <StatCard
-                    title="Leads"
-                    value={leadCount}
-                    subtitle={`${leadCountLast7Days} new this week`}
-                    icon={<Users className="h-4 w-4 text-muted-foreground" />}
-                    href="/dashboard/leads"
-                    highlight={leadCountLast7Days > 0}
-                />
-                <StatCard
-                    title="Bookings"
-                    value={bookingCount}
-                    subtitle={`${upcomingBookings} upcoming`}
-                    icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-                    href="/dashboard/calendar"
-                />
-                <StatCard
-                    title="Revenue"
-                    value={`$${totalRevenue.toFixed(0)}`}
-                    subtitle={`${totalPurchases} purchases`}
-                    icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-                    href="/dashboard/payments"
-                />
-            </div>
-
-            {/* Analytics Charts */}
-            <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
-                <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="font-semibold">30-Day Trends</h3>
-                </div>
-                <AnalyticsCharts data={chartData} />
-            </div>
-
-            {/* Conversion Funnel */}
-            <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
-                <h3 className="font-semibold mb-4">Conversion Funnel</h3>
-                <div className="flex flex-col sm:flex-row items-stretch gap-2">
-                    <FunnelStep label="Conversations" value={conversationCount} color="bg-blue-500" widthPct={100} />
-                    <FunnelArrow />
-                    <FunnelStep label="Leads" value={leadCount} color="bg-yellow-500" widthPct={conversationCount > 0 ? Math.max(10, (leadCount / conversationCount) * 100) : 10} />
-                    <FunnelArrow />
-                    <FunnelStep label="Purchases" value={totalPurchases} color="bg-green-500" widthPct={leadCount > 0 ? Math.max(10, (totalPurchases / leadCount) * 100) : 10} />
-                    <FunnelArrow />
-                    <FunnelStep label="Revenue" value={`$${totalRevenue.toFixed(0)}`} color="bg-purple-500" widthPct={50} />
-                </div>
-                <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
-                    {conversationCount > 0 && (
-                        <span>Chat→Lead: {((leadCount / conversationCount) * 100).toFixed(1)}%</span>
-                    )}
-                    {leadCount > 0 && (
-                        <span>Lead→Purchase: {((totalPurchases / leadCount) * 100).toFixed(1)}%</span>
-                    )}
-                </div>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-                <div className="rounded-xl border bg-card text-card-foreground shadow">
-                    <div className="flex items-center justify-between p-6 pb-4">
-                        <h3 className="font-semibold">Recent Conversations</h3>
-                        <Link href="/dashboard/conversations" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
-                            View all <ExternalLink className="w-3 h-3" />
+        <div className="space-y-4">
+            {liveRequests.length > 0 && (
+                <div className="overflow-hidden rounded-2xl border border-aurora/30 bg-aurora/10">
+                    {liveRequests.map((req) => (
+                        <Link
+                            key={req.id}
+                            href={`/dashboard/inbox?c=${req.id}`}
+                            className="flex items-center justify-between gap-2 border-b border-aurora/15 px-3 py-2.5 last:border-b-0"
+                        >
+                            <p className="truncate text-sm font-medium">
+                                {req.visitorName || req.visitorEmail || "A visitor"} wants to talk live
+                            </p>
+                            <span className="shrink-0 text-xs text-aurora">Open</span>
                         </Link>
+                    ))}
+                </div>
+            )}
+            <div className="flex items-start justify-between gap-2 pt-0.5">
+                <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{profile.displayName}</p>
+                    <p className="text-xs text-muted-foreground">{nextAction(stats)}</p>
+                </div>
+                <ShareSheet slug={profile.slug} name={profile.displayName} baseUrl={baseUrl} />
+            </div>
+
+            <HomePulse stats={stats} slug={profile.slug} />
+
+            <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+                <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
+                    <p className="text-xs font-medium text-muted-foreground">Live</p>
+                    <div className="flex gap-2 text-[11px] text-muted-foreground">
+                        <Link href="/dashboard/inbox" className="hover:text-foreground">Chats</Link>
+                        {hasSurface(profile.roleTemplate, "leads", extras) ? (
+                            <Link href="/dashboard/leads" className="hover:text-foreground">Leads</Link>
+                        ) : null}
+                        {hasSurface(profile.roleTemplate, "sales", extras) ? (
+                            <Link href="/dashboard/money" className="hover:text-foreground">Sales</Link>
+                        ) : null}
                     </div>
-                    <div className="px-6 pb-6">
-                        {recentConversations.length === 0 ? (
+                </div>
+                <div className="divide-y divide-border/50">
+                    {(() => {
+                        const feed = [
+                            ...recentConversations.map((c) => ({
+                                id: c.id,
+                                href: "/dashboard/inbox",
+                                name: c.visitorName || "Visitor",
+                                detail: c.messages[0]?.text || "Chat",
+                                at: c.lastMessageAt,
+                                kind: "chat" as const,
+                            })),
+                            ...recentLeads.map((l) => ({
+                                id: l.id,
+                                href: "/dashboard/inbox",
+                                name: l.name,
+                                detail: l.email,
+                                at: l.createdAt,
+                                kind: "lead" as const,
+                            })),
+                        ].sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 8)
+                        if (feed.length === 0) return (
                             <EmptyState
                                 icon={<MessageSquare />}
-                                title="Share your profile to start chatting"
-                                description="Visitors who talk to your AI show up here."
+                                title="Nothing live yet"
+                                description="Share your page. Visits and chats land here."
                                 action={
                                     <Button variant="brand" pill size="sm" asChild>
-                                        <Link href={`/${profile.slug}`}>Share your link</Link>
+                                        <Link href={`/${profile.slug}`}>Open live page</Link>
                                     </Button>
                                 }
                             />
-                        ) : (
-                            <div className="space-y-4">
-                                {recentConversations.map((conv) => (
-                                    <div key={conv.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                            <MessageSquare className="w-4 h-4 text-primary" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium text-sm">
-                                                    {conv.visitorName || "Anonymous Visitor"}
-                                                </span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {formatRelativeTime(conv.lastMessageAt)}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm text-muted-foreground truncate">
-                                                {conv.messages[0]?.text || "No messages"}
-                                            </p>
-                                        </div>
+                        )
+                        return feed.map((item) => (
+                            <Link key={`${item.kind}-${item.id}`} href={item.href} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-muted/40">
+                                <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${item.kind === "lead" ? "bg-emerald-500" : "bg-aurora"}`} />
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="truncate text-sm font-medium">{item.name}</span>
+                                        <span className="shrink-0 text-[11px] text-muted-foreground">{formatRelativeTime(item.at)}</span>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="rounded-xl border bg-card text-card-foreground shadow">
-                    <div className="flex items-center justify-between p-6 pb-4">
-                        <h3 className="font-semibold">Recent Leads</h3>
-                        <Link href="/dashboard/leads" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
-                            View all <ExternalLink className="w-3 h-3" />
-                        </Link>
-                    </div>
-                    <div className="px-6 pb-6">
-                        {recentLeads.length === 0 ? (
-                            <p className="text-sm text-muted-foreground py-8 text-center">
-                                No leads yet. Your AI will collect contact info from interested visitors.
-                            </p>
-                        ) : (
-                            <div className="space-y-4">
-                                {recentLeads.map((lead) => (
-                                    <div key={lead.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                                        <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
-                                            <Users className="w-4 h-4 text-green-500" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span className="font-medium text-sm">{lead.name}</span>
-                                                <StatusBadge status={lead.status} />
-                                            </div>
-                                            <p className="text-sm text-muted-foreground truncate">
-                                                {lead.email}
-                                            </p>
-                                            {lead.company && (
-                                                <p className="text-xs text-muted-foreground mt-0.5">{lead.company}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
-                <h3 className="font-semibold mb-4">Quick Actions</h3>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <QuickAction title="Edit Profile" description="Update your bio, headline, and settings" href="/dashboard/profile" />
-                    <QuickAction title="Manage Services" description="Add or edit your service offerings" href="/dashboard/services" />
-                    <QuickAction title="View Calendar" description="Check your upcoming bookings" href="/dashboard/calendar" />
-                    <QuickAction title="Content Library" description="Upload documents for your AI to learn" href="/dashboard/content" />
+                                    <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
+                                </div>
+                            </Link>
+                        ))
+                    })()}
                 </div>
             </div>
         </div>
     )
 }
 
-function StatCard({ title, value, subtitle, icon, href, highlight = false }: {
-    title: string; value: string | number; subtitle: string; icon: React.ReactNode; href: string; highlight?: boolean
-}) {
-    return (
-        <Link href={href} className="block">
-            <div className={`rounded-xl border bg-card text-card-foreground shadow p-6 hover:shadow-md transition-all hover:border-primary/50 ${highlight ? 'ring-2 ring-green-500/20' : ''}`}>
-                <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <h3 className="tracking-tight text-sm font-medium text-muted-foreground">{title}</h3>
-                    {icon}
-                </div>
-                <div className="text-2xl font-bold">{value}</div>
-                <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-            </div>
-        </Link>
-    )
-}
-
-function QuickAction({ title, description, href }: { title: string; description: string; href: string }) {
-    return (
-        <Link href={href}>
-            <div className="p-4 rounded-lg border border-dashed hover:border-solid hover:bg-muted/50 transition-all cursor-pointer">
-                <h4 className="font-medium text-sm">{title}</h4>
-                <p className="text-xs text-muted-foreground mt-1">{description}</p>
-            </div>
-        </Link>
-    )
-}
-
-function StatusBadge({ status }: { status: string }) {
-    const colors: Record<string, string> = {
-        NEW: "bg-blue-500/10 text-blue-500",
-        QUALIFIED: "bg-green-500/10 text-green-500",
-        CONTACTED: "bg-yellow-500/10 text-yellow-500",
-        CONVERTED: "bg-purple-500/10 text-purple-500",
-        LOST: "bg-red-500/10 text-red-500"
-    }
-    return <span className={`text-xs px-2 py-0.5 rounded-full ${colors[status] || "bg-muted text-muted-foreground"}`}>{status.toLowerCase()}</span>
-}
-
-function FunnelStep({ label, value, color, widthPct }: { label: string; value: string | number; color: string; widthPct: number }) {
-    return (
-        <div className="flex-1 flex flex-col items-center">
-            <span className="text-xs text-muted-foreground mb-1">{label}</span>
-            <div className="w-full flex justify-center">
-                <div className={`${color} text-white rounded-lg py-3 text-center font-bold transition-all`} style={{ width: `${widthPct}%`, minWidth: '60px' }}>
-                    {value}
-                </div>
-            </div>
-        </div>
-    )
-}
-
-function FunnelArrow() {
-    return <div className="flex items-center justify-center text-muted-foreground text-lg sm:rotate-0 rotate-90">→</div>
+function nextAction(s: Awaited<ReturnType<typeof buildHomeStats>>) {
+    if (s.unanswered > 0) return `${s.unanswered} chat${s.unanswered === 1 ? "" : "s"} waiting on you.`
+    if ((s.leads7 || 0) > 0) return `${s.leads7} new lead${s.leads7 === 1 ? "" : "s"} this week. Open Inbox.`
+    if ((s.upcoming || 0) > 0) return `${s.upcoming} upcoming. Check Calendar.`
+    if (s.visits > 0 && s.chats === 0) return "People opened the page. Share the chat chip."
+    if (s.chats30 > 0) return `${s.chats30} chats in 30 days. Share the page again.`
+    return "Share your page. Visits land here."
 }
 
 function formatRelativeTime(date: Date): string {
@@ -365,7 +152,6 @@ function formatRelativeTime(date: Date): string {
     const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
-
     if (diffMins < 1) return "just now"
     if (diffMins < 60) return `${diffMins}m ago`
     if (diffHours < 24) return `${diffHours}h ago`

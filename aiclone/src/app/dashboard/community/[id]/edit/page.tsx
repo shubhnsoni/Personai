@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { CommunityForm } from "@/components/dashboard/community-form"
+import { requireSurface } from "@/lib/require-surface"
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,7 @@ export default async function EditCommunityPage({ params }: EditCommunityPagePro
 
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
+    requireSurface(profile.roleTemplate, "events", profile)
 
     const { id } = await params
 
@@ -30,9 +32,9 @@ export default async function EditCommunityPage({ params }: EditCommunityPagePro
     }
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex-1 space-y-4">
             <div className="max-w-2xl mx-auto">
-                <CommunityForm profileId={profile.id} community={community} />
+                <CommunityForm profileId={profile.id} community={community} embedded />
             </div>
         </div>
     )

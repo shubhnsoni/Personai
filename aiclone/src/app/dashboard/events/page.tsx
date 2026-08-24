@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { EventsList } from "@/components/dashboard/events-list"
+import { requireSurface } from "@/lib/require-surface"
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,7 @@ export default async function DashboardEventsPage() {
 
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
+    requireSurface(profile.roleTemplate, "events", profile)
 
     const { prisma } = await import("@/lib/prisma")
     const events = await prisma.event.findMany({
@@ -25,8 +27,8 @@ export default async function DashboardEventsPage() {
     })
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
-            <EventsList profileId={profile.id} events={events} />
+        <div className="flex-1 space-y-4">
+            <EventsList slug={profile.slug} profileId={profile.id} events={events} />
         </div>
     )
 }

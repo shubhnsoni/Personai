@@ -3,6 +3,7 @@
 import { VisitorLead } from "@prisma/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { leadStatusLabel } from "@/lib/lead-status"
 
 interface LeadsListProps {
     leads: VisitorLead[]
@@ -18,7 +19,7 @@ export function LeadsList({ leads }: LeadsListProps) {
                             {lead.name}
                         </CardTitle>
                         <Badge variant={lead.status === "NEW" ? "default" : "secondary"}>
-                            {lead.status}
+                            {leadStatusLabel(lead.status)}
                         </Badge>
                     </CardHeader>
                     <CardContent>

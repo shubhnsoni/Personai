@@ -1,11 +1,15 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
-import { ProfileEditor } from "@/components/dashboard/profile-editor"
+import { YouStudio } from "@/components/dashboard/you-studio"
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
-export default async function DashboardProfilePage() {
+export default async function DashboardProfilePage({
+    searchParams,
+}: {
+    searchParams: Promise<{ tab?: string }>
+}) {
     const user = await syncUser()
     if (!user) redirect("/sign-in")
 
@@ -13,17 +17,30 @@ export default async function DashboardProfilePage() {
         where: { id: user.profiles[0].id },
         include: {
             workExperiences: true,
-            projects: true
-        }
+            projects: true,
+        },
     })
 
     if (!profile) redirect("/onboarding")
 
-    const presets = await prisma.welcomeAnimationPreset.findMany()
+    const [presets, documents] = await Promise.all([
+        prisma.welcomeAnimationPreset.findMany(),
+        prisma.profileDocument.findMany({
+            where: { profileId: profile.id },
+            orderBy: { createdAt: "desc" },
+        }),
+    ])
+
+    const { tab } = await searchParams
+    const defaultTab =
+        tab === "import" ? "import" : tab === "knowledge" || tab === "brain" ? "knowledge" : "profile"
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
-            <ProfileEditor profile={profile} presets={presets} />
-        </div>
+        <YouStudio
+            defaultTab={defaultTab}
+            profile={profile}
+            presets={presets}
+            documents={documents}
+        />
     )
 }

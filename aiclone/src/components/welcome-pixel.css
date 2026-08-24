@@ -1,0 +1,260 @@
+.pl-orb-scene.is-pixel {
+  --pix: calc(var(--orb-s) / 16);
+}
+
+.pl-pix {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--pix) * 3);
+  width: var(--orb-s);
+  height: var(--orb-s);
+  z-index: 1;
+  animation:
+    pl-orb-float calc(4.2s / var(--orb-speed)) ease-in-out infinite,
+    pl-orb-tilt calc(6.4s / var(--orb-speed)) ease-in-out infinite;
+  transform:
+    translate(
+      calc(var(--pix) * var(--pix-gx, 0)),
+      calc(var(--pix) * var(--pix-gy, 0))
+    );
+}
+
+.pl-pix-eye {
+  position: relative;
+  width: calc(var(--pix) * 3);
+  height: calc(var(--pix) * 5);
+  background: #fff;
+  flex: none;
+  image-rendering: pixelated;
+}
+
+/* CRT — phosphor slabs with a rolling scan */
+.pl-pix.is-crt {
+  gap: calc(var(--pix) * 4);
+}
+
+.pl-pix.is-crt .pl-pix-eye {
+  width: calc(var(--pix) * 3);
+  height: calc(var(--pix) * 6);
+  background: color-mix(in srgb, var(--c-bright) 82%, #04120a);
+  box-shadow:
+    0 0 calc(var(--pix) * 1.6) color-mix(in srgb, var(--c-bright) 70%, transparent),
+    0 0 calc(var(--pix) * 4) color-mix(in srgb, var(--c-mid) 45%, transparent);
+  overflow: hidden;
+}
+
+.pl-pix-phos {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #fff 55%, var(--c-bright)) 0%,
+    transparent 38%,
+    transparent 100%
+  );
+  opacity: 0.55;
+}
+
+.pl-pix-scan {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.28) 0,
+    rgba(0, 0, 0, 0.28) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  background-size: 100% calc(var(--pix) * 1);
+  animation: pl-pix-scanroll calc(1.8s / var(--orb-speed)) linear infinite;
+  pointer-events: none;
+}
+
+.pl-pix.is-crt .pl-pix-eye::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 60%);
+  animation: pl-pix-flicker calc(2.8s / var(--orb-speed)) steps(2, end) infinite;
+}
+
+/* Spark — plus-shaped pixel stars */
+.pl-pix.is-spark {
+  gap: calc(var(--pix) * 4);
+}
+
+.pl-pix.is-spark .pl-pix-eye {
+  width: calc(var(--pix) * 5);
+  height: calc(var(--pix) * 5);
+  background: transparent;
+}
+
+.pl-pix-arm {
+  position: absolute;
+  background: #fff;
+  box-shadow: 0 0 calc(var(--pix) * 1.4) color-mix(in srgb, var(--c-bright) 80%, transparent);
+}
+
+.pl-pix-arm.is-h {
+  left: 0;
+  top: calc(var(--pix) * 2);
+  width: calc(var(--pix) * 5);
+  height: var(--pix);
+}
+
+.pl-pix-arm.is-v {
+  left: calc(var(--pix) * 2);
+  top: 0;
+  width: var(--pix);
+  height: calc(var(--pix) * 5);
+}
+
+.pl-pix-arm.is-c {
+  left: calc(var(--pix) * 2);
+  top: calc(var(--pix) * 2);
+  width: var(--pix);
+  height: var(--pix);
+  background: var(--c-bright);
+}
+
+.pl-pix.is-spark .pl-pix-eye {
+  animation: pl-pix-twinkle calc(2.4s / var(--orb-speed)) ease-in-out infinite;
+}
+
+.pl-pix.is-spark .pl-pix-eye:nth-child(2) {
+  animation-delay: 0.35s;
+}
+
+/* Shared moods */
+.pl-pix.is-listening .pl-pix-eye {
+  filter: brightness(1.18);
+}
+
+.pl-pix.is-greeting .pl-pix-eye {
+  opacity: 0;
+  animation: pl-pix-eye-pop 0.32s 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pl-pix.is-greeting .pl-pix-eye:nth-child(2) {
+  animation-delay: 0.54s;
+}
+
+.pl-pix.is-spark.is-greeting .pl-pix-eye {
+  animation:
+    pl-pix-eye-pop 0.32s 0.42s cubic-bezier(0.16, 1, 0.3, 1) both,
+    pl-pix-twinkle calc(2.4s / var(--orb-speed)) 0.9s ease-in-out infinite;
+}
+
+.pl-pix.is-spark.is-greeting .pl-pix-eye:nth-child(2) {
+  animation-delay: 0.54s, 1.05s;
+}
+
+.pl-pix.is-delighted .pl-pix-eye {
+  animation: pl-pix-eye-happy 0.68s cubic-bezier(0.16, 1, 0.3, 1) both;
+  opacity: 1;
+}
+
+.pl-pix.is-crt.is-delighted .pl-pix-eye {
+  box-shadow:
+    0 0 calc(var(--pix) * 2.4) color-mix(in srgb, var(--c-bright) 90%, transparent),
+    0 0 calc(var(--pix) * 6) var(--c-bright);
+}
+
+.pl-pix.is-spark.is-delighted .pl-pix-eye {
+  transform: rotate(45deg) scale(1.18);
+}
+
+.pl-pix.is-thinking {
+  animation:
+    pl-orb-float calc(4.2s / var(--orb-speed)) ease-in-out infinite,
+    pl-pix-think calc(0.9s / var(--orb-speed)) steps(2, end) infinite;
+}
+
+.pl-pix.is-speaking .pl-pix-eye {
+  animation: pl-pix-talk 0.28s steps(2, end) infinite;
+}
+
+.pl-pix.is-success .pl-pix-eye {
+  filter: brightness(1.35);
+}
+
+.pl-pix.is-error.is-bit .pl-pix-eye,
+.pl-pix.is-error.is-crt .pl-pix-eye {
+  height: calc(var(--pix) * 2);
+}
+
+.pl-pix.is-blinking:not(.is-delighted).is-bit .pl-pix-eye,
+.pl-pix.is-blinking:not(.is-delighted).is-crt .pl-pix-eye,
+.pl-pix.is-wink-left:not(.is-delighted).is-bit .pl-pix-eye:first-child,
+.pl-pix.is-wink-left:not(.is-delighted).is-crt .pl-pix-eye:first-child,
+.pl-pix.is-wink-right:not(.is-delighted).is-bit .pl-pix-eye:nth-child(2),
+.pl-pix.is-wink-right:not(.is-delighted).is-crt .pl-pix-eye:nth-child(2) {
+  height: var(--pix);
+}
+
+.pl-pix.is-blinking:not(.is-delighted).is-spark .pl-pix-arm.is-v,
+.pl-pix.is-wink-left:not(.is-delighted).is-spark .pl-pix-eye:first-child .pl-pix-arm.is-v,
+.pl-pix.is-wink-right:not(.is-delighted).is-spark .pl-pix-eye:nth-child(2) .pl-pix-arm.is-v {
+  height: var(--pix);
+  top: calc(var(--pix) * 2);
+}
+
+@keyframes pl-pix-eye-pop {
+  from {
+    opacity: 0;
+    transform: scaleY(0.15);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes pl-pix-eye-happy {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  35% {
+    transform: scaleY(0.55);
+  }
+}
+
+@keyframes pl-pix-think {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(var(--pix)); }
+}
+
+@keyframes pl-pix-talk {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.4); }
+}
+
+@keyframes pl-pix-scanroll {
+  from { background-position: 0 0; }
+  to { background-position: 0 calc(var(--pix) * 4); }
+}
+
+@keyframes pl-pix-flicker {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes pl-pix-twinkle {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-pix,
+  .pl-pix.is-greeting .pl-pix-eye,
+  .pl-pix.is-thinking,
+  .pl-pix.is-speaking .pl-pix-eye,
+  .pl-pix-scan,
+  .pl-pix.is-crt .pl-pix-eye::after,
+  .pl-pix.is-spark .pl-pix-eye {
+    animation: none;
+  }
+}
