@@ -1,9 +1,10 @@
 "use client"
 
 import NextImage from "next/image"
-import { X, ChevronLeft, ChevronRight, ArrowUp, Clock, Calendar } from "lucide-react"
+import { X, ChevronLeft, ChevronRight, ArrowUp, Clock, Calendar, DollarSign } from "lucide-react"
 import { CommunitiesStore, CoursesStore, EventsStore, ProductsStore } from "@/components/profile/store-panel"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 import { motion, AnimatePresence } from "framer-motion"

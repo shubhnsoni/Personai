@@ -418,6 +418,7 @@ export function ImportStudio({
                             <ReviewRow
                                 key={row.id}
                                 row={row}
+                                kinds={KINDS}
                                 open={openId === row.id}
                                 onToggleOpen={() => setOpenId((id) => id === row.id ? null : row.id)}
                                 onPatch={patch}
@@ -432,17 +433,19 @@ export function ImportStudio({
 
 function ReviewRow({
     row,
+    kinds,
     open,
     onToggleOpen,
     onPatch,
 }: {
     row: ImportItem
+    kinds: typeof ALL_KINDS
     open: boolean
     onToggleOpen: () => void
     onPatch: (id: string, update: Partial<ImportItem> | ((row: ImportItem) => ImportItem)) => void
 }) {
     const f = row.fields
-    const kindLabel = KINDS.find((k) => k.id === row.kind)?.label || row.kind
+    const kindLabel = kinds.find((k) => k.id === row.kind)?.label || row.kind
     return (
         <div className={cn(!row.selected && "bg-muted/20")}>
             <div className="flex items-center gap-2.5 px-3 py-2.5">
@@ -475,7 +478,7 @@ function ReviewRow({
                             onChange={(e) => onPatch(row.id, { kind: e.target.value as ImportKind })}
                             className="h-8 w-full rounded-xl border border-border/70 bg-background px-2 text-sm"
                         >
-                            {KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+                            {kinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
                         </select>
                     </label>
                     <Field label="Title" value={row.title} onChange={(v) => onPatch(row.id, { title: v })} />
