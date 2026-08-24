@@ -503,3 +503,16 @@ iframe[title="Clerk Keyless Prompt"],
 .cl-logoBox {
   display: none !important;
 }
+
+
+/* Clerk keyless-mode prompt.
+   In keyless (temporary API keys) mode Clerk injects a floating prompt into
+   #clerk-components. Its label changes as you go ("Configure your application",
+   then "You've created your first user"), so match the button's stable
+   aria-label rather than the text, and hide the wrapper it sits in. Without this
+   the prompt overlaps the Continue button on the sign-in card.
+   Hiding only the prompt, not all of #clerk-components, so Clerk's real modals
+   still render. Adding real Clerk keys removes the prompt at the source. */
+:where(div, aside, section):has(> button[aria-label="Keyless prompt"]) {
+  display: none !important;
+}
