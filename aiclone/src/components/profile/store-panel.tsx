@@ -94,7 +94,6 @@ export function ProductsStore({
     onPurchase?: (itemType: string, itemId: string) => void
 }) {
     const money = useMoney()
-    const money = useMoney()
     const products = data.digitalProducts || []
     if (products.length === 0) {
         return <EmptyStore label="No products in the shop yet." />
