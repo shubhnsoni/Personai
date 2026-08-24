@@ -23,6 +23,7 @@ dist/
 .DS_Store
 *.pem
 *.log
+*.log.err
 *.tsbuildinfo
 
 # Debug
