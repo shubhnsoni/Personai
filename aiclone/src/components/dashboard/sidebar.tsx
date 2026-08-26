@@ -98,52 +98,68 @@ export function SidebarNav({ counts, onLinkClick, role, extras }: SidebarNavProp
     const items = visibleNavItems(role, extras)
 
     return (
-        <>
-            <div className="flex-1 overflow-auto py-3">
-                <nav className="flex flex-col gap-0.5 px-2">
-                    {items.map((item) => {
-                        const active = isActivePath(pathname, item)
-                        const stat = counts ? countForHref(counts, item.href) : null
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={onLinkClick}
-                                className={cn(
-                                    "flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] font-medium transition-colors",
-                                    active
-                                        ? "bg-aurora/10 text-foreground ring-1 ring-aurora/25"
-                                        : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
-                                )}
-                            >
-                                <item.icon className={cn("h-3.5 w-3.5", active && "text-aurora")} />
-                                <span className="flex-1 truncate">{item.name}</span>
-                                {stat && stat.value > 0 && (
-                                    <span className="text-[10px] tabular-nums text-muted-foreground">
-                                        {stat.value}
-                                        {stat.fresh ? (
-                                            <span className="ml-1 text-aurora">+{stat.fresh}</span>
-                                        ) : null}
-                                    </span>
-                                )}
-                            </Link>
-                        )
-                    })}
-                </nav>
-            </div>
-        </>
+        <div className="flex-1 overflow-auto py-3">
+            <nav className="flex flex-col gap-0.5 px-2">
+                {items.map((item) => {
+                    const active = isActivePath(pathname, item)
+                    const stat = counts ? countForHref(counts, item.href) : null
+                    return (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={onLinkClick}
+                            className={cn(
+                                "relative flex h-9 items-center gap-2.5 rounded-xl px-2.5 text-sm font-medium transition-colors",
+                                active
+                                    ? "bg-cyan-400/8 text-foreground"
+                                    : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground",
+                            )}
+                        >
+                            {active ? (
+                                <span className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-full bg-[#00D7FF]" />
+                            ) : null}
+                            <item.icon className={cn("h-4 w-4", active && "text-[#00D7FF]")} />
+                            <span className="flex-1 truncate">{item.name}</span>
+                            {stat && stat.value > 0 ? (
+                                <span className="rounded-full bg-white/6 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                                    {stat.value}
+                                    {stat.fresh ? <span className="ml-1 text-[#00D7FF]">+{stat.fresh}</span> : null}
+                                </span>
+                            ) : null}
+                        </Link>
+                    )
+                })}
+            </nav>
+        </div>
     )
 }
 
-export function Sidebar({ counts, role, extras }: { counts?: NavCounts; role?: string | null; extras?: import("@/lib/surfaces").SurfaceExtras | null }) {
+export function Sidebar({
+    counts,
+    role,
+    extras,
+    name,
+    slug,
+}: {
+    counts?: NavCounts
+    role?: string | null
+    extras?: import("@/lib/surfaces").SurfaceExtras | null
+    name?: string
+    slug?: string
+}) {
     return (
-        <div className="hidden md:flex h-full w-56 flex-col border-r border-border/60 bg-sidebar text-sidebar-foreground">
-            <div className="flex h-12 items-center px-4">
-                <Logo />
+        <div className="hidden h-full w-60 flex-col border-r border-white/8 bg-sidebar text-sidebar-foreground dark:bg-[#050607] md:flex">
+            <div className="flex h-16 flex-col justify-center px-4">
+                <Logo href="/dashboard" size="sm" />
+                <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Studio</span>
             </div>
             <SidebarNav counts={counts} role={role} extras={extras} />
-            <div className="border-t border-border/60 p-2">
-                <StudioSignOut />
+            <div className="flex items-center gap-2 border-t border-white/8 p-3">
+                <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{name || "Studio"}</p>
+                    {slug ? <p className="truncate text-[11px] text-muted-foreground">/{slug}</p> : null}
+                </div>
+                <StudioSignOut compact />
             </div>
         </div>
     )

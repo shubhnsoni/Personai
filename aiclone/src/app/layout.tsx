@@ -34,10 +34,7 @@ export const viewport = {
 }
 
 export const metadata: Metadata = {
-  title: {
-    default: "PersonaLink",
-    template: "%s · PersonaLink",
-  },
+  title: "PersonaLink",
   description:
     "Your AI-powered professional profile. Chat with visitors, book calls, and sell from one link.",
 };
@@ -49,11 +46,12 @@ export default async function RootLayout({
 }>) {
   const currency = await getRequestCurrency()
   return (
-    <ClerkProvider appearance={clerkAppearance}>
-      <html lang="en" suppressHydrationWarning>
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
+      >
+        <ClerkProvider appearance={clerkAppearance} dynamic>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -67,8 +65,8 @@ export default async function RootLayout({
               <Toaster theme="system" />
             </PricingProvider>
           </ThemeProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }

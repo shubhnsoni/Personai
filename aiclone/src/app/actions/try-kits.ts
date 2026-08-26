@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { syncUser } from "@/lib/auth-sync"
-import { ACTIVE_PROFILE_COOKIE, TRY_KITS } from "@/lib/try-kits"
+import { ACTIVE_PROFILE_COOKIE, TRY_KITS, TRY_NOW_COOKIE } from "@/lib/try-kits"
 
 async function seedRole(profileId: string, role: string) {
     if (role === "RESTAURANT") {
@@ -106,6 +106,7 @@ export async function openTryKit(formData: FormData) {
 
     const jar = await cookies()
     jar.set(ACTIVE_PROFILE_COOKIE, profile.id, { path: "/", sameSite: "lax", httpOnly: true })
+    jar.set(TRY_NOW_COOKIE, "1", { path: "/", sameSite: "lax", httpOnly: true, maxAge: 60 * 60 })
     revalidatePath("/dashboard")
     redirect(kit.next)
 }
@@ -113,6 +114,7 @@ export async function openTryKit(formData: FormData) {
 export async function exitTryKit() {
     const jar = await cookies()
     jar.delete(ACTIVE_PROFILE_COOKIE)
+    jar.delete(TRY_NOW_COOKIE)
     revalidatePath("/dashboard")
     redirect("/qa")
 }

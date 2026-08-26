@@ -36,7 +36,7 @@ export function CatalogSearch({
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
-                className="h-8 rounded-full pl-8 text-sm"
+                className="h-9 rounded-full border-white/10 bg-white/[0.03] pl-8 text-sm lg:h-10"
             />
         </div>
     )
@@ -50,7 +50,7 @@ export function ViewToggle({
     onChange: (view: CatalogView) => void
 }) {
     return (
-        <div className="flex shrink-0 rounded-full border border-border/70 p-0.5">
+        <div className="flex shrink-0 rounded-full border border-white/10 p-0.5">
             <button
                 type="button"
                 aria-label="List view"
@@ -91,8 +91,8 @@ export function FilterChips<T extends string>({
                     type="button"
                     onClick={() => onChange(f.id)}
                     className={cn(
-                        "rounded-full px-2.5 py-1 text-xs",
-                        value === f.id ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+                        "rounded-full px-2.5 py-1.5 text-xs",
+                        value === f.id ? "bg-[#00D7FF] text-[#061018]" : "bg-white/6 text-muted-foreground hover:text-foreground"
                     )}
                 >
                     {f.label}

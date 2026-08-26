@@ -37,6 +37,7 @@ interface ChatInterfaceProps {
         slug: string
         imageUrl?: string | null
         chatAvatarMode?: string | null
+        roleTemplate?: string | null
     }
     welcome?: ReactNode
     chips?: ChatChip[]
@@ -128,13 +129,14 @@ export function ChatInterface({
         }
     }, [messages, isLoading])
 
+    const restaurant = profile.roleTemplate === "RESTAURANT"
     const getRichContent = (content: string): RichContentType | null => {
         const lower = content.toLowerCase()
         if (lower.includes("consultation services") || lower.includes("would you like to book")) return "services"
         if (lower.includes("work experience") || lower.includes("work history")) return "experience"
         if (lower.includes("project") || lower.includes("portfolio")) return "projects"
         if (lower.includes("about") || lower.includes("who is")) return "about"
-        if (lower.includes("digital products") || lower.includes("would you like to purchase")) return "products"
+        if (!restaurant && (lower.includes("digital products") || lower.includes("would you like to purchase"))) return "products"
         if (lower.includes("courses") || lower.includes("would you like to enroll")) return "courses"
         if (lower.includes("upcoming events") || lower.includes("would you like to register")) return "events"
         if (lower.includes("communities") || lower.includes("would you like to join")) return "communities"

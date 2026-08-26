@@ -7,20 +7,97 @@ export const MENU_IMPORT_WARNING =
 export function isMenuHost(url: string) {
     try {
         const host = new URL(url).hostname.toLowerCase()
-        return /(^|\.)swiggy\.com$|(^|\.)zomato\.com$|(^|\.)ubereats\.com$|(^|\.)uber\.com$/.test(host)
+        return (
+            /(^|\.)swiggy\.com$|(^|\.)zomato\.com$|(^|\.)ubereats\.com$|(^|\.)uber\.com$/.test(host) ||
+            isGoogleBusinessHost(url)
+        )
     } catch {
-        return /swiggy\.com|zomato\.com|ubereats\.com|uber\.com/i.test(url)
+        return /swiggy\.com|zomato\.com|ubereats\.com|uber\.com|google\.|g\.page|maps\.app\.goo\.gl/i.test(url)
     }
+}
+
+export function isGoogleBusinessHost(url: string) {
+    try {
+        const u = new URL(url)
+        const host = u.hostname.toLowerCase()
+        if (/(^|\.)g\.page$|(^|\.)share\.google$|(^|\.)maps\.app\.goo\.gl$|(^|\.)goo\.gl$/.test(host)) return true
+        if (host === "maps.google.com" || host.endsWith(".maps.google.com")) return true
+        if (/(^|\.)google\.[a-z.]+$/.test(host)) {
+            return /maps|business|search|place|local/i.test(u.pathname + u.search)
+        }
+        return false
+    } catch {
+        return /google\.|g\.page|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(url)
+    }
+}
+
+export function discoverMenuUrls(html: string): string[] {
+    const found = new Set<string>()
+    const raw = html.replace(/\\u002f/gi, "/").replace(/\\\//g, "/")
+    const re = /https?:\/\/(?:www\.)?(?:zomato\.com|link\.zomato\.com|swiggy\.com|ubereats\.com|uber\.com)[^"'\\\s<>]*/gi
+    for (const m of raw.match(re) || []) {
+        try {
+            const u = new URL(m.replace(/&amp;/g, "&").replace(/\\u003d/gi, "=").replace(/\\u0026/gi, "&"))
+            u.hash = ""
+            if (/zomato|swiggy|ubereats|uber\.com/i.test(u.hostname)) found.add(u.toString())
+        } catch { /* ignore */ }
+    }
+    return preferOrderUrls([...found]).slice(0, 8)
+}
+
+function preferOrderUrls(urls: string[]) {
+    return [...urls].sort((a, b) => scoreMenuUrl(b) - scoreMenuUrl(a))
+}
+
+function scoreMenuUrl(url: string) {
+    let n = 0
+    if (/\/order\b|menu|dineout|restaurant/i.test(url)) n += 3
+    if (/zomato\.com/i.test(url)) n += 2
+    if (/swiggy\.com/i.test(url)) n += 2
+    if (/ubereats/i.test(url)) n += 1
+    return n
+}
+
+export function googleListingName(html: string) {
+    const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1]
+        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)?.[1]
+    const title = html.match(/<title>([^<]+)<\/title>/i)?.[1]
+    const raw = (og || title || "")
+        .replace(/&amp;/g, "&")
+        .replace(/\s*[-–|].*(google|maps|search).*$/i, "")
+        .replace(/\s+/g, " ")
+        .trim()
+    return raw.slice(0, 80)
 }
 
 export function extractMenuFromHtml(html: string, url: string): ImportItem[] {
     const fromLd = extractJsonLdMenu(html)
     const fromState = extractEmbeddedMenu(html)
+    const fromGoogle = isGoogleBusinessHost(url) ? extractGoogleMenuJson(html) : []
     const fromText = extractRupeeMenu(stripTags(html))
-    const merged = dedupeMenu([...fromLd, ...fromState, ...fromText])
+    const merged = dedupeMenu([...fromLd, ...fromState, ...fromGoogle, ...fromText])
     if (isMenuHost(url) && merged.length) return merged
     if (merged.length >= 4) return merged
     return merged
+}
+
+function extractGoogleMenuJson(html: string): ImportItem[] {
+    const items: ImportItem[] = []
+    const blobs = html.match(/\{[^{}]{0,200}"(?:name|title|itemName)"[^{}]{0,400}(?:price|finalPrice|priceInr)[^{}]{0,200}\}/gi) || []
+    for (const blob of blobs.slice(0, 200)) {
+        try {
+            const n = JSON.parse(blob) as Record<string, unknown>
+            const name = String(n.name || n.title || n.itemName || "").trim()
+            const price = firstPrice(n)
+            if (!name || name.length > 90 || price == null) continue
+            items.push(dishItem(name, price, {
+                description: String(n.description || "").slice(0, 240) || undefined,
+                category: String(n.category || n.categoryName || "").slice(0, 40) || undefined,
+                diet: parseDiet(String(n.dietary || n.vegClassifier || name)),
+            }))
+        } catch { /* ignore */ }
+    }
+    return items
 }
 
 export function extractSwiggyMenu(html: string) {

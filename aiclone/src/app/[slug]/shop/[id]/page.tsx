@@ -2,27 +2,25 @@ import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { CourseEnrollButton } from "@/components/catalog/enroll-button"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
-import { ProductGallery } from "@/components/shop/product-gallery"
-import { parseGallery, parseVariants } from "@/lib/commerce"
+import { parseVariants } from "@/lib/commerce"
 import { CatalogHeader } from "@/components/shop/catalog-header"
-import { formatMoney } from "@/lib/pricing"
+import { formatStoredPrice } from "@/lib/pricing"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { ReviewForm } from "@/components/shop/review-form"
-import { ArDish } from "@/components/shop/ar-dish"
+import { StoryGallery } from "@/components/shop/story-gallery"
+import { collectItemPhotos } from "@/lib/item-photos"
 import { catalogLabel, dietLabel, isRestaurant, serveLabel } from "@/lib/menu"
+import { Camera } from "lucide-react"
 import Link from "next/link"
 
 export const dynamic = "force-dynamic"
 
 export default async function ProductSalesPage({
     params,
-    searchParams,
 }: {
     params: Promise<{ slug: string; id: string }>
-    searchParams: Promise<{ ar?: string }>
 }) {
     const { slug, id } = await params
-    const query = await searchParams
     const currency = await getRequestCurrency()
     const product = await prisma.digitalProduct.findFirst({
         where: { id, isActive: true, profile: { slug, isPublic: true } },
@@ -44,7 +42,16 @@ export default async function ProductSalesPage({
         }
     })()
     const logo = (product.profile as { shopLogoUrl?: string | null }).shopLogoUrl
-    const photos = parseGallery(product.galleryUrls, product.thumbnailUrl)
+    const reviewRows = await prisma.$queryRaw<{ id: string; visitorName: string; rating: number; imageUrl: string | null; text: string | null }[]>`
+        SELECT id, "visitorName", rating, "imageUrl", "text" FROM "OfferReview" WHERE "productId" = ${product.id} ORDER BY "createdAt" DESC LIMIT 8
+    `
+    const photos = await collectItemPhotos({
+        title: product.title,
+        category: product.category,
+        galleryUrls: product.galleryUrls,
+        thumbnailUrl: product.thumbnailUrl,
+        reviews: reviewRows,
+    })
     const variants = parseVariants(product.variantsJson)
     const restaurant = isRestaurant(product.profile.roleTemplate)
     const diet = (product as { diet?: string | null }).diet
@@ -68,7 +75,16 @@ export default async function ProductSalesPage({
             />
 
             <main className="mx-auto max-w-2xl space-y-5 px-4 py-5 pb-28">
-                <ProductGallery photos={photos} type={product.type} title={product.title} />
+                <StoryGallery photos={photos} title={product.title} />
+                {(arGlb || arUsdz) ? (
+                    <Link
+                        href={`/${slug}/ar?item=${product.id}`}
+                        className="flex h-12 items-center justify-center gap-1.5 rounded-full bg-cyan-400 text-sm font-medium text-zinc-950"
+                    >
+                        <Camera className="h-4 w-4" />
+                        View on table
+                    </Link>
+                ) : null}
                 <div>
                     <p className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">
                         {restaurant
@@ -80,14 +96,13 @@ export default async function ProductSalesPage({
                 </div>
                 <div className="flex items-end gap-3">
                     <p className="text-3xl font-semibold tabular-nums">
-                        {formatMoney(product.priceCents, currency)}
+                        {formatStoredPrice(product.priceCents, product.currency, currency)}
                     </p>
                     {product.compareAtCents && product.compareAtCents > product.priceCents && (
-                        <p className="pb-1 text-zinc-500 line-through">{formatMoney(product.compareAtCents, currency)}</p>
+                        <p className="pb-1 text-zinc-500 line-through">{formatStoredPrice(product.compareAtCents, product.currency, currency)}</p>
                     )}
                 </div>
                 {spice ? <p className="text-sm text-zinc-400">Spice {"🌶".repeat(spice)}</p> : null}
-                {(arGlb || arUsdz) ? <ArDish glb={arGlb} usdz={arUsdz} title={product.title} auto={query.ar === "1"} /> : null}
                 {restaurant ? (
                     <Link href={`/${slug}/reserve`} className="inline-flex rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium">
                         Reserve a table
@@ -107,13 +122,16 @@ export default async function ProductSalesPage({
                     <p className="text-sm text-zinc-400">{product.stock <= 0 ? "Sold out" : product.stock <= 3 ? `${product.stock} left` : `${product.stock} in stock`}</p>
                 ) : null}
                 <ReviewForm productId={product.id} />
-                {product.reviews.length > 0 ? (
+                {reviewRows.length > 0 ? (
                     <div className="space-y-2">
                         <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Reviews</p>
-                        {product.reviews.map((r) => (
-                            <div key={r.id} className="rounded-2xl border border-white/8 px-3 py-2">
-                                <p className="text-xs text-zinc-400">{r.visitorName} · {"★".repeat(r.rating)}</p>
-                                {r.text ? <p className="mt-1 text-sm text-zinc-200">{r.text}</p> : null}
+                        {reviewRows.map((r) => (
+                            <div key={r.id} className="flex gap-3 rounded-2xl border border-white/8 px-3 py-2">
+                                {r.imageUrl ? <img src={r.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" /> : null}
+                                <div className="min-w-0">
+                                    <p className="text-xs text-zinc-400">{r.visitorName} · {"★".repeat(r.rating)}</p>
+                                    {r.text ? <p className="mt-1 text-sm text-zinc-200">{r.text}</p> : null}
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -127,6 +145,7 @@ export default async function ProductSalesPage({
                             itemId: product.id,
                             title: product.title,
                             priceCents: product.priceCents,
+                            currency: product.currency,
                             description: product.description,
                             fulfillment: product.fulfillment,
                             allowCod: product.allowCod,

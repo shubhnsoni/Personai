@@ -349,6 +349,9 @@ function resolveCheckoutItem(
 }
 
 function welcomeTopics(profile: ProfileViewProps["profile"]) {
+    if (profile.roleTemplate === "RESTAURANT") {
+        return ["the menu", "a table", "today's specials"]
+    }
     const raw = [
         ...profile.serviceOfferings.filter((s) => s.isActive).map((s) => s.name),
         ...(profile.digitalProducts || []).map((p) => p.title),
@@ -463,8 +466,8 @@ function buildGoalChips(
         },
         products: {
             id: "products",
-            label: profile.roleTemplate === "RESTAURANT" ? "Menu" : "Shop",
-            available: (profile.digitalProducts?.length ?? 0) > 0,
+            label: "Shop",
+            available: profile.roleTemplate !== "RESTAURANT" && (profile.digitalProducts?.length ?? 0) > 0,
             icon: <DollarSign className="w-3.5 h-3.5" />,
             onSelect: () => actions.openContent("products"),
         },
@@ -522,12 +525,15 @@ function buildGoalChips(
         COLLECT_LEADS: ["guide", "ask", "work", "book"],
         SELL_PRODUCTS: ["products", "shop", "wa", "tip"],
         TAKE_APPOINTMENTS: ["book", "services", "rates", "about"],
-        BOOK_TABLE: ["shop", "book", "wa", "products"],
+        BOOK_TABLE: ["shop", "book", "wa"],
     }
 
     const goal = profile.primaryGoal || "BOOK_CALL"
     const keys = orderByGoal[goal] ?? ["about", "work", "services", "book"]
-    const extras = ["products", "shop", "wa", "tip", "courses", "events", "communities"].filter((k) => !keys.includes(k))
+    const extraKeys = profile.roleTemplate === "RESTAURANT"
+        ? ["wa", "tip"]
+        : ["products", "shop", "wa", "tip", "courses", "events", "communities"]
+    const extras = extraKeys.filter((k) => !keys.includes(k))
     const allowed = [...keys, ...extras].filter((k) => publicChipAllowed(profile.roleTemplate, k, extrasOf(profile)))
     const chips = allowed
         .map((key) => catalog[key])

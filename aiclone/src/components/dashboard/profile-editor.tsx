@@ -312,7 +312,7 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
                             ) : null}
                         </div>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-3 max-w-sm">
                         <QrCard name={watch("displayName") || profile.displayName} slug={watch("slug") || profile.slug} />
                     </div>
                 </TabsContent>

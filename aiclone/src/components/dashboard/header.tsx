@@ -27,9 +27,11 @@ function titleFor(pathname: string, role?: string | null, extras?: import("@/lib
 
 export function Header({ slug, role, extras, onMenuClick }: HeaderProps) {
     const pathname = usePathname()
+    const title = titleFor(pathname, role, extras)
+    const home = pathname === "/dashboard"
 
     return (
-        <header className="flex h-12 items-center gap-2 border-b border-border/60 bg-background/80 px-3 backdrop-blur-md md:px-5">
+        <header className="flex h-12 items-center gap-2 border-b border-white/8 bg-background/70 px-3 backdrop-blur-md md:h-14 md:px-5 lg:px-8">
             <Button
                 variant="ghost"
                 size="icon"
@@ -40,13 +42,21 @@ export function Header({ slug, role, extras, onMenuClick }: HeaderProps) {
                 <Menu className="h-4 w-4" />
             </Button>
             <div className="min-w-0 flex-1">
-                <h1 className="truncate text-sm font-medium tracking-tight">{titleFor(pathname, role, extras)}</h1>
+                <h1 className={`truncate text-[15px] font-medium tracking-tight ${home ? "md:hidden" : ""}`}>
+                    {title}
+                </h1>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
                 <Link
                     href={`/${slug}`}
+                    className="hidden h-8 items-center rounded-full border border-white/10 px-2.5 text-xs text-muted-foreground hover:text-foreground lg:inline-flex"
+                >
+                    /{slug}
+                </Link>
+                <Link
+                    href={`/${slug}`}
                     target="_blank"
-                    className="inline-flex h-8 items-center gap-1 rounded-full bg-foreground px-2.5 text-xs font-medium text-background hover:opacity-90"
+                    className="inline-flex h-8 items-center gap-1 rounded-full bg-[#00D7FF] px-3 text-xs font-medium text-[#061018] hover:bg-[#5ee7ff]"
                 >
                     Live
                     <ExternalLink className="h-3 w-3" />

@@ -41,7 +41,7 @@ export function placeholderForHint(hint: SourceHint) {
         case "cv":
             return "Paste a CV, about page, or https://…"
         case "shop":
-            return "https://www.swiggy.com/…\nhttps://www.zomato.com/…\nhttps://www.ubereats.com/…\nor paste dishes: Paneer tikka, 220, Starters, Veg"
+            return "https://maps.google.com/…\nhttps://www.zomato.com/…\nhttps://www.swiggy.com/…\nor paste dishes: Paneer tikka, 220, Starters, Veg"
         case "course":
             return "Module: Cadence\n- Weekly stack (12m, free)\nor a course URL"
         case "events":

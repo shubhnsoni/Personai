@@ -24,7 +24,13 @@ export default async function DashboardLayout({
     const counts = await getNavCounts(user.profiles[0].id).catch(() => emptyNavCounts)
 
     return (
-        <DashboardLayoutClient slug={user.profiles[0].slug} counts={counts} role={user.profiles[0].roleTemplate} extras={extrasOf(user.profiles[0])}>
+        <DashboardLayoutClient
+            slug={user.profiles[0].slug}
+            name={user.profiles[0].displayName}
+            counts={counts}
+            role={user.profiles[0].roleTemplate}
+            extras={extrasOf(user.profiles[0])}
+        >
             {children}
         </DashboardLayoutClient>
     )

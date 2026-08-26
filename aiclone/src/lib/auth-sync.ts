@@ -2,7 +2,7 @@ import { cookies } from "next/headers"
 import { currentUser } from "@clerk/nextjs/server"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { ACTIVE_PROFILE_COOKIE } from "@/lib/try-kits"
+import { ACTIVE_PROFILE_COOKIE, TRY_NOW_COOKIE } from "@/lib/try-kits"
 
 /**
  * Syncs the signed-in Clerk user into the local database.
@@ -104,18 +104,24 @@ export async function syncUser() {
     }
 }
 
-async function withActiveProfile<T extends { profiles: { id: string }[] }>(dbUser: T): Promise<T> {
-    if (dbUser.profiles.length < 2) return dbUser
+async function withActiveProfile<T extends { profiles: { id: string; slug: string; updatedAt: Date }[] }>(dbUser: T): Promise<T> {
+    if (!dbUser.profiles.length) return dbUser
+    const real = dbUser.profiles.filter((p) => !p.slug.startsWith("try-"))
+    const latestReal = [...real].sort((a, b) => +b.updatedAt - +a.updatedAt)[0]
     try {
-        const activeId = (await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value
-        if (!activeId) return dbUser
-        const idx = dbUser.profiles.findIndex((p) => p.id === activeId)
-        if (idx <= 0) return dbUser
-        const next = [...dbUser.profiles]
-        const [picked] = next.splice(idx, 1)
-        next.unshift(picked)
+        const jar = await cookies()
+        const activeId = jar.get(ACTIVE_PROFILE_COOKIE)?.value
+        const trying = jar.get(TRY_NOW_COOKIE)?.value
+        const fromCookie = dbUser.profiles.find((p) => p.id === activeId)
+        const honorCookie = fromCookie && (trying || !fromCookie.slug.startsWith("try-"))
+        const chosen = honorCookie ? fromCookie : latestReal || fromCookie || dbUser.profiles[0]
+        const next = dbUser.profiles.filter((p) => p.id !== chosen.id)
+        next.unshift(chosen)
         return { ...dbUser, profiles: next }
     } catch {
-        return dbUser
+        const chosen = latestReal || dbUser.profiles[0]
+        const next = dbUser.profiles.filter((p) => p.id !== chosen.id)
+        next.unshift(chosen)
+        return { ...dbUser, profiles: next }
     }
 }

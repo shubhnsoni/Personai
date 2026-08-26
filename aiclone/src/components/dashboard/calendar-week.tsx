@@ -69,9 +69,9 @@ export function CalendarWeek({ bookings }: { bookings: CalBooking[] }) {
                     const key = dayKey(day)
                     const items = (byDay.get(key) || []).sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime))
                     return (
-                        <div key={key} className="overflow-hidden rounded-2xl border border-border/70 bg-card">
-                            <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
-                                <p className="text-xs font-medium">{dayLabel(day, todayKey)}</p>
+                        <div key={key} className={cn("studio-panel overflow-hidden rounded-2xl", key === todayKey && "ring-1 ring-cyan-400/30")}>
+                            <div className="flex items-center justify-between border-b border-white/8 px-4 py-2.5">
+                                <p className={cn("text-xs font-medium", key === todayKey && "text-[#00D7FF]")}>{dayLabel(day, todayKey)}</p>
                                 <span className="text-[11px] tabular-nums text-muted-foreground">{items.length}</span>
                             </div>
                             {items.length === 0 ? (

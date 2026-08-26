@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { ShopCover } from "@/components/shop/shop-cover"
-import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
+import { formatStoredPrice, type DisplayCurrency } from "@/lib/pricing"
 import { whatsappHref } from "@/lib/commerce"
 import { dietDotClass, dietLabel } from "@/lib/menu"
 
@@ -13,6 +13,7 @@ type Item = {
     type: string
     thumbnailUrl: string | null
     priceCents: number
+    currency?: string | null
     fulfillment: string
     stock: number | null
     category: string | null
@@ -62,6 +63,18 @@ export function ShopCatalog({
 
     return (
         <div className="space-y-4">
+            {restaurant && items.some((p) => p.ar) ? (
+                <Link
+                    href={`/${slug}/ar`}
+                    className="flex items-center justify-between rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2.5"
+                >
+                    <span>
+                        <span className="block text-sm font-medium text-cyan-100">View on your table</span>
+                        <span className="mt-0.5 block text-[12px] text-cyan-200/70">Open the camera, swipe dishes, save a photo</span>
+                    </span>
+                    <span className="rounded-full bg-cyan-400 px-3 py-1.5 text-xs font-medium text-zinc-950">AR menu</span>
+                </Link>
+            ) : null}
             {(hours || bookHref) ? (
                 <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-zinc-900/50 px-3 py-2.5 text-sm">
                     {hours ? <span className="text-zinc-300">{hours}</span> : null}
@@ -127,7 +140,7 @@ export function ShopCatalog({
                                     {p.title}
                                 </p>
                                 <p className="text-sm tabular-nums" style={{ color: accent }}>
-                                    {formatMoney(p.priceCents, currency)}
+                                    {formatStoredPrice(p.priceCents, p.currency, currency)}
                                     {!restaurant && (p.fulfillment === "PHYSICAL" || p.fulfillment === "BOTH") ? " · Physical" : ""}
                                     {p.spiceLevel ? ` · ${"🌶".repeat(p.spiceLevel)}` : ""}
                                     {p.ar ? " · AR" : ""}

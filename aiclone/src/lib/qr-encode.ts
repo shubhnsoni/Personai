@@ -77,7 +77,11 @@ export function encodeQr(text: string): { size: number; get: (r: number, c: numb
     const countBits = bytes.length < 32 ? 8 : 16
     const needed = 4 + countBits + bytes.length * 8 + 4
     const ver = VERSIONS.find((v) => v[2] * 8 >= needed)
-    if (!ver) throw new Error("URL too long for QR")
+    if (!ver) {
+        const short = text.length > 80 ? text.slice(0, 80) : "https://personalink.app"
+        if (short === text) throw new Error("URL too long for QR")
+        return encodeQr(short)
+    }
     const [version, totalCw, dataCw, ecPer, blocks] = ver
     const bits: number[] = []
     pushBits(bits, 0b0100, 4)

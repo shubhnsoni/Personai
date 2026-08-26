@@ -90,17 +90,17 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
                 <button
                     type="button"
                     onClick={() => setImportOpen(true)}
-                    className="flex w-full items-center justify-between rounded-2xl border border-border/70 bg-card px-4 py-3 text-left"
+                    className="studio-panel flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left"
                 >
                     <span>
                         <span className="block text-sm font-medium">Import menu</span>
-                        <span className="mt-0.5 block text-[12px] text-muted-foreground">Swiggy, Zomato, or Uber Eats — paste the public link</span>
+                        <span className="mt-0.5 block text-[12px] text-muted-foreground">Google Business, Swiggy, Zomato, or Uber Eats — paste the public link</span>
                     </span>
                     <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
             ) : null}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
                 <CatalogSearch value={q} onChange={setQ} />
                 <ViewToggle view={view} onChange={setViewPersist} />
             </div>
@@ -119,7 +119,7 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
             />
 
             {rows.length === 0 ? (
-                <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+                <div className="studio-panel overflow-hidden rounded-2xl">
                     <EmptyState
                         icon={<Package />}
                         title={products.length === 0 ? (restaurant ? "Nothing on the menu" : "Nothing in the shop") : "Nothing matches"}
@@ -133,7 +133,7 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
                     />
                 </div>
             ) : view === "list" ? (
-                <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+                <div className="studio-panel overflow-hidden rounded-2xl">
                     {rows.map((product) => (
                         <ProductRow
                             key={product.id}
@@ -318,7 +318,7 @@ function ProductRow({
             <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
                 <p className="truncate text-sm font-medium">{product.title}</p>
                 <p className="truncate text-[11px] text-muted-foreground">
-                    {money(product.priceCents)}
+                    {money(product.priceCents, product.currency)}
                     {isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
                     {stockLabel(product.stock) ? ` · ${stockLabel(product.stock)}` : ""}
                     {!product.isActive ? " · Off" : ""}
@@ -349,7 +349,7 @@ function ProductTile({
 }) {
     const money = useMoney()
     return (
-        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+        <div className="studio-panel overflow-hidden rounded-2xl">
             <button type="button" onClick={onOpen} className="block w-full">
                 <Thumb product={product} className="aspect-square w-full" />
             </button>
@@ -357,7 +357,7 @@ function ProductTile({
                 <button type="button" onClick={onOpen} className="min-h-[2.75rem] text-left">
                     <p className="line-clamp-2 text-sm font-medium leading-5">{product.title}</p>
                     <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-                        {money(product.priceCents)}
+                        {money(product.priceCents, product.currency)}
                         {isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
                         {stockLabel(product.stock) ? ` · ${stockLabel(product.stock)}` : ""}
                         {!product.isActive ? " · Off" : ""}

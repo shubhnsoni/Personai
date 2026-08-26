@@ -25,7 +25,7 @@ const METRICS: { key: MetricKey; label: string; color: string }[] = [
 
 export function AnalyticsCharts({ data, hideLeads, hideSales }: AnalyticsChartsProps & { hideLeads?: boolean; hideSales?: boolean }) {
     const metrics = METRICS.filter((m) => !(m.key === "leads" && hideLeads) && !(m.key === "revenue" && hideSales))
-    const [activeMetric, setActiveMetric] = useState<MetricKey>('conversations')
+    const [activeMetric, setActiveMetric] = useState<MetricKey>('visits')
     const [period, setPeriod] = useState<'7d' | '14d' | '30d'>('30d')
 
     const periodDays = period === '7d' ? 7 : period === '14d' ? 14 : 30
@@ -36,33 +36,33 @@ export function AnalyticsCharts({ data, hideLeads, hideSales }: AnalyticsChartsP
     const maxVal = Math.max(...values, 1)
 
     const chartWidth = 600
-    const chartHeight = 200
+    const chartHeight = 220
     const barWidth = Math.max(4, (chartWidth - 20) / filtered.length - 2)
+    const total = values.reduce((a, b) => a + b, 0)
 
     return (
         <div>
-            {/* Controls */}
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-                <div className="flex gap-0.5 bg-muted/70 rounded-full p-0.5">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+                <div className="flex gap-0.5 rounded-full bg-white/6 p-0.5">
                     {metrics.map(m => (
                         <button
                             key={m.key}
                             onClick={() => setActiveMetric(m.key)}
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                                activeMetric === m.key ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                activeMetric === m.key ? 'bg-[#00D7FF] text-[#061018]' : 'text-muted-foreground hover:text-foreground'
                             }`}
                         >
                             {m.label}
                         </button>
                     ))}
                 </div>
-                <div className="flex gap-1 bg-muted rounded-lg p-1 ml-auto">
+                <div className="ml-auto flex gap-0.5 rounded-full bg-white/6 p-0.5">
                     {(['7d', '14d', '30d'] as const).map(p => (
                         <button
                             key={p}
                             onClick={() => setPeriod(p)}
-                            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                                period === p ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                period === p ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground'
                             }`}
                         >
                             {p}
@@ -71,25 +71,24 @@ export function AnalyticsCharts({ data, hideLeads, hideSales }: AnalyticsChartsP
                 </div>
             </div>
 
-            {/* Summary */}
-            <div className="flex gap-6 mb-4 text-sm">
+            <div className="mb-4 flex gap-6 text-sm">
                 <div>
-                    <span className="text-muted-foreground">Total: </span>
-                    <span className="font-bold">
-                        {activeMetric === 'revenue' ? `$${values.reduce((a, b) => a + b, 0).toFixed(0)}` : values.reduce((a, b) => a + b, 0)}
+                    <span className="text-muted-foreground">Total </span>
+                    <span className="font-semibold tabular-nums">
+                        {activeMetric === 'revenue' ? `$${total.toFixed(0)}` : total}
                     </span>
                 </div>
                 <div>
-                    <span className="text-muted-foreground">Avg/day: </span>
-                    <span className="font-bold">
+                    <span className="text-muted-foreground">Avg </span>
+                    <span className="font-semibold tabular-nums">
                         {activeMetric === 'revenue'
-                            ? `$${(values.reduce((a, b) => a + b, 0) / filtered.length).toFixed(1)}`
-                            : (values.reduce((a, b) => a + b, 0) / filtered.length).toFixed(1)}
+                            ? `$${(total / Math.max(filtered.length, 1)).toFixed(1)}`
+                            : (total / Math.max(filtered.length, 1)).toFixed(1)}
                     </span>
                 </div>
                 <div>
-                    <span className="text-muted-foreground">Peak: </span>
-                    <span className="font-bold">
+                    <span className="text-muted-foreground">Peak </span>
+                    <span className="font-semibold tabular-nums">
                         {activeMetric === 'revenue' ? `$${maxVal.toFixed(0)}` : maxVal}
                     </span>
                 </div>
@@ -127,7 +126,7 @@ export function AnalyticsCharts({ data, hideLeads, hideSales }: AnalyticsChartsP
                                     rx="2"
                                     opacity="0.8"
                                 >
-                                    <title>{d.date}: {activeMetric === 'revenue' ? `$${val.toFixed(2)}` : val}</title>
+                                    <title>{`${d.date}: ${activeMetric === "revenue" ? `$${val.toFixed(2)}` : val}`}</title>
                                 </rect>
                                 {/* Date labels (show every Nth) */}
                                 {(i % Math.ceil(filtered.length / 7) === 0 || i === filtered.length - 1) && (

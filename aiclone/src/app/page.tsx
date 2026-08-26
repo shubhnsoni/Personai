@@ -56,16 +56,12 @@ export default function Home() {
             <Link href="/demo" className="hidden text-sm text-zinc-400 hover:text-white sm:inline">
               Demo
             </Link>
-            <Link href="/sign-in">
-              <Button variant="ghost" size="sm" className="px-2 text-zinc-400 hover:text-white sm:px-3">
-                Sign in
-              </Button>
-            </Link>
-            <Link href="/sign-up">
-              <Button size="sm" variant="pill" className="h-8 px-3 text-xs sm:h-9 sm:px-5 sm:text-sm">
-                Get started
-              </Button>
-            </Link>
+            <Button asChild variant="ghost" size="sm" className="px-2 text-zinc-400 hover:text-white sm:px-3">
+              <Link href="/sign-in">Sign in</Link>
+            </Button>
+            <Button asChild size="sm" variant="pill" className="h-8 px-3 text-xs sm:h-9 sm:px-5 sm:text-sm">
+              <Link href="/sign-up">Get started</Link>
+            </Button>
           </div>
         </div>
       </nav>
@@ -122,16 +118,14 @@ export default function Home() {
           transition={{ delay: 0.32, duration: 0.55 }}
           className="relative mt-8 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center"
         >
-          <Link href="/sign-up">
-            <Button size="lg" variant="pill" className="h-12 w-full gap-2 px-8 text-base sm:w-auto">
+          <Button asChild size="lg" variant="pill" className="h-12 w-full gap-2 px-8 text-base sm:w-auto">
+            <Link href="/sign-up">
               Create your page <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link href="/demo">
-            <Button variant="outline" size="lg" pill className="h-12 w-full border-zinc-700 px-8 text-base text-zinc-300 hover:bg-zinc-900 sm:w-auto">
-              Talk to Riley
-            </Button>
-          </Link>
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" pill className="h-12 w-full border-zinc-700 px-8 text-base text-zinc-300 hover:bg-zinc-900 sm:w-auto">
+            <Link href="/demo">Talk to Riley</Link>
+          </Button>
         </motion.div>
 
         <motion.div
@@ -274,11 +268,9 @@ export default function Home() {
               ))}
             </motion.ul>
             <motion.div variants={fadeUp} custom={3} className="mt-8">
-              <Link href="/sign-up">
-                <Button variant="pill" className="h-12 px-8">
-                  Start free
-                </Button>
-              </Link>
+              <Button asChild variant="pill" className="h-12 px-8">
+                <Link href="/sign-up">Start free</Link>
+              </Button>
             </motion.div>
           </motion.div>
         </div>
@@ -296,16 +288,14 @@ export default function Home() {
             Creators and consultants who want the page to handle the first conversation.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/sign-up">
-              <Button size="lg" variant="pill" className="h-12 gap-2 px-8">
+            <Button asChild size="lg" variant="pill" className="h-12 gap-2 px-8">
+              <Link href="/sign-up">
                 Create your PersonaLink <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/demo">
-              <Button variant="outline" size="lg" pill className="h-12 border-zinc-700 px-8 text-zinc-300 hover:bg-zinc-900">
-                See the live demo
-              </Button>
-            </Link>
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="lg" pill className="h-12 border-zinc-700 px-8 text-zinc-300 hover:bg-zinc-900">
+              <Link href="/demo">See the live demo</Link>
+            </Button>
           </div>
         </div>
       </section>

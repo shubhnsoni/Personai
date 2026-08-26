@@ -56,7 +56,7 @@ export function StudioPulse({
     )
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+        <div className="studio-panel overflow-hidden rounded-2xl">
             <div className="flex flex-col gap-2 px-3 pt-3">
                 <div className="flex items-center justify-between">
                     <div>

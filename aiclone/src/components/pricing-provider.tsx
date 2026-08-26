@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext } from "react"
-import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
+import { formatStoredPrice, type DisplayCurrency } from "@/lib/pricing"
 
 const PricingContext = createContext<{ currency: DisplayCurrency }>({ currency: "USD" })
 
@@ -21,5 +21,8 @@ export function usePricing() {
 
 export function useMoney() {
     const { currency } = usePricing()
-    return useCallback((usdCents: number) => formatMoney(usdCents, currency), [currency])
+    return useCallback(
+        (amountCents: number, stored?: string | null) => formatStoredPrice(amountCents, stored, currency),
+        [currency],
+    )
 }

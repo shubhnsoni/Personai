@@ -245,8 +245,8 @@ export function InboxPeople({
     }
 
     return (
-        <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden bg-card md:grid-cols-3 md:rounded-none">
-            <div className={cn("flex min-h-0 flex-col overflow-hidden border-r border-border/60", active && "hidden md:flex")}>
+        <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[minmax(16rem,20rem)_1fr] md:rounded-none xl:grid-cols-[20rem_1fr]">
+            <div className={cn("flex min-h-0 flex-col overflow-hidden border-r border-white/8", active && "hidden md:flex")}>
                 <div className="space-y-2 border-b border-border/60 p-3">
                     <div className="relative">
                         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -283,10 +283,13 @@ export function InboxPeople({
                             type="button"
                             onClick={() => setSelected(p.key)}
                             className={cn(
-                                "flex w-full items-start gap-3 border-b border-border/40 px-3 py-3 text-left last:border-b-0",
-                                selected === p.key ? "bg-aurora/8" : "hover:bg-muted/40"
+                                "relative flex min-h-12 w-full items-start gap-3 border-b border-white/6 px-3 py-3 text-left last:border-b-0",
+                                selected === p.key ? "bg-cyan-400/8" : "hover:bg-white/[0.04]"
                             )}
                         >
+                            {selected === p.key ? (
+                                <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-[#00D7FF]" />
+                            ) : null}
                             <Avatar name={p.name} />
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-baseline justify-between gap-2">
@@ -308,7 +311,7 @@ export function InboxPeople({
                 </div>
             </div>
 
-            <div className={cn("flex min-h-0 flex-col overflow-hidden md:col-span-2", !active && "hidden md:flex")}>
+            <div className={cn("flex min-h-0 flex-col overflow-hidden", !active && "hidden md:flex")}>
                 {!active ? (
                     <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
                         Pick a chat to read the thread

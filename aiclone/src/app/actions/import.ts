@@ -69,19 +69,16 @@ export async function ingestUrl(url: string): Promise<ImportBundle> {
         let html = ""
         try {
             const res = await fetch(target, {
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (compatible; PersonaLinkImporter/1.0)",
-                    Accept: "text/html,application/xhtml+xml",
-                },
+                headers: PAGE_HEADERS,
                 redirect: "follow",
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.timeout(12000),
             })
             if (!res.ok) throw new Error(`Could not fetch that page (${res.status})`)
             const type = res.headers.get("content-type") || ""
             if (!/html|xml|text|json/i.test(type) && type) {
                 throw new Error("That link is not a readable page.")
             }
-            html = (await res.text()).slice(0, 500_000)
+            html = (await res.text()).slice(0, 700_000)
         } catch (e) {
             if (community) {
                 return serializeBundle({
@@ -95,8 +92,42 @@ export async function ingestUrl(url: string): Promise<ImportBundle> {
             throw new Error(/abort|timeout/i.test(msg) ? "That page took too long. Paste the text instead." : `${msg} Paste the text if the site is private.`)
         }
         let bundle = bundleFromHtml(html, target)
-        const { extractMenuFromHtml, isMenuHost, MENU_IMPORT_WARNING } = await import("@/lib/menu-import")
-        if (isMenuHost(target)) {
+        const { extractMenuFromHtml, isMenuHost, isGoogleBusinessHost, discoverMenuUrls, googleListingName, MENU_IMPORT_WARNING } = await import("@/lib/menu-import")
+        if (isGoogleBusinessHost(target)) {
+            const dishes = extractMenuFromHtml(html, target)
+            const linked: string[] = discoverMenuUrls(html)
+            const extraMenus: ImportItem[] = [...dishes]
+            const place = googleListingName(html)
+            if (place && !linked.length) {
+                for (const href of [
+                    `https://www.zomato.com/search?q=${encodeURIComponent(place)}`,
+                    `https://www.swiggy.com/search?query=${encodeURIComponent(place)}`,
+                ]) {
+                    const page = await fetchPageHtml(href)
+                    if (!page) continue
+                    linked.push(...discoverMenuUrls(page.html))
+                    extraMenus.push(...extractMenuFromHtml(page.html, page.url))
+                }
+            }
+            for (const href of [...new Set(linked)].slice(0, 4)) {
+                const page = await fetchPageHtml(href)
+                if (!page) continue
+                extraMenus.push(...extractMenuFromHtml(page.html, page.url))
+            }
+            const unique = extraMenus.filter((d, i, arr) => arr.findIndex((x) => x.title.toLowerCase() === d.title.toLowerCase()) === i)
+            if (unique.length) {
+                bundle = {
+                    sourceLabel: place || bundle.sourceLabel || "Google Business",
+                    sourceKind: "url",
+                    items: unique,
+                    warning: MENU_IMPORT_WARNING,
+                }
+            } else if (!bundle.items.some((i) => i.kind === "product")) {
+                throw new Error("No menu on that Google listing. Paste a Zomato / Swiggy / Uber Eats link, or the menu text.")
+            } else {
+                bundle = { ...bundle, sourceLabel: place || bundle.sourceLabel, warning: MENU_IMPORT_WARNING }
+            }
+        } else if (isMenuHost(target)) {
             const dishes = extractMenuFromHtml(html, target)
             if (!dishes.length && !bundle.items.some((i) => i.kind === "product")) {
                 throw new Error("That page is blocked. Paste the menu or upload a CSV.")
@@ -305,6 +336,7 @@ export async function applyImportBundle(profileId: string, items: ImportItem[]):
                 category: fields.category,
                 diet: fields.diet,
                 spiceLevel: fields.spiceLevel,
+                currency: profile.roleTemplate === "RESTAURANT" ? "INR" : "USD",
             })
             have.product.add(norm(title))
             bump("product")
@@ -407,7 +439,10 @@ export async function applyImportBundle(profileId: string, items: ImportItem[]):
     const destinations = destLabels(wrote)
     revalidatePath("/dashboard/profile")
     revalidatePath("/dashboard/import")
+    revalidatePath("/dashboard/products")
     revalidatePath(`/${profile.slug}`)
+    revalidatePath(`/${profile.slug}/menu`)
+    revalidatePath(`/${profile.slug}/shop`)
     return { wrote, skipped, destinations }
 }
 
@@ -424,25 +459,29 @@ async function enrichWithModel(bundle: ImportBundle, text: string): Promise<Impo
     return bundle
 }
 
+const PAGE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-IN,en;q=0.9",
+}
+
 async function fetchPageHtml(url: string): Promise<{ url: string; html: string } | null> {
     try {
         const res = await fetch(url, {
-            headers: {
-                "User-Agent": "Mozilla/5.0 (compatible; PersonaLinkImporter/1.0)",
-                Accept: "text/html,application/xhtml+xml",
-            },
+            headers: PAGE_HEADERS,
             redirect: "follow",
-            signal: AbortSignal.timeout(6000),
+            signal: AbortSignal.timeout(10000),
         })
         if (!res.ok) return null
-        return { url, html: (await res.text()).slice(0, 350_000) }
+        return { url: res.url || url, html: (await res.text()).slice(0, 500_000) }
     } catch {
         return null
     }
 }
 
 function serializeBundle(bundle: ImportBundle): ImportBundle {
-    const items = (bundle.items || []).slice(0, 60).map((it) => ({
+    const cap = bundle.items?.every((i) => i.kind === "product") ? 200 : 80
+    const items = (bundle.items || []).slice(0, cap).map((it) => ({
         id: String(it.id || ""),
         kind: it.kind,
         title: sanitizeDbText(String(it.title || "Untitled")).slice(0, 160),
@@ -478,6 +517,10 @@ function serializeBundle(bundle: ImportBundle): ImportBundle {
             billingCycle: it.fields?.billingCycle,
             magnetType: it.fields?.magnetType,
             body: strField(it.fields?.body),
+            category: strField(it.fields?.category)?.slice(0, 40),
+            diet: strField(it.fields?.diet),
+            spiceLevel: numField(it.fields?.spiceLevel),
+            fulfillment: it.fields?.fulfillment,
             modules: Array.isArray(it.fields?.modules) ? it.fields.modules.slice(0, 20) : undefined,
         },
     }))

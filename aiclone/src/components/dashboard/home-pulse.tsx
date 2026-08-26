@@ -1,9 +1,8 @@
 "use client"
 
-import Link from "next/link"
-import { TrendingUp } from "lucide-react"
 import { AnalyticsCharts } from "@/components/dashboard/analytics-charts"
 import { StudioPulse } from "@/components/dashboard/studio-pulse"
+import { StudioKpi, StudioPanel } from "@/components/dashboard/studio-ui"
 import type { HomeStats } from "@/lib/analytics"
 
 export function HomePulse({ stats, slug }: { stats: HomeStats; slug: string }) {
@@ -48,12 +47,13 @@ export function HomePulse({ stats, slug }: { stats: HomeStats; slug: string }) {
     const hideLeads = stats.leads == null
     const hideSales = stats.revenueCents == null
     const chartData = stats.series
+    const shown = cells.slice(0, 4)
 
     return (
         <>
-            <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-border/70 bg-card lg:grid-cols-4">
-                {cells.slice(0, 4).map((cell) => (
-                    <StatCell key={cell.title} {...cell} />
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3">
+                {shown.map((cell) => (
+                    <StudioKpi key={cell.title} {...cell} />
                 ))}
             </div>
 
@@ -73,22 +73,20 @@ export function HomePulse({ stats, slug }: { stats: HomeStats; slug: string }) {
                     }}
                 />
             </div>
-            <div className="hidden gap-2 lg:grid lg:grid-cols-5">
-                <div className="rounded-2xl border border-border/70 bg-card p-3 md:p-4 lg:col-span-3">
-                    <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                        <TrendingUp className="h-3.5 w-3.5" />
-                        Last 30 days
-                    </div>
+
+            <div className="hidden gap-3 lg:grid lg:grid-cols-12">
+                <StudioPanel className="p-5 lg:col-span-8">
+                    <p className="mb-4 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Last 30 days</p>
                     <AnalyticsCharts data={chartData} hideLeads={hideLeads} hideSales={hideSales} />
                     {stats.sources.length > 0 ? (
-                        <p className="mt-3 text-[11px] text-muted-foreground">
+                        <p className="mt-4 text-[11px] text-muted-foreground">
                             {stats.sources.map((s) => `${s.ref} · ${s.n}`).join("   ")}
                         </p>
                     ) : null}
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-card p-3 md:p-4 lg:col-span-2">
-                    <p className="mb-3 text-xs font-medium text-muted-foreground">Funnel</p>
-                    <div className="flex flex-col gap-2">
+                </StudioPanel>
+                <StudioPanel className="p-5 lg:col-span-4">
+                    <p className="mb-4 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Funnel</p>
+                    <div className="flex flex-col gap-3">
                         <FunnelRow label="Visits" value={stats.funnel.visits} pct={100} />
                         <FunnelRow
                             label="Chats"
@@ -110,37 +108,22 @@ export function HomePulse({ stats, slug }: { stats: HomeStats; slug: string }) {
                             />
                         ) : null}
                     </div>
-                </div>
+                </StudioPanel>
             </div>
         </>
     )
 }
 
-function StatCell({ title, value, subtitle, href, hot = false }: {
-    title: string; value: string | number; subtitle: string; href: string; hot?: boolean
-}) {
-    return (
-        <Link
-            href={href}
-            className={`border-b border-r border-border/60 px-3 py-3 last:border-r-0 even:border-r-0 lg:even:border-r lg:[&:nth-child(4)]:border-r-0 lg:border-b-0 ${hot ? "bg-aurora/5" : ""}`}
-        >
-            <p className="text-[11px] text-muted-foreground">{title}</p>
-            <p className="mt-0.5 text-xl font-semibold tracking-tight">{value}</p>
-            <p className="text-[11px] text-muted-foreground">{subtitle}</p>
-        </Link>
-    )
-}
-
 function FunnelRow({ label, value, pct }: { label: string; value: string | number; pct: number }) {
     return (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
             <div className="flex items-baseline justify-between text-xs">
                 <span className="text-muted-foreground">{label}</span>
-                <span className="font-medium">{value}</span>
+                <span className="font-medium tabular-nums">{value}</span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
                 <div
-                    className="h-full rounded-full bg-gradient-to-r from-aurora to-aurora-2"
+                    className="h-full rounded-full bg-[#00D7FF]"
                     style={{ width: `${Math.min(100, pct)}%` }}
                 />
             </div>

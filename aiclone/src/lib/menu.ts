@@ -75,6 +75,14 @@ export function serveLabel(window?: string | null) {
     }
 }
 
+export function readyLabel(category?: string | null, serve?: string | null) {
+    if (category === "Coffee") return "Ready in 4 min"
+    if (category === "Bakery") return "Ready now"
+    if (serve === "Breakfast") return "Ready in 12 min"
+    if (serve === "Lunch") return "Ready in 14 min"
+    return "Ready in 10 min"
+}
+
 export function parseReservation(metadata?: string | null) {
     if (!metadata) return { partySize: 1, phone: "", notes: "" }
     try {

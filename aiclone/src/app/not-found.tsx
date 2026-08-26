@@ -16,11 +16,9 @@ export default function NotFound() {
             That page doesn&apos;t exist or the profile is no longer public.
           </p>
         </div>
-        <Link href="/">
-          <Button className="bg-purple-600 hover:bg-purple-500">
-            Go Home
-          </Button>
-        </Link>
+        <Button asChild className="bg-purple-600 hover:bg-purple-500">
+          <Link href="/">Go Home</Link>
+        </Button>
       </div>
     </div>
   )

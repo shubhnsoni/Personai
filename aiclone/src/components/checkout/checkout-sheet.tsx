@@ -14,6 +14,7 @@ export type CheckoutItem = {
     itemId: string
     title: string
     priceCents: number
+    currency?: string | null
     description?: string | null
     fulfillment?: string | null
     allowCod?: boolean
@@ -54,7 +55,7 @@ export function CheckoutSheet({
         } catch {}
     }, [])
 
-    const price = money(total)
+    const price = money(total, item.currency)
     const cta =
         item.soldOut ? "Sold out"
         : item.itemType === "course" ? (item.priceCents === 0 ? "Enroll free" : `Enroll · ${price}`)

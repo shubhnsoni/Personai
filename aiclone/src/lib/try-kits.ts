@@ -15,3 +15,4 @@ export const TRY_KITS = [
 export type TryKit = (typeof TRY_KITS)[number]
 
 export const ACTIVE_PROFILE_COOKIE = "pl-active-profile"
+export const TRY_NOW_COOKIE = "pl-try-now"

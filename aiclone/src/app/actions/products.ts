@@ -29,6 +29,7 @@ export interface ProductData {
     serveWindow?: string
     arModelUrl?: string
     arUsdzUrl?: string
+    currency?: string
     variantsText?: string
     shipMode?: "NONE" | "PICKUP" | "DELIVER" | "BOTH"
     shipFeeCents?: number
@@ -63,6 +64,7 @@ function productWrite(data: ProductData) {
         variantsJson: data.variantsText != null ? variantsToJson(data.variantsText) : undefined,
         shipMode: data.shipMode || "NONE",
         shipFeeCents: data.shipFeeCents ?? 0,
+        currency: data.currency?.trim() || undefined,
     }
 }
 
@@ -71,8 +73,8 @@ export async function createProduct(profileId: string, data: ProductData) {
     const created = await prisma.digitalProduct.create({
         data: {
             profileId,
-            currency: "USD",
             ...write,
+            currency: write.currency || "USD",
             variantsJson: write.variantsJson ?? null,
         },
     })
@@ -150,6 +152,51 @@ export async function placeManualOrder(input: {
     }
 }
 
+export async function placeCartOrder(input: {
+    lines: { productId: string; qty: number; extras?: string }[]
+    visitorName: string
+    visitorEmail: string
+    payMethod: "UPI" | "COD" | "WHATSAPP"
+    address?: string
+}) {
+    if (!input.lines.length) throw new Error("Cart is empty")
+    const ids = [...new Set(input.lines.map((l) => l.productId))]
+    const products = await prisma.digitalProduct.findMany({
+        where: { id: { in: ids }, isActive: true },
+        include: { profile: true },
+    })
+    if (!products.length) throw new Error("Those dishes are no longer available")
+    const profile = products[0].profile
+    const rows = []
+    for (const line of input.lines) {
+        const product = products.find((p) => p.id === line.productId)
+        if (!product) continue
+        const qty = Math.max(1, Math.min(20, Math.floor(line.qty) || 1))
+        const purchase = await prisma.productPurchase.create({
+            data: {
+                productId: product.id,
+                visitorEmail: input.visitorEmail,
+                visitorName: input.visitorName,
+                status: "PENDING",
+                payMethod: input.payMethod,
+                address: input.address?.trim() || null,
+                buyerNote: [`x${qty}`, line.extras].filter(Boolean).join(" · ") || null,
+            },
+        })
+        rows.push({ id: purchase.id, title: product.title, qty })
+    }
+    if (!rows.length) throw new Error("Could not place that order")
+    revalidatePath("/dashboard/orders")
+    revalidatePath("/dashboard/money")
+    return {
+        count: rows.length,
+        upiId: profile.upiId,
+        whatsapp: profile.whatsapp,
+        slug: profile.slug,
+        gstin: profile.gstin,
+    }
+}
+
 export async function confirmProductOrder(purchaseId: string) {
     const purchase = await prisma.productPurchase.update({
         where: { id: purchaseId },
@@ -193,9 +240,10 @@ export async function addProductReview(input: {
     rating: number
     text?: string
     visitorName: string
+    imageUrl?: string
 }) {
     const rating = Math.min(5, Math.max(1, Math.round(input.rating)))
-    await prisma.offerReview.create({
+    const created = await prisma.offerReview.create({
         data: {
             productId: input.productId,
             rating,
@@ -203,5 +251,9 @@ export async function addProductReview(input: {
             visitorName: input.visitorName.trim() || "Buyer",
         },
     })
+    const imageUrl = input.imageUrl?.trim()
+    if (imageUrl) {
+        await prisma.$executeRaw`UPDATE "OfferReview" SET "imageUrl" = ${imageUrl} WHERE id = ${created.id}`
+    }
     revalidatePath("/dashboard/products")
 }

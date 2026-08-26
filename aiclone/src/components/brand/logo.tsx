@@ -17,7 +17,7 @@ export function Logo({ className, href = "/", size = "md" }: LogoProps) {
     const mark = (
         <span
             className={cn(
-                "font-bold tracking-tight bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent",
+                "font-bold tracking-tight bg-gradient-to-r from-[#5ee7ff] to-[#00D7FF] bg-clip-text text-transparent",
                 sizeClass[size],
                 className,
             )}

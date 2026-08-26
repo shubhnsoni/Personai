@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
-import { MessageSquare } from "lucide-react"
+import { ExternalLink, MessageSquare } from "lucide-react"
 import Link from "next/link"
 import { ShareSheet } from "@/components/dashboard/share-sheet"
 import { HomePulse } from "@/components/dashboard/home-pulse"
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { extrasOf, hasSurface } from "@/lib/surfaces"
 import { buildHomeStats } from "@/lib/analytics"
+import { StudioPageHead, StudioPanel, StudioRow } from "@/components/dashboard/studio-ui"
 
 export const dynamic = "force-dynamic"
 
@@ -45,82 +46,82 @@ export default async function DashboardPage() {
             : Promise.resolve([]),
     ])
 
+    const feed = [
+        ...recentConversations.map((c) => ({
+            id: c.id,
+            href: "/dashboard/inbox",
+            name: c.visitorName || "Visitor",
+            detail: c.messages[0]?.text || "Chat",
+            at: c.lastMessageAt,
+            kind: "chat" as const,
+        })),
+        ...recentLeads.map((l) => ({
+            id: l.id,
+            href: "/dashboard/inbox",
+            name: l.name,
+            detail: l.email,
+            at: l.createdAt,
+            kind: "lead" as const,
+        })),
+    ].sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 8)
+
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 lg:space-y-5">
             {liveRequests.length > 0 && (
-                <div className="overflow-hidden rounded-2xl border border-aurora/30 bg-aurora/10">
+                <StudioPanel className="border-cyan-400/30 bg-cyan-400/8">
                     {liveRequests.map((req) => (
                         <Link
                             key={req.id}
                             href={`/dashboard/inbox?c=${req.id}`}
-                            className="flex items-center justify-between gap-2 border-b border-aurora/15 px-3 py-2.5 last:border-b-0"
+                            className="flex items-center justify-between gap-2 border-b border-cyan-400/15 px-4 py-3 last:border-b-0"
                         >
                             <p className="truncate text-sm font-medium">
                                 {req.visitorName || req.visitorEmail || "A visitor"} wants to talk live
                             </p>
-                            <span className="shrink-0 text-xs text-aurora">Open</span>
+                            <span className="shrink-0 text-xs text-[#00D7FF]">Open</span>
                         </Link>
                     ))}
-                </div>
+                </StudioPanel>
             )}
-            <div className="flex items-start justify-between gap-2 pt-0.5">
-                <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{profile.displayName}</p>
-                    <p className="text-xs text-muted-foreground">{nextAction(stats)}</p>
-                </div>
-                <ShareSheet slug={profile.slug} name={profile.displayName} baseUrl={baseUrl} />
-            </div>
+
+            <StudioPageHead
+                kicker="Studio"
+                title={profile.displayName}
+                hint={nextAction(stats)}
+                action={<ShareSheet slug={profile.slug} name={profile.displayName} baseUrl={baseUrl} />}
+            />
 
             <HomePulse stats={stats} slug={profile.slug} />
 
-            <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
-                <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
-                    <p className="text-xs font-medium text-muted-foreground">Live</p>
-                    <div className="flex gap-2 text-[11px] text-muted-foreground">
-                        <Link href="/dashboard/inbox" className="hover:text-foreground">Chats</Link>
-                        {hasSurface(profile.roleTemplate, "leads", extras) ? (
-                            <Link href="/dashboard/leads" className="hover:text-foreground">Leads</Link>
-                        ) : null}
-                        {hasSurface(profile.roleTemplate, "sales", extras) ? (
-                            <Link href="/dashboard/money" className="hover:text-foreground">Sales</Link>
-                        ) : null}
+            <div className="grid gap-3 lg:grid-cols-12">
+                <StudioPanel className="lg:col-span-7">
+                    <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Live</p>
+                        <div className="flex gap-3 text-[11px] text-muted-foreground">
+                            <Link href="/dashboard/inbox" className="hover:text-foreground">Chats</Link>
+                            {hasSurface(profile.roleTemplate, "leads", extras) ? (
+                                <Link href="/dashboard/leads" className="hover:text-foreground">Leads</Link>
+                            ) : null}
+                            {hasSurface(profile.roleTemplate, "sales", extras) ? (
+                                <Link href="/dashboard/money" className="hover:text-foreground">Sales</Link>
+                            ) : null}
+                        </div>
                     </div>
-                </div>
-                <div className="divide-y divide-border/50">
-                    {(() => {
-                        const feed = [
-                            ...recentConversations.map((c) => ({
-                                id: c.id,
-                                href: "/dashboard/inbox",
-                                name: c.visitorName || "Visitor",
-                                detail: c.messages[0]?.text || "Chat",
-                                at: c.lastMessageAt,
-                                kind: "chat" as const,
-                            })),
-                            ...recentLeads.map((l) => ({
-                                id: l.id,
-                                href: "/dashboard/inbox",
-                                name: l.name,
-                                detail: l.email,
-                                at: l.createdAt,
-                                kind: "lead" as const,
-                            })),
-                        ].sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 8)
-                        if (feed.length === 0) return (
-                            <EmptyState
-                                icon={<MessageSquare />}
-                                title="Nothing live yet"
-                                description="Share your page. Visits and chats land here."
-                                action={
-                                    <Button variant="brand" pill size="sm" asChild>
-                                        <Link href={`/${profile.slug}`}>Open live page</Link>
-                                    </Button>
-                                }
-                            />
-                        )
-                        return feed.map((item) => (
-                            <Link key={`${item.kind}-${item.id}`} href={item.href} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-muted/40">
-                                <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${item.kind === "lead" ? "bg-emerald-500" : "bg-aurora"}`} />
+                    {feed.length === 0 ? (
+                        <EmptyState
+                            icon={<MessageSquare />}
+                            title="Nothing live yet"
+                            description="Share your page. Visits and chats land here."
+                            action={
+                                <Button variant="pill" size="sm" asChild>
+                                    <Link href={`/${profile.slug}`}>Open live page</Link>
+                                </Button>
+                            }
+                        />
+                    ) : (
+                        feed.map((item) => (
+                            <StudioRow key={`${item.kind}-${item.id}`} href={item.href}>
+                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.kind === "lead" ? "bg-emerald-400" : "bg-[#00D7FF]"}`} />
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-baseline gap-2">
                                         <span className="truncate text-sm font-medium">{item.name}</span>
@@ -128,10 +129,21 @@ export default async function DashboardPage() {
                                     </div>
                                     <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
                                 </div>
-                            </Link>
+                            </StudioRow>
                         ))
-                    })()}
-                </div>
+                    )}
+                </StudioPanel>
+
+                <StudioPanel className="hidden p-5 lg:col-span-5 lg:block">
+                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-cyan-300/80">Live page</p>
+                    <p className="mt-3 text-lg font-semibold tracking-tight">/{profile.slug}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Share this. Visitors chat, book, and buy here.</p>
+                    <Button asChild variant="pill" className="mt-5 h-9">
+                        <Link href={`/${profile.slug}`} target="_blank">
+                            Open page <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                        </Link>
+                    </Button>
+                </StudioPanel>
             </div>
         </div>
     )

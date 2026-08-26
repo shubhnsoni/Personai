@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { CatalogHeader } from "@/components/shop/catalog-header"
 import { ShopCatalog } from "@/components/shop/shop-catalog"
+import { RestaurantMenu } from "@/components/shop/restaurant-menu"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { parseGallery } from "@/lib/commerce"
 import { catalogLabel, hoursToday, isRestaurant } from "@/lib/menu"
@@ -28,15 +29,53 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
         config = profile.animationStyle?.config ? JSON.parse(profile.animationStyle.config) : {}
     } catch { /* ignore */ }
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
-    const logo = (profile as { shopLogoUrl?: string | null }).shopLogoUrl
+    const logo = (profile as { shopLogoUrl?: string | null }).shopLogoUrl || profile.imageUrl
     const restaurant = isRestaurant(profile.roleTemplate)
+
+    if (restaurant) {
+        return (
+            <div className="min-h-dvh bg-background text-foreground">
+                <Tracker slug={slug} name="menu_view" />
+                <CatalogHeader
+                    slug={slug}
+                    name={profile.displayName}
+                    logoUrl={logo}
+                    label={catalogLabel(profile.roleTemplate)}
+                    whatsapp={profile.whatsapp}
+                    themeToggle
+                    compact
+                />
+                <RestaurantMenu
+                    slug={slug}
+                    shopName={profile.displayName}
+                    currency={profile.digitalProducts.some((p) => p.currency === "INR") ? "INR" : currency}
+                    logoUrl={logo}
+                    whatsapp={profile.whatsapp}
+                    upiId={profile.upiId}
+                    items={profile.digitalProducts.map((p) => ({
+                        id: p.id,
+                        title: p.title,
+                        thumbnailUrl: p.thumbnailUrl || parseGallery(p.galleryUrls)[0] || null,
+                        priceCents: p.priceCents,
+                        currency: p.currency,
+                        compareAtCents: p.compareAtCents,
+                        category: p.category,
+                        diet: (p as { diet?: string | null }).diet,
+                        sold: p.downloadCount,
+                        rating: p.downloadCount > 0 ? 4.5 : p.compareAtCents ? 4.2 : 4.1,
+                        ar: Boolean((p as { arModelUrl?: string | null }).arModelUrl),
+                    }))}
+                />
+            </div>
+        )
+    }
 
     return (
         <div
             className="dark min-h-dvh bg-zinc-950 text-zinc-100"
             style={{ ["--pl-aurora" as string]: theme.accent, ["--pl-brand-foreground" as string]: theme.onAccent }}
         >
-            <Tracker slug={slug} name={restaurant ? "menu_view" : "shop_view"} />
+            <Tracker slug={slug} name="shop_view" />
             <CatalogHeader slug={slug} name={profile.displayName} logoUrl={logo} label={catalogLabel(profile.roleTemplate)} whatsapp={profile.whatsapp} />
 
             <main className="mx-auto max-w-2xl px-4 py-5 pb-10">
@@ -56,6 +95,7 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
                         type: p.type,
                         thumbnailUrl: p.thumbnailUrl || parseGallery(p.galleryUrls)[0] || null,
                         priceCents: p.priceCents,
+                        currency: p.currency,
                         fulfillment: p.fulfillment,
                         stock: p.stock,
                         category: p.category,

@@ -381,19 +381,19 @@ function WeekGrid({
     const cols = `3rem repeat(${days.length}, minmax(0,1fr))`
 
     return (
-        <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-border/70 bg-card">
+        <div className="studio-panel min-h-0 flex-1 overflow-auto rounded-2xl">
             <div
-                className={cn("sticky top-0 z-10 grid border-b border-border/50 bg-card/95 backdrop-blur", days.length > 1 && "min-w-[640px]")}
+                className={cn("sticky top-0 z-10 grid border-b border-white/8 bg-background/90 backdrop-blur", days.length > 1 && "min-w-[640px]")}
                 style={{ gridTemplateColumns: cols }}
             >
                 <div />
                 {days.map((d) => (
                     <div
                         key={dayKey(d)}
-                        className={cn("px-1 py-2 text-center", sameDay(d, today) && "text-foreground")}
+                        className={cn("px-2 py-3 text-center", sameDay(d, today) && "text-foreground")}
                     >
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{WEEKDAYS[d.getDay()]}</p>
-                        <p className={cn("mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm tabular-nums", sameDay(d, today) && "bg-foreground text-background")}>
+                        <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{WEEKDAYS[d.getDay()]}</p>
+                        <p className={cn("mx-auto mt-1 flex h-8 w-8 items-center justify-center rounded-full text-sm tabular-nums", sameDay(d, today) && "bg-[#00D7FF] text-[#061018]")}>
                             {d.getDate()}
                         </p>
                     </div>
@@ -413,7 +413,7 @@ function WeekGrid({
                 {days.map((d) => {
                     const items = byDay.get(dayKey(d)) || []
                     return (
-                        <div key={dayKey(d)} className={cn("relative border-l border-border/40", sameDay(d, today) && "bg-foreground/[0.02]")}>
+                        <div key={dayKey(d)} className={cn("relative border-l border-white/6", sameDay(d, today) && "bg-cyan-400/[0.04]")}>
                             {hours.map((h) => (
                                 <button
                                     key={h}

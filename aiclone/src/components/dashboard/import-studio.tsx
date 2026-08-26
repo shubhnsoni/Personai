@@ -15,7 +15,7 @@ import { Check, Upload, X } from "lucide-react"
 
 const ALL_DESTINATIONS: { id: SourceHint; label: string; blurb: string; file: string; surface?: "shop" | "courses" | "services" | "events" }[] = [
     { id: "cv", label: "You", blurb: "CV, about page, or jobs", file: "PDF or TXT" },
-    { id: "shop", label: "Shop / Menu", blurb: "CSV, paste, or a Swiggy / Zomato / Uber Eats link", file: "CSV or TXT", surface: "shop" },
+    { id: "shop", label: "Shop / Menu", blurb: "CSV, paste, or a Google Business / Swiggy / Zomato / Uber Eats link", file: "CSV or TXT", surface: "shop" },
     { id: "course", label: "Courses", blurb: "Outline or course URL", file: "TXT", surface: "courses" },
     { id: "services", label: "Services", blurb: "Offers and prices", file: "TXT or CSV", surface: "services" },
     { id: "events", label: "Events", blurb: "Event list or calendar", file: "ICS or CSV", surface: "events" },
@@ -92,6 +92,7 @@ function defaultHintFor(role?: string | null, initial?: SourceHint): SourceHint 
 }
 
 const MENU_LINKS = [
+    { id: "google", label: "Google", placeholder: "https://maps.google.com/… or a Google Business listing" },
     { id: "swiggy", label: "Swiggy", placeholder: "https://www.swiggy.com/city/…" },
     { id: "zomato", label: "Zomato", placeholder: "https://www.zomato.com/…" },
     { id: "ubereats", label: "Uber Eats", placeholder: "https://www.ubereats.com/…" },
@@ -271,7 +272,7 @@ export function ImportStudio({
                     ) : null}
 
                     {hint === "shop" ? (
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                             {MENU_LINKS.map((src) => (
                                 <button
                                     key={src.id}
@@ -319,13 +320,15 @@ export function ImportStudio({
                             value={draft}
                             onChange={(e) => setDraft(e.target.value)}
                             placeholder={
-                                linkFocus === "swiggy"
-                                    ? "Paste your Swiggy restaurant link…"
-                                    : linkFocus === "zomato"
-                                        ? "Paste your Zomato restaurant link…"
-                                        : linkFocus === "ubereats"
-                                            ? "Paste your Uber Eats store link…"
-                                            : placeholderForHint(hint)
+                                linkFocus === "google"
+                                    ? "Paste your Google Business or Maps listing…"
+                                    : linkFocus === "swiggy"
+                                        ? "Paste your Swiggy restaurant link…"
+                                        : linkFocus === "zomato"
+                                            ? "Paste your Zomato restaurant link…"
+                                            : linkFocus === "ubereats"
+                                                ? "Paste your Uber Eats store link…"
+                                                : placeholderForHint(hint)
                             }
                             className="min-h-[10.5rem] resize-none rounded-none border-0 bg-transparent px-3.5 py-3.5 shadow-none focus-visible:ring-0"
                             onKeyDown={(e) => {

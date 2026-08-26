@@ -25,6 +25,7 @@ export type StoreData = {
         description: string | null
         type: string
         priceCents: number
+        currency?: string | null
         thumbnailUrl?: string | null
         fulfillment?: string | null
         stock?: number | null
@@ -113,7 +114,7 @@ export function ProductsStore({
                                         <p className="mt-1 text-sm text-zinc-400 line-clamp-3">{product.description}</p>
                                     )}
                                 </div>
-                                <p className="shrink-0 text-lg font-semibold tabular-nums">{money(product.priceCents)}</p>
+                                <p className="shrink-0 text-lg font-semibold tabular-nums">{money(product.priceCents, product.currency)}</p>
                             </div>
                             <div className="flex items-center justify-between">
                                 <Badge variant="secondary" className="bg-zinc-800 text-zinc-300">
