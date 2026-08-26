@@ -39,6 +39,10 @@ export const emptyNavCounts: NavCounts = {
 export async function getNavCounts(profileId: string): Promise<NavCounts> {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     try {
+    const restaurant = (await prisma.profile.findUnique({
+        where: { id: profileId },
+        select: { roleTemplate: true },
+    }))?.roleTemplate === "RESTAURANT"
     const [
         conversations,
         leads,
@@ -66,9 +70,11 @@ export async function getNavCounts(profileId: string): Promise<NavCounts> {
         prisma.visitorLead.count({ where: { profileId } }),
         prisma.visitorLead.count({ where: { profileId, createdAt: { gte: weekAgo } } }),
         prisma.booking.count({ where: { profileId, startTime: { gte: new Date() } } }),
-        prisma.productPurchase.count({
-            where: { product: { profileId }, status: "COMPLETED" },
-        }),
+        restaurant
+            ? prisma.order.count({ where: { profileId, status: { not: "CANCELLED" } } })
+            : prisma.productPurchase.count({
+                where: { product: { profileId }, status: "COMPLETED" },
+            }),
         prisma.payment.count({ where: { profileId, status: "SUCCEEDED" } }),
         prisma.serviceOffering.count({ where: { profileId } }),
         prisma.digitalProduct.count({ where: { profileId } }),
@@ -94,10 +100,15 @@ export async function getNavCounts(profileId: string): Promise<NavCounts> {
             where: { profileId, status: "SUCCEEDED", createdAt: { gte: weekAgo } },
             select: { createdAt: true },
         }),
-        prisma.productPurchase.findMany({
-            where: { product: { profileId }, status: "COMPLETED", createdAt: { gte: weekAgo } },
-            select: { createdAt: true },
-        }),
+        restaurant
+            ? prisma.order.findMany({
+                where: { profileId, status: { not: "CANCELLED" }, placedAt: { gte: weekAgo } },
+                select: { placedAt: true },
+            })
+            : prisma.productPurchase.findMany({
+                where: { product: { profileId }, status: "COMPLETED", createdAt: { gte: weekAgo } },
+                select: { createdAt: true },
+            }),
         prisma.courseEnrollment.findMany({
             where: { course: { profileId }, enrolledAt: { gte: weekAgo } },
             select: { enrolledAt: true },
@@ -109,14 +120,15 @@ export async function getNavCounts(profileId: string): Promise<NavCounts> {
     ])
 
     const days = lastSevenDays()
+    const salesDates = buyDays.map((row) => "placedAt" in row ? row.placedAt : row.createdAt)
     const sparks: Record<string, number[]> = {
         "/dashboard": spark(chatDays.map((d) => d.startedAt), days),
         "/dashboard/inbox": spark(chatDays.map((d) => d.startedAt), days),
         "/dashboard/leads": spark(leadDays.map((d) => d.createdAt), days),
         "/dashboard/calendar": spark(bookDays.map((d) => d.createdAt), days),
         "/dashboard/services": spark(bookDays.map((d) => d.createdAt), days),
-        "/dashboard/money": spark(payDays.map((d) => d.createdAt), days),
-        "/dashboard/products": spark(buyDays.map((d) => d.createdAt), days),
+        "/dashboard/money": spark(restaurant ? salesDates : payDays.map((d) => d.createdAt), days),
+        "/dashboard/products": spark(salesDates, days),
         "/dashboard/courses": spark(enrollDays.map((d) => d.enrolledAt), days),
         "/dashboard/events": spark(eventDays.map((d) => d.createdAt), days),
     }

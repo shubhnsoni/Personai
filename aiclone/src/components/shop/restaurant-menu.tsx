@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { Box, Mic, Minus, Plus, Search, ShoppingBag, UtensilsCrossed, X } from "lucide-react"
 import { formatStoredPrice, type DisplayCurrency } from "@/lib/pricing"
 import { whatsappHref } from "@/lib/commerce"
-import { placeCartOrder } from "@/app/actions/products"
+import { createRestaurantOrder } from "@/app/actions/orders"
+import type { ModifierSelectionInput } from "@/lib/restaurant-orders"
 import {
     defaultPicks,
     dishGroups,
@@ -39,6 +40,7 @@ type CartLine = {
     extraCents: number
     currency?: string | null
     extras: string
+    modifiers: ModifierSelectionInput[]
     thumbnailUrl: string | null
 }
 
@@ -53,6 +55,8 @@ export function RestaurantMenu({
     items,
     whatsapp,
     upiId,
+    tableCode,
+    tableLabel,
 }: {
     slug: string
     shopName: string
@@ -61,6 +65,8 @@ export function RestaurantMenu({
     logoUrl?: string | null
     whatsapp?: string | null
     upiId?: string | null
+    tableCode?: string | null
+    tableLabel?: string | null
 }) {
     const cats = useMemo(() => {
         const set = new Set<string>()
@@ -120,17 +126,31 @@ export function RestaurantMenu({
     const [nav, setNav] = useState(false)
     const [active, setActive] = useState(buckets[0]?.id || "")
     const [cart, setCart] = useState<CartLine[]>([])
+    const cartHydrated = useRef(false)
     const [custom, setCustom] = useState<Item | null>(null)
     const [cartOpen, setCartOpen] = useState(false)
 
     useEffect(() => {
-        try {
-            const raw = sessionStorage.getItem(`pl-cart-${slug}`)
-            if (raw) setCart(JSON.parse(raw) as CartLine[])
-        } catch { /* ignore */ }
+        const timer = window.setTimeout(() => {
+            try {
+                const raw = sessionStorage.getItem(`pl-cart-${slug}`)
+                if (raw) {
+                    const parsed = JSON.parse(raw) as CartLine[]
+                    if (Array.isArray(parsed)) {
+                        setCart(parsed.map((line) => ({
+                            ...line,
+                            modifiers: Array.isArray(line.modifiers) ? line.modifiers : [],
+                        })))
+                    }
+                }
+            } catch { /* ignore */ }
+            cartHydrated.current = true
+        }, 0)
+        return () => window.clearTimeout(timer)
     }, [slug])
 
     useEffect(() => {
+        if (!cartHydrated.current) return
         try {
             sessionStorage.setItem(`pl-cart-${slug}`, JSON.stringify(cart))
         } catch { /* ignore */ }
@@ -193,6 +213,7 @@ export function RestaurantMenu({
                 extraCents: 0,
                 currency: item.currency,
                 extras: "",
+                modifiers: [],
                 thumbnailUrl: item.thumbnailUrl,
             }]
         })
@@ -218,6 +239,9 @@ export function RestaurantMenu({
                 extraCents,
                 currency: item.currency,
                 extras,
+                modifiers: Object.entries(picked)
+                    .filter(([, optionIds]) => optionIds.length > 0)
+                    .map(([groupId, optionIds]) => ({ groupId, optionIds: [...optionIds] })),
                 thumbnailUrl: item.thumbnailUrl,
             }]
         })
@@ -419,11 +443,14 @@ export function RestaurantMenu({
 
             {cartOpen ? (
                 <CartSheet
+                    slug={slug}
                     shopName={shopName}
                     currency={currency}
                     cart={cart}
                     whatsapp={whatsapp}
                     upiId={upiId}
+                    tableCode={tableCode}
+                    tableLabel={tableLabel}
                     onClose={() => setCartOpen(false)}
                     onChange={setCart}
                     onClear={() => { setCart([]); setCartOpen(false) }}
@@ -613,48 +640,109 @@ function CustomizeSheet({
 }
 
 function CartSheet({
+    slug,
     shopName,
     currency,
     cart,
     whatsapp,
     upiId,
+    tableCode,
+    tableLabel,
     onClose,
     onChange,
     onClear,
 }: {
+    slug: string
     shopName: string
     currency: DisplayCurrency
     cart: CartLine[]
     whatsapp?: string | null
     upiId?: string | null
+    tableCode?: string | null
+    tableLabel?: string | null
     onClose: () => void
     onChange: (cart: CartLine[]) => void
     onClear: () => void
 }) {
     const [name, setName] = useState("")
     const [email, setEmail] = useState("")
-    const [table, setTable] = useState("")
     const [pay, setPay] = useState<"UPI" | "COD" | "WHATSAPP">(upiId ? "UPI" : whatsapp ? "WHATSAPP" : "COD")
+    const [idempotencyKey, setIdempotencyKey] = useState("")
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [done, setDone] = useState<string | null>(null)
     const total = cart.reduce((n, l) => n + (l.baseCents + l.extraCents) * l.qty, 0)
     const stored = cart[0]?.currency || "INR"
+    const channel = tableCode ? "DINE_IN" as const : "TAKEAWAY" as const
+    const invalidTableCode = Boolean(tableCode && !tableLabel)
+    const orderKeyStorage = `pl-order-key-${slug}`
+
+    function makeOrderKey() {
+        if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID()
+        return `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`
+    }
+
+    function rememberOrderKey(key: string) {
+        setIdempotencyKey(key)
+        try {
+            sessionStorage.setItem(orderKeyStorage, key)
+        } catch { /* ignore */ }
+        return key
+    }
+
+    function rotateOrderKey() {
+        return rememberOrderKey(makeOrderKey())
+    }
+
+    function ensureOrderKey() {
+        return idempotencyKey || rotateOrderKey()
+    }
 
     useEffect(() => {
+        let nextEmail = ""
+        let nextName = ""
+        let nextKey = ""
         try {
-            setEmail(localStorage.getItem("pl_buyer_email") || "")
-            setName(localStorage.getItem("pl_buyer_name") || "")
-        } catch { /* ignore */ }
-    }, [])
+            nextEmail = localStorage.getItem("pl_buyer_email") || ""
+            nextName = localStorage.getItem("pl_buyer_name") || ""
+            const existing = sessionStorage.getItem(orderKeyStorage)
+            nextKey = existing && /^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$/.test(existing)
+                ? existing
+                : (typeof globalThis.crypto?.randomUUID === "function"
+                    ? globalThis.crypto.randomUUID()
+                    : `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`)
+            sessionStorage.setItem(orderKeyStorage, nextKey)
+        } catch {
+            nextKey = `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`
+        }
+        let cancelled = false
+        queueMicrotask(() => {
+            if (cancelled) return
+            setEmail(nextEmail)
+            setName(nextName)
+            setIdempotencyKey(nextKey)
+        })
+        return () => { cancelled = true }
+    }, [orderKeyStorage])
 
     function setQty(key: string, qty: number) {
-        onChange(qty <= 0 ? cart.filter((l) => l.key !== key) : cart.map((l) => l.key === key ? { ...l, qty } : l))
+        const nextQty = Math.min(20, qty)
+        onChange(nextQty <= 0 ? cart.filter((l) => l.key !== key) : cart.map((l) => l.key === key ? { ...l, qty: nextQty } : l))
+    }
+
+    function finish(message: string) {
+        setDone(message)
+        onChange([])
+        rotateOrderKey()
     }
 
     async function place() {
         if (!name.trim() || !email.includes("@")) {
             setError("Name and a real email are required.")
+            return
+        }
+        if (invalidTableCode) {
+            setError("This table link is invalid. Scan the QR code on your table again.")
             return
         }
         if (!cart.length) return
@@ -663,31 +751,42 @@ function CartSheet({
         try {
             localStorage.setItem("pl_buyer_email", email.trim())
             localStorage.setItem("pl_buyer_name", name.trim())
-            const summary = cart.map((l) => `${l.qty}× ${l.title}${l.extras ? ` (${l.extras})` : ""}`).join("\n")
-            const result = await placeCartOrder({
-                lines: cart.map((l) => ({ productId: l.itemId, qty: l.qty, extras: l.extras || undefined })),
-                visitorName: name.trim(),
-                visitorEmail: email.trim(),
+            const result = await createRestaurantOrder({
+                profileSlug: slug,
+                idempotencyKey: ensureOrderKey(),
+                lines: cart.map((line) => ({
+                    productId: line.itemId,
+                    qty: line.qty,
+                    modifiers: line.modifiers || [],
+                })),
+                guestName: name.trim(),
+                guestEmail: email.trim(),
                 payMethod: pay,
-                address: table.trim() || undefined,
+                channel,
+                tableCode: tableCode || undefined,
             })
+            const summary = result.lines
+                .map((line) => `${line.qty}× ${line.title}${line.modifiersLabel ? ` (${line.modifiersLabel})` : ""}`)
+                .join("\n")
+            const authoritativeTotal = money(result.totalCents, result.currency, currency)
+            const location = result.tableLabel ? `\nTable: ${result.tableLabel}` : "\nTakeaway"
+
             if (pay === "WHATSAPP") {
                 const href = whatsappHref(
-                    whatsapp || result.whatsapp,
-                    `Hi ${shopName}, I'd like to order:\n${summary}\nTotal ${money(total, stored, currency)}\nName: ${name.trim()}${table ? `\nTable: ${table}` : ""}`,
+                    result.whatsapp || whatsapp,
+                    `Hi ${shopName}, order #${result.number}:\n${summary}\nTotal ${authoritativeTotal}\nName: ${name.trim()}${location}`,
                 )
                 if (href) window.open(href, "_blank")
-                setDone("WhatsApp opened with your order.")
-                onChange([])
+                finish(`Order #${result.number} placed. WhatsApp opened with the confirmed total.`)
                 return
             }
             if (pay === "UPI") {
-                setDone(`Pay ${money(total, stored, currency)} to ${upiId || result.upiId || "the UPI ID on this page"}. We'll confirm in Sales.`)
-                onChange([])
+                finish(`Order #${result.number} placed. Pay ${authoritativeTotal} to ${result.upiId || upiId || "the restaurant UPI ID"}.`)
                 return
             }
-            setDone("Order placed. Pay at the table when it arrives.")
-            onChange([])
+            finish(channel === "DINE_IN"
+                ? `Order #${result.number} placed for ${result.tableLabel}. Pay at the table when it arrives.`
+                : `Order #${result.number} placed for takeaway. Pay on pickup.`)
         } catch (e) {
             setError(e instanceof Error ? e.message : "Could not place that order")
         } finally {
@@ -707,18 +806,18 @@ function CartSheet({
                 </div>
                 <div className="space-y-3 px-4 py-4">
                     {cart.length === 0 && !done ? <p className="text-sm text-muted-foreground">Cart is empty.</p> : null}
-                    {cart.map((l) => (
-                        <div key={l.key} className="flex items-start gap-3">
-                            {l.thumbnailUrl ? <img src={l.thumbnailUrl} alt="" className="h-14 w-14 rounded-xl object-cover" /> : null}
+                    {cart.map((line) => (
+                        <div key={line.key} className="flex items-start gap-3">
+                            {line.thumbnailUrl ? <img src={line.thumbnailUrl} alt="" className="h-14 w-14 rounded-xl object-cover" /> : null}
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold">{l.title}</p>
-                                {l.extras ? <p className="text-[12px] text-muted-foreground">{l.extras}</p> : null}
-                                <p className="mt-0.5 text-[13px] font-semibold tabular-nums">{money((l.baseCents + l.extraCents) * l.qty, l.currency, currency)}</p>
+                                <p className="text-sm font-semibold">{line.title}</p>
+                                {line.extras ? <p className="text-[12px] text-muted-foreground">{line.extras}</p> : null}
+                                <p className="mt-0.5 text-[13px] font-semibold tabular-nums">{money((line.baseCents + line.extraCents) * line.qty, line.currency, currency)}</p>
                             </div>
                             <div className="flex items-center rounded-lg border border-emerald-700 text-emerald-700">
-                                <button type="button" className="px-2 py-1" onClick={() => setQty(l.key, l.qty - 1)}><Minus className="h-3 w-3" /></button>
-                                <span className="min-w-4 text-center text-[12px] font-bold tabular-nums">{l.qty}</span>
-                                <button type="button" className="px-2 py-1" onClick={() => setQty(l.key, l.qty + 1)}><Plus className="h-3 w-3" /></button>
+                                <button type="button" className="px-2 py-1" onClick={() => setQty(line.key, line.qty - 1)}><Minus className="h-3 w-3" /></button>
+                                <span className="min-w-4 text-center text-[12px] font-bold tabular-nums">{line.qty}</span>
+                                <button type="button" className="px-2 py-1" onClick={() => setQty(line.key, line.qty + 1)}><Plus className="h-3 w-3" /></button>
                             </div>
                         </div>
                     ))}
@@ -727,34 +826,40 @@ function CartSheet({
                     ) : cart.length ? (
                         <>
                             <div className="flex items-center justify-between border-t border-border/50 pt-3 text-sm font-semibold">
-                                <span>Total</span>
+                                <span>Estimated total</span>
                                 <span className="tabular-nums">{money(total, stored, currency)}</span>
+                            </div>
+                            <div className={cn("rounded-2xl px-3 py-2.5 text-sm", invalidTableCode ? "bg-rose-500/10 text-rose-700" : "bg-muted text-foreground")}>
+                                {invalidTableCode
+                                    ? "Invalid table link — scan the QR code on your table again."
+                                    : tableLabel
+                                        ? `Dining at ${tableLabel}`
+                                        : "Takeaway order"}
                             </div>
                             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full rounded-2xl bg-muted px-3 py-2.5 text-sm outline-none" />
                             <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="w-full rounded-2xl bg-muted px-3 py-2.5 text-sm outline-none" />
-                            <input value={table} onChange={(e) => setTable(e.target.value)} placeholder="Table number (optional)" className="w-full rounded-2xl bg-muted px-3 py-2.5 text-sm outline-none" />
                             <div className="flex gap-2">
-                                {(["COD", "UPI", "WHATSAPP"] as const).filter((m) => m === "COD" || (m === "UPI" && upiId) || (m === "WHATSAPP" && whatsapp)).map((m) => (
+                                {(["COD", "UPI", "WHATSAPP"] as const).filter((method) => method === "COD" || (method === "UPI" && upiId) || (method === "WHATSAPP" && whatsapp)).map((method) => (
                                     <button
-                                        key={m}
+                                        key={method}
                                         type="button"
-                                        onClick={() => setPay(m)}
-                                        className={cn("rounded-full px-3 py-1.5 text-[12px] font-medium", pay === m ? "bg-foreground text-background" : "bg-muted")}
+                                        onClick={() => setPay(method)}
+                                        className={cn("rounded-full px-3 py-1.5 text-[12px] font-medium", pay === method ? "bg-foreground text-background" : "bg-muted")}
                                     >
-                                        {m === "COD" ? "Pay at table" : m === "UPI" ? "UPI" : "WhatsApp"}
+                                        {method === "COD" ? (channel === "DINE_IN" ? "Pay at table" : "Pay on pickup") : method === "UPI" ? "UPI" : "WhatsApp"}
                                     </button>
                                 ))}
                             </div>
                             {error ? <p className="text-sm text-rose-600">{error}</p> : null}
                             <button
                                 type="button"
-                                disabled={busy}
+                                disabled={busy || invalidTableCode}
                                 onClick={place}
                                 className="w-full rounded-full bg-emerald-700 py-3 text-sm font-semibold text-white disabled:opacity-60"
                             >
                                 {busy ? "Placing…" : `Place order · ${money(total, stored, currency)}`}
                             </button>
-                            <button type="button" onClick={onClear} className="w-full text-center text-[12px] text-muted-foreground">Clear cart</button>
+                            <button type="button" onClick={() => { rotateOrderKey(); onClear() }} className="w-full text-center text-[12px] text-muted-foreground">Clear cart</button>
                         </>
                     ) : null}
                 </div>

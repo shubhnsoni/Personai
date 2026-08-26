@@ -8,74 +8,142 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum OrderChannel {
+  DINE_IN
+  TAKEAWAY
+}
+
+enum OrderStatus {
+  PLACED
+  ACCEPTED
+  PREPARING
+  READY
+  SERVED
+  PAID
+  CANCELLED
+}
+
+enum OrderLineStatus {
+  QUEUED
+  PREPARING
+  READY
+  SERVED
+}
+
+enum OrderPayMethod {
+  UPI
+  COD
+  WHATSAPP
+  STRIPE
+}
+
+enum OrderPayStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+enum OrderEventActor {
+  GUEST
+  STAFF
+  SYSTEM
+}
+
+enum OrderEventKind {
+  CREATED
+  ORDER_STATUS
+  LINE_STATUS
+  PAYMENT_STATUS
+  BACKFILL
+}
+
+enum OfferReviewStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+}
+
+enum ProfileImageCategory {
+  AMBIENCE
+  INTERIOR
+  FOOD
+  TEAM
+  EVENT
+}
+
 model User {
-  id        String   @id @default(cuid())
-  clerkId   String   @unique // Map to Clerk User ID
-  email     String   @unique
-  name      String?
-  image     String?
-  role      String   @default("CREATOR") // "CREATOR" | "ADMIN"
+  id                     String   @id @default(cuid())
+  clerkId                String   @unique // Map to Clerk User ID
+  email                  String   @unique
+  name                   String?
+  image                  String?
+  role                   String   @default("CREATOR") // "CREATOR" | "ADMIN"
   stripeConnectAccountId String? // Stripe Connect account for payouts
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   profiles      Profile[]
   notifications Notification[]
 }
 
 model Profile {
-  id                    String                 @id @default(cuid())
-  userId                String
-  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  slug                  String                 @unique
-  displayName           String
-  headline              String?
-  bio                   String?
-  roleTemplate          String                 @default("CUSTOM") // Enum as String
-  primaryGoal           String                 @default("BOOK_CALL") // Enum as String
-  language              String                 @default("en")
-  timezone              String                 @default("UTC")
-  themeColor            String                 @default("#000000")
-  imageUrl              String?
-  shopLogoUrl           String?
-  whatsapp              String?
-  upiId                 String?
-  gstin                 String?
-  deliveryNote          String?
-  chatAvatarMode        String                 @default("ORB") // "ORB" | "IMAGE"
-  animationStyleId      String?
-  animationStyle        WelcomeAnimationPreset? @relation(fields: [animationStyleId], references: [id])
-  isPublic              Boolean                @default(false)
-  showInDirectory       Boolean                @default(false)
+  id                     String                  @id @default(cuid())
+  userId                 String
+  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug                   String                  @unique
+  displayName            String
+  headline               String?
+  bio                    String?
+  roleTemplate           String                  @default("CUSTOM") // Enum as String
+  primaryGoal            String                  @default("BOOK_CALL") // Enum as String
+  language               String                  @default("en")
+  timezone               String                  @default("UTC")
+  themeColor             String                  @default("#000000")
+  imageUrl               String?
+  shopLogoUrl            String?
+  whatsapp               String?
+  upiId                  String?
+  gstin                  String?
+  deliveryNote           String?
+  chatAvatarMode         String                  @default("ORB") // "ORB" | "IMAGE"
+  animationStyleId       String?
+  animationStyle         WelcomeAnimationPreset? @relation(fields: [animationStyleId], references: [id])
+  isPublic               Boolean                 @default(false)
+  showInDirectory        Boolean                 @default(false)
   welcomeMessageOverride String?
-  contentDisplayMode    String                 @default("POPUP") // "SIDE_PANEL" | "POPUP"
-  personalityConfig     String?                // JSON: {tone, customInstructions, responseLength, language}
-  aiModel               String                 @default("gpt-4o-mini") // "gpt-4o-mini" | "gpt-4o"
-  autoMemoryEnabled     Boolean                @default(false)
-  liveChatEnabled       Boolean                @default(false)
-  liveChatSlaMinutes    Int                    @default(10)
-  bufferMinutes         Int                    @default(0)
-  calendarToken         String?                @unique
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  contentDisplayMode     String                  @default("POPUP") // "SIDE_PANEL" | "POPUP"
+  personalityConfig      String? // JSON: {tone, customInstructions, responseLength, language}
+  aiModel                String                  @default("gpt-4o-mini") // "gpt-4o-mini" | "gpt-4o"
+  autoMemoryEnabled      Boolean                 @default(false)
+  liveChatEnabled        Boolean                 @default(false)
+  liveChatSlaMinutes     Int                     @default(10)
+  bufferMinutes          Int                     @default(0)
+  calendarToken          String?                 @unique
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
-  documents        ProfileDocument[]
-  serviceOfferings ServiceOffering[]
-  bookings         Booking[]
-  conversations    Conversation[]
-  payments         Payment[]
-  leads            VisitorLead[]
-  availability     AvailabilitySchedule[]
+  documents         ProfileDocument[]
+  serviceOfferings  ServiceOffering[]
+  bookings          Booking[]
+  conversations     Conversation[]
+  payments          Payment[]
+  leads             VisitorLead[]
+  availability      AvailabilitySchedule[]
   calendarOverrides CalendarOverride[]
-  workExperiences  WorkExperience[]
-  projects         Project[]
-  digitalProducts  DigitalProduct[]
-  courses          Course[]
-  events           Event[]
-  communities      Community[]
-  leadMagnets      LeadMagnet[]
-  shortLinks       ShortLink[]
-  analyticsEvents  ProfileEvent[]
+  workExperiences   WorkExperience[]
+  projects          Project[]
+  digitalProducts   DigitalProduct[]
+  courses           Course[]
+  events            Event[]
+  communities       Community[]
+  leadMagnets       LeadMagnet[]
+  shortLinks        ShortLink[]
+  analyticsEvents   ProfileEvent[]
+  restaurantOrders  Order[]
+  restaurantTables  RestaurantTable[]
+  orderCounters     OrderCounter[]
+  profileImages     ProfileImage[]
+  restaurantReviews OfferReview[]
 }
 
 model ProfileEvent {
@@ -94,17 +162,17 @@ model ProfileEvent {
 }
 
 model WorkExperience {
-  id          String   @id @default(cuid())
-  profileId   String
-  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  company     String
-  role        String
-  startDate   String   // e.g. "2022" or "Jan 2022"
-  endDate     String?  // null = Present
-  description String?
+  id           String   @id @default(cuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  company      String
+  role         String
+  startDate    String // e.g. "2022" or "Jan 2022"
+  endDate      String? // null = Present
+  description  String?
   achievements String? // JSON string array
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Project {
@@ -134,22 +202,22 @@ model WelcomeAnimationPreset {
 }
 
 model ProfileDocument {
-  id                String              @id @default(cuid())
+  id                String   @id @default(cuid())
   profileId         String
-  profile           Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  type              String              // Enum
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  type              String // Enum
   title             String
-  sourceType        String              // Enum
+  sourceType        String // Enum
   url               String?
   filePath          String?
   rawText           String?
-  embedding         Float[]             // OpenAI embedding vector
-  embeddingMetadata String?             // Json
+  embedding         Float[] // OpenAI embedding vector
+  embeddingMetadata String? // Json
   visitorKey        String?
   memberId          String?
   conversationId    String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([profileId, visitorKey])
 }
@@ -177,10 +245,10 @@ model ServiceOffering {
 }
 
 model Booking {
-  id                String        @id @default(cuid())
+  id                String          @id @default(cuid())
   profileId         String
-  profile           Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  visitorId         String?       
+  profile           Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  visitorId         String?
   visitorName       String
   visitorEmail      String
   memberId          String?
@@ -192,45 +260,45 @@ model Booking {
   status            String          @default("PENDING_PAYMENT") // Enum
   paymentId         String?         @unique
   payment           Payment?        @relation(fields: [paymentId], references: [id])
-  metadata          String?         // Json
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-}
-
-model Payment {
-  id                String          @id @default(cuid())
-  profileId         String
-  profile           Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  bookingId         String?         @unique 
-  booking           Booking?
-  amountCents       Int
-  currency          String
-  status            String          @default("PENDING") // Enum
-  provider          String          @default("STRIPE") // Enum
-  providerPaymentId String?
+  metadata          String? // Json
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 }
 
+model Payment {
+  id                String   @id @default(cuid())
+  profileId         String
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  bookingId         String?  @unique
+  booking           Booking?
+  amountCents       Int
+  currency          String
+  status            String   @default("PENDING") // Enum
+  provider          String   @default("STRIPE") // Enum
+  providerPaymentId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
 model Conversation {
-  id             String             @id @default(cuid())
-  profileId      String
-  profile        Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  visitorId      String?
-  visitorName    String?
-  visitorEmail   String?
-  memberId       String?
-  member         Member?            @relation(fields: [memberId], references: [id])
-  source         String             @default("PROFILE_PAGE") // Enum
-  leadStatus     String             @default("NEW") // Enum
-  notes          String?
-  mode           String             @default("AI") // "AI" | "LIVE_REQUESTED" | "LIVE"
-  liveRequestedAt DateTime?
-  liveRespondedAt DateTime?
+  id                  String    @id @default(cuid())
+  profileId           String
+  profile             Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  visitorId           String?
+  visitorName         String?
+  visitorEmail        String?
+  memberId            String?
+  member              Member?   @relation(fields: [memberId], references: [id])
+  source              String    @default("PROFILE_PAGE") // Enum
+  leadStatus          String    @default("NEW") // Enum
+  notes               String?
+  mode                String    @default("AI") // "AI" | "LIVE_REQUESTED" | "LIVE"
+  liveRequestedAt     DateTime?
+  liveRespondedAt     DateTime?
   lastSummarizedMsgId String?
-  startedAt      DateTime           @default(now())
-  endedAt        DateTime?
-  lastMessageAt  DateTime           @default(now())
+  startedAt           DateTime  @default(now())
+  endedAt             DateTime?
+  lastMessageAt       DateTime  @default(now())
 
   messages     Message[]
   visitorLeads VisitorLead[]
@@ -243,26 +311,26 @@ model Message {
   id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderType     String       // Enum
-  text           String       
-  role           String       
+  senderType     String // Enum
+  text           String
+  role           String
   createdAt      DateTime     @default(now())
 }
 
 model VisitorLead {
-  id             String            @id @default(cuid())
+  id             String        @id @default(cuid())
   profileId      String
-  profile        Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profile        Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
   conversationId String?
-  conversation   Conversation?     @relation(fields: [conversationId], references: [id])
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
   name           String
   email          String
   company        String?
   budgetRange    String?
-  status         String            @default("NEW") // Enum
-  tags           String?           // Json
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  status         String        @default("NEW") // Enum
+  tags           String? // Json
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model AdminSettings {
@@ -275,9 +343,9 @@ model AvailabilitySchedule {
   id        String   @id @default(cuid())
   profileId String
   profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  dayOfWeek Int      // 0-6 (Sun-Sat)
-  startTime String   // "09:00"
-  endTime   String   // "17:00"
+  dayOfWeek Int // 0-6 (Sun-Sat)
+  startTime String // "09:00"
+  endTime   String // "17:00"
   isEnabled Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -301,64 +369,65 @@ model CalendarOverride {
 // ==================== SuperProfile-like Features ====================
 
 model DigitalProduct {
-  id            String   @id @default(cuid())
-  profileId     String
-  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  title         String
-  description   String?
-  type          String   @default("OTHER") // "PDF" | "VIDEO" | "AUDIO" | "OTHER" | "PHYSICAL"
-  fileUrl       String?
-  thumbnailUrl  String?
-  subtitle      String?
-  body          String?
+  id             String   @id @default(cuid())
+  profileId      String
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  type           String   @default("OTHER") // "PDF" | "VIDEO" | "AUDIO" | "OTHER" | "PHYSICAL"
+  fileUrl        String?
+  thumbnailUrl   String?
+  subtitle       String?
+  body           String?
   compareAtCents Int?
-  highlights    String?
-  galleryUrls   String?
-  fulfillment   String   @default("DIGITAL") // "DIGITAL" | "PHYSICAL" | "BOTH"
-  stock         Int?
-  sku           String?
-  weightGrams   Int?
-  allowCod      Boolean  @default(false)
-  category      String?
-  diet          String?
-  spiceLevel    Int?
-  serveWindow   String?
-  arModelUrl    String?
-  arUsdzUrl     String?
-  variantsJson  String?
-  shipMode      String   @default("NONE") // "NONE" | "PICKUP" | "DELIVER" | "BOTH"
-  shipFeeCents  Int      @default(0)
-  priceCents    Int      @default(0)
-  currency      String   @default("USD")
-  isActive      Boolean  @default(true)
-  downloadCount Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  highlights     String?
+  galleryUrls    String?
+  fulfillment    String   @default("DIGITAL") // "DIGITAL" | "PHYSICAL" | "BOTH"
+  stock          Int?
+  sku            String?
+  weightGrams    Int?
+  allowCod       Boolean  @default(false)
+  category       String?
+  diet           String?
+  spiceLevel     Int?
+  serveWindow    String?
+  arModelUrl     String?
+  arUsdzUrl      String?
+  variantsJson   String?
+  shipMode       String   @default("NONE") // "NONE" | "PICKUP" | "DELIVER" | "BOTH"
+  shipFeeCents   Int      @default(0)
+  priceCents     Int      @default(0)
+  currency       String   @default("USD")
+  isActive       Boolean  @default(true)
+  downloadCount  Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  purchases ProductPurchase[]
-  reviews   OfferReview[]
+  purchases  ProductPurchase[]
+  reviews    OfferReview[]
+  orderLines OrderLine[]
 }
 
 model Course {
-  id            String   @id @default(cuid())
-  profileId     String
-  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  title         String
-  description   String?
-  thumbnailUrl  String?
-  subtitle      String?
-  body          String?
-  outcomes      String?
-  level         String   @default("ALL")
+  id             String   @id @default(cuid())
+  profileId      String
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  thumbnailUrl   String?
+  subtitle       String?
+  body           String?
+  outcomes       String?
+  level          String   @default("ALL")
   compareAtCents Int?
-  priceCents    Int      @default(0)
-  currency      String   @default("USD")
-  isActive      Boolean  @default(true)
-  isPublished   Boolean  @default(false)
-  totalModules  Int      @default(0)
-  totalLessons  Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  priceCents     Int      @default(0)
+  currency       String   @default("USD")
+  isActive       Boolean  @default(true)
+  isPublished    Boolean  @default(false)
+  totalModules   Int      @default(0)
+  totalLessons   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   modules     CourseModule[]
   enrollments CourseEnrollment[]
@@ -378,43 +447,43 @@ model CourseModule {
 }
 
 model CourseLesson {
-  id              String   @id @default(cuid())
+  id              String       @id @default(cuid())
   moduleId        String
   module          CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   title           String
   description     String?
-  contentType     String   @default("VIDEO") // "VIDEO" | "TEXT" | "PDF"
+  contentType     String       @default("VIDEO") // "VIDEO" | "TEXT" | "PDF"
   contentUrl      String?
   videoUrl        String?
   body            String?
   fileUrl         String?
-  durationMinutes Int      @default(0)
-  orderIndex      Int      @default(0)
-  isFree          Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  durationMinutes Int          @default(0)
+  orderIndex      Int          @default(0)
+  isFree          Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 }
 
 model Event {
-  id            String    @id @default(cuid())
-  profileId     String
-  profile       Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  title         String
-  description   String?
-  eventType     String    @default("WEBINAR") // "WEBINAR" | "WORKSHOP" | "MEETUP"
-  thumbnailUrl  String?
-  startTime     DateTime
-  endTime       DateTime
-  timezone      String    @default("UTC")
-  location      String?   // For offline events
-  meetingUrl    String?   // For online events
-  priceCents    Int       @default(0)
-  currency      String    @default("USD")
-  isFree        Boolean   @default(false)
-  maxAttendees  Int?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String   @id @default(cuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  eventType    String   @default("WEBINAR") // "WEBINAR" | "WORKSHOP" | "MEETUP"
+  thumbnailUrl String?
+  startTime    DateTime
+  endTime      DateTime
+  timezone     String   @default("UTC")
+  location     String? // For offline events
+  meetingUrl   String? // For online events
+  priceCents   Int      @default(0)
+  currency     String   @default("USD")
+  isFree       Boolean  @default(false)
+  maxAttendees Int?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   registrations EventRegistration[]
 }
@@ -446,7 +515,7 @@ model LeadMagnet {
   description   String?
   type          String   @default("DOWNLOAD") // "FORM" | "GIVEAWAY" | "DOWNLOAD"
   fileUrl       String?
-  formFields    String?  // JSON array of form field definitions
+  formFields    String? // JSON array of form field definitions
   isActive      Boolean  @default(true)
   downloadCount Int      @default(0)
   createdAt     DateTime @default(now())
@@ -478,13 +547,13 @@ model Member {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  sessions     MemberSession[]
-  libraryLinks LibraryLink[]
-  purchases    ProductPurchase[]
-  enrollments  CourseEnrollment[]
-  events       EventRegistration[]
-  communities  CommunityMember[]
-  bookings     Booking[]
+  sessions      MemberSession[]
+  libraryLinks  LibraryLink[]
+  purchases     ProductPurchase[]
+  enrollments   CourseEnrollment[]
+  events        EventRegistration[]
+  communities   CommunityMember[]
+  bookings      Booking[]
   conversations Conversation[]
 }
 
@@ -508,34 +577,179 @@ model LibraryLink {
 }
 
 model ProductPurchase {
-  id           String    @id @default(cuid())
-  productId    String
-  product      DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
-  memberId     String?
-  member       Member?   @relation(fields: [memberId], references: [id])
-  visitorEmail String
-  visitorName  String?
-  paymentId    String?
-  status       String    @default("PENDING") // "PENDING" | "COMPLETED" | "REFUNDED"
-  payMethod    String?
-  buyerNote    String?
-  address      String?
-  confirmedAt  DateTime?
-  downloadToken  String?   @unique
+  id             String         @id @default(cuid())
+  productId      String
+  product        DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  memberId       String?
+  member         Member?        @relation(fields: [memberId], references: [id])
+  visitorEmail   String
+  visitorName    String?
+  paymentId      String?
+  status         String         @default("PENDING") // "PENDING" | "COMPLETED" | "REFUNDED"
+  payMethod      String?
+  buyerNote      String?
+  address        String?
+  confirmedAt    DateTime?
+  downloadToken  String?        @unique
   downloadExpiry DateTime?
-  downloadedAt DateTime?
-  createdAt    DateTime  @default(now())
+  downloadedAt   DateTime?
+  createdAt      DateTime       @default(now())
 }
 
 model OfferReview {
-  id          String         @id @default(cuid())
-  productId   String
-  product     DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
-  rating      Int
-  text        String?
-  imageUrl    String?
-  visitorName String
-  createdAt   DateTime       @default(now())
+  id             String            @id @default(cuid())
+  productId      String?
+  product        DigitalProduct?   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  profileId      String?
+  profile        Profile?          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  orderId        String?
+  order          Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  rating         Int
+  text           String?
+  imageUrl       String?
+  visitorName    String
+  status         OfferReviewStatus @default(PUBLISHED)
+  ownerReply     String?
+  ownerRepliedAt DateTime?
+  createdAt      DateTime          @default(now())
+
+  @@index([productId, status, createdAt])
+  @@index([profileId, status, createdAt])
+  @@index([orderId])
+}
+
+model Order {
+  id             String           @id @default(cuid())
+  profileId      String
+  profile        Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  publicToken    String           @unique
+  idempotencyKey String?
+  legacyGroupKey String?          @unique
+  number         Int
+  businessDate   DateTime         @db.Date
+  channel        OrderChannel     @default(DINE_IN)
+  tableId        String?
+  table          RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  tableLabel     String?
+  status         OrderStatus      @default(PLACED)
+  guestName      String?
+  guestPhone     String?
+  guestEmail     String?
+  note           String?
+  subtotalCents  Int
+  taxCents       Int              @default(0)
+  totalCents     Int
+  currency       String
+  payMethod      OrderPayMethod?
+  payStatus      OrderPayStatus   @default(UNPAID)
+  paidAt         DateTime?
+  paidBy         String?
+  paymentRef     String?
+  placedAt       DateTime         @default(now())
+  acceptedAt     DateTime?
+  preparingAt    DateTime?
+  readyAt        DateTime?
+  servedAt       DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  updatedAt      DateTime         @updatedAt
+
+  lines   OrderLine[]
+  events  OrderEvent[]
+  reviews OfferReview[]
+
+  @@unique([profileId, businessDate, number])
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status])
+  @@index([profileId, placedAt])
+  @@index([publicToken, status])
+}
+
+model OrderLine {
+  id                String          @id @default(cuid())
+  orderId           String
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId         String?
+  product           DigitalProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  titleSnapshot     String
+  skuSnapshot       String?
+  qty               Int
+  unitPriceCents    Int
+  unitModifierCents Int             @default(0)
+  modifiers         Json?
+  modifiersLabel    String?
+  lineTotalCents    Int
+  status            OrderLineStatus @default(QUEUED)
+  legacyPurchaseId  String?         @unique
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  events OrderEvent[]
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderEvent {
+  id          String          @id @default(cuid())
+  orderId     String
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderLineId String?
+  orderLine   OrderLine?      @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+  seq         BigInt          @default(autoincrement())
+  kind        OrderEventKind
+  from        String?
+  to          String
+  actor       OrderEventActor
+  actorId     String?
+  metadata    Json?
+  at          DateTime        @default(now())
+
+  @@index([orderId, seq])
+  @@index([orderLineId, seq])
+}
+
+model RestaurantTable {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  label     String
+  seats     Int?
+  zone      String?
+  code      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  scans     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@unique([profileId, label])
+  @@index([profileId, isActive, sortOrder])
+}
+
+model OrderCounter {
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  businessDate DateTime @db.Date
+  value        Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@id([profileId, businessDate])
+}
+
+model ProfileImage {
+  id        String               @id @default(cuid())
+  profileId String
+  profile   Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  url       String
+  caption   String?
+  category  ProfileImageCategory @default(AMBIENCE)
+  sortOrder Int                  @default(0)
+  createdAt DateTime             @default(now())
+
+  @@index([profileId, sortOrder])
 }
 
 model CourseEnrollment {
@@ -548,7 +762,7 @@ model CourseEnrollment {
   visitorName  String?
   paymentId    String?
   status       String    @default("PENDING") // "PENDING" | "ACTIVE" | "COMPLETED" | "CANCELLED"
-  progress     String?   // JSON object tracking lesson completion
+  progress     String? // JSON object tracking lesson completion
   enrolledAt   DateTime  @default(now())
   completedAt  DateTime?
 
@@ -556,11 +770,11 @@ model CourseEnrollment {
 }
 
 model LessonCompletion {
-  id           String   @id @default(cuid())
+  id           String           @id @default(cuid())
   enrollmentId String
   enrollment   CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   lessonId     String
-  completedAt  DateTime @default(now())
+  completedAt  DateTime         @default(now())
 
   @@unique([enrollmentId, lessonId])
 }
@@ -613,6 +827,6 @@ model LeadMagnetSubmission {
   leadMagnet   LeadMagnet @relation(fields: [leadMagnetId], references: [id], onDelete: Cascade)
   visitorEmail String
   visitorName  String?
-  formData     String?    // JSON object with form field values
+  formData     String? // JSON object with form field values
   createdAt    DateTime   @default(now())
 }

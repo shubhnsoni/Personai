@@ -1,8 +1,3 @@
-ALTER TABLE "DigitalProduct" ADD COLUMN IF NOT EXISTS "diet" TEXT;
-ALTER TABLE "DigitalProduct" ADD COLUMN IF NOT EXISTS "spiceLevel" INTEGER;
-ALTER TABLE "DigitalProduct" ADD COLUMN IF NOT EXISTS "serveWindow" TEXT;
-ALTER TABLE "DigitalProduct" ADD COLUMN IF NOT EXISTS "arModelUrl" TEXT;
-ALTER TABLE "DigitalProduct" ADD COLUMN IF NOT EXISTS "arUsdzUrl" TEXT;
-
-ALTER TABLE "ServiceOffering" ADD COLUMN IF NOT EXISTS "kind" TEXT NOT NULL DEFAULT 'SESSION';
-ALTER TABLE "ServiceOffering" ADD COLUMN IF NOT EXISTS "covers" INTEGER;
+-- Intentionally empty.
+-- This historical change is included in the PostgreSQL baseline migration
+-- 20251125082337_init so the previously db-pushed schema can replay cleanly.

@@ -1,1 +1,3 @@
-ALTER TABLE "OfferReview" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;
+-- Intentionally empty.
+-- This historical change is included in the PostgreSQL baseline migration
+-- 20251125082337_init so the previously db-pushed schema can replay cleanly.

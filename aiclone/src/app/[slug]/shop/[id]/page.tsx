@@ -42,9 +42,7 @@ export default async function ProductSalesPage({
         }
     })()
     const logo = (product.profile as { shopLogoUrl?: string | null }).shopLogoUrl
-    const reviewRows = await prisma.$queryRaw<{ id: string; visitorName: string; rating: number; imageUrl: string | null; text: string | null }[]>`
-        SELECT id, "visitorName", rating, "imageUrl", "text" FROM "OfferReview" WHERE "productId" = ${product.id} ORDER BY "createdAt" DESC LIMIT 8
-    `
+    const reviewRows = product.reviews
     const photos = await collectItemPhotos({
         title: product.title,
         category: product.category,

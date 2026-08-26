@@ -12,8 +12,14 @@ export default async function DashboardMoneyPage() {
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
     requireSurface(profile.roleTemplate, "sales", profile)
+    const restaurant = profile.roleTemplate === "RESTAURANT"
 
-    const [productPurchases, courseEnrollments, eventRegistrations, communityMembers, bookings, payments] = await Promise.all([
+    const [restaurantOrders, productPurchases, courseEnrollments, eventRegistrations, communityMembers, bookings, payments] = await Promise.all([
+        prisma.order.findMany({
+            where: { profileId: profile.id },
+            include: { lines: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+            orderBy: { placedAt: "desc" },
+        }),
         prisma.productPurchase.findMany({
             where: { product: { profileId: profile.id } },
             include: { product: true },
@@ -62,17 +68,33 @@ export default async function DashboardMoneyPage() {
         peopleMap.set(key, cur)
     }
 
-    for (const p of productPurchases) {
-        touch(p.visitorEmail, p.visitorName, {
-            id: p.id,
-            kind: "product",
-            title: p.product.title,
-            status: p.status,
-            amountCents: p.status === "REFUNDED" ? 0 : p.paymentId ? paidFor(p.paymentId, p.product.priceCents) : p.product.priceCents,
-            at: p.createdAt.toISOString(),
-            receiptHref: `/dashboard/orders/${p.id}/receipt`,
-            canConfirm: p.status === "PENDING",
-        })
+    if (restaurant) {
+        for (const order of restaurantOrders) {
+            if (!order.guestEmail) continue
+            const summary = order.lines.map((line) => `${line.qty}× ${line.titleSnapshot}`).join(", ")
+            touch(order.guestEmail, order.guestName, {
+                id: order.id,
+                kind: "product",
+                title: `Order #${order.number}${summary ? ` · ${summary}` : ""}`,
+                status: order.status,
+                amountCents: order.status === "CANCELLED" ? 0 : order.totalCents,
+                at: order.placedAt.toISOString(),
+                receiptHref: `/dashboard/orders/${order.id}/receipt`,
+            })
+        }
+    } else {
+        for (const purchase of productPurchases) {
+            touch(purchase.visitorEmail, purchase.visitorName, {
+                id: purchase.id,
+                kind: "product",
+                title: purchase.product.title,
+                status: purchase.status,
+                amountCents: purchase.status === "REFUNDED" ? 0 : purchase.paymentId ? paidFor(purchase.paymentId, purchase.product.priceCents) : purchase.product.priceCents,
+                at: purchase.createdAt.toISOString(),
+                receiptHref: `/dashboard/orders/${purchase.id}/receipt`,
+                canConfirm: purchase.status === "PENDING",
+            })
+        }
     }
     for (const e of courseEnrollments) {
         touch(e.visitorEmail, e.visitorName, {
@@ -115,18 +137,26 @@ export default async function DashboardMoneyPage() {
         })
     }
 
-    const stripeRevenue = payments.reduce((sum, p) => sum + p.amountCents, 0)
-    const cashRevenue = productPurchases
-        .filter((p) => p.status === "COMPLETED" && !p.paymentId)
-        .reduce((sum, p) => sum + p.product.priceCents, 0)
-    const totalRevenue = stripeRevenue + cashRevenue
+    const stripeRevenue = payments.reduce((sum, payment) => sum + payment.amountCents, 0)
+    const legacyCashRevenue = productPurchases
+        .filter((purchase) => purchase.status === "COMPLETED" && !purchase.paymentId)
+        .reduce((sum, purchase) => sum + purchase.product.priceCents, 0)
+    const restaurantRevenue = restaurantOrders
+        .filter((order) => order.status === "PAID" && order.payStatus === "PAID")
+        .reduce((sum, order) => sum + order.totalCents, 0)
+    const totalRevenue = restaurant ? restaurantRevenue : stripeRevenue + legacyCashRevenue
+    const productsSold = restaurant
+        ? restaurantOrders
+            .filter((order) => order.status === "PAID" && order.payStatus === "PAID")
+            .reduce((sum, order) => sum + order.lines.reduce((lineSum, line) => lineSum + line.qty, 0), 0)
+        : productPurchases.filter((purchase) => purchase.status === "COMPLETED").length
 
     return (
         <MoneyBoard
             people={[...peopleMap.values()]}
             stats={{
                 revenueCents: totalRevenue,
-                products: productPurchases.filter((p) => p.status === "COMPLETED").length,
+                products: productsSold,
                 courses: courseEnrollments.length,
                 events: eventRegistrations.length,
                 members: communityMembers.filter((m) => m.status === "ACTIVE").length,

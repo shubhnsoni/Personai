@@ -11,8 +11,17 @@ import { Tracker } from "@/components/profile/tracker"
 
 export const dynamic = "force-dynamic"
 
-export default async function ShopPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ShopPage({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ slug: string }>
+    searchParams?: Promise<{ t?: string | string[] }>
+}) {
     const { slug } = await params
+    const query = searchParams ? await searchParams : {}
+    const rawTableCode = Array.isArray(query.t) ? query.t[0] : query.t
+    const requestedTableCode = rawTableCode?.trim().slice(0, 128) || null
     const currency = await getRequestCurrency()
     const profile = await prisma.profile.findUnique({
         where: { slug },
@@ -31,6 +40,12 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
     const logo = (profile as { shopLogoUrl?: string | null }).shopLogoUrl || profile.imageUrl
     const restaurant = isRestaurant(profile.roleTemplate)
+    const restaurantTable = restaurant && requestedTableCode
+        ? await prisma.restaurantTable.findFirst({
+            where: { profileId: profile.id, code: requestedTableCode, isActive: true },
+            select: { label: true },
+        })
+        : null
 
     if (restaurant) {
         return (
@@ -52,6 +67,8 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
                     logoUrl={logo}
                     whatsapp={profile.whatsapp}
                     upiId={profile.upiId}
+                    tableCode={requestedTableCode}
+                    tableLabel={restaurantTable?.label || null}
                     items={profile.digitalProducts.map((p) => ({
                         id: p.id,
                         title: p.title,

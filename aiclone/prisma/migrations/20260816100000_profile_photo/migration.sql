@@ -1,3 +1,3 @@
--- AlterTable
-ALTER TABLE "Profile" ADD COLUMN "imageUrl" TEXT;
-ALTER TABLE "Profile" ADD COLUMN "chatAvatarMode" TEXT NOT NULL DEFAULT 'ORB';
+-- Intentionally empty.
+-- This historical change is included in the PostgreSQL baseline migration
+-- 20251125082337_init so the previously db-pushed schema can replay cleanly.

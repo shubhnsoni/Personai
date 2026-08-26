@@ -9,6 +9,7 @@ import { Package, GraduationCap, Calendar, Users, DollarSign } from "lucide-reac
 import { ResendLibraryLink } from "@/components/dashboard/resend-library-link"
 import { ConfirmOrderButton } from "@/components/dashboard/confirm-order-button"
 import { requireSurface } from "@/lib/require-surface"
+import { RestaurantOrdersDashboard } from "@/components/dashboard/restaurant-orders-dashboard"
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,10 @@ export default async function DashboardOrdersPage() {
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
     requireSurface(profile.roleTemplate, "shop", profile)
+
+    if (profile.roleTemplate === "RESTAURANT") {
+        return <RestaurantOrdersDashboard profileId={profile.id} />
+    }
 
     const [productPurchases, courseEnrollments, eventRegistrations, communityMembers, payments] = await Promise.all([
         prisma.productPurchase.findMany({

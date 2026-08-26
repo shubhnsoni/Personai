@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { variantsToJson } from "@/lib/commerce"
 import { parseDiet } from "@/lib/menu"
+import { syncUser } from "@/lib/auth-sync"
 
 export interface ProductData {
     title: string
@@ -165,9 +166,15 @@ export async function placeCartOrder(input: {
         where: { id: { in: ids }, isActive: true },
         include: { profile: true },
     })
-    if (!products.length) throw new Error("Those dishes are no longer available")
+    if (!products.length || products.length !== ids.length) throw new Error("One or more products are no longer available")
     const profile = products[0].profile
-    const rows = []
+    if (products.some((product) => product.profileId !== profile.id)) {
+        throw new Error("Every cart item must belong to the same seller")
+    }
+    if (profile.roleTemplate === "RESTAURANT") {
+        throw new Error("Restaurant carts must use restaurant checkout")
+    }
+    const rows: { id: string; title: string; qty: number }[] = []
     for (const line of input.lines) {
         const product = products.find((p) => p.id === line.productId)
         if (!product) continue
@@ -198,17 +205,31 @@ export async function placeCartOrder(input: {
 }
 
 export async function confirmProductOrder(purchaseId: string) {
-    const purchase = await prisma.productPurchase.update({
-        where: { id: purchaseId },
-        data: { status: "COMPLETED", confirmedAt: new Date() },
-        include: { product: true },
-    })
-    if (purchase.product.stock != null && purchase.payMethod !== "COD") {
-        await prisma.digitalProduct.update({
-            where: { id: purchase.productId },
-            data: { stock: { decrement: 1 } },
+    const user = await syncUser()
+    const profile = user?.profiles[0]
+    if (!user || !profile) throw new Error("Unauthorized")
+
+    await prisma.$transaction(async (tx) => {
+        const purchase = await tx.productPurchase.findUnique({
+            where: { id: purchaseId },
+            include: { product: true },
         })
-    }
+        if (!purchase || purchase.product.profileId !== profile.id) throw new Error("Order not found")
+        if (purchase.status === "COMPLETED") return
+        if (purchase.status !== "PENDING") throw new Error(`Cannot confirm a ${purchase.status.toLowerCase()} purchase`)
+
+        if (purchase.product.stock != null && purchase.payMethod !== "COD") {
+            const stockUpdate = await tx.digitalProduct.updateMany({
+                where: { id: purchase.productId, stock: { gte: 1 } },
+                data: { stock: { decrement: 1 } },
+            })
+            if (stockUpdate.count !== 1) throw new Error("Product is sold out")
+        }
+        await tx.productPurchase.update({
+            where: { id: purchase.id },
+            data: { status: "COMPLETED", confirmedAt: new Date() },
+        })
+    })
     revalidatePath("/dashboard/orders")
     revalidatePath("/dashboard/money")
 }
@@ -243,17 +264,14 @@ export async function addProductReview(input: {
     imageUrl?: string
 }) {
     const rating = Math.min(5, Math.max(1, Math.round(input.rating)))
-    const created = await prisma.offerReview.create({
+    await prisma.offerReview.create({
         data: {
             productId: input.productId,
             rating,
             text: input.text?.trim() || null,
+            imageUrl: input.imageUrl?.trim() || null,
             visitorName: input.visitorName.trim() || "Buyer",
         },
     })
-    const imageUrl = input.imageUrl?.trim()
-    if (imageUrl) {
-        await prisma.$executeRaw`UPDATE "OfferReview" SET "imageUrl" = ${imageUrl} WHERE id = ${created.id}`
-    }
     revalidatePath("/dashboard/products")
 }
