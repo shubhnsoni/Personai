@@ -533,6 +533,7 @@ model OfferReview {
   product     DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
   rating      Int
   text        String?
+  imageUrl    String?
   visitorName String
   createdAt   DateTime       @default(now())
 }

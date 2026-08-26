@@ -1,0 +1,1 @@
+ALTER TABLE "OfferReview" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;
