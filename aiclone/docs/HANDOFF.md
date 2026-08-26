@@ -113,13 +113,22 @@ exist; the stale worktree registrations were pruned.
 
 ```
 personai/
-├── HANDOFF.md                  this file
-├── CHAT-HISTORY-2026-08-24.md  transcript of the recovery session
-└── aiclone/                    the Next.js app
+├── README.md                   pointer into aiclone/
+└── aiclone/                    the Next.js app (this is the project)
+    ├── README.md
+    ├── docs/
+    │   ├── HANDOFF.md          this file
+    │   └── attached-assets/    early design dumps
     ├── prisma/
     │   ├── schema.prisma       35 models
+    │   ├── seed.ts
+    │   ├── sql/
     │   └── migrations/         5 (see caveat below)
-    ├── scripts/                ad-hoc utilities, excluded from the build
+    ├── scripts/
+    │   ├── fixtures/           import test data
+    │   ├── test-import.ts
+    │   └── one-off/            demo fill, Sylvie, debug
+    ├── public/uploads/         user/demo images (gitkeep)
     └── src/
         ├── app/     112 files  routes
         ├── components/ 116     UI

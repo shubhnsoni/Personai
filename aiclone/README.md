@@ -14,7 +14,7 @@ Marketing copy may say `personalink.com/{slug}` — that host is **brand fiction
 - Resend (optional; console fallback if unset)
 - Tailwind CSS 4 + Radix UI + Framer Motion
 
-App lives in this `aiclone/` folder.
+App lives in this `aiclone/` folder. Recovery notes: [`docs/HANDOFF.md`](docs/HANDOFF.md).
 
 ## Scripts
 
@@ -34,6 +34,10 @@ npx prisma db seed
 3. `npx prisma migrate dev`
 4. `npx prisma db seed`
 5. `npm run dev` → [http://localhost:3000](http://localhost:3000)
+
+`npx prisma migrate dev` will fail until `prisma/migrations/migration_lock.toml` is switched from `sqlite` to `postgresql` (schema is already Postgres). The running app does not need a new migrate — tables already match.
+
+Layout: `src/` app code, `prisma/` schema + seed + migrations, `scripts/one-off/` demo fillers, `docs/` handoff. User images go in `public/uploads/`.
 
 ## Environment (names only)
 
