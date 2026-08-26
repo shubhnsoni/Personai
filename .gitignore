@@ -56,3 +56,9 @@ build.log
 
 # Local development
 .local/
+
+# Raw AR pipeline inputs and intermediates (~1.6 GB).
+# Meshy exports ~90 MB per dish; scripts/one-off/optimize-ar-glbs.ps1 turns those
+# into the ~1 MB models actually served from public/uploads. Only the outputs are
+# worth versioning — see aiclone/docs/AR.md to regenerate.
+ar-raw/
