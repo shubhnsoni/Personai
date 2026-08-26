@@ -62,3 +62,10 @@ build.log
 # into the ~1 MB models actually served from public/uploads. Only the outputs are
 # worth versioning — see aiclone/docs/AR.md to regenerate.
 ar-raw/
+
+# Database dumps. These carry real visitor conversations, leads and user emails,
+# and this repository is public — they must never be committed. Keep them here
+# for local restore and copy them somewhere off this machine.
+backups/
+*.dump
+*.sql.gz

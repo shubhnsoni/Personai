@@ -1,7 +1,8 @@
 # Handoff — PersonaLink (`personai`)
 
-Written 2026-08-24. Covers what this project is, what was lost and how it was
-recovered, how the repo and artifacts are organised, and what is still open.
+Written 2026-08-24, section 1 updated 2026-08-26. Covers what this project is,
+what was lost and how it was recovered, how the repo and artifacts are organised,
+and what is still open.
 
 ---
 
@@ -9,16 +10,53 @@ recovered, how the repo and artifacts are organised, and what is still open.
 
 | | |
 |---|---|
-| Checked-out branch | `recovered/aug20-wt-pr-32` |
-| HEAD | `75ab116` |
+| Checked-out branch | `recovered/aug20-wt-pr-32` — **the canonical branch; `origin/main` is not where the work is** |
+| HEAD | `8805bc8` |
 | Working tree | clean |
 | Commit identity | `shubhnsoni <shubhamprasadsony@gmail.com>` (repo-local; global config untouched) |
-| Pushed? | **No.** `origin/main` is still at `9e8a0ff` (initial commit) |
+| Pushed? | **Yes.** `origin/recovered/aug20-wt-pr-32` is up to date as of 2026-08-26 |
 
 The app is `aiclone/` — Next.js 16.0.6 (App Router, Turbopack), Prisma 5.22 on
 PostgreSQL, Clerk for auth, Stripe for payments, OpenAI for chat.
 
 290 source files, 35 Prisma models.
+
+### What is preserved, and what is not
+
+*Added 2026-08-26, after pushing everything to GitHub.*
+
+| | Where it lives | Survives losing this machine? |
+|---|---|---|
+| source, docs, scripts | GitHub | yes |
+| AR models served to users (63 MB) | GitHub, commit `8805bc8` | yes |
+| **database content** | local Postgres only | **no** — see `../backups/README.md` |
+| **`ar-raw/`, 1.67 GB of raw Meshy exports** | this disk only | **no** |
+| **`aiclone/.env` values** | this disk only | **no** — keys are *named* in `.env.example` |
+
+The database holds 16 profiles, 234 products (214 of them the SkyDine menu), 35
+reviews and 99 chat messages, and none of it is in the repo. Current tally:
+
+```bash
+node --env-file=.env scripts/one-off/db-inventory.mjs
+```
+
+Dumps live in `../backups/` and are gitignored deliberately — they contain real
+visitor conversations, a lead and user emails, and this repository is **public**.
+A verified dump from 2026-08-26 is already there.
+
+The Postgres service (`postgresql-x64-17`) is set to **Manual** start and stopped
+mid-session on 2026-08-26, taking the dev server with it. Automatic would avoid
+the surprise.
+
+### Known credential exposure
+
+`aiclone/.env` was committed in the initial commit and modified in `44a2e39`. Both
+are ancestors of the already-published `origin/main`, and the repo is public — so
+this leaked before any of the recent work and is not something a future push can
+avoid. The one value in genuine format is `CLERK_SECRET_KEY` (`sk_test_…`, 40
+chars): **rotate it.** The Stripe and OpenAI values are too short to be valid
+keys, and `DATABASE_URL` was a SQLite path with no password. Rewriting history
+would not undo the exposure; rotating is the fix that works.
 
 ---
 
@@ -204,8 +242,18 @@ and match the schema — **no migration is needed**.
 6. **29 edits across 19 files** could not be anchored during the replay. Most
    were already applied in the base commit; the three that mattered are fixed in
    `e3db19f`. `src/lib/bloub/{skins,expressions}.ts` remain partial.
-7. **Nothing is pushed.** The recovered branch is 19 commits ahead of
-   `origin/main`.
+7. ~~**Nothing is pushed.**~~ Resolved 2026-08-26: everything is committed and
+   `origin/recovered/aug20-wt-pr-32` is up to date. Note `origin/main` is still at
+   the initial commit, so the feature branch is the canonical one until merged.
+8. **Rotate `CLERK_SECRET_KEY`** — it is in already-published history in a public
+   repo. See section 1.
+9. **Nothing but this disk holds the database or `ar-raw/`.** See section 9.
+10. **iOS AR Quick Look is unconfirmed.** The `rel="ar"` anchor and the
+   `model/vnd.usdz+zip` header are in place and all 10 `.usdz` files pass
+   `scripts/one-off/check-usdz.mjs`, but it has never been observed working on a
+   real iPhone. Android is signed off and pinned — see `docs/AR.md`.
+11. **`shop/page.tsx` fabricates product ratings** (`downloadCount > 0 ? 4.5 : …`)
+   while the AR page averages real `OfferReview` rows. Worth reconciling.
 
 ---
 
@@ -213,11 +261,16 @@ and match the schema — **no migration is needed**.
 
 | Location | Contents | Keep? |
 |---|---|---|
+| `personai\backups\` | Verified `pg_dump` of the local database — the only copy of 16 profiles, 234 products, 35 reviews, 99 messages. Gitignored: holds real conversations and emails, and the repo is public | **Yes. Copy it off this machine** |
+| `personai\ar-raw\` | 1.67 GB: raw ~90 MB Meshy exports per dish, the compression intermediates, and a 32 MB zip of the generated outputs. Gitignored | Yes, unless you would rather re-pay for the models |
 | `Desktop\personai-recovery-evidence\` | 1.16 GB insurance copy: surviving `wt-pr-32` files, the bloub git pack, the full Grok session (`updates.jsonl`), the chat history, and the replay scripts | Yes, until you're confident the recovery is complete |
 | `Desktop\domain-hunt\` | Unrelated to the code — the `.com` naming search. `csv/` has the shortlists, `README.md` explains it | Independent of the app |
 
 The evidence folder exists because the originals lived in `%LOCALAPPDATA%\Temp`,
 which Windows can purge at any time.
+
+The first two rows are on one disk with no second copy anywhere. That is the whole
+gap between "committed" and "preserved".
 
 ---
 
