@@ -9,6 +9,7 @@ export type Surface =
     | "courses"
     | "events"
     | "sales"
+    | "businessOs"
 
 export type FieldPack =
     | "shopPhysical"
@@ -26,6 +27,12 @@ const ALL_SURFACES: Surface[] = [
     "shop", "services", "calendar",
     "courses", "events", "sales",
 ]
+
+// `businessOs` is intentionally absent from ALL_SURFACES. CUSTOM is the schema default
+// for `Profile.roleTemplate`, the "Something else" onboarding option, and the try-kit
+// role, and `kit()` falls back to CUSTOM for any unrecognised role. Listing the surface
+// here would therefore switch an unfinished owner console on for those profiles by
+// default. It is granted only by explicit per-profile opt-in through extras.
 
 const ALL_PACKS: FieldPack[] = [
     "shopPhysical", "shopDigital", "menuDish", "tableBook", "ar", "portfolio", "whatsappUpi",
@@ -147,6 +154,7 @@ export function calendarNoun(role?: string | null) {
 
 export function surfaceForPath(pathname: string): Surface | null {
     if (pathname === "/dashboard") return "home"
+    if (pathname.startsWith("/dashboard/business-os")) return "businessOs"
     if (pathname.startsWith("/dashboard/profile") || pathname.startsWith("/dashboard/content") || pathname.startsWith("/dashboard/import") || pathname.startsWith("/dashboard/links")) return "profile"
     if (pathname.startsWith("/dashboard/inbox") || pathname.startsWith("/dashboard/conversations")) return "inbox"
     if (pathname.startsWith("/dashboard/leads")) return "leads"
@@ -171,6 +179,7 @@ export function navHrefToSurface(href: string): Surface | null {
         case "/dashboard/courses": return "courses"
         case "/dashboard/events": return "events"
         case "/dashboard/money": return "sales"
+        case "/dashboard/business-os": return "businessOs"
         default: return null
     }
 }
