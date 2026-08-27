@@ -36,8 +36,21 @@ path, no Prisma file and no migration is touched.
 2. **No Clerk keys in this environment.** The signed-in path cannot be exercised, so the
    `FORBIDDEN`, `BAD_REQUEST` and `NOT_FOUND` API branches and the authenticated page render
    are verified by direct function assertion rather than over HTTP. Unauthenticated 401 with
-   the envelope **was** confirmed over HTTP on both routes, including the malformed
-   percent-encoding path.
+   the envelope was confirmed over HTTP on both routes.
+
+   Correction to an earlier claim: a **literally** malformed percent sequence in the URL
+   (`/api/business-os/blueprints/%E0%A4%A`) never reaches the application. Next.js rejects it
+   at the framework level with **400 `text/html`** before the handler runs, so it does not
+   produce the Business OS JSON envelope. Only an *encoded* percent
+   (`/%25E0%25A4%25A`, which decodes to the literal string `%E0%A4%A`) reaches the route and
+   returns the 401 envelope. Both were measured. The `parseBlueprintId` guard and its unit
+   assertions are still correct and still worth keeping — they defend the decode step for
+   inputs that do reach the handler — but no claim should be made that all malformed URLs
+   surface through the application envelope.
+
+   Owner decision recorded: missing Clerk keys are not a blocker. Deterministic mocked
+   authentication, authorization and tenant-isolation tests are queued as P1-008 instead of
+   requesting real credentials.
 3. **The workflow layer does not execute.** `planWorkflowRun`, `listApprovalGates` and
    `AuditEvent` have no consumers. The UI now says so explicitly, but any vertical whose
    safety boundary involves money or outbound messaging is gated on this becoming real. See

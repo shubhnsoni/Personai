@@ -1,6 +1,6 @@
 {
-  "milestone": "Phase 1 - Business OS consolidation",
-  "updatedAt": "2026-08-27 10:15 +05:30",
+  "milestone": "Phase 1 foundation - wave 1 dispatch",
+  "updatedAt": "2026-08-27 13:30 +05:30",
   "updatedBy": "single root orchestrator",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 4,
@@ -12,14 +12,19 @@
       "title": "Capability bootstrap and run ledger",
       "owner": "root-orchestrator",
       "status": "done",
-      "outputs": ["docs/orchestration/KIROCREW_CAPABILITY_MAP.md", "docs/orchestration/RUNLOG.md"]
+      "outputs": [
+        "docs/orchestration/KIROCREW_CAPABILITY_MAP.md",
+        "docs/orchestration/RUNLOG.md"
+      ]
     },
     {
       "id": "P0-002",
       "title": "Worktree ownership classification",
       "owner": "root-orchestrator",
       "status": "done",
-      "outputs": ["docs/orchestration/OWNERSHIP.md"]
+      "outputs": [
+        "docs/orchestration/OWNERSHIP.md"
+      ]
     },
     {
       "id": "P0-003",
@@ -28,7 +33,10 @@
       "status": "superseded_by_P1-001",
       "lane": "core",
       "commits": 0,
-      "measured": { "files": 7, "lines": 330 },
+      "measured": {
+        "files": 7,
+        "lines": 330
+      },
       "verdict": "Domain model accepted verbatim as canonical by ADR-005 and landed in 627b826. Its force-static route was superseded by ADR-006."
     },
     {
@@ -38,7 +46,10 @@
       "status": "not_delivered",
       "lane": "api",
       "commits": 0,
-      "measured": { "files": 6, "lines": 209 },
+      "measured": {
+        "files": 6,
+        "lines": 209
+      },
       "verdict": "The assigned spec was never written; the lane built a divergent blueprint API instead. Its envelope, error map and limit validation were kept in 627b826; its data model was discarded. Spec re-queued as P0-007 and now delivered."
     },
     {
@@ -48,7 +59,10 @@
       "status": "not_delivered",
       "lane": "docs-verticals",
       "commits": 0,
-      "measured": { "files": 0, "lines": 0 },
+      "measured": {
+        "files": 0,
+        "lines": 0
+      },
       "verdict": "Reported complete but produced no files. Re-queued as P0-008 and now delivered."
     },
     {
@@ -69,7 +83,9 @@
       "title": "Owner-facing Business Copilot product and runtime spec",
       "status": "done",
       "writePath": "docs/orchestration/OWNER_COPILOT_SPEC.md",
-      "measured": { "lines": 573 },
+      "measured": {
+        "lines": 573
+      },
       "verdict": "Delivered. Grounds the two AI planes in real code, defines the ADR-004 run ledger as PROPOSED with four named models blocked on owner-approved migration, builds approval gates on the committed ApprovalPolicy, and specifies the permission boundary as engine-mediated writes only."
     },
     {
@@ -77,7 +93,10 @@
       "title": "Vertical wave blueprint map",
       "status": "done",
       "writePath": "docs/orchestration/VERTICAL_BLUEPRINT_MAP.md",
-      "measured": { "lines": 310, "verticalsMapped": 18 },
+      "measured": {
+        "lines": 310,
+        "verticalsMapped": 18
+      },
       "verdict": "Delivered. Maps all 18 scorecard rows onto real engine and capability ids, separates shipped from declared capability by capability, and derives a build order from engine readiness rather than scorecard rank."
     },
     {
@@ -87,7 +106,11 @@
       "branch": "orchestrator/business-os-consolidation",
       "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-business-os-consolidation-wt",
       "baseCommit": "a4d9fba",
-      "commits": ["627b826", "3ded129", "95839a5"],
+      "commits": [
+        "627b826",
+        "3ded129",
+        "95839a5"
+      ],
       "gates": {
         "prismaValidate": 0,
         "prismaGenerate": 0,
@@ -103,29 +126,41 @@
       "id": "P1-002",
       "title": "Register and permission-gate the business-os surface",
       "status": "done_pending_owner_review",
-      "commits": ["8c58870", "95839a5"],
+      "commits": [
+        "8c58870",
+        "95839a5"
+      ],
       "note": "8c58870 wrongly added businessOs to ALL_SURFACES, which granted it by default to CUSTOM and to every unrecognised role. 95839a5 removed it; the surface is now extras-opt-in only and the harness asserts CUSTOM, unknown, null and empty roles are denied."
     },
     {
       "id": "P1-003",
       "title": "Retire the six superseded lane worktrees",
       "status": "blocked_until_consolidation_merged",
-      "dependencies": ["P1-001", "P1-002"],
+      "dependencies": [
+        "P1-001",
+        "P1-002"
+      ],
       "note": "Frozen as read-only evidence at ea69595 with a SHA-256 snapshot at ../personai-lane-evidence-20260827/. Owner forbade rebasing, stashing or deleting them."
     },
     {
       "id": "P1-004",
       "title": "Reconcile capability ids with the engine ownership contract",
       "status": "ready_for_readonly_worker",
-      "dependencies": ["P0-008"],
-      "allowedPaths": ["docs/orchestration/**"],
+      "dependencies": [
+        "P0-008"
+      ],
+      "allowedPaths": [
+        "docs/orchestration/**"
+      ],
       "note": "Three capability ids per engine versus eight or nine owned nouns. Produce an ADR that either grows the vocabulary or narrows the contract."
     },
     {
       "id": "P1-005",
       "title": "Make workflows and approvals executable",
       "status": "blocked_waiting_for_owner",
-      "dependencies": ["P0-007"],
+      "dependencies": [
+        "P0-007"
+      ],
       "reason": "Requires the run ledger models proposed in OWNER_COPILOT_SPEC.md, which need an owner-approved Prisma migration. No migration is approved.",
       "note": "Until then every requestApproval and recordAudit in every blueprint is a plan, not a control."
     },
@@ -140,29 +175,223 @@
       "id": "P1-007",
       "title": "Live database cutover",
       "status": "blocked_waiting_for_owner",
-      "outputs": ["docs/orchestration/DB_CUTOVER_PLAN.md"],
+      "outputs": [
+        "docs/orchestration/DB_CUTOVER_PLAN.md"
+      ],
       "note": "Preparation only: fresh-backup checklist with a restore proof, dry run on a disposable copy, verification list, and two rollback paths. Explicitly not approved for execution."
+    },
+    {
+      "id": "P1-008",
+      "title": "Deterministic mocked authentication, authorization and tenant-isolation tests",
+      "status": "ready",
+      "adr": "ADR-010",
+      "note": "No real credentials. Inject a principal; assert the guard's UNAUTHORIZED vs FORBIDDEN split, surface entitlement and per-tenant scoping."
+    },
+    {
+      "id": "P1-009",
+      "title": "Scoped repo-wide lint cleanup",
+      "status": "queued_separate_package",
+      "adr": "ADR-009",
+      "note": "Baseline 124 problems / 63 errors. Never bundled into feature work; restaurant-owned files need owner review."
+    },
+    {
+      "id": "P1-010",
+      "title": "Capability and blueprint contract: granular ids, maturity, activation enforcement, corrected restaurant blueprint",
+      "status": "dispatch_wave_1",
+      "model": "gpt-5.6-terra",
+      "adr": [
+        "ADR-012",
+        "ADR-013",
+        "ADR-014"
+      ],
+      "exclusiveOwnerOf": [
+        "src/lib/business-os/engines.ts",
+        "src/lib/business-os/types.ts",
+        "src/lib/business-os/blueprints.ts",
+        "src/lib/business-os/validation.ts"
+      ],
+      "note": "No other worker may touch these files while open. Must not edit restaurant runtime paths."
+    },
+    {
+      "id": "P1-011",
+      "title": "Platform and tenancy: workspace/organization, location, membership, RBAC, tenant-isolation contracts",
+      "status": "dispatch_wave_1",
+      "model": "gpt-5.6-sol",
+      "allowedPaths": [
+        "src/lib/tenancy/**",
+        "scripts/one-off/check-tenancy*.ts",
+        "docs/orchestration/TENANCY_DESIGN.md"
+      ],
+      "forbidden": [
+        "prisma/**",
+        "shared auth",
+        "src/lib/business-os/**"
+      ],
+      "note": "No Prisma or shared auth edits in wave 1."
+    },
+    {
+      "id": "P1-012",
+      "title": "Contact, activity and durable task foundation over existing data",
+      "status": "dispatch_wave_1",
+      "model": "claude-sonnet-5",
+      "allowedPaths": [
+        "src/lib/foundation/**",
+        "scripts/one-off/check-foundation*.ts",
+        "docs/orchestration/FOUNDATION_DESIGN.md"
+      ],
+      "forbidden": [
+        "prisma/**",
+        "src/lib/business-os/**",
+        "restaurant paths"
+      ],
+      "note": "Contracts and adapters only."
+    },
+    {
+      "id": "P1-013",
+      "title": "Orchestration observability: fix the dashboard loop or retain honest one-shot",
+      "status": "dispatch_wave_1",
+      "model": "gpt-5.6-terra",
+      "allowedPaths": [
+        "docs/orchestration/Orchestrator-Dashboard.ps1",
+        "docs/orchestration/OBSERVABILITY_DIAGNOSIS.md"
+      ],
+      "exitCriteria": "Three completed timestamped ticks, no 1s polling, no overlapping writers; otherwise retain one-shot and document why."
+    },
+    {
+      "id": "P1-014",
+      "title": "Security, auth and isolation audit, read-only",
+      "status": "dispatch_wave_1",
+      "model": "gpt-5.6-sol",
+      "allowedPaths": [
+        "docs/orchestration/SECURITY_AUDIT.md",
+        "docs/orchestration/SECURITY_TEST_PLAN.md"
+      ],
+      "forbidden": [
+        "all source code",
+        "shared auth",
+        "public chat"
+      ]
+    },
+    {
+      "id": "P1-015",
+      "title": "Owner Copilot ledger and workflow runtime contracts",
+      "status": "dispatch_wave_1",
+      "model": "claude-sonnet-5",
+      "allowedPaths": [
+        "src/lib/copilot/**",
+        "scripts/one-off/check-copilot*.ts",
+        "docs/orchestration/OWNER_COPILOT_SPEC.md"
+      ],
+      "forbidden": [
+        "prisma/**"
+      ],
+      "note": "Executable contracts, transitions, idempotency and recovery tests, plus a reviewed schema proposal."
+    },
+    {
+      "id": "P2-001",
+      "title": "Exclusive schema owner: additive Phase 1 and Phase 2 schema, rehearsed on a disposable database",
+      "status": "blocked_until_wave_1_integrated",
+      "model": "gpt-5.6-sol",
+      "adr": "ADR-011",
+      "note": "Exactly one schema owner. Prove the parsed target is disposable and not personalink before any migration command. Additive only; adapters for existing Profile/Booking/Notification/Conversation/Order/course data.",
+      "batches": [
+        "workspace/location/team/RBAC and tenant isolation",
+        "contact/activity and durable task primitives",
+        "blueprint activation, WorkflowRun/AgentRun, steps/tool calls",
+        "Approval and append-only Audit/Event ledger"
+      ]
     }
   ],
   "laneState": {
     "observedAt": "2026-08-27 10:15 +05:30",
     "activeWorkers": 0,
     "kirocrewSessions": "all four report complete via kirocrew spawn list",
-    "supervisorProcesses": 1,
-    "supervisorNote": "Five overlapping dashboards were consolidated into Orchestrator-Dashboard.ps1; one of the removed ones polled every 1 second.",
+    "supervisorProcesses": 0,
+    "continuousSupervisors": 0,
+    "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
+    "supervisorNote": "Five overlapping dashboards were stopped, one of which polled every 1 second. The replacement script's loop mode is not running: launched detached it stalls on git and never completes a tick, so only -Once is supported until P1-013 fixes it.",
     "lanes": [
-      { "name": "consolidation", "branch": "orchestrator/business-os-consolidation", "role": "ACTIVE", "head": "95839a5", "aheadOfBaseline": 4, "dirty": 0 },
-      { "name": "core", "branch": "kirocrew/business-os-phase-1", "role": "FROZEN_EVIDENCE", "head": "ea69595", "dirty": 4 },
-      { "name": "api", "branch": "kirocrew/business-os-api", "role": "FROZEN_EVIDENCE", "head": "ea69595", "dirty": 3 },
-      { "name": "ui", "branch": "kirocrew/business-os-ui", "role": "FROZEN_EVIDENCE", "head": "ea69595", "dirty": 4 },
-      { "name": "quality", "branch": "kirocrew/business-os-quality", "role": "FROZEN_EVIDENCE", "head": "ea69595", "dirty": 1 },
-      { "name": "docs-verticals", "branch": "kirocrew/business-os-docs", "role": "FROZEN_EVIDENCE", "head": "ea69595", "dirty": 0 },
-      { "name": "integration", "branch": "kirocrew/business-os-integration", "role": "FROZEN_EVIDENCE", "head": "ea69595", "dirty": 1 }
+      {
+        "name": "consolidation",
+        "branch": "orchestrator/business-os-consolidation",
+        "role": "ACTIVE",
+        "head": "95839a5",
+        "aheadOfBaseline": 4,
+        "dirty": 0
+      },
+      {
+        "name": "core",
+        "branch": "kirocrew/business-os-phase-1",
+        "role": "FROZEN_EVIDENCE",
+        "head": "ea69595",
+        "dirty": 4
+      },
+      {
+        "name": "api",
+        "branch": "kirocrew/business-os-api",
+        "role": "FROZEN_EVIDENCE",
+        "head": "ea69595",
+        "dirty": 3
+      },
+      {
+        "name": "ui",
+        "branch": "kirocrew/business-os-ui",
+        "role": "FROZEN_EVIDENCE",
+        "head": "ea69595",
+        "dirty": 4
+      },
+      {
+        "name": "quality",
+        "branch": "kirocrew/business-os-quality",
+        "role": "FROZEN_EVIDENCE",
+        "head": "ea69595",
+        "dirty": 1
+      },
+      {
+        "name": "docs-verticals",
+        "branch": "kirocrew/business-os-docs",
+        "role": "FROZEN_EVIDENCE",
+        "head": "ea69595",
+        "dirty": 0
+      },
+      {
+        "name": "integration",
+        "branch": "kirocrew/business-os-integration",
+        "role": "FROZEN_EVIDENCE",
+        "head": "ea69595",
+        "dirty": 1
+      }
     ]
   },
   "runtime": {
     "publicTunnel": "DOWN, cloudflared terminated, hostname returns 530",
     "localApp": "127.0.0.1:3000 serving the consolidation worktree against the rehearsal database",
     "liveDatabase": "personalink untouched: 35 tables, 774 rows, 0 applied migrations, ProductPurchase 8"
-  }
+  },
+  "modelPolicy": {
+    "root": {
+      "model": "claude-opus-5",
+      "effort": "max",
+      "note": "Root is not one of the six worker slots."
+    },
+    "defaults": {
+      "agent.model": "claude-sonnet-5",
+      "agent.role_models.subagent": "claude-sonnet-5",
+      "agent.reasoning_effort": "high",
+      "agent.role_efforts.subagent": "high",
+      "agent.role_models.background": "gpt-5.6-terra",
+      "agent.role_efforts.background": "medium"
+    },
+    "rule": "Every fresh spawn and continuation must name a model. auto, omitted model or an unidentified fallback is unacceptable. Model-pinned spawns require the MCP spawn_run tool; the shell spawn path exposes no model argument.",
+    "substitutions": {
+      "gpt-5.6-sol": "claude-opus-4.8",
+      "claude-sonnet-5": "claude-sonnet-4.6",
+      "gpt-5.6-terra": "claude-sonnet-4.6"
+    }
+  },
+  "corrections": [
+    "A literally malformed percent sequence in a URL returns Next.js framework-level 400 text/html before the route runs; it does not reach the Business OS JSON envelope. Only an encoded percent reaches the handler and returns 401. Measured both ways.",
+    "Continuous supervisor count is 0. LIVE_ACTIVITY.md is an on-demand one-shot snapshot, not a live feed.",
+    "OWNER_COPILOT_SPEC.md reconciled with final code: approval reasons validated; CUSTOM/unknown/null/empty denied by default; navigation registered; extras opt-in required; authenticated-without-surface returns FORBIDDEN/403."
+  ]
 }

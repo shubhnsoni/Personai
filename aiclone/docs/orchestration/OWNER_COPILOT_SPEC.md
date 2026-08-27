@@ -18,7 +18,7 @@ are owner-reviewed paths under OWNERSHIP.md and no worker may run a migration.
 | Capability | State today | Where |
 |---|---|---|
 | Canonical domain model (`BusinessBlueprint`, `WorkflowAction`, `ApprovalPolicy`, `AuditEvent`) | Implemented | `src/lib/business-os/types.ts` |
-| Blueprint validation on load | Implemented (does not yet check approval `reason`) | `src/lib/business-os/validation.ts` |
+| Blueprint validation on load | Implemented, and it now rejects a required approval with a blank `reason`, an `event` trigger with no event name, a `schedule` trigger with no schedule, and duplicate blueprint ids | `src/lib/business-os/validation.ts`, `blueprints.ts` |
 | Plan-time approval/audit derivation | Implemented, in-memory only | `src/lib/business-os/workflow.ts` |
 | Engine + capability registry | Implemented | `src/lib/business-os/engines.ts` |
 | Owner-only blueprint API with `{ ok, data }` envelope | Implemented | `src/app/api/business-os/blueprints/route.ts`, `.../[blueprintId]/route.ts`, `src/lib/business-os/api/responses.ts` |
@@ -102,13 +102,26 @@ session.
 
 ### 1.5 Current entry points and one gap
 
-`businessOs` is a registered `Surface` in `src/lib/surfaces.ts` and
-`surfaceForPath("/dashboard/business-os")` resolves it, but it is not in any role `KIT`
-except `CUSTOM` (which takes `ALL_SURFACES`). So today it is reachable only by a `CUSTOM`
-profile or a profile that opted in through `extras.surfaces`, and there is no navigation
-entry — that is P1-002, `blocked_waiting_for_owner`. The copilot inherits the same gate:
-if `hasSurface(role, "businessOs", extras)` is false the page redirects and the API
-returns `UNAUTHORIZED`.
+`businessOs` is a registered `Surface` in `src/lib/surfaces.ts`,
+`surfaceForPath("/dashboard/business-os")` and `navHrefToSurface("/dashboard/business-os")`
+both resolve it, and a "Business OS" navigation entry exists in the shared `navGroups` list,
+which `visibleNavItems` filters through `hasSurface` so mobile and header inherit the gate.
+P1-002 is done.
+
+Entitlement is deliberately closed by default. `businessOs` is **not** in `ALL_SURFACES` and
+not in any role `KIT`, so `RESTAURANT`, `SHOP`, `COACH`, `CUSTOM`, an unrecognised role, a
+null role and an empty role are all denied. `CUSTOM` matters specifically because it is the
+Prisma default for `Profile.roleTemplate`, the "Something else" onboarding option, the
+try-kit role, and the fallback `kit()` uses for any unknown role; granting it there would
+have switched an unfinished console on for exactly the profiles most likely to exist. The
+only way in is an explicit per-profile opt-in through `extras.surfaces`. All eight of those
+cases are asserted in `scripts/one-off/check-business-os-surface.ts`.
+
+The copilot inherits that gate exactly. On the page, `requireSurface` redirects to
+`/dashboard`. On the API, the shared `requireBusinessOsAccess` guard distinguishes the two
+failures: a caller with no session gets `UNAUTHORIZED`/401, and a caller who is
+authenticated but lacks the surface gets **`FORBIDDEN`/403**. Any copilot route must reuse
+that guard rather than re-deriving the check.
 
 ## 2. Durable run ledger (ADR-004)
 
@@ -307,10 +320,11 @@ Rules:
   run becomes `expired` with an audit entry. Silence is not approval.
 - The `reason` from the snapshot is displayed verbatim to the approver together with the
   concrete diff or payload the step will execute. ENGINE_CONTRACTS makes a reasonless
-  approval request invalid; `validateBusinessBlueprint` does not yet enforce a non-empty
-  `reason` (it checks ids, names, non-empty actions and capability membership), so a
-  **PROPOSED** validation issue `workflows.N.actions.M.approval.reason` should be added in
-  `src/lib/business-os/validation.ts` under P1 to make the contract self-enforcing.
+  approval request invalid, and `validateBusinessBlueprint` now enforces this: a required
+  approval whose `reason` is empty or whitespace produces the issue
+  `workflows.N.actions.M.approval.reason`, so the registry throws at load rather than
+  serving a gate the approver cannot understand. The negative case is asserted in
+  `scripts/one-off/check-business-os-surface.ts`.
 
 ## 4. Audit surface
 
@@ -379,9 +393,13 @@ pattern already used by `src/app/api/business-os/blueprints/route.ts`.
 
 ### 5.1 Authorization
 
-Every owner-plane request: `syncUser()` → non-null `User`, else `UNAUTHORIZED`; the target
-`profileId` must belong to that user; `hasSurface(role, "businessOs", extras)` must be
-true. No cookie-only identity, no `pl_vid`, no IP-keyed rate limit as an authorization
+Every owner-plane request goes through the shared `requireBusinessOsAccess` guard in
+`src/lib/business-os/api/guard.ts`, which returns two distinct failures rather than
+collapsing them: `syncUser()` yielding no user is `UNAUTHORIZED`/401, and an authenticated
+user whose active profile lacks the surface is `FORBIDDEN`/403. A user with no profile at all
+is also `FORBIDDEN`. The target `profileId` must belong to that user, and
+`hasSurface(role, "businessOs", extras)` must be true. No cookie-only identity, no `pl_vid`,
+no IP-keyed rate limit as an authorization
 substitute. Per-profile rate and cost limits still apply, but as budget control.
 
 ### 5.2 May read (all filtered by `profileId`)
@@ -553,10 +571,11 @@ what was skipped and why, and what the owner must decide. A run that ends `faile
 | Item | Blocks | Owner |
 |---|---|---|
 | Ledger migration (§2.5) | every durable, gated, or multi-step behaviour | profile owner — `prisma/**` is owner-reviewed |
-| P1-002 surface registration | navigation entry; `businessOs` currently reaches only `CUSTOM` or extras-opted profiles | owner (`src/lib/surfaces.ts` is patch-only) |
-| Approval `reason` validation in `validation.ts` | makes the ENGINE_CONTRACTS rule self-enforcing | P1 |
 | Engine-exported write functions per capability | each effectful tool; absent function means absent tool (§5.5) | per-engine, restaurant paths owner-reviewed |
 | Scheduler | `schedule` triggers | out of Phase 0 |
+
+Closed since the first draft: P1-002 surface registration is done and the navigation entry
+exists; approval `reason` validation is implemented and enforced at load.
 
 ## 10. Grounding
 
