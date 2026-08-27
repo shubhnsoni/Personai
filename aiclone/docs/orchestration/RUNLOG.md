@@ -462,3 +462,84 @@ branded and requires actor, reason, ticket, timestamp and a synchronous audit em
 remembering a filter, and fails when inverted. Slot 5 also recorded an honest gap:
 `requireBusinessOsAccess` closes over a Clerk/Prisma-backed `syncUser` with no injection point, so
 the boundary is proven with deterministic fakes only, not against the real provider.
+
+
+## 2026-08-27 20:50 — Security hotfix Next 16.3.3; P2-001 blocked, verified, NOT integrated
+
+### Vulnerable tunnel destroyed first
+`GHSA-p293-qw3h-jr36` (Next.js `>=16.0 <16.3.3`, unauthenticated RCE, no workaround) applied to the
+running preview. The public quick tunnel was killed before anything else: cloudflared process count
+went to 0, and the old hostname now returns Cloudflare **Error 1033 "unable to resolve"** with
+`server: cloudflare` and no application envelope in the body, so no request reaches the Next server.
+The firewall LAN block was never sufficient here — cloudflared connects outbound and hands requests
+to the origin over loopback, which bypasses inbound rules entirely.
+
+### Hotfix
+Branch `security/next-16.3.3`, commit `cc41883`, cut from `0aba8d0`, isolated `node_modules`.
+Dependency-only: `next` and `eslint-config-next` `16.0.6` -> `16.3.3`, pinned exactly to match the
+prior convention. React/react-dom ranges untouched, resolved to `19.2.4`. Exactly three files
+changed — `package.json`, `package-lock.json`, and the required security document. No `prisma/**`,
+no `src/**`, no Clerk logic.
+
+Gates: `npm ls` confirms `next@16.3.3`; `prisma validate`=0, `prisma generate`=0, `tsc --noEmit`=0,
+targeted `eslint`=0, `npm run build`=0. Harnesses 10/13 pass. The three failures were each isolated
+and none is caused by the upgrade:
+- `check-restaurant-phase0-behavior` — **pre-existing**, proven by reproducing the identical
+  `TS2550 Property 'replaceAll' does not exist` at base on 16.0.6. A `lib` target defect in
+  `scripts/tsconfig.checks.json`.
+- `check-order-stream` — its own guard refuses any database not named the rehearsal target. Not
+  pointed at the rehearsal DB deliberately: that is P2-001's database and this harness writes orders.
+- `check-restaurant-order-transaction` — data precondition (`No public restaurant with an available
+  product`) asserted on a Prisma query result before any Next code path; the disposable copy lacks
+  the fixture. Deliberately not baselined against live because it can write.
+
+Database safety: the hotfix worktree inherited a `.env` pointing at `personalink`, so it was
+repointed to the unused disposable copy `personalink_phase0_clean_20260826_221845` before any
+harness ran, proven disposable through the committed guard. The live `.env` was untouched.
+
+Primary fast-forwarded (verified true fast-forward) to `cc41883`, dependencies installed, rebuilt
+(`BUILD_ID jd9g0fEeTaiBrOTZl79VF`), preview restarted supervised, and a NEW tunnel created. Route
+matrix verified locally and through the tunnel; `/skydine-cafe/shop` is back to 431,112 bytes, which
+also confirms the 21,365-byte reading during hotfix verification was just the thinner disposable
+copy rather than a regression.
+
+One honest caveat: the temporary firewall rule for the verification port 3100 failed to create
+(`New-NetFirewallRule ... cannot find the file specified`), so that short-lived verification server
+was briefly unblocked on a `::` bind before being stopped. Port 3100 is now clear and the rule
+removed.
+
+### Still outstanding, owner decision
+`npm audit --omit=dev`: **5 vulnerabilities (2 critical, 3 high), all Clerk SDK**; Next.js is clean.
+`@clerk/nextjs` 6.39.0 is inside the affected range for `GHSA-vqx2-fgx2-5wq9`, a **middleware-based
+route protection bypass** — the most plausible explanation for unauthenticated `/dashboard/*`
+returning 200 with a `Profile Not Found` shell instead of redirecting to sign-in. Out of the stated
+hotfix scope (no Clerk auth logic, no unrelated upgrades), so it was documented rather than changed.
+Recommend a separate scoped Clerk hotfix.
+
+### P2-001 — genuine blocker, independently verified, NOT integrated
+The schema owner (`gpt-5.6-sol`, observed `gpt-5.6-sol`) stopped because **its destructive rollback
+rehearsal was denied at tool authorization**. It did not bypass, did not retry a different
+destructive path, and reported the denial precisely. That is the correct behaviour.
+
+Root verified its claims rather than accepting them:
+
+| Claim | Verification |
+|---|---|
+| Backup taken outside repo, 149,270 bytes | CONFIRMED, file present at exactly that size |
+| Target was the disposable rehearsal DB | CONFIRMED; guard independently returns ALLOWED for it and REFUSES `personalink`, `PersonaLink`, `PERSONALINK` |
+| Migration additive-only | CONFIRMED — 14 `CREATE TABLE`, 38 indexes, 2 triggers, and **0** `DROP`/`TRUNCATE`/`DELETE FROM`/`RENAME`; all 26 `ALTER TABLE` target only new tables for FK wiring |
+| 14 new tables applied | CONFIRMED, 14/14 present, migration `20260827140000_phase0_foundations` finished |
+| New FKs nullable | CONFIRMED — `Workspace/Contact/ContactSourceLink/ActivityEvent/WorkflowRun.profileId` all `is_nullable=YES` |
+| Append-only enforcement | CONFIRMED — triggers on both `ActivityEvent` and `CopilotAuditEvent` for UPDATE **and** DELETE |
+| Backfill rehearsal rolled back cleanly | CONFIRMED — `Workspace`/`Contact`/`ContactSourceLink` residue all 0, `Profile` still 16 |
+| `personalink` untouched | CONFIRMED — 35 public tables, `_prisma_migrations` absent, none of the 14 new tables, `Profile`=16 |
+
+Not done, and therefore NOT acceptable for integration: rollback rehearsal, reapply verification,
+the invariant harness and its failure-mode proof, `tsc`/`eslint`/`build` gates, and the single local
+commit. Its worktree still holds an uncommitted `schema.prisma` and an untracked migration
+directory, 0 commits ahead.
+
+**Verdict: NOT ACCEPTED — blocked, work sound so far but incomplete.** Completion needs explicit
+owner authorization to execute the guarded down migration against
+`personalink_phase0_rehearsal_20260826_210704` and nothing else. The rehearsal database currently
+carries the migration (56 public tables vs the live baseline of 35).
