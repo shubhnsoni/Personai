@@ -1,6 +1,7 @@
 param(
   [int]$IntervalSeconds = 30,
-  [string]$Baseline = 'a4d9fba'
+  [string]$Baseline = 'a4d9fba',
+  [switch]$Once
 )
 
 # Single truthful orchestration dashboard.
@@ -32,27 +33,47 @@ $Lanes = @(
 
 function NowStamp { Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz' }
 
+$TracePath = Join-Path $env:TEMP 'orchestrator-dashboard-trace.txt'
+function Trace([string]$phase) {
+  try { Add-Content -LiteralPath $TracePath -Value "$(Get-Date -Format 'HH:mm:ss.fff') $phase" } catch { }
+}
+
 function Git($dir, [string[]]$gitArgs) {
   try { return (& git -C $dir @gitArgs 2>$null | Out-String).Trim() } catch { return '' }
 }
 
 function LaneRow($lane) {
   $dir = $lane.Dir
+  Trace "  laneRow:enter:$($lane.Name)"
   if (-not (Test-Path -LiteralPath $dir)) {
+    Trace "  laneRow:absent:$($lane.Name)"
     return [pscustomobject]@{ Name = $lane.Name; Role = $lane.Role; Branch = 'absent'; Head = '-'; Ahead = '-'; Dirty = '-'; LastActivity = '-'; Task = $lane.Task }
   }
+  Trace '  laneRow:git:branch'
   $branch = Git $dir @('rev-parse', '--abbrev-ref', 'HEAD')
+  Trace '  laneRow:git:head'
   $head = Git $dir @('log', '-1', '--format=%h')
+  Trace '  laneRow:git:ahead'
   $ahead = Git $dir @('rev-list', '--count', "$Baseline..HEAD")
+  Trace '  laneRow:git:status'
   $status = Git $dir @('status', '--porcelain=v1')
+  Trace '  laneRow:git:done'
   $dirty = if ($status) { @($status -split "`n" | Where-Object { $_.Trim() }).Count } else { 0 }
 
+  # Scoped to the business-os directories on purpose. Recursing all of aiclone/src for
+  # every lane on every tick took longer than the interval and starved the loop.
   $last = '-'
-  try {
-    $newest = Get-ChildItem -LiteralPath (Join-Path $dir 'aiclone\src') -Recurse -File -ErrorAction SilentlyContinue |
+  $newest = $null
+  foreach ($rel in @('src\lib\business-os', 'src\app\api\business-os', 'src\components\business-os', 'src\app\dashboard\business-os')) {
+    $probe = Join-Path $dir "aiclone\$rel"
+    if (-not (Test-Path -LiteralPath $probe)) { continue }
+    Trace "  laneRow:scan:$rel"
+    $candidate = Get-ChildItem -LiteralPath $probe -Recurse -File -ErrorAction SilentlyContinue |
       Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($newest) { $last = $newest.LastWriteTime.ToString('MM-dd HH:mm') }
-  } catch { }
+    if ($candidate -and (-not $newest -or $candidate.LastWriteTime -gt $newest)) { $newest = $candidate.LastWriteTime }
+  }
+  if ($newest) { $last = $newest.ToString('MM-dd HH:mm') }
+  Trace "  laneRow:exit:$($lane.Name)"
 
   [pscustomobject]@{
     Name = $lane.Name; Role = $lane.Role; Branch = $branch; Head = $head
@@ -61,10 +82,19 @@ function LaneRow($lane) {
 }
 
 function SpawnList {
+  # Time-boxed: `kirocrew spawn list` starts a CLI plus Python children, and a slow or
+  # hung call must not stall the dashboard loop.
   try {
-    $text = (& kirocrew spawn list 2>&1 | Out-String).Trim()
-    if (-not $text) { return 'no sessions reported' }
-    return $text
+    $job = Start-Job -ScriptBlock { (& kirocrew spawn list 2>&1 | Out-String).Trim() }
+    if (Wait-Job -Job $job -Timeout 15) {
+      $text = Receive-Job -Job $job
+      Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+      if ($text) { return ($text | Out-String).Trim() }
+      return 'no sessions reported'
+    }
+    Stop-Job -Job $job -ErrorAction SilentlyContinue
+    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+    return 'spawn list timed out after 15s'
   } catch { return "spawn list unavailable: $($_.Exception.Message)" }
 }
 
@@ -80,9 +110,13 @@ function AppState {
 }
 
 function Write-Dashboard {
-  $rows = $Lanes | ForEach-Object { LaneRow $_ }
+  Trace 'tick:start'
+  $rows = $Lanes | ForEach-Object { Trace "lane:$($_.Name)"; LaneRow $_ }
+  Trace 'lanes:done'
   $app = AppState
+  Trace 'appstate:done'
   $spawn = SpawnList
+  Trace 'spawnlist:done'
 
   $lines = @(
     '# KiroCrew Live Activity',
@@ -117,8 +151,19 @@ function Write-Dashboard {
   )
 
   Set-Content -LiteralPath $Out -Value $lines -Encoding UTF8
+  Trace 'tick:written'
 }
 
+if ($Once) {
+  Write-Dashboard
+  Write-Host "Dashboard written: $Out"
+  return
+}
+
+# Loop mode. Run this in a visible console, not as a detached hidden process: when it is
+# launched hidden from a shell that then exits, git invocations inside it have been observed
+# to stall for ~45s and return nothing, which starves the loop. `-Once` from an interactive
+# shell is the reliable path.
 Write-Host "Orchestrator dashboard running. Output: $Out"
 Write-Host 'Ctrl+C to stop.'
 while ($true) {
