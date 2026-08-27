@@ -1,6 +1,31 @@
 import type { BusinessBlueprint } from "./types"
 import { assertValidBusinessBlueprint } from "./validation"
 
+const restaurantWorkflows: BusinessBlueprint["workflows"] = [
+  {
+    id: "order-placed",
+    name: "Order placed",
+    trigger: { kind: "event", event: "order.created" },
+    actions: [
+      { id: "notify-kitchen", kind: "sendNotification", label: "Notify the kitchen board" },
+      { id: "audit-order", kind: "recordAudit", label: "Record order status history", auditSubject: "order" },
+    ],
+  },
+  {
+    id: "order-paid",
+    name: "Order paid",
+    trigger: { kind: "event", event: "order.paid" },
+    actions: [
+      { id: "audit-payment", kind: "recordAudit", label: "Record payment state", auditSubject: "payment" },
+    ],
+  },
+]
+
+const restaurantOwnerCopilotPrompts = [
+  "Which open orders have been waiting longest?",
+  "What did each table spend today?",
+]
+
 const builtInBlueprints: BusinessBlueprint[] = [
   {
     id: "coaching-studio-v1",
@@ -70,9 +95,11 @@ const builtInBlueprints: BusinessBlueprint[] = [
     ],
   },
   {
+    // Historical contract retained for addressability. It is deprecated because it
+    // claimed reservations and real inventory before either capability was available.
     id: "restaurant-venue-v1",
     version: "1.0.0",
-    status: "active",
+    status: "deprecated",
     name: "Restaurant and cloud kitchen",
     vertical: "restaurant-cloud-kitchen",
     summary: "QR dine-in and takeaway ordering with a live service queue, guest status history, and payment capture.",
@@ -80,29 +107,33 @@ const builtInBlueprints: BusinessBlueprint[] = [
       { engineId: "venueOrders", capabilities: ["reservations", "qrOrdering", "guestTracking"], required: true },
       { engineId: "commerce", capabilities: ["catalog", "inventory", "orders"], required: true },
     ],
-    workflows: [
+    workflows: restaurantWorkflows,
+    ownerCopilotPrompts: restaurantOwnerCopilotPrompts,
+  },
+  {
+    id: "restaurant-venue-v2",
+    version: "2.0.0",
+    status: "active",
+    name: "Restaurant and cloud kitchen",
+    vertical: "restaurant-cloud-kitchen",
+    summary: "QR dine-in and takeaway ordering with a live service queue, guest status history, and payment capture.",
+    engines: [
       {
-        id: "order-placed",
-        name: "Order placed",
-        trigger: { kind: "event", event: "order.created" },
-        actions: [
-          { id: "notify-kitchen", kind: "sendNotification", label: "Notify the kitchen board" },
-          { id: "audit-order", kind: "recordAudit", label: "Record order status history", auditSubject: "order" },
-        ],
+        engineId: "venueOrders",
+        capabilities: ["qrOrdering", "guestTracking"],
+        required: true,
+        plannedCapabilities: ["reservations"],
       },
       {
-        id: "order-paid",
-        name: "Order paid",
-        trigger: { kind: "event", event: "order.paid" },
-        actions: [
-          { id: "audit-payment", kind: "recordAudit", label: "Record payment state", auditSubject: "payment" },
-        ],
+        engineId: "commerce",
+        capabilities: ["catalog", "orders"],
+        required: true,
+        plannedCapabilities: ["inventory"],
       },
     ],
-    ownerCopilotPrompts: [
-      "Which open orders have been waiting longest?",
-      "What did each table spend today?",
-    ],
+    workflows: restaurantWorkflows,
+    ownerCopilotPrompts: restaurantOwnerCopilotPrompts,
+    supersedes: "restaurant-venue-v1",
   },
 ]
 
