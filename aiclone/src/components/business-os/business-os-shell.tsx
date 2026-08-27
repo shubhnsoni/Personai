@@ -59,42 +59,60 @@ export function BusinessOsShell({
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Blueprints</CardTitle>
-                        <GitBranch className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">
+                            <h3>Blueprints defined</h3>
+                        </CardTitle>
+                        <GitBranch className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{blueprints.length}</div>
-                        <p className="text-xs text-muted-foreground">{activeCount} active</p>
+                        <p className="text-xs text-muted-foreground">
+                            {activeCount} marked active in the registry
+                        </p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Engines</CardTitle>
-                        <CircleCheck className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">
+                            <h3>Engines referenced</h3>
+                        </CardTitle>
+                        <CircleCheck className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{usage.size}/{engines.length}</div>
-                        <p className="text-xs text-muted-foreground">composed at least once</p>
+                        <p className="text-xs text-muted-foreground">composed in at least one blueprint</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Workflows</CardTitle>
-                        <Workflow className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">
+                            <h3>Workflows declared</h3>
+                        </CardTitle>
+                        <Workflow className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{workflowCount}</div></CardContent>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{workflowCount}</div>
+                        <p className="text-xs text-muted-foreground">configuration only, not yet run</p>
+                    </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Approval gates</CardTitle>
-                        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">
+                            <h3>Approval gates specified</h3>
+                        </CardTitle>
+                        <ShieldCheck className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{approvalGates}</div></CardContent>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{approvalGates}</div>
+                        <p className="text-xs text-muted-foreground">configuration only, not yet run</p>
+                    </CardContent>
                 </Card>
             </div>
 
             <Card>
-                <CardHeader><CardTitle>Engine coverage</CardTitle></CardHeader>
+                <CardHeader>
+                    <CardTitle><h3>Engine coverage</h3></CardTitle>
+                </CardHeader>
                 <CardContent>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {engines.map((engine) => {
@@ -119,11 +137,13 @@ export function BusinessOsShell({
             </Card>
 
             <Card>
-                <CardHeader><CardTitle>Blueprints</CardTitle></CardHeader>
+                <CardHeader>
+                    <CardTitle><h3>Blueprints</h3></CardTitle>
+                </CardHeader>
                 <CardContent>
                     {blueprints.length === 0 ? (
                         <EmptyState
-                            icon={<GitBranch />}
+                            icon={<GitBranch aria-hidden="true" />}
                             title="No blueprints yet"
                             description="A blueprint composes the shared engines into a vertical. None are registered."
                         />
@@ -134,7 +154,7 @@ export function BusinessOsShell({
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <p className="font-semibold">{blueprint.name}</p>
+                                                <h4 className="font-semibold">{blueprint.name}</h4>
                                                 <Badge variant={statusVariant(blueprint.status)}>{blueprint.status}</Badge>
                                                 <Badge variant="outline">v{blueprint.version}</Badge>
                                             </div>
@@ -192,18 +212,18 @@ export function BusinessOsShell({
                                     {blueprint.ownerCopilotPrompts.length > 0 ? (
                                         <div className="mt-3">
                                             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                                                Owner copilot prompts
+                                                Owner copilot prompts (example text, not interactive)
                                             </p>
-                                            <div className="mt-2 flex flex-wrap gap-2">
+                                            <ul className="mt-2 space-y-1.5" aria-label="Example owner copilot prompts">
                                                 {blueprint.ownerCopilotPrompts.map((prompt) => (
-                                                    <span
+                                                    <li
                                                         key={prompt}
-                                                        className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground"
+                                                        className="rounded-lg border-l-2 border-border bg-background px-3 py-1.5 text-xs italic text-muted-foreground"
                                                     >
-                                                        {prompt}
-                                                    </span>
+                                                        &ldquo;{prompt}&rdquo;
+                                                    </li>
                                                 ))}
-                                            </div>
+                                            </ul>
                                         </div>
                                     ) : null}
                                 </article>
