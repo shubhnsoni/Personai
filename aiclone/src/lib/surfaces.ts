@@ -9,6 +9,7 @@ export type Surface =
     | "courses"
     | "events"
     | "sales"
+    | "businessOs"
 
 export type FieldPack =
     | "shopPhysical"
@@ -25,6 +26,9 @@ const ALL_SURFACES: Surface[] = [
     "home", "profile", "inbox", "leads",
     "shop", "services", "calendar",
     "courses", "events", "sales",
+    // Owner-facing operations console. Deliberately not granted to any role KIT
+    // yet: it is opt-in per profile through extras until the feature is complete.
+    "businessOs",
 ]
 
 const ALL_PACKS: FieldPack[] = [
@@ -147,6 +151,7 @@ export function calendarNoun(role?: string | null) {
 
 export function surfaceForPath(pathname: string): Surface | null {
     if (pathname === "/dashboard") return "home"
+    if (pathname.startsWith("/dashboard/business-os")) return "businessOs"
     if (pathname.startsWith("/dashboard/profile") || pathname.startsWith("/dashboard/content") || pathname.startsWith("/dashboard/import") || pathname.startsWith("/dashboard/links")) return "profile"
     if (pathname.startsWith("/dashboard/inbox") || pathname.startsWith("/dashboard/conversations")) return "inbox"
     if (pathname.startsWith("/dashboard/leads")) return "leads"
@@ -171,6 +176,7 @@ export function navHrefToSurface(href: string): Surface | null {
         case "/dashboard/courses": return "courses"
         case "/dashboard/events": return "events"
         case "/dashboard/money": return "sales"
+        case "/dashboard/business-os": return "businessOs"
         default: return null
     }
 }
