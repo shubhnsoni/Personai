@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RestaurantOrderControls } from "@/components/dashboard/restaurant-order-controls"
+import { OrderStreamIndicator } from "@/components/dashboard/order-stream-indicator"
 
 function money(cents: number, currency: string) {
     try {
@@ -43,7 +44,10 @@ export async function RestaurantOrdersDashboard({ profileId }: { profileId: stri
 
     return (
         <div className="flex-1 space-y-6">
-            <p className="text-sm text-muted-foreground">Restaurant orders — grouped by guest checkout</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">Restaurant orders — grouped by guest checkout</p>
+                <OrderStreamIndicator />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

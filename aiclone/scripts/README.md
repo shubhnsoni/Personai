@@ -23,3 +23,15 @@ npx ts-node --compiler-options '{"module":"CommonJS","moduleResolution":"node"}'
 ```
 
 Grouping is deterministic and versioned: exact restaurant profile plus trimmed/lower-cased visitor email, ordered by creation time and purchase ID, with a maximum 5-second adjacent gap and 60-second total span. Notes must fully match `xN` or `xN · modifier prose`; modifier labels must map uniquely to the current dish catalog. Current product and modifier prices are explicitly marked as inferences in line-scoped `BACKFILL` events. Unsafe rows/groups are skipped and reported only through one-way references. `Order.legacyGroupKey` and `OrderLine.legacyPurchaseId` make reruns idempotent.
+
+## Live order transport
+
+`scripts/one-off/check-order-stream.ts` verifies Phase 1. It checks in-process fan-out and scoping, that both stream endpoints reject unauthenticated and unknown-token requests, idle survival with heartbeats, `Last-Event-ID` replay, and cursor-poll latency. Point `--base` at any origin to test a specific hop:
+
+```powershell
+$env:DATABASE_URL = 'postgresql://user@127.0.0.1:5432/restored_copy'
+npx ts-node --compiler-options '{"module":"CommonJS","moduleResolution":"node"}' scripts/one-off/check-order-stream.ts --idle-seconds=330
+npx ts-node --compiler-options '{"module":"CommonJS","moduleResolution":"node"}' scripts/one-off/check-order-stream.ts --base=https://<tunnel-host>
+```
+
+Either transport is acceptable and the report names the one that carried the updates. A Cloudflare **quick** tunnel buffers streaming responses, so the event stream delivers zero frames through it and the cursor poll is what keeps such a client current; a direct origin delivers the stream normally.
