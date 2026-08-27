@@ -686,3 +686,12 @@ Lane 3 remains blocked after lane 1 not only by its stated dependency but also b
 Lane 1 (`687b369`, persisted adapters/APIs) and lane 2 (`04ec86a`, executable workflow/approval/audit runtime) each completed as exactly one clean commit from `9291e93`, with all changed files inside their exclusive owned paths and no Prisma, manifest, middleware/auth, restaurant, chat/RAG or root-ledger changes. Requested and observed model: `gpt-5.6-sol` for both.
 
 Root independently ran both gate sets from their isolated worktrees. For each lane: Prisma validate=0, `tsc --noEmit`=0, targeted ESLint=0, normal harness=0, intentional inversion=1, and `npm run build`=0. Lane 1 proves tenant scoping, persisted adapter/API behavior and idempotency; lane 2 proves approval-before-effect ordering, append-only audit behavior, retry idempotency, failure recovery and tenant isolation. Both are accepted pending serial `--no-ff` integration.
+
+
+## 2026-08-28 04:46 +05:30 — HARD STOP: two integrations green; observability left isolated
+
+Lane 1 merged into primary with `--no-ff` at `6c3229c`. Post-merge `tsc`, targeted lint, the 26-assertion persisted-adapter harness and production build all exited 0. Lane 2 then merged serially with `--no-ff` at `42e31fb`; combined-tip `tsc`, targeted lint, executable-runtime harness and production build all exited 0. No conflicts, Prisma edits, manifest edits, migration, database write, push, PR, deploy or tunnel occurred.
+
+Lane 3 was not dispatched. Although lane 1 is now committed, the independently confirmed onboarding action trusts caller-supplied identity; a separate security remediation must be accepted first, and the 04:45 hard stop forbids starting another large package this cycle.
+
+At 04:46 IST, P1-013 observability job `0e532936` remains active with two in-scope uncommitted files, zero commits and no report. It was not interrupted or integrated; its isolated state is recorded for the next cycle. All completed one-shot jobs had already removed themselves, so no completed cron remained to delete. Cleanup verified: cloudflared process count 0; ports 3000 and 3100 each have 0 listeners; primary is clean except preserved `.codex-remote-attachments/`; no temporary server remains.

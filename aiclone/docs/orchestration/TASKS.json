@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 04:37 +05:30",
+  "updatedAt": "2026-08-28 04:46 +05:30",
   "updatedBy": "overnight supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -160,7 +160,7 @@
     {
       "id": "P1-005",
       "title": "Make workflows and approvals executable",
-      "status": "accepted_pending_merge",
+      "status": "done",
       "dependencies": [
         "P0-007"
       ],
@@ -172,7 +172,8 @@
       "baseCommit": "9291e93",
       "observedModel": "gpt-5.6-sol",
       "commit": "04ec86a8824b3c132242541d27af0549cea403a1",
-      "rootVerdict": "ACCEPTED - independent prisma, tsc, lint, normal/inverted harness and build gates green"
+      "rootVerdict": "ACCEPTED, merged --no-ff after lane 1, and combined-tip tsc, targeted lint, harness and build green",
+      "mergeCommit": "42e31fb42181e4cb01bc3ec92d85c2a8c5079c92"
     },
     {
       "id": "P1-006",
@@ -398,7 +399,7 @@
     {
       "id": "P2-002",
       "title": "Persisted tenancy/contact/activity/task adapters and APIs",
-      "status": "accepted_pending_merge",
+      "status": "done",
       "model": "gpt-5.6-sol",
       "job": "5af32286",
       "branch": "worker/w7-persisted-adapters",
@@ -421,17 +422,18 @@
       "note": "Lane 1. Must prove persisted adapter correctness, tenant scoping, authorization and idempotency without schema changes.",
       "observedModel": "gpt-5.6-sol",
       "commit": "687b369bb7faec501c220d4b9089f59f23a6d87b",
-      "rootVerdict": "ACCEPTED - independent prisma, tsc, lint, normal/inverted harness and build gates green"
+      "rootVerdict": "ACCEPTED, merged --no-ff, and post-merge tsc, targeted lint, harness and build green",
+      "mergeCommit": "6c3229c89abe23ad3cb1eed0724e9112e5d747a3"
     },
     {
       "id": "P2-003",
       "title": "Business onboarding and Business OS UI connected to persisted APIs",
-      "status": "blocked_waiting_for_P2-002",
+      "status": "blocked_security_remediation_and_hard_stop",
       "model": "claude-sonnet-5",
       "dependencies": [
         "P2-002"
       ],
-      "note": "Lane 3 is not dispatched until lane 1 is committed and independently accepted."
+      "note": "Lane 1 is integrated, but lane 3 was not dispatched: the current onboarding action trusts caller-supplied identity. A separate accepted security remediation and a fresh green base are required; the 04:45 hard stop also forbids a new large package this cycle."
     },
     {
       "id": "P2-004",
@@ -450,9 +452,9 @@
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-28 04:37 +05:30",
+    "observedAt": "2026-08-28 04:46 +05:30",
     "activeWorkers": 1,
-    "kirocrewSessions": "Only P1-013 observability remains active. Persisted adapters and executable runtime completed, passed independent gates, and await serial merge; lane 3 remains blocked by onboarding security remediation.",
+    "kirocrewSessions": "Hard stop reached. Only P1-013 observability remains active and isolated with no commit/report yet. Lanes 1 and 2 are integrated green; lane 3 was not dispatched because onboarding security remediation is required.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
@@ -515,8 +517,8 @@
     ]
   },
   "runtime": {
-    "publicTunnel": "DOWN, cloudflared terminated, hostname returns 530",
-    "localApp": "DOWN by owner directive; ports 3000 and 3100 clear after verification",
+    "publicTunnel": "DOWN, cloudflared process count 0 at 04:46 IST",
+    "localApp": "DOWN; ports 3000 and 3100 have 0 listeners at 04:46 IST",
     "liveDatabase": "personalink untouched: 35 tables, 774 rows, 0 applied migrations, ProductPurchase 8"
   },
   "modelPolicy": {
