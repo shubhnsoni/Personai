@@ -668,3 +668,21 @@ Five path-disjoint jobs were dispatched from green base `9291e93`, all with expl
 | independent integration reviewer | `1168937d` | `gpt-5.6-sol` | `worker/w11-integration-review` | in flight |
 
 Lane 3 (`claude-sonnet-5`) was not dispatched: it depends on lane 1 being committed and independently accepted first. Frozen evidence worktrees and `.codex-remote-attachments/` remain untouched. Nothing pushed, deployed, migrated, or tunneled.
+
+
+## 2026-08-28 04:25 +05:30 — Lane 4 rejected for integration; reviewer completed
+
+Two of five wave-2 jobs reached terminal state. The integration reviewer (`1168937d`, requested and observed `gpt-5.6-sol`) completed read-only with a clean worktree and external report; no repository file changed. It independently accepted SEC-002 dependency scope, noted that the retained server log is not durable HTTP-matrix evidence, and confirmed release-blocking pre-existing authorization/storage defects.
+
+The adversarial evaluator (`92545f2c`, requested and observed `gpt-5.6-terra`) produced one commit (`edb65fa`) containing only a new review document and source-regex harness. Root independently inspected the production sources and confirmed the critical/high findings: caller-selected profile ownership in onboarding, ownerless content mutations, anonymous public uploads, anonymous image-to-3D compute/public writes, course-progress IDOR, and detailed anonymous health disclosure. No production source was changed.
+
+**Integration verdict: REJECTED.** The branch is not green: the new harness intentionally exits 1, scans source text rather than executing route/action boundaries, has no inversion control, and the worktree retains untracked `.kiro/` metadata outside the candidate scope. Independent gates otherwise passed with a process-only disposable-name placeholder used only for schema parsing: Prisma validate, `tsc --noEmit`, targeted ESLint, the existing auth/authz, tenant-isolation and tenancy harnesses, and `npm run build`. The failing harness truthfully reports seven missing controls; it is evidence of blockers, not an acceptable regression suite.
+
+Lane 3 remains blocked after lane 1 not only by its stated dependency but also by onboarding authorization: it must not connect to the current caller-supplied-identity action. Separate exclusive security remediation packages are required before release. Lanes 1, 2 and 5 remain active and untouched; no new package was dispatched, no Prisma writer or manifest writer was introduced, and no branch was merged in this check.
+
+
+## 2026-08-28 04:37 +05:30 — Lanes 1 and 2 independently accepted
+
+Lane 1 (`687b369`, persisted adapters/APIs) and lane 2 (`04ec86a`, executable workflow/approval/audit runtime) each completed as exactly one clean commit from `9291e93`, with all changed files inside their exclusive owned paths and no Prisma, manifest, middleware/auth, restaurant, chat/RAG or root-ledger changes. Requested and observed model: `gpt-5.6-sol` for both.
+
+Root independently ran both gate sets from their isolated worktrees. For each lane: Prisma validate=0, `tsc --noEmit`=0, targeted ESLint=0, normal harness=0, intentional inversion=1, and `npm run build`=0. Lane 1 proves tenant scoping, persisted adapter/API behavior and idempotency; lane 2 proves approval-before-effect ordering, append-only audit behavior, retry idempotency, failure recovery and tenant isolation. Both are accepted pending serial `--no-ff` integration.

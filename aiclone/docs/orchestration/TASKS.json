@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 03:59 +05:30",
+  "updatedAt": "2026-08-28 04:37 +05:30",
   "updatedBy": "overnight supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -160,7 +160,7 @@
     {
       "id": "P1-005",
       "title": "Make workflows and approvals executable",
-      "status": "in_flight",
+      "status": "accepted_pending_merge",
       "dependencies": [
         "P0-007"
       ],
@@ -169,7 +169,10 @@
       "job": "c535c6a4",
       "branch": "worker/w8-executable-runtime",
       "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w8-runtime-wt",
-      "baseCommit": "9291e93"
+      "baseCommit": "9291e93",
+      "observedModel": "gpt-5.6-sol",
+      "commit": "04ec86a8824b3c132242541d27af0549cea403a1",
+      "rootVerdict": "ACCEPTED - independent prisma, tsc, lint, normal/inverted harness and build gates green"
     },
     {
       "id": "P1-006",
@@ -292,7 +295,7 @@
     {
       "id": "P1-014",
       "title": "Security, auth and isolation audit, read-only",
-      "status": "adversarial_eval_in_flight",
+      "status": "completed_blocked_remediation_required",
       "model": "gpt-5.6-terra",
       "allowedPaths": [
         "docs/orchestration/SECURITY_AUDIT.md",
@@ -303,11 +306,15 @@
         "shared auth",
         "public chat"
       ],
-      "reconciledNote": "Lane 4 dispatched read-only by default. It may write only a new adversarial harness and review document; any production defect requires a failing test and blocker report, not a source patch this cycle.",
+      "reconciledNote": "Evaluation completed and the production defects were independently confirmed. The branch is not green or integrable: its source-regex harness intentionally exits 1, does not execute route/action boundaries, and the worktree retains untracked .kiro metadata outside scope. No production source was patched. Separate exclusive remediation lanes are required before release; lane 3 must not use the insecure caller-selected onboarding action.",
       "job": "92545f2c",
       "branch": "worker/w9-auth-adversarial",
       "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w9-auth-adversarial-wt",
-      "baseCommit": "9291e93"
+      "baseCommit": "9291e93",
+      "observedModel": "gpt-5.6-terra",
+      "commit": "edb65facb354b2c8bb42a18ffdb9e35e4fee03f2",
+      "rootVerdict": "REJECTED FOR INTEGRATION - findings confirmed, evidence harness not executable boundary proof",
+      "externalReport": "C:\\Users\\shubh\\AppData\\Local\\Temp\\personalink-phase0\\wave2-reports\\LANE-4-AUTH-ADVERSARIAL.md"
     },
     {
       "id": "P1-015",
@@ -391,7 +398,7 @@
     {
       "id": "P2-002",
       "title": "Persisted tenancy/contact/activity/task adapters and APIs",
-      "status": "in_flight",
+      "status": "accepted_pending_merge",
       "model": "gpt-5.6-sol",
       "job": "5af32286",
       "branch": "worker/w7-persisted-adapters",
@@ -411,7 +418,10 @@
         "restaurant",
         "chat/RAG"
       ],
-      "note": "Lane 1. Must prove persisted adapter correctness, tenant scoping, authorization and idempotency without schema changes."
+      "note": "Lane 1. Must prove persisted adapter correctness, tenant scoping, authorization and idempotency without schema changes.",
+      "observedModel": "gpt-5.6-sol",
+      "commit": "687b369bb7faec501c220d4b9089f59f23a6d87b",
+      "rootVerdict": "ACCEPTED - independent prisma, tsc, lint, normal/inverted harness and build gates green"
     },
     {
       "id": "P2-003",
@@ -426,20 +436,23 @@
     {
       "id": "P2-004",
       "title": "Independent quality and integration reviewer",
-      "status": "in_flight",
+      "status": "done",
       "model": "gpt-5.6-sol",
       "job": "1168937d",
       "branch": "worker/w11-integration-review",
       "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w11-review-wt",
       "baseCommit": "9291e93",
       "allowedPaths": [],
-      "note": "Read-only repo review; external report only. Verifies claims, ownership, security, tests and integration order."
+      "note": "Read-only repo review completed with a clean worktree and external report only. It independently accepted SEC-002 dependency scope, identified the missing durable HTTP regression, rejected lane 4 as non-executable evidence, and confirmed release-blocking production auth/storage defects.",
+      "observedModel": "gpt-5.6-sol",
+      "rootVerdict": "ACCEPTED AS READ-ONLY REVIEW - no repository mutation",
+      "externalReport": "C:\\Users\\shubh\\AppData\\Local\\Temp\\personalink-phase0\\wave2-reports\\LANE-6-INTEGRATION-REVIEW.md"
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-28 03:59 +05:30",
-    "activeWorkers": 5,
-    "kirocrewSessions": "Five one-shot cron workers dispatched from green base 9291e93 with explicit models; lane 3 blocked on lane 1 commit.",
+    "observedAt": "2026-08-28 04:37 +05:30",
+    "activeWorkers": 1,
+    "kirocrewSessions": "Only P1-013 observability remains active. Persisted adapters and executable runtime completed, passed independent gates, and await serial merge; lane 3 remains blocked by onboarding security remediation.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
@@ -498,11 +511,7 @@
     ],
     "supervisionMode": "root supervises inside its own turn with bounded polls; monitor_start cannot arm in this ACP CLI session and autonudge.json loops is empty",
     "activeCronJobs": [
-      "5af32286",
-      "c535c6a4",
-      "92545f2c",
-      "0e532936",
-      "1168937d"
+      "0e532936"
     ]
   },
   "runtime": {
