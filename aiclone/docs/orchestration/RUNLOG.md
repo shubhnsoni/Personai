@@ -157,3 +157,84 @@ none of the six new tables, and `ProductPurchase` still 8. `DB_CUTOVER_PLAN.md` 
 preparation only and explicitly not approved for execution.
 
 Tunnel remains down. Local app serves the consolidation worktree on 127.0.0.1:3000.
+
+
+## 2026-08-27 — corrections applied, consolidation integrated, model policy partially blocked
+
+Corrections. All three were verified by measurement before being written down.
+
+- The malformed-URL claim was wrong and is retracted. `/api/business-os/blueprints/%E0%A4%A`
+  returns **400 `text/html`** from Next.js before the handler runs; it never reaches the
+  Business OS envelope. Only `/%25E0%25A4%25A`, an encoded percent that Next hands over as the
+  literal string `%E0%A4%A`, reaches the route and returns the 401 JSON. Reproduced in the
+  integration worktree. The `parseBlueprintId` guard and its assertions stay, because they
+  defend the decode step for values that do arrive.
+- `OWNER_COPILOT_SPEC.md` reconciled in five places against final code.
+- Continuous supervisor count is **0**, and `LIVE_ACTIVITY.md` is now described as an
+  on-demand one-shot snapshot rather than a live feed.
+
+Owner decisions recorded as ADR-009 through ADR-014, and nine task packages queued with
+explicit models and exact allowed and forbidden paths.
+
+Local integration, all gates run in `../personai-integration-wt`:
+
+| Gate | Exit |
+|---|---|
+| `prisma validate` | 0 |
+| `prisma generate` | 0 |
+| `tsc --noEmit` | 0 |
+| targeted `eslint` | 0 |
+| `check-business-os-surface.ts` | 0, PASS |
+| `check-business-os-render.ts` | 0, PASS |
+| `npm run build` | 0, three routes dynamic |
+| unauthenticated HTTP | 401 JSON on all app-reachable routes, 400 HTML on the framework-rejected one |
+
+The merge was `--no-ff` and rewrote neither branch. 22 files, path-disjoint apart from
+`surfaces.ts` (+9) and `sidebar.tsx` (+2); zero restaurant, Prisma or migration paths. The
+fixed `surfaces.ts` carried through, verified by asserting `businessOs` is absent from
+`ALL_SURFACES` in the merged tree. Local primary fast-forwarded to `5ed4fa9`. Origin remains
+`4b386d1`. Untracked user files preserved. The six lane worktrees and the evidence snapshot
+are retained.
+
+Integration base note: the owner named `4f7a582`. The actual base is `6a57232`, which is
+`4f7a582` plus the mandated corrections, so the integration includes them rather than
+requiring a second pass.
+
+Model policy. `agent.model` was `auto`; it is now explicit.
+
+| Key | Value | How |
+|---|---|---|
+| `agent.model` | `claude-sonnet-5` | `kirocrew config set`, verified by CLI readback |
+| `agent.reasoning_effort` | `high` | `kirocrew config set`, verified by CLI readback |
+| `agent.role_models.subagent` | `claude-sonnet-5` | config file, CLI rejects nested keys |
+| `agent.role_efforts.subagent` | `high` | config file |
+| `agent.role_models.background` | `gpt-5.6-terra` | config file |
+| `agent.role_efforts.background` | `medium` | config file |
+
+`kirocrew config set` returns "Unknown key" for the four nested `role_models.*` and
+`role_efforts.*` paths, although both objects exist in the schema and were empty. They were
+written directly into `~/.kiro/crew/config.json` and read back to confirm. A timestamped
+backup of the original config was taken first.
+
+**Owner-only blocker: per-worker model pinning is not possible in this environment.**
+
+- The KiroCrew MCP server is not configured. `~/.kiro/settings/mcp.json` contains only the
+  two `windows-computer-control` power servers, and the installed powers are `nova-act`,
+  `power-builder` and `windows-computer-control`. There is no `spawn_run` tool exposed to
+  this session.
+- `kirocrew spawn run --help` confirms the shell path takes only `[--async] task`. No model
+  argument, exactly as the owner said.
+
+So a six-worker wave with three distinct models cannot be dispatched as specified. Config
+pinning makes every KiroCrew session deterministic on `claude-sonnet-5` at high effort, which
+removes the `auto` ambiguity, but it cannot give `gpt-5.6-sol` to one worker and
+`gpt-5.6-terra` to another. Wave 1 is therefore held rather than dispatched under an
+unidentified model, which the policy forbids.
+
+Safety control landed while blocked, per ADR-011: `scripts/lib/disposable-db.ts` proves from
+the parsed connection target that a database is disposable and is not `personalink`, and
+`scripts/one-off/check-disposable-db-guard.ts` tests it without connecting to anything.
+Deny beats allow, comparison is case-insensitive because PostgreSQL folds unquoted
+identifiers, and credentials are redacted for reporting. 6 disposable names accepted, 5
+live-database casings rejected, 11 other rejections, exit 0. Every future migration command
+must call `assertDisposableTarget` before the command is constructed.
