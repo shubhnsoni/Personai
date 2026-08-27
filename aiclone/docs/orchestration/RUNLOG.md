@@ -643,3 +643,28 @@ version bump fixed anything, and must resolve whether the unauthenticated `/dash
 Tooling limitations recorded in `TASKS.json`: `spawn_run` is unusable (hollow records, reaped),
 `monitor_start` cannot arm, and no `todo_list` tool is exposed in this profile so the stale TUI list
 cannot be reconciled programmatically — `TASKS.json` is authoritative.
+
+
+
+## 2026-08-28 02:35 +05:30 — SEC-002 worker completed; independent verification started
+
+Job `2db4fb9e` is no longer registered. Branch `security/clerk-6.39.6` is one clean commit (`4f816f1`) ahead of base `9d5d20e`, and the required external report exists. Observed model matches requested model: `gpt-5.6-sol`. The diff is restricted to `aiclone/package.json`, `aiclone/package-lock.json`, and the minimal server-side gate `aiclone/src/middleware.ts`; no Prisma, shared auth library, restaurant, chat/RAG, or other runtime path changed. Worker prose is not accepted as evidence: root has started the full independent gate and local HTTP verification matrix.
+
+
+## 2026-08-28 03:59 +05:30 — SEC-002 ACCEPTED and merged; five READY lanes dispatched
+
+SEC-002 was independently verified rather than accepted from worker prose. Commit `4f816f1` is exactly one clean commit from `9d5d20e`; the diff contains only `aiclone/package.json`, `aiclone/package-lock.json`, and the four-line `aiclone/src/middleware.ts` redirect gate. Requested and observed model both `gpt-5.6-sol`.
+
+Pre-merge and post-merge gates passed: `prisma validate`, `tsc --noEmit`, targeted middleware ESLint, seven auth/tenant/Business OS harnesses, production dependency audit (0), and `npm run build`. The localhost-only HTTP matrix bound to `::1`, stopped afterward, and proved: unauthenticated dashboard routes -> 307 `/sign-in`; Business OS API routes -> 401 JSON with only `{ok,error}` and no data payload; malformed URL -> framework 400; public root -> 200; authenticated dashboards -> 200; authenticated user without `businessOs` -> API 403. No key, token, identity, database URL or environment content was printed. Merge `9291e93` used `--no-ff`; post-merge matrix repeated against a process-only disposable DB override. Ports 3000/3100 clear and cloudflared count 0.
+
+Five path-disjoint jobs were dispatched from green base `9291e93`, all with explicit models, one-shot isolated worktrees, no Prisma writer, and package manifests forbidden:
+
+| Lane | Job | Model | Branch | State |
+|---|---|---|---|---|
+| persisted adapters/APIs | `5af32286` | `gpt-5.6-sol` | `worker/w7-persisted-adapters` | in flight |
+| executable workflow/approval/audit runtime | `c535c6a4` | `gpt-5.6-sol` | `worker/w8-executable-runtime` | in flight |
+| auth/authz/tenant adversarial evaluation | `92545f2c` | `gpt-5.6-terra` | `worker/w9-auth-adversarial` | in flight |
+| P1-013 observability | `0e532936` | `gpt-5.6-terra` | `worker/w10-observability` | in flight |
+| independent integration reviewer | `1168937d` | `gpt-5.6-sol` | `worker/w11-integration-review` | in flight |
+
+Lane 3 (`claude-sonnet-5`) was not dispatched: it depends on lane 1 being committed and independently accepted first. Frozen evidence worktrees and `.codex-remote-attachments/` remain untouched. Nothing pushed, deployed, migrated, or tunneled.

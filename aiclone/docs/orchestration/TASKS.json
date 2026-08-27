@@ -1,9 +1,9 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 00:17 +05:30",
-  "updatedBy": "root orchestrator (claude-opus-5, max effort) - overnight run",
+  "updatedAt": "2026-08-28 03:59 +05:30",
+  "updatedBy": "overnight supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
-  "maxParallelWorkers": 4,
+  "maxParallelWorkers": 6,
   "baseCommitPolicy": "Lanes must branch from a commit where tsc --noEmit and next build both exit 0. Qualifying commits: e97edf4 and later. The consolidation branched from a4d9fba. See ADR-007.",
   "databasePolicy": "No migration, backfill or cutover against personalink is approved. DB_CUTOVER_PLAN.md is preparation only.",
   "tasks": [
@@ -160,12 +160,16 @@
     {
       "id": "P1-005",
       "title": "Make workflows and approvals executable",
-      "status": "blocked_waiting_for_owner",
+      "status": "in_flight",
       "dependencies": [
         "P0-007"
       ],
-      "reason": "Requires the run ledger models proposed in OWNER_COPILOT_SPEC.md, which need an owner-approved Prisma migration. No migration is approved.",
-      "note": "Until then every requestApproval and recordAudit in every blueprint is a plan, not a control."
+      "note": "Lane 2 dispatched after P2-001 schema integration. Exclusive new copilot execution/runtime and API paths; no Prisma or package edits.",
+      "model": "gpt-5.6-sol",
+      "job": "c535c6a4",
+      "branch": "worker/w8-executable-runtime",
+      "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w8-runtime-wt",
+      "baseCommit": "9291e93"
     },
     {
       "id": "P1-006",
@@ -272,20 +276,24 @@
     {
       "id": "P1-013",
       "title": "Orchestration observability: fix the dashboard loop or retain honest one-shot",
-      "status": "ready",
+      "status": "in_flight",
       "model": "gpt-5.6-terra",
       "allowedPaths": [
         "docs/orchestration/Orchestrator-Dashboard.ps1",
         "docs/orchestration/OBSERVABILITY_DIAGNOSIS.md"
       ],
       "exitCriteria": "Three completed timestamped ticks, no 1s polling, no overlapping writers; otherwise retain one-shot and document why.",
-      "reconciledNote": "NOT dispatched in wave 1 despite the stale dispatch_wave_1 status. Observability remains unfinished: autonudge.json loops is empty, monitor_start cannot arm in this ACP CLI session, and LIVE_ACTIVITY.md is an on-demand one-shot. Continuous supervisors = 0."
+      "reconciledNote": "Dispatched with gpt-5.6-terra. Exact ownership remains Orchestrator-Dashboard.ps1 and OBSERVABILITY_DIAGNOSIS.md. Must prove three ticks or retain an honest one-shot; false running state forbidden.",
+      "job": "0e532936",
+      "branch": "worker/w10-observability",
+      "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w10-observability-wt",
+      "baseCommit": "9291e93"
     },
     {
       "id": "P1-014",
       "title": "Security, auth and isolation audit, read-only",
-      "status": "partially_satisfied",
-      "model": "gpt-5.6-sol",
+      "status": "adversarial_eval_in_flight",
+      "model": "gpt-5.6-terra",
       "allowedPaths": [
         "docs/orchestration/SECURITY_AUDIT.md",
         "docs/orchestration/SECURITY_TEST_PLAN.md"
@@ -295,7 +303,11 @@
         "shared auth",
         "public chat"
       ],
-      "reconciledNote": "NOT dispatched as its own lane. Covered so far: P1-008 deterministic mocked auth/authz/tenant-isolation tests (all exit 0, falsifiable under INVERT_ASSERTION), plus a root-run dependency audit that found and is fixing 5 Clerk advisories (SEC-002) and the Next.js RCE (SEC-001). NOT yet covered: uploads/storage boundary review, secret-exposure sweep, and adversarial testing of the real provider rather than fakes."
+      "reconciledNote": "Lane 4 dispatched read-only by default. It may write only a new adversarial harness and review document; any production defect requires a failing test and blocker report, not a source patch this cycle.",
+      "job": "92545f2c",
+      "branch": "worker/w9-auth-adversarial",
+      "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w9-auth-adversarial-wt",
+      "baseCommit": "9291e93"
     },
     {
       "id": "P1-015",
@@ -368,15 +380,66 @@
     {
       "id": "SEC-002",
       "title": "Security hotfix: Clerk SDK 6.39.0 -> 6.39.6 (GHSA-vqx2-fgx2-5wq9 middleware route-protection bypass, GHSA-w24r-5266-9c3c, GHSA-qjx8-664m-686j)",
+      "status": "done",
+      "model": "gpt-5.6-sol",
+      "observedModel": "gpt-5.6-sol",
+      "commit": "4f816f1988a4aa18bb5e2758deee8d6a952fe237",
+      "reconciledNote": "One clean commit from 9d5d20e. Scope exactly package.json, package-lock.json and the minimal src/middleware.ts redirect gate. Independent pre-merge and post-merge verification passed: prisma validate, tsc, targeted eslint, seven auth/tenant/Business OS harnesses, production audit, build, and localhost-only unauthenticated/authenticated HTTP matrices. Unauthenticated dashboards redirect 307 to /sign-in; Business OS APIs return structural 401 JSON envelopes with no data payload; authenticated dashboards return 200 and a user without the surface receives API 403. Merged --no-ff at 9291e93. No tunnel or temporary server remains.",
+      "mergeCommit": "9291e93",
+      "rootVerdict": "ACCEPTED - independently verified, merged --no-ff, post-merge gates green"
+    },
+    {
+      "id": "P2-002",
+      "title": "Persisted tenancy/contact/activity/task adapters and APIs",
       "status": "in_flight",
       "model": "gpt-5.6-sol",
-      "reconciledNote": "Job 2db4fb9e. Isolated worktree security/clerk-6.39.6 from 9d5d20e. Must verify real behaviour, not just the version bump, and resolve the unauthenticated /dashboard/* 200 finding. Clerk 7.x major migration explicitly forbidden."
+      "job": "5af32286",
+      "branch": "worker/w7-persisted-adapters",
+      "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w7-persisted-adapters-wt",
+      "baseCommit": "9291e93",
+      "allowedPaths": [
+        "src/lib/persistence/**",
+        "src/app/api/platform/**",
+        "scripts/one-off/check-persisted-adapters.ts",
+        "docs/orchestration/PERSISTED_ADAPTERS.md"
+      ],
+      "forbidden": [
+        "prisma/**",
+        "package manifests",
+        "middleware/auth/Clerk",
+        "business-os",
+        "restaurant",
+        "chat/RAG"
+      ],
+      "note": "Lane 1. Must prove persisted adapter correctness, tenant scoping, authorization and idempotency without schema changes."
+    },
+    {
+      "id": "P2-003",
+      "title": "Business onboarding and Business OS UI connected to persisted APIs",
+      "status": "blocked_waiting_for_P2-002",
+      "model": "claude-sonnet-5",
+      "dependencies": [
+        "P2-002"
+      ],
+      "note": "Lane 3 is not dispatched until lane 1 is committed and independently accepted."
+    },
+    {
+      "id": "P2-004",
+      "title": "Independent quality and integration reviewer",
+      "status": "in_flight",
+      "model": "gpt-5.6-sol",
+      "job": "1168937d",
+      "branch": "worker/w11-integration-review",
+      "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w11-review-wt",
+      "baseCommit": "9291e93",
+      "allowedPaths": [],
+      "note": "Read-only repo review; external report only. Verifies claims, ownership, security, tests and integration order."
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-27 19:05 +05:30",
-    "activeWorkers": 0,
-    "kirocrewSessions": "all four report complete via kirocrew spawn list",
+    "observedAt": "2026-08-28 03:59 +05:30",
+    "activeWorkers": 5,
+    "kirocrewSessions": "Five one-shot cron workers dispatched from green base 9291e93 with explicit models; lane 3 blocked on lane 1 commit.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
@@ -433,11 +496,18 @@
         "dirty": 1
       }
     ],
-    "supervisionMode": "root supervises inside its own turn with bounded polls; monitor_start cannot arm in this ACP CLI session and autonudge.json loops is empty"
+    "supervisionMode": "root supervises inside its own turn with bounded polls; monitor_start cannot arm in this ACP CLI session and autonudge.json loops is empty",
+    "activeCronJobs": [
+      "5af32286",
+      "c535c6a4",
+      "92545f2c",
+      "0e532936",
+      "1168937d"
+    ]
   },
   "runtime": {
     "publicTunnel": "DOWN, cloudflared terminated, hostname returns 530",
-    "localApp": "127.0.0.1:3000 serving the consolidation worktree against the rehearsal database",
+    "localApp": "DOWN by owner directive; ports 3000 and 3100 clear after verification",
     "liveDatabase": "personalink untouched: 35 tables, 774 rows, 0 applied migrations, ProductPurchase 8"
   },
   "modelPolicy": {
