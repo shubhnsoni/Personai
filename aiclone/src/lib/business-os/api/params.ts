@@ -27,8 +27,14 @@ export function parseBlueprintId(value: string): string | null {
     try {
         decoded = decodeURIComponent(value)
     } catch {
-        // Malformed percent-encoding throws URIError; treat it as a bad id rather than
-        // letting it escape the response envelope as a 500.
+        // Guards the decode step for values that actually reach this function, for example
+        // an encoded percent such as `%25E0%25A4%25A`, which Next hands over as the literal
+        // string `%E0%A4%A` and which would otherwise throw URIError past the envelope.
+        //
+        // Note what this does NOT cover: a literally malformed sequence in the request URL
+        // (`/blueprints/%E0%A4%A`) is rejected by Next at the framework level with a
+        // 400 text/html response before this handler runs, so it never produces the
+        // Business OS JSON envelope. Measured, not assumed.
         return null
     }
 
