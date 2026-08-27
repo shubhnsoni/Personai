@@ -77,3 +77,36 @@ worktrees only after the consolidation is merged.
 
 - Engine contract versus capability-id reconciliation (blocker 4), producing an ADR.
 - Owner copilot ledger schema review ahead of any migration request (blocker 3).
+
+
+## Wave 1 — INTEGRATED 2026-08-27 at `4649ff1`
+
+Queue is empty: all six wave-1 branches were accepted and merged. Nothing is awaiting integration.
+
+| Order | Branch | Commit | Package | Merge |
+|---|---|---|---|---|
+| 1 | `worker/w1-tenancy-security` | `66e4945` | P1-011 tenancy contracts | `--no-ff`, clean |
+| 2 | `worker/w2-capability-contract` | `eb188d2` | P1-010 capability/blueprint contract | `--no-ff`, clean |
+| 3 | `worker/w3-contact-activity` | `82f562e` | P1-012 contact/activity/task foundation | `--no-ff`, clean |
+| 4 | `worker/w4-business-os-ui` | `3120048` | P1-016 Business OS UI remediation | `--no-ff`, clean |
+| 5 | `worker/w5-auth-evals` | `757dea3` | P1-008 mocked auth/authz/isolation evals | `--no-ff`, clean |
+| 6 | `worker/w6-copilot-runtime` | `eda4249` | P1-015 copilot ledger/runtime contracts | `--no-ff`, clean |
+
+Integration branch `orchestrator/integration-wave1b`, cut from primary `a2afe0d`. Zero merge
+conflicts across all six. Local primary `recovered/aug20-wt-pr-32` fast-forwarded to `4649ff1`
+after the full gate set passed. Not pushed; `origin/recovered/aug20-wt-pr-32` remains `4b386d1`.
+
+Gates on the merged result: `prisma validate`=0, `prisma generate`=0, `tsc --noEmit`=0, targeted
+`eslint`=0, 10/10 harnesses=0, `npm run build`=0.
+
+Rejected: none. No path violations were found in any worker.
+
+Retained for audit, not deleted: the six worker worktrees and the earlier
+`orchestrator/integration-wave1` (`5ed4fa9`) and `orchestrator/business-os-consolidation`
+(`5f47a61`) lanes, plus the six frozen evidence lanes at `ea69595`.
+
+### Next in queue
+`P2-001` (exclusive schema owner, `gpt-5.6-sol`) is now `ready` — it was unblocked by this
+integration. It is the ONLY task permitted to touch `prisma/**`, it must run alone with no
+concurrent schema worker, and every migration command must first prove its target is disposable
+via `assertDisposableTarget` from `scripts/lib/disposable-db.ts`. It may never target `personalink`.

@@ -80,3 +80,46 @@ Each lane owns these inside its own worktree only.
   against non-ephemeral data without the owner's approval.
 - A task needing an owner-reviewed or patch-only path is WAITING_FOR_OWNER until the
   owner assigns it explicitly.
+
+
+## Wave 1 Module Ownership (integrated 2026-08-27 at `4649ff1`)
+
+These modules landed in wave 1. Each was owned by exactly one worker, and the disjointness held —
+six `--no-ff` merges produced zero conflicts.
+
+| Module / path | Wave-1 owner | Package |
+|---|---|---|
+| `src/lib/tenancy/**` | slot 1 (gpt-5.6-sol) | P1-011 |
+| `src/lib/business-os/{types,engines,blueprints,validation}.ts` | slot 2 (gpt-5.6-sol), EXCLUSIVE | P1-010 |
+| `scripts/one-off/check-business-os-{surface,render}.ts` | slot 2, EXCLUSIVE | P1-010 |
+| `src/lib/foundation/**` | slot 3 (claude-sonnet-5) | P1-012 |
+| `src/components/business-os/**`, `src/app/dashboard/business-os/{error,loading}.tsx` | slot 4 (claude-sonnet-5) | P1-016 |
+| `src/lib/testing/**` | slot 5 (gpt-5.6-terra) | P1-008 |
+| `src/lib/copilot/**` | slot 6 (gpt-5.6-terra) | P1-015 |
+
+### Contract-layer rule (carry forward)
+`src/lib/business-os/**` is a CONTRACT LAYER with a single owner at any time. Consumers — notably
+`src/components/business-os/**` — treat it as read-only and may rely only on symbols it already
+exports. Changes to it must be ADDITIVE: no exported field, type, symbol or enum member may be
+renamed, removed or narrowed while a consumer is being built concurrently. Wave 1 proved this
+works: slot 2 reshaped the capability vocabulary while slot 4 rendered it, in parallel, and both
+compiled after merge.
+
+### Still root-owned
+`docs/orchestration/TASKS.json`, `RUNLOG.md`, `INTEGRATION_QUEUE.md`, `OWNERSHIP.md`,
+`DECISIONS.md`. Workers never edit these; they write their own design/ADR documents instead.
+
+### Never worker-owned, in any wave
+`prisma/**` (single exclusive schema owner only, and only against a provably disposable database),
+`src/middleware.ts`, `src/lib/auth/**`, `src/lib/clerk/**`, `src/lib/surfaces*`, restaurant runtime
+(`src/app/api/orders/**`, `src/app/api/restaurant/**`, `src/app/api/bookings/**`,
+`src/lib/restaurant/**`, `src/components/restaurant/**`), shared chat/RAG
+(`src/app/api/chat/**`, `src/app/api/persona/**`, `src/lib/rag*`, `src/lib/embeddings/**`),
+`package.json`, `package-lock.json`.
+
+### Shared-toolchain hazard (learned in wave 1)
+Worker worktrees share ONE `node_modules` via a directory junction. Therefore no worker may run
+`npm install` or `npx prisma generate` — concurrent generate runs collide on
+`query_engine-windows.dll.node` with EPERM and break every sibling. `prisma generate` is a
+root-only step, run once at integration after all workers have stopped. Workers run
+`prisma validate` only, which is read-only.

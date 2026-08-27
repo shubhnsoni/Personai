@@ -1,7 +1,7 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-27 13:30 +05:30",
-  "updatedBy": "single root orchestrator",
+  "updatedAt": "2026-08-27 19:05 +05:30",
+  "updatedBy": "root orchestrator (claude-opus-5, max effort)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 4,
   "baseCommitPolicy": "Lanes must branch from a commit where tsc --noEmit and next build both exit 0. Qualifying commits: e97edf4 and later. The consolidation branched from a4d9fba. See ADR-007.",
@@ -183,9 +183,14 @@
     {
       "id": "P1-008",
       "title": "Deterministic mocked authentication, authorization and tenant-isolation tests",
-      "status": "ready",
+      "status": "done",
       "adr": "ADR-010",
-      "note": "No real credentials. Inject a principal; assert the guard's UNAUTHORIZED vs FORBIDDEN split, surface entitlement and per-tenant scoping."
+      "note": "No real credentials. Inject a principal; assert the guard's UNAUTHORIZED vs FORBIDDEN split, surface entitlement and per-tenant scoping.",
+      "wave": 1,
+      "commit": "757dea3",
+      "observedModel": "gpt-5.6-terra",
+      "workerBranch": "worker/w5-auth-evals",
+      "rootVerdict": "ACCEPTED - root re-ran all gates independently"
     },
     {
       "id": "P1-009",
@@ -197,7 +202,7 @@
     {
       "id": "P1-010",
       "title": "Capability and blueprint contract: granular ids, maturity, activation enforcement, corrected restaurant blueprint",
-      "status": "dispatch_wave_1",
+      "status": "done",
       "model": "gpt-5.6-terra",
       "adr": [
         "ADR-012",
@@ -210,12 +215,17 @@
         "src/lib/business-os/blueprints.ts",
         "src/lib/business-os/validation.ts"
       ],
-      "note": "No other worker may touch these files while open. Must not edit restaurant runtime paths."
+      "note": "No other worker may touch these files while open. Must not edit restaurant runtime paths.",
+      "wave": 1,
+      "commit": "eb188d2",
+      "observedModel": "gpt-5.6-sol",
+      "workerBranch": "worker/w2-capability-contract",
+      "rootVerdict": "ACCEPTED - root re-ran all gates independently"
     },
     {
       "id": "P1-011",
       "title": "Platform and tenancy: workspace/organization, location, membership, RBAC, tenant-isolation contracts",
-      "status": "dispatch_wave_1",
+      "status": "done",
       "model": "gpt-5.6-sol",
       "allowedPaths": [
         "src/lib/tenancy/**",
@@ -227,12 +237,17 @@
         "shared auth",
         "src/lib/business-os/**"
       ],
-      "note": "No Prisma or shared auth edits in wave 1."
+      "note": "No Prisma or shared auth edits in wave 1.",
+      "wave": 1,
+      "commit": "66e4945",
+      "observedModel": "gpt-5.6-sol",
+      "workerBranch": "worker/w1-tenancy-security",
+      "rootVerdict": "ACCEPTED - root re-ran all gates independently"
     },
     {
       "id": "P1-012",
       "title": "Contact, activity and durable task foundation over existing data",
-      "status": "dispatch_wave_1",
+      "status": "done",
       "model": "claude-sonnet-5",
       "allowedPaths": [
         "src/lib/foundation/**",
@@ -244,7 +259,12 @@
         "src/lib/business-os/**",
         "restaurant paths"
       ],
-      "note": "Contracts and adapters only."
+      "note": "Contracts and adapters only.",
+      "wave": 1,
+      "commit": "82f562e",
+      "observedModel": "claude-sonnet-5",
+      "workerBranch": "worker/w3-contact-activity",
+      "rootVerdict": "ACCEPTED - root re-ran all gates independently"
     },
     {
       "id": "P1-013",
@@ -275,7 +295,7 @@
     {
       "id": "P1-015",
       "title": "Owner Copilot ledger and workflow runtime contracts",
-      "status": "dispatch_wave_1",
+      "status": "done",
       "model": "claude-sonnet-5",
       "allowedPaths": [
         "src/lib/copilot/**",
@@ -285,12 +305,17 @@
       "forbidden": [
         "prisma/**"
       ],
-      "note": "Executable contracts, transitions, idempotency and recovery tests, plus a reviewed schema proposal."
+      "note": "Executable contracts, transitions, idempotency and recovery tests, plus a reviewed schema proposal.",
+      "wave": 1,
+      "commit": "eda4249",
+      "observedModel": "gpt-5.6-terra",
+      "workerBranch": "worker/w6-copilot-runtime",
+      "rootVerdict": "ACCEPTED - root re-ran all gates independently"
     },
     {
       "id": "P2-001",
       "title": "Exclusive schema owner: additive Phase 1 and Phase 2 schema, rehearsed on a disposable database",
-      "status": "blocked_until_wave_1_integrated",
+      "status": "ready",
       "model": "gpt-5.6-sol",
       "adr": "ADR-011",
       "note": "Exactly one schema owner. Prove the parsed target is disposable and not personalink before any migration command. Additive only; adapters for existing Profile/Booking/Notification/Conversation/Order/course data.",
@@ -299,11 +324,37 @@
         "contact/activity and durable task primitives",
         "blueprint activation, WorkflowRun/AgentRun, steps/tool calls",
         "Approval and append-only Audit/Event ledger"
-      ]
+      ],
+      "unblockedBy": "wave 1 integrated at 4649ff1"
+    },
+    {
+      "id": "P1-016",
+      "title": "Business OS console UI remediation: false-affordance prompts, honest error boundary, truthful stat provenance, loading skeleton, a11y sweep",
+      "status": "done",
+      "model": "claude-sonnet-5",
+      "observedModel": "unobservable (pinned by job config; worker could not self-report)",
+      "wave": 1,
+      "commit": "3120048",
+      "workerBranch": "worker/w4-business-os-ui",
+      "allowedPaths": [
+        "src/components/business-os/**",
+        "src/app/dashboard/business-os/error.tsx",
+        "src/app/dashboard/business-os/loading.tsx",
+        "scripts/one-off/check-business-os-a11y.ts"
+      ],
+      "forbidden": [
+        "prisma/**",
+        "shared auth",
+        "src/lib/business-os/**",
+        "scripts/one-off/check-business-os-surface.ts",
+        "scripts/one-off/check-business-os-render.ts"
+      ],
+      "rootVerdict": "ACCEPTED - root re-ran all gates independently",
+      "note": "Created from root-review findings; slot 2 held exclusive ownership of the contract layer so the UI consumed it read-only."
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-27 10:15 +05:30",
+    "observedAt": "2026-08-27 19:05 +05:30",
     "activeWorkers": 0,
     "kirocrewSessions": "all four report complete via kirocrew spawn list",
     "supervisorProcesses": 0,
@@ -361,7 +412,8 @@
         "head": "ea69595",
         "dirty": 1
       }
-    ]
+    ],
+    "supervisionMode": "root supervises inside its own turn with bounded polls; monitor_start cannot arm in this ACP CLI session and autonudge.json loops is empty"
   },
   "runtime": {
     "publicTunnel": "DOWN, cloudflared terminated, hostname returns 530",
@@ -393,5 +445,33 @@
     "A literally malformed percent sequence in a URL returns Next.js framework-level 400 text/html before the route runs; it does not reach the Business OS JSON envelope. Only an encoded percent reaches the handler and returns 401. Measured both ways.",
     "Continuous supervisor count is 0. LIVE_ACTIVITY.md is an on-demand one-shot snapshot, not a live feed.",
     "OWNER_COPILOT_SPEC.md reconciled with final code: approval reasons validated; CUSTOM/unknown/null/empty denied by default; navigation registered; extras opt-in required; authenticated-without-surface returns FORBIDDEN/403."
-  ]
+  ],
+  "wave1Result": {
+    "integrationBranch": "orchestrator/integration-wave1b",
+    "integrationCommit": "4649ff1",
+    "basedOn": "a2afe0d",
+    "mergeStrategy": "six individual --no-ff merges, zero conflicts",
+    "localPrimary": "recovered/aug20-wt-pr-32 fast-forwarded to 4649ff1",
+    "pushed": false,
+    "filesChanged": 36,
+    "gates": {
+      "prisma_validate": 0,
+      "prisma_generate": 0,
+      "tsc": 0,
+      "eslint_targeted": 0,
+      "harnesses": "10 of 10 exit 0",
+      "npm_run_build": 0
+    },
+    "accepted": [
+      "P1-011",
+      "P1-010",
+      "P1-012",
+      "P1-016",
+      "P1-008",
+      "P1-015"
+    ],
+    "rejected": [],
+    "dispatchMechanism": "cron_add with explicit model per job; spawn_run is broken in this environment (parent_session unresolved, hollow records reaped without executing)",
+    "substitutionsUsed": "none - every requested model resolved on this gateway"
+  }
 }

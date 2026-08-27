@@ -360,3 +360,105 @@ as distinct from failure, read-only adapter shapes, notification projection).
 `prisma generate` remains deliberately unrun while any worker is pending or active, because the
 six worktrees share one `node_modules` junction and concurrent runs collide on
 `query_engine-windows.dll.node` with EPERM. It runs once at integration, after all workers stop.
+
+
+## 2026-08-27 19:05 — Wave 1 integrated at `4649ff1`, all six workers accepted
+
+All six wave-1 workers reached terminal state, were independently verified by root, accepted,
+merged and verified again as a whole. Local primary `recovered/aug20-wt-pr-32` is fast-forwarded
+to `4649ff1`. Nothing was pushed.
+
+### Dispatch mechanism
+`spawn_run` was abandoned as unusable in this environment (see the correction entry above).
+Every worker was dispatched with `cron_add` carrying an explicit `model` field, proven by a
+control probe to execute and to honour the pin. Each was a one-shot job with
+`approval_mode=auto`, `persistent_session=false`, `timeout_secs=5400`. Batches were staggered
+3 + 3 (≈45 min apart) so six concurrent Next builds never contended. **No model substitution was
+used or needed** — `gpt-5.6-sol`, `gpt-5.6-terra` and `claude-sonnet-5` all resolve on this
+gateway, which was verified against `kiro-cli chat --list-models` before dispatch.
+
+### Per-worker verdicts (root re-ran every gate; self-reports were not taken on trust)
+| Slot | Package | Requested | Observed | Commit | Verdict |
+|---|---|---|---|---|---|
+| 1 | P1-011 tenancy | gpt-5.6-sol | gpt-5.6-sol | `66e4945` | ACCEPTED |
+| 2 | P1-010 capability contract | gpt-5.6-sol | gpt-5.6-sol | `eb188d2` | ACCEPTED |
+| 3 | P1-012 contact/activity/task | claude-sonnet-5 | claude-sonnet-5 | `82f562e` | ACCEPTED |
+| 4 | P1-016 Business OS UI | claude-sonnet-5 | unobservable | `3120048` | ACCEPTED |
+| 5 | P1-008 mocked auth/authz/isolation | gpt-5.6-terra | gpt-5.6-terra | `757dea3` | ACCEPTED |
+| 6 | P1-015 copilot ledger/runtime | gpt-5.6-terra | gpt-5.6-terra | `eda4249` | ACCEPTED |
+
+Slot 4 reported `OBSERVED_MODEL: unobservable`. Its pin is nonetheless evidenced externally:
+`cron_list` showed `model=claude-sonnet-5` on job `8b4be8e6`. Recorded as pinned-by-config rather
+than self-confirmed, because an unverifiable claim should not be written down as a verified one.
+
+Every worker: exactly 1 commit, clean tree, claimed SHA matched actual HEAD, and **zero paths
+outside its owned set**. No worker touched `prisma/**`, `src/middleware.ts`, `src/lib/auth/**`,
+`src/lib/clerk/**`, `src/lib/surfaces*`, restaurant runtime, bookings, chat, RAG, embeddings, or
+the package manifests. Slot 4 respected slot 2's exclusive ownership of the contract layer and of
+the two pre-existing business-os harnesses.
+
+### Claims that were checked rather than believed
+- **Slot 2's additive-only constraint held.** All 23 pre-existing exports still present.
+  `BusinessBlueprintStatus` was widened `draft|active|deprecated` -> `draft|proposed|active|deprecated`
+  (a member added, none removed or narrowed). `restaurant-venue-v1` remains addressable beside the
+  new `restaurant-venue-v2`. Capability maturity is honestly distributed — 4 `available`,
+  8 `partial`, 12 `planned` — rather than everything declared shipped. The negative test proves an
+  active blueprint requiring a `planned` capability is rejected while the same blueprint in draft
+  passes. This additive discipline is why slot 4's UI still compiled after both merged.
+- **Slot 5's tests are genuinely falsifiable.** Root re-ran them with `INVERT_ASSERTION=1`: both
+  harnesses exited 1, and both returned to 0 once restored. They are not vacuous passes.
+- **Slot 6's spec reduction is real and large.** `OWNER_COPILOT_SPEC.md` went from 34,539 to
+  4,275 bytes (-88%). It retains the five mandated corrections and forward-looking design moved to
+  the new `COPILOT_RUNTIME_PROPOSAL.md`, so spec now means shipped truth and proposal means future.
+  Flagged to the owner because ~30KB of documented design intent was removed; the owner may want
+  part of it restored.
+
+### Integration
+Fresh worktree `personai-integration-wave1b-wt`, branch `orchestrator/integration-wave1b`, cut
+from primary `a2afe0d`. Six individual `--no-ff` merges, each inspected: **zero conflicts**, which
+is the designed outcome of the disjoint-ownership split. Result `4649ff1`, clean tree, 6 merge
+commits, 36 files, 4070 insertions / 660 deletions.
+
+Full gate set on the merged result, with `prisma generate` now safe because every worker had
+stopped:
+
+| Gate | Exit |
+|---|---|
+| `npx prisma validate` | 0 |
+| `npx prisma generate` | 0 |
+| `npx tsc --noEmit --pretty false` | 0 |
+| targeted `npx eslint` over all 14 new/changed paths | 0 |
+| 10 harnesses (surface, render, capability, tenancy, foundation, a11y, auth-authz, tenant-isolation, copilot-runtime, disposable-db-guard) | 0 / 0 failing |
+| `npm run build` | 0 |
+
+Fast-forward verified as a true fast-forward (`a2afe0d` is an ancestor) before applying, so
+neither branch was rewritten. Untracked user files preserved (`.codex-remote-attachments/` still
+present and untouched).
+
+### Preservation evidence
+- **Live database untouched.** Read-only probe: database `personalink`, 35 public tables,
+  `_prisma_migrations` table absent (0 applied migrations), `ProductPurchase` = 8, and none of
+  `Order`, `OrderLine`, `OrderEvent`, `RestaurantTable`, `OrderCounter`, `ProfileImage`,
+  `Workspace`, `Contact` or `WorkflowRun` exist. No worker ran any database command. The probe
+  script was deleted afterwards and the repo is clean.
+- **Origin untouched.** `origin/recovered/aug20-wt-pr-32` is still `4b386d1`. Never pushed.
+- **Frozen evidence lanes untouched.** All six `kirocrew/business-os-*` worktrees remain at
+  `ea69595`.
+- **Restaurant runtime, shared chat and RAG untouched** across the entire wave diff.
+
+### Supervision mode
+Zero continuous supervisors. `monitor_start` cannot arm in this ACP CLI session — it reports a
+loop as "requested" but `~/.kiro/crew/autonudge.json` stays `{"loops":[]}`. Root supervised the
+wave inside its own turn with bounded 45-second polls. `LIVE_ACTIVITY.md` remains an on-demand
+one-shot snapshot, not a live feed. No cron jobs remain registered and no worker processes remain
+alive.
+
+### Tenant-isolation evidence
+Two independent layers, both proven by harness rather than assertion. Slot 1's
+`check-tenancy-contracts` proves deny-by-default for unknown, null and empty roles, the permission
+closure of each named role, refusal of a cross-tenant read, and that the escape hatch is separately
+branded and requires actor, reason, ticket, timestamp and a synchronous audit emission. Slot 5's
+`check-tenant-isolation` proves the refusal is the DEFAULT rather than contingent on a caller
+remembering a filter, and fails when inverted. Slot 5 also recorded an honest gap:
+`requireBusinessOsAccess` closes over a Clerk/Prisma-backed `syncUser` with no injection point, so
+the boundary is proven with deterministic fakes only, not against the real provider.
