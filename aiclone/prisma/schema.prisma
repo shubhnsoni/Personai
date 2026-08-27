@@ -830,3 +830,260 @@ model LeadMagnetSubmission {
   formData     String? // JSON object with form field values
   createdAt    DateTime   @default(now())
 }
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  profileId String?  @unique
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  locations    Location[]
+  memberships  Membership[]
+  contacts     Contact[]
+  workflowRuns WorkflowRun[]
+
+  @@index([profileId])
+}
+
+model Location {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  timezone    String    @default("UTC")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  membershipLocations MembershipLocation[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model Membership {
+  id          String         @id @default(cuid())
+  workspaceId String
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  role        MembershipRole
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  membershipLocations MembershipLocation[]
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId, role])
+}
+
+model MembershipLocation {
+  membershipId String
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  locationId   String
+  location     Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([membershipId, locationId])
+  @@index([locationId])
+}
+
+model Contact {
+  id          String     @id @default(cuid())
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  profileId   String?
+  displayName String?
+  email       String?
+  phone       String?
+  confidence  String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  sourceLinks ContactSourceLink[]
+  activities  ActivityEvent[]
+
+  @@index([workspaceId, email])
+  @@index([workspaceId, phone])
+  @@index([profileId, email])
+  @@index([profileId, phone])
+}
+
+model ContactSourceLink {
+  id         String   @id @default(cuid())
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  sourceKind String
+  sourceId   String
+  profileId  String?
+  observedAt DateTime
+
+  @@unique([sourceKind, sourceId])
+  @@index([contactId])
+  @@index([profileId])
+}
+
+model ActivityEvent {
+  id         String    @id
+  contactId  String
+  contact    Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  profileId  String?
+  type       String
+  sourceKind String
+  sourceId   String
+  occurredAt DateTime?
+  summary    String
+  metadata   String?
+  createdAt  DateTime  @default(now())
+
+  @@index([contactId, occurredAt, id])
+  @@index([profileId, occurredAt, id])
+  @@index([sourceKind, sourceId])
+}
+
+model TaskJob {
+  id             String    @id @default(cuid())
+  idempotencyKey String?   @unique
+  payload        String
+  state          String
+  attempts       Int       @default(0)
+  maxAttempts    Int
+  nextAttemptAt  DateTime
+  leaseExpiresAt DateTime?
+  leaseToken     String?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([state, nextAttemptAt])
+}
+
+model WorkflowRun {
+  id             String     @id @default(cuid())
+  workspaceId    String?
+  workspace      Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  profileId      String?
+  workflowKey    String
+  workflowName   String
+  state          String
+  idempotencyKey String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  completedAt    DateTime?
+  failureCode    String?
+  failureDetail  String?
+
+  agentRuns   AgentRun[]
+  steps       WorkflowStep[]
+  approvals   Approval[]
+  auditEvents CopilotAuditEvent[]
+
+  @@unique([profileId, idempotencyKey])
+  @@index([workspaceId, state, createdAt])
+  @@index([profileId, state, createdAt])
+  @@index([state, updatedAt])
+}
+
+model AgentRun {
+  id            String      @id @default(cuid())
+  workflowRunId String
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  agentKey      String
+  state         String
+  attempt       Int         @default(1)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  failureCode   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  auditEvents CopilotAuditEvent[]
+
+  @@index([workflowRunId, createdAt])
+  @@index([state, updatedAt])
+}
+
+model WorkflowStep {
+  id            String      @id @default(cuid())
+  workflowRunId String
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  ordinal       Int
+  label         String
+  state         String
+  startedAt     DateTime?
+  completedAt   DateTime?
+  inputJson     Json?
+  resultJson    Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  toolCalls ToolCall[]
+  approvals Approval[]
+
+  @@unique([workflowRunId, ordinal])
+  @@index([workflowRunId, state, ordinal])
+}
+
+model ToolCall {
+  id             String       @id @default(cuid())
+  workflowStepId String
+  workflowStep   WorkflowStep @relation(fields: [workflowStepId], references: [id], onDelete: Cascade)
+  ordinal        Int
+  toolName       String
+  inputJson      Json
+  outputJson     Json?
+  state          String
+  startedAt      DateTime?
+  completedAt    DateTime?
+  errorCode      String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([workflowStepId, ordinal])
+  @@index([workflowStepId, createdAt])
+}
+
+model Approval {
+  id             String        @id @default(cuid())
+  workflowRunId  String
+  workflowRun    WorkflowRun   @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowStepId String?
+  workflowStep   WorkflowStep? @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
+  reason         String
+  state          String
+  requestedBy    String
+  requestedAt    DateTime      @default(now())
+  decidedBy      String?
+  decidedAt      DateTime?
+  decisionNote   String?
+
+  @@index([workflowRunId, state, requestedAt])
+  @@index([workflowStepId])
+  @@index([state, requestedAt])
+}
+
+model CopilotAuditEvent {
+  id            String      @id @default(cuid())
+  workflowRunId String
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  agentRunId    String?
+  agentRun      AgentRun?   @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  sequence      Int
+  eventType     String
+  actorType     String
+  actorId       String?
+  occurredAt    DateTime    @default(now())
+  payloadJson   Json
+
+  @@unique([workflowRunId, sequence])
+  @@index([workflowRunId, sequence])
+  @@index([agentRunId])
+  @@index([eventType, occurredAt])
+}
