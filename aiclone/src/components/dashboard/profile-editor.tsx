@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { useForm, type UseFormRegisterReturn } from "react-hook-form"
+import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Profile, WelcomeAnimationPreset } from "@prisma/client"
@@ -75,7 +75,9 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
     const [blobOpen, setBlobOpen] = useState(false)
 
     const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<ProfileData>({
-        resolver: zodResolver(profileSchema),
+        // zod v4 and @hookform/resolvers v5 disagree on the internal issue type,
+        // so pin the resolver to this form's own data shape.
+        resolver: zodResolver(profileSchema) as unknown as Resolver<ProfileData>,
         defaultValues: {
             displayName: profile.displayName,
             headline: profile.headline || "",

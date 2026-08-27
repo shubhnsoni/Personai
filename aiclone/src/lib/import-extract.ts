@@ -931,7 +931,7 @@ function extractServiceCards(html: string): ImportItem[] {
     for (const zone of zones) {
         const heads = [...zone.html.matchAll(/<h([3-6])[^>]*>([\s\S]*?)<\/h\1>/gi)]
         const mil = [...zone.html.matchAll(/<p[^>]*mil-text-lg[^>]*>([\s\S]*?)<\/p>/gi)]
-        for (const m of mil) heads.push(["", "", m[1]] as unknown as RegExpMatchArray)
+        for (const m of mil) heads.push(["", "", m[1]] as unknown as RegExpExecArray)
         for (const h of heads) {
             const title = cleanHeading(h[2] || "")
             if (!title || title.length < 3 || title.length > 70 || isChromeHeading(title)) continue

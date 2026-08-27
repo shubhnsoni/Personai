@@ -26,7 +26,7 @@ export function StudioPulse({
         return slice
             .map((d, i) => {
                 const x = (i / Math.max(slice.length - 1, 1)) * w
-                const y = h - (d[metric] / max) * (h - 8) - 4
+                const y = h - ((d[metric] ?? 0) / max) * (h - 8) - 4
                 return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`
             })
             .join(" ")

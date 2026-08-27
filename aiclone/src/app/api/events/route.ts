@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     } | null
     const slug = body?.slug?.trim().toLowerCase()
     const name = body?.name?.trim()
-    if (!slug || !name || !NAMES.has(name)) {
+    if (!body || !slug || !name || !NAMES.has(name)) {
         return NextResponse.json({ ok: false }, { status: 400 })
     }
     const { allowed } = checkRateLimit(`ev:${ip}:${slug}`, 60)

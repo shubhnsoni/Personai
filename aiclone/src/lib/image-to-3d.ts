@@ -11,7 +11,7 @@ async function gradioUpload(base: string, buf: Buffer, name: string, mime: strin
     if (!res.ok) throw new Error(`Upload ${res.status}`)
     const json = await res.json() as string[] | { path?: string }
     if (Array.isArray(json) && json[0]) return json[0]
-    if (json && typeof json === "object" && json.path) return json.path
+    if (!Array.isArray(json) && json && typeof json === "object" && json.path) return json.path
     throw new Error("Upload failed")
 }
 

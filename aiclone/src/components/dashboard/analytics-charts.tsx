@@ -112,7 +112,7 @@ export function AnalyticsCharts({ data, hideLeads, hideSales }: AnalyticsChartsP
 
                     {/* Bars */}
                     {filtered.map((d, i) => {
-                        const val = d[activeMetric]
+                        const val = d[activeMetric] ?? 0
                         const barHeight = (val / maxVal) * chartHeight
                         const x = 10 + i * ((chartWidth - 20) / filtered.length)
                         return (

@@ -22,7 +22,12 @@ export default async function DashboardServicesPage() {
 
     return (
         <div className="flex-1 space-y-4">
-            <ServicesManager profileId={profile.id} services={services} />
+            <ServicesManager
+                slug={profile.slug}
+                profileId={profile.id}
+                services={services}
+                allowTable={fieldOn(profile.roleTemplate, "tableBook", extrasOf(profile))}
+            />
         </div>
     )
 }

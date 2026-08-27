@@ -1,3 +1,5 @@
+import type { FieldPack, Surface } from "@/lib/surfaces"
+
 export type NeedId = "sell" | "dine" | "time" | "teach" | "ca" | "hire" | "show" | "leads" | "page"
 
 export type RoleTemplate =
@@ -59,8 +61,8 @@ export const ADDONS: {
     label: string
     action: string
     blurb: string
-    surfaces: string[]
-    packs: string[]
+    surfaces: Surface[]
+    packs: FieldPack[]
 }[] = [
     { id: "leads", label: "Leads", action: "Collect leads", blurb: "People who reach out from chat", surfaces: ["leads"], packs: [] },
     { id: "shop", label: "Shop", action: "Sell products", blurb: "Physical things with photos and price", surfaces: ["shop", "sales"], packs: ["shopPhysical"] },
@@ -93,8 +95,8 @@ export function suggestedAddons(role?: string | null): AddonId[] {
 
 export function extrasFromAddons(role: string, selected: AddonId[]) {
     const suggested = new Set(suggestedAddons(role))
-    const surfaces: string[] = []
-    const packs: string[] = []
+    const surfaces: Surface[] = []
+    const packs: FieldPack[] = []
     for (const id of selected) {
         if (suggested.has(id) && role !== "CUSTOM") continue
         const addon = ADDONS.find((a) => a.id === id)
