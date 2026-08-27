@@ -2,3 +2,6 @@
 # These are live status output, not source files.
 MONITOR_STATUS.md
 LIVE_ACTIVITY.md
+
+# Contains the temporary secret quick-tunnel URL; live status, not source.
+PREVIEW_STATUS.md
