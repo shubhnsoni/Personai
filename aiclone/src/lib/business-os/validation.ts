@@ -47,10 +47,32 @@ export function validateBusinessBlueprint(blueprint: BusinessBlueprint): Validat
       return
     }
 
-    const availableCapabilities = new Set(engine.capabilities.map((capability) => capability.id))
-    composition.capabilities.forEach((capability, capabilityIndex) => {
-      if (!availableCapabilities.has(capability)) {
-        issues.push(issue(`${enginePath}.capabilities.${capabilityIndex}`, `Capability is not available on ${engine.id}.`))
+    const capabilitiesById = new Map(engine.capabilities.map((capability) => [capability.id, capability]))
+    composition.capabilities.forEach((capabilityId, capabilityIndex) => {
+      const capabilityPath = `${enginePath}.capabilities.${capabilityIndex}`
+      const capability = capabilitiesById.get(capabilityId)
+      if (!capability) {
+        issues.push(issue(capabilityPath, `Capability is not declared on ${engine.id}.`))
+        return
+      }
+      if (blueprint.status === "active" && composition.required && capability.maturity !== "available") {
+        issues.push(
+          issue(
+            capabilityPath,
+            `Active blueprint requires ${engine.id}:${capability.id}, but its maturity is ${capability.maturity}; required capabilities must be available.`,
+          ),
+        )
+      }
+    })
+
+    const selectedCapabilities = new Set(composition.capabilities)
+    composition.plannedCapabilities?.forEach((capabilityId, capabilityIndex) => {
+      const capabilityPath = `${enginePath}.plannedCapabilities.${capabilityIndex}`
+      if (!capabilitiesById.has(capabilityId)) {
+        issues.push(issue(capabilityPath, `Planned capability is not declared on ${engine.id}.`))
+      }
+      if (selectedCapabilities.has(capabilityId)) {
+        issues.push(issue(capabilityPath, "A capability cannot be both selected and in the planned backlog."))
       }
     })
   })

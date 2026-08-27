@@ -6,7 +6,9 @@ export type BusinessEngineId =
   | "fieldJobs"
   | "casesProjects"
 
-export type BusinessBlueprintStatus = "draft" | "active" | "deprecated"
+export type BusinessBlueprintStatus = "draft" | "proposed" | "active" | "deprecated"
+
+export type CapabilityMaturity = "planned" | "partial" | "available"
 
 export type WorkflowTriggerKind = "manual" | "event" | "schedule"
 
@@ -57,6 +59,9 @@ export type EngineCapability = {
   id: string
   label: string
   description: string
+  maturity: CapabilityMaturity
+  /** A repository code path, verification harness, or "none" when no implementation exists. */
+  evidence: string
 }
 
 export type EngineDescriptor = {
@@ -68,8 +73,11 @@ export type EngineDescriptor = {
 
 export type BlueprintEngineComposition = {
   engineId: BusinessEngineId
+  /** Capabilities selected for the executable blueprint composition. */
   capabilities: string[]
   required: boolean
+  /** Known future capabilities excluded from the executable composition. */
+  plannedCapabilities?: string[]
 }
 
 export type BusinessBlueprint = {
@@ -82,6 +90,8 @@ export type BusinessBlueprint = {
   engines: BlueprintEngineComposition[]
   workflows: WorkflowDefinition[]
   ownerCopilotPrompts: string[]
+  /** Prior immutable blueprint id retained for historical lookup. */
+  supersedes?: string
 }
 
 export type ValidationIssue = {
