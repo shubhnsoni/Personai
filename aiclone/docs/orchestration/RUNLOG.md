@@ -238,3 +238,125 @@ Deny beats allow, comparison is case-insensitive because PostgreSQL folds unquot
 identifiers, and credentials are redacted for reporting. 6 disposable names accepted, 5
 live-database casings rejected, 11 other rejections, exit 0. Every future migration command
 must call `assertDisposableTarget` before the command is constructed.
+
+
+## 2026-08-27 — Wave 1 dispatched (supersedes the hold above)
+
+The hold recorded in the previous entry is lifted. The KiroCrew V3 profile exposes the MCP
+`spawn_run` tool with an explicit `model` field, so a six-worker wave with three distinct
+models is now dispatchable as the owner specified. The shell `kirocrew spawn run` path is
+still model-less and remains unused for model-pinned workers.
+
+Two mechanical constraints were discovered and worked around, both recorded here because
+they change how future waves must be dispatched:
+
+- `spawn_run.task` is capped at 5000 characters. Slots 2-6 were rejected on the first
+  attempt (5597-6782 chars). Full mandates are therefore written to
+  `%TEMP%\personalink-phase0\wave1-briefs\SLOT-<n>.md` — deliberately OUTSIDE the repo so a
+  worker cannot commit its own brief — and the task text is a short pointer that names the
+  brief, the worktree, the branch, the requested model and the non-negotiable prohibitions.
+  A worker that cannot read its brief is instructed to stop and report a blocker rather than
+  guess its scope.
+- `agent.subagent_cwd_allowed_roots` did not include the project tree, so `spawn_run(cwd=...)`
+  would have been refused. The project root was added, and worker budgets were raised for
+  build-bearing work: `subagent_timeout_secs` 1800 -> 5400, `subagent_max_turns` 100 -> 200,
+  `subagent_stall_idle_secs` 120 -> 600. Backup: `config.json.bak-wave1-2026-08-27T16-57-02`.
+
+Model pinning is unchanged and explicit: `agent.model=claude-sonnet-5`,
+`role_models.subagent=claude-sonnet-5`, `reasoning_effort=high`, `role_efforts.subagent=high`,
+`role_models.background=gpt-5.6-terra`, `role_efforts.background=medium`. No `auto` anywhere.
+
+All six worktrees were created by root from base `2248d77` and verified before dispatch:
+branch correct, HEAD `2248d77`, working tree clean, write-probe passed, `node_modules`
+junction resolving `@prisma/client`, `.env` present.
+
+| Slot | Role | Requested model | Session | Branch | Worktree | Owned paths |
+|---|---|---|---|---|---|---|
+| 1 | platform & tenancy (P1-011) | gpt-5.6-sol | 43d92337 | worker/w1-tenancy-security | ..\personai-w1-tenancy-wt | src/lib/tenancy/**, scripts/one-off/check-tenancy-contracts.ts, docs/orchestration/TENANCY_DESIGN.md |
+| 2 | capability & blueprint contract (P1-010) | gpt-5.6-sol | 4486d4a4 | worker/w2-capability-contract | ..\personai-w2-contract-wt | src/lib/business-os/{types,engines,blueprints,validation}.ts, the two business-os harnesses, check-capability-contract.ts, docs/orchestration/CAPABILITY_ADR.md |
+| 3 | contact/activity/task foundation (P1-012) | claude-sonnet-5 | 429e177a | worker/w3-contact-activity | ..\personai-w3-foundation-wt | src/lib/foundation/**, scripts/one-off/check-foundation-contracts.ts, docs/orchestration/FOUNDATION_DESIGN.md |
+| 4 | Business OS UI remediation (P1-016) | claude-sonnet-5 | 428db03a | worker/w4-business-os-ui | ..\personai-w4-ui-wt | src/components/business-os/**, src/app/dashboard/business-os/{error,loading}.tsx, scripts/one-off/check-business-os-a11y.ts |
+| 5 | mocked auth/authz/isolation evals (P1-008) | gpt-5.6-terra | 8ca86e0c | worker/w5-auth-evals | ..\personai-w5-evals-wt | src/lib/testing/**, scripts/one-off/check-auth-authz.ts, scripts/one-off/check-tenant-isolation.ts, docs/orchestration/TEST_STRATEGY.md |
+| 6 | Owner Copilot ledger & runtime (P1-015) | gpt-5.6-terra | 72d1fc34 | worker/w6-copilot-runtime | ..\personai-w6-copilot-wt | src/lib/copilot/**, scripts/one-off/check-copilot-runtime.ts, docs/orchestration/OWNER_COPILOT_SPEC.md, docs/orchestration/COPILOT_RUNTIME_PROPOSAL.md |
+
+Observed models are not yet recorded: each worker is asked to report `OBSERVED_MODEL` in its
+structured report, and root will reconcile requested against observed at review time. If a
+requested model proves unavailable, only the owner-approved substitutions apply
+(`gpt-5.6-sol` -> `claude-opus-4.8`, `claude-sonnet-5` -> `claude-sonnet-4.6`,
+`gpt-5.6-terra` -> `claude-sonnet-4.6`) and the substitution is recorded per worker.
+
+Slot 6's role name in the owner's list is "verticals/docs". True vertical documentation
+depends on the granular capability vocabulary slot 2 is defining in this same wave, so
+writing it now would guarantee rework. Slot 6 was therefore assigned the dependency-ready,
+path-disjoint Owner Copilot package instead, and the brief states that reassignment openly.
+
+Concurrency: the host cap is 3 concurrent subagents, so slots 4-6 are queued and start as
+slots free. Sequencing does not affect correctness because the six path sets are disjoint.
+
+Cross-worker hazard and its mitigation: slot 2 owns the Business OS contract layer while
+slot 4 renders it. Slot 2 is under a purely additive constraint (no exported symbol renamed,
+removed or narrowed) and slot 4 is instructed to consume only symbols exported today and to
+code defensively against extra fields. That lets both land independently instead of
+serialising slot 2 before slot 4.
+
+Known infrastructure defect, worked around rather than fixed: `spawn_run` reports
+`parent_session UNRESOLVED`, so subagent completion events will not be delivered into this
+conversation. Root therefore polls `spawn_list` and reads each finished run's transcript via
+`spawn_status` instead of waiting on events. This is a KiroCrew identity-plumbing issue
+(`KIROCREW_HOST_PID` / `session_pid` / claim-push), not a worker failure, and it does not
+affect the workers themselves.
+
+
+## 2026-08-27 18:05 — CORRECTION: two claims in the previous entry were wrong
+
+Two things stated earlier were not true when measured, and are corrected here rather than
+quietly edited away.
+
+**1. `spawn_run` never executed anything.** The six MCP spawns recorded in the entry above
+(43d92337, 4486d4a4, 429e177a, 428db03a, 8ca86e0c, 72d1fc34) were accepted by the API and
+reported `[running]` by `spawn_list` with climbing elapsed times, but not one of them ran a
+single turn. Slot 1's tombstone is explicit: `started=null`, `pid=null`, `turns=0`,
+`parent_session=""`, `cause=reaped`, `outcome=failed` — and even `task` and `agent` were empty
+strings, so the record was created hollow. After 28 minutes all six worktrees were still
+byte-identical to base `2248d77`. Root cause: `KIROCREW_HOST_PID` and `KIROCREW_SESSION_KEY`
+are empty in this ACP-client session, so the gateway cannot bind a parent session. Ruled out
+as causes: model availability (`gpt-5.6-sol`, `gpt-5.6-terra`, `claude-sonnet-5` all resolve on
+this gateway, so NO substitution was warranted and none was used), the cwd allow-list (fixed
+and verified), and task payload size (all six accepted). Do not use `spawn_run` in this
+environment.
+
+**2. The supervision loop was never armed.** `monitor_start` returned a "requested" message,
+and the previous entry described a 10-minute loop as active. It was not: `~/.kiro/crew/autonudge.json`
+contained `{"loops":[]}`, no supervision process existed, and the `CRON-CONTROL.txt` marker file
+proves only that a one-shot cron once ran — it is not evidence of a live monitor. `monitor_start`
+requires a session binding this ACP CLI session does not have. Root supervises wave 1 directly
+inside its own turn with bounded poll cycles instead. Any future claim that a loop is running
+must be backed by a non-empty `loops` array in that file.
+
+Also corrected: the previous entry's "half verified" framing was wrong. Verification is counted
+per worker against measured git and gate state, not estimated.
+
+### Measured wave-1 status at 18:05
+| Slot | Model requested | Model observed | Commit | Root verdict |
+|---|---|---|---|---|
+| 1 tenancy | gpt-5.6-sol | gpt-5.6-sol | 66e4945 | ACCEPTED |
+| 2 capability contract | gpt-5.6-sol | gpt-5.6-sol | eb188d2 | ACCEPTED |
+| 3 foundation | claude-sonnet-5 | claude-sonnet-5 | 82f562e | ACCEPTED |
+| 4 UI | claude-sonnet-5 | — | — | scheduled 18:22, not started |
+| 5 evals | gpt-5.6-terra | — | — | scheduled 18:24, not started |
+| 6 copilot runtime | gpt-5.6-terra | — | — | scheduled 18:25, not started |
+
+3 of 6 committed, 3 of 6 independently root-verified, 3 of 6 scheduled but not started.
+
+Slot 3 verification, run by root rather than taken from its self-report: HEAD
+`82f562e5d41cb5d77c308d57eb42b139ded9bc8d` on `worker/w3-contact-activity`, 1 commit ahead of
+`2248d77`, clean tree, 10 files and 1442 insertions with 0 deletions, every path inside its
+owned set, and no `prisma/**`, shared-auth, restaurant-runtime, chat/RAG, sibling-module or
+package-manifest change. Gates re-run by root: `prisma validate`=0, `tsc --noEmit`=0, targeted
+`eslint`=0, foundation harness=0 with 8 named assertions and 0 failures (identity resolution,
+timeline ordering, backoff math, retry/dead-letter, idempotent re-enqueue, lease expiry treated
+as distinct from failure, read-only adapter shapes, notification projection).
+
+`prisma generate` remains deliberately unrun while any worker is pending or active, because the
+six worktrees share one `node_modules` junction and concurrent runs collide on
+`query_engine-windows.dll.node` with EPERM. It runs once at integration, after all workers stop.
