@@ -1,7 +1,7 @@
 import type { BusinessBlueprint } from "./types"
 import { assertValidBusinessBlueprint } from "./validation"
 
-const sampleBlueprints: BusinessBlueprint[] = [
+const builtInBlueprints: BusinessBlueprint[] = [
   {
     id: "coaching-studio-v1",
     version: "1.0.0",
@@ -106,7 +106,21 @@ const sampleBlueprints: BusinessBlueprint[] = [
   },
 ]
 
-export const businessBlueprintRegistry = sampleBlueprints.map(assertValidBusinessBlueprint)
+/**
+ * Built-in blueprint templates. Static and non-tenant: these ship with the product and
+ * are not owner-authored configuration. Each is validated at module load, so a malformed
+ * template fails the build rather than reaching a request.
+ */
+export const businessBlueprintRegistry = builtInBlueprints.map(assertValidBusinessBlueprint)
+
+const duplicateBlueprintIds = businessBlueprintRegistry
+  .map((blueprint) => blueprint.id)
+  .filter((id, index, all) => all.indexOf(id) !== index)
+
+if (duplicateBlueprintIds.length > 0) {
+  // getBusinessBlueprint resolves by find(), so a duplicate id would silently shadow.
+  throw new Error(`Duplicate business blueprint ids: ${[...new Set(duplicateBlueprintIds)].join(", ")}`)
+}
 
 export function listBusinessBlueprints() {
   return businessBlueprintRegistry

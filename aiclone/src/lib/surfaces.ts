@@ -26,10 +26,13 @@ const ALL_SURFACES: Surface[] = [
     "home", "profile", "inbox", "leads",
     "shop", "services", "calendar",
     "courses", "events", "sales",
-    // Owner-facing operations console. Deliberately not granted to any role KIT
-    // yet: it is opt-in per profile through extras until the feature is complete.
-    "businessOs",
 ]
+
+// `businessOs` is intentionally absent from ALL_SURFACES. CUSTOM is the schema default
+// for `Profile.roleTemplate`, the "Something else" onboarding option, and the try-kit
+// role, and `kit()` falls back to CUSTOM for any unrecognised role. Listing the surface
+// here would therefore switch an unfinished owner console on for those profiles by
+// default. It is granted only by explicit per-profile opt-in through extras.
 
 const ALL_PACKS: FieldPack[] = [
     "shopPhysical", "shopDigital", "menuDish", "tableBook", "ar", "portfolio", "whatsappUpi",

@@ -23,6 +23,20 @@ export function validateBusinessBlueprint(blueprint: BusinessBlueprint): Validat
     workflowIds.add(workflow.id)
     if (!workflow.name.trim()) issues.push(issue(`${workflowPath}.name`, "Workflow name is required."))
     if (!workflow.actions.length) issues.push(issue(`${workflowPath}.actions`, "Workflow needs at least one action."))
+    if (workflow.trigger.kind === "event" && !workflow.trigger.event?.trim()) {
+      issues.push(issue(`${workflowPath}.trigger.event`, "An event trigger must name its event."))
+    }
+    if (workflow.trigger.kind === "schedule" && !workflow.trigger.schedule?.trim()) {
+      issues.push(issue(`${workflowPath}.trigger.schedule`, "A schedule trigger must carry a schedule."))
+    }
+    workflow.actions.forEach((action, actionIndex) => {
+      const actionPath = `${workflowPath}.actions.${actionIndex}`
+      if (!action.id.trim()) issues.push(issue(`${actionPath}.id`, "Action id is required."))
+      // The contract requires a human-readable reason, because the approver is shown it.
+      if (action.approval?.required && !action.approval.reason.trim()) {
+        issues.push(issue(`${actionPath}.approval.reason`, "A required approval must state a reason."))
+      }
+    })
   })
 
   blueprint.engines.forEach((composition, engineIndex) => {

@@ -50,6 +50,12 @@ export function BusinessOsShell({
                 description="Versioned blueprints composed from the shared operating engines."
             />
 
+            <p className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+                These are built-in templates. Workflows and approval gates below are declared
+                configuration and are not executed yet, so the counts describe what a blueprint
+                specifies rather than anything that has run.
+            </p>
+
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
