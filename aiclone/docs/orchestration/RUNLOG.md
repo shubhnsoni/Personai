@@ -543,3 +543,103 @@ directory, 0 commits ahead.
 owner authorization to execute the guarded down migration against
 `personalink_phase0_rehearsal_20260826_210704` and nothing else. The rehearsal database currently
 carries the migration (56 public tables vs the live baseline of 35).
+
+
+## 2026-08-28 (overnight run) — preview torn down, P2-001 ACCEPTED and integrated, SEC-002 dispatched
+
+### Public exposure removed (owner directive)
+Cloudflare tunnel, preview supervisor and preview Next process all stopped. Verified: cloudflared
+process count **0**, ports 3000 and 3100 have no listeners, and every retired hostname fails to reach
+the application (`conducted-moment-commands-cheats` and `prix-sciences-regulation-dark` answer 530,
+`incorporated-photograph-teach-race` is unreachable). No new tunnel was created. Next.js 16.3.3 and
+the SEC-001 hotfix are preserved. Temporary local servers were used only for tests and stopped
+immediately afterwards.
+
+### P2-001 — ACCEPTED, integrated at `9d5d20e`
+The owner's explicit authorization unblocked the destructive rollback rehearsal. Because the cron
+worker had been denied at tool authorization, root executed the guarded rollback itself, exactly as
+the directive permits, and never bypassed the guard.
+
+A guarded executor `scripts/one-off/p2-guarded-sql.ts` was written to enforce the mandated five-step
+preflight with no bypass flag: redacted-name-only printing, `assertDisposableTarget`, exact-target
+equality, backup existence plus SHA-256, abort otherwise. It additionally re-asserts
+`select current_database()` **after connecting**, so the database actually attached to is proven
+rather than trusted from the URL.
+
+Backup: 149,270 bytes, SHA-256 `77c6eeb27b065b84fdab1cd0e77f820540ff5c1e53ac54dc6da286ab1fb4cc69`,
+outside the repo, never deleted.
+
+Guard negative tests, all correctly refused with nothing executed: `personalink`, `PersonaLink`,
+`PERSONALINK` (refused by the guard) and `personalink_phase0_clean_20260826_221845` (disposable, but
+refused because it is not the authorized target). The rehearsal DB was still at 56 tables afterwards,
+proving no statement ran.
+
+The first rollback attempt FAILED on `2BP01` — `Approval` depends on `WorkflowStep` — and **rolled
+back atomically** (56 tables intact). Rather than retry by guesswork, the FK graph among the 14 new
+tables was queried and a topological drop order computed, children strictly before parents, so no
+`CASCADE` was needed. `CASCADE` was deliberately avoided because it can silently drop constraints on
+pre-existing tables.
+
+Rollback: **zero residue** — 0 of 14 tables left, enum dropped, function dropped, 0 triggers, ledger
+row removed. Catalog diff exact: **42 of 42 expected tables, 0 missing and 0 unexpected columns**,
+all pre-existing row counts unchanged apart from the intended `_prisma_migrations` 8 -> 7. Restore
+from backup was therefore unnecessary; the down migration alone restored the exact prior shape.
+
+Reapply via `prisma migrate deploy`: clean, 14/14 tables, enum and all four triggers restored, all 8
+migrations `finished`.
+
+Invariant harness `check-schema-invariants.ts`: **18/18, exit 0**, every write inside a
+deliberately-rolled-back transaction leaving zero residue. Append-only enforcement proven for real —
+`ERROR: ActivityEvent is append-only; UPDATE is forbidden` and the DELETE equivalent (SQLSTATE
+55000) — and separately confirmed outside the harness with the row surviving unmutated. Backfill
+projects all 16 Profile rows and its replay is a no-op (16 -> 16). Failure mode proven:
+`INVERT_ASSERTION=1` gives 13/18 and exit 1; restored gives 18/18 and exit 0.
+
+Two defects in root's own new code were found and fixed rather than shipped: the harness reported
+`no error raised` as evidence while still passing, because Prisma error messages begin with a blank
+line and `split("\n")[0]` was empty; and targeted ESLint failed on a `require()` import in the
+guarded runner. Both corrected.
+
+Gates on the P2 branch: `prisma validate`=0, `prisma generate`=0, `tsc`=0, targeted `eslint`=0,
+`npm run build`=0, and 16 harnesses at 0 including `check-order-stream` and
+`check-restaurant-order-transaction`, which needed a temporary local server and the disposable
+database (both had failed earlier only for environmental reasons).
+
+Merged into primary with `--no-ff`, zero conflicts, 6 files, 1195 insertions. Combined-baseline
+gates after the merge: `prisma validate`=0, `prisma generate`=0, `tsc`=0, targeted `eslint`=0, 10
+in-memory harnesses=0, `npm run build`=0 (`BUILD_ID fjeZZWAnM_dpwFrHJr0RD`). Defence in depth
+confirmed: `check-schema-invariants` **refuses the live database** —
+`personalink is a protected live database and is never a valid schema target` — while passing 18/18
+against the authorized rehearsal target.
+
+**`personalink` untouched after integration**: 35 public tables, `_prisma_migrations` absent, none of
+the 14 new tables present, `Profile`=16. Origin still `4b386d1`. Nothing pushed.
+
+### SEC-002 Clerk hotfix — dispatched
+Job `2db4fb9e`, model `gpt-5.6-sol`, branch `security/clerk-6.39.6` from `9d5d20e`, isolated real
+`node_modules`, `DATABASE_URL` pointed at the disposable clean copy so it can never reach live.
+
+Root established the target facts first: the audit's affected range for `GHSA-vqx2-fgx2-5wq9`
+**includes 6.39.2**, so the real patched floor is **6.39.3**, not 6.39.2 as originally briefed; the
+newest release in the existing major is **6.39.6**, whose peer deps (`next ^16`, `react ~19.2.3`)
+match our Next 16.3.3 and React 19.2.4. A 7.x Clerk Core 3 line exists (latest 7.8.2) and the worker
+is explicitly forbidden from migrating to it. The worker must prove behaviour rather than assume a
+version bump fixed anything, and must resolve whether the unauthenticated `/dashboard/*` HTTP 200
+`Profile Not Found` shell is the advisory, intentional behaviour, or a missing page gate.
+
+### Ledger reconciliation against observed state
+- `P1-001`, `P1-002`: `done_pending_owner_review` -> **done**; the owner accepted both explicitly.
+- `P1-004` -> **superseded_by_P1-010**. P1-010 delivered exactly this: granular stable capability IDs
+  matching engine ownership contracts, plus maturity and activation enforcement.
+- `P1-013` -> **ready**, and honestly NOT started. Its `dispatch_wave_1` status was stale: it was
+  never dispatched. Observability is still unfinished — `autonudge.json` loops is empty,
+  `monitor_start` cannot arm here, continuous supervisors = 0, `LIVE_ACTIVITY.md` is a one-shot.
+- `P1-014` -> **partially_satisfied**. Covered: P1-008's deterministic mocked auth/authz/tenant tests
+  and a root dependency audit that produced SEC-001 and SEC-002. Not covered: uploads/storage
+  boundary review, secret-exposure sweep, adversarial testing against the real provider.
+- `P1-009` stays `queued_separate_package`; `P1-006` stays `queued_patch_only`.
+- `P2-001` -> **done**. `SEC-001` -> **done**. `SEC-002` -> **in_flight**.
+
+Tooling limitations recorded in `TASKS.json`: `spawn_run` is unusable (hollow records, reaped),
+`monitor_start` cannot arm, and no `todo_list` tool is exposed in this profile so the stale TUI list
+cannot be reconciled programmatically — `TASKS.json` is authoritative.
