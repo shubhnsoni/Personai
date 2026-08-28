@@ -9,8 +9,22 @@ import type { BusinessBlueprint, CapabilityMaturity } from "../../src/lib/busine
 const report: Record<string, unknown> = {}
 const failures: string[] = []
 
+/**
+ * Inversion control. This harness previously had none, so it exited 0 whether or
+ * not its assertions were meaningful. Wave A added the hook so the harness can be
+ * shown to fail loudly, which is the standard every other boundary here is held to.
+ *
+ * It flips exactly ONE assertion: the maturity-enforcement negative test, which is
+ * the property that actually guards against overclaiming a capability.
+ */
+const INVERT = process.env.INVERT_ASSERTION === "1"
+
 function check(name: string, condition: unknown, detail?: string) {
   if (!condition) failures.push(detail ? `${name}: ${detail}` : name)
+}
+
+function checkInvertible(name: string, condition: unknown, detail?: string) {
+  check(name, INVERT ? !condition : condition, detail)
 }
 
 const requiredGranularCapabilities: Record<string, string[]> = {
@@ -63,22 +77,39 @@ function composition(engineId: "venueOrders" | "commerce") {
 
 check(
   "restaurant v2 venue required capabilities are exact",
-  JSON.stringify(composition("venueOrders")?.capabilities) === JSON.stringify(["qrOrdering", "guestTracking"]),
+  JSON.stringify(composition("venueOrders")?.capabilities) ===
+    JSON.stringify(["qrOrdering", "guestTracking", "reservations"]),
 )
 check(
   "restaurant v2 commerce required capabilities are exact",
   JSON.stringify(composition("commerce")?.capabilities) === JSON.stringify(["catalog", "orders"]),
 )
 check(
-  "restaurant reservations are in planned backlog",
-  JSON.stringify(composition("venueOrders")?.plannedCapabilities) === JSON.stringify(["reservations"]),
+  "restaurant reservations are no longer a planned backlog item",
+  composition("venueOrders")?.plannedCapabilities === undefined,
 )
 check(
-  "restaurant real inventory is in planned backlog",
+  "restaurant reservations capability is declared available with real evidence",
+  (() => {
+    const capability = businessEngineDescriptors.venueOrders.capabilities.find((c) => c.id === "reservations")
+    return capability?.maturity === "available" && capability.evidence !== "none"
+  })(),
+)
+check(
+  "restaurant real inventory is STILL in planned backlog",
   JSON.stringify(composition("commerce")?.plannedCapabilities) === JSON.stringify(["inventory"]),
+)
+check(
+  "commerce inventory capability is still declared planned",
+  businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "inventory")?.maturity === "planned",
 )
 check("all registry blueprints validate", listBusinessBlueprints().every((blueprint) => validateBusinessBlueprint(blueprint).ok))
 
+// Negative test: an active blueprint may not REQUIRE a capability whose maturity is
+// still planned. This deliberately targets commerce.inventory, which remains planned.
+// It previously targeted venueOrders.reservations; Wave A made reservations genuinely
+// available, which would have turned this assertion vacuous, so it was repointed at a
+// capability that is still actually planned rather than left to pass for free.
 const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   id: "invalid-active-planned-capability",
   version: "1.0.0",
@@ -86,12 +117,12 @@ const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   name: "Invalid active blueprint",
   vertical: "contract-test",
   summary: "Negative test: active blueprints cannot require planned capabilities.",
-  engines: [{ engineId: "venueOrders", capabilities: ["reservations"], required: true }],
+  engines: [{ engineId: "commerce", capabilities: ["inventory"], required: true }],
   workflows: [],
   ownerCopilotPrompts: [],
 }
 const negativeResult = validateBusinessBlueprint(activeWithPlannedRequiredCapability)
-check("active blueprint requiring planned capability is rejected", !negativeResult.ok)
+checkInvertible("active blueprint requiring planned capability is rejected", !negativeResult.ok)
 check(
   "negative rejection identifies maturity enforcement",
   negativeResult.issues.some(

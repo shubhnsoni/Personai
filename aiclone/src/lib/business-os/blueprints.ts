@@ -120,14 +120,19 @@ const builtInBlueprints: BusinessBlueprint[] = [
     engines: [
       {
         engineId: "venueOrders",
-        capabilities: ["qrOrdering", "guestTracking"],
+        // reservations moved from plannedCapabilities to a required capability in
+        // Wave A, when it became genuinely persisted against RestaurantTable with
+        // tenant isolation, capacity limits, overlap refusal and an append-only
+        // ledger. Before that it was a JSON blob on a generic Booking.
+        capabilities: ["qrOrdering", "guestTracking", "reservations"],
         required: true,
-        plannedCapabilities: ["reservations"],
       },
       {
         engineId: "commerce",
         capabilities: ["catalog", "orders"],
         required: true,
+        // inventory stays PLANNED on purpose. It is still a single nullable stock
+        // column, so claiming it would overstate what is built.
         plannedCapabilities: ["inventory"],
       },
     ],
