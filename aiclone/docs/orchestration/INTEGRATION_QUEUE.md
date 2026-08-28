@@ -110,3 +110,80 @@ Retained for audit, not deleted: the six worker worktrees and the earlier
 integration. It is the ONLY task permitted to touch `prisma/**`, it must run alone with no
 concurrent schema worker, and every migration command must first prove its target is disposable
 via `assertDisposableTarget` from `scripts/lib/disposable-db.ts`. It may never target `personalink`.
+
+
+
+## Security remediation wave and P2-003 — INTEGRATED 2026-08-28
+
+Queue is empty for Phase 2 UI work. Nothing is awaiting integration. Nothing has been pushed;
+`origin/recovered/aug20-wt-pr-32` remains `4b386d1`.
+
+| Order | Branch | Commit | Package | Integration |
+|---|---|---|---|---|
+| 1 | `security/ownership-foundation` | `f05e197` | SEC-F ownership foundation | `ac93e2c` |
+| 2 | `security/lane-b-uploads` | `3c720b7` | Lane B uploads & external compute | `f69fa24` |
+| 3 | `security/lane-a-actions` | `21f53a9` | Lane A tenant-owned Server Actions | `4d24076` |
+| 4 | `security/lane-c-resources` | `9e14fcd` | Lane C resource & enrollment authz | `b9b2794` |
+| 5 | `security/lane-e-middleware-boundary` + Lane E harness | root-resolved | Lane E health/auth HTTP + middleware | `b3afc2a` |
+| 6 | `security/lane-d-conversations` | `a53d3cb` | Lane D conversation ownership | `4435da6`, `05ead37` |
+| 7 | `security/actions-catalog-authz` | `2ed49d8` | catalog actions authz | `6ec8db5` |
+| 8 | `security/actions-course-profile-authz` | `7e768b1` | course/profile actions authz | `f97dce2` |
+| 9 | `security/actions-import-library-authz` | `18f37e1` | import/library actions authz | `e91471f` |
+| 10 | `feature/p2-003-business-os-ui-fresh` | `147b2d1` | **P2-003 Business OS on persisted data** | **`64ec987`** |
+
+P2-003 was implemented, gated and reviewed **by root**, because job `918886b6` delivered nothing
+and the gateway then refused connections. This is recorded as a root-serial delivery, not as an
+independent worker verification. Gates on the merged tip: `prisma validate`/`generate` 0, `tsc` 0,
+targeted `eslint` 0 errors with 1 inherited `<img>` warning, `check-actions-authz` /
+`check-persisted-adapters` / `check-business-os-p2-e2e` each 0/1/0 with 115/33/33 assertions, all
+remaining production security boundaries 0, HTTP `portCleared=true`, shared regressions 0,
+`npm audit --omit=dev` 0 vulnerabilities, `npm run build` 0.
+
+Rejected: none in this batch. Lane E's first two attempts and the first middleware dispatch were
+rejected earlier and are recorded in `RUNLOG.md`; their eventual resolution is row 5.
+
+## Blocker status update
+
+- **Blocker 1 (repo-wide lint) — still open.** Baseline 124 problems / 63 errors, unchanged.
+  Queued as P1-009 for path-disjoint cleanup packages.
+- **Blocker 2 (no Clerk keys) — closed by owner decision.** Deterministic mocked auth/authz/
+  isolation tests shipped as P1-008; executable boundary harnesses now cover the signed-in paths.
+- **Blocker 3 (workflow layer does not execute) — partially closed.** P1-005 landed an executable
+  copilot runtime and P2-003 surfaces real Copilot runs, approvals and audit. Only server-owned
+  `recordAudit` is exposed; notification/payment/publication actions are still declared-not-
+  executable, and the UI says so.
+- **Blocker 4 (coarse capability vocabulary) — closed.** P1-010 grew capabilities to granular
+  stable ids with `planned|partial|available` maturity and active-blueprint enforcement.
+- **Blocker 5 (two active-blueprint capabilities overstate reality) — HALF being addressed now.**
+  Wave A implements `venueOrders.reservations` for real. `commerce.inventory` stays `partial` and
+  is explicitly NOT claimed; it remains a single nullable `stock` column. Blocker 5 closes only
+  when Wave A integrates green, and then only for the reservations half.
+
+## Next in queue — Wave A, READY
+
+Base `64ec987e1935c99460dc7b1261829bcaf39877b7`. Branch
+`feature/wave-a-restaurant-reservations`, worktree `../personai-wave-a-reservations-wt` with its
+own real `node_modules` (`npm ci`, not a junction) so Prisma generation cannot collide.
+
+Wave A is largely serial: each package consumes the previous package's types or runtime. Packages
+are integrated one at a time, each with a `--no-ff` merge and a full combined gate re-run.
+
+| Pkg | Owner paths | Depends on | Required proof |
+|---|---|---|---|
+| A1 | `prisma/**` (EXCLUSIVE), `scripts/one-off/check-reservation-schema-invariants.ts` | — | external backup taken; `assertDisposableTarget` before every command; apply → rollback → reapply on the disposable target only; `pg_catalog` drift zero; invariants 0/non-zero/0 |
+| A2 | `src/lib/reservations/**`, its harness | A1 | tenant+venue isolation, capacity fail-closed, overlap refusal proven by two genuinely interleaved transactions, guarded transitions, idempotent replay returns the original row and writes no second event, append-only ledger, refusals leave zero rows/events |
+| A3 | `src/app/api/platform/reservations/**`, its harness | A2 | real route factories, four verbs × anonymous/wrong-tenant/authenticated-without-surface/valid-owner, byte-identical foreign-vs-nonexistent responses, envelope revalidated after storage filtering |
+| A4 | `src/components/business-os/**` reservations panel + page wiring | A3 | explicit loading/empty/401/403/dependency-error wording, no sample operational data, capacity and overlap refusals surfaced as actionable messages, surface/render/a11y 0 |
+| A5 | `src/lib/business-os/{engines,blueprints}.ts` + validation | A2 | strictly additive; `venueOrders.reservations` → `available`; `commerce.inventory` stays `partial`; negative test proves an `active` blueprint requiring a `planned` capability is still rejected |
+| A6 | adversarial re-run, no new product paths | A2–A5 | every A2–A5 harness re-run by root; restaurant Phase 0–1 surface unbroken; `check-restaurant-phase0-behavior` 0; secret scan clean; `npm audit --omit=dev` 0; build 0 |
+
+Standing constraints for every Wave A package: no live `personalink` mutation, no migration or
+cutover against it, no push/PR/deploy, no tunnel, no concurrent Prisma writers, and no
+modification of the six frozen evidence worktrees or the preserved untracked user files.
+
+### Then, in dependency order
+Wave B appointments engine (B1 schema → B2 availability/conflict → B3 lifecycle/deposits/waitlist/
+reminders → B4 UI/customer API), Wave C cases/projects engine (C1–C3), Wave D content/cohorts
+engine (D1–D3), Wave E truthful vertical activation (E1–E4 after their engines are green, E5 retail
+stays `draft` while `commerce.inventory` is `partial`). Healthcare/clinics/hospitals remain
+blueprint-only. P1-007 live cutover is NOT executed.

@@ -1093,3 +1093,145 @@ Root held the shared supervisor lock from 10:31 to 11:25 while doing this work, 
 each supervisor cycle exit immediately — correct mutual exclusion, but it meant no autonomous progress
 during that window. The lock is now released and `wave3-supervisor` (`94f62025`) resumes ownership of
 verification and serial integration for lane D and P2-003.
+
+
+## 2026-08-28 11:39 +05:30 - Wave 3 terminal security-evidence blocker; supervisor removed
+
+Execution lock held for the full cycle. Reconciled all five remediation lanes: A (`4d24076`), B (`f69fa24`), C (`b9b2794`) and the root-resolved E/middleware package (`b3afc2a`) are already integrated green. D job `66e1aefb` completed after retry `d61fc50c` as commit `49f503a37d062a0562450c32b87f80789654fbf4`, requested/observed model `gpt-5.6-sol`, with an exact four-file owned commit and zero secret-pattern hits. Independent Prisma validate, TypeScript, targeted ESLint, all five named regressions and production build exited 0.
+
+Lane D is **REJECTED and unmerged** because its mandatory executable harness sequence was **1/1/0**, not 0/non-zero/0. The first normal run accepted the text-mutated visitor capability, persisted messages and called the injected provider/retrieval stubs; inverted exited 1; restored exited 0. Root cause: the harness mutates only the last base64url character. A 32-byte HMAC can end in canonical `A`; changing it to `B` alters only ignored padding bits, and Node decodes both strings to identical signature bytes (`decoded_bytes_equal=true`). The adversarial assertion is therefore probabilistic and cannot establish forged-capability refusal. Lane D already consumed its one allowed retry, so no further retry or merge was attempted.
+
+`P1-014` remains blocked: executable Lane D evidence is invalid, and the original audit counted 11 unguarded Server Action modules while Lane A remediated only four owned modules. Lane F was not dispatched because A-E are not all resolved. The prematurely dispatched P2-003 job `918886b6` is absent from the registry, produced no worktree/report, has no matching worker process and delivered nothing; P2-003 remains blocked and unintegrated.
+
+Terminal cleanup: no matching Lane D/P2 worker process, `cloudflared` count 0, no temporary server started by this cycle, one-shot remediation jobs absent from the registry, and `wave3-supervisor` cron `94f62025` removed. This is a genuine security-evidence blocker; no release-blocker completion claim is made.
+
+
+
+## 2026-08-28 13:15 +05:30 - Direct-owner continuation; Lane D accepted and action remediation dispatched
+
+Root re-established state from disk before mutation: primary `recovered/aug20-wt-pr-32` was `fc2c8ae`, origin remained `4b386d1`, only `RUNLOG.md`/`TASKS.json` plus the preserved untracked `.codex-remote-attachments/` were present, cron registry was empty, cloudflared count was 0, ports 3000/3100 were clear, Lane D was `49f503a` with only the inherited checks-tsconfig widening unstaged, and stale P2-003 remained clean at `b3afc2a` with no report or delivery.
+
+Under Shubh's explicit narrow root authorization, only `check-conversation-authz.ts` was corrected: the original HMAC signature is decoded, byte 0 is XORed with `0x01`, the forged bytes are canonically base64url-encoded, and the harness asserts that re-decoded forged/original bytes differ. Production verification was unchanged. Against only `personalink_phase0_rehearsal_20260826_210704`, the real route harness passed normal/inverted/restored `0/1/0` with 34 assertions, stub-only provider/retrieval use, refusal zero-effects, valid member/public visitor success, and transaction rollback. Prisma validate/generate, TypeScript, targeted ESLint, five auth/tenant/foundation regressions, `npm audit --omit=dev` (0 vulnerabilities), and production build all exited 0. Evidence fix `a53d3cb` contained only the harness; inherited `scripts/tsconfig.checks.json` remained excluded. Root independently inspected both Lane D commits and serially integrated them as `4435da6` then `05ead37`.
+
+The audit's exact 11-module static list is `communities`, `content`, `courses`, `events`, `import`, `lead-magnets`, `library`, `onboarding`, `profile`, `services`, and `short-links`. Lane A fixed three members of that list (`content`, `onboarding`, `short-links`) plus the separately added critical `products` finding. Of the other eight, seven contain unguarded owner mutations; `library` is an intentional anonymous email-capability surface but its dashboard resend still requires an explicit ownership decision and executable evidence.
+
+Created three clean, path-disjoint worktrees from `05ead37` and dispatched pinned `gpt-5.6-sol` jobs: catalog actions `42cba339`, course/profile `219c14cd`, and import/library `dcbf03b9`. Each owns unique source, harness, and report paths; no package manifest, Prisma, shared-security, origin, live DB, tunnel, or frozen-evidence path is writable. Lane F and P2-003 remain blocked until root independently verifies and serially integrates these packages.
+
+## 2026-08-28 14:10 +05:30 — Root serial action remediation complete; Lane F unblocked
+
+Disk, Git, scheduler, and runtime state were reconciled before mutation. Primary was `recovered/aug20-wt-pr-32` at `f97dce2bb6073e02e674583361e43d877bc9c942`; origin tracking remained `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`; the import/library worktree was clean at `18f37e1e9523b1eac47a70b9438de11eb4f9ab47`; cron registry was empty; cloudflared count was 0; ports 3000/3100 were clear. The three earlier package jobs `42cba339`, `219c14cd`, and `dcbf03b9` are corrected to **FAILED_NO_START**: each failed with `Error: cannot reach gateway. Is \`kirocrew gateway\` running?` and performed no work. Root retained exclusive serial ownership rather than leaving dormant writers.
+
+Catalog was already integrated at `6ec8db5fdaa4c3c3a1b496f882208626fee0ecc0` from branch commit `2ed49d860734ef3251f8006aa7dda398d565e541`. Course/profile was already integrated at `f97dce2bb6073e02e674583361e43d877bc9c942` from branch commit `7e768b1b1e3182900b09004c2d14f5d876863c34`. Root independently rechecked the clean import/library branch and cherry-picked only `18f37e1e9523b1eac47a70b9438de11eb4f9ab47`, producing primary commit `e91471f467fa7cb3ad7bb456e2e1e2bc4e0f6aea`; its exact five-path scope and preservation fingerprints were verified before and after integration.
+
+Combined primary gates are green: Prisma validate/generate 0; TypeScript 0; targeted ESLint 0 errors with only the two documented inherited warnings; catalog, course/profile, and import/library real-action harnesses each normal/inverted/restored **0/1/0** with 127, 183, and 60 assertions; all five shared authorization regressions 0; transaction rollback residue 0; real external calls 0; `npm audit --omit=dev` 0 vulnerabilities; production build 0. No live database migration or cutover, origin change, push, PR, deploy, public tunnel, or shared-path concurrent writer occurred.
+
+P1-014 is **not yet complete**. The action remediation is integrated green, active workers/crons are 0, and independent Lane F is now unblocked. Lane F must execute real route/action/service boundaries and independently rerun the action harnesses; source regex may supplement but cannot establish PASS.
+
+## 2026-08-28 14:17 +05:30 — Lane F worker FAILED_NO_START; root fallback closes P1-014
+
+The explicitly pinned `gpt-5.6-sol` Lane F spawn failed before creating an agent: `WinError 10061 — No connection could be made because the target machine actively refused it`. No worker ran, and this record does not claim otherwise.
+
+Root executed the documented fallback as a separate final adversarial pass. Eight real production-boundary harnesses—actions, upload/external compute, resources/enrollment, conversations, auth HTTP/health/middleware, catalog actions, course/profile actions, and import/library actions—each passed normal/inverted/restored **0/non-zero/0**. Seven counted harnesses produced 575 assertions per normal pass (117+22+32+34+127+183+60); the separate HTTP boundary was uncounted and passed with `portCleared=true`. Seven shared ownership/auth/tenant/Business OS/disposable-target regressions all exited 0. Existing static gates, production audit, and build remained green. Production export mapping confirmed executable coverage of all exact-list Critical/High modules plus the `products.ts` addendum; intentional public purchase/login-link/chat capabilities remain constrained and non-enumerating. Unresolved Critical/High findings: **0**.
+
+Final reconciliation: origin tracking remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`; cloudflared 0; ports 3000/3100 clear; cron registry empty; the six frozen evidence worktrees retain their exact heads and dirty counts; `P1_014_ACTION_INVENTORY.md` and `.codex-remote-attachments/` fingerprints are unchanged. P1-014 is accepted under the root fallback, explicitly without representing it as an independent worker execution. P2-003 may now start only from a new worktree at the verified `e91471f` base.
+
+
+
+## 2026-08-28 17:10 +05:30 — P2-003 INTEGRATED GREEN at `64ec987`; ledger reconciled; Wave A opening
+
+### State re-established from disk before any mutation
+Root did not trust the prior cycle's chat claims. Measured: primary `recovered/aug20-wt-pr-32`
+at `64ec987e1935c99460dc7b1261829bcaf39877b7`, 82 ahead of origin; origin tracking unchanged at
+`4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`; working tree dirty only in the two intentional ledger
+files plus the two preserved untracked entries; `cron_list` "No cron jobs."; `spawn_list` "No
+subagents running."; `cloudflared` 0; ports 3000 and 3100 with 0 listeners; 42.8 GB free. All six
+frozen evidence worktrees remain at `ea695956cfc8237bbbe32865723a2b8a80466db8` with dirty counts
+4/3/4/1/0/1. `P1_014_ACTION_INVENTORY.md` is `A157FD53…C9BCC` and both attachments match their
+recorded hashes and byte sizes.
+
+### P2-003 — implemented and reviewed BY ROOT, integrated green
+This is recorded plainly: the originally dispatched job `918886b6` delivered nothing, and the
+gateway then refused connections, so **root wrote this code, ran every gate, and performed the
+review itself. No worker independence is claimed for P2-003.** The stale clean worktree
+`personai-p2003-ui-wt` at `b3afc2a` was deliberately NOT reused as the final integration base; a
+fresh worktree was cut from the verified `e91471f` instead.
+
+Implementation decisions:
+
+- **Canonical `createProfile(data)` with a server-derived actor only.** The legacy
+  `createProfile(userId, data)` compatibility form was *removed*, not retained behind an equality
+  check — client-selected identity is rejected outright rather than validated.
+- **Atomic provisioning.** Profile, Workspace and an OWNER Membership are created in one
+  transaction with starter rows. UI-only workspace facades and partial provisioning were rejected.
+- **Caller identity claim removed from onboarding.** The `userId` prop and the caller claim were
+  deleted from both normal and QA onboarding paths.
+- **Tenant-authorized `GET /api/platform/tasks`**, gated by persisted membership plus
+  `profile.read`. Global `TaskJob` reads were rejected. The exact task envelope is revalidated
+  *after* storage filtering; trusting substring matching as the tenant boundary was rejected.
+- **Persisted Business OS UI** for workspaces, contacts, activities, tasks, Copilot runs,
+  approvals and audit, exposing **only** server-owned `recordAudit`. Notification, payment,
+  publication and other blueprint actions are not presented as executable.
+- Explicit loading / empty / 401 / 403 / dependency-error wording, and **no sample operational
+  data**. `businessOs` remains explicit-opt-in; caller-provided onboarding config cannot
+  self-grant the privileged surface.
+
+Feature commit `147b2d18dbb8bec9906b47139c47807fbf249fef` on
+`feature/p2-003-business-os-ui-fresh`, one clean commit, cherry-picked onto primary as
+`64ec987e1935c99460dc7b1261829bcaf39877b7` with **no conflicts** and the primary intentional dirty
+ledger/evidence state preserved.
+
+### Gates, measured on the fresh branch and again on the merged primary
+
+| Gate | Result |
+|---|---|
+| `prisma validate` / `prisma generate` | 0 / 0 |
+| app `tsc --noEmit --pretty false` | 0 |
+| targeted `eslint` | 0 errors, 1 inherited `<img>` warning |
+| Business OS surface / render / a11y | 0 |
+| executable Copilot runtime | 0 / 1 / 0 |
+| `check-actions-authz` | 0 / 1 / 0, 115 assertions |
+| `check-persisted-adapters` | 0 / 1 / 0, 33 assertions |
+| `check-business-os-p2-e2e` | 0 / 1 / 0, 33 assertions, `externalCalls=0`, ten tracked row categories roll back to zero |
+| seven non-HTTP security boundaries | each 0 / 1 / 0 |
+| HTTP boundary | 0 / 1 / 0, `portCleared=true` |
+| seven shared regressions | all 0 |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run build` | 0 |
+
+`check-actions-authz` additionally proves users, profiles, workspaces and memberships all roll
+back to zero.
+
+### Corrections carried into the ledger
+The primary ledger previously recorded a **false Lane F assertion total of 692**. The measured
+total is **575** (`117+22+32+34+127+183+60`), with the HTTP boundary explicitly *uncounted*. That
+correction is now in `TASKS.json`.
+
+One caveat is stated rather than glossed: the prior aggregate attachment fingerprint
+`5A6CA648…37A` came from a recipe that is no longer available, so **only the two individual file
+hashes and byte sizes were verified**. No aggregate match is claimed and no replacement formula
+was invented.
+
+### Ledger reconciliation
+`P2-003` moved from the false `blocked_security_evidence` / `BLOCKED-NO DELIVERY` state to `done`,
+carrying its base, branch, worktree, feature commit, integration commit, report path and measured
+gates. The failed job `918886b6` is retained truthfully under `priorDispatchFailure` rather than
+deleted. Active workers 0 and active crons 0, both evidence-backed at the observed time.
+
+### Wave A opening
+`P1-006` moves to `in_progress_wave_a`. Wave A closes the `venueOrders.reservations` gap named in
+`INTEGRATION_QUEUE.md` blocker 5 with a real `Reservation` model related to `RestaurantTable`.
+
+Two design facts were established by reading the schema rather than assumed:
+
+- **Tenant bridge.** `RestaurantTable`, `Order` and `OrderCounter` are `profileId`-scoped, while
+  `/api/platform/*` is `workspaceId`-scoped through `PersistedTenancy.requireAccess()`.
+  `Workspace.profileId` is already `@unique`, so authorization flows workspace membership →
+  `Workspace.profileId` → must equal `Reservation.profileId`. Existing tenancy is composed; no
+  second tenant key is invented.
+- **Capacity is not always knowable.** `RestaurantTable.seats` is `Int?`. Reservations against a
+  table with unconfigured seats are refused **fail-closed**, rather than silently skipping
+  capacity validation.
+
+`commerce.inventory` stays `partial` and no inventory claim is made — it remains a single nullable
+`stock` column. No live database migration or cutover; only
+`personalink_phase0_rehearsal_20260826_210704` is authorized for rehearsal.

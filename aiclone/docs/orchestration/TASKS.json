@@ -1,7 +1,7 @@
 {
-  "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 10:17 +05:30",
-  "updatedBy": "wave 3 supervisor (gpt-5.6-sol)",
+  "milestone": "Phase 2 delivery - P2-003 integrated, Wave A restaurant reservations opening",
+  "updatedAt": "2026-08-28 17:10 +05:30",
+  "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
   "baseCommitPolicy": "Lanes must branch from a commit where tsc --noEmit and next build both exit 0. Qualifying commits: e97edf4 and later. The consolidation branched from a4d9fba. See ADR-007.",
@@ -178,9 +178,20 @@
     {
       "id": "P1-006",
       "title": "Complete restaurant/cloud-kitchen venue-order vertical",
-      "status": "queued_patch_only",
+      "status": "in_progress_wave_a",
       "reason": "Restaurant paths are owner-reviewed. Phases 0 and 1 of the restaurant spec shipped in ea69595, 96ebf4b and e97edf4.",
-      "note": "Open items: venueOrders.reservations has no model related to RestaurantTable, commerce.inventory is one nullable column, and Cloudflare quick tunnels buffer SSE so the cursor fallback carries live updates on such hops."
+      "note": "Open items: venueOrders.reservations has no model related to RestaurantTable, commerce.inventory is one nullable column, and Cloudflare quick tunnels buffer SSE so the cursor fallback carries live updates on such hops.",
+      "waveA": {
+        "opened": "2026-08-28 17:10 +05:30",
+        "base": "64ec987e1935c99460dc7b1261829bcaf39877b7",
+        "branch": "feature/wave-a-restaurant-reservations",
+        "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-wave-a-reservations-wt",
+        "scope": "Close the venueOrders.reservations gap named in INTEGRATION_QUEUE blocker 5 with a real Reservation model related to RestaurantTable, tenant+venue isolation, capacity and overlap rejection at the write boundary, guarded lifecycle transitions, idempotent create/mutate, an append-only ReservationEvent ledger, honest blueprint capability maturity, owner UI, and executable normal/inverted/restored evidence.",
+        "explicitlyOutOfScope": "commerce.inventory stays partial; it remains a single nullable stock column and no inventory claim is made. No live database migration or cutover.",
+        "tenantBridge": "Reservation is profileId-scoped to match RestaurantTable/Order/OrderCounter. Platform API authorization flows workspace membership -> Workspace.profileId (already @unique) -> must equal Reservation.profileId. This composes existing tenancy rather than inventing a second tenant key.",
+        "capacityConstraint": "RestaurantTable.seats is Int? (nullable). Reservations on a table with unconfigured seats are refused fail-closed rather than silently skipping capacity validation.",
+        "packages": ["A1 schema", "A2 domain engine", "A3 API boundary", "A4 owner UI", "A5 blueprint truthfulness", "A6 adversarial + restaurant regression"]
+      }
     },
     {
       "id": "P1-007",
@@ -299,7 +310,7 @@
     {
       "id": "P1-014",
       "title": "Security, auth and isolation audit, read-only",
-      "status": "remediation_in_progress",
+      "status": "done",
       "model": "gpt-5.6-terra",
       "allowedPaths": [
         "docs/orchestration/SECURITY_AUDIT.md",
@@ -310,15 +321,68 @@
         "shared auth",
         "public chat"
       ],
-      "reconciledNote": "Evaluation completed and the production defects were independently confirmed. The branch is not green or integrable: its source-regex harness intentionally exits 1, does not execute route/action boundaries, and the worktree retains untracked .kiro metadata outside scope. No production source was patched. Separate exclusive remediation lanes are required before release; lane 3 must not use the insecure caller-selected onboarding action.",
+      "reconciledNote": "Lanes A/B/C/D/E and the catalog, course/profile, and import/library action packages are integrated green. The three package cron jobs never started because the gateway was unreachable, so root took serial ownership from disk, inspected each clean branch commit, integrated them as 6ec8db5, f97dce2, and e91471f, and reran the real action harnesses. The pinned gpt-5.6-sol Lane F spawn then failed before start with WinError 10061; no agent ran. Under the documented fallback, root performed a separate final adversarial pass without claiming worker independence: eight production-boundary harnesses each passed 0/non-zero/0, shared regressions passed, and every Critical/High inventory row was mapped to executable evidence with no unresolved finding.",
       "job": "92545f2c",
       "branch": "worker/w9-auth-adversarial",
       "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w9-auth-adversarial-wt",
       "baseCommit": "9291e93",
       "observedModel": "gpt-5.6-terra",
       "commit": "edb65facb354b2c8bb42a18ffdb9e35e4fee03f2",
-      "rootVerdict": "REJECTED FOR INTEGRATION - findings confirmed, evidence harness not executable boundary proof",
+      "rootVerdict": "ACCEPTED - all Critical/High findings closed by executable boundaries; Lane F worker FAILED_NO_START, root fallback review completed and is recorded without claiming a worker ran",
       "externalReport": "C:\\Users\\shubh\\AppData\\Local\\Temp\\personalink-phase0\\wave2-reports\\LANE-4-AUTH-ADVERSARIAL.md",
+      "actionInventory": {
+        "exactAuditList": [
+          "communities.ts",
+          "content.ts",
+          "courses.ts",
+          "events.ts",
+          "import.ts",
+          "lead-magnets.ts",
+          "library.ts",
+          "onboarding.ts",
+          "profile.ts",
+          "services.ts",
+          "short-links.ts"
+        ],
+        "laneAFixedFromList": ["content.ts", "onboarding.ts", "short-links.ts"],
+        "laneAAdditionalFindingFixed": "products.ts",
+        "remainingOwnerMutations": [],
+        "explicitCapabilityDecision": "library.ts keeps non-enumerating anonymous login-link request; dashboard resend is authenticated and ownership-scoped",
+        "packageDispatchFailures": {
+          "42cba339": "FAILED_NO_START - gateway unreachable",
+          "219c14cd": "FAILED_NO_START - gateway unreachable",
+          "dcbf03b9": "FAILED_NO_START - gateway unreachable"
+        },
+        "packageIntegrations": {
+          "catalog": {
+            "branchCommit": "2ed49d860734ef3251f8006aa7dda398d565e541",
+            "primaryCommit": "6ec8db5fdaa4c3c3a1b496f882208626fee0ecc0"
+          },
+          "courseProfile": {
+            "branchCommit": "7e768b1b1e3182900b09004c2d14f5d876863c34",
+            "primaryCommit": "f97dce2bb6073e02e674583361e43d877bc9c942"
+          },
+          "importLibrary": {
+            "branchCommit": "18f37e1e9523b1eac47a70b9438de11eb4f9ab47",
+            "primaryCommit": "e91471f467fa7cb3ad7bb456e2e1e2bc4e0f6aea"
+          }
+        },
+        "combinedPrimaryGates": "Prisma validate/generate=0; TypeScript=0; targeted ESLint=0 errors with 2 inherited warnings; catalog/course-profile/import-library harnesses each 0/1/0 with 127/183/60 assertions; five shared regressions=0; npm audit --omit=dev=0 vulnerabilities; build=0",
+        "laneF": {
+          "requestedModel": "gpt-5.6-sol",
+          "workerStatus": "FAILED_NO_START",
+          "workerFailure": "WinError 10061 - target machine actively refused the connection; no agent was created",
+          "fallbackOwner": "root",
+          "fallbackVerdict": "PASS",
+          "boundarySequence": "eight real production action/route harnesses normal/inverted/restored=0/non-zero/0",
+          "assertionsPerNormalPass": 575,
+          "assertionBreakdown": "117+22+32+34+127+183+60; HTTP boundary uncounted",
+          "httpBoundary": "PASS with portCleared=true (uncounted boundary)",
+          "sharedRegressions": "seven of seven exit 0",
+          "unresolvedCriticalHigh": 0
+        },
+        "activePackages": {}
+      },
       "remediationLanes": {
         "laneA": {
           "status": "integrated_green",
@@ -355,27 +419,37 @@
           "postMergeGates": "tsc=0, targeted eslint=0"
         },
         "laneD": {
-          "status": "running",
+          "status": "integrated_green",
           "job": "66e1aefb",
+          "retryJob": "d61fc50c",
           "branch": "security/lane-d-conversations",
-          "requestedModel": "gpt-5.6-sol"
+          "requestedModel": "gpt-5.6-sol",
+          "observedModel": "gpt-5.6-sol",
+          "commit": "49f503a37d062a0562450c32b87f80789654fbf4",
+          "evidenceFixCommit": "a53d3cb5cd60c13dc1386a0fc72726238ab99fa2",
+          "independentGates": "deterministic real route harness normal/inverted/restored=0/1/0 with 34 assertions; scope/secret/prisma validate+generate/tsc/targeted lint/five regressions/audit/build all passed",
+          "blocker": null,
+          "retryCount": 1,
+          "rootAuthorizedCorrection": "decoded HMAC signature byte 0 XOR 0x01, canonical base64url re-encode, decoded-byte inequality assertion; production verifier unchanged",
+          "rootVerdict": "ACCEPTED after direct-owner-authorized evidence correction and independent inspection",
+          "mergeCommits": ["4435da648752d5dadcbecab42d62632b19256eca", "05ead37ed39a7a926786419f4fc0e108d9a440b9"]
         },
         "laneE": {
-          "status": "blocked_after_retry",
+          "status": "integrated_green",
           "job": "bfb2dc03",
           "branch": "security/lane-e-health-regressions",
           "requestedModel": "gpt-5.6-terra",
           "observedModel": "gpt-5.6-terra",
           "commit": "9c7d998d416bf3a357c9270bf9fafdd4adcb9569",
           "independentGates": "scope/secret/prisma/tsc/lint/regressions/build passed; own harness normal/inverted/restored=1/1/1; unsuppressed normal run had one matcher-boundary failure and portCleared=true",
-          "blocker": "installed Clerk 6.39.6 /dashboard(.*) matcher gates /dashboardfoo; src/middleware.ts is outside Lane E ownership and needs a separate exact-path owner",
+          "blocker": null,
           "retryCount": 1,
           "retryJob": "b1d231e9",
           "retryModel": "gpt-5.6-terra",
           "retryCommit": "9c7d998d416bf3a357c9270bf9fafdd4adcb9569",
-          "rootVerdict": "REJECTED/BLOCKED after the single allowed retry; do not merge until segment-safe middleware is fixed and the harness restores to 0",
+          "rootVerdict": "ACCEPTED and integrated via the root-owned middleware/test-tooling resolution",
           "middlewareRemediation": {
-            "status": "rejected_after_retry",
+            "status": "integrated_after_root_resolution",
             "firstJob": "b8af7c1d",
             "firstVerdict": "FAILED_NO_DELIVERY - job left registry, no report written, promised worktree absent",
             "retryCount": 1,
@@ -388,7 +462,10 @@
             "exclusiveOwnedPath": "src/middleware.ts",
             "independentGates": "scope/secret/prisma/tsc/targeted lint/named regressions/build passed; HTTP harness normal/inverted/restored=1/1/1 with portCleared=true",
             "rootVerdict": "REJECTED - product matcher fix is scoped and compiles, but the owned Lane E harness hard-codes the known-defective old matcher and cannot establish mandatory 0/non-zero/0 evidence"
-          }
+          },
+          "resolution": "Root fixed shared checks tooling (ES2022 + DOM.Iterable), made middleware route patterns segment-safe and exported as the harness single source of truth; HTTP harness then passed 0/1/0.",
+          "mergeCommit": "b3afc2a",
+          "postMergeGates": "16 harnesses=0, tsc=0, targeted lint=0, build=0, port clear"
         }
       }
     },
@@ -503,12 +580,43 @@
     {
       "id": "P2-003",
       "title": "Business onboarding and Business OS UI connected to persisted APIs",
-      "status": "blocked_security_remediation_and_hard_stop",
-      "model": "claude-sonnet-5",
+      "status": "done",
+      "model": "root (claude-opus-5)",
       "dependencies": [
-        "P2-002"
+        "P2-002",
+        "P1-014"
       ],
-      "note": "Lane 1 is integrated, but lane 3 was not dispatched: the current onboarding action trusts caller-supplied identity. A separate accepted security remediation and a fresh green base are required; the 04:45 hard stop also forbids a new large package this cycle."
+      "base": "e91471f467fa7cb3ad7bb456e2e1e2bc4e0f6aea",
+      "branch": "feature/p2-003-business-os-ui-fresh",
+      "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-p2003-ui-fresh-wt",
+      "commit": "147b2d18dbb8bec9906b47139c47807fbf249fef",
+      "integrationCommit": "64ec987e1935c99460dc7b1261829bcaf39877b7",
+      "report": "docs/orchestration/P2_003_BUSINESS_OS_UI.md",
+      "note": "Implemented DIRECTLY BY ROOT from a fresh worktree at the verified e91471f base, after the originally dispatched worker and then the gateway both failed. NO worker independence is claimed for this task: root wrote the code, root ran every gate, and root performed the review. Canonical createProfile(data) with a server-derived actor only; the legacy createProfile(userId, data) compatibility form was removed rather than retained with an equality check. Profile + Workspace + OWNER Membership provisioned atomically in one transaction. The onboarding userId prop and caller claim were removed from both normal and QA onboarding. Added tenant-authorized GET /api/platform/tasks whose envelope is revalidated AFTER storage filtering rather than trusting substring matching as the tenant boundary. Business OS UI reads persisted workspaces, contacts, activities, tasks, Copilot runs, approvals and audit, and exposes ONLY server-owned recordAudit; notification/payment/publication blueprint actions are not presented as executable. Explicit loading/empty/401/403/dependency-error wording; no sample operational data. businessOs remains explicit-opt-in and is not granted by caller-supplied onboarding config.",
+      "gates": {
+        "prismaValidate": 0,
+        "prismaGenerate": 0,
+        "tsc": 0,
+        "targetedLint": "0 errors, 1 inherited <img> warning",
+        "businessOsSurfaceRenderA11y": 0,
+        "executableCopilotRuntime": "0/1/0",
+        "checkActionsAuthz": "0/1/0, 115 assertions",
+        "checkPersistedAdapters": "0/1/0, 33 assertions",
+        "checkBusinessOsP2E2E": "0/1/0, 33 assertions, externalCalls=0, ten tracked row categories roll back to zero",
+        "nonHttpSecurityBoundaries": "seven of seven each 0/1/0",
+        "httpBoundary": "0/1/0 with portCleared=true",
+        "sharedRegressions": "seven of seven exit 0",
+        "npmAuditOmitDev": "0 vulnerabilities",
+        "build": 0
+      },
+      "priorDispatchFailure": {
+        "job": "918886b6",
+        "requestedModel": "claude-sonnet-5",
+        "status": "FAILED_NO_DELIVERY",
+        "detail": "A root cycle dispatched this job before Lane D and Lane F were resolved. At terminal reconciliation the job was absent from the cron registry, no P2-003 worktree or report existed, and no matching worker process was running; therefore it delivered nothing and nothing was integrated. Retained as a truthful historical failure record.",
+        "staleWorktreeNotReused": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-p2003-ui-wt at b3afc2a1e6b2edd30b68d2d84378bfc98ec51f7c, left untouched"
+      },
+      "rootVerdict": "INTEGRATED GREEN by root cherry-pick at 64ec987, no conflicts, primary intentional dirty ledger/evidence state preserved. Root implemented and reviewed this package itself; this is explicitly NOT an independent worker verification."
     },
     {
       "id": "P2-004",
@@ -527,9 +635,9 @@
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-28 10:17 +05:30",
-    "activeWorkers": 1,
-    "kirocrewSessions": "Wave 3: lanes A, B and C integrated green; Lane D active as 66e1aefb; Lane E and its exclusive middleware remediation retry are rejected on mandatory 1/1/1 HTTP evidence.",
+    "observedAt": "2026-08-28 17:10 +05:30",
+    "activeWorkers": 0,
+    "kirocrewSessions": "No worker or cron job is active; cron_list returns 'No cron jobs.' and spawn_list returns 'No subagents running.' at the observed time. Catalog, course/profile, and import/library dispatches failed before starting; root completed and integrated all three packages serially. The pinned Lane F worker also failed before start; root fallback executed all real boundaries and closed P1-014 without claiming a worker ran. P2-003 was likewise implemented and reviewed by root directly, not by a worker.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
@@ -586,15 +694,14 @@
         "dirty": 1
       }
     ],
-    "supervisionMode": "root supervises inside its own turn with bounded polls; monitor_start cannot arm in this ACP CLI session and autonudge.json loops is empty",
-    "activeCronJobs": [
-      "66e1aefb"
-    ]
+    "supervisionMode": "P1-014 closed by root fallback after Lane F FAILED_NO_START; P2-003 integrated green at 64ec987 by root. Wave A (P1-006 restaurant reservations) is now READY and opens with an exclusive prisma/** schema owner.",
+    "activeCronJobs": []
   },
   "runtime": {
-    "publicTunnel": "DOWN, cloudflared process count 0 at 04:46 IST",
-    "localApp": "DOWN; ports 3000 and 3100 have 0 listeners at 04:46 IST",
-    "liveDatabase": "personalink untouched: 35 tables, 774 rows, 0 applied migrations, ProductPurchase 8"
+    "publicTunnel": "DOWN, cloudflared process count 0 at 17:10 IST",
+    "localApp": "DOWN; ports 3000 and 3100 have 0 listeners at 17:10 IST",
+    "liveDatabase": "personalink untouched and forbidden: 35 tables, 0 applied migrations, _prisma_migrations absent. Only personalink_phase0_rehearsal_20260826_210704 is authorized for rehearsal.",
+    "diskFreeGb": 42.8
   },
   "modelPolicy": {
     "root": {
