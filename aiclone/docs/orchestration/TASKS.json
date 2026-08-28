@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 09:10 +05:30",
+  "updatedAt": "2026-08-28 09:15 +05:30",
   "updatedBy": "wave 3 supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -321,10 +321,14 @@
       "externalReport": "C:\\Users\\shubh\\AppData\\Local\\Temp\\personalink-phase0\\wave2-reports\\LANE-4-AUTH-ADVERSARIAL.md",
       "remediationLanes": {
         "laneA": {
-          "status": "running",
+          "status": "accepted_pending_merge",
           "job": "1248c213",
           "branch": "security/lane-a-actions",
-          "requestedModel": "gpt-5.6-sol"
+          "requestedModel": "gpt-5.6-sol",
+          "observedModel": "gpt-5.6-sol",
+          "commit": "21f53a98d36c19df8de7aecb0c885fee1001e169",
+          "independentGates": "scope, secret scan, prisma validate, tsc, targeted eslint, executable harness 0/1/0, seven named regressions and build all passed",
+          "onboardingApi": "canonical createProfile(data); server-derived actor identity"
         },
         "laneB": {
           "status": "integrated_green",
@@ -492,9 +496,9 @@
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-28 09:10 +05:30",
+    "observedAt": "2026-08-28 09:15 +05:30",
     "activeWorkers": 4,
-    "kirocrewSessions": "Wave 3 security remediation: lane B integrated green; lanes A, C, D and E remain active and path-isolated.",
+    "kirocrewSessions": "Wave 3: lane B integrated green; lane A accepted pending serial merge; lanes C and E finished awaiting resolution; lane D remains active.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
