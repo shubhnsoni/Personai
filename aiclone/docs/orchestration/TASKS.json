@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 09:38 +05:30",
+  "updatedAt": "2026-08-28 10:17 +05:30",
   "updatedBy": "wave 3 supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -375,12 +375,19 @@
           "retryCommit": "9c7d998d416bf3a357c9270bf9fafdd4adcb9569",
           "rootVerdict": "REJECTED/BLOCKED after the single allowed retry; do not merge until segment-safe middleware is fixed and the harness restores to 0",
           "middlewareRemediation": {
-            "status": "running",
-            "job": "b8af7c1d",
+            "status": "rejected_after_retry",
+            "firstJob": "b8af7c1d",
+            "firstVerdict": "FAILED_NO_DELIVERY - job left registry, no report written, promised worktree absent",
+            "retryCount": 1,
+            "retryJob": "3637c5e5",
             "requestedModel": "gpt-5.6-sol",
+            "observedModel": "gpt-5.6-sol",
             "branch": "security/lane-e-middleware-boundary",
             "baseCommit": "9c7d998d416bf3a357c9270bf9fafdd4adcb9569",
-            "exclusiveOwnedPath": "src/middleware.ts"
+            "commit": "af9458e55e6f0638e68641fb619e2fca161608ac",
+            "exclusiveOwnedPath": "src/middleware.ts",
+            "independentGates": "scope/secret/prisma/tsc/targeted lint/named regressions/build passed; HTTP harness normal/inverted/restored=1/1/1 with portCleared=true",
+            "rootVerdict": "REJECTED - product matcher fix is scoped and compiles, but the owned Lane E harness hard-codes the known-defective old matcher and cannot establish mandatory 0/non-zero/0 evidence"
           }
         }
       }
@@ -520,9 +527,9 @@
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-28 09:28 +05:30",
-    "activeWorkers": 2,
-    "kirocrewSessions": "Wave 3: lanes A, B and C integrated green; Lane E retry 1/1 running as b1d231e9; Lane D remains active.",
+    "observedAt": "2026-08-28 10:17 +05:30",
+    "activeWorkers": 1,
+    "kirocrewSessions": "Wave 3: lanes A, B and C integrated green; Lane D active as 66e1aefb; Lane E and its exclusive middleware remediation retry are rejected on mandatory 1/1/1 HTTP evidence.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
@@ -581,8 +588,7 @@
     ],
     "supervisionMode": "root supervises inside its own turn with bounded polls; monitor_start cannot arm in this ACP CLI session and autonudge.json loops is empty",
     "activeCronJobs": [
-      "66e1aefb",
-      "b1d231e9"
+      "66e1aefb"
     ]
   },
   "runtime": {
