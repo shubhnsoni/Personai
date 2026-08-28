@@ -1,178 +1,425 @@
+import { createHash, createHmac, timingSafeEqual } from "node:crypto"
+import type { Prisma } from "@prisma/client"
 import OpenAI from "openai"
-import { cookies } from "next/headers"
 import { prisma } from "@/lib/prisma"
 import { vectorRetrieval, buildSystemPrompt, scopeDocuments } from "@/lib/rag"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { getMemberFromSession } from "@/lib/members"
 import { generateSuggestions } from "@/lib/suggestions"
 import { maybeSummarizeConversation, visitorKeyFrom } from "@/lib/memory"
-import { formatMoney } from "@/lib/pricing"
+import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
+import { createOwnershipFoundation, ownershipRefusalResponse } from "@/lib/security"
+import { getRequestCurrency } from "@/lib/request-currency"
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+const VISITOR_COOKIE = "pl_vid"
+const VISITOR_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
+const CAPABILITY_VERSION = 1
+export const CONVERSATION_CAPABILITY_TTL_SECONDS = 60 * 60 * 24
+const CAPABILITY_CONTEXT = "personai:conversation-capability:v1"
+
+const CONVERSATION_FORBIDDEN = Object.freeze({
+    code: "FORBIDDEN" as const,
+    status: 403 as const,
+    message: "Access denied",
 })
 
-export async function POST(req: Request) {
-    // Check if OpenAI is configured
-    if (!process.env.OPENAI_API_KEY) {
-        return new Response(
-            JSON.stringify({ error: "ai_not_configured", message: "AI chat is coming soon! The creator hasn't set up AI yet." }),
-            { status: 503, headers: { "Content-Type": "application/json" } }
-        )
-    }
+type ConversationDb = Prisma.TransactionClient
+type MemberIdentity = Awaited<ReturnType<typeof getMemberFromSession>>
+type StreamingCompletionInput = OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming
+type StreamingChunk = OpenAI.Chat.Completions.ChatCompletionChunk
 
-    // Rate limiting
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-               req.headers.get("x-real-ip") || "unknown"
-    const { allowed, remaining } = checkRateLimit(ip)
-    if (!allowed) {
-        return new Response("Too many requests. Please wait a moment before sending more messages.", {
-            status: 429,
-            headers: { "Retry-After": "60", "X-RateLimit-Remaining": "0" }
+type ChatRouteDependencies = Readonly<{
+    db: ConversationDb
+    resolveMember: () => Promise<MemberIdentity>
+    rateLimit: typeof checkRateLimit
+    retrieve: typeof vectorRetrieval
+    buildPrompt: typeof buildSystemPrompt
+    requestCurrency: () => Promise<DisplayCurrency>
+    createCompletion: (input: StreamingCompletionInput) => Promise<AsyncIterable<StreamingChunk>>
+    summarizeConversation: (conversationId: string) => Promise<unknown>
+    providerConfigured: () => boolean
+    capabilitySecret: () => string | null
+    now: () => number
+}>
+
+type CapabilityPayload = Readonly<{
+    v: number
+    c: string
+    p: string
+    i: string
+    e: number
+}>
+
+function opaqueId(value: unknown): string | null {
+    if (typeof value !== "string" || value.length === 0 || value.length > 191) return null
+    if (value.trim() !== value || /[\s\u0000-\u001f\u007f]/u.test(value)) return null
+    return value
+}
+
+function parseCookies(header: string | null): Map<string, string> {
+    const parsed = new Map<string, string>()
+    for (const part of (header || "").split(";")) {
+        const separator = part.indexOf("=")
+        if (separator < 1) continue
+        const name = part.slice(0, separator).trim()
+        const encoded = part.slice(separator + 1).trim()
+        try {
+            parsed.set(name, decodeURIComponent(encoded))
+        } catch {
+            // Malformed cookies are ignored and therefore fail closed.
+        }
+    }
+    return parsed
+}
+
+function serializeHttpOnlyCookie(name: string, value: string, maxAge: number, path = "/"): string {
+    const secure = process.env.NODE_ENV === "production" ? "; Secure" : ""
+    return `${name}=${encodeURIComponent(value)}; Path=${path}; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure}`
+}
+
+function capabilitySigningKey(secret: string): Buffer {
+    return createHash("sha256").update(CAPABILITY_CONTEXT).update("\0").update(secret).digest()
+}
+
+export function conversationCapabilityCookieName(profileId: string): string {
+    const scope = createHash("sha256").update(profileId).digest("hex").slice(0, 24)
+    return `pl_cc_${scope}`
+}
+
+export function issueConversationCapability(input: {
+    conversationId: string
+    profileId: string
+    visitorId: string
+    secret: string
+    nowMs?: number
+    ttlSeconds?: number
+}): string {
+    const nowMs = input.nowMs ?? Date.now()
+    const ttlSeconds = input.ttlSeconds ?? CONVERSATION_CAPABILITY_TTL_SECONDS
+    const payload: CapabilityPayload = {
+        v: CAPABILITY_VERSION,
+        c: input.conversationId,
+        p: input.profileId,
+        i: input.visitorId,
+        e: Math.floor(nowMs / 1000) + ttlSeconds,
+    }
+    const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")
+    const signature = createHmac("sha256", capabilitySigningKey(input.secret)).update(encoded).digest("base64url")
+    return `${encoded}.${signature}`
+}
+
+export function verifyConversationCapability(input: {
+    token: string
+    conversationId: string
+    profileId: string
+    visitorId: string
+    secret: string
+    nowMs?: number
+}): boolean {
+    if (!input.token || input.token.length > 2048) return false
+    const [encoded, suppliedSignature, extra] = input.token.split(".")
+    if (!encoded || !suppliedSignature || extra !== undefined) return false
+
+    const expectedSignature = createHmac("sha256", capabilitySigningKey(input.secret)).update(encoded).digest()
+    let supplied: Buffer
+    try {
+        supplied = Buffer.from(suppliedSignature, "base64url")
+    } catch {
+        return false
+    }
+    if (supplied.length !== expectedSignature.length || !timingSafeEqual(supplied, expectedSignature)) return false
+
+    let payload: CapabilityPayload
+    try {
+        payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as CapabilityPayload
+    } catch {
+        return false
+    }
+    const nowSeconds = Math.floor((input.nowMs ?? Date.now()) / 1000)
+    return payload.v === CAPABILITY_VERSION
+        && payload.c === input.conversationId
+        && payload.p === input.profileId
+        && payload.i === input.visitorId
+        && Number.isSafeInteger(payload.e)
+        && payload.e > nowSeconds
+}
+
+function productionCapabilitySecret(): string | null {
+    return process.env.CONVERSATION_CAPABILITY_SECRET
+        || process.env.CLERK_SECRET_KEY
+        || process.env.OPENAI_API_KEY
+        || null
+}
+
+const productionDependencies: ChatRouteDependencies = {
+    db: prisma as unknown as ConversationDb,
+    resolveMember: getMemberFromSession,
+    rateLimit: checkRateLimit,
+    retrieve: vectorRetrieval,
+    buildPrompt: buildSystemPrompt,
+    requestCurrency: getRequestCurrency,
+    createCompletion: async (input) => {
+        const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+        return client.chat.completions.create(input)
+    },
+    summarizeConversation: maybeSummarizeConversation,
+    providerConfigured: () => Boolean(process.env.OPENAI_API_KEY),
+    capabilitySecret: productionCapabilitySecret,
+    now: Date.now,
+}
+
+function conversationRefusal(): Response {
+    return ownershipRefusalResponse(CONVERSATION_FORBIDDEN)
+}
+
+export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> = {}) {
+    const dependencies: ChatRouteDependencies = { ...productionDependencies, ...overrides }
+
+    return async function handleChatPost(req: Request): Promise<Response> {
+        const {
+            db,
+            resolveMember,
+            rateLimit,
+            retrieve,
+            buildPrompt,
+            requestCurrency,
+            createCompletion,
+            summarizeConversation,
+            providerConfigured,
+            capabilitySecret,
+            now,
+        } = dependencies
+
+        const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+            || req.headers.get("x-real-ip")
+            || "unknown"
+        const { allowed } = rateLimit(ip)
+        if (!allowed) {
+            return new Response("Too many requests. Please wait a moment before sending more messages.", {
+                status: 429,
+                headers: { "Retry-After": "60", "X-RateLimit-Remaining": "0" },
+            })
+        }
+
+        let body: {
+            messages?: Array<{ role?: string; content?: string }>
+            profileId?: unknown
+            conversationId?: unknown
+            visitorId?: unknown
+        }
+        try {
+            body = await req.json()
+        } catch {
+            return new Response("Invalid request", { status: 400 })
+        }
+
+        const messages = Array.isArray(body.messages) ? body.messages : []
+        const profileId = opaqueId(body.profileId)
+        const existingConversationId = body.conversationId === null || body.conversationId === undefined
+            ? null
+            : opaqueId(body.conversationId)
+        const lastMessage = messages[messages.length - 1]
+        const query = typeof lastMessage?.content === "string" ? lastMessage.content.trim() : ""
+        if (!profileId || !query || (body.conversationId != null && !existingConversationId)) {
+            return new Response("Invalid request", { status: 400 })
+        }
+
+        const requestCookies = parseCookies(req.headers.get("cookie"))
+        const cookieVisitorId = opaqueId(requestCookies.get(VISITOR_COOKIE))
+        const bodyVisitorId = opaqueId(body.visitorId)
+        const member = await resolveMember().catch(() => null)
+
+        const profile = await db.profile.findUnique({
+            where: { id: profileId },
+            include: {
+                documents: true,
+                workExperiences: true,
+                projects: true,
+                serviceOfferings: { where: { isActive: true } },
+                digitalProducts: { where: { isActive: true } },
+                courses: {
+                    where: { isActive: true, isPublished: true },
+                    include: { modules: { include: { lessons: true } } },
+                },
+                events: { where: { isActive: true } },
+                communities: { where: { isActive: true } },
+                leadMagnets: { where: { isActive: true } },
+            },
         })
-    }
+        if (!profile) return new Response("Profile not found", { status: 404 })
 
-    const { messages, profileId, conversationId: existingConversationId, visitorId: bodyVisitorId } = await req.json()
-    const jar = await cookies()
-    const cookieVid = jar.get("pl_vid")?.value
-    const visitorId = cookieVid || bodyVisitorId || null
-    const member = await getMemberFromSession().catch(() => null)
+        let conversationId = existingConversationId
+        let visitorId = cookieVisitorId || bodyVisitorId || null
+        let liveMode = "AI"
 
-    const profile = await prisma.profile.findUnique({
-        where: { id: profileId },
-        include: { 
-            documents: true,
-            workExperiences: true,
-            projects: true,
-            serviceOfferings: {
-                where: { isActive: true }
-            },
-            digitalProducts: {
-                where: { isActive: true }
-            },
-            courses: {
-                where: { isActive: true, isPublished: true },
-                include: {
-                    modules: {
-                        include: { lessons: true }
-                    }
-                }
-            },
-            events: {
-                where: { isActive: true }
-            },
-            communities: {
-                where: { isActive: true }
-            },
-            leadMagnets: {
-                where: { isActive: true }
+        if (conversationId && member) {
+            const memberOwnership = createOwnershipFoundation({
+                resolve: async () => ({ id: member.id, profiles: [{ id: profile.id }] }),
+            })
+            const owned = await memberOwnership.requireOwnedResource({
+                resourceId: conversationId,
+                claimedProfileId: profileId,
+                findOwned: ({ resourceId, profile: ownedProfile, actor }) => db.conversation.findFirst({
+                    where: {
+                        id: resourceId,
+                        profileId: ownedProfile.id,
+                        memberId: actor.userId,
+                    },
+                }),
+            })
+            if (!owned.ok) return ownershipRefusalResponse(owned.refusal)
+            liveMode = owned.value.resource.mode
+            visitorId = owned.value.resource.visitorId
+        } else if (conversationId) {
+            const secret = capabilitySecret()
+            const token = requestCookies.get(conversationCapabilityCookieName(profileId)) || ""
+            if (!secret || !cookieVisitorId || !verifyConversationCapability({
+                token,
+                conversationId,
+                profileId,
+                visitorId: cookieVisitorId,
+                secret,
+                nowMs: now(),
+            })) {
+                return conversationRefusal()
+            }
+            const existing = await db.conversation.findFirst({
+                where: {
+                    id: conversationId,
+                    profileId,
+                    memberId: null,
+                    visitorId: cookieVisitorId,
+                },
+            })
+            if (!existing) return conversationRefusal()
+            liveMode = existing.mode
+            visitorId = existing.visitorId
+        }
+
+        if (!providerConfigured() || !capabilitySecret()) {
+            return new Response(
+                JSON.stringify({ error: "ai_not_configured", message: "AI chat is coming soon! The creator hasn't set up AI yet." }),
+                { status: 503, headers: { "Content-Type": "application/json" } },
+            )
+        }
+
+        const responseCookies: string[] = []
+        if (!conversationId) {
+            if (!member && !profile.isPublic) return conversationRefusal()
+            visitorId = member ? visitorId : (visitorId || crypto.randomUUID())
+            const ref = (requestCookies.get("pl_ref") || "").slice(0, 40)
+            const conversation = await db.conversation.create({
+                data: {
+                    profileId,
+                    visitorId: visitorId || null,
+                    memberId: member?.id || null,
+                    visitorName: member?.name || null,
+                    visitorEmail: member?.email || null,
+                    source: ref || "PROFILE_PAGE",
+                    leadStatus: "NEW",
+                },
+            })
+            await db.profileEvent.create({
+                data: {
+                    profileId,
+                    name: "chat_open",
+                    ref: ref || null,
+                    visitor: visitorId?.slice(0, 80) || null,
+                },
+            }).catch(() => null)
+            conversationId = conversation.id
+        }
+
+        if (!member) {
+            if (!visitorId) return conversationRefusal()
+            const secret = capabilitySecret()
+            if (!secret) return conversationRefusal()
+            const token = issueConversationCapability({
+                conversationId,
+                profileId,
+                visitorId,
+                secret,
+                nowMs: now(),
+            })
+            responseCookies.push(serializeHttpOnlyCookie(
+                conversationCapabilityCookieName(profileId),
+                token,
+                CONVERSATION_CAPABILITY_TTL_SECONDS,
+                "/api",
+            ))
+            if (!cookieVisitorId) {
+                responseCookies.push(serializeHttpOnlyCookie(
+                    VISITOR_COOKIE,
+                    visitorId,
+                    VISITOR_COOKIE_MAX_AGE_SECONDS,
+                ))
             }
         }
-    })
 
-    if (!profile) {
-        return new Response("Profile not found", { status: 404 })
-    }
+        if (!conversationId) return conversationRefusal()
+        const authorizedConversationId = conversationId
+        const authorizedProfileId = profileId
 
-    const profileData = {
-        displayName: profile.displayName,
-        headline: profile.headline,
-        bio: profile.bio,
-        roleTemplate: profile.roleTemplate,
-        primaryGoal: profile.primaryGoal,
-        serviceOfferings: profile.serviceOfferings,
-        workExperiences: profile.workExperiences,
-        projects: profile.projects,
-        digitalProducts: profile.digitalProducts,
-        whatsapp: profile.whatsapp,
-        upiId: profile.upiId,
-        courses: profile.courses,
-        events: profile.events,
-        communities: profile.communities,
-        leadMagnets: profile.leadMagnets
-    }
-
-    const lastMessage = messages[messages.length - 1]
-    const query = lastMessage.content
-
-    const visitorKey = visitorKeyFrom(member?.email, visitorId)
-    const contextDocs = await vectorRetrieval(query, scopeDocuments(profile.documents, visitorKey))
-    const { getRequestCurrency } = await import("@/lib/request-currency")
-    const currency = await getRequestCurrency()
-    const systemPrompt = buildSystemPrompt(profile, contextDocs, currency)
-
-    let conversationId = existingConversationId
-    let liveMode = "AI"
-
-    if (conversationId) {
-        const existing = await prisma.conversation.findUnique({ where: { id: conversationId } })
-        if (existing) liveMode = existing.mode
-    }
-
-    if (!conversationId) {
-        const ref = (jar.get("pl_ref")?.value || "").slice(0, 40)
-        const conversation = await prisma.conversation.create({
-            data: {
-                profileId,
-                visitorId: visitorId || null,
-                memberId: member?.id || null,
-                visitorName: member?.name || null,
-                visitorEmail: member?.email || null,
-                source: ref || "PROFILE_PAGE",
-                leadStatus: "NEW"
-            }
-        })
-        void prisma.profileEvent.create({
-            data: {
-                profileId,
-                name: "chat_open",
-                ref: ref || null,
-                visitor: visitorId?.slice(0, 80) || null,
-            },
-        }).catch(() => {})
-        conversationId = conversation.id
-    } else if (member?.id) {
-        await prisma.conversation.update({
-            where: { id: conversationId },
-            data: {
-                memberId: member.id,
-                visitorEmail: member.email,
-                visitorName: member.name || undefined,
-            },
-        }).catch(() => {})
-    }
-
-    await prisma.message.create({
-        data: {
-            conversationId,
-            senderType: "VISITOR",
-            text: query,
-            role: "user"
+        const profileData = {
+            displayName: profile.displayName,
+            headline: profile.headline,
+            bio: profile.bio,
+            roleTemplate: profile.roleTemplate,
+            primaryGoal: profile.primaryGoal,
+            serviceOfferings: profile.serviceOfferings,
+            workExperiences: profile.workExperiences,
+            projects: profile.projects,
+            digitalProducts: profile.digitalProducts,
+            whatsapp: profile.whatsapp,
+            upiId: profile.upiId,
+            courses: profile.courses,
+            events: profile.events,
+            communities: profile.communities,
+            leadMagnets: profile.leadMagnets,
         }
-    })
 
-    await prisma.conversation.update({
-        where: { id: conversationId },
-        data: { lastMessageAt: new Date() }
-    })
+        const visitorKey = visitorKeyFrom(member?.email, visitorId)
+        const contextDocs = await retrieve(query, scopeDocuments(profile.documents, visitorKey))
+        const currency = await requestCurrency()
+        const systemPrompt = buildPrompt(profile, contextDocs, currency)
 
-    if (liveMode === "LIVE" || liveMode === "LIVE_REQUESTED") {
-        const notice = liveMode === "LIVE"
-            ? "I'm with you now — give me a moment to reply."
-            : `${profile.displayName} has been notified. Hang tight.`
-        const encoder = new TextEncoder()
-        return new Response(encoder.encode(`0:${JSON.stringify(notice)}\n`), {
-            headers: {
+        await db.message.create({
+            data: {
+                conversationId: authorizedConversationId,
+                senderType: "VISITOR",
+                text: query,
+                role: "user",
+            },
+        })
+
+        await db.conversation.updateMany({
+            where: { id: authorizedConversationId, profileId: authorizedProfileId },
+            data: { lastMessageAt: new Date(now()) },
+        })
+
+        const responseHeaders = (extra: Record<string, string> = {}): Headers => {
+            const headers = new Headers({
                 "Content-Type": "text/plain; charset=utf-8",
                 "X-Vercel-AI-Data-Stream": "v1",
-                "X-Conversation-Id": conversationId,
-                "X-Chat-Mode": liveMode,
-            },
-        })
-    }
+                "X-Conversation-Id": authorizedConversationId,
+                ...extra,
+            })
+            for (const cookie of responseCookies) headers.append("Set-Cookie", cookie)
+            return headers
+        }
+
+        if (liveMode === "LIVE" || liveMode === "LIVE_REQUESTED") {
+            const notice = liveMode === "LIVE"
+                ? "I'm with you now — give me a moment to reply."
+                : `${profile.displayName} has been notified. Hang tight.`
+            const encoder = new TextEncoder()
+            return new Response(encoder.encode(`0:${JSON.stringify(notice)}\n`), {
+                headers: responseHeaders({ "X-Chat-Mode": liveMode }),
+            })
+        }
 
     const allTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         {
@@ -310,10 +557,10 @@ export async function POST(req: Request) {
             case "collectLead": {
                 const { name, email, company, budget } = args as { name: string; email: string; company?: string; budget?: string }
                 try {
-                    await prisma.visitorLead.create({
+                    await db.visitorLead.create({
                         data: {
-                            profileId,
-                            conversationId,
+                            profileId: authorizedProfileId,
+                            conversationId: authorizedConversationId,
                             name,
                             email,
                             company,
@@ -322,8 +569,8 @@ export async function POST(req: Request) {
                         }
                     })
 
-                    await prisma.conversation.update({
-                        where: { id: conversationId },
+                    await db.conversation.update({
+                        where: { id: authorizedConversationId, profileId: authorizedProfileId },
                         data: { 
                             visitorName: name,
                             visitorEmail: email,
@@ -412,7 +659,7 @@ export async function POST(req: Request) {
                     return `I don't have table bookings open yet. ${profileData.whatsapp ? "WhatsApp us and we'll seat you." : "Ask the restaurant directly."}`
                 }
                 try {
-                    const slots = await getAvailableSlots(profileId, date, tableService.durationMinutes, {
+                    const slots = await getAvailableSlots(authorizedProfileId, date, tableService.durationMinutes, {
                         partySize,
                         serviceId: tableService.id,
                     })
@@ -423,7 +670,7 @@ export async function POST(req: Request) {
                             : `No tables left on ${date} for ${partySize}. Try another day or WhatsApp us.`
                     }
                     await createBooking({
-                        profileId,
+                        profileId: authorizedProfileId,
                         serviceOfferingId: tableService.id,
                         startTime: `${date}T${time}:00`,
                         visitorName,
@@ -502,16 +749,16 @@ export async function POST(req: Request) {
 
     const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
         { role: "system", content: systemPrompt },
-        ...messages.map((m: { role: string; content: string }) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content
+        ...messages.map((m) => ({
+            role: m.role === "assistant" ? "assistant" as const : "user" as const,
+            content: m.content || "",
         }))
     ]
 
     const aiModel = profile.aiModel || "gpt-4o-mini"
 
     try {
-        const response = await openai.chat.completions.create({
+        const response = await createCompletion({
             model: aiModel,
             messages: openaiMessages,
             tools,
@@ -520,7 +767,7 @@ export async function POST(req: Request) {
 
         const encoder = new TextEncoder()
         let fullResponse = ""
-        let toolCalls: { id: string; name: string; arguments: string }[] = []
+        const toolCalls: { id: string; name: string; arguments: string }[] = []
 
         const stream = new ReadableStream({
             async start(controller) {
@@ -558,7 +805,7 @@ export async function POST(req: Request) {
                                     { role: "tool", tool_call_id: tc.id, content: toolResult }
                                 ]
 
-                                const followUpResponse = await openai.chat.completions.create({
+                                const followUpResponse = await createCompletion({
                                     model: aiModel,
                                     messages: followUpMessages,
                                     stream: true
@@ -576,9 +823,9 @@ export async function POST(req: Request) {
                     }
 
                     if (fullResponse) {
-                        await prisma.message.create({
+                        await db.message.create({
                             data: {
-                                conversationId,
+                                conversationId: authorizedConversationId,
                                 senderType: "AI",
                                 text: fullResponse,
                                 role: "assistant"
@@ -586,7 +833,7 @@ export async function POST(req: Request) {
                         })
                         const suggestions = generateSuggestions(fullResponse, profile.displayName)
                         controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions })}\n`))
-                        maybeSummarizeConversation(conversationId).catch(() => {})
+                        summarizeConversation(authorizedConversationId).catch(() => {})
                     }
 
                     controller.close()
@@ -598,14 +845,15 @@ export async function POST(req: Request) {
         })
 
         return new Response(stream, {
-            headers: {
-                "Content-Type": "text/plain; charset=utf-8",
-                "X-Vercel-AI-Data-Stream": "v1",
-                "X-Conversation-Id": conversationId
-            }
+            headers: responseHeaders()
         })
     } catch (error) {
         console.error("Chat API error:", error)
         return new Response("Failed to generate response", { status: 500 })
     }
 }
+
+
+}
+
+export const POST = createChatPostHandler()
