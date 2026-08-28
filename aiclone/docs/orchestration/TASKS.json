@@ -373,7 +373,15 @@
           "retryJob": "b1d231e9",
           "retryModel": "gpt-5.6-terra",
           "retryCommit": "9c7d998d416bf3a357c9270bf9fafdd4adcb9569",
-          "rootVerdict": "REJECTED/BLOCKED after the single allowed retry; do not merge until segment-safe middleware is fixed and the harness restores to 0"
+          "rootVerdict": "REJECTED/BLOCKED after the single allowed retry; do not merge until segment-safe middleware is fixed and the harness restores to 0",
+          "middlewareRemediation": {
+            "status": "running",
+            "job": "b8af7c1d",
+            "requestedModel": "gpt-5.6-sol",
+            "branch": "security/lane-e-middleware-boundary",
+            "baseCommit": "9c7d998d416bf3a357c9270bf9fafdd4adcb9569",
+            "exclusiveOwnedPath": "src/middleware.ts"
+          }
         }
       }
     },
