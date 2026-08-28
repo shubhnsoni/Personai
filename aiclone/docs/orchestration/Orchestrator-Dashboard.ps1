@@ -1,7 +1,6 @@
 param(
-  [int]$IntervalSeconds = 30,
   [string]$Baseline = 'a4d9fba',
-  [switch]$Once
+  [string]$OutputPath
 )
 
 # Single truthful orchestration dashboard.
@@ -17,7 +16,8 @@ $ErrorActionPreference = 'Continue'
 $Here = $PSScriptRoot
 $Primary = (Resolve-Path (Join-Path $Here '..\..')).Path
 $Projects = (Resolve-Path (Join-Path $Primary '..\..')).Path
-$Out = Join-Path $Here 'LIVE_ACTIVITY.md'
+$DefaultOut = Join-Path $Here 'LIVE_ACTIVITY.md'
+$Out = if ($OutputPath) { [System.IO.Path]::GetFullPath($OutputPath) } else { $DefaultOut }
 
 # role: PRIMARY | FROZEN_EVIDENCE | ACTIVE
 $Lanes = @(
@@ -39,7 +39,33 @@ function Trace([string]$phase) {
 }
 
 function Git($dir, [string[]]$gitArgs) {
-  try { return (& git -C $dir @gitArgs 2>$null | Out-String).Trim() } catch { return '' }
+  $process = $null
+  try {
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'git'
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.CreateNoWindow = $true
+    [void]$startInfo.ArgumentList.Add('-C')
+    [void]$startInfo.ArgumentList.Add($dir)
+    foreach ($gitArg in $gitArgs) { [void]$startInfo.ArgumentList.Add($gitArg) }
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    if (-not $process.Start()) { return '' }
+    if (-not $process.WaitForExit(3000)) {
+      $process.Kill()
+      $process.WaitForExit()
+      return 'timed out after 3s'
+    }
+
+    $stdout = $process.StandardOutput.ReadToEnd().Trim()
+    [void]$process.StandardError.ReadToEnd()
+    if ($process.ExitCode -ne 0) { return '' }
+    return $stdout
+  } catch { return '' }
+  finally { if ($process) { $process.Dispose() } }
 }
 
 function LaneRow($lane) {
@@ -119,9 +145,11 @@ function Write-Dashboard {
   Trace 'spawnlist:done'
 
   $lines = @(
-    '# KiroCrew Live Activity',
+    '# KiroCrew Orchestration Activity Snapshot',
     '',
     "Updated: $(NowStamp)",
+    'Mode: one-shot snapshot; this script does not start, schedule, or claim a running monitor.',
+    'A later manual invocation replaces this snapshot; no automatic next tick is promised.',
     "Baseline: $Baseline",
     '',
     'Measured from git, the process table, and the KiroCrew CLI. Lane state is never',
@@ -154,20 +182,20 @@ function Write-Dashboard {
   Trace 'tick:written'
 }
 
-if ($Once) {
+# Snapshot-only by design. ACP CLI cannot arm monitor_start here and no autonomous loop is
+# registered, so a perpetual local loop would falsely imply durable orchestration. Invoke this
+# command manually when a fresh measurement is needed; it exits after one completed write.
+$dashboardMutex = [System.Threading.Mutex]::new($false, 'Local\PersonaAI.OrchestratorDashboard')
+$hasWriterLock = $false
+try {
+  $hasWriterLock = $dashboardMutex.WaitOne(0)
+  if (-not $hasWriterLock) {
+    throw 'Another Orchestrator-Dashboard snapshot is already collecting; no output was written.'
+  }
   Write-Dashboard
-  Write-Host "Dashboard written: $Out"
-  return
+  Write-Host "Dashboard snapshot written: $Out"
+} finally {
+  if ($hasWriterLock) { [void]$dashboardMutex.ReleaseMutex() }
+  $dashboardMutex.Dispose()
 }
-
-# Loop mode. Run this in a visible console, not as a detached hidden process: when it is
-# launched hidden from a shell that then exits, git invocations inside it have been observed
-# to stall for ~45s and return nothing, which starves the loop. `-Once` from an interactive
-# shell is the reliable path.
-Write-Host "Orchestrator dashboard running. Output: $Out"
-Write-Host 'Ctrl+C to stop.'
-while ($true) {
-  Write-Dashboard
-  Write-Host "[$(NowStamp)] dashboard tick"
-  Start-Sleep -Seconds $IntervalSeconds
-}
+return
