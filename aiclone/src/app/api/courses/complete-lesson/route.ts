@@ -1,44 +1,144 @@
+import type { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import {
+    ownershipRefusalResponse,
+    requireAuthenticatedUser,
+    type OwnershipRefusal,
+} from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest) {
-    try {
-        const { enrollmentId, lessonId } = await request.json()
-        if (!enrollmentId || !lessonId) {
-            return NextResponse.json({ error: 'Missing enrollmentId or lessonId' }, { status: 400 })
-        }
+const ACCESS_DENIED: OwnershipRefusal = Object.freeze({
+    code: 'FORBIDDEN',
+    status: 403,
+    message: 'Access denied',
+})
 
-        const enrollment = await prisma.courseEnrollment.findUnique({
-            where: { id: enrollmentId },
-            include: { course: { include: { modules: { include: { lessons: true } } } } }
-        })
-        if (!enrollment || !['ACTIVE', 'COMPLETED'].includes(enrollment.status)) {
-            return NextResponse.json({ error: 'Invalid enrollment' }, { status: 404 })
-        }
+type CompletionDb = Pick<
+    Prisma.TransactionClient,
+    'user' | 'member' | 'courseEnrollment' | 'courseLesson' | 'lessonCompletion'
+>
 
-        // Create completion record
-        await prisma.lessonCompletion.upsert({
-            where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
-            create: { enrollmentId, lessonId },
-            update: {},
-        })
+type CompleteLessonDependencies = Readonly<{
+    requireAuthenticatedUser: typeof requireAuthenticatedUser
+    ownershipRefusalResponse: typeof ownershipRefusalResponse
+    withTransaction: <Value>(work: (db: CompletionDb) => Promise<Value>) => Promise<Value>
+}>
 
-        // Check if all lessons are completed
-        const totalLessons = enrollment.course.modules.reduce((sum, m) => sum + m.lessons.length, 0)
-        const completedCount = await prisma.lessonCompletion.count({ where: { enrollmentId } })
+const productionDependencies: CompleteLessonDependencies = {
+    requireAuthenticatedUser,
+    ownershipRefusalResponse,
+    withTransaction: (work) => prisma.$transaction((db) => work(db)),
+}
 
-        if (completedCount >= totalLessons && totalLessons > 0) {
-            await prisma.courseEnrollment.update({
-                where: { id: enrollmentId },
-                data: { status: 'COMPLETED', completedAt: new Date() },
+type CompletionResult = Readonly<{
+    completedCount: number
+    totalLessons: number
+}> | null
+
+export function createCompleteLessonPost(
+    dependencies: CompleteLessonDependencies = productionDependencies,
+) {
+    return async function completeLessonPost(request: NextRequest) {
+        try {
+            const authenticated = await dependencies.requireAuthenticatedUser()
+            if (!authenticated.ok) {
+                return dependencies.ownershipRefusalResponse(authenticated.refusal)
+            }
+
+            let body: unknown
+            try {
+                body = await request.json()
+            } catch {
+                return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+            }
+
+            const { enrollmentId, lessonId } = (body ?? {}) as Record<string, unknown>
+            if (typeof enrollmentId !== 'string' || typeof lessonId !== 'string') {
+                return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+            }
+
+            const result = await dependencies.withTransaction<CompletionResult>(async (db) => {
+                const account = await db.user.findUnique({
+                    where: { id: authenticated.value.userId },
+                    select: { clerkId: true, email: true },
+                })
+                if (!account) return null
+
+                const member = await db.member.findFirst({
+                    where: {
+                        OR: [
+                            { clerkId: account.clerkId },
+                            { email: account.email },
+                        ],
+                    },
+                    select: { id: true },
+                })
+                if (!member) return null
+
+                const enrollment = await db.courseEnrollment.findFirst({
+                    where: {
+                        id: enrollmentId,
+                        memberId: member.id,
+                        status: { in: ['ACTIVE', 'COMPLETED'] },
+                        course: {
+                            modules: {
+                                some: {
+                                    lessons: { some: { id: lessonId } },
+                                },
+                            },
+                        },
+                    },
+                    select: { id: true, courseId: true },
+                })
+                if (!enrollment) return null
+
+                await db.lessonCompletion.upsert({
+                    where: {
+                        enrollmentId_lessonId: {
+                            enrollmentId: enrollment.id,
+                            lessonId,
+                        },
+                    },
+                    create: { enrollmentId: enrollment.id, lessonId },
+                    update: {},
+                })
+
+                const courseLessons = await db.courseLesson.findMany({
+                    where: { module: { courseId: enrollment.courseId } },
+                    select: { id: true },
+                })
+                const totalLessons = courseLessons.length
+                const completedCount = await db.lessonCompletion.count({
+                    where: {
+                        enrollmentId: enrollment.id,
+                        lessonId: { in: courseLessons.map((lesson) => lesson.id) },
+                    },
+                })
+
+                if (totalLessons > 0 && completedCount >= totalLessons) {
+                    await db.courseEnrollment.updateMany({
+                        where: {
+                            id: enrollment.id,
+                            courseId: enrollment.courseId,
+                            memberId: member.id,
+                            status: { in: ['ACTIVE', 'COMPLETED'] },
+                        },
+                        data: { status: 'COMPLETED', completedAt: new Date() },
+                    })
+                }
+
+                return { completedCount, totalLessons }
             })
-        }
 
-        return NextResponse.json({ success: true, completedCount, totalLessons })
-    } catch (error) {
-        console.error('Lesson completion error:', error)
-        return NextResponse.json({ error: 'Failed to mark lesson complete' }, { status: 500 })
+            if (!result) return dependencies.ownershipRefusalResponse(ACCESS_DENIED)
+            return NextResponse.json({ success: true, ...result })
+        } catch (error) {
+            console.error('Lesson completion error:', error)
+            return NextResponse.json({ error: 'Failed to mark lesson complete' }, { status: 500 })
+        }
     }
 }
+
+export const POST = createCompleteLessonPost()
