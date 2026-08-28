@@ -187,3 +187,72 @@ reminders → B4 UI/customer API), Wave C cases/projects engine (C1–C3), Wave 
 engine (D1–D3), Wave E truthful vertical activation (E1–E4 after their engines are green, E5 retail
 stays `draft` while `commerce.inventory` is `partial`). Healthcare/clinics/hospitals remain
 blueprint-only. P1-007 live cutover is NOT executed.
+
+
+
+## Wave A — INTEGRATED 2026-08-29 at `79abb14`
+
+Queue is empty for Wave A. Nothing awaits integration. Nothing pushed; origin remains
+`4b386d1`.
+
+| Order | Package | Commit | Scope |
+|---|---|---|---|
+| 1 | A1 schema (exclusive `prisma/**`) | `d4cfe40` | `Reservation`, `ReservationEvent`, 3 enums, exclusion constraint, append-only trigger |
+| 2 | A2 engine | `1a306b6` | `src/lib/reservations/**` |
+| 3 | A3 API | `7456491` | `src/app/api/platform/reservations/**` |
+| 4 | A5 blueprint | `4972424` | capability maturity truthfulness |
+| 5 | A4 UI | `8da2294` | owner reservations panel |
+| 6 | A6 report | `4ff7ff4` | `WAVE_A_RESERVATIONS.md` |
+
+Merged `--no-ff` at `79abb14716000726276743b5a77098f349f10a0c`, zero conflicts, 20 files,
+all inside declared Wave A ownership. **Root implemented and reviewed every package; no
+worker independence is claimed.** A5 preceded A4 because it depends only on A2.
+
+Rejected: none.
+
+## Blocker status update
+
+- **Blocker 5 — HALF CLOSED.** `venueOrders.reservations` is now a real persisted model
+  related to `RestaurantTable`, with tenant/venue isolation, fail-closed capacity, overlap
+  refusal at the write boundary, guarded transitions and an append-only ledger.
+  `commerce.inventory` remains `planned` and is explicitly not claimed — it is still a
+  single nullable `stock` column. **Blocker 5 stays open for the inventory half.**
+- Blockers 1 (repo-wide lint) and the new FK-drift item below remain open.
+
+## New open items discovered during Wave A
+
+1. **Pre-existing `profileId` FK drift.** `prisma migrate diff` wants to drop the
+   `profileId` foreign keys on `ActivityEvent`, `Contact`, `ContactSourceLink`,
+   `WorkflowRun` and `Workspace`, because `schema.prisma` declares those columns with no
+   relation field while `20260827140000_phase0_foundations` created real FK constraints.
+   Wave A deliberately excluded those statements rather than strip referential integrity
+   from five existing tables inside a reservations migration. Needs its own decision:
+   either add the relation fields to `schema.prisma` or intentionally drop the FKs.
+2. **`check-order-stream` requires a running dev server.** It exits 1 with `fetch failed`
+   against `127.0.0.1:3000`. Confirmed pre-existing — it fails identically at the
+   pre-Wave-A source. Needs a documented precondition or an in-process transport stub so
+   it stops reading as a failure.
+3. **Reservations with history cannot be deleted** while the append-only trigger is armed,
+   because `Reservation` cascades onto `ReservationEvent`. Correct for an audit ledger, but
+   it means no delete path exists; if one is ever needed it requires an explicit archival
+   decision.
+
+## Next in queue — Wave B appointments engine, READY
+
+Base `79abb14`. Must **wrap** the existing `Booking`, `AvailabilitySchedule`,
+`CalendarOverride` and `ServiceOffering` models. Do not fork a parallel industry-specific
+appointment system.
+
+| Pkg | Owner paths | Depends on | Required proof |
+|---|---|---|---|
+| B1 | `prisma/**` (EXCLUSIVE) + schema harness | — | additive only; external backup; `assertDisposableTarget` before every command; apply/rollback/reapply on the disposable target; catalog drift zero |
+| B2 | `src/lib/appointments/**` availability + conflict | B1 | availability windows with overrides; conflict refusal proven under genuinely interleaved transactions; tenant isolation; idempotency; append-only events |
+| B3 | lifecycle, deposits, waitlist, reminders | B2 | guarded transitions incl. cancellation/no-show; **no real Stripe call and no real email/SMS**; harness asserts the provider was NOT invoked on refusal |
+| B4 | appointments UI + customer API | B3 | four principal classes; byte-identical foreign-vs-nonexistent; surface/render/a11y 0; explicit loading/empty/401/403/error wording |
+
+The Wave A row-lock-then-predicate pattern should be reused for B2 conflict prevention, and
+the same two-layer approach considered, since it is now proven in this codebase.
+
+Then Wave C cases/projects, Wave D content/cohorts, Wave E truthful vertical activation
+(retail stays `draft` while inventory is `partial`). Healthcare/clinics/hospitals remain
+blueprint-only. P1-007 live cutover is NOT executed.

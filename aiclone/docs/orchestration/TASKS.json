@@ -1,6 +1,6 @@
 {
-  "milestone": "Phase 2 delivery - P2-003 integrated, Wave A restaurant reservations opening",
-  "updatedAt": "2026-08-28 17:10 +05:30",
+  "milestone": "Wave A integrated - restaurant reservations live; Wave B appointments next",
+  "updatedAt": "2026-08-29 00:08 +05:30",
   "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -178,19 +178,66 @@
     {
       "id": "P1-006",
       "title": "Complete restaurant/cloud-kitchen venue-order vertical",
-      "status": "in_progress_wave_a",
-      "reason": "Restaurant paths are owner-reviewed. Phases 0 and 1 of the restaurant spec shipped in ea69595, 96ebf4b and e97edf4.",
-      "note": "Open items: venueOrders.reservations has no model related to RestaurantTable, commerce.inventory is one nullable column, and Cloudflare quick tunnels buffer SSE so the cursor fallback carries live updates on such hops.",
+      "status": "done",
+      "reason": "Restaurant paths are owner-reviewed. Phases 0 and 1 of the restaurant spec shipped in ea69595, 96ebf4b and e97edf4. Wave A completed the reservation gap.",
+      "note": "Remaining open items after Wave A: commerce.inventory is still one nullable stock column and is deliberately NOT claimed; Cloudflare quick tunnels buffer SSE so the cursor fallback carries live updates on such hops.",
       "waveA": {
         "opened": "2026-08-28 17:10 +05:30",
+        "integrated": "2026-08-28 23:05 +05:30",
         "base": "64ec987e1935c99460dc7b1261829bcaf39877b7",
         "branch": "feature/wave-a-restaurant-reservations",
         "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-wave-a-reservations-wt",
-        "scope": "Close the venueOrders.reservations gap named in INTEGRATION_QUEUE blocker 5 with a real Reservation model related to RestaurantTable, tenant+venue isolation, capacity and overlap rejection at the write boundary, guarded lifecycle transitions, idempotent create/mutate, an append-only ReservationEvent ledger, honest blueprint capability maturity, owner UI, and executable normal/inverted/restored evidence.",
-        "explicitlyOutOfScope": "commerce.inventory stays partial; it remains a single nullable stock column and no inventory claim is made. No live database migration or cutover.",
-        "tenantBridge": "Reservation is profileId-scoped to match RestaurantTable/Order/OrderCounter. Platform API authorization flows workspace membership -> Workspace.profileId (already @unique) -> must equal Reservation.profileId. This composes existing tenancy rather than inventing a second tenant key.",
-        "capacityConstraint": "RestaurantTable.seats is Int? (nullable). Reservations on a table with unconfigured seats are refused fail-closed rather than silently skipping capacity validation.",
-        "packages": ["A1 schema", "A2 domain engine", "A3 API boundary", "A4 owner UI", "A5 blueprint truthfulness", "A6 adversarial + restaurant regression"]
+        "mergeCommit": "79abb14716000726276743b5a77098f349f10a0c",
+        "report": "docs/orchestration/WAVE_A_RESERVATIONS.md",
+        "owner": "root (claude-opus-5)",
+        "workerIndependenceClaimed": false,
+        "workerProbe": "MCP cron_add (the only model-pinning dispatch) was not exposed in the session; CLI kirocrew cron add and spawn run accept no model argument, which the model policy forbids. The gateway itself WAS reachable, so this is NOT a WinError 10061 connection refusal and is not recorded as one. No job was created, so nothing needed cancelling. Root took serial ownership under the documented fallback.",
+        "commits": {
+          "A1_schema": "d4cfe40568f3ff74c0d52c8ef1db66bfeb3a3d0b",
+          "A2_engine": "1a306b6b49b644b94d2b35744f8f433ef2ac3d48",
+          "A3_api": "74564913b8d45e3c417ab6bb00e23797bc242558",
+          "A5_blueprint": "4972424dfad7c5ac7c1c21fc5e8ab3af881457ac",
+          "A4_ui": "8da2294acfb62b631c0535291d68a17c0af72a49",
+          "A6_report": "4ff7ff445bfd7f28f60a4bcf262a3c0ebe30234c"
+        },
+        "tenantBridge": "Reservation is profileId-scoped to match RestaurantTable/Order/OrderCounter. Platform API authorization flows workspace membership -> Workspace.profileId (already @unique) -> must equal Reservation.profileId. Existing tenancy composed; no second tenant key introduced.",
+        "capacityConstraint": "RestaurantTable.seats is Int? (nullable). Tables with unconfigured seats refuse reservations fail-closed rather than skipping capacity validation.",
+        "overlapPrevention": "Two layers, each verified independently. Primary: transactional SELECT FOR UPDATE on the parent RestaurantTable then a half-open overlap test. Defense-in-depth: partial Postgres exclusion constraint EXCLUDE USING gist (tableId WITH =, tsrange(startAt,endAt,'[)') WITH &&) WHERE status is non-terminal. btree_gist availability was probed before use. With the constraint temporarily dropped the row lock ALONE still produced exactly one winner, proving it is not redundant; the constraint was restored and re-asserted.",
+        "rehearsal": {
+          "target": "personalink_phase0_rehearsal_20260826_210704",
+          "livePersonalinkTargeted": false,
+          "freshBackup": "wave-a-pre-migration-2026-08-28T17-52-33-136Z.dump, 190590 bytes, sha256 e164414d55a57da9c0d033f7213b82f4099938f02d4b028e393bcfc876b69682",
+          "catalogBeforeApply": "56 tables / 606 columns / 537 constraints / 134 indexes / 41 enum labels / 4 triggers / 1 extension / 0 exclusion",
+          "catalogAfterApply": "58 / 637 / 559 / 142 / 54 / 6 / 2 / 1",
+          "rollbackVsBaseline": "byte-identical, raw sha256 c454c0ecd9638a56051784a394ba96db51bc015a8bf796f6cd24bdd28f8ad3c9",
+          "reapplyVsApply": "structurally identical, normalized sha256 85debc41da2de7d8617008f4d3009d410d831698ba8c131ce77a30fff2f55491; only Postgres OID-derived NOT NULL constraint names differ, which drop-and-recreate necessarily changes",
+          "guardProvenToRefuseLive": "personalink is a protected live database and is never a valid schema target"
+        },
+        "deliberateOmission": "prisma migrate diff also emitted five DropForeignKey statements against ActivityEvent, Contact, ContactSourceLink, WorkflowRun and Workspace profileId FKs. EXCLUDED on purpose: pre-existing drift between schema.prisma and 20260827140000_phase0_foundations. Shipping them would strip referential integrity from five existing tables. Reported, still open, NOT fixed here.",
+        "gates": {
+          "prismaValidate": 0,
+          "prismaGenerate": 0,
+          "tsc": 0,
+          "targetedLint": "0 errors, 0 warnings across all 20 changed paths",
+          "checkReservationSchemaInvariants": "0/1/0, 21 assertions",
+          "checkReservationAuthz": "0/1/0, 34 assertions",
+          "checkReservationRoutes": "0/1/0, 36 assertions",
+          "checkCapabilityContract": "0/1/0 (inversion control added; it previously had none)",
+          "noDbRegressions": "13 of 13 exit 0",
+          "dbRegressions": "schema-invariants, actions-authz, resource-authz, conversation-authz, persisted-adapters, business-os-p2-e2e, catalog/course-profile/import-library actions all 0",
+          "restaurantRegressions": "check-restaurant-phase0-behavior 0, check-restaurant-order-transaction 0",
+          "httpBoundary": "0 with portCleared=true",
+          "npmAuditOmitDev": "0 vulnerabilities",
+          "build": 0,
+          "secretScan": "0 hits",
+          "allowedPathAudit": "20/20 in scope, 0 forbidden"
+        },
+        "knownNonRegression": "check-order-stream exits 1 with 'fetch failed' against http://127.0.0.1:3000 because it requires a running dev server and ports are deliberately clear. Confirmed NOT a Wave A regression: it fails identically at the pre-Wave-A source in the primary worktree where no reservations code exists. Its in-process fan-out and subscriber-teardown assertions pass.",
+        "harnessCorrections": [
+          "check-capability-contract used venueOrders.reservations as the subject of its maturity-enforcement NEGATIVE test. Promoting reservations to available would have made that test pass for free, silently losing the safety property. Repointed at commerce.inventory, which is still genuinely planned.",
+          "check-capability-contract had NO inversion control and exited 0 with INVERT_ASSERTION=1 set. A hook was added over the maturity-enforcement assertion.",
+          "check-business-os-a11y covered only pre-existing UI, so the new panel would have been exercised only incidentally. Ten explicit assertions were added."
+        ]
       }
     },
     {
@@ -694,13 +741,14 @@
         "dirty": 1
       }
     ],
-    "supervisionMode": "P1-014 closed by root fallback after Lane F FAILED_NO_START; P2-003 integrated green at 64ec987 by root. Wave A (P1-006 restaurant reservations) is now READY and opens with an exclusive prisma/** schema owner.",
+    "supervisionMode": "P1-014 closed by root fallback. P2-003 integrated green at 64ec987. Wave A (P1-006 restaurant reservations) integrated green at 79abb14, root-serial, no worker independence claimed. Wave B appointments engine is the next READY package.",
     "activeCronJobs": []
   },
   "runtime": {
-    "publicTunnel": "DOWN, cloudflared process count 0 at 17:10 IST",
-    "localApp": "DOWN; ports 3000 and 3100 have 0 listeners at 17:10 IST",
-    "liveDatabase": "personalink untouched and forbidden: 35 tables, 0 applied migrations, _prisma_migrations absent. Only personalink_phase0_rehearsal_20260826_210704 is authorized for rehearsal.",
+    "publicTunnel": "DOWN, cloudflared process count 0",
+    "localApp": "DOWN; ports 3000 and 3100 have 0 listeners. No dev server was started for Wave A.",
+    "liveDatabase": "personalink untouched and forbidden. Only personalink_phase0_rehearsal_20260826_210704 was used, for Wave A apply/rollback/reapply rehearsal.",
+    "postgresService": "PostgreSQL 17 was already listening on 5432 before this cycle; the Windows service handle postgresql-x64-17 reports Stopped and could not be started without elevation, so the running instance was not started by this cycle and was left exactly as found.",
     "diskFreeGb": 42.8
   },
   "modelPolicy": {

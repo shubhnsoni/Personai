@@ -1235,3 +1235,175 @@ Two design facts were established by reading the schema rather than assumed:
 `commerce.inventory` stays `partial` and no inventory claim is made — it remains a single nullable
 `stock` column. No live database migration or cutover; only
 `personalink_phase0_rehearsal_20260826_210704` is authorized for rehearsal.
+
+
+
+## 2026-08-28 22:23 +05:30 — Wave A worker probe: NO MODEL-PINNING DISPATCH PATH; root takes serial ownership
+
+### The probe was run exactly once, and the result differs from the documented history
+Prior cycles recorded gateway *connection refusal* (`WinError 10061`, and
+`cannot reach gateway. Is \`kirocrew gateway\` running?`). That is **not** what happened here, and
+this entry does not reuse that label.
+
+Measured this cycle:
+
+| Path | Result |
+|---|---|
+| MCP `cron_add` — the only model-pinning dispatch tool | **not exposed in this session** |
+| MCP `cron_list` / `spawn_list` | worked earlier this same session, then became unavailable |
+| Gateway reachability | **reachable** — `kirocrew cron list` returns "No cron jobs.", exit 0 |
+| CLI `kirocrew cron add --help` | exists; **zero** model options (only `--every`, `--cron`, `--channel`, `--agent`, `--silent`, `--approval-mode`) |
+| CLI `kirocrew spawn run --help` | exists; **zero** model options (only `--async`) |
+
+So the gateway is up and the CLI works, but **no path capable of pinning a model is available**.
+The binding model policy states that every spawn must name a model and that `auto`, an omitted
+model, or an unidentified fallback is unacceptable. Dispatching `kirocrew cron add` would have
+meant an unnamed model, so it was not done.
+
+**No job was created.** Because the dispatch tool could not be invoked at all, there is no hollow
+job, no zero-turn tombstone, and nothing to cancel or remove. The cron and spawn registries were
+verified empty before and after the probe. `~/.kiro/crew/autonudge.json` is untouched, so no
+monitor is armed and none is claimed.
+
+### Consequence, recorded honestly
+Root takes safe serial ownership of every Wave A package under the documented fallback. **No
+worker independence is claimed for any part of Wave A**: root writes the code, root runs the
+gates, root performs the review. Where a genuinely independent reviewer is available it will be
+named as such; otherwise the review is attributed to root.
+
+The A1 brief was still written to `%TEMP%\personalink-phase0\wave-a-briefs\A1-SCHEMA.md` —
+deliberately outside the repository so no worker could ever commit its own brief — and root
+executes against that same brief so the scope contract is identical to what a worker would have
+received.
+
+### Tooling interruption, recorded because it affected delivery
+Between 17:10 and 22:23 the write and shell tool surface (`execute_pwsh`, `fs_write`,
+`str_replace`, `fs_append`) was withdrawn from this session, after the Phase 1 reconciliation
+commit `dc4a7f5` had landed and the Wave A worktree had been provisioned. During that window no
+mutation was possible, so Wave A implementation did not start. State was verified read-only and
+found clean and consistent: reconciliation committed, worktree prepared with real dependencies,
+zero reservation code written, no partial or inconsistent edit anywhere. Tools returned at 22:23
+and work resumed from that verified point.
+
+
+
+## 2026-08-29 00:08 +05:30 — WAVE A INTEGRATED GREEN at `79abb14`: restaurant reservations are real
+
+Six packages, all implemented, gated and reviewed **by root**. No worker independence is
+claimed anywhere in this wave; the probe result above explains why.
+
+| Package | Commit | Scope |
+|---|---|---|
+| A1 schema | `d4cfe40` | `prisma/**` exclusive, invariant harness |
+| A2 engine | `1a306b6` | `src/lib/reservations/**` |
+| A3 API | `7456491` | `src/app/api/platform/reservations/**` |
+| A5 blueprint | `4972424` | capability maturity, contract harness |
+| A4 UI | `8da2294` | reservations panel, shell mount, a11y harness |
+| A6 report | `4ff7ff4` | `docs/orchestration/WAVE_A_RESERVATIONS.md` |
+
+Merged `--no-ff` at `79abb14716000726276743b5a77098f349f10a0c`, zero conflicts. A5 landed
+before A4 because it depends only on A2. Full detail is in `WAVE_A_RESERVATIONS.md`.
+
+### What is now genuinely true that was not before
+`INTEGRATION_QUEUE.md` blocker 5 said `venueOrders.reservations` was a JSON blob on a
+generic `Booking` with no relation to `RestaurantTable`. It is now a real persisted model
+with tenant and venue isolation, fail-closed capacity, overlap refusal at the write
+boundary, guarded lifecycle transitions, idempotent creation, and an append-only ledger.
+An owner can view, create, hold, confirm, seat, complete, cancel and mark-no-show
+reservations from the Business OS console.
+
+**Blocker 5 is only half closed.** `commerce.inventory` is untouched and stays `planned`
+because it is still a single nullable `stock` column. Retail/social commerce therefore
+cannot honestly leave `draft`.
+
+### Three things were verified rather than assumed, and one of them nearly went unnoticed
+
+**Tenancy bridge.** The restaurant domain is `profileId`-scoped while `/api/platform/*` is
+`workspaceId`-scoped. `Workspace.profileId` was already `@unique`, so venue isolation is
+membership → `Workspace.profileId` → `Reservation.profileId`. No second tenant key was
+invented.
+
+**Capacity had to be fail-closed.** `RestaurantTable.seats` is `Int?`. A table with no
+seat count cannot have capacity validated, so it refuses reservations rather than skipping
+the check.
+
+**The row lock was nearly credited to the wrong layer.** The first concurrent test showed
+the loser failing at `INSERT`, meaning the exclusion constraint caught it and the
+application row lock had apparently done nothing. Rather than accept a green result whose
+code comments might be false, the constraint was temporarily dropped and the race re-run:
+the row lock **alone** still produced exactly one winner with an application-level
+conflict. The constraint was restored and its presence re-asserted. Both layers are real;
+which one fires depends on interleaving. Either way exactly one row persists and the
+caller gets a clean `CONFLICT`.
+
+A related mapping defect was found and fixed during that investigation: the engine only
+parsed SQLSTATE out of raw-query messages, so a genuine exclusion-constraint conflict
+raised through a Prisma Client method was mis-reported as an unexpected error. It now also
+reads Prisma `meta` and falls back to constraint identity.
+
+### Migration rehearsal — disposable target only, never live
+Fresh external `pg_dump` first (190590 bytes, sha256 `e164414d…9682`).
+`assertDisposableTarget` was called before every command and was proven to refuse live by
+name. `btree_gist` availability was probed before the exclusion constraint was written.
+
+| Step | tables | cols | constraints | indexes | enum labels | triggers | ext | exclusion |
+|---|---|---|---|---|---|---|---|---|
+| before | 56 | 606 | 537 | 134 | 41 | 4 | 1 | 0 |
+| apply | 58 | 637 | 559 | 142 | 54 | 6 | 2 | 1 |
+| rollback | 56 | 606 | 537 | 134 | 41 | 4 | 1 | 0 |
+| reapply | 58 | 637 | 559 | 142 | 54 | 6 | 2 | 1 |
+
+Rollback is **byte-identical** to baseline (raw sha256 `c454c0ec…`). Reapply is
+structurally identical to apply (normalized sha256 `85debc41…`); only Postgres
+OID-derived NOT NULL constraint names differ, which a drop-and-recreate necessarily
+changes. That normalization is stated rather than hidden, and it relaxes nothing else.
+
+**Five `DropForeignKey` statements were deliberately omitted** from the migration.
+`prisma migrate diff` wanted to drop the `profileId` FKs on `ActivityEvent`, `Contact`,
+`ContactSourceLink`, `WorkflowRun` and `Workspace`. That is pre-existing drift between
+`schema.prisma` and the phase0 migration; shipping it would strip referential integrity
+from five existing tables. **Reported, still open, not fixed inside a reservations
+migration.**
+
+### Combined gates on primary `79abb14`
+`prisma validate` 0, `prisma generate` 0, `tsc` 0, targeted `eslint` 0 errors and 0
+warnings across all 20 changed paths, 13 of 13 no-DB harnesses 0, the three new
+reservation harnesses **0/1/0** with 21/34/36 assertions, `check-capability-contract`
+**0/1/0**, `check-schema-invariants` / `check-actions-authz` / `check-resource-authz` /
+`check-conversation-authz` / `check-persisted-adapters` / `check-business-os-p2-e2e` /
+catalog / course-profile / import-library all 0, `check-restaurant-phase0-behavior` **0**
+and `check-restaurant-order-transaction` **0** so the shipped restaurant vertical is
+unbroken, HTTP boundary 0 with `portCleared=true`, `npm audit --omit=dev` 0
+vulnerabilities, `npm run build` 0 with all three reservation routes dynamic, secret scan
+0 hits, and an allowed-path audit showing 20 of 20 files in scope with zero forbidden
+paths.
+
+### `check-order-stream` exits 1 and it is NOT a Wave A regression
+It fails with `fetch failed` against `http://127.0.0.1:3000` because it requires a running
+dev server, and ports are deliberately clear. Its in-process assertions pass. This was
+confirmed rather than asserted: the same harness fails **identically** at the pre-Wave-A
+source in the primary worktree, where no reservations code exists at all. It needs a
+documented dev-server precondition or an in-process transport stub.
+
+### Harness corrections, including one that would have quietly weakened a safety property
+`check-capability-contract` used `venueOrders.reservations` as the subject of its
+maturity-enforcement negative test — "an active blueprint may not require a `planned`
+capability". Promoting reservations to `available` would have made that test **pass for
+free**, silently losing the property. It was repointed at `commerce.inventory`, which is
+still genuinely planned. Separately, that harness had **no inversion control at all** and
+exited 0 with `INVERT_ASSERTION=1` set; a hook was added, giving it 0/1/0 for the first
+time. `check-business-os-a11y` covered only pre-existing UI, so ten explicit assertions
+were added for the new panel.
+
+### Runtime and preservation
+No dev server was started. No tunnel, push, PR or deploy. PostgreSQL 17 was already
+listening on 5432 before this cycle — the Windows service handle reports `Stopped` and
+could not be started without elevation, so the running instance was **not** started by
+this cycle and was left exactly as found. Origin remains
+`4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. The six frozen evidence worktrees remain at
+`ea695956cfc8237bbbe32865723a2b8a80466db8` with dirty counts 4/3/4/1/0/1.
+`P1_014_ACTION_INVENTORY.md` and both `.codex-remote-attachments` files are unchanged.
+
+Next READY package: **Wave B**, the shared appointments engine, which must wrap the
+existing `Booking`, `AvailabilitySchedule`, `CalendarOverride` and `ServiceOffering`
+models rather than fork a parallel booking system.
