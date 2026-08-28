@@ -1,60 +1,90 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
 import { revalidatePath } from "next/cache"
 
-export async function addService(profileId: string, data: { name: string, description: string, price: number, duration: number, isRecurring?: boolean, packageSessions?: number, kind?: "SESSION" | "TABLE", covers?: number | null }) {
+type ServiceData = {
+    name: string
+    description: string
+    price: number
+    duration: number
+    isRecurring?: boolean
+    packageSessions?: number
+    kind?: "SESSION" | "TABLE"
+    covers?: number | null
+}
+
+function serviceWrite(data: ServiceData, preserveKind = false) {
     const priceCents = Math.round((Number.isFinite(data.price) ? data.price : 0) * 100)
-    const kind = data.kind === "TABLE" ? "TABLE" : "SESSION"
+    const kind = data.kind === "TABLE" ? "TABLE" : preserveKind && data.kind !== "SESSION" ? undefined : "SESSION"
+    return {
+        name: data.name,
+        description: data.description,
+        priceCents,
+        isFree: priceCents === 0,
+        durationMinutes: data.duration,
+        isRecurring: Boolean(data.isRecurring),
+        packageSessions: data.packageSessions && data.packageSessions > 0 ? data.packageSessions : 1,
+        ...(kind ? {
+            kind,
+            covers: kind === "TABLE"
+                ? (data.covers && data.covers > 0 ? data.covers : 20)
+                : data.covers ?? null,
+        } : {}),
+    }
+}
+
+export async function addService(profileId: string, data: ServiceData) {
+    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
     await prisma.serviceOffering.create({
         data: {
-            profileId,
-            name: data.name,
-            description: data.description,
-            priceCents,
-            isFree: priceCents === 0,
-            durationMinutes: data.duration,
+            profileId: profile.id,
+            ...serviceWrite(data),
             currency: "USD",
             isActive: true,
-            isRecurring: Boolean(data.isRecurring),
-            packageSessions: data.packageSessions && data.packageSessions > 0 ? data.packageSessions : 1,
-            kind,
-            covers: kind === "TABLE" ? (data.covers && data.covers > 0 ? data.covers : 20) : data.covers ?? null,
-        }
+        },
     })
     revalidatePath("/dashboard/services")
 }
 
-export async function updateService(serviceId: string, data: { name: string, description: string, price: number, duration: number, isRecurring?: boolean, packageSessions?: number, kind?: "SESSION" | "TABLE", covers?: number | null }) {
-    const priceCents = Math.round((Number.isFinite(data.price) ? data.price : 0) * 100)
-    const kind = data.kind === "TABLE" ? "TABLE" : data.kind === "SESSION" ? "SESSION" : undefined
-    await prisma.serviceOffering.update({
-        where: { id: serviceId },
-        data: {
-            name: data.name,
-            description: data.description,
-            priceCents,
-            isFree: priceCents === 0,
-            durationMinutes: data.duration,
-            isRecurring: Boolean(data.isRecurring),
-            packageSessions: data.packageSessions && data.packageSessions > 0 ? data.packageSessions : 1,
-            ...(kind ? { kind, covers: kind === "TABLE" ? (data.covers && data.covers > 0 ? data.covers : 20) : data.covers ?? null } : {}),
-        }
-    })
+export async function updateService(serviceId: string, data: ServiceData) {
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: serviceId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const updated = await prisma.serviceOffering.updateMany({
+                where: { id: resourceId, profileId: profile.id },
+                data: serviceWrite(data, true),
+            })
+            return updated.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/services")
 }
 
 export async function deleteService(serviceId: string) {
-    await prisma.serviceOffering.delete({
-        where: { id: serviceId }
-    })
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: serviceId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const deleted = await prisma.serviceOffering.deleteMany({
+                where: { id: resourceId, profileId: profile.id },
+            })
+            return deleted.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/services")
 }
 
 export async function setServiceActive(serviceId: string, isActive: boolean) {
-    await prisma.serviceOffering.update({
-        where: { id: serviceId },
-        data: { isActive },
-    })
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: serviceId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const updated = await prisma.serviceOffering.updateMany({
+                where: { id: resourceId, profileId: profile.id },
+                data: { isActive },
+            })
+            return updated.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/services")
 }

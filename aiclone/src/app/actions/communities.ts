@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
 import { revalidatePath } from "next/cache"
 
 export interface CommunityData {
@@ -13,42 +14,53 @@ export interface CommunityData {
     isActive: boolean
 }
 
+function communityWrite(data: CommunityData) {
+    return {
+        name: data.name,
+        description: data.description || null,
+        platform: data.platform,
+        inviteLink: data.inviteLink || null,
+        priceCents: Math.round(data.price * 100),
+        billingCycle: data.billingCycle,
+        isActive: data.isActive,
+    }
+}
+
 export async function createCommunity(profileId: string, data: CommunityData) {
+    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
     await prisma.community.create({
         data: {
-            profileId,
-            name: data.name,
-            description: data.description || null,
-            platform: data.platform,
-            inviteLink: data.inviteLink || null,
-            priceCents: Math.round(data.price * 100),
-            billingCycle: data.billingCycle,
-            isActive: data.isActive,
+            profileId: profile.id,
+            ...communityWrite(data),
             currency: "USD",
-        }
+        },
     })
     revalidatePath("/dashboard/community")
 }
 
 export async function updateCommunity(communityId: string, data: CommunityData) {
-    await prisma.community.update({
-        where: { id: communityId },
-        data: {
-            name: data.name,
-            description: data.description || null,
-            platform: data.platform,
-            inviteLink: data.inviteLink || null,
-            priceCents: Math.round(data.price * 100),
-            billingCycle: data.billingCycle,
-            isActive: data.isActive,
-        }
-    })
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: communityId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const updated = await prisma.community.updateMany({
+                where: { id: resourceId, profileId: profile.id },
+                data: communityWrite(data),
+            })
+            return updated.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/community")
 }
 
 export async function deleteCommunity(communityId: string) {
-    await prisma.community.delete({
-        where: { id: communityId }
-    })
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: communityId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const deleted = await prisma.community.deleteMany({
+                where: { id: resourceId, profileId: profile.id },
+            })
+            return deleted.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/community")
 }
