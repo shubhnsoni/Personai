@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 09:23 +05:30",
+  "updatedAt": "2026-08-28 09:27 +05:30",
   "updatedBy": "wave 3 supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -361,10 +361,15 @@
           "requestedModel": "gpt-5.6-sol"
         },
         "laneE": {
-          "status": "running",
+          "status": "rejected_retry_required",
           "job": "bfb2dc03",
           "branch": "security/lane-e-health-regressions",
-          "requestedModel": "gpt-5.6-terra"
+          "requestedModel": "gpt-5.6-terra",
+          "observedModel": "gpt-5.6-terra",
+          "commit": "d525b83345579679a3b80e016c5167fee685fe33",
+          "independentGates": "scope/secret/prisma/tsc/lint/regressions/build passed; own harness normal/inverted/restored=1/1/1",
+          "blocker": "harness does not self-load approved .env under documented command; with env inherited, installed Clerk /dashboard(.*) matcher gates /dashboardfoo; middleware is outside lane ownership",
+          "retryCount": 0
         }
       }
     },
@@ -503,9 +508,9 @@
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-28 09:23 +05:30",
+    "observedAt": "2026-08-28 09:27 +05:30",
     "activeWorkers": 4,
-    "kirocrewSessions": "Wave 3: lanes A, B and C integrated green; lane E finished but unresolved; lane D remains active.",
+    "kirocrewSessions": "Wave 3: lanes A, B and C integrated green; lane E rejected and awaiting its one narrow retry; lane D remains active.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
