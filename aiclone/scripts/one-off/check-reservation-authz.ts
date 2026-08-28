@@ -294,6 +294,45 @@ async function main() {
             rejectionCodes.length === 1 && rejectionCodes[0] === "CONFLICT",
             `codes=${rejectionCodes.join(",")} detail=${rejectionDetail.slice(0, 160)}`,
         )
+
+        // Which LAYER refused matters. Wave B discovered that this engine's
+        // application-level overlap check was inert: it used a raw query with JS Date
+        // parameters, and against a `timestamp without time zone` column Prisma binds a
+        // Date parameter as LOCAL wall-clock while writing rows in UTC components. On a
+        // UTC+05:30 host the predicate was silently false, so the Reservation_no_overlap
+        // exclusion constraint was doing all the work. The engine now uses Prisma's typed
+        // count, which is symmetric with how rows are written.
+        //
+        // A sequential (non-racing) overlap must therefore be caught by the APPLICATION.
+        let sequentialDetectedBy: unknown = null
+        const sequentialOverlap = await attempt(async () => {
+            try {
+                return await engine.create(
+                    ids.wsA,
+                    {
+                        tableId: ids.tableA,
+                        partySize: 2,
+                        startAt: at("2031-04-01T19:15:00Z"),
+                        endAt: at("2031-04-01T19:45:00Z"),
+                        guestName: "SeqOverlap",
+                    },
+                    actor,
+                )
+            } catch (e) {
+                if (e instanceof PersistenceError) sequentialDetectedBy = e.details?.detectedBy
+                throw e
+            }
+        })
+        check(
+            "a sequential overlapping reservation is refused",
+            !sequentialOverlap.ok && sequentialOverlap.code === "CONFLICT",
+            !sequentialOverlap.ok ? sequentialOverlap.message : "ACCEPTED",
+        )
+        check(
+            "the sequential overlap was detected by the APPLICATION, not only the database constraint",
+            sequentialDetectedBy === "application",
+            `detectedBy=${String(sequentialDetectedBy)}`,
+        )
         const raceRows = await prisma.reservation.count({
             where: { tableId: ids.tableA, startAt: { gte: at("2031-04-01T00:00:00Z"), lt: at("2031-04-02T00:00:00Z") } },
         })
