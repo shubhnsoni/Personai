@@ -10,7 +10,7 @@ resume aid, not a source of truth. Re-measure before trusting any line of it.
 | Fact | Value |
 |---|---|
 | Primary branch | `recovered/aug20-wt-pr-32` |
-| Primary HEAD | `9ed5449714cc9c9587733ec291d072703820a065` |
+| Primary HEAD | `1659f29eff96e4fff5c2d96cf9cf6898a43e7ea1` |
 | Ahead of origin | 91 |
 | Origin (MUST NOT CHANGE) | `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827` |
 | Wave A merge | `79abb14716000726276743b5a77098f349f10a0c` |
@@ -21,7 +21,11 @@ Integrated and green: P2-003 (`64ec987`), Wave A restaurant reservations (`79abb
 
 Wave A worktree `../personai-wave-a-reservations-wt` is clean at `4ff7ff4` with its own
 real `node_modules`. It can be reused for Wave B or a fresh worktree can be cut from
-`9ed5449`.
+`1659f29`.
+
+> Base correction, 2026-08-29 01:33 +05:30: this file was written immediately BEFORE its
+> own commit, so it originally recorded primary HEAD as `9ed5449`. The commit that added
+> this file made primary `1659f29`, which is the correct Wave B base. Corrected in place.
 
 ## Infrastructure reality — read before planning any dispatch
 
@@ -106,7 +110,7 @@ Resume with:
 ```powershell
 cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
 git worktree add -b feature/wave-b-appointments `
-  "C:\Users\shubh\Desktop\Projects\personal projects\personai-wave-b-appointments-wt" 9ed5449714cc9c9587733ec291d072703820a065
+  "C:\Users\shubh\Desktop\Projects\personal projects\personai-wave-b-appointments-wt" 1659f29eff96e4fff5c2d96cf9cf6898a43e7ea1
 cd "C:\Users\shubh\Desktop\Projects\personal projects\personai-wave-b-appointments-wt\aiclone"
 npm ci --no-audit --no-fund
 Copy-Item "C:\Users\shubh\Desktop\Projects\personal projects\personai\aiclone\.env" ".env"
