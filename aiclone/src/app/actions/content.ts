@@ -1,12 +1,14 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
 import { revalidatePath } from "next/cache"
 
 export async function addContent(profileId: string, data: { type: string, title: string, content: string }) {
+    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
     const created = await prisma.profileDocument.create({
         data: {
-            profileId,
+            profileId: profile.id,
             type: "TEXT",
             sourceType: data.type,
             title: data.title,
@@ -23,21 +25,28 @@ export async function addContent(profileId: string, data: { type: string, title:
 
 export async function updateContent(documentId: string, data: { title: string, content: string, sourceType?: string }) {
     const sourceType = data.sourceType
-    await prisma.profileDocument.update({
-        where: { id: documentId },
-        data: {
-            title: data.title,
-            rawText: data.content,
-            url: sourceType === "URL" ? data.content : undefined,
-        }
-    })
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: documentId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const updated = await prisma.profileDocument.updateMany({
+                where: { id: resourceId, profileId: profile.id },
+                data: {
+                    title: data.title,
+                    rawText: data.content,
+                    url: sourceType === "URL" ? data.content : undefined,
+                },
+            })
+            return updated.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/content")
     revalidatePath("/dashboard/profile")
 }
 
 export async function syncKnowledgeFromChats(profileId: string) {
+    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
     const conversations = await prisma.conversation.findMany({
-        where: { profileId },
+        where: { profileId: profile.id },
         orderBy: { lastMessageAt: "desc" },
         take: 12,
         include: {
@@ -60,7 +69,7 @@ export async function syncKnowledgeFromChats(profileId: string) {
     const title = `Chat sync · ${new Date().toLocaleDateString()}`
     const created = await prisma.profileDocument.create({
         data: {
-            profileId,
+            profileId: profile.id,
             type: "TEXT",
             sourceType: "CHAT_SUMMARY",
             title,
@@ -75,9 +84,15 @@ export async function syncKnowledgeFromChats(profileId: string) {
 }
 
 export async function deleteContent(documentId: string) {
-    await prisma.profileDocument.delete({
-        where: { id: documentId }
-    })
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: documentId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const deleted = await prisma.profileDocument.deleteMany({
+                where: { id: resourceId, profileId: profile.id },
+            })
+            return deleted.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/content")
     revalidatePath("/dashboard/profile")
 }
