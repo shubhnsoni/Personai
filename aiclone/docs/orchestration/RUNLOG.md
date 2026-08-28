@@ -856,3 +856,11 @@ other lanes' harnesses itself, so it starts once A-E are resolved.
 lock and the full playbook at `SUPERVISOR-WAVE3.md`. It verifies independently, integrates serially,
 then dispatches Lane F and finally P2-003 once the combined baseline is green. Its terminal condition is
 P2-003 integrated green or a proven security blocker.
+
+## 2026-08-28 09:06 +05:30 - Wave 3 Lane B ACCEPTED pending serial merge
+
+Lane B `security/lane-b-uploads`, job `8a1a79e1`, commit `3c720b74b6ec8b52aeba431908b9b346cdbf93d6`; requested and observed model `gpt-5.6-sol`.
+
+Root independently verified the four-file owned-path boundary, clean worktree, and zero secret-pattern matches. The harness imports and invokes both real route factories with controlled identity, persistence, limiter and provider dependencies; it is executable route-boundary evidence rather than source regex. Independent gates: Prisma validate 0, TypeScript 0, targeted ESLint 0, upload harness normal/inverted/restored **0/1/0**, `check-auth-authz` 0, `check-tenant-isolation` 0, `check-business-os-surface` 0, `check-business-os-render` 0, `check-ownership-foundation` 0, and production build 0. The provider remained stubbed. Anonymous and wrong-tenant paths caused no usage charge, write or compute; byte sniffing, bounded bodies, octet-stream refusal, safe generated filenames, fail-closed durable limiting, generic errors, and GLB/USDZ AR success were all exercised.
+
+Verdict: **ACCEPTED pending one-at-a-time `--no-ff` merge**. Lanes A, C, D and E remain active and were not touched.
