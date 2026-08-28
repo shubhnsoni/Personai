@@ -1002,3 +1002,94 @@ Dispatched the single narrow retry as job `3637c5e5` with requested model `gpt-5
 Execution lock held for the cycle. Lanes A, B and C were independently rechecked from their clean one-commit worktrees: exact owned scope, zero secret-pattern hits, Prisma validate 0, TypeScript 0, targeted ESLint 0, real action/route harnesses normal/inverted/restored 0/1/0, all named regressions 0 and production build 0. Their commits are already ancestors of primary through merge commits `4d24076`, `f69fa24` and `b9b2794`, so no duplicate merge was attempted. Lane D job `66e1aefb` remains active with uncommitted owned-path work and was not touched.
 
 Lane E remains rejected after its exhausted retry. The exclusive middleware retry job `3637c5e5` completed as commit `af9458e55e6f0638e68641fb619e2fca161608ac`; requested and observed model `gpt-5.6-sol`. Root independently verified clean exact `src/middleware.ts` scope, zero secret-pattern hits, Prisma validate 0, TypeScript 0, targeted ESLint 0, all named regressions 0 and production build 0. The mandatory HTTP harness was **1/1/1**, not 0/non-zero/0, with the same sole restored-normal failure (`installed Clerk matcher does not gate dashboard lookalikes`) and `portCleared=true`. The product matcher fix itself is segment-safe, but Lane E's owned harness separately hard-codes the known-defective old `/dashboard(.*)` matcher, so it cannot establish release evidence. The retry is **REJECTED** and unmerged; P1-014, Lane F and P2-003 remain blocked while Lane D continues.
+
+
+## 2026-08-28 11:25 +05:30 — ROOT breaks the lane E deadlock; real cause was shared test tooling
+
+### The deadlock was misdiagnosed three times, including by root's own supervisor
+Lane E was rejected twice and a middleware lane was dispatched twice, all on the belief that the
+`1/1/1` harness sequence meant the assertion *"installed Clerk matcher does not gate dashboard
+lookalikes"* was failing. It was not. `check-auth-http-regressions` **could not compile**:
+
+```
+check-auth-http-regressions.ts(43,46): error TS2339: Property 'entries' does not exist on type 'Headers'.
+```
+
+`scripts/tsconfig.checks.json` declared `lib: ["ES2020","DOM"]`, missing `DOM.Iterable`, which
+`Headers.entries()` requires. **A compile error exits 1 in normal, inverted and restored runs alike —
+which is precisely the 1/1/1 signature everyone kept reading as an assertion failure.** `tsc --noEmit`
+never caught it because the app tsconfig excludes `scripts/`, so the defect was invisible to every
+gate except actually executing the harness.
+
+No lane could have fixed this: `scripts/tsconfig.checks.json` is shared root-owned test tooling, and
+ownership boundaries meant lane E could not touch middleware while the middleware lane could not touch
+lane E's harness. The boundaries that kept the wave safe also made this specific class of defect
+unfixable from inside a lane. Root holding the lock and owning shared infra is the resolution path.
+
+Root fix, verified end to end:
+- `scripts/tsconfig.checks.json`: `target` and `lib` widened to **ES2022 + DOM + DOM.Iterable**.
+- `src/middleware.ts` now **exports `PROTECTED_ROUTE_PATTERNS`**, and the harness asserts against that
+  export instead of a hard-coded copy. The old harness hard-coded `["/dashboard(.*)"]` and then
+  asserted that pattern does not match `/dashboardfoo` — self-contradictory, so unpassable no matter
+  how middleware was fixed. Single source of truth removes the whole drift class.
+- All four protected prefixes are now segment-safe (`/dashboard`, `/dashboard/(.*)`, and the same for
+  `/onboarding`, `/admin`, `/qa`). Verified behaviour-preserving first: no lookalike top-level route
+  exists in `src/app`. Note the imprecision was fail-*closed* (it over-gated `/dashboardfoo`), so this
+  was correctness hygiene, not an open hole.
+
+Result: harness **0 / 1 / 0**, 16 harnesses all 0, build 0, port cleared. Merged at `b3afc2a`.
+
+**Bonus fix from the same root cause:** `check-restaurant-phase0-behavior` now exits **0**. Its
+`TS2550 replaceAll` failure had been recorded as a known pre-existing defect and written off as out of
+scope in `HANDOFF.md`; it was the same too-narrow `lib`. That entry in `HANDOFF.md` is now stale and
+should be corrected.
+
+### Combined baseline on primary `b3afc2a`
+`prisma validate`=0, `prisma generate`=0, `tsc`=0, `npm audit --omit=dev` = **0 vulnerabilities**,
+`npm run build`=0, targeted `eslint` on all lane-owned paths=0, and 14 no-DB harnesses plus
+`check-actions-authz`, `check-resource-authz` and `check-schema-invariants` (run against the authorized
+disposable target) all 0.
+
+Two clarifications worth recording so they are not re-flagged as regressions:
+- `check-auth-http-regressions`, `check-restaurant-phase0-behavior`, `check-actions-authz`,
+  `check-resource-authz` and `check-schema-invariants` **correctly exit 1 on primary**, because
+  primary's `.env` targets live `personalink` and their guards refuse it. That refusal is the feature.
+  They must be run with `DATABASE_URL` pointed at a disposable target.
+- A root `eslint` run reporting 1 was root's own scoping error: it passed the whole
+  `src/app/actions` directory, which includes `bookings.ts`, `courses.ts`, `import.ts` and `profile.ts`
+  — files no lane owns, carrying pre-existing errors from the accepted ~124-problem baseline. Verified
+  unchanged since `ac93e2c`. Scoped to genuinely owned paths, `eslint` is 0.
+
+Full-wave path audit: 22 files changed since `ac93e2c`, every one inside a declared lane's ownership.
+**No unowned action file, no `prisma/**`, no manifest, no `src/lib/rag*`, no `src/lib/auth-sync.ts`, no
+restaurant runtime and no `.kiro/**` was touched.**
+
+### Lane D — timed out, real cause found, one retry dispatched
+Lane D hit its 2h budget with **zero commits** and no report. Root ran its harness directly and killed
+it after 10 minutes with no output: **`check-conversation-authz.ts` hangs and never terminates**, which
+is why the lane never reached its gates or its commit. Its work is preserved uncommitted
+(`chat/route.ts`, `live/route.ts`, and the harness). Retry `d61fc50c` dispatched with the same model
+`gpt-5.6-sol` and a narrowed brief: bound the SSE read with an AbortController, stub every provider,
+close all handles, add a hard self-timeout, and prove termination before committing. Root also copied
+the fixed `tsconfig.checks.json` into its worktree. One retry only; if the harness still cannot
+terminate it must stop early and name the hang site rather than time out silently.
+
+### P2-003 dispatched
+Job `918886b6`, model `claude-sonnet-5`, branch `feature/p2-003-business-os-ui` from the green
+`b3afc2a`, isolated deps, disposable DB target. It consumes lane A's remediated
+`createProfile(data)` for server-derived identity and treats security, persistence, copilot and
+business-os libraries as read-only. Explicitly forbidden from chat/live (lane D is active there) and
+from every security test file. Hard requirement carried over from the earlier UI review: **no sample
+data presented as real.**
+
+### Disk pressure handled
+Free space had fallen to **4.6 GB**, which would have failed a Next build. Root reclaimed **11.5 GB**
+(now 16.3 GB) by deleting only regenerable, gitignored `node_modules` and `.next` from worktrees whose
+work is already merged. No worktree, `.env`, or frozen evidence lane was touched; all 6 evidence lanes
+remain at `ea69595` and 32 worktrees remain registered. Lane D and P2-003 dependencies were left intact.
+
+### Supervision note
+Root held the shared supervisor lock from 10:31 to 11:25 while doing this work, which by design made
+each supervisor cycle exit immediately — correct mutual exclusion, but it meant no autonomous progress
+during that window. The lock is now released and `wave3-supervisor` (`94f62025`) resumes ownership of
+verification and serial integration for lane D and P2-003.
