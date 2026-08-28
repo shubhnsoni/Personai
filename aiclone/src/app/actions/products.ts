@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { variantsToJson } from "@/lib/commerce"
 import { parseDiet } from "@/lib/menu"
-import { syncUser } from "@/lib/auth-sync"
+import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
 
 export interface ProductData {
     title: string
@@ -70,10 +70,11 @@ function productWrite(data: ProductData) {
 }
 
 export async function createProduct(profileId: string, data: ProductData) {
+    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
     const write = productWrite(data)
     const created = await prisma.digitalProduct.create({
         data: {
-            profileId,
+            profileId: profile.id,
             ...write,
             currency: write.currency || "USD",
             variantsJson: write.variantsJson ?? null,
@@ -84,28 +85,45 @@ export async function createProduct(profileId: string, data: ProductData) {
 }
 
 export async function updateProduct(productId: string, data: ProductData) {
-    await prisma.digitalProduct.update({
-        where: { id: productId },
-        data: productWrite(data),
-    })
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: productId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const updated = await prisma.digitalProduct.updateMany({
+                where: { id: resourceId, profileId: profile.id },
+                data: productWrite(data),
+            })
+            return updated.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/products")
 }
 
 export async function deleteProduct(productId: string) {
-    await prisma.digitalProduct.delete({
-        where: { id: productId },
-    })
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: productId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const deleted = await prisma.digitalProduct.deleteMany({
+                where: { id: resourceId, profileId: profile.id },
+            })
+            return deleted.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/products")
 }
 
 export async function setProductActive(productId: string, isActive: boolean) {
-    await prisma.digitalProduct.update({
-        where: { id: productId },
-        data: { isActive },
-    })
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: productId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const updated = await prisma.digitalProduct.updateMany({
+                where: { id: resourceId, profileId: profile.id },
+                data: { isActive },
+            })
+            return updated.count === 1 ? true : null
+        },
+    }))
     revalidatePath("/dashboard/products")
 }
-
 export async function placeManualOrder(input: {
     productId: string
     visitorName: string
@@ -205,35 +223,39 @@ export async function placeCartOrder(input: {
 }
 
 export async function confirmProductOrder(purchaseId: string) {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!user || !profile) throw new Error("Unauthorized")
-
-    await prisma.$transaction(async (tx) => {
-        const purchase = await tx.productPurchase.findUnique({
-            where: { id: purchaseId },
-            include: { product: true },
-        })
-        if (!purchase || purchase.product.profileId !== profile.id) throw new Error("Order not found")
-        if (purchase.status === "COMPLETED") return
-        if (purchase.status !== "PENDING") throw new Error(`Cannot confirm a ${purchase.status.toLowerCase()} purchase`)
-
-        if (purchase.product.stock != null && purchase.payMethod !== "COD") {
-            const stockUpdate = await tx.digitalProduct.updateMany({
-                where: { id: purchase.productId, stock: { gte: 1 } },
-                data: { stock: { decrement: 1 } },
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: purchaseId,
+        writeOwned: async ({ resourceId, profile }) => prisma.$transaction(async (tx) => {
+            const purchase = await tx.productPurchase.findFirst({
+                where: { id: resourceId, product: { profileId: profile.id } },
+                include: { product: true },
             })
-            if (stockUpdate.count !== 1) throw new Error("Product is sold out")
-        }
-        await tx.productPurchase.update({
-            where: { id: purchase.id },
-            data: { status: "COMPLETED", confirmedAt: new Date() },
-        })
-    })
+            if (!purchase) return null
+            if (purchase.status === "COMPLETED") return true
+            if (purchase.status !== "PENDING") throw new Error(`Cannot confirm a ${purchase.status.toLowerCase()} purchase`)
+
+            if (purchase.product.stock != null && purchase.payMethod !== "COD") {
+                const stockUpdate = await tx.digitalProduct.updateMany({
+                    where: { id: purchase.productId, profileId: profile.id, stock: { gte: 1 } },
+                    data: { stock: { decrement: 1 } },
+                })
+                if (stockUpdate.count !== 1) throw new Error("Product is sold out")
+            }
+            const purchaseUpdate = await tx.productPurchase.updateMany({
+                where: {
+                    id: purchase.id,
+                    productId: purchase.productId,
+                    status: "PENDING",
+                    product: { profileId: profile.id },
+                },
+                data: { status: "COMPLETED", confirmedAt: new Date() },
+            })
+            return purchaseUpdate.count === 1 ? true : null
+        }),
+    }))
     revalidatePath("/dashboard/orders")
     revalidatePath("/dashboard/money")
 }
-
 export async function placeTip(input: {
     profileId: string
     visitorName: string

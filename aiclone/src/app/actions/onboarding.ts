@@ -6,8 +6,9 @@ import { cookies } from "next/headers"
 import { extrasFromAddons, needById, type AddonId, type NeedId } from "@/lib/onboarding-needs"
 import { writeExtras } from "@/lib/surfaces"
 import { ACTIVE_PROFILE_COOKIE } from "@/lib/try-kits"
+import { requireAuthenticatedUser, unwrapOwnershipResult } from "@/lib/security"
 
-export async function createProfile(userId: string, data: {
+export interface CreateProfileData {
     displayName: string
     headline?: string
     bio?: string
@@ -22,7 +23,29 @@ export async function createProfile(userId: string, data: {
     imageUrl?: string
     chatAvatarMode?: string
     personalityConfig?: string
-}) {
+}
+
+export interface CreateProfileResult {
+    slug: string
+    next: string
+}
+
+export async function createProfile(
+    dataOrClaimedUserId: CreateProfileData | string,
+    legacyData?: CreateProfileData,
+): Promise<CreateProfileResult> {
+    const actor = unwrapOwnershipResult(await requireAuthenticatedUser())
+    const claimedUserId = typeof dataOrClaimedUserId === "string" ? dataOrClaimedUserId : undefined
+    const data = typeof dataOrClaimedUserId === "string" ? legacyData : dataOrClaimedUserId
+
+    if (!data) throw new TypeError("Profile data is required")
+    if (claimedUserId !== undefined && claimedUserId !== actor.userId) {
+        unwrapOwnershipResult({
+            ok: false,
+            refusal: { code: "FORBIDDEN", status: 403, message: "Access denied" },
+        })
+    }
+
     let slug = data.displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
     if (!slug) slug = "page"
     const existing = await prisma.profile.findUnique({ where: { slug } })
@@ -31,7 +54,7 @@ export async function createProfile(userId: string, data: {
     const extras = extrasFromAddons(data.roleTemplate, data.addons || [])
     const profile = await prisma.profile.create({
         data: {
-            userId,
+            userId: actor.userId,
             slug,
             displayName: data.displayName,
             headline: data.headline,
