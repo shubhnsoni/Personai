@@ -30,113 +30,131 @@ export interface CreateProfileResult {
     next: string
 }
 
-export async function createProfile(
-    dataOrClaimedUserId: CreateProfileData | string,
-    legacyData?: CreateProfileData,
-): Promise<CreateProfileResult> {
+async function availableBusinessSlug(displayName: string): Promise<string> {
+    const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "page"
+    let candidate = base
+    let suffix = 2
+
+    while (true) {
+        const [profile, workspace] = await Promise.all([
+            prisma.profile.findUnique({ where: { slug: candidate }, select: { id: true } }),
+            prisma.workspace.findUnique({ where: { slug: candidate }, select: { id: true } }),
+        ])
+        if (!profile && !workspace) return candidate
+        candidate = `${base}-${suffix++}`
+    }
+}
+
+export async function createProfile(data: CreateProfileData): Promise<CreateProfileResult> {
     const actor = unwrapOwnershipResult(await requireAuthenticatedUser())
-    const claimedUserId = typeof dataOrClaimedUserId === "string" ? dataOrClaimedUserId : undefined
-    const data = typeof dataOrClaimedUserId === "string" ? legacyData : dataOrClaimedUserId
+    const displayName = data.displayName.trim()
+    if (!displayName) throw new TypeError("Profile display name is required")
 
-    if (!data) throw new TypeError("Profile data is required")
-    if (claimedUserId !== undefined && claimedUserId !== actor.userId) {
-        unwrapOwnershipResult({
-            ok: false,
-            refusal: { code: "FORBIDDEN", status: 403, message: "Access denied" },
-        })
-    }
-
-    let slug = data.displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
-    if (!slug) slug = "page"
-    const existing = await prisma.profile.findUnique({ where: { slug } })
-    if (existing) slug = `${slug}-${Math.floor(Math.random() * 1000)}`
-
+    const slug = await availableBusinessSlug(displayName)
     const extras = extrasFromAddons(data.roleTemplate, data.addons || [])
-    const profile = await prisma.profile.create({
-        data: {
-            userId: actor.userId,
-            slug,
-            displayName: data.displayName,
-            headline: data.headline,
-            bio: data.bio,
-            roleTemplate: data.roleTemplate,
-            primaryGoal: data.primaryGoal,
-            language: data.language || "en",
-            timezone: data.timezone || "UTC",
-            animationStyleId: data.animationStyleId || null,
-            isPublic: true,
-            imageUrl: data.imageUrl || null,
-            chatAvatarMode: data.chatAvatarMode === "IMAGE" && data.imageUrl ? "IMAGE" : "ORB",
-            personalityConfig: writeExtras(data.personalityConfig || null, extras),
-        },
+    const profile = await prisma.$transaction(async (tx) => {
+        const created = await tx.profile.create({
+            data: {
+                userId: actor.userId,
+                slug,
+                displayName,
+                headline: data.headline,
+                bio: data.bio,
+                roleTemplate: data.roleTemplate,
+                primaryGoal: data.primaryGoal,
+                language: data.language || "en",
+                timezone: data.timezone || "UTC",
+                animationStyleId: data.animationStyleId || null,
+                isPublic: true,
+                imageUrl: data.imageUrl || null,
+                chatAvatarMode: data.chatAvatarMode === "IMAGE" && data.imageUrl ? "IMAGE" : "ORB",
+                personalityConfig: writeExtras(data.personalityConfig || null, extras),
+            },
+        })
+        const workspace = await tx.workspace.create({
+            data: {
+                profileId: created.id,
+                name: created.displayName,
+                slug: created.slug,
+            },
+        })
+        await tx.membership.create({
+            data: {
+                workspaceId: workspace.id,
+                userId: actor.userId,
+                role: "OWNER",
+            },
+        })
+
+        if (data.roleTemplate === "RESTAURANT") {
+            await tx.serviceOffering.create({
+                data: {
+                    profileId: created.id,
+                    name: "Reserve a table",
+                    description: "Dine-in seating",
+                    priceCents: 0,
+                    isFree: true,
+                    durationMinutes: 90,
+                    currency: "USD",
+                    isActive: true,
+                    kind: "TABLE",
+                    covers: 20,
+                },
+            })
+            await tx.availabilitySchedule.createMany({
+                data: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+                    profileId: created.id,
+                    dayOfWeek,
+                    startTime: "12:00",
+                    endTime: "22:00",
+                    isEnabled: dayOfWeek !== 1,
+                })),
+            })
+        }
+
+        if (data.roleTemplate === "CONSULTANT" || data.roleTemplate === "CA" || data.roleTemplate === "COACH") {
+            await tx.serviceOffering.create({
+                data: {
+                    profileId: created.id,
+                    name: data.roleTemplate === "COACH" ? "Intro session" : "Fit call",
+                    description: "A first conversation to see if we should work together.",
+                    priceCents: 0,
+                    isFree: true,
+                    durationMinutes: 30,
+                    currency: "USD",
+                    isActive: true,
+                    kind: "SESSION",
+                },
+            })
+            await tx.availabilitySchedule.createMany({
+                data: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+                    profileId: created.id,
+                    dayOfWeek,
+                    startTime: "10:00",
+                    endTime: "18:00",
+                    isEnabled: dayOfWeek >= 1 && dayOfWeek <= 5,
+                })),
+            })
+        }
+
+        if (data.addons?.includes("services") && data.roleTemplate !== "CONSULTANT" && data.roleTemplate !== "CA" && data.roleTemplate !== "COACH" && data.roleTemplate !== "RESTAURANT") {
+            await tx.serviceOffering.create({
+                data: {
+                    profileId: created.id,
+                    name: "Fit call",
+                    description: "A first conversation to see if we should work together.",
+                    priceCents: 0,
+                    isFree: true,
+                    durationMinutes: 30,
+                    currency: "USD",
+                    isActive: true,
+                    kind: "SESSION",
+                },
+            })
+        }
+
+        return created
     })
-
-    if (data.roleTemplate === "RESTAURANT") {
-        await prisma.serviceOffering.create({
-            data: {
-                profileId: profile.id,
-                name: "Reserve a table",
-                description: "Dine-in seating",
-                priceCents: 0,
-                isFree: true,
-                durationMinutes: 90,
-                currency: "USD",
-                isActive: true,
-                kind: "TABLE",
-                covers: 20,
-            },
-        })
-        await prisma.availabilitySchedule.createMany({
-            data: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
-                profileId: profile.id,
-                dayOfWeek,
-                startTime: "12:00",
-                endTime: "22:00",
-                isEnabled: dayOfWeek !== 1,
-            })),
-        })
-    }
-
-    if (data.roleTemplate === "CONSULTANT" || data.roleTemplate === "CA" || data.roleTemplate === "COACH") {
-        await prisma.serviceOffering.create({
-            data: {
-                profileId: profile.id,
-                name: data.roleTemplate === "COACH" ? "Intro session" : "Fit call",
-                description: "A first conversation to see if we should work together.",
-                priceCents: 0,
-                isFree: true,
-                durationMinutes: 30,
-                currency: "USD",
-                isActive: true,
-                kind: "SESSION",
-            },
-        })
-        await prisma.availabilitySchedule.createMany({
-            data: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
-                profileId: profile.id,
-                dayOfWeek,
-                startTime: "10:00",
-                endTime: "18:00",
-                isEnabled: dayOfWeek >= 1 && dayOfWeek <= 5,
-            })),
-        })
-    }
-
-    if (data.addons?.includes("services") && data.roleTemplate !== "CONSULTANT" && data.roleTemplate !== "CA" && data.roleTemplate !== "COACH" && data.roleTemplate !== "RESTAURANT") {
-        await prisma.serviceOffering.create({
-            data: {
-                profileId: profile.id,
-                name: "Fit call",
-                description: "A first conversation to see if we should work together.",
-                priceCents: 0,
-                isFree: true,
-                durationMinutes: 30,
-                currency: "USD",
-                isActive: true,
-                kind: "SESSION",
-            },
-        })
-    }
 
     revalidatePath("/dashboard")
     if (data.activate) {

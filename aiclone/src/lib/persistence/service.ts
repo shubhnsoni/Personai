@@ -199,6 +199,14 @@ export class PlatformService {
         })
     }
 
+    tasks(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const workspaceId = requiredString(new URL(request.url).searchParams.get("workspaceId"), "workspaceId")
+            await this.dependencies.tenancy.requireAccess(workspaceId, "profile.read")
+            return success({ tasks: await this.dependencies.tasks.list(workspaceId) })
+        })
+    }
+
     enqueueTask(request: Request): Promise<Response> {
         return this.run(async () => {
             const input = await body(request)

@@ -263,15 +263,53 @@ async function runSuite(tx: Prisma.TransactionClient): Promise<void> {
     { id: linkIds.foreignDelete, profileId: foreignProfileId, code: `${prefix}-fd`, targetUrl: "https://example.invalid/fd" },
   ] })
 
-  await protectedCase({
-    name: "createProfile", ownerIdentity, central: true,
-    anonymous: () => onboarding.createProfile({ displayName: "Anonymous", roleTemplate: "CUSTOM", primaryGoal: "TEST" }),
-    foreign: () => onboarding.createProfile(foreignUserId, { displayName: "Foreign claim", roleTemplate: "CUSTOM", primaryGoal: "TEST" }),
-    missing: () => onboarding.createProfile(`${prefix}-missing-user`, { displayName: "Missing claim", roleTemplate: "CUSTOM", primaryGoal: "TEST" }),
-    owner: () => onboarding.createProfile({ displayName: `${prefix} safe profile`, roleTemplate: "CUSTOM", primaryGoal: "TEST" }),
-    state: () => tx.profile.count({ where: { userId: ownerUserId } }),
-    ownerSucceeded: async () => await tx.profile.count({ where: { userId: ownerUserId } }) === 2,
+  const onboardingSlug = `${prefix}-safe-profile`
+  const onboardingData = {
+    displayName: `${prefix} safe profile`,
+    roleTemplate: "CUSTOM",
+    primaryGoal: "TEST",
+  }
+  const onboardingState = async () => ({
+    profiles: await tx.profile.count({ where: { slug: onboardingSlug } }),
+    workspaces: await tx.workspace.count({ where: { slug: onboardingSlug } }),
+    memberships: await tx.membership.count({ where: { workspace: { slug: onboardingSlug } } }),
   })
+
+  identity.current = null
+  const onboardingAnonymousBefore = JSON.stringify({ db: await onboardingState(), effects: { ...effects } })
+  const onboardingAnonymousError = await captureError(() => onboarding.createProfile(onboardingData))
+  const onboardingAnonymousAfter = JSON.stringify({ db: await onboardingState(), effects: { ...effects } })
+  check("createProfile: anonymous is 401 UNAUTHORIZED",
+    errorShape(onboardingAnonymousError).includes('"code":"UNAUTHORIZED"')
+      && errorShape(onboardingAnonymousError).includes('"status":401'))
+  check("createProfile: anonymous refusal has no write or side effect",
+    onboardingAnonymousBefore === onboardingAnonymousAfter)
+
+  identity.current = ownerIdentity
+  check("createProfile: canonical action accepts one data argument", onboarding.createProfile.length === 1)
+  const onboardingResult = await onboarding.createProfile({
+    ...onboardingData,
+    userId: foreignUserId,
+  }) as { slug: string }
+  const onboardingProfile = await tx.profile.findUnique({ where: { slug: onboardingSlug } })
+  const onboardingWorkspace = await tx.workspace.findUnique({ where: { slug: onboardingSlug } })
+  const onboardingMembership = onboardingWorkspace
+    ? await tx.membership.findUnique({
+      where: { workspaceId_userId: { workspaceId: onboardingWorkspace.id, userId: ownerUserId } },
+    })
+    : null
+  check("createProfile: caller identity field cannot override the server actor",
+    onboardingProfile?.userId === ownerUserId
+      && await tx.profile.count({ where: { userId: foreignUserId } }) === 1,
+    true)
+  check("createProfile: profile and workspace are provisioned together",
+    onboardingResult.slug === onboardingSlug
+      && onboardingWorkspace?.profileId === onboardingProfile?.id
+      && onboardingWorkspace?.name === onboardingProfile?.displayName)
+  check("createProfile: server actor receives OWNER membership",
+    onboardingMembership?.role === "OWNER" && onboardingMembership.userId === ownerUserId)
+  coverage.push("createProfile")
+
   await protectedCase({
     name: "addContent", ownerIdentity,
     anonymous: () => content.addContent(ownerProfileId, { type: "TEXT", title: "anon", content: "anon" }),
@@ -443,8 +481,16 @@ async function main(): Promise<void> {
     if (!(error instanceof RollbackProof)) failures.push(`unexpected suite error: ${errorShape(error)}`)
   }
 
-  const restoredRows = await prisma.user.count({ where: { clerkId: { startsWith: prefix } } })
-  check("transaction rollback restored zero fixture rows", restoredRows === 0)
+  const restoredRows = {
+    users: await prisma.user.count({ where: { clerkId: { startsWith: prefix } } }),
+    profiles: await prisma.profile.count({ where: { slug: { startsWith: prefix } } }),
+    workspaces: await prisma.workspace.count({ where: { slug: { startsWith: prefix } } }),
+    memberships: await prisma.membership.count({
+      where: { workspace: { slug: { startsWith: prefix } } },
+    }),
+  }
+  check("transaction rollback restored zero fixture rows",
+    Object.values(restoredRows).every((count) => count === 0))
 
   console.log(JSON.stringify({
     result: failures.length === 0 ? "PASS" : "FAIL",

@@ -75,6 +75,25 @@ export class PersistedTaskQueue<TPayload = unknown> {
         private readonly backoff: BackoffPolicy = DEFAULT_BACKOFF,
     ) {}
 
+    async list(workspaceId: string): Promise<readonly TaskRecord<TPayload>[]> {
+        const workspaceMarker = `\"workspaceId\":${JSON.stringify(workspaceId)}`
+        const rows = await this.db.taskJob.findMany({
+            where: { payload: { contains: workspaceMarker } },
+            orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+            take: 200,
+        })
+        const tasks: TaskRecord<TPayload>[] = []
+        for (const row of rows) {
+            try {
+                const envelope = parseEnvelope<TPayload>(row.payload)
+                if (envelope.workspaceId === workspaceId) tasks.push(toTaskRecord<TPayload>(row))
+            } catch {
+                // Invalid legacy envelopes are omitted rather than leaking another tenant's row.
+            }
+        }
+        return Object.freeze(tasks)
+    }
+
     async enqueue(workspaceId: string, input: EnqueueInput<TPayload>): Promise<TaskRecord<TPayload>> {
         const idempotencyKey = input.idempotencyKey?.trim() || null
         const maxAttempts = input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS

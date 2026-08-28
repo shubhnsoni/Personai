@@ -53,9 +53,11 @@ function createFakePrisma(): { db: PrismaClient; counts: () => Record<string, nu
     const taskResult = (task: any) => task ? { ...task } : null
 
     function matchesTaskWhere(task: any, where: any): boolean {
+        if (!where) return true
         if (where.id !== undefined && task.id !== where.id) return false
         if (where.state !== undefined && task.state !== where.state) return false
         if (where.idempotencyKey !== undefined && task.idempotencyKey !== where.idempotencyKey) return false
+        if (where.payload?.contains !== undefined && !task.payload.includes(where.payload.contains)) return false
         if (where.nextAttemptAt?.lte && task.nextAttemptAt > where.nextAttemptAt.lte) return false
         if (where.leaseExpiresAt?.lte && (!task.leaseExpiresAt || task.leaseExpiresAt > where.leaseExpiresAt.lte)) return false
         return true
@@ -323,6 +325,31 @@ async function main(): Promise<void> {
         workspaceId: "workspace-b",
     })))).data.task
     check("task idempotency keys are tenant namespaced", taskB.id !== taskOne.id)
+
+    identity.value = "clerk-a"
+    const taskReadCounts = fake.counts()
+    response = await service.tasks(request("/tasks?workspaceId=workspace-a"))
+    const taskListBody = await responseBody(response)
+    check("task list returns only the authorized tenant", response.status === 200
+        && taskListBody.data.tasks.length === 1
+        && taskListBody.data.tasks[0].id === taskOne.id)
+    check("task list does not mutate queue state", JSON.stringify(fake.counts()) === JSON.stringify(taskReadCounts))
+
+    identity.value = null
+    response = await service.tasks(request("/tasks?workspaceId=workspace-a"))
+    check("anonymous task list is 401 with no data", response.status === 401
+        && (await responseBody(response)).data === undefined)
+    check("anonymous task refusal does not mutate queue state", JSON.stringify(fake.counts()) === JSON.stringify(taskReadCounts))
+
+    identity.value = "clerk-b"
+    response = await service.tasks(request("/tasks?workspaceId=workspace-a"))
+    const foreignTaskBody = await responseBody(response)
+    check("cross-tenant task list is forbidden", response.status === 403 && foreignTaskBody.data === undefined)
+    response = await service.tasks(request("/tasks?workspaceId=workspace-missing"))
+    const missingTaskBody = await responseBody(response)
+    check("foreign and missing task lists are indistinguishable",
+        response.status === 403 && JSON.stringify(foreignTaskBody) === JSON.stringify(missingTaskBody))
+    check("forbidden task reads do not mutate queue state", JSON.stringify(fake.counts()) === JSON.stringify(taskReadCounts))
 
     identity.value = "clerk-a"
     const leasedA = (await responseBody(await service.leaseTasks(request("/tasks/lease", "POST", {

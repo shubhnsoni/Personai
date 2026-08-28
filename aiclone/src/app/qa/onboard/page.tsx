@@ -21,7 +21,6 @@ export default async function QaOnboardPage({
     return (
         <OnboardingWizard
             presets={presets}
-            userId={user.id}
             suggestedName={picked.title}
             initialNeed={picked.id as NeedId}
             activate

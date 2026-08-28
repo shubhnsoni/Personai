@@ -15,5 +15,5 @@ export default async function OnboardingPage() {
 
     const presets = await prisma.welcomeAnimationPreset.findMany()
 
-    return <OnboardingWizard presets={presets} userId={user.id} suggestedName={user.name || ""} />
+    return <OnboardingWizard presets={presets} suggestedName={user.name || ""} />
 }

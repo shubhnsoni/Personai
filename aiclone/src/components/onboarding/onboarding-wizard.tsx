@@ -97,13 +97,11 @@ function findBlobPreset(presets: WelcomeAnimationPreset[]) {
 
 export function OnboardingWizard({
     presets,
-    userId,
     suggestedName,
     initialNeed,
     activate = false,
 }: {
     presets: WelcomeAnimationPreset[]
-    userId: string
     suggestedName?: string
     initialNeed?: NeedId
     activate?: boolean
@@ -188,7 +186,7 @@ export function OnboardingWizard({
         setBusy(true)
         try {
             const bag = blobOn ? writeOrbBag(orbBag || undefined, liveBlob) : orbBag
-            const result = await createProfile(userId, {
+            const result = await createProfile({
                 roleTemplate: picked.role,
                 primaryGoal: picked.goal,
                 displayName: name.trim(),

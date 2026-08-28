@@ -27,6 +27,7 @@ export default async function DashboardBusinessOsPage() {
 
     return (
         <BusinessOsShell
+            activeProfileId={profile.id}
             blueprints={listBusinessBlueprints()}
             engines={listBusinessEngines()}
         />
