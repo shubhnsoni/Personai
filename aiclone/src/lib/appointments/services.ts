@@ -350,6 +350,23 @@ export class AppointmentServices {
     // -----------------------------------------------------------------------
 
     /**
+     * Reads the deposit for one appointment, tenant-checked first. Returns null rather
+     * than 404 when no deposit exists, because "this booking takes no deposit" is a
+     * legitimate answer and not an error.
+     */
+    async getDeposit(workspaceId: string, bookingId: string): Promise<DepositRecord | null> {
+        const profileId = await this.requireVenue(workspaceId, "profile.read")
+        const id = bookingId.trim()
+        if (!id) throw new PersistenceError("BAD_REQUEST", "bookingId is required")
+        const booking = await this.db.booking.findUnique({ where: { id }, select: { profileId: true } })
+        if (!booking || booking.profileId !== profileId) {
+            throw new PersistenceError("FORBIDDEN", "Access denied")
+        }
+        const row = await this.db.appointmentDeposit.findUnique({ where: { bookingId: id } })
+        return row ? this.toDeposit(row) : null
+    }
+
+    /**
      * Records a deposit REQUIREMENT. It never contacts a provider: the row is created in
      * state REQUIRED and stays there until an explicitly injected provider authorizes it.
      */

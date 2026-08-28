@@ -226,6 +226,70 @@ check(
     /cannot change/.test(reservationsSrc),
 )
 
+// ---------------------------------------------------------------------------
+// Wave B — same explicit coverage for the appointments panel, so "a11y 0" says
+// something about it rather than only about the panels that came before.
+// ---------------------------------------------------------------------------
+const appointmentsSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/appointments-panel.tsx"),
+    "utf8",
+)
+check(
+    "appointments panel is mounted in the shell",
+    readFileSync(join(__dirname, "../../src/components/business-os/business-os-shell.tsx"), "utf8").includes(
+        "<AppointmentsPanel",
+    ),
+)
+check(
+    "appointments decorative icons are hidden from assistive tech",
+    /aria-hidden="true"/.test(appointmentsSrc),
+)
+check(
+    "appointments loading state announces itself politely and as busy",
+    appointmentsSrc.includes('aria-live="polite"') && appointmentsSrc.includes('aria-busy="true"'),
+)
+check(
+    "appointments loading state carries a screen-reader label",
+    appointmentsSrc.includes("sr-only") && /Loading appointments/.test(appointmentsSrc),
+)
+check(
+    "appointments panel distinguishes 401, 403, 409 and 400 for the owner",
+    /error\.status === 401/.test(appointmentsSrc) &&
+        /error\.status === 403/.test(appointmentsSrc) &&
+        /error\.status === 409/.test(appointmentsSrc) &&
+        /error\.status === 400/.test(appointmentsSrc),
+)
+check(
+    "appointments panel does not leak internals on a dependency failure",
+    /error\.status === 503/.test(appointmentsSrc) && /Nothing was changed/.test(appointmentsSrc),
+)
+check(
+    "appointments empty state states that no sample data is shown",
+    /No sample appointments are shown/.test(appointmentsSrc),
+)
+check(
+    "appointments panel contains no hardcoded sample booking",
+    !/visitorName:\s*"[A-Z]/.test(appointmentsSrc) && !/sampleAppointment/i.test(appointmentsSrc),
+)
+check(
+    "appointments panel explains why a terminal appointment has no actions",
+    /cannot change/.test(appointmentsSrc),
+)
+// The honesty requirement that matters most for money and messaging: the UI must not
+// imply a payment was taken or a message was sent when no provider is wired up.
+check(
+    "deposit copy states plainly that no payment has been taken while pending",
+    /no payment has been taken/i.test(appointmentsSrc),
+)
+check(
+    "reminder copy states plainly that a queued reminder is not yet sent",
+    /not yet sent/i.test(appointmentsSrc),
+)
+check(
+    "appointments panel surfaces waitlist status to the owner",
+    /Waitlist/.test(appointmentsSrc) && /Waitlisted for/.test(appointmentsSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
