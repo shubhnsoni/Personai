@@ -29,8 +29,6 @@ import {
  * so they cannot probe for existence.
  */
 
-const OCCUPYING_LIST = OCCUPYING_STATUSES.map((s) => `'${s}'`).join(", ")
-
 /** Postgres exclusion-constraint violation. */
 const EXCLUSION_VIOLATION = "23P01"
 /** Postgres unique-constraint violation. */
@@ -316,24 +314,36 @@ export class PersistedReservations {
                     )
                 }
 
-                // Overlap test, under the row lock. Half-open comparison matches the
-                // '[)' range bounds used by the exclusion constraint: a booking that
-                // ends exactly when this one starts does not conflict.
-                const clash = await tx.$queryRawUnsafe<Array<{ n: bigint }>>(
-                    `select count(*) as n
-                       from "Reservation"
-                      where "tableId" = $1
-                        and "status" in (${OCCUPYING_LIST})
-                        and "startAt" < $3
-                        and "endAt" > $2`,
-                    tableId,
-                    input.startAt,
-                    input.endAt,
-                )
-                if (Number(clash[0]?.n ?? 0) > 0) {
+                // Overlap test, under the row lock.
+                //
+                // CORRECTED IN WAVE B. This previously used a raw query with JS Date
+                // parameters, which is timezone-unsafe against a `timestamp without time
+                // zone` column: Prisma writes a Date by its UTC components but binds a
+                // Date PARAMETER in raw SQL as local wall-clock. On a UTC+05:30 host that
+                // made the predicate silently false, so this application-level check was
+                // not actually detecting overlaps and the Reservation_no_overlap exclusion
+                // constraint was doing all the work. The earlier drop-the-constraint
+                // experiment passed only because that probe used raw parameters for BOTH
+                // its insert and its select, making them self-consistent.
+                //
+                // Prisma's typed count is symmetric with how the rows are written. Half-open
+                // semantics still match the '[)' bounds of the exclusion constraint.
+                const clash = await tx.reservation.count({
+                    where: {
+                        tableId,
+                        status: { in: [...OCCUPYING_STATUSES] },
+                        startAt: { lt: input.endAt },
+                        endAt: { gt: input.startAt },
+                    },
+                })
+                if (clash > 0) {
                     throw new PersistenceError(
                         "CONFLICT",
                         "That table is already booked for an overlapping time",
+                        // Records which layer refused, so a harness can prove the
+                        // application check works rather than being masked by the
+                        // database constraint.
+                        { detectedBy: "application" },
                     )
                 }
 
@@ -384,7 +394,11 @@ export class PersistedReservations {
             // which can only happen if a writer bypassed this engine. Surface it as
             // the same conflict rather than a 500.
             if (code === EXCLUSION_VIOLATION) {
-                throw new PersistenceError("CONFLICT", "That table is already booked for an overlapping time")
+                throw new PersistenceError(
+                    "CONFLICT",
+                    "That table is already booked for an overlapping time",
+                    { detectedBy: "database" },
+                )
             }
             if (code === UNIQUE_VIOLATION) {
                 throw new PersistenceError("CONFLICT", "A reservation with this idempotency key already exists")

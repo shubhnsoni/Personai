@@ -97,6 +97,63 @@ enum ReservationEventActor {
   SYSTEM
 }
 
+/// Assignable appointment capacity: a person, a room, or a piece of equipment.
+/// One vocabulary for coaching, consulting, CA practice, salon, events, real estate
+/// and pet care, so no industry gets a forked booking system.
+enum AppointmentResourceKind {
+  STAFF
+  ROOM
+  EQUIPMENT
+}
+
+enum AppointmentWaitlistStatus {
+  WAITING
+  OFFERED
+  CONVERTED
+  EXPIRED
+  CANCELLED
+}
+
+/// Deposit intent state. NONE means the service does not take a deposit; it is
+/// modelled explicitly rather than by a null row so the absence is deliberate.
+enum AppointmentDepositState {
+  NONE
+  REQUIRED
+  AUTHORIZED
+  CAPTURED
+  REFUNDED
+  FORFEITED
+  FAILED
+}
+
+enum AppointmentReminderChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum AppointmentReminderState {
+  SCHEDULED
+  SENT
+  FAILED
+  CANCELLED
+  SUPPRESSED
+}
+
+enum AppointmentEventKind {
+  CREATED
+  STATUS
+  DEPOSIT
+  REMINDER
+  WAITLIST
+}
+
+enum AppointmentEventActor {
+  GUEST
+  STAFF
+  SYSTEM
+}
+
 model User {
   id                     String   @id @default(cuid())
   clerkId                String   @unique // Map to Clerk User ID
@@ -171,6 +228,11 @@ model Profile {
   profileImages     ProfileImage[]
   restaurantReviews OfferReview[]
   reservations      Reservation[]
+
+  appointmentResources AppointmentResource[]
+  appointmentWaitlist  AppointmentWaitlistEntry[]
+  appointmentDeposits  AppointmentDeposit[]
+  appointmentReminders AppointmentReminder[]
 }
 
 model ProfileEvent {
@@ -269,8 +331,22 @@ model ServiceOffering {
   updatedAt         DateTime @updatedAt
 
   bookings Booking[]
+  eligibleResources ServiceResource[]
+  waitlistEntries   AppointmentWaitlistEntry[]
 }
 
+/// Appointment booking.
+///
+/// EVOLVED, NOT REPLACED. Every column added by Wave B is nullable or defaulted, so
+/// the pre-existing rows and the pre-existing booking flow stay valid.
+///
+/// `status` is deliberately left as `String`. It is `text NOT NULL` in the live
+/// schema with real data in it, so converting it to a Prisma enum would be a
+/// breaking change rather than an additive one. The canonical vocabulary and the
+/// legal transitions live in src/lib/appointments/lifecycle.ts, which validates on
+/// the way in. A future migration may tighten the column once legacy values are
+/// audited; until then TypeScript is the single source of truth and the exclusion
+/// constraint below references the same literals.
 model Booking {
   id                String          @id @default(cuid())
   profileId         String
@@ -284,12 +360,159 @@ model Booking {
   serviceOffering   ServiceOffering @relation(fields: [serviceOfferingId], references: [id])
   startTime         DateTime
   endTime           DateTime
-  status            String          @default("PENDING_PAYMENT") // Enum
+  status            String          @default("PENDING_PAYMENT") // vocabulary owned by src/lib/appointments/lifecycle.ts
   paymentId         String?         @unique
   payment           Payment?        @relation(fields: [paymentId], references: [id])
   metadata          String? // Json
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  // ---- Wave B additive appointment fields ----
+  resourceId     String?
+  resource       AppointmentResource? @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  locationId     String?
+  location       Location?            @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  idempotencyKey String?
+  partySize      Int                  @default(1)
+  holdExpiresAt  DateTime?
+  confirmedAt    DateTime?
+  checkedInAt    DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  noShowAt       DateTime?
+  cancelReason   String?
+
+  deposit         AppointmentDeposit?
+  reminders       AppointmentReminder[]
+  appointmentEvents AppointmentEvent[]
+  waitlistOffers  AppointmentWaitlistEntry[]
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, startTime])
+  @@index([profileId, status])
+  @@index([resourceId, startTime])
+}
+
+/// A person, room, or piece of equipment that an appointment can consume.
+model AppointmentResource {
+  id         String                  @id @default(cuid())
+  profileId  String
+  profile    Profile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  locationId String?
+  location   Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  name       String
+  kind       AppointmentResourceKind @default(STAFF)
+  /// Simultaneous appointments this resource can hold. NULL means unknown, which the
+  /// engine treats as fail-closed rather than unlimited.
+  capacity   Int?
+  isActive   Boolean                 @default(true)
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  bookings       Booking[]
+  services       ServiceResource[]
+  waitlistEntries AppointmentWaitlistEntry[]
+
+  @@unique([profileId, name])
+  @@index([profileId, isActive])
+}
+
+/// Which resources are eligible to deliver which service.
+model ServiceResource {
+  serviceOfferingId String
+  serviceOffering   ServiceOffering     @relation(fields: [serviceOfferingId], references: [id], onDelete: Cascade)
+  resourceId        String
+  resource          AppointmentResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@id([serviceOfferingId, resourceId])
+  @@index([resourceId])
+}
+
+model AppointmentWaitlistEntry {
+  id                String                    @id @default(cuid())
+  profileId         String
+  profile           Profile                   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  serviceOfferingId String
+  serviceOffering   ServiceOffering           @relation(fields: [serviceOfferingId], references: [id], onDelete: Cascade)
+  resourceId        String?
+  resource          AppointmentResource?      @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  requestedStart    DateTime
+  requestedEnd      DateTime
+  partySize         Int                       @default(1)
+  guestName         String
+  guestEmail        String?
+  guestPhone        String?
+  status            AppointmentWaitlistStatus @default(WAITING)
+  offeredBookingId  String?
+  offeredBooking    Booking?                  @relation(fields: [offeredBookingId], references: [id], onDelete: SetNull)
+  offerExpiresAt    DateTime?
+  idempotencyKey    String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status, requestedStart])
+  @@index([serviceOfferingId, status])
+}
+
+model AppointmentDeposit {
+  id             String                  @id @default(cuid())
+  bookingId      String                  @unique
+  booking        Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  profileId      String
+  profile        Profile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  amountCents    Int
+  currency       String                  @default("USD")
+  state          AppointmentDepositState @default(REQUIRED)
+  /// Opaque reference from the payment provider. No provider is called by this wave.
+  providerRef    String?
+  idempotencyKey String?
+  failureCode    String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, state])
+}
+
+model AppointmentReminder {
+  id             String                     @id @default(cuid())
+  bookingId      String
+  booking        Booking                    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  profileId      String
+  profile        Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  channel        AppointmentReminderChannel
+  sendAt         DateTime
+  state          AppointmentReminderState   @default(SCHEDULED)
+  attempts       Int                        @default(0)
+  lastError      String?
+  dispatchedAt   DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  /// One reminder per booking, channel and moment. This is what makes reminder
+  /// scheduling idempotent under replay.
+  @@unique([bookingId, channel, sendAt])
+  @@index([state, sendAt])
+  @@index([profileId, state])
+}
+
+/// Append-only appointment ledger. UPDATE and DELETE are refused by trigger, reusing
+/// reject_append_only_mutation() from 20260827140000_phase0_foundations.
+model AppointmentEvent {
+  id        String                @id @default(cuid())
+  bookingId String
+  booking   Booking               @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seq       BigInt                @default(autoincrement())
+  kind      AppointmentEventKind
+  from      String?
+  to        String
+  actor     AppointmentEventActor
+  actorId   String?
+  metadata  Json?
+  at        DateTime              @default(now())
+
+  @@index([bookingId, seq])
 }
 
 model Payment {
@@ -957,6 +1180,8 @@ model Location {
   updatedAt   DateTime  @updatedAt
 
   membershipLocations MembershipLocation[]
+  appointmentResources AppointmentResource[]
+  bookings             Booking[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
