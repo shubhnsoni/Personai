@@ -291,22 +291,24 @@ model WelcomeAnimationPreset {
 }
 
 model ProfileDocument {
-  id                String   @id @default(cuid())
-  profileId         String
-  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  type              String // Enum
-  title             String
-  sourceType        String // Enum
-  url               String?
-  filePath          String?
-  rawText           String?
-  embedding         Float[] // OpenAI embedding vector
-  embeddingMetadata String? // Json
-  visitorKey        String?
-  memberId          String?
-  conversationId    String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                  String                @id @default(cuid())
+  profileId           String
+  profile             Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  type                String // Enum
+  title               String
+  sourceType          String // Enum
+  url                 String?
+  filePath            String?
+  rawText             String?
+  embedding           Float[] // OpenAI embedding vector
+  embeddingMetadata   String? // Json
+  visitorKey          String?
+  memberId            String?
+  conversationId      String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  CaseDeliverable     CaseDeliverable[]
+  CaseDocumentRequest CaseDocumentRequest[]
 
   @@index([profileId, visitorKey])
 }
@@ -330,7 +332,7 @@ model ServiceOffering {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  bookings Booking[]
+  bookings          Booking[]
   eligibleResources ServiceResource[]
   waitlistEntries   AppointmentWaitlistEntry[]
 }
@@ -382,10 +384,10 @@ model Booking {
   noShowAt       DateTime?
   cancelReason   String?
 
-  deposit         AppointmentDeposit?
-  reminders       AppointmentReminder[]
+  deposit           AppointmentDeposit?
+  reminders         AppointmentReminder[]
   appointmentEvents AppointmentEvent[]
-  waitlistOffers  AppointmentWaitlistEntry[]
+  waitlistOffers    AppointmentWaitlistEntry[]
 
   @@unique([profileId, idempotencyKey])
   @@index([profileId, startTime])
@@ -409,8 +411,8 @@ model AppointmentResource {
   createdAt  DateTime                @default(now())
   updatedAt  DateTime                @updatedAt
 
-  bookings       Booking[]
-  services       ServiceResource[]
+  bookings        Booking[]
+  services        ServiceResource[]
   waitlistEntries AppointmentWaitlistEntry[]
 
   @@unique([profileId, name])
@@ -476,19 +478,19 @@ model AppointmentDeposit {
 }
 
 model AppointmentReminder {
-  id             String                     @id @default(cuid())
-  bookingId      String
-  booking        Booking                    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  profileId      String
-  profile        Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  channel        AppointmentReminderChannel
-  sendAt         DateTime
-  state          AppointmentReminderState   @default(SCHEDULED)
-  attempts       Int                        @default(0)
-  lastError      String?
-  dispatchedAt   DateTime?
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
+  id           String                     @id @default(cuid())
+  bookingId    String
+  booking      Booking                    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  profileId    String
+  profile      Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  channel      AppointmentReminderChannel
+  sendAt       DateTime
+  state        AppointmentReminderState   @default(SCHEDULED)
+  attempts     Int                        @default(0)
+  lastError    String?
+  dispatchedAt DateTime?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
 
   /// One reminder per booking, channel and moment. This is what makes reminder
   /// scheduling idempotent under replay.
@@ -1162,8 +1164,11 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  locations    Location[]
-  memberships  Membership[]
+  locations   Location[]
+  memberships Membership[]
+
+  caseIntakes  CaseIntake[]
+  caseProjects CaseProject[]
   contacts     Contact[]
   workflowRuns WorkflowRun[]
 
@@ -1180,8 +1185,10 @@ model Location {
   updatedAt   DateTime  @updatedAt
 
   membershipLocations MembershipLocation[]
-  appointmentResources AppointmentResource[]
+
+  caseProjects         CaseProject[]
   bookings             Booking[]
+  appointmentResources AppointmentResource[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -1225,8 +1232,10 @@ model Contact {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  sourceLinks ContactSourceLink[]
-  activities  ActivityEvent[]
+  caseIntakes  CaseIntake[]
+  caseProjects CaseProject[]
+  sourceLinks  ContactSourceLink[]
+  activities   ActivityEvent[]
 
   @@index([workspaceId, email])
   @@index([workspaceId, phone])
@@ -1267,18 +1276,19 @@ model ActivityEvent {
 }
 
 model TaskJob {
-  id             String    @id @default(cuid())
-  idempotencyKey String?   @unique
+  id             String         @id @default(cuid())
+  idempotencyKey String?        @unique
   payload        String
   state          String
-  attempts       Int       @default(0)
+  attempts       Int            @default(0)
   maxAttempts    Int
   nextAttemptAt  DateTime
   leaseExpiresAt DateTime?
   leaseToken     String?
   lastError      String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  CaseTaskLink   CaseTaskLink[]
 
   @@index([state, nextAttemptAt])
 }
@@ -1368,18 +1378,19 @@ model ToolCall {
 }
 
 model Approval {
-  id             String        @id @default(cuid())
-  workflowRunId  String
-  workflowRun    WorkflowRun   @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
-  workflowStepId String?
-  workflowStep   WorkflowStep? @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
-  reason         String
-  state          String
-  requestedBy    String
-  requestedAt    DateTime      @default(now())
-  decidedBy      String?
-  decidedAt      DateTime?
-  decisionNote   String?
+  id               String             @id @default(cuid())
+  workflowRunId    String
+  workflowRun      WorkflowRun        @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowStepId   String?
+  workflowStep     WorkflowStep?      @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
+  reason           String
+  state            String
+  requestedBy      String
+  requestedAt      DateTime           @default(now())
+  decidedBy        String?
+  decidedAt        DateTime?
+  decisionNote     String?
+  CaseApprovalLink CaseApprovalLink[]
 
   @@index([workflowRunId, state, requestedAt])
   @@index([workflowStepId])
@@ -1403,4 +1414,298 @@ model CopilotAuditEvent {
   @@index([workflowRunId, sequence])
   @@index([agentRunId])
   @@index([eventType, occurredAt])
+}
+
+// ===========================================================================
+// Wave C / P2-006 — shared cases and projects foundation.
+//
+// One engine for consultants, agencies, CA/accounting practices, events and real
+// estate. Deliberately COMPOSES the systems that already exist rather than
+// duplicating them:
+//
+//   * Contact            — clients are Contacts, not a new party table
+//   * TaskJob            — case work items are durable tasks, via CaseTaskLink
+//   * Approval           — sign-off reuses the copilot approval ledger, via CaseApprovalLink
+//   * ProfileDocument    — uploaded files stay ProfileDocuments, via CaseDocumentRequest
+//   * ActivityEvent      — contact-level timeline is untouched; CaseEvent is case-level
+//   * Workspace/Location — tenancy, no new tenant key
+//   * Payment            — CaseInvoice records STATE and links out; it is not a ledger
+//
+// NAME NOTE: `Project` is already taken by the pre-existing portfolio model, so the
+// case aggregate is `CaseProject`. Renaming the existing model would have been a
+// breaking change for no benefit.
+//
+// Tenancy is workspaceId, which is what /api/platform already authorizes against.
+// Unlike the restaurant and appointment domains there is no legacy profileId-scoped
+// table to bridge to, so no bridge is invented.
+// ===========================================================================
+
+enum CaseStatus {
+  INTAKE
+  BRIEFED
+  ACTIVE
+  ON_HOLD
+  DELIVERED
+  CLOSED
+  CANCELLED
+}
+
+enum CaseIntakeStatus {
+  NEW
+  QUALIFYING
+  ACCEPTED
+  DECLINED
+  CONVERTED
+}
+
+enum CaseMilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  BLOCKED
+  CANCELLED
+}
+
+enum CaseDeliverableStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  DELIVERED
+  REJECTED
+}
+
+enum CaseDocumentRequestStatus {
+  REQUESTED
+  RECEIVED
+  WAIVED
+  REJECTED
+}
+
+/// Billing STATE only. Money movement stays with Payment; this records where an
+/// invoice is, so the engine never becomes a second accounting ledger.
+enum CaseInvoiceState {
+  NONE
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  VOID
+  WRITTEN_OFF
+}
+
+enum CaseEventKind {
+  CREATED
+  STATUS
+  MILESTONE
+  DELIVERABLE
+  DOCUMENT
+  INVOICE
+  TASK
+  APPROVAL
+  NOTE
+}
+
+enum CaseEventActor {
+  CLIENT
+  STAFF
+  SYSTEM
+}
+
+/// Lead / intake. Exists before a case does, so it is a sibling of CaseProject
+/// rather than a field on it.
+model CaseIntake {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contactId      String?
+  contact        Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  source         String
+  summary        String
+  status         CaseIntakeStatus @default(NEW)
+  declineReason  String?
+  idempotencyKey String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  convertedCase CaseProject?
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, status, createdAt])
+  @@index([contactId])
+}
+
+/// The case or project aggregate.
+model CaseProject {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  locationId     String?
+  location       Location?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  contactId      String?
+  contact        Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  intakeId       String?          @unique
+  intake         CaseIntake?      @relation(fields: [intakeId], references: [id], onDelete: SetNull)
+  reference      String
+  title          String
+  status         CaseStatus       @default(INTAKE)
+  invoiceState   CaseInvoiceState @default(NONE)
+  openedAt       DateTime?
+  deliveredAt    DateTime?
+  closedAt       DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  idempotencyKey String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  brief            CaseBrief?
+  milestones       CaseMilestone[]
+  deliverables     CaseDeliverable[]
+  documentRequests CaseDocumentRequest[]
+  invoices         CaseInvoice[]
+  events           CaseEvent[]
+  taskLinks        CaseTaskLink[]
+  approvalLinks    CaseApprovalLink[]
+
+  @@unique([workspaceId, reference])
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, status, createdAt])
+  @@index([contactId])
+}
+
+/// Agreed scope. One per case, so a 1:1 rather than a repeated row.
+model CaseBrief {
+  id          String      @id @default(cuid())
+  caseId      String      @unique
+  case        CaseProject @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  objectives  String
+  scope       String?
+  constraints String?
+  agreedAt    DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model CaseMilestone {
+  id              String              @id @default(cuid())
+  caseId          String
+  case            CaseProject         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title           String
+  ordinal         Int
+  status          CaseMilestoneStatus @default(PENDING)
+  dueAt           DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  CaseDeliverable CaseDeliverable[]
+
+  @@unique([caseId, ordinal])
+  @@index([caseId, status])
+}
+
+model CaseDeliverable {
+  id          String                @id @default(cuid())
+  caseId      String
+  case        CaseProject           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  milestoneId String?
+  milestone   CaseMilestone?        @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  title       String
+  status      CaseDeliverableStatus @default(DRAFT)
+  /// Reuses ProfileDocument rather than storing a second copy of the file.
+  documentId  String?
+  document    ProfileDocument?      @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  deliveredAt DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([caseId, status])
+  @@index([milestoneId])
+}
+
+/// A request for something the client must supply. When it arrives it is linked to an
+/// existing ProfileDocument; no parallel upload store is introduced.
+model CaseDocumentRequest {
+  id           String                    @id @default(cuid())
+  caseId       String
+  case         CaseProject               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  status       CaseDocumentRequestStatus @default(REQUESTED)
+  dueAt        DateTime?
+  documentId   String?
+  document     ProfileDocument?          @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  receivedAt   DateTime?
+  waivedReason String?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+
+  @@index([caseId, status])
+}
+
+/// Invoice STATE for a case. `paymentId` links to the existing Payment row when one
+/// exists; this table never holds amounts that contradict it.
+model CaseInvoice {
+  id             String           @id @default(cuid())
+  caseId         String
+  case           CaseProject      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  reference      String
+  amountCents    Int
+  currency       String           @default("USD")
+  state          CaseInvoiceState @default(DRAFT)
+  issuedAt       DateTime?
+  paidAt         DateTime?
+  paymentId      String?
+  idempotencyKey String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([caseId, reference])
+  @@index([caseId, state])
+}
+
+/// Composition link to the EXISTING durable task queue. Case work items are TaskJobs;
+/// this table only records which case they belong to.
+model CaseTaskLink {
+  caseId    String
+  case      CaseProject @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  taskJobId String
+  taskJob   TaskJob     @relation(fields: [taskJobId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+
+  @@id([caseId, taskJobId])
+  @@index([taskJobId])
+}
+
+/// Composition link to the EXISTING approval ledger. Case sign-off reuses Approval
+/// rather than defining a second approval concept.
+model CaseApprovalLink {
+  caseId     String
+  case       CaseProject @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  approvalId String
+  approval   Approval    @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@id([caseId, approvalId])
+  @@index([approvalId])
+}
+
+/// Append-only case timeline. UPDATE and DELETE are refused by trigger, reusing
+/// reject_append_only_mutation() from 20260827140000_phase0_foundations.
+///
+/// This is case-level and deliberately separate from ActivityEvent, which is
+/// contact-level and remains untouched.
+model CaseEvent {
+  id       String         @id @default(cuid())
+  caseId   String
+  case     CaseProject    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  seq      BigInt         @default(autoincrement())
+  kind     CaseEventKind
+  from     String?
+  to       String
+  actor    CaseEventActor
+  actorId  String?
+  metadata Json?
+  at       DateTime       @default(now())
+
+  @@index([caseId, seq])
 }
