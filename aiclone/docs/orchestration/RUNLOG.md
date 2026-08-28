@@ -917,3 +917,73 @@ The mandatory HTTP harness remains **1/1/1**, not 0/non-zero/0. An unsuppressed 
 ## 2026-08-28 09:39 +05:30 - Lane E middleware boundary remediation dispatched
 
 Job `b8af7c1d`, requested model `gpt-5.6-sol`, branch `security/lane-e-middleware-boundary`, fresh worktree `personai-lane-e-middleware-wt`, based on Lane E retry tip `9c7d998`. It exclusively owns `src/middleware.ts`; Lane E's health route and executable HTTP harness are read-only inputs. Required proof is segment-safe dashboard matching with the real harness normal/inverted/restored **0/non-zero/0**, named regressions, build, zero secret hits and `portCleared=true`. Lane D remains active with disjoint ownership and was not interrupted.
+
+
+## 2026-08-28 09:45 +05:30 — ROOT CORRECTION: lane A was accepted on an unexecutable harness
+
+Root re-verified the merged baseline independently and found that **two security harnesses exited 1 on
+primary**. Diagnosing them separately mattered, because only one was a real defect.
+
+**`check-resource-authz` (lane C) — not a defect.** It exits 1 on primary solely because
+`assertDisposableTarget` refuses live `personalink`: *"personalink is a protected live database and is
+never a valid schema target."* Run in its own worktree against the disposable rehearsal target it exits
+**0**. This is the guard working as designed. Like `check-schema-invariants`, it must be run with
+`DATABASE_URL` pointed at a disposable target; its failure on primary is correct behaviour and is now
+documented as such rather than treated as a regression.
+
+**`check-actions-authz` (lane A) — a real defect that invalidated the lane's evidence.** It failed
+**even in its own worktree**, and not on an assertion:
+
+```
+TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', ...
+```
+
+`scripts/tsconfig.checks.json` compiles these harnesses as **CommonJS**, where `import.meta` is a
+compile error, and lane A's harness was the **only** one in the repo using it
+(`createRequire(import.meta.url)`). The harness therefore could not execute at all — so lane A's
+`0 / non-zero / 0` inversion control and all of its authorization proofs were never actually observed,
+yet the lane was accepted and merged as proven. That is precisely the "no unsupported completion claims"
+rule the wave was meant to enforce, and the supervisor missed it.
+
+Scope of the damage was limited: primary `tsc` is 0, so the **merged remediation source itself compiles
+and is intact**. Only the test was inert. The security property was unproven, not absent.
+
+Root fixed it directly rather than spending a worker cycle on a one-line test-only change, holding the
+shared supervisor lock so there was never a second integration owner:
+
+- `createRequire(import.meta.url)` -> `createRequire(__filename)`, with a comment recording why, so the
+  next author does not reintroduce it.
+- Verified: `tsc`=0, targeted `eslint`=0.
+- On primary (whose `.env` targets live) it now refuses through the **guard** instead of failing to
+  compile — the correct failure mode.
+- Against the authorized disposable target `personalink_phase0_rehearsal_20260826_210704`:
+  **normal=0, INVERT_ASSERTION=1 -> 1, restored=0**. The inversion control is real and lane A's
+  authorization claims are now genuinely provable.
+
+Standing correction for future lanes: a harness that cannot compile under
+`scripts/tsconfig.checks.json` is not evidence. Re-running a harness and observing its exit code is
+mandatory before acceptance; reading the exit code out of a worker's report is not verification.
+
+### Combined baseline at this point
+`prisma validate`=0, `prisma generate`=0, `tsc`=0, `npm audit --omit=dev` = **0 vulnerabilities**, and
+all of `check-ownership-foundation`, `check-upload-security`, `check-auth-authz`,
+`check-tenant-isolation`, `check-tenancy-contracts`, `check-foundation-contracts`,
+`check-copilot-runtime`, `check-capability-contract`, `check-business-os-surface`,
+`check-business-os-render`, `check-business-os-a11y`, `check-disposable-db-guard` = 0. The two
+DB-backed security harnesses pass against the disposable target and correctly refuse live.
+
+Live database untouched: `personalink`, 35 public tables, `_prisma_migrations` absent, `Profile`=16.
+Origin still `4b386d1`. cloudflared 0.
+
+### Wave 3 lane state
+- A merged (`4d24076`) — remediation intact, harness now executable after this correction.
+- B merged (`f69fa24`) — root-verified independently: scope clean, no secrets, own harness 0/1/0,
+  magic-byte content validation, octet-stream bypass removed, durable quota, AR preserved, external
+  provider stubbed and proven not called on refusal.
+- C merged (`b9b2794`) — passes against the disposable target.
+- D still implementing.
+- E first attempt **rejected** by the supervisor for a 1/1/1 harness sequence and a harness that did not
+  load its worktree `.env`; one narrow retry dispatched (`b1d231e9`, same model `gpt-5.6-terra`). E has
+  since produced 2 commits. Lane E also surfaced a genuine middleware finding — Clerk's
+  `/dashboard(.*)` matcher also gates `/dashboardfoo` — which is outside lane E's ownership; the
+  supervisor dispatched a separate middleware boundary fix for it.

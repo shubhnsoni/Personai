@@ -18,7 +18,11 @@ const failures: string[] = []
 const checks: string[] = []
 const coverage: string[] = []
 const prisma = new PrismaClient()
-const nativeRequire = createRequire(import.meta.url)
+// `scripts/tsconfig.checks.json` compiles these harnesses as CommonJS, where
+// `import.meta` is a TS1343 error. `__filename` is the CommonJS equivalent and
+// keeps this harness executable — without it the whole suite fails to compile,
+// which would leave lane A's authorization claims unproven.
+const nativeRequire = createRequire(__filename)
 const prefix = `lane-a-${process.pid}-${Date.now()}`
 
 function check(name: string, condition: unknown, central = false): void {
