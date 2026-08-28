@@ -707,3 +707,75 @@ At 04:46 IST, P1-013 observability job `0e532936` remains active with two in-sco
 No new package was dispatched after 04:45. Primary remains at `020d23c`, containing the two independently green serial integrations already recorded above. P1-013 job `0e532936` remains active and isolated at base `9291e93`: zero commits, no external report, and exactly two in-scope uncommitted files whose last writes were 04:00:58 and 04:01:05. It was not interrupted, accepted, or integrated.
 
 The completed recurring overnight supervisor job `4cacfc68` was removed so no further post-hard-stop cycles run. No completed worker cron remains registered. Final cleanup re-confirmed cloudflared process count 0, ports 3000 and 3100 with 0 listeners, and primary clean except preserved `.codex-remote-attachments/`. No temporary server, push, PR, deploy, migration, tunnel, or frozen-worktree change occurred.
+
+
+## 2026-08-28 07:50 +05:30 — Clerk advisory record corrected; P1-013 accepted; security wave opening
+
+### Baseline correction
+The directive's measured baseline said primary was at `020d23c` with an uncommitted final-hard-stop
+RUNLOG append. That was true when written; primary had since moved to `7813d7c`. The append was
+**committed, not overwritten**, as `9b8ba64`, and `7813d7c` added `HANDOFF.md`. The 04:49 FINAL HARD
+STOP entry is verified present in the log.
+
+### Clerk advisory record corrected — root's earlier claim was FALSE
+Root previously recorded that the `GHSA-vqx2-fgx2-5wq9` affected range "includes 6.39.2" and that the
+patched floor was therefore 6.39.3. **That was wrong.** Fetched from the GitHub Advisory Database:
+
+- `GHSA-vqx2-fgx2-5wq9` (CVE-2026-41248, CRITICAL, CVSS 9.1): `@clerk/nextjs` 6.x vulnerable range is
+  `>= 6.0.0-snapshot.vb87a27f, < 6.39.2`, **first patched 6.39.2**.
+- `GHSA-w24r-5266-9c3c` (CVE-2026-42349, HIGH, CVSS 8.1): `@clerk/nextjs` 6.x range `>= 6.0.0,
+  <= 6.39.2`, **first patched 6.39.3**.
+
+The 6.39.6 upgrade was therefore correct, but for a reason root had not documented: 6.39.2 closes the
+critical middleware bypass yet remains inside the separate high-severity authorization-bypass range.
+Two advisories, two floors. The false sentence is marked in place and the authoritative ranges now
+live in `CLERK_ADVISORY_RECORD.md`. `@clerk/nextjs` 6.39.6 stays; no downgrade.
+
+Two findings from the advisory text that bear directly on this repo:
+1. `GHSA-vqx2-fgx2-5wq9` names the affected middleware shape explicitly, and it is **the shape this
+   repo uses** — `if (isProtectedRoute(req)) await auth.protect()`. The shape it names as correctly
+   blocking the bypass is the inverted public-route check. Middleware hardening should adopt the
+   inverted form.
+2. `GHSA-w24r-5266-9c3c` contains a second bypass: `auth.protect()` silently discarded authorization
+   params when the same argument object also carried `unauthenticatedUrl`, `unauthorizedUrl` or
+   `token`. SEC-002's dashboard-gate fix passes **`unauthenticatedUrl`**. We are patched at 6.39.6, so
+   it is inert today, but it is now a standing codebase constraint: never pair those redirect/token
+   params with `role`/`permission`/`feature`/`plan`/`reverification` in one call without a test
+   proving the authorization param is still enforced, and never downgrade below 6.39.3.
+
+### P1-013 — ACCEPTED as snapshot fallback, merged at `a65d296`
+Branch `worker/w10-observability`, commit `595afc3`, base `9291e93`, observed model `gpt-5.6-terra`.
+Root verified independently rather than accepting the report:
+
+| Check | Result |
+|---|---|
+| exact two-file scope | PASS — only `Orchestrator-Dashboard.ps1` and `OBSERVABILITY_DIAGNOSIS.md` |
+| PowerShell parser | PASS — 0 parse errors |
+| one invocation, one snapshot, exits | PASS — exit 0 in ~9-12s, returned on its own |
+| snapshot-only wording | PASS — "does not start, schedule, or claim a running monitor" and "no automatic next tick is promised" |
+| mutex refuses concurrent writer | PASS — of two simultaneous runs, A wrote and exited 0, B was refused and exited 1, no partial output |
+| git probes bounded | PASS — `WaitForExit(3000)` per probe |
+| external CLI probe bounded | PASS — `Wait-Job -Timeout 15` with `Stop-Job` + `Remove-Job` on both paths |
+| no loop / polling / scheduler / detached process | PASS — no `while ($true)`, no `Start-Sleep`, no `Register-ScheduledTask`, no `schtasks`, no stray jobs or child processes afterwards |
+
+Post-merge: parser 0 errors on the merged copy, one run exits 0, snapshot mode line present,
+`tsc`=0, and `check-tenancy-contracts` / `check-auth-authz` / `check-tenant-isolation` all 0.
+
+Status is **`accepted_snapshot_fallback`**, deliberately not `done`: no durable three-tick monitor
+exists, and none is achievable in this session type. `monitor_start` cannot arm here and
+`autonudge.json` loops stays empty. One cosmetic residue: a code comment still says "must not stall
+the dashboard loop" though no loop remains — noted, not blocking.
+
+One root-side note for the record: the first concurrency test reported a false negative because
+`Start-Process -ArgumentList` split the space-containing `-File` path (both processes exited 64 with a
+usage message). Re-run with the path quoted, the mutex behaved correctly. This is the same
+space-in-path gotcha already documented in `HANDOFF.md`.
+
+### Security remediation wave — opening
+Existing helpers surveyed so the foundation reuses rather than duplicates: `syncUser()` in
+`src/lib/auth-sync.ts` is the server-derived identity source; `requireBusinessOsAccess()` in
+`src/lib/business-os/api/guard.ts` already establishes the UNAUTHORIZED-vs-FORBIDDEN split;
+`src/lib/persistence/tenancy.ts` (from P2-002) holds persisted tenancy access; `src/lib/tenancy/**`
+holds in-memory contracts only. Confirmed vulnerable signatures that take caller-supplied identity:
+`createProfile(userId, …)`, `addContent(profileId, …)`, `updateContent(documentId, …)`,
+`syncKnowledgeFromChats(profileId)`, `deleteContent(documentId)`.

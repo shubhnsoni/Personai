@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 04:46 +05:30",
+  "updatedAt": "2026-08-28 07:49 +05:30",
   "updatedBy": "overnight supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -280,18 +280,21 @@
     {
       "id": "P1-013",
       "title": "Orchestration observability: fix the dashboard loop or retain honest one-shot",
-      "status": "in_flight",
+      "status": "accepted_snapshot_fallback",
       "model": "gpt-5.6-terra",
       "allowedPaths": [
         "docs/orchestration/Orchestrator-Dashboard.ps1",
         "docs/orchestration/OBSERVABILITY_DIAGNOSIS.md"
       ],
       "exitCriteria": "Three completed timestamped ticks, no 1s polling, no overlapping writers; otherwise retain one-shot and document why.",
-      "reconciledNote": "Dispatched with gpt-5.6-terra. Exact ownership remains Orchestrator-Dashboard.ps1 and OBSERVABILITY_DIAGNOSIS.md. Must prove three ticks or retain an honest one-shot; false running state forbidden.",
       "job": "0e532936",
       "branch": "worker/w10-observability",
       "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-w10-observability-wt",
-      "baseCommit": "9291e93"
+      "baseCommit": "9291e93",
+      "commit": "595afc3",
+      "mergedAt": "a65d296",
+      "observedModel": "gpt-5.6-terra",
+      "reconciledNote": "Root-verified: exact 2-file scope, parser 0 errors, one invocation writes one timestamped snapshot and exits (exit 0, ~9-12s), explicit snapshot-only/no-automatic-tick wording, mutex refuses a concurrent writer (A wrote exit 0, B refused exit 1), git probes bounded at 3s, spawn-list probe time-boxed at 15s with Stop-Job+Remove-Job, no perpetual loop/polling/scheduler/detached process/false running claim. NOT fully done: no durable three-tick monitor exists and none is possible in this session type."
     },
     {
       "id": "P1-014",
