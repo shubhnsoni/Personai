@@ -171,6 +171,61 @@ check(
     loadingSrc.includes('aria-busy="true"'),
 )
 
+// ---------------------------------------------------------------------------
+// Wave A — the reservations panel is mounted inside the shell, so it is rendered
+// incidentally above. These assertions make its coverage EXPLICIT, so "a11y 0"
+// actually says something about the reservations UI rather than only the parts
+// that existed before it.
+// ---------------------------------------------------------------------------
+const reservationsSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/reservations-panel.tsx"),
+    "utf8",
+)
+check(
+    "reservations panel is mounted in the shell",
+    readFileSync(join(__dirname, "../../src/components/business-os/business-os-shell.tsx"), "utf8").includes(
+        "<ReservationsPanel",
+    ),
+)
+check(
+    "reservations decorative icons are hidden from assistive tech",
+    /aria-hidden="true"/.test(reservationsSrc),
+)
+check(
+    "reservations loading state announces itself politely and as busy",
+    reservationsSrc.includes('aria-live="polite"') && reservationsSrc.includes('aria-busy="true"'),
+)
+check(
+    "reservations loading state carries a screen-reader label",
+    reservationsSrc.includes("sr-only") && /Loading reservations/.test(reservationsSrc),
+)
+check(
+    "reservations panel uses a structural skeleton while loading",
+    reservationsSrc.includes("Skeleton"),
+)
+check(
+    "reservations panel distinguishes 401, 403 and 409 for the owner",
+    /error\.status === 401/.test(reservationsSrc) &&
+        /error\.status === 403/.test(reservationsSrc) &&
+        /error\.status === 409/.test(reservationsSrc),
+)
+check(
+    "reservations panel does not leak internals on a dependency failure",
+    /error\.status === 503/.test(reservationsSrc) && /Nothing was changed/.test(reservationsSrc),
+)
+check(
+    "reservations empty state states that no sample data is shown",
+    /No sample reservations are shown/.test(reservationsSrc),
+)
+check(
+    "reservations panel contains no hardcoded sample booking",
+    !/guestName:\s*"[A-Z]/.test(reservationsSrc) && !/sampleReservation/i.test(reservationsSrc),
+)
+check(
+    "reservations panel explains why a terminal booking has no actions",
+    /cannot change/.test(reservationsSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"

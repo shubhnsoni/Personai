@@ -129,8 +129,8 @@ export const businessEngineDescriptors: Record<BusinessEngineId, EngineDescripto
         id: "reservations",
         label: "Reservations",
         description: "Table, room, and seat reservations.",
-        maturity: "planned",
-        evidence: "none",
+        maturity: "available",
+        evidence: "src/lib/reservations/engine.ts",
       },
       {
         id: "qrOrdering",
