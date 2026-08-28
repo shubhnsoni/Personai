@@ -619,8 +619,13 @@ the 14 new tables present, `Profile`=16. Origin still `4b386d1`. Nothing pushed.
 Job `2db4fb9e`, model `gpt-5.6-sol`, branch `security/clerk-6.39.6` from `9d5d20e`, isolated real
 `node_modules`, `DATABASE_URL` pointed at the disposable clean copy so it can never reach live.
 
-Root established the target facts first: the audit's affected range for `GHSA-vqx2-fgx2-5wq9`
-**includes 6.39.2**, so the real patched floor is **6.39.3**, not 6.39.2 as originally briefed; the
+Root established the target facts first — **but got one of them wrong; see the correction entry
+dated 2026-08-28 later in this log and `CLERK_ADVISORY_RECORD.md` for the authoritative ranges.**
+Root claimed the affected range for `GHSA-vqx2-fgx2-5wq9` includes 6.39.2 and that the patched floor
+was therefore 6.39.3. That is **FALSE**: for `@clerk/nextjs` 6.x the advisory range is
+`>= 6.0.0-snapshot.vb87a27f, < 6.39.2` with `first_patched_version: 6.39.2`. The upgrade to 6.39.6
+was still correct, but for a different and separately-documented reason: the second advisory
+`GHSA-w24r-5266-9c3c` covers `<= 6.39.2` and is first patched in **6.39.3**. The
 newest release in the existing major is **6.39.6**, whose peer deps (`next ^16`, `react ~19.2.3`)
 match our Next 16.3.3 and React 19.2.4. A 7.x Clerk Core 3 line exists (latest 7.8.2) and the worker
 is explicitly forbidden from migrating to it. The worker must prove behaviour rather than assume a
