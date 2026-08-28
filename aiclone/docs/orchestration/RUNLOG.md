@@ -779,3 +779,80 @@ Existing helpers surveyed so the foundation reuses rather than duplicates: `sync
 holds in-memory contracts only. Confirmed vulnerable signatures that take caller-supplied identity:
 `createProfile(userId, …)`, `addContent(profileId, …)`, `updateContent(documentId, …)`,
 `syncKnowledgeFromChats(profileId)`, `deleteContent(documentId)`.
+
+
+## 2026-08-28 08:20 +05:30 — SEC-F foundation ACCEPTED and merged; five remediation lanes dispatched
+
+### SEC-F ownership foundation — ACCEPTED, merged at `ac93e2c`
+Job `b710e029`, branch `security/ownership-foundation`, commit `f05e197`, requested and observed model
+both `gpt-5.6-sol`. Completed in ~14 minutes.
+
+Root verified independently rather than trusting the report:
+
+| Check | Result |
+|---|---|
+| scope | 5 files, all inside owned paths — `src/lib/security/{index,ownership,server}.ts`, `check-ownership-foundation.ts`, `SECURITY_FOUNDATION.md` |
+| ownership violations | none |
+| `prisma/**` / manifests / `.kiro` | untouched |
+| secret scan of the diff | 0 hits for `pk_test`, `sk_test`, `CLERK_SECRET_KEY=`, `postgresql://`, `password` |
+| `prisma validate` / `tsc` / targeted `eslint` | 0 / 0 / 0 |
+| own harness normal / inverted / restored | **0 / 1 / 0** — fails loudly, not vacuous |
+| 9 regression harnesses | all 0 |
+| post-merge on primary: `prisma generate`, `tsc`, `eslint`, `npm run build` | 0 / 0 / 0 / 0 |
+
+It composed the existing `syncUser()` rather than duplicating identity synchronisation, and altered no
+existing helper. Its justification for a new module was accepted: existing helpers separately covered
+server identity, Business OS entitlement semantics, workspace tenancy and page redirects, but none
+composed all five required capabilities over legacy Profile-owned resources.
+
+Evidence that mattered most, because these are the properties the lanes depend on:
+- **Caller-supplied id is never honoured as identity.** The public identity function takes no `userId`
+  parameter. Its harness passes a forged `callerSuppliedUserId` while the fake identity resolves
+  `user-a`, and proves the actor stays `user-a`. A `claimedProfileId` is only ever matched against the
+  server-owned profile list, and writes receive `profile.id` from that result.
+- **Non-enumeration is proven, not asserted.** Foreign-resource and nonexistent-resource requests go
+  through the same composite lookup and their API status/body snapshots are byte-identical, as are the
+  Server Action envelopes, with one lookup call per request. Both are 403 "Access denied".
+- **Fail closed.** Anonymous is 401 with zero lookup/write calls; empty identity is 401; malformed
+  owned-profile id and failed entitlement are 403 **before** any lookup or write; every refused write
+  leaves state unchanged. No debug, env, dev-skip or middleware-only bypass exists.
+
+Public API the lanes consume: `requireAuthenticatedUser`, `requireOwnedProfile`,
+`requireOwnedResource`, `executeOwnedResourceWrite`, with `toOwnershipActionFailure`,
+`ownershipRefusalResponse` and `unwrapOwnershipResult` for error mapping. `src/lib/security/**` is now
+FROZEN for every lane.
+
+### Five path-disjoint remediation lanes dispatched, all based on `ac93e2c`
+Each has a fresh worktree, its own **real** `node_modules` (`npm ci`, not a junction, so no shared
+EPERM risk), and `DATABASE_URL` pointed at the disposable rehearsal database so no lane can reach live.
+Disk checked first: 29.9 GB free, ~0.75 GB per copy, 22 GB remaining after provisioning — no risky
+cleanup of other worktrees was needed.
+
+| Lane | Job | Requested model | Branch |
+|---|---|---|---|
+| A tenant-owned Server Actions | `1248c213` | gpt-5.6-sol | `security/lane-a-actions` |
+| B uploads & external compute | `8a1a79e1` | gpt-5.6-sol | `security/lane-b-uploads` |
+| C resource & enrollment authz | `8e0d703c` | gpt-5.6-sol | `security/lane-c-resources` |
+| D conversation ownership | `66e1aefb` | gpt-5.6-sol | `security/lane-d-conversations` |
+| E health & auth HTTP regressions | `bfb2dc03` | gpt-5.6-terra | `security/lane-e-health-regressions` |
+
+Staggered 2 minutes apart to spread `npm run build` load. Every brief carries exact owned and forbidden
+paths, and every one states that **regex over source does not establish PASS** — the earlier audit
+branch was rejected for precisely that — plus a mandatory `INVERT_ASSERTION=1` control that must exit
+non-zero.
+
+Lane-specific constraints worth recording: lane B must not invoke the real paid external provider and
+must assert it was **not** called on refusal, while preserving legitimate AR/USDZ/GLB behaviour; lane C
+must not call the real Stripe API; lane D is forbidden from touching `src/lib/rag.ts` or
+`src/lib/embeddings.ts` and must preserve the intentionally public persona-chat surface via a bound,
+expiring visitor capability; lane E does **not** own `src/middleware.ts` — it writes HTTP regression
+coverage for it, including the 307 signed-out redirect that SEC-002 introduced.
+
+Lane F, the independent read-only reviewer, is deliberately **not** dispatched yet: it must re-run the
+other lanes' harnesses itself, so it starts once A-E are resolved.
+
+### Supervisor
+`wave3-supervisor` job `94f62025`, every 900s, model `gpt-5.6-sol`, with a stale-tolerant execution
+lock and the full playbook at `SUPERVISOR-WAVE3.md`. It verifies independently, integrates serially,
+then dispatches Lane F and finally P2-003 once the combined baseline is green. Its terminal condition is
+P2-003 integrated green or a proven security blocker.
