@@ -10,22 +10,34 @@ resume aid, not a source of truth. Re-measure before trusting any line of it.
 | Fact | Value |
 |---|---|
 | Primary branch | `recovered/aug20-wt-pr-32` |
-| Primary HEAD | `1659f29eff96e4fff5c2d96cf9cf6898a43e7ea1` |
-| Ahead of origin | 91 |
+| Primary HEAD | see `git rev-parse HEAD` — was `e1372a3` + ledger commit at last update |
 | Origin (MUST NOT CHANGE) | `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827` |
 | Wave A merge | `79abb14716000726276743b5a77098f349f10a0c` |
+| Wave B B1-B2 merge | `e1372a3d764d1daa92e44211bfe58039880d6f6d` |
 | Preserved untracked | `.codex-remote-attachments/`, `aiclone/docs/orchestration/P1_014_ACTION_INVENTORY.md` |
 
-Integrated and green: P2-003 (`64ec987`), Wave A restaurant reservations (`79abb14`).
-`P1-006` is `done`. Full Wave A detail is in `WAVE_A_RESERVATIONS.md`.
+Integrated and green: P2-003 (`64ec987`), Wave A reservations (`79abb14`), Wave B B1-B2
+appointments foundation and conflict engine (`e1372a3`). `P1-006` is `done`; `P2-005` is
+`in_progress_b1_b2_integrated`.
 
-Wave A worktree `../personai-wave-a-reservations-wt` is clean at `4ff7ff4` with its own
-real `node_modules`. It can be reused for Wave B or a fresh worktree can be cut from
-`1659f29`.
+**NEXT READY WORK: Wave B B3 and B4.** Their schema already exists from B1, so B3 is
+runtime and service work with no further migration. Scope and required proof are tabulated
+in `INTEGRATION_QUEUE.md`. The Wave B worktree
+`../personai-wave-b-appointments-wt` is clean at `8e76bf0` with its own real
+`node_modules` and can be reused.
 
-> Base correction, 2026-08-29 01:33 +05:30: this file was written immediately BEFORE its
-> own commit, so it originally recorded primary HEAD as `9ed5449`. The commit that added
-> this file made primary `1659f29`, which is the correct Wave B base. Corrected in place.
+## The single most important thing to know before writing another overlap check
+
+Do **not** pass JS `Date` objects as raw-SQL parameters against
+`timestamp without time zone` columns. Prisma writes a `Date` by its UTC components but
+binds a `Date` parameter as **local wall-clock**, so on this UTC+05:30 host the comparison
+is silently wrong. Wave A shipped this defect and its application-level overlap check was
+inert for a full wave, with only the exclusion constraint preventing double-booking. Use
+the typed query API (`count({ where: ... })`), or bind explicit naive-UTC strings with a
+`::timestamp` cast.
+
+Both engines now record which layer refused, and both harnesses assert an
+application-detected conflict. Keep those assertions.
 
 ## Infrastructure reality — read before planning any dispatch
 

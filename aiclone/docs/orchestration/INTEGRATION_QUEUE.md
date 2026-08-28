@@ -256,3 +256,65 @@ the same two-layer approach considered, since it is now proven in this codebase.
 Then Wave C cases/projects, Wave D content/cohorts, Wave E truthful vertical activation
 (retail stays `draft` while inventory is `partial`). Healthcare/clinics/hospitals remain
 blueprint-only. P1-007 live cutover is NOT executed.
+
+
+
+## Wave B B1-B2 — INTEGRATED 2026-08-29 at `e1372a3`
+
+Nothing pushed; origin remains `4b386d1`. **Root implemented and reviewed both packages;
+no worker independence is claimed** — the gateway listener on port 5476 was absent and no
+model-pinning dispatch tool was exposed.
+
+| Order | Package | Commit | Scope |
+|---|---|---|---|
+| 1 | B1 appointment schema (exclusive `prisma/**`) | `3ebe8a1` | 7 enums, 6 tables, 11 Booking columns, 4 Booking indexes, partial exclusion constraint, append-only trigger |
+| 2 | B2 availability + conflict engine | `8e76bf0` | `src/lib/appointments/**`, plus a correction to the already-integrated Wave A reservations engine |
+
+Merged `--no-ff` at `e1372a3d764d1daa92e44211bfe58039880d6f6d`, zero conflicts.
+
+### Wave A correction shipped in B2 — read this before trusting any overlap check
+
+The Wave A reservations engine's application-level overlap check was **inert**. Against a
+`timestamp without time zone` column, Prisma writes a `Date` by its UTC components but
+binds a `Date` parameter in raw SQL as local wall-clock; on a UTC+05:30 host the predicate
+was silently false and `Reservation_no_overlap` was the only thing preventing
+double-booking. Wave A's drop-the-constraint experiment had appeared to prove otherwise,
+but it used raw parameters for both its insert and its select, so it was self-consistent
+and did not reproduce the real engine's asymmetry.
+
+Both engines now use Prisma's typed `count()`. Each records which layer refused, and both
+harnesses assert an application-detected conflict, so this cannot regress silently.
+
+**Standing rule for future waves:** do not pass JS `Date` objects as raw-SQL parameters
+against `timestamp without time zone` columns. Use the typed query API, or bind explicit
+naive-UTC strings with a `::timestamp` cast.
+
+## Next in queue — Wave B B3 and B4, READY
+
+Base `e1372a3` (or newer primary). The Wave B worktree
+`../personai-wave-b-appointments-wt` is clean at `8e76bf0` with its own real
+`node_modules` and can be reused.
+
+| Pkg | Owner paths | Depends on | Required proof |
+|---|---|---|---|
+| B3 | `src/lib/appointments/**` lifecycle/waitlist/deposit/reminder services + harness | B2 | guarded deposit and waitlist transitions; reminder scheduling idempotent on the `(bookingId, channel, sendAt)` unique key; **no real Stripe/email/SMS/WhatsApp call**; harness asserts the provider was NOT invoked on refusal; append-only event per accepted transition |
+| B4 | `src/app/api/platform/appointments/**`, `src/components/business-os/appointments-panel.tsx` + shell mount, route and a11y harnesses | B3 | four principal classes; byte-identical foreign-vs-nonexistent; 400/409/503 split; zero writes and zero provider calls on refusal; explicit loading/empty/401/403/conflict/dependency wording; no fabricated persisted data |
+
+The schema for waitlist, deposits and reminders already exists from B1, so B3 is runtime
+and service work only — no further migration is required.
+
+Then Wave C cases/projects, Wave D content/cohorts, Wave E truthful vertical activation.
+Healthcare/clinics/hospitals remain blueprint-only. P1-007 live cutover is NOT executed.
+
+### Open items carried forward
+1. **Pre-existing `profileId` FK drift** — now excluded by TWO waves. Any future
+   `prisma migrate diff` will re-emit the five `DropForeignKey` statements against
+   `ActivityEvent`, `Contact`, `ContactSourceLink`, `WorkflowRun`, `Workspace`. Exclude
+   them again until this gets its own decision.
+2. **`commerce.inventory` still `planned`** — blocker 5 remains half open; retail cannot
+   honestly leave `draft`.
+3. **`check-order-stream` needs a running dev server** — pre-existing, confirmed identical
+   at the pre-Wave-A source.
+4. **Appointments and reservations with history cannot be deleted** while their append-only
+   triggers are armed. Correct for an audit ledger; needs an explicit archival decision if
+   a delete path is ever required.

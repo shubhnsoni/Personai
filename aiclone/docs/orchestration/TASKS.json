@@ -1,6 +1,6 @@
 {
-  "milestone": "Wave A integrated - restaurant reservations live; Wave B appointments next",
-  "updatedAt": "2026-08-29 00:08 +05:30",
+  "milestone": "Wave B B1-B2 integrated - appointments foundation and conflict engine; B3-B4 remain",
+  "updatedAt": "2026-08-29 02:10 +05:30",
   "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -664,6 +664,67 @@
         "staleWorktreeNotReused": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-p2003-ui-wt at b3afc2a1e6b2edd30b68d2d84378bfc98ec51f7c, left untouched"
       },
       "rootVerdict": "INTEGRATED GREEN by root cherry-pick at 64ec987, no conflicts, primary intentional dirty ledger/evidence state preserved. Root implemented and reviewed this package itself; this is explicitly NOT an independent worker verification."
+    },
+    {
+      "id": "P2-005",
+      "title": "Shared appointments engine wrapping the existing Booking model",
+      "status": "in_progress_b1_b2_integrated",
+      "owner": "root (claude-opus-5)",
+      "workerIndependenceClaimed": false,
+      "dependencies": ["P1-006"],
+      "base": "7701963721ef485ca743c0886efd61cf9313ce37",
+      "branch": "feature/wave-b-appointments",
+      "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-wave-b-appointments-wt",
+      "mergeCommit": "e1372a3d764d1daa92e44211bfe58039880d6f6d",
+      "workerProbe": "Gateway listener on port 5476 absent and no model-pinning dispatch tool exposed. Per the standing fallback root proceeded serially with no probe cycle spent. No worker independence is claimed.",
+      "scope": "One appointments engine for coaching, consulting, CA practice, salon, events, real estate and pet care. Wraps and evolves the existing Booking, ServiceOffering, AvailabilitySchedule and CalendarOverride models; no per-industry fork.",
+      "commits": {
+        "B1_schema": "3ebe8a1b93367b17850465c1b085f4f68f453018",
+        "B2_engine": "8e76bf08cd237f11bea515b3440291114b071643"
+      },
+      "b1": {
+        "added": "7 enums; 6 tables (AppointmentResource, ServiceResource, AppointmentWaitlistEntry, AppointmentDeposit, AppointmentReminder, append-only AppointmentEvent); 11 nullable-or-defaulted Booking columns; 4 Booking indexes (Booking previously had NO profileId index); partial exclusion constraint Booking_resource_no_overlap; append-only trigger reusing reject_append_only_mutation().",
+        "bookingStatusDecision": "Booking.status deliberately LEFT AS text. It is text NOT NULL holding real data ('CONFIRMED' on the rehearsal target), so converting it to a Prisma enum would be breaking rather than additive. src/lib/appointments/lifecycle.ts is the documented single source of truth and a harness asserts OCCUPYING_STATUSES exactly matches the exclusion constraint predicate.",
+        "legacyProtection": "The exclusion constraint is guarded by resourceId IS NOT NULL so pre-existing resource-less bookings can never conflict with each other. Proven by an explicit harness assertion that two resource-less bookings in the same slot are accepted.",
+        "rehearsal": {
+          "target": "personalink_phase0_rehearsal_20260826_210704",
+          "livePersonalinkTargeted": false,
+          "freshBackup": "wave-b-pre-migration-2026-08-28T20-11-14-874Z.dump, 200660 bytes, sha256 e89f9fc4cf8b8bb92893ebabc6f3098bac91f42d0a251ac3fe2a9decd7c7e614",
+          "catalogBefore": "58 tables / 637 columns / 559 constraints / 142 indexes / 54 enum labels / 6 triggers / 2 ext / 1 exclusion / 1 Booking row",
+          "catalogAfter": "64 / 707 / 624 / 166 / 85 / 8 / 2 / 2 / 1 Booking row",
+          "rollbackVsBaseline": "byte-identical, raw sha256 1a015c421f33f4b32163f4d488daaf61c3aaf6cf31ef048ea96d2d51d8f25e0f; Wave A btree_gist and Reservation_no_overlap survived; pre-existing Booking row preserved",
+          "reapplyVsApply": "structurally identical, normalized sha256 364d0d13132a75ef2e51be09d6f4f0a5e2bac2667857265f8c2decb333a8a9ec",
+          "downSqlNote": "down.sql deliberately does NOT drop btree_gist (Wave A's Reservation_no_overlap depends on it) nor reject_append_only_mutation() (three other tables use it)."
+        },
+        "firstAttemptFailed": "The first migrate deploy FAILED with SQLSTATE 42601, 'syntax error at or near [', because the diff was captured through the rehearsal runner and its own stdout status lines were baked into the SQL. The catalog was byte-identical afterwards so it rolled back atomically with no partial state; the failed record was cleared with migrate resolve --rolled-back. The builder now strips runner noise, asserts the strip count, and rejects any non-SQL line.",
+        "deliberateOmission": "The five pre-existing profileId DropForeignKey statements were excluded AGAIN, this time programmatically with the removal count asserted. Still open as its own decision."
+      },
+      "b2": {
+        "availability": "Wraps existing AvailabilitySchedule and CalendarOverride with documented precedence; fails closed; refuses slots spanning two days; Profile.bufferMinutes (pre-existing, default 0) widens the conflict window.",
+        "capacity": "FAIL-CLOSED - AppointmentResource.capacity is nullable so an unconfigured resource refuses bookings.",
+        "waveACorrection": {
+          "severity": "real bug in already-integrated production code",
+          "defect": "Against a timestamp-without-time-zone column Prisma writes a Date by its UTC components but binds a Date PARAMETER in raw SQL as LOCAL wall-clock. On this UTC+05:30 host a stored 12:30 was compared against a bound 17:30, so the reservations engine's application-level overlap predicate was silently false. The Reservation_no_overlap exclusion constraint was doing all the work.",
+          "whyWaveAMissedIt": "Wave A's drop-the-constraint experiment passed only because that probe used raw parameters for BOTH its insert and its select, making them self-consistent and masking the asymmetry.",
+          "fix": "Both the reservations and appointments engines now use Prisma's typed count, which is symmetric with how rows are written. Verified empirically: raw+Date returned 0 conflicts where typed and naive-UTC-string forms both returned 1, with adjacency correctly still 0.",
+          "regressionGuard": "Each engine records which LAYER refused. The appointments harness asserts a buffer-gap conflict is application-detected (the constraint cannot see the buffer); the reservations harness asserts a sequential overlap is application-detected. User-facing messages unchanged."
+        }
+      },
+      "gates": {
+        "prismaValidate": 0,
+        "prismaGenerate": 0,
+        "tsc": 0,
+        "targetedLint": 0,
+        "checkAppointmentSchemaInvariants": "0/1/0, 39 assertions",
+        "checkAppointmentAuthz": "0/1/0, 43 assertions",
+        "checkReservationAuthz": "0/1/0, 36 assertions (34 before, plus two layer-attribution checks)",
+        "noDbRegressions": "13 of 13 exit 0",
+        "dbRegressions": "17 of 17 exit 0 including restaurant phase0, order transaction, all action packages and the HTTP boundary",
+        "npmAuditOmitDev": "0 vulnerabilities",
+        "build": 0,
+        "secretScan": "0 hits"
+      },
+      "remaining": "B3 lifecycle/waitlist/deposits/reminders and B4 APIs plus Business OS UI are NOT implemented. No Stripe, email, SMS or WhatsApp adapter exists yet; when built they must be stubbed and proven not invoked on refusal."
     },
     {
       "id": "P2-004",

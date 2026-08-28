@@ -1407,3 +1407,125 @@ this cycle and was left exactly as found. Origin remains
 Next READY package: **Wave B**, the shared appointments engine, which must wrap the
 existing `Booking`, `AvailabilitySchedule`, `CalendarOverride` and `ServiceOffering`
 models rather than fork a parallel booking system.
+
+
+
+## 2026-08-29 02:10 +05:30 — WAVE B B1-B2 INTEGRATED at `e1372a3`, and a real Wave A bug fixed
+
+Root implemented, gated and reviewed both packages. **No worker independence is claimed.**
+The gateway listener on port 5476 was absent and no model-pinning dispatch tool was
+exposed, so per the standing fallback no probe cycle was spent and root proceeded
+serially.
+
+| Package | Commit | Scope |
+|---|---|---|
+| B1 schema | `3ebe8a1` | `prisma/**` exclusive, invariant harness |
+| B2 engine | `8e76bf0` | `src/lib/appointments/**`, plus the Wave A engine correction |
+
+Merged `--no-ff` at `e1372a3d764d1daa92e44211bfe58039880d6f6d`, zero conflicts.
+
+### The finding that matters most: Wave A's overlap check was inert
+
+While proving that `bufferMinutes` widens the conflict window, the appointment conflict
+query returned **zero** where it should have returned one. The cause is a genuine and
+easily-missed asymmetry:
+
+> Against a `timestamp without time zone` column, Prisma writes a `Date` by its **UTC
+> components**, but binds a `Date` **parameter** in raw SQL as **local wall-clock**.
+
+On this UTC+05:30 host a stored `12:30` was compared against a bound `17:30`, so the
+predicate was silently false. Measured directly: raw query with `Date` params returned
+`0` conflicts, while the same predicate with naive-UTC strings and with Prisma's typed
+`count()` both returned `1`, and the adjacency control correctly stayed `0`.
+
+**The already-integrated Wave A reservations engine had the identical defect.** Its
+application-level overlap check was doing nothing, and `Reservation_no_overlap` — the
+layer Wave A described as mere defense-in-depth — was the only thing preventing
+double-booking.
+
+Worse, Wave A's own drop-the-constraint experiment had *appeared* to prove the row lock
+sufficient. It passed only because that probe used raw parameters for **both** its insert
+and its select, making the two self-consistent and hiding the asymmetry that exists in the
+real engine, where inserts go through Prisma and the check went through raw SQL. The
+earlier RUNLOG claim that "the row lock alone prevents double-booking" was therefore
+correct about the probe and wrong about the shipped code. That is corrected here.
+
+Both engines now use Prisma's typed `count()`, which is symmetric with how rows are
+written. To stop this regressing silently, each engine records **which layer** refused:
+the appointments harness asserts a buffer-gap conflict is `detectedBy: "application"` —
+something the exclusion constraint cannot possibly see — and the reservations harness
+asserts a sequential overlap is likewise application-detected. User-facing messages are
+unchanged, so nothing new is leaked.
+
+### B1 — additive appointment foundation
+Seven enums; six tables (`AppointmentResource`, `ServiceResource`,
+`AppointmentWaitlistEntry`, `AppointmentDeposit`, `AppointmentReminder`, append-only
+`AppointmentEvent`); eleven nullable-or-defaulted columns and four indexes on the
+pre-existing `Booking`, which previously had **no `profileId` index at all**.
+
+`Booking.status` was deliberately **left as `text`**. It is `text NOT NULL` holding real
+data, so converting it to a Prisma enum would have been breaking rather than additive.
+`src/lib/appointments/lifecycle.ts` is the documented single source of truth, and a
+harness assertion proves `OCCUPYING_STATUSES` exactly matches the exclusion constraint
+predicate so the two cannot drift about what a conflict is.
+
+The constraint is guarded by `resourceId IS NOT NULL` so pre-existing resource-less
+bookings can never conflict with each other — asserted explicitly, because getting that
+wrong would have broken the shipped booking flow.
+
+**The first `migrate deploy` FAILED** with SQLSTATE 42601, *syntax error at or near "["*,
+because the diff was captured through the rehearsal runner and the runner's own stdout
+status lines were baked into the SQL. The catalog was byte-identical afterwards, so it
+rolled back atomically with no partial state, and the failed record was cleared with
+`migrate resolve --rolled-back`. The builder now strips runner noise, asserts the strip
+count, and rejects any non-SQL line.
+
+### Rehearsal — disposable target only
+Fresh `pg_dump` first (200660 bytes, sha256 `e89f9fc4…`).
+
+| Step | tables | cols | constraints | indexes | enum labels | triggers | ext | exclusion | Booking rows |
+|---|---|---|---|---|---|---|---|---|---|
+| before | 58 | 637 | 559 | 142 | 54 | 6 | 2 | 1 | 1 |
+| apply | 64 | 707 | 624 | 166 | 85 | 8 | 2 | 2 | 1 |
+| rollback | 58 | 637 | 559 | 142 | 54 | 6 | 2 | 1 | 1 |
+| reapply | 64 | 707 | 624 | 166 | 85 | 8 | 2 | 2 | 1 |
+
+Rollback is **byte-identical** to baseline (raw sha256 `1a015c42…`), with Wave A's
+`btree_gist` and `Reservation_no_overlap` intact and the pre-existing Booking row
+preserved. `down.sql` deliberately does not drop `btree_gist` or
+`reject_append_only_mutation()`, both of which other migrations depend on.
+
+Reapply matched apply structurally (normalized `364d0d13…`). This required widening the
+OID normalization, and the justification was **verified before relaxing anything**:
+adding a `NOT NULL` column to an existing table and re-adding it reallocates the internal
+attribute number, so `<oid>_24_not_null` became `<oid>_35_not_null`. Columns with
+`is_nullable` and defaults, tables, indexes, enums, triggers, extensions, exclusion
+constraints and all *named* constraints were byte-identical, per-table auto-NOT-NULL
+counts matched, and `Booking.partySize` was `integer`/`NOT NULL`/default `1` on both
+sides. The comparator now also records per-table counts so a genuine added or removed
+`NOT NULL` still surfaces.
+
+The five pre-existing `profileId` `DropForeignKey` statements were excluded **again**,
+this time programmatically with the removal count asserted. Still open as its own
+decision.
+
+### Combined gates on primary `e1372a3`
+`prisma validate`/`generate` 0, `tsc` 0, targeted `eslint` 0, 13 of 13 no-DB harnesses 0,
+17 of 17 DB-backed harnesses 0 — including `check-restaurant-phase0-behavior`,
+`check-restaurant-order-transaction`, all three action packages and the HTTP boundary —
+new appointment schema harness **0/1/0** with 39 assertions, appointment engine harness
+**0/1/0** with 43 assertions, reservation engine harness **0/1/0** with 36 assertions,
+`npm audit --omit=dev` 0 vulnerabilities, `npm run build` 0, secret scan 0 hits.
+
+### Not done
+**B3** (lifecycle, waitlist, deposits, reminders) and **B4** (APIs and Business OS UI) are
+not implemented. No Stripe, email, SMS or WhatsApp adapter exists yet; when they are
+built they must be stubbed and proven not invoked on refusal.
+
+### Preservation
+Live `personalink` untouched: still 35 public tables, `_prisma_migrations` absent, no
+reservation or appointment tables, no `btree_gist`, `Profile`=16. Origin remains
+`4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Six frozen worktrees at `ea69595` with dirty
+counts 4/3/4/1/0/1. The Wave A worktree was briefly edited by mistake and immediately
+restored to clean. No push, PR, deploy, tunnel or dev server. PostgreSQL was already
+listening before this cycle and was left as found.
