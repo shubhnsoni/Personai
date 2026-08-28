@@ -903,3 +903,11 @@ No Lane E commit was merged. Per playbook, dispatch exactly one narrower retry w
 ## 2026-08-28 09:28 +05:30 - Lane E retry 1/1 dispatched
 
 Job `b1d231e9`, model `gpt-5.6-terra`, same isolated worktree and branch. Scope is narrowed to self-loading the existing `.env` safely in the owned harness, rerunning exact 0/non-zero/0 controls, and reporting the already observed segment-matcher blocker without touching `src/middleware.ts`. No second retry is permitted.
+
+
+
+## 2026-08-28 09:38 +05:30 - Lane E retry REJECTED; middleware blocker confirmed
+
+Retry job `b1d231e9`, branch `security/lane-e-health-regressions`, commit `9c7d998d416bf3a357c9270bf9fafdd4adcb9569`; requested and observed model `gpt-5.6-terra`. Root independently verified exact three-file owned scope, clean status, zero secret-pattern matches, Prisma validate 0, TypeScript 0, targeted ESLint 0, all named regressions 0, and production build 0. The retry fixed harness reproducibility by self-loading the worktree `.env` without printing it.
+
+The mandatory HTTP harness remains **1/1/1**, not 0/non-zero/0. An unsuppressed restored-normal run reported exactly one failure, `installed Clerk matcher does not gate dashboard lookalikes`, and `portCleared=true`. The installed Clerk 6.39.6 matcher for the unowned `src/middleware.ts` pattern `/dashboard(.*)` gates `/dashboardfoo`. Lane E has exhausted its one permitted retry and is **REJECTED/BLOCKED**; neither commit is merged. A separate exact-path middleware owner is required before Lane E can be re-verified. Lane D remains active and untouched; Lane F and P2-003 remain blocked.

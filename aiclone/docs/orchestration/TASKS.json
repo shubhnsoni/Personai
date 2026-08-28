@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 09:28 +05:30",
+  "updatedAt": "2026-08-28 09:38 +05:30",
   "updatedBy": "wave 3 supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -361,17 +361,19 @@
           "requestedModel": "gpt-5.6-sol"
         },
         "laneE": {
-          "status": "retry_running",
+          "status": "blocked_after_retry",
           "job": "bfb2dc03",
           "branch": "security/lane-e-health-regressions",
           "requestedModel": "gpt-5.6-terra",
           "observedModel": "gpt-5.6-terra",
-          "commit": "d525b83345579679a3b80e016c5167fee685fe33",
-          "independentGates": "scope/secret/prisma/tsc/lint/regressions/build passed; own harness normal/inverted/restored=1/1/1",
-          "blocker": "harness does not self-load approved .env under documented command; with env inherited, installed Clerk /dashboard(.*) matcher gates /dashboardfoo; middleware is outside lane ownership",
+          "commit": "9c7d998d416bf3a357c9270bf9fafdd4adcb9569",
+          "independentGates": "scope/secret/prisma/tsc/lint/regressions/build passed; own harness normal/inverted/restored=1/1/1; unsuppressed normal run had one matcher-boundary failure and portCleared=true",
+          "blocker": "installed Clerk 6.39.6 /dashboard(.*) matcher gates /dashboardfoo; src/middleware.ts is outside Lane E ownership and needs a separate exact-path owner",
           "retryCount": 1,
           "retryJob": "b1d231e9",
-          "retryModel": "gpt-5.6-terra"
+          "retryModel": "gpt-5.6-terra",
+          "retryCommit": "9c7d998d416bf3a357c9270bf9fafdd4adcb9569",
+          "rootVerdict": "REJECTED/BLOCKED after the single allowed retry; do not merge until segment-safe middleware is fixed and the harness restores to 0"
         }
       }
     },
