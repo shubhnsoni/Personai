@@ -8,6 +8,7 @@ import { createRouteMatcher } from "@clerk/nextjs/server"
 import { NextRequest } from "next/server"
 
 import { GET as healthGet } from "../../src/app/api/health/route"
+import { PROTECTED_ROUTE_PATTERNS } from "../../src/middleware"
 import { assertDisposableTarget } from "../lib/disposable-db"
 import {
   createBusinessOsRoute,
@@ -200,10 +201,18 @@ async function main(): Promise<void> {
     check("dashboard lookalike remains public", dashboardLookalike.status === 200)
     check("public route remains 200", publicRoute.status === 200)
 
-    const realDashboardMatcher = createRouteMatcher(["/dashboard(.*)"])
+    // Assert against the REAL exported patterns, never a hard-coded copy.
+    // A local copy is what made this check unpassable before: it hard-coded
+    // "/dashboard(.*)" and then asserted that pattern does not match
+    // "/dashboardfoo", which is self-contradictory.
+    const realDashboardMatcher = createRouteMatcher([...PROTECTED_ROUTE_PATTERNS])
     check("installed Clerk matcher does not gate dashboard lookalikes", !realDashboardMatcher(new NextRequest("http://127.0.0.1/dashboardfoo")))
     check("installed Clerk matcher gates dashboard root", realDashboardMatcher(new NextRequest("http://127.0.0.1/dashboard")))
     check("installed Clerk matcher gates dashboard descendants", realDashboardMatcher(new NextRequest("http://127.0.0.1/dashboard/x")))
+    check("installed Clerk matcher does not gate onboarding lookalikes", !realDashboardMatcher(new NextRequest("http://127.0.0.1/onboardingfoo")))
+    check("installed Clerk matcher gates onboarding root", realDashboardMatcher(new NextRequest("http://127.0.0.1/onboarding")))
+    check("installed Clerk matcher does not gate admin lookalikes", !realDashboardMatcher(new NextRequest("http://127.0.0.1/adminfoo")))
+    check("installed Clerk matcher gates admin root", realDashboardMatcher(new NextRequest("http://127.0.0.1/admin")))
 
     const unauthenticatedApi = await fetch(`http://127.0.0.1:${port}/api/business-os/blueprints`)
     const unauthenticatedBody = await unauthenticatedApi.json() as { ok?: boolean; error?: { code?: string } }
