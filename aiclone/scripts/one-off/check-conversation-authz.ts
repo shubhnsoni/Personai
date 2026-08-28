@@ -398,7 +398,20 @@ async function main(): Promise<void> {
 
             if (!publicConversationId) throw new Error("Public route did not return a conversation id")
             const validCapability = visitorJar.get(conversationCapabilityCookieName(ids.profileA)) || ""
-            const forgedCapability = `${validCapability.slice(0, -1)}${validCapability.endsWith("A") ? "B" : "A"}`
+            const [encodedCapability, encodedSignature, extraCapabilityPart] = validCapability.split(".")
+            if (!encodedCapability || !encodedSignature || extraCapabilityPart !== undefined) {
+                throw new Error("Public route returned a malformed visitor capability")
+            }
+            const originalSignature = Buffer.from(encodedSignature, "base64url")
+            if (originalSignature.length === 0) throw new Error("Public route returned an empty capability signature")
+            const forgedSignature = Buffer.from(originalSignature)
+            forgedSignature[0] ^= 0x01
+            const forgedEncodedSignature = forgedSignature.toString("base64url")
+            const forgedDecodedSignature = Buffer.from(forgedEncodedSignature, "base64url")
+            const forgedCapability = `${encodedCapability}.${forgedEncodedSignature}`
+            check("forged capability signature changes decoded bytes", !forgedDecodedSignature.equals(originalSignature))
+            check("forged capability signature is canonical base64url",
+                forgedDecodedSignature.toString("base64url") === forgedEncodedSignature)
             const forgedBefore = await stateSnapshot(tx, profileIds)
             const forgedCallCounts = { provider: providerCalls, retrieval: retrievalCalls }
             const forged = await responseSnapshot(await chatPost(jsonRequest("/api/chat", {
