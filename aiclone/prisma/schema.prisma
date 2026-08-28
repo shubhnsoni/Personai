@@ -71,6 +71,32 @@ enum ProfileImageCategory {
   EVENT
 }
 
+/// Reservation lifecycle. Terminal states are COMPLETED, CANCELLED and NO_SHOW.
+/// Transitions are enforced in src/lib/reservations, not by the database alone.
+enum ReservationStatus {
+  REQUESTED
+  HELD
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ReservationEventKind {
+  CREATED
+  STATUS
+  HOLD_EXPIRED
+}
+
+/// Deliberately separate from OrderEventActor so the existing order enum is not
+/// widened or otherwise modified.
+enum ReservationEventActor {
+  GUEST
+  STAFF
+  SYSTEM
+}
+
 model User {
   id                     String   @id @default(cuid())
   clerkId                String   @unique // Map to Clerk User ID
@@ -144,6 +170,7 @@ model Profile {
   orderCounters     OrderCounter[]
   profileImages     ProfileImage[]
   restaurantReviews OfferReview[]
+  reservations      Reservation[]
 }
 
 model ProfileEvent {
@@ -723,10 +750,75 @@ model RestaurantTable {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders Order[]
+  orders       Order[]
+  reservations Reservation[]
 
   @@unique([profileId, label])
   @@index([profileId, isActive, sortOrder])
+}
+
+/// A table booking held against a real RestaurantTable.
+///
+/// Tenancy: profileId, matching RestaurantTable/Order/OrderCounter rather than
+/// introducing a second tenant key. Platform API access resolves workspace
+/// membership to Workspace.profileId (already @unique) and requires it to equal
+/// this profileId, which is what makes venue isolation checkable.
+///
+/// Overlap prevention is enforced two ways: a transactional row lock on the
+/// parent RestaurantTable in src/lib/reservations, plus a Postgres exclusion
+/// constraint added by the migration as defense-in-depth. Neither is sufficient
+/// alone: the constraint cannot express "non-terminal only" through Prisma, and
+/// the row lock alone would not survive a direct SQL writer.
+model Reservation {
+  id             String            @id @default(cuid())
+  profileId      String
+  profile        Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  tableId        String
+  table          RestaurantTable   @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  idempotencyKey String?
+  partySize      Int
+  startAt        DateTime
+  endAt          DateTime
+  status         ReservationStatus @default(REQUESTED)
+  guestName      String
+  guestPhone     String?
+  guestEmail     String?
+  note           String?
+  holdExpiresAt  DateTime?
+  confirmedAt    DateTime?
+  seatedAt       DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  noShowAt       DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  events ReservationEvent[]
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status])
+  @@index([profileId, startAt])
+  @@index([tableId, startAt])
+}
+
+/// Append-only reservation ledger. UPDATE and DELETE are refused by database
+/// trigger using the existing reject_append_only_mutation() function created by
+/// 20260827140000_phase0_foundations.
+model ReservationEvent {
+  id            String                @id @default(cuid())
+  reservationId String
+  reservation   Reservation           @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  seq           BigInt                @default(autoincrement())
+  kind          ReservationEventKind
+  from          String?
+  to            String
+  actor         ReservationEventActor
+  actorId       String?
+  metadata      Json?
+  at            DateTime              @default(now())
+
+  @@index([reservationId, seq])
 }
 
 model OrderCounter {
