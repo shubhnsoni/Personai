@@ -1,56 +1,43 @@
-import { NextResponse } from 'next/server'
+import { timingSafeEqual } from "node:crypto"
 
-export const dynamic = 'force-dynamic'
+import { NextRequest, NextResponse } from "next/server"
 
-async function checkDatabase(): Promise<{ ok: boolean; message: string }> {
-  if (!process.env.DATABASE_URL) {
-    return { ok: false, message: 'DATABASE_URL not configured' }
-  }
+export const dynamic = "force-dynamic"
+
+const publicLiveness = Object.freeze({ status: "ok" })
+const detailsHeader = "x-health-diagnostics-token"
+
+function isOperatorAuthorized(request: NextRequest): boolean {
+  const expected = process.env.HEALTH_DIAGNOSTICS_TOKEN
+  const supplied = request.headers.get(detailsHeader)
+  if (!expected || !supplied) return false
+
+  const expectedBuffer = Buffer.from(expected)
+  const suppliedBuffer = Buffer.from(supplied)
+  return expectedBuffer.length === suppliedBuffer.length && timingSafeEqual(expectedBuffer, suppliedBuffer)
+}
+
+async function databaseDiagnostic(): Promise<"ok" | "unavailable"> {
   try {
-    const { prisma } = await import('@/lib/prisma')
+    const { prisma } = await import("@/lib/prisma")
     await prisma.$queryRaw`SELECT 1`
-    return { ok: true, message: 'Connected' }
-  } catch (e) {
-    return { ok: false, message: `Connection failed: ${(e as Error).message}` }
+    return "ok"
+  } catch {
+    // Diagnostics are deliberately categorical: provider errors and configuration state
+    // are operationally useful to an attacker and must never become response content.
+    return "unavailable"
   }
 }
 
-function checkOpenAI(): { ok: boolean; message: string } {
-  if (!process.env.OPENAI_API_KEY) return { ok: false, message: 'OPENAI_API_KEY not configured' }
-  return { ok: true, message: 'Configured' }
-}
-
-function checkStripe(): { ok: boolean; message: string } {
-  if (!process.env.STRIPE_SECRET_KEY) return { ok: false, message: 'STRIPE_SECRET_KEY not configured' }
-  if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) return { ok: false, message: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY not configured' }
-  return { ok: true, message: 'Configured' }
-}
-
-function checkEmail(): { ok: boolean; message: string } {
-  if (!process.env.RESEND_API_KEY) return { ok: false, message: 'RESEND_API_KEY not configured — falling back to console.log' }
-  return { ok: true, message: 'Configured' }
-}
-
-function checkAuth(): { ok: boolean; message: string } {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
-    return { ok: false, message: 'Clerk keys not configured' }
+export async function GET(request: NextRequest) {
+  const requestedDetails = request.nextUrl.searchParams.get("details") === "1"
+  if (!requestedDetails || !isOperatorAuthorized(request)) {
+    return NextResponse.json(publicLiveness)
   }
-  return { ok: true, message: 'Configured' }
-}
 
-export async function GET() {
-  const db = await checkDatabase()
-  const openai = checkOpenAI()
-  const stripe = checkStripe()
-  const email = checkEmail()
-  const auth = checkAuth()
-
-  const services = { database: db, openai, stripe, email, auth }
-  const allOk = Object.values(services).every(s => s.ok)
-
-  return NextResponse.json({
-    status: allOk ? 'healthy' : 'degraded',
-    timestamp: new Date().toISOString(),
-    services,
-  }, { status: allOk ? 200 : 503 })
+  const database = await databaseDiagnostic()
+  return NextResponse.json(
+    { status: database === "ok" ? "ok" : "degraded", database },
+    { status: database === "ok" ? 200 : 503 },
+  )
 }
