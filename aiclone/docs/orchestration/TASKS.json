@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 09:06 +05:30",
+  "updatedAt": "2026-08-28 09:10 +05:30",
   "updatedBy": "wave 3 supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -327,13 +327,15 @@
           "requestedModel": "gpt-5.6-sol"
         },
         "laneB": {
-          "status": "accepted_pending_merge",
+          "status": "integrated_green",
           "job": "8a1a79e1",
           "branch": "security/lane-b-uploads",
           "requestedModel": "gpt-5.6-sol",
           "observedModel": "gpt-5.6-sol",
           "commit": "3c720b74b6ec8b52aeba431908b9b346cdbf93d6",
-          "independentGates": "scope, secret scan, prisma validate, tsc, targeted eslint, executable harness 0/1/0, named regressions and build all passed"
+          "independentGates": "scope, secret scan, prisma validate, tsc, targeted eslint, executable harness 0/1/0, named regressions and build all passed",
+          "mergeCommit": "f69fa2403ee60252b07cd6d5fe30eb6126c5a1d9",
+          "postMergeGates": "tsc=0, targeted eslint=0"
         },
         "laneC": {
           "status": "running",
@@ -490,9 +492,9 @@
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-28 09:06 +05:30",
+    "observedAt": "2026-08-28 09:10 +05:30",
     "activeWorkers": 4,
-    "kirocrewSessions": "Wave 3 security remediation: lane B accepted pending serial merge; lanes A, C, D and E remain active and path-isolated.",
+    "kirocrewSessions": "Wave 3 security remediation: lane B integrated green; lanes A, C, D and E remain active and path-isolated.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
