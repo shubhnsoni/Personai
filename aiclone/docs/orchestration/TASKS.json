@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 09:27 +05:30",
+  "updatedAt": "2026-08-28 09:28 +05:30",
   "updatedBy": "wave 3 supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -361,7 +361,7 @@
           "requestedModel": "gpt-5.6-sol"
         },
         "laneE": {
-          "status": "rejected_retry_required",
+          "status": "retry_running",
           "job": "bfb2dc03",
           "branch": "security/lane-e-health-regressions",
           "requestedModel": "gpt-5.6-terra",
@@ -369,7 +369,9 @@
           "commit": "d525b83345579679a3b80e016c5167fee685fe33",
           "independentGates": "scope/secret/prisma/tsc/lint/regressions/build passed; own harness normal/inverted/restored=1/1/1",
           "blocker": "harness does not self-load approved .env under documented command; with env inherited, installed Clerk /dashboard(.*) matcher gates /dashboardfoo; middleware is outside lane ownership",
-          "retryCount": 0
+          "retryCount": 1,
+          "retryJob": "b1d231e9",
+          "retryModel": "gpt-5.6-terra"
         }
       }
     },
@@ -508,9 +510,9 @@
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-28 09:27 +05:30",
-    "activeWorkers": 4,
-    "kirocrewSessions": "Wave 3: lanes A, B and C integrated green; lane E rejected and awaiting its one narrow retry; lane D remains active.",
+    "observedAt": "2026-08-28 09:28 +05:30",
+    "activeWorkers": 2,
+    "kirocrewSessions": "Wave 3: lanes A, B and C integrated green; Lane E retry 1/1 running as b1d231e9; Lane D remains active.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
@@ -569,10 +571,8 @@
     ],
     "supervisionMode": "root supervises inside its own turn with bounded polls; monitor_start cannot arm in this ACP CLI session and autonudge.json loops is empty",
     "activeCronJobs": [
-      "1248c213",
-      "8e0d703c",
       "66e1aefb",
-      "bfb2dc03"
+      "b1d231e9"
     ]
   },
   "runtime": {
