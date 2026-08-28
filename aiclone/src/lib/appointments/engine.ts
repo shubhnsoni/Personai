@@ -190,6 +190,26 @@ export class PersistedAppointments {
         )
     }
 
+    /**
+     * Tenant-scoped availability inputs, so an availability lookup uses EXACTLY the same
+     * windows, overrides and buffer the booking path uses. Sharing this rather than
+     * re-querying in the HTTP layer is what stops the two from disagreeing.
+     */
+    async availabilityContext(workspaceId: string) {
+        const { profileId } = await this.requireVenue(workspaceId, "profile.read")
+        const [profile, windows, overrides] = await Promise.all([
+            this.db.profile.findUnique({ where: { id: profileId }, select: { bufferMinutes: true } }),
+            this.db.availabilitySchedule.findMany({ where: { profileId } }),
+            this.db.calendarOverride.findMany({ where: { profileId } }),
+        ])
+        return Object.freeze({
+            profileId,
+            bufferMinutes: profile?.bufferMinutes ?? 0,
+            windows: Object.freeze(windows),
+            overrides: Object.freeze(overrides),
+        })
+    }
+
     async list(workspaceId: string): Promise<readonly AppointmentRecord[]> {
         const { profileId } = await this.requireVenue(workspaceId, "profile.read")
         const rows = await this.db.booking.findMany({

@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { ErrorState } from "@/components/ui/error-state"
 import { Input } from "@/components/ui/input"
 import { ReservationsPanel } from "@/components/business-os/reservations-panel"
+import { AppointmentsPanel } from "@/components/business-os/appointments-panel"
 import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/ui/page-header"
 import {
@@ -613,6 +614,8 @@ export function BusinessOsShell({
                             </Card>
 
                             <ReservationsPanel workspaceId={selectedWorkspaceId} />
+
+                            <AppointmentsPanel workspaceId={selectedWorkspaceId} />
 
                             <Card>
                                 <CardHeader>
