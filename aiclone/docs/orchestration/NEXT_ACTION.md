@@ -14,17 +14,16 @@ resume aid, not a source of truth. Re-measure before trusting any line of it.
 | Origin (MUST NOT CHANGE) | `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827` |
 | Wave A merge | `79abb14716000726276743b5a77098f349f10a0c` |
 | Wave B B1-B2 merge | `e1372a3d764d1daa92e44211bfe58039880d6f6d` |
+| Wave B B3-B4 merge | `ce6348c62d1f9c17a7b72eb26b2b3e551f73b34d` |
 | Preserved untracked | `.codex-remote-attachments/`, `aiclone/docs/orchestration/P1_014_ACTION_INVENTORY.md` |
 
-Integrated and green: P2-003 (`64ec987`), Wave A reservations (`79abb14`), Wave B B1-B2
-appointments foundation and conflict engine (`e1372a3`). `P1-006` is `done`; `P2-005` is
-`in_progress_b1_b2_integrated`.
+Integrated and green: P2-003 (`64ec987`), Wave A reservations (`79abb14`), **Wave B shared
+appointments engine COMPLETE** (`e1372a3` + `ce6348c`). `P1-006` and `P2-005` are both
+`done`.
 
-**NEXT READY WORK: Wave B B3 and B4.** Their schema already exists from B1, so B3 is
-runtime and service work with no further migration. Scope and required proof are tabulated
-in `INTEGRATION_QUEUE.md`. The Wave B worktree
-`../personai-wave-b-appointments-wt` is clean at `8e76bf0` with its own real
-`node_modules` and can be reused.
+**NEXT READY WORK: Wave C cases/projects.** Scope, required proof and the list of existing
+models that must be REUSED rather than duplicated are tabulated in `INTEGRATION_QUEUE.md`.
+Needs a fresh isolated worktree with real `node_modules`.
 
 ## The single most important thing to know before writing another overlap check
 

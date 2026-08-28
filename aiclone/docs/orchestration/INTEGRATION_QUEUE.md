@@ -318,3 +318,62 @@ Healthcare/clinics/hospitals remain blueprint-only. P1-007 live cutover is NOT e
 4. **Appointments and reservations with history cannot be deleted** while their append-only
    triggers are armed. Correct for an audit ledger; needs an explicit archival decision if
    a delete path is ever required.
+
+
+
+## Wave B COMPLETE — B3-B4 INTEGRATED 2026-08-29 at `ce6348c`
+
+Nothing pushed; origin remains `4b386d1`. **Root implemented and reviewed all four
+packages; no worker independence is claimed.**
+
+| Order | Package | Commit | Scope |
+|---|---|---|---|
+| 3 | B3 services | `2789e50` | waitlist, deposits, reminders, injected inert providers |
+| 4 | B4 API + UI | `0b33887` | ten routes, owner panel, twelve new a11y assertions |
+
+Merged `--no-ff` at `ce6348c62d1f9c17a7b72eb26b2b3e551f73b34d`, zero conflicts. `P2-005` is
+`done`. Wave B queue is empty.
+
+Gate summary on the integrated tip: four appointment harnesses `0/1/0` with 39, 43, 49 and
+56 assertions; 13/13 no-DB and 19/19 DB-backed regressions 0; audit 0 vulnerabilities;
+build 0 with all ten routes dynamic; 21 files changed, zero forbidden paths.
+
+### Standing rule earned in this wave
+External capability that costs money or reaches a customer must be an **injected interface
+with an inert default**, not an inline call. That is what makes "no provider was contacted"
+a countable assertion instead of a promise, and it is why an unavailable provider here
+leaves a deposit `REQUIRED` and a reminder `SCHEDULED` rather than recording something that
+did not happen.
+
+## Next in queue — Wave C cases/projects engine, READY
+
+Base `ce6348c` or newer primary. Needs a fresh isolated worktree with real `node_modules`
+(never a junction).
+
+**Inspect and REUSE before adding anything.** These already exist and must not be
+duplicated: `Contact` and `ContactSourceLink`; `ActivityEvent` (append-only);
+`TaskJob` durable queue; `Approval` with `WorkflowRun`/`WorkflowStep`; `Workspace`,
+`Location`, `Membership`, `MembershipLocation`; `ProfileDocument`; `Payment` and
+`ProductPurchase`; `CopilotAuditEvent`. Wave C should compose these, not create parallel
+contact, task, approval or audit systems.
+
+| Pkg | Owner paths | Required proof |
+|---|---|---|
+| C1 | `prisma/**` EXCLUSIVE + schema harness | additive only; fresh external backup; `assertDisposableTarget` before every command; apply → rollback → reapply with normalized catalog comparison; **exclude and count-assert the five pre-existing `profileId` DropForeignKey statements**; reuse `reject_append_only_mutation()` |
+| C2 | `src/lib/cases/**` + harness | intake → brief → case; milestone/deliverable/document-request transitions; compose existing tasks and approvals; billing state; tenant isolation; non-enumerating refusals; idempotency; append-only events; zero effects on refusal; `0/non-zero/0` |
+| C3 | `src/app/api/platform/cases/**`, Business OS panel + harnesses | four principal classes; byte-identical foreign-vs-nonexistent; explicit loading/empty/401/403/dependency states; persisted data only; no real storage/payment/messaging call |
+
+### Open items carried forward
+1. **Pre-existing `profileId` FK drift** — excluded by TWO waves now. Any future
+   `prisma migrate diff` re-emits five `DropForeignKey` statements against `ActivityEvent`,
+   `Contact`, `ContactSourceLink`, `WorkflowRun`, `Workspace`. Exclude again until decided.
+2. **`commerce.inventory` still `planned`** — blocker 5 half open; retail cannot leave
+   `draft`.
+3. **`check-order-stream` needs a running dev server** — pre-existing, confirmed identical
+   at the pre-Wave-A source.
+4. **No durable scheduler** — `dispatchDueReminders` and hold expiry are implemented and
+   tested but nothing invokes them periodically. Needs either a real worker or explicit
+   documentation that they are manual.
+5. **No payment or messaging provider wired** — deliberate. Wiring one requires editing
+   `src/lib/appointments/runtime.ts` and must come with tests that the live adapter is only
+   reached on accepted paths.

@@ -1,6 +1,6 @@
 {
-  "milestone": "Wave B B1-B2 integrated - appointments foundation and conflict engine; B3-B4 remain",
-  "updatedAt": "2026-08-29 02:10 +05:30",
+  "milestone": "Wave B COMPLETE - shared appointments engine integrated; Wave C cases/projects next",
+  "updatedAt": "2026-08-29 02:55 +05:30",
   "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -668,19 +668,38 @@
     {
       "id": "P2-005",
       "title": "Shared appointments engine wrapping the existing Booking model",
-      "status": "in_progress_b1_b2_integrated",
+      "status": "done",
       "owner": "root (claude-opus-5)",
       "workerIndependenceClaimed": false,
       "dependencies": ["P1-006"],
       "base": "7701963721ef485ca743c0886efd61cf9313ce37",
-      "branch": "feature/wave-b-appointments",
+      "branch": "feature/wave-b-appointments then feature/wave-b-appointments-completion",
       "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-wave-b-appointments-wt",
       "mergeCommit": "e1372a3d764d1daa92e44211bfe58039880d6f6d",
+      "completionMergeCommit": "ce6348c62d1f9c17a7b72eb26b2b3e551f73b34d",
       "workerProbe": "Gateway listener on port 5476 absent and no model-pinning dispatch tool exposed. Per the standing fallback root proceeded serially with no probe cycle spent. No worker independence is claimed.",
       "scope": "One appointments engine for coaching, consulting, CA practice, salon, events, real estate and pet care. Wraps and evolves the existing Booking, ServiceOffering, AvailabilitySchedule and CalendarOverride models; no per-industry fork.",
       "commits": {
         "B1_schema": "3ebe8a1b93367b17850465c1b085f4f68f453018",
-        "B2_engine": "8e76bf08cd237f11bea515b3440291114b071643"
+        "B2_engine": "8e76bf08cd237f11bea515b3440291114b071643",
+        "B3_services": "2789e50382edbbe49190136a532519b105907d55",
+        "B4_api_ui": "0b33887a912adc7348e3a5aca2c18169f387d334"
+      },
+      "b3": {
+        "scope": "Waitlist, deposits and reminders. NO new migration was required; B1 already created the tables.",
+        "providerContainment": "External providers are INJECTED interfaces whose defaults perform no network I/O and report 'unavailable'. The harness injects counting stubs and asserts ZERO invocations on every refusal path, so 'no Stripe, email, SMS or WhatsApp call' is measured rather than promised. Production wiring in runtime.ts uses the unconfigured defaults, so a live provider requires a deliberate code change.",
+        "honestFailureModes": "An unavailable payment provider yields DEPENDENCY_UNAVAILABLE and deliberately does NOT move the deposit to AUTHORIZED. An unavailable notifier leaves the reminder SCHEDULED rather than marking it SENT. A reminder on a cancelled/completed/no-show/expired appointment is SUPPRESSED without reaching the notifier at all.",
+        "waitlist": "Promotion books THROUGH the engine so it inherits capacity, availability and overlap refusal. It claims the entry under a row lock first so two promoters cannot both convert it, and on refusal returns the entry to WAITING rather than losing its place. Both asserted.",
+        "idempotency": "Deposit on one-per-booking; reminder on the (bookingId, channel, sendAt) unique key with no duplicate queued; waitlist on (profileId, idempotencyKey).",
+        "harness": "check-appointment-lifecycle 0/1/0 with 49 assertions"
+      },
+      "b4": {
+        "routes": "Ten routes under /api/platform/appointments: list, create, get, transition, history, resources, availability, deposit GET/POST/PATCH, reminders GET/POST, waitlist GET/POST, waitlist cancel, waitlist promote. All registered dynamic.",
+        "availabilitySharing": "Availability lookup uses engine.availabilityContext(), the SAME tenant-scoped windows, overrides and buffer the booking path uses, so a slot reported available cannot then be refused for an availability reason.",
+        "authorization": "anonymous 401 with no data payload; wrong tenant and nonexistent BYTE-IDENTICAL 403; malformed 400; conflict/illegal transition/over-capacity 409; dependency failure 503 with no internal message or connection string. Every refusal proven to write nothing and reach no provider by counters.",
+        "depositVisibility": "A deposit GET was added rather than deleting an unused display, with its own tenant check and 403 coverage. It returns null instead of 404 when no deposit exists, because 'this booking takes no deposit' is a legitimate answer.",
+        "uiHonesty": "A pending deposit reads 'no payment has been taken' and a queued reminder reads 'not yet sent'. Two a11y assertions enforce that exact wording so a future edit cannot quietly imply money moved or a message was sent. Twelve further assertions cover mounting, icon hiding, the busy/polite loading contract, the screen-reader label, the status-code split, no-sample-data wording, absence of any hardcoded booking, terminal-state explanation and waitlist visibility.",
+        "harness": "check-appointment-routes 0/1/0 with 56 assertions"
       },
       "b1": {
         "added": "7 enums; 6 tables (AppointmentResource, ServiceResource, AppointmentWaitlistEntry, AppointmentDeposit, AppointmentReminder, append-only AppointmentEvent); 11 nullable-or-defaulted Booking columns; 4 Booking indexes (Booking previously had NO profileId index); partial exclusion constraint Booking_resource_no_overlap; append-only trigger reusing reject_append_only_mutation().",
@@ -714,17 +733,20 @@
         "prismaValidate": 0,
         "prismaGenerate": 0,
         "tsc": 0,
-        "targetedLint": 0,
+        "targetedLint": "0 errors, 0 warnings",
         "checkAppointmentSchemaInvariants": "0/1/0, 39 assertions",
         "checkAppointmentAuthz": "0/1/0, 43 assertions",
-        "checkReservationAuthz": "0/1/0, 36 assertions (34 before, plus two layer-attribution checks)",
+        "checkAppointmentLifecycle": "0/1/0, 49 assertions",
+        "checkAppointmentRoutes": "0/1/0, 56 assertions",
+        "checkReservationAuthz": "0/1/0, 36 assertions",
         "noDbRegressions": "13 of 13 exit 0",
-        "dbRegressions": "17 of 17 exit 0 including restaurant phase0, order transaction, all action packages and the HTTP boundary",
+        "dbRegressions": "19 of 19 exit 0 including restaurant phase0, order transaction, all action packages and the HTTP boundary",
         "npmAuditOmitDev": "0 vulnerabilities",
-        "build": 0,
-        "secretScan": "0 hits"
+        "build": "0, all ten appointment routes dynamic",
+        "secretScan": "0 hits",
+        "allowedPathAudit": "21 files, zero forbidden paths"
       },
-      "remaining": "B3 lifecycle/waitlist/deposits/reminders and B4 APIs plus Business OS UI are NOT implemented. No Stripe, email, SMS or WhatsApp adapter exists yet; when built they must be stubbed and proven not invoked on refusal."
+      "remaining": "Wave B is COMPLETE. Not yet built: a real payment or messaging provider (deliberately unwired), and an automated hold-expiry/reminder worker - dispatchDueReminders exists and is tested but nothing schedules it, which is honest because no durable scheduler is claimed."
     },
     {
       "id": "P2-004",

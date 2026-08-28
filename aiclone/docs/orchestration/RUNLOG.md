@@ -1529,3 +1529,94 @@ reservation or appointment tables, no `btree_gist`, `Profile`=16. Origin remains
 counts 4/3/4/1/0/1. The Wave A worktree was briefly edited by mistake and immediately
 restored to clean. No push, PR, deploy, tunnel or dev server. PostgreSQL was already
 listening before this cycle and was left as found.
+
+
+
+## 2026-08-29 02:55 +05:30 — WAVE B COMPLETE at `ce6348c`: shared appointments engine
+
+Root implemented, gated and reviewed all four packages. **No worker independence is
+claimed.** Gateway port 5476 absent and no model-pinning dispatch tool exposed, so per the
+standing fallback no probe cycle was spent.
+
+| Package | Commit | Scope |
+|---|---|---|
+| B1 schema | `3ebe8a1` | 7 enums, 6 tables, 11 Booking columns, exclusion constraint, append-only trigger |
+| B2 engine | `8e76bf0` | availability + conflict, **plus the Wave A timezone fix** |
+| B3 services | `2789e50` | waitlist, deposits, reminders, inert providers |
+| B4 API + UI | `0b33887` | ten routes, owner panel, a11y coverage |
+
+Merges: `e1372a3` (B1–B2), `ce6348c` (B3–B4). Both `--no-ff`, zero conflicts. `P2-005` is
+`done`.
+
+### What is now usable
+One appointments engine serves coaching, consulting, CA practice, salon, events, real
+estate and pet care. An owner can book against staff, rooms or equipment; availability,
+capacity and double-booking are refused at the write boundary; appointments move through
+`PENDING_PAYMENT → HELD → CONFIRMED → CHECKED_IN → COMPLETED` with `CANCELLED`, `NO_SHOW`
+and `EXPIRED` as guarded exits; customers can join a waitlist and be promoted into a real
+booking; deposits and reminders are tracked. All from the existing Business OS console,
+with **no industry-specific fork**.
+
+### The containment that matters most: money and messaging cannot fire
+Deposits touch money and reminders touch someone's inbox. Rather than leave a TODO where a
+Stripe or Twilio call would go, the capability is an **injected interface with an inert
+default**. Consequences, each asserted by invocation counter rather than claimed in prose:
+
+- An unavailable payment provider returns `DEPENDENCY_UNAVAILABLE` and **does not** move the
+  deposit to `AUTHORIZED`. Recording a payment that never happened would be worse than
+  failing.
+- An unavailable notifier leaves the reminder `SCHEDULED`, never `SENT`, so the ledger
+  cannot claim a delivery.
+- A reminder on a cancelled, completed, no-show or expired appointment is `SUPPRESSED`
+  **without reaching the notifier at all**.
+- Every refusal path across B3 and B4 shows `payments.calls === 0` and
+  `notifications.calls === 0`.
+
+`runtime.ts` wires the unconfigured defaults, so acquiring a live provider requires a
+deliberate code change. The UI matches: a pending deposit reads *"no payment has been
+taken"* and a queued reminder reads *"not yet sent"*, and two a11y assertions enforce that
+exact wording so a future edit cannot quietly imply otherwise.
+
+### Waitlist promotion goes through the engine, not around it
+Promotion books via `PersistedAppointments.book()`, so it inherits capacity, availability
+and overlap refusal instead of bypassing them. It claims the entry under a row lock first,
+so two concurrent promoters cannot both convert it. If the booking is then refused — for
+example because the slot was taken while the customer waited — the entry is returned to
+`WAITING` rather than silently losing its place. Both behaviours are asserted, including
+the case where a second entry wants the slot the first just took.
+
+### Availability is shared, not duplicated
+The availability endpoint calls `engine.availabilityContext()` and uses the same
+tenant-scoped windows, overrides and buffer the booking path uses. Re-querying in the HTTP
+layer would have let the two drift, so a slot reported available could then be refused for
+an availability reason. Sharing the data removes that class of bug.
+
+### Combined gates on primary `ce6348c`
+`prisma validate`/`generate` 0 · `tsc` 0 · targeted `eslint` 0 errors and 0 warnings ·
+13/13 no-DB harnesses 0 · 19/19 DB-backed harnesses 0, including
+`check-restaurant-phase0-behavior`, `check-restaurant-order-transaction`, all three action
+packages and the HTTP boundary · four appointment harnesses **0/1/0** with 39, 43, 49 and
+56 assertions · reservation engine **0/1/0** with 36 · `npm audit --omit=dev` 0
+vulnerabilities · `npm run build` 0 with all ten appointment routes dynamic · secret scan 0
+hits · allowed-path audit 21 files, zero forbidden.
+
+### Two corrections made rather than worked around
+`setDeposits` was flagged unused because the panel displayed deposit state but never
+fetched it — and deposit visibility is a stated requirement. Rather than delete the
+display, a tenant-checked deposit `GET` was added with its own 403 coverage, returning
+`null` instead of 404 when no deposit exists, because *"this booking takes no deposit"* is
+a legitimate answer rather than an error.
+
+An unused `DepositState` import was removed instead of suppressed.
+
+### Not built, and said plainly
+No real payment or messaging provider is wired, on purpose. `dispatchDueReminders` exists
+and is tested but **nothing schedules it** — there is no durable worker, and none is
+claimed. Hold expiry is modelled as a status but is likewise not swept automatically.
+
+### Preservation
+Live `personalink` untouched: 35 public tables, `_prisma_migrations` absent, no reservation
+or appointment tables, no `btree_gist`, `Profile`=16. Origin remains
+`4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Six frozen worktrees at `ea69595`, dirty
+4/3/4/1/0/1. No push, PR, deploy, tunnel or dev server. PostgreSQL was already listening
+and was left as found.
