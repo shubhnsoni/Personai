@@ -879,3 +879,10 @@ Verdict: **ACCEPTED pending one-at-a-time `--no-ff` merge**. Lane D remains acti
 ## 2026-08-28 09:16 +05:30 - Wave 3 Lane A INTEGRATED green
 
 Merged `security/lane-a-actions` one-at-a-time with `--no-ff` at `4d2407648147958a6a35b453a541cb1544cffb46`. Post-merge TypeScript and targeted ESLint both exited 0. Lane B remains integrated green; Lane D remains active and untouched.
+
+
+## 2026-08-28 09:22 +05:30 - Wave 3 Lane C ACCEPTED pending serial merge
+
+Lane C `security/lane-c-resources`, job `8e0d703c`, commit `9e14fcd3fb434117b0b2c02ac346016f3c650f84`; requested and observed model `gpt-5.6-sol`. Root independently verified exact five-file scope, zero secret-pattern matches, executable route-boundary coverage, approved rehearsal target with deterministic rollback, no real Stripe call, Prisma validate 0, TypeScript 0, targeted ESLint 0, resource harness normal/inverted/restored **0/1/0**, all five named regressions 0, and production build 0. Lesson completion binds member+enrollment+course+lesson; booking ICS requires owned profile; only published public catalogs are anonymous and use explicit field projection.
+
+Verdict: **ACCEPTED pending one-at-a-time `--no-ff` merge**. Lane D remains active and untouched; Lane E remains unresolved because its restored normal harness is non-zero.

@@ -1,6 +1,6 @@
 {
   "milestone": "Phase 1 foundation - wave 1 dispatch",
-  "updatedAt": "2026-08-28 09:16 +05:30",
+  "updatedAt": "2026-08-28 09:22 +05:30",
   "updatedBy": "wave 3 supervisor (gpt-5.6-sol)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -344,10 +344,13 @@
           "postMergeGates": "tsc=0, targeted eslint=0"
         },
         "laneC": {
-          "status": "running",
+          "status": "accepted_pending_merge",
           "job": "8e0d703c",
           "branch": "security/lane-c-resources",
-          "requestedModel": "gpt-5.6-sol"
+          "requestedModel": "gpt-5.6-sol",
+          "observedModel": "gpt-5.6-sol",
+          "commit": "9e14fcd3fb434117b0b2c02ac346016f3c650f84",
+          "independentGates": "scope, secret scan, prisma validate, tsc, targeted eslint, executable harness 0/1/0, five named regressions and build all passed"
         },
         "laneD": {
           "status": "running",
@@ -498,9 +501,9 @@
     }
   ],
   "laneState": {
-    "observedAt": "2026-08-28 09:16 +05:30",
+    "observedAt": "2026-08-28 09:22 +05:30",
     "activeWorkers": 4,
-    "kirocrewSessions": "Wave 3: lanes A and B integrated green; lanes C and E finished awaiting resolution; lane D remains active.",
+    "kirocrewSessions": "Wave 3: lanes A and B integrated green; lane C accepted pending serial merge; lane E finished but unresolved; lane D remains active.",
     "supervisorProcesses": 0,
     "continuousSupervisors": 0,
     "liveActivityMode": "on-demand one-shot snapshot; not a live feed and does not self-update",
