@@ -199,11 +199,11 @@ export function ImportStudio({
         if (!text || reading) return
         const url = looksLikeUrl(text)
         if (url && text.split(/\n/).filter(Boolean).length <= 1) {
-            void run("Reading page…", () => ingestUrl(url))
+            void run("Reading page…", () => ingestUrl(profileId, url))
             return
         }
-        void run("Reading…", () => ingestText(text, hint))
-    }, [draft, hint, reading])
+        void run("Reading…", () => ingestText(profileId, text, hint))
+    }, [draft, hint, profileId, reading])
 
     useEffect(() => {
         if (!onBindApply) return
@@ -232,7 +232,7 @@ export function ImportStudio({
         setFileName(file.name)
         const fd = new FormData()
         fd.append("file", file)
-        void run(`Reading ${file.name}…`, () => ingestFile(fd, hint))
+        void run(`Reading ${file.name}…`, () => ingestFile(profileId, fd, hint))
     }
 
     const visible = useMemo(

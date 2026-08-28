@@ -1,6 +1,10 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import {
+    requireOwnedProfile,
+    unwrapOwnershipResult,
+} from "@/lib/security"
 import { revalidatePath } from "next/cache"
 import {
     bundleFromHtml,
@@ -35,7 +39,8 @@ export type ApplyResult = {
     destinations: string[]
 }
 
-export async function ingestText(raw: string, hint: SourceHint = "auto"): Promise<ImportBundle> {
+export async function ingestText(claimedProfileId: string, raw: string, hint: SourceHint = "auto"): Promise<ImportBundle> {
+    unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId }))
     const text = raw.trim()
     if (!text) throw new Error("Paste some text first.")
     let bundle = bundleFromText(text, hint === "auto" ? "Pasted text" : `${hint} paste`)
@@ -57,7 +62,8 @@ export async function ingestText(raw: string, hint: SourceHint = "auto"): Promis
     return serializeBundle(await enrichWithModel(bundle, text))
 }
 
-export async function ingestUrl(url: string): Promise<ImportBundle> {
+export async function ingestUrl(claimedProfileId: string, url: string): Promise<ImportBundle> {
+    unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId }))
     try {
         const target = normalizeUrl(url)
         const kind = classifyUrl(target)
@@ -167,7 +173,8 @@ export async function ingestUrl(url: string): Promise<ImportBundle> {
     }
 }
 
-export async function ingestFile(formData: FormData, hint: SourceHint = "auto"): Promise<ImportBundle> {
+export async function ingestFile(claimedProfileId: string, formData: FormData, hint: SourceHint = "auto"): Promise<ImportBundle> {
+    unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId }))
     const file = formData.get("file")
     if (!(file instanceof File)) throw new Error("No file")
     const buf = Buffer.from(await file.arrayBuffer())
@@ -192,7 +199,7 @@ export async function ingestFile(formData: FormData, hint: SourceHint = "auto"):
         const items = parseCsv(text)
         if (items.length) return serializeBundle({ sourceLabel: name, sourceKind: "csv", items })
     }
-    return ingestText(text, hint)
+    return ingestText(claimedProfileId, text, hint)
 }
 
 /**
@@ -215,7 +222,9 @@ function sanitizeDeep<T>(value: T): T {
     return value
 }
 
-export async function applyImportBundle(profileId: string, items: ImportItem[]): Promise<ApplyResult> {
+export async function applyImportBundle(claimedProfileId: string, items: ImportItem[]): Promise<ApplyResult> {
+    const { profile: ownedProfile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId }))
+    const profileId = ownedProfile.id
     const selected = sanitizeDeep(items).filter((i) => i.selected)
     if (!selected.length) throw new Error("Select at least one item.")
 

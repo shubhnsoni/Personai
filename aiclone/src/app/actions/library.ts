@@ -4,9 +4,14 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import {
+    requireOwnedResource,
+    unwrapOwnershipResult,
+} from "@/lib/security"
+import {
     clearMemberCookie,
     createLibraryLink,
     issueLibraryAccess,
+    normalizeEmail,
     upsertMember,
 } from "@/lib/members"
 import { sendEmail } from "@/lib/email"
@@ -36,8 +41,37 @@ export async function logoutLibrary() {
     redirect("/library/login")
 }
 
+async function requireOwnedLibraryRecipient(email: string) {
+    const normalized = normalizeEmail(email)
+    unwrapOwnershipResult(await requireOwnedResource({
+        resourceId: normalized,
+        findOwned: ({ resourceId, actor }) => {
+            const profileIds = actor.profiles.map((profile) => profile.id)
+            const recipient = { equals: resourceId, mode: "insensitive" as const }
+            return prisma.profile.findFirst({
+                where: {
+                    id: { in: profileIds },
+                    OR: [
+                        { digitalProducts: { some: { purchases: { some: { visitorEmail: recipient } } } } },
+                        { courses: { some: { enrollments: { some: { visitorEmail: recipient } } } } },
+                        { events: { some: { registrations: { some: { visitorEmail: recipient } } } } },
+                        { communities: { some: { members: { some: { visitorEmail: recipient } } } } },
+                        { bookings: { some: { visitorEmail: recipient } } },
+                        { conversations: { some: { visitorEmail: recipient } } },
+                        { leads: { some: { email: recipient } } },
+                        { restaurantOrders: { some: { guestEmail: recipient } } },
+                    ],
+                },
+                select: { id: true },
+            })
+        },
+    }))
+    return normalized
+}
+
 export async function resendLibraryLink(email: string) {
-    const member = await upsertMember(email)
+    const normalized = await requireOwnedLibraryRecipient(email)
+    const member = await upsertMember(normalized)
     const headersList = await headers()
     const host = headersList.get("x-forwarded-host") || headersList.get("host") || "localhost:3000"
     const proto = headersList.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https")
