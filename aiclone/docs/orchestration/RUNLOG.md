@@ -695,3 +695,10 @@ Lane 1 merged into primary with `--no-ff` at `6c3229c`. Post-merge `tsc`, target
 Lane 3 was not dispatched. Although lane 1 is now committed, the independently confirmed onboarding action trusts caller-supplied identity; a separate security remediation must be accepted first, and the 04:45 hard stop forbids starting another large package this cycle.
 
 At 04:46 IST, P1-013 observability job `0e532936` remains active with two in-scope uncommitted files, zero commits and no report. It was not interrupted or integrated; its isolated state is recorded for the next cycle. All completed one-shot jobs had already removed themselves, so no completed cron remained to delete. Cleanup verified: cloudflared process count 0; ports 3000 and 3100 each have 0 listeners; primary is clean except preserved `.codex-remote-attachments/`; no temporary server remains.
+
+
+## 2026-08-28 04:49 +05:30 — FINAL HARD STOP: supervisor retired; observability remains isolated
+
+No new package was dispatched after 04:45. Primary remains at `020d23c`, containing the two independently green serial integrations already recorded above. P1-013 job `0e532936` remains active and isolated at base `9291e93`: zero commits, no external report, and exactly two in-scope uncommitted files whose last writes were 04:00:58 and 04:01:05. It was not interrupted, accepted, or integrated.
+
+The completed recurring overnight supervisor job `4cacfc68` was removed so no further post-hard-stop cycles run. No completed worker cron remains registered. Final cleanup re-confirmed cloudflared process count 0, ports 3000 and 3100 with 0 listeners, and primary clean except preserved `.codex-remote-attachments/`. No temporary server, push, PR, deploy, migration, tunnel, or frozen-worktree change occurred.
