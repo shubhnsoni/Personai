@@ -1620,3 +1620,98 @@ or appointment tables, no `btree_gist`, `Profile`=16. Origin remains
 `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Six frozen worktrees at `ea69595`, dirty
 4/3/4/1/0/1. No push, PR, deploy, tunnel or dev server. PostgreSQL was already listening
 and was left as found.
+
+
+
+## 2026-08-29 03:16 +05:30 — WAVE C C1 INTEGRATED at `d08a5a4`: cases and projects schema
+
+Root implemented, gated and reviewed this package. **No worker independence is claimed.**
+Gateway port 5476 absent and no model-pinning dispatch tool exposed.
+
+C1 commit `fc5bcef`, merged `--no-ff` at `d08a5a4aa18ac33c1fb2f8374e03ce3cf4a1ede6`, zero
+conflicts. `P2-006` is `in_progress_c1_integrated`.
+
+### Ten tables that compose rather than duplicate
+`CaseIntake`, `CaseProject`, `CaseBrief`, `CaseMilestone`, `CaseDeliverable`,
+`CaseDocumentRequest`, `CaseInvoice`, `CaseTaskLink`, `CaseApprovalLink` and append-only
+`CaseEvent`, plus eight enums.
+
+The directive's hardest requirement here was *not* to create parallel contact, task,
+approval or audit systems. A naive "the tables exist" check would pass either way, so the
+harness verifies **foreign key targets by name**: `CaseTaskLink → TaskJob`,
+`CaseApprovalLink → Approval`, `CaseDeliverable`/`CaseDocumentRequest → ProfileDocument`,
+`CaseProject`/`CaseIntake → Contact` and `→ Workspace`, `CaseProject → Location`. A further
+assertion fails if any `Case*` table grows its own `email`, `phone`, `payload`, `attempts`,
+`leaseToken` or `embedding` column. Contact-level `ActivityEvent` is untouched; `CaseEvent`
+is a separate case-level timeline. `CaseInvoice` records billing **state** and links out to
+`Payment` rather than becoming a second accounting ledger.
+
+The aggregate is `CaseProject` because `Project` is already taken by the pre-existing
+portfolio model. Renaming that would have been breaking for no benefit, and the harness
+asserts `Project` still exists.
+
+### A regression I introduced, and the verification gap it exposed
+Adding the back-relations with a PowerShell `-replace` using a **double-quoted**
+capture-group reference interpolated it as an *undefined shell variable* rather than the
+regex group. That **deleted six pre-existing relation fields** across `Contact`,
+`Workspace` and `Location`. `prisma format` then helpfully re-added them under
+auto-generated names — `sourceLinks` became `ContactSourceLink`, `contacts` became
+`Contact`, `bookings` became `Booking` — which broke `src/lib/persistence/contacts.ts`.
+
+The gap is the part worth recording. I had already run a semantic check with
+`prisma migrate diff` and it was clean: **0** `DROP TABLE`, **0** `DROP COLUMN`, **0**
+`ALTER COLUMN`, **0** `ADD COLUMN`. That check was not wrong, it was *insufficient* —
+`migrate diff` compares DATABASE schema, and Prisma relation **field names are client-side
+only**, so they never appear in SQL. The database was genuinely unchanged while the client
+contract was broken.
+
+`tsc` caught the three relations application code actually used. It could not catch the
+others, because an unused-but-declared relation renames silently and only breaks a future
+consumer. So I wrote a verifier that compares relation field names between the committed
+schema and the working copy across every model: **63 pre-existing models checked, 0
+renamed or dropped, exactly 10 new models added.** That verifier now lives beside the other
+rehearsal tooling and should be run after any `prisma format`.
+
+I also hit a second, smaller self-inflicted problem: a `git commit -m` message containing
+a literal `$1` broke shell escaping badly enough that git treated part of the message as a
+path. Commit messages of this length now go through `git commit -F` with a file.
+
+### Rehearsal — disposable target only
+Fresh `pg_dump` first (228319 bytes, sha256 `c7c76351…`).
+
+| Step | tables | cols | constraints | indexes | enum labels | triggers | ext | exclusion |
+|---|---|---|---|---|---|---|---|---|
+| before | 64 | 707 | 624 | 166 | 85 | 8 | 2 | 2 |
+| apply | 74 | 799 | 713 | 195 | 130 | 10 | 2 | 2 |
+| rollback | 64 | 707 | 624 | 166 | 85 | 8 | 2 | 2 |
+| reapply | 74 | 799 | 713 | 195 | 130 | 10 | 2 | 2 |
+
+Rollback **byte-identical** to baseline (raw `b05804b2…`), with Wave A/B exclusion
+constraints, `btree_gist` and all four append-only triggers intact and the existing
+`Booking` row preserved. Reapply structurally identical to apply (normalized `d43b59a3…`).
+A post-fix drift check confirms only the five known pre-existing `profileId`
+`DropForeignKey` statements remain — excluded programmatically for the **third** wave
+running, with the removal count asserted.
+
+`down.sql` deliberately drops neither `reject_append_only_mutation()` (four ledgers depend
+on it) nor `btree_gist` (two exclusion constraints depend on it, and this migration
+installed neither).
+
+### Combined gates on primary `d08a5a4`
+`prisma validate`/`generate` 0 · `tsc` 0 · relation-rename verifier 0 · targeted `eslint`
+0 · 13/13 no-DB harnesses 0 · 20/20 DB-backed harnesses 0, including
+`check-restaurant-phase0-behavior`, `check-restaurant-order-transaction`, all four
+appointment harnesses, both reservation harnesses, all three action packages and the HTTP
+boundary · `npm audit --omit=dev` 0 vulnerabilities · `npm run build` 0 · secret scan 0
+hits.
+
+### Not done
+**C2** cases runtime and **C3** APIs plus Business OS UI are not implemented. The schema
+exists, so both are runtime and surface work needing no further migration. I stopped before
+starting C2 rather than risk leaving it half-written.
+
+### Preservation
+Live `personalink` untouched: 35 public tables, `_prisma_migrations` absent, no
+reservation, appointment or case tables, no `btree_gist`, `Profile`=16. Origin remains
+`4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Six frozen worktrees at `ea69595`, dirty
+4/3/4/1/0/1. No push, PR, deploy, tunnel or dev server.

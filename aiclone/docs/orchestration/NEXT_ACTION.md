@@ -15,15 +15,32 @@ resume aid, not a source of truth. Re-measure before trusting any line of it.
 | Wave A merge | `79abb14716000726276743b5a77098f349f10a0c` |
 | Wave B B1-B2 merge | `e1372a3d764d1daa92e44211bfe58039880d6f6d` |
 | Wave B B3-B4 merge | `ce6348c62d1f9c17a7b72eb26b2b3e551f73b34d` |
+| Wave C C1 merge | `d08a5a4aa18ac33c1fb2f8374e03ce3cf4a1ede6` |
 | Preserved untracked | `.codex-remote-attachments/`, `aiclone/docs/orchestration/P1_014_ACTION_INVENTORY.md` |
 
 Integrated and green: P2-003 (`64ec987`), Wave A reservations (`79abb14`), **Wave B shared
-appointments engine COMPLETE** (`e1372a3` + `ce6348c`). `P1-006` and `P2-005` are both
-`done`.
+appointments engine COMPLETE** (`e1372a3` + `ce6348c`), **Wave C C1 cases schema**
+(`d08a5a4`). `P1-006` and `P2-005` are `done`; `P2-006` is `in_progress_c1_integrated`.
 
-**NEXT READY WORK: Wave C cases/projects.** Scope, required proof and the list of existing
-models that must be REUSED rather than duplicated are tabulated in `INTEGRATION_QUEUE.md`.
-Needs a fresh isolated worktree with real `node_modules`.
+**NEXT READY WORK: Wave C C2 (cases runtime) and C3 (APIs + UI).** No further migration is
+required — C1 created everything they need. Scope and required proof are tabulated in
+`INTEGRATION_QUEUE.md`. The Wave C worktree `../personai-wave-c-cases-wt` is clean at
+`fc5bcef` with its own real `node_modules`.
+
+## Two schema-editing rules earned the hard way
+
+**1. `prisma migrate diff` cannot prove a schema edit is safe.** It compares DATABASE
+schema, and Prisma relation *field names* are client-side only. A rename that breaks every
+consumer produces a completely clean SQL diff. After any `prisma format` or bulk edit, run
+`%TEMP%\personalink-phase0\wave-c\verify-no-renames.js`, which compares relation field names
+between the committed schema and the working copy across all models. Wave C shipped this
+bug and `tsc` only caught the relations that application code happened to use.
+
+**2. Never use PowerShell `-replace` with a double-quoted capture-group reference.** The
+shell interpolates it as an undefined variable and silently deletes the matched text. That
+is how six pre-existing relation fields were destroyed. Use an editing tool instead. Also
+send long commit messages through `git commit -F <file>`: a literal `$1` in `-m` broke
+escaping enough that git treated part of the message as a path.
 
 ## The single most important thing to know before writing another overlap check
 

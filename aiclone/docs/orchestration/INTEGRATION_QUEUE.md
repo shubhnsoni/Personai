@@ -377,3 +377,52 @@ contact, task, approval or audit systems.
 5. **No payment or messaging provider wired** — deliberate. Wiring one requires editing
    `src/lib/appointments/runtime.ts` and must come with tests that the live adapter is only
    reached on accepted paths.
+
+
+
+## Wave C C1 — INTEGRATED 2026-08-29 at `d08a5a4`
+
+Nothing pushed; origin remains `4b386d1`. **Root implemented and reviewed; no worker
+independence is claimed.**
+
+| Order | Package | Commit | Scope |
+|---|---|---|---|
+| 1 | C1 cases schema (exclusive `prisma/**`) | `fc5bcef` | 8 enums, 10 tables, append-only trigger |
+
+Merged `--no-ff` at `d08a5a4aa18ac33c1fb2f8374e03ce3cf4a1ede6`, zero conflicts. Gates:
+invariant harness `0/1/0` with 36 assertions; relation-rename verifier 0 across 63
+pre-existing models; 13/13 no-DB and 20/20 DB-backed regressions 0; audit 0; build 0.
+
+### Standing rule earned in this package
+**`prisma migrate diff` is not sufficient to prove a schema edit was safe.** It compares
+DATABASE schema, and Prisma relation *field names* are client-side only, so a rename that
+breaks every consumer produces a clean SQL diff. After any `prisma format` or bulk schema
+edit, also run the relation-name verifier at
+`%TEMP%\personalink-phase0\wave-c\verify-no-renames.js`, which compares field names between
+the committed schema and the working copy across all models.
+
+Related: do not use PowerShell `-replace` with a double-quoted capture-group reference —
+the shell interpolates it as an undefined variable and silently deletes the matched text.
+Use an editing tool. And send long commit messages through `git commit -F <file>`; a
+literal `$1` in `-m` broke escaping badly enough that git read part of the message as a
+path.
+
+## Next in queue — Wave C C2 and C3, READY
+
+Base `d08a5a4` or newer primary. The Wave C worktree `../personai-wave-c-cases-wt` is clean
+at `fc5bcef` with its own real `node_modules` and can be reused. **No further migration is
+required** — C1 created everything C2 and C3 need.
+
+| Pkg | Owner paths | Required proof |
+|---|---|---|
+| C2 | `src/lib/cases/**` + harness | intake → brief → active case; milestone, deliverable and document-request transitions; compose existing `TaskJob` and `Approval` rather than reimplementing; `CaseInvoiceState` transitions; tenant isolation on `workspaceId`; non-enumerating foreign-vs-missing refusals; idempotency on `(workspaceId, idempotencyKey)`; append-only `CaseEvent` per accepted change; zero effects on refusal; `0/non-zero/0` |
+| C3 | `src/app/api/platform/cases/**`, `src/components/business-os/cases-panel.tsx` + shell mount, route and a11y harnesses | four principal classes; byte-identical foreign-vs-nonexistent; 400/409/503 split; explicit loading/empty/401/403/dependency wording; persisted data only; contacts, tasks and approvals rendered through the existing shared systems; no real storage, payment or messaging call |
+
+Reuse the patterns already proven here: Prisma **typed** queries for any time comparison
+(never raw `Date` parameters), injected inert adapters for anything external, and a
+layer-attribution field on conflict errors so a harness can prove the application check is
+live rather than masked by a database constraint.
+
+Then Wave D content/cohorts, Wave E truthful vertical activation, commerce inventory
+hardening, P1-009 scoped lint. Healthcare/clinics/hospitals remain blueprint-only. P1-007
+live cutover is NOT executed.

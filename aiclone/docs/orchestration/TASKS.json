@@ -1,6 +1,6 @@
 {
-  "milestone": "Wave B COMPLETE - shared appointments engine integrated; Wave C cases/projects next",
-  "updatedAt": "2026-08-29 02:55 +05:30",
+  "milestone": "Wave B COMPLETE; Wave C C1 schema integrated - C2/C3 runtime and UI remain",
+  "updatedAt": "2026-08-29 03:16 +05:30",
   "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -747,6 +747,56 @@
         "allowedPathAudit": "21 files, zero forbidden paths"
       },
       "remaining": "Wave B is COMPLETE. Not yet built: a real payment or messaging provider (deliberately unwired), and an automated hold-expiry/reminder worker - dispatchDueReminders exists and is tested but nothing schedules it, which is honest because no durable scheduler is claimed."
+    },
+    {
+      "id": "P2-006",
+      "title": "Shared cases and projects engine",
+      "status": "in_progress_c1_integrated",
+      "owner": "root (claude-opus-5)",
+      "workerIndependenceClaimed": false,
+      "dependencies": ["P2-002"],
+      "base": "872fed1f2e77c4981ca4a2f43115957657652439",
+      "branch": "feature/wave-c-cases",
+      "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-wave-c-cases-wt",
+      "mergeCommit": "d08a5a4aa18ac33c1fb2f8374e03ce3cf4a1ede6",
+      "commits": { "C1_schema": "fc5bceff9a944eddf78a7365cc58953344b2606e" },
+      "scope": "One cases/projects engine for consultants, agencies, CA/accounting practices, events and real estate. No per-industry fork.",
+      "c1": {
+        "added": "8 enums; 10 tables (CaseIntake, CaseProject, CaseBrief, CaseMilestone, CaseDeliverable, CaseDocumentRequest, CaseInvoice, CaseTaskLink, CaseApprovalLink, append-only CaseEvent); one append-only trigger reusing reject_append_only_mutation().",
+        "compositionProven": "The harness verifies foreign key TARGETS by name, so a parallel system cannot pass: CaseTaskLink->TaskJob, CaseApprovalLink->Approval, CaseDeliverable/CaseDocumentRequest->ProfileDocument, CaseProject/CaseIntake->Contact and ->Workspace, CaseProject->Location. A further assertion fails if any Case* table grows contact, task-queue or embedding columns of its own. Contact-level ActivityEvent is untouched; CaseEvent is a separate case-level timeline. CaseInvoice records billing STATE and links to Payment rather than becoming a second accounting ledger.",
+        "nameDecision": "The aggregate is CaseProject because Project is already taken by the pre-existing portfolio model. Renaming that would have been breaking for no benefit; the harness asserts Project still exists.",
+        "tenancy": "workspaceId, which /api/platform already authorizes against. Unlike the restaurant and appointment domains there is no legacy profileId-scoped table to bridge to, so no bridge was invented.",
+        "rehearsal": {
+          "target": "personalink_phase0_rehearsal_20260826_210704",
+          "livePersonalinkTargeted": false,
+          "freshBackup": "wave-c-pre-migration-2026-08-28T21-33-48-097Z.dump, 228319 bytes, sha256 c7c76351daf39111df2f5df02c5c38c1b8d3928d99bbdf829dba2472297ba453",
+          "catalogBefore": "64 tables / 707 columns / 624 constraints / 166 indexes / 85 enum labels / 8 triggers / 2 ext / 2 exclusion / 1 Booking row",
+          "catalogAfter": "74 / 799 / 713 / 195 / 130 / 10 / 2 / 2 / 1 Booking row",
+          "rollbackVsBaseline": "byte-identical, raw sha256 b05804b22e9b84a4ddc59d2211fa92603b4dd0b45bde3cec83bb5639b6afb108, with Wave A/B constraints, extensions and triggers intact",
+          "reapplyVsApply": "structurally identical, normalized sha256 d43b59a3bd687e1ee93fdad520763b08cfb17ceb811f34153b09994204178abd",
+          "postFixDriftCheck": "only the five known pre-existing profileId DropForeignKey statements remain; zero CREATE/ALTER/DROP of anything else"
+        },
+        "regressionIntroducedAndFixed": {
+          "what": "Adding back-relations with a PowerShell -replace using a double-quoted capture-group reference interpolated it as an undefined shell variable instead of the regex group, DELETING six pre-existing relation fields across Contact, Workspace and Location. prisma format then re-added them under auto-generated names (sourceLinks -> ContactSourceLink, contacts -> Contact, bookings -> Booking), breaking src/lib/persistence/contacts.ts.",
+          "whyTheEarlierCheckMissedIt": "The semantic check used prisma migrate diff, which compares DATABASE schema. Prisma relation FIELD NAMES are client-side only and never appear in SQL, so the diff was legitimately clean while the client contract was broken.",
+          "howItWasCaughtAndClosed": "tsc caught the three relations application code used. A dedicated verifier then compared relation field names between the committed schema and the working copy across all 63 pre-existing models, proving the unused ones were not silently renamed either: 0 renamed or dropped, exactly 10 new models. That verifier is the durable guard.",
+          "verifierLocation": "%TEMP%\\personalink-phase0\\wave-c\\verify-no-renames.js (outside the repo, as with the other rehearsal tooling)"
+        },
+        "gates": {
+          "prismaValidate": 0,
+          "prismaGenerate": 0,
+          "tsc": 0,
+          "targetedLint": 0,
+          "checkCaseSchemaInvariants": "0/1/0, 36 assertions",
+          "relationRenameVerifier": "0 renamed across 63 pre-existing models",
+          "noDbRegressions": "13 of 13 exit 0",
+          "dbRegressions": "20 of 20 exit 0",
+          "npmAuditOmitDev": "0 vulnerabilities",
+          "build": 0,
+          "secretScan": "0 hits"
+        }
+      },
+      "remaining": "C2 cases runtime and C3 APIs plus Business OS UI are NOT implemented. The schema exists, so both are runtime/surface work needing no further migration."
     },
     {
       "id": "P2-004",
