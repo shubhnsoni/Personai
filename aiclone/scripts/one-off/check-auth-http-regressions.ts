@@ -114,6 +114,7 @@ function portIsClear(port: number): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
+  process.loadEnvFile(".env")
   assertDisposableTarget(process.env.DATABASE_URL)
 
   const previousDiagnosticToken = process.env.HEALTH_DIAGNOSTICS_TOKEN
