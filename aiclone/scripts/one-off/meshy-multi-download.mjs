@@ -40,7 +40,6 @@ if (await modelsTab.count()) await modelsTab.click()
 await page.waitForTimeout(800)
 
 // Selection toggle in the assets toolbar (checkbox square)
-const selectToggle = page.locator("button").filter({ has: page.locator("svg") })
 console.log("trying select mode")
 const toolbarBtns = page.locator("text=Search Mo").locator("xpath=ancestor::div[1]/button")
 console.log("toolbar near search", await toolbarBtns.count())
@@ -60,8 +59,6 @@ if (await panel.count()) {
 await shot(page, "select-mode.png")
 
 // Click first 10 model tiles in the right-side Models grid
-const grid = page.locator("text=Models").locator("xpath=following::img[1]/ancestor::div[contains(@style,'') or true()][1]")
-const tiles = page.locator("img").filter({ hasNotText: "" })
 console.log("imgs", await page.locator("img").count())
 
 // Click the 10 food tiles in the right panel by going through visible model cards

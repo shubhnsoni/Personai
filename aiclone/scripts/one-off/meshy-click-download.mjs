@@ -34,7 +34,6 @@ if (await label.count()) {
     await label.scrollIntoViewIfNeeded().catch(() => {})
 }
 
-const thumbs = page.locator("img").filter({ has: page.locator("xpath=ancestor::div") })
 // Prefer images in the chat column
 const chatImgs = page.locator("div").filter({ hasText: "Created 3D model" }).locator("img")
 const n = await chatImgs.count()

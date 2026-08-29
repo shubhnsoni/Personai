@@ -51,7 +51,6 @@ const assets = page.locator("text=Models").first()
 if (await assets.count()) await assets.click().catch(() => {})
 await page.waitForTimeout(800)
 
-const tiles = page.locator("[class*='asset'], [class*='Asset'] img, img")
 console.log("imgs", await page.locator("img").count())
 
 const names = ["burger", "pizza", "cappuccino", "shake", "salad", "avocado", "brownie", "pancake", "momo", "garlic", "steamer", "bread"]
@@ -63,13 +62,11 @@ for (const name of names) {
     }
 }
 
-const modelTiles = page.locator("img").filter({ hasNot: page.locator("header") })
 const count = await page.locator("aside img, [class*='library'] img, [class*='asset'] img").count()
 console.log("library imgs", count)
 
 await page.screenshot({ path: path.join(out, "before-click-model.png"), fullPage: false })
 
-const rightPanel = page.locator("text=Models").locator("xpath=ancestor::*[contains(@class,'') or true()][1]")
 const panelImgs = page.locator("img[src*='meshy'], img[src*='asset']")
 console.log("meshy imgs", await panelImgs.count())
 

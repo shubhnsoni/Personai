@@ -76,7 +76,7 @@ interface ProfileEditorProps {
 }
 
 export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEditorProps) {
-    const [isSaving, setIsSaving] = useState(false)
+    const [, setIsSaving] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [blobOpen, setBlobOpen] = useState(false)
 

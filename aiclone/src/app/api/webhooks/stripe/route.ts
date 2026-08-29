@@ -55,7 +55,7 @@ export async function POST(req: Request) {
             return new Response(null, { status: 200 })
         }
 
-        const { itemType, itemId, visitorName, profileSlug } = metadata
+        const { itemType, itemId, visitorName } = metadata
         const visitorEmail = session.customer_email || "anonymous@example.com"
         const paymentId = session.payment_intent as string
         const headersList = await headers()
