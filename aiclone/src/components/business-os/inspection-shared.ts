@@ -240,3 +240,76 @@ export function handoffVariant(state: InvoiceHandoffState) {
     if (state === "READY") return "secondary" as const
     return "outline" as const
 }
+
+
+/**
+ * One authored line of a checklist template.
+ *
+ * Distinct from InspectionItemView on purpose: a template line is what an owner ASKS, and an
+ * inspection item is what a technician ANSWERED. The item is snapshotted from the line at
+ * inspection creation, so editing a template afterwards cannot rewrite a past answer - and keeping
+ * two view types is what stops a panel from blurring the two.
+ *
+ * expectedMin and expectedMax are Decimal columns serialised as STRINGS, exactly as on the item.
+ */
+export type InspectionTemplateItemView = Readonly<{
+    id: string
+    templateId: string
+    position: number
+    kind: InspectionItemKind
+    label: string
+    guidance: string | null
+    required: boolean
+    unit: string | null
+    expectedMin: string | null
+    expectedMax: string | null
+    createdAt: string
+    updatedAt: string
+}>
+
+/**
+ * Refusal copy for the checklist-authoring surface.
+ *
+ * Deliberately a separate function from inspectionErrorCopy rather than a shared one with a noun
+ * argument: the 403 wording is the load-bearing part of both, and a caller passing the wrong noun
+ * would silently produce copy that describes the wrong object. Two small functions cannot be
+ * mis-parameterised.
+ *
+ * The 403 says the same thing for a foreign checklist and one that does not exist, because the
+ * contract has no 404 - a 404 would let a caller discover which template ids exist. This copy never
+ * claims the id is absent.
+ */
+export function templateErrorCopy(error: unknown): { title: string; description: string } {
+    if (error instanceof InspectionRequestError) {
+        if (error.status === 401) return { title: "Sign in required", description: error.message }
+        if (error.status === 403) {
+            return {
+                title: "Checklist access required",
+                description: "You do not have access to this checklist.",
+            }
+        }
+        if (error.status === 400) return { title: "Check the details", description: error.message }
+        if (error.status === 409) return { title: "That change is not allowed", description: error.message }
+        if (error.status === 503) {
+            return {
+                title: "Checklists are unavailable",
+                description: "The inspection engine is not responding right now. Nothing was changed.",
+            }
+        }
+        return { title: "Checklists could not load", description: error.message }
+    }
+    return {
+        title: "Checklists could not load",
+        description: "An unexpected problem occurred. Nothing was changed.",
+    }
+}
+
+/** The expected range an owner authored on a template line, or null when they authored none. */
+export function templateRange(item: InspectionTemplateItemView): string | null {
+    if (item.expectedMin === null && item.expectedMax === null) return null
+    const min = formatDecimal(item.expectedMin)
+    const max = formatDecimal(item.expectedMax)
+    if (min !== null && max !== null) return `expected ${min}–${max}${item.unit ? ` ${item.unit}` : ""}`
+    if (min !== null) return `expected ≥ ${min}${item.unit ? ` ${item.unit}` : ""}`
+    return `expected ≤ ${max}${item.unit ? ` ${item.unit}` : ""}`
+}

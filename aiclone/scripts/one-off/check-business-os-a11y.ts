@@ -1181,6 +1181,80 @@ check(
         /No history recorded yet/.test(inspectionSrc),
 )
 
+// ---------------------------------------------------------------------------
+// H1 follow-up: the checklist-AUTHORING surface.
+//
+// The five /inspection-templates/** endpoints shipped with no owner surface at all, so a checklist
+// could only be created by calling the API. That gap was recorded honestly rather than hidden, and
+// this closes it.
+//
+// The load-bearing distinction these assertions defend is that a template LINE and a recorded ITEM
+// are different objects. The item is a snapshot of the line taken when the inspection is created, so
+// editing a checklist must never be describable as changing a past answer - and the panel has to say
+// so, because "did I just rewrite history?" is the first thing an owner asks.
+// ---------------------------------------------------------------------------
+const templatesSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/inspection-templates-panel.tsx"),
+    "utf8",
+)
+
+check("checklist decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(templatesSrc))
+check(
+    "checklist loading states announce themselves politely and as busy",
+    templatesSrc.includes('aria-live="polite"') && templatesSrc.includes('aria-busy="true"'),
+)
+check(
+    "every checklist loading state carries a screen-reader label",
+    /Loading inspection checklists/.test(templatesSrc) && /Loading checklist detail/.test(templatesSrc),
+)
+check("checklist panel uses a structural skeleton while loading", /Skeleton/.test(templatesSrc))
+check(
+    "the checklist 403 copy never says not found, for a foreign or a nonexistent checklist alike",
+    /you do not have access to this checklist/i.test(inspectionSharedSrc) && !/not found/i.test(inspectionSharedSrc),
+)
+check(
+    "checklist refusals are split by status, with 503 leaking nothing and changing nothing",
+    /Checklists are unavailable/.test(inspectionSharedSrc) && /Nothing was changed/.test(inspectionSharedSrc),
+)
+check("checklist empty state states that no sample data is shown", /no sample checklists are shown/i.test(templatesSrc))
+check(
+    "the checklist panel contains no fabricated checklist or line",
+    !/\bid:\s*"/.test(templatesSrc) && !/sampleTemplate/i.test(templatesSrc),
+)
+check("checklist disclosures expose their expanded state", /aria-expanded=/.test(templatesSrc))
+check(
+    "checklist sections are headed rather than only visually grouped",
+    /<h3/.test(templatesSrc) && /<h5/.test(templatesSrc),
+)
+check(
+    "MEASURED: the panel states that editing a checklist cannot rewrite a past inspection",
+    /never changes what a past inspection asked or answered/.test(templatesSrc),
+)
+check(
+    "deactivating a checklist is stated to neither delete it nor alter existing inspections",
+    /It is not deleted/.test(templatesSrc) && /keep their own copy of these lines/.test(templatesSrc),
+)
+check(
+    "an empty checklist says an inspection made from it would ask nothing, rather than rendering a placeholder line",
+    /would ask nothing/.test(templatesSrc),
+)
+check(
+    "the measurement unit requirement is presented as a hint while the server stays the authority",
+    /required for a measurement/.test(templatesSrc) && /not as an authority/.test(templatesSrc),
+)
+// The panel must not decide which line is legal. If it ever starts refusing a MEASUREMENT without a
+// unit locally, this goes red - the engine and a CHECK constraint own that rule, and a second copy
+// of it in the client is exactly the drift this program keeps paying for.
+check(
+    "the checklist panel does not re-implement the server's measurement or range validation",
+    !/lineKind === "MEASUREMENT" && !lineUnit/.test(templatesSrc) && !/Number\(lineMax\) < Number\(lineMin\)/.test(templatesSrc),
+)
+check(
+    "the authoring panel is mounted in the shell, so the endpoints are reachable from the product",
+    /<InspectionTemplatesPanel workspaceId=\{selectedWorkspaceId\} \/>/.test(shellSrc) &&
+        /inspection-templates-panel/.test(shellSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
