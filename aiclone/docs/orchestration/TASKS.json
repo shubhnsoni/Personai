@@ -1,6 +1,6 @@
 {
-  "milestone": "Wave G3 COMPLETE - retainers and course access levels integrated at 5a26b6b. Waves A-G complete; retail-storefront-v1 ACTIVE. Remaining truthful gaps: appointments providers (owner-gated) and the whole fieldJobs engine.",
-  "updatedAt": "2026-08-29 18:58 +05:30",
+  "milestone": "Wave G4 COMPLETE - the fieldJobs foundation integrated at ef17770. Waves A-G4 complete; retail-storefront-v1 ACTIVE. The only remaining declared gaps are appointments:reminders and :deposits (owner-gated, inert providers) and fieldJobs:inspection (not built).",
+  "updatedAt": "2026-08-29 20:12 +05:30",
   "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -1252,6 +1252,64 @@
         "build": "exit 0",
         "disposableDb": "left fully applied at 104 tables; live personalink untouched (35 public tables, 0 wave tables, 16 Profile rows)",
         "harnessResidueFinding": "The first full sweep failed on check-schema-invariants because the G3 reconciliation fixture was still resident and collided on Workspace.profileId, which is unique. The fixture was removed with its own cleanup step, the append-only trigger verified re-armed, and pre-existing counts confirmed back at 4 courses / 6 modules / 18 lessons / 1 enrolment. Harness residue, not a regression; recorded rather than quietly re-run."
+      }
+    },
+    {
+      "id": "P2-013",
+      "title": "Shared fieldJobs engine foundation: intake and dispatch",
+      "status": "done",
+      "owner": "root (claude-opus-5)",
+      "workerIndependenceClaimed": false,
+      "orchestration": "Root-serial. ORCHESTRATION_UNAVAILABLE recorded once for this run at efb843f; no second recovery attempt.",
+      "dependencies": [
+        "P2-005",
+        "P2-012"
+      ],
+      "base": "61670da",
+      "branch": "feature/wave-g4-fieldjobs",
+      "mergeCommit": "ef17770",
+      "commits": {
+        "G4_schema": "20c509e",
+        "G4_runtime_and_promotion": "8d966af",
+        "waveG4_integration": "ef17770"
+      },
+      "scope": "fieldJobs was the last engine in the registry with nothing built at all - intake, dispatch and inspection were all planned with evidence 'none'. This is the FOUNDATION: intake and dispatch only.",
+      "notAFullEngine": "fieldJobs:inspection is deliberately NOT built and stays declared planned with evidence 'none'. Asset checks, parts, completion notes and invoice handoff are absent on purpose. The commit messages, the migration header, the capability description and the ledger all say so, so three available-sounding capabilities cannot imply a finished engine.",
+      "migration": "20260829210000_fieldjobs_intake_and_dispatch",
+      "reuse": {
+        "technician": "A field technician IS an AppointmentResource with kind STAFF. That table is already profile-scoped, already optionally tied to a Location, already carries capacity and isActive, and is already what ServiceOffering rows are made eligible for. A separate Technician table would have been a second answer to 'who can do this work', and the two would have drifted the first time somebody was added to one and not the other.",
+        "consequence": "Tenancy is therefore profileId, bridged from Workspace.profileId. That is forced rather than chosen: sharing AppointmentResource means sharing its scope. The harness asserts no fieldJobs table has a workspaceId.",
+        "byReferenceNotExtension": "AppointmentResource, ServiceOffering and Location are asserted to have gained no columns - AppointmentResource is pinned at exactly 9 columns. Reuse is by foreign key, not by extension. The runtime harness additionally asserts the technician rows are the same AppointmentResource rows (count moves by exactly the 5 seeded) and that no Booking row was created.",
+        "siteIsNotALocation": "Location models the owner's own premises and is read by the reservation, appointment and inventory engines. Creating Location rows for customer addresses would pollute it, so FieldJob.siteAddress is required free text and originLocationId is only the depot the job is dispatched FROM.",
+        "requestIsNotAJob": "FieldJobRequest is separate from FieldJob for the same reason CaseIntake is separate from CaseProject: a declined request must remain a record, and a job that exists must mean somebody committed to it. Collapsing them would make 'how many jobs do we have' unanswerable. One request converts to at most one job, enforced by UNIQUE on FieldJob.requestId."
+      },
+      "whatDispatchDoesNotDo": "No route is optimised, no distance or travel time is computed, no map provider is called, and no technician is notified by email, SMS or push. The schema harness asserts there is no routeId, routeOrder, distanceMeters, travelMinutes, latitude, longitude, notifiedAt, smsSentAt, emailSentAt, pushSentAt or providerMessageId column anywhere in the four tables, and that no Route, Inspection, Part, Asset, Invoice or Notification table exists. The runtime harness replaces global fetch with a counting blocker and asserts zero calls, and asserts every assignment event records notified: false.",
+      "sideConditions": "The design work is in the side conditions on job transitions, each exported as a named list in lifecycle.ts rather than buried in an if. MEASURED: a job with no visit window cannot be scheduled or dispatched; a job cannot be dispatched without an accountable LEAD and a helper alone is not enough; work cannot start until a technician is ON_SITE; a job is not complete while any card is still ASSIGNED, ACCEPTED, EN_ROUTE or ON_SITE, and the refusal names how many; cancelling a job, declining a card and releasing a card all need a reason, and whitespace does not count.",
+      "assignmentIsARequest": "ASSIGNED cannot jump to EN_ROUTE - a technician has to answer first. Recording only ASSIGNED would make a silent refusal look like agreement. ACCEPTED and DECLINED both exist for that reason, and a technician who declined can be assigned again because both partial unique indexes exclude DECLINED and RELEASED, so the declined row survives.",
+      "directionality": "SCHEDULED can return to DRAFT, because un-scheduling is normal when a customer moves. DISPATCHED cannot return to SCHEDULED, because a technician has already been told. An IN_PROGRESS job can still be CANCELLED, because work does get abandoned. A COMPLETED job is terminal and cannot be cancelled.",
+      "guarantees": "6 CHECK constraints: non-negative estimates on both tables; a job's schedule is both timestamps or neither; the end must be after the start; a DECLINED card must carry a non-blank reason; so must a RELEASED one. 2 partial unique indexes: one active LEAD per job, and one active assignment per technician per job. 1 trigger enforcing that a job and its technician share a profile - the same shape as the four G3 guards, a rule a composite foreign key would express if Prisma could describe one. 1 append-only trigger on FieldJobEvent, the tenth ledger in this database.",
+      "rehearsal": "pre-g4 104 tables / 257 enum labels / 31 trigger rows; post-apply 108 / 292 / 35; rollback byte-identical raw sha256 19214961de96a2d1; reapply normalized-identical. Post-apply drift: 0 of everything except the five pre-existing profileId DROP CONSTRAINT statements, ninth wave running. Relation verifier: 4 models added, 0 renamed, 0 dropped.",
+      "promotions": "fieldJobs:intake and fieldJobs:dispatch planned -> available, both citing src/lib/fieldjobs/engine.ts. fieldJobs:inspection unchanged.",
+      "contractHarnessFourthRepoint": "The planned-capability negative test moved from fieldJobs:dispatch to fieldJobs:inspection - the FOURTH move in this program (venueOrders:reservations -> commerce:inventory -> commerce:returns -> fieldJobs:dispatch -> fieldJobs:inspection) and the SECOND within this single run, since G3 promoted returns and G4 promoted dispatch. A new assertion warns about the end of that road: if a future wave promotes inspection there will be no planned capability left in the registry and the test will have to be rewritten against a synthetic descriptor rather than repointed. The assertion lists the surviving planned capabilities in its detail field, so the day it fails it will say exactly why.",
+      "noApiOrUi": "Like G3, this wave shipped runtime without APIs or owner surfaces. The brief asked to BEGIN the foundation; claiming a surface would have meant building one. NEXT_ACTION.md records this explicitly so two available capabilities are not read as two finished features.",
+      "gatesWaveG4": {
+        "tip": "ef17770",
+        "prismaValidate": 0,
+        "prismaGenerate": 0,
+        "tsc": 0,
+        "targetedLint": 0,
+        "repoWideLint": "91 problems (39 errors, 52 warnings) - still identical to 34f8561 after four integrated waves",
+        "checkHarnesses": "50 of 50 exit 0 (48 at Wave G3 plus 2 new fieldJobs harnesses)",
+        "fieldjobSchema": "79/79; inverted 78/79 exit 1",
+        "fieldjobRuntime": "75/75; inverted 74/75 exit 1",
+        "capabilityContract": "PASS 0 failures; INVERT_ASSERTION=1 produces 19 failures, exit 1",
+        "relationRenameVerifier": "0 renamed, 0 dropped",
+        "externalCalls": "zero, counted",
+        "residue": "zero across 7 tracked tables; append-only trigger verified re-armed",
+        "secretScan": "0 hits",
+        "npmAuditOmitDev": "0 vulnerabilities",
+        "build": "exit 0",
+        "disposableDb": "left fully applied at 108 tables; live personalink untouched (35 public tables, 0 wave tables, 16 Profile rows)"
       }
     }
   ],

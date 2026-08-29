@@ -799,3 +799,46 @@ Do not begin any schema package with less than 90 minutes remaining.
 - Gateway on port 5476: LISTENING (pid 54756), but no KiroCrew MCP server is registered with the
   client, so no model-pinned dispatch tool is exposed. Owner action: register it in
   `~/.kiro/settings/mcp.json` and restart the client. Every wave so far has been root-serial.
+
+
+---
+
+## Wave G4 integrated - the fieldJobs foundation
+
+Merge `ef17770` on `recovered/aug20-wt-pr-32`, `--no-ff`, from base `61670da` via
+`feature/wave-g4-fieldjobs`. Root-serial.
+
+| Commit | Slice | Gate result at commit time |
+|---|---|---|
+| `20c509e` | G4.1 schema | 79/79 invariants; rollback byte-identical; strictly additive |
+| `8d966af` | G4.2 runtime + promotion | 75/75 runtime assertions; contract PASS; 50/50 sweep |
+| `ef17770` | integration | full combined suite green - see RUNLOG |
+
+`fieldJobs:intake` and `fieldJobs:dispatch` are now `available`.
+**`fieldJobs:inspection` is still `planned`, because it is not built.**
+
+### Next in queue - revised after Wave G4
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| G5 | `fieldJobs:inspection` | Asset checks, parts, completion notes, invoice handoff. **Read the warning first:** inspection is the last `planned` capability in the registry, so promoting it leaves the capability-contract planned-capability negative test with nowhere to point. That test will need rewriting against a synthetic engine descriptor rather than repointing, and a new assertion already fails loudly with the surviving-planned list in its detail field when that happens. |
+| APIs and UI | retainers, access levels, field jobs | Three engines now exist with no owner surface at all. No schema is needed, so any of them fits a short window. Follow the Wave G pattern: `src/lib/<domain>/{http,runtime}.ts` for one envelope and one resolve-then-authorize step, then a panel, then a11y assertions in `check-business-os-a11y.ts`. |
+| P1-009 slice 2 | repo-wide lint | 91 problems, unchanged across Waves F, G, G3 and G4. `no-unused-vars` (24) is the safest slice. |
+| G2 | appointments reminders + deposits providers | Still **owner-gated**. `appointments:reminders` remains the target of the partial-capability negative test. |
+
+Do not begin any schema package with less than 90 minutes remaining.
+
+### Open items carried forward
+
+- P1-007 live cutover: still owner-gated, unchanged. Not executed.
+- Pre-existing `profileId` FK drift: five `DropForeignKey` statements, excluded and
+  count-asserted for **nine** waves running. Untouched.
+- Trigger-instead-of-composite-FK entries, now six in total: `InventoryItem.productId` vs
+  `variantId` (Wave G), the four G3 guards, and `FieldJobAssignment` job/technician profile
+  agreement (G4). Each is a rule a composite foreign key would express if Prisma could describe
+  one.
+- `restaurant-venue-v2` lists `commerce:inventory` as planned, left alone on purpose. It is a
+  deprecated historical contract; the harness exempts it by name.
+- `check-order-stream` precondition: still unmet, still non-blocking.
+- Gateway on port 5476: LISTENING (pid 54756), no KiroCrew MCP server registered with the client.
+  Owner action. Every wave in this run has been root-serial.

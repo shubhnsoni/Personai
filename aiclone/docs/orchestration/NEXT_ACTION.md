@@ -5,14 +5,14 @@ Updated 2026-08-29, mid-run, root-serial. No worker independence claimed.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`5a26b6b`** — Waves C, D, E, F, **G** and **G3** integrated green, plus the
+- Primary HEAD: **`ef17770`** — Waves C, D, E, F, **G**, **G3** and **G4** integrated green, plus the
   first P1-009 lint slice and the Wave G/G3 ledger commits
 - Origin `recovered/aug20-wt-pr-32`: `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`, unchanged;
   `origin/main`: `9e8a0fffb84937d809788ee4512884289c3132b8`, unchanged
-- Waves A–G complete. P2-005, P2-006, P2-008, P2-009, P2-010, **P2-011**, **P2-012** are `done`.
+- Waves A–G complete. P2-005, P2-006, P2-008, P2-009, P2-010, **P2-011**, **P2-012**, **P2-013** are `done`.
   P1-009 is `in_progress_slice_1_done`.
 - Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**,
-  16 migrations, 104 tables / 1140+ columns / 257 enum labels / 31 trigger rows. Never
+  17 migrations, 108 tables / 1221 columns / 292 enum labels / 35 trigger rows. Never
   mid-rehearsal.
 - Live `personalink`: verified untouched — 35 tables, no `_prisma_migrations`, none of the
   thirty-one tables this run created, no `btree_gist`, `Profile` = 16.
@@ -56,22 +56,24 @@ added no lint debt. Targeted wave paths are at zero.
 | G variants, fulfilment, returns | `src/lib/commerce/**` | 16 routes under `/api/platform/**` | `commerce-variants-panel.tsx`, `commerce-orders-panel.tsx` |
 | G3 retainers | `src/lib/cases/retainers.ts` | none yet — engine and harnesses only | none yet |
 | G3 course access levels | `src/lib/cohorts/access.ts` | none yet — engine and harnesses only | none yet |
+| G4 field jobs (intake, dispatch) | `src/lib/fieldjobs/**` | none yet — engine and harnesses only | none yet |
 
-**G3 shipped runtime without APIs or UI, on purpose.** The wave brief for retainers and access
-levels asked for schema, runtime and executable tests, and said to promote capabilities only
-after runtime evidence exists. It did not ask for owner surfaces, and claiming one would have
-meant building it. So the two capabilities are `available` on the strength of engines plus 405
-executable assertions, and the honest next step for either is an API and a Business OS panel
-following the Wave G pattern in `src/lib/commerce/{http,runtime}.ts`.
+**G3 and G4 shipped runtime without APIs or UI, on purpose.** Their briefs asked for schema,
+runtime and executable tests, and said to promote capabilities only after runtime evidence
+exists. Neither asked for owner surfaces, and claiming one would have meant building it. So four
+capabilities are `available` on the strength of engines plus executable assertions, and the
+honest next step for any of them is an API and a Business OS panel following the Wave G pattern
+in `src/lib/commerce/{http,runtime}.ts`.
 
 Active blueprints: `restaurant-venue-v3`, `coaching-studio-v2`, `consulting-agency-v1`,
 `ca-practice-v1`, **`retail-storefront-v1`**. Deprecated: `restaurant-venue-v1`,
 `restaurant-venue-v2`, `coaching-studio-v1`. No blueprint is in draft.
 
 Still not built, and named as such in the capability registry: `appointments:reminders`
-(partial, inert provider), `appointments:deposits` (partial, inert provider), and all of
-`fieldJobs` — `intake`, `dispatch`, `inspection` (planned, evidence `none`). That is the whole
-remaining list.
+(partial, inert provider), `appointments:deposits` (partial, inert provider), and
+`fieldJobs:inspection` (planned, evidence `none`). That is the whole remaining list, and
+`fieldJobs:inspection` is the **only** capability left at `planned` anywhere — see the warning in
+step 1.
 
 ### What Wave G deliberately does not claim
 
@@ -86,7 +88,7 @@ retail storefront cannot drift into implying an integration that does not exist.
 
 ```powershell
 cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
-git rev-parse HEAD                     # expect 5a26b6b... or a ledger commit on top of it
+git rev-parse HEAD                     # expect ef17770... or a ledger commit on top of it
 git status --porcelain                 # expect only .codex-remote-attachments/ and P1_014_ACTION_INVENTORY.md untracked
 git rev-parse origin/recovered/aug20-wt-pr-32   # expect 4b386d1...
 ```
@@ -100,18 +102,21 @@ node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\check-live-rea
 
 ### Step 1 — pick the next package
 
-Read `INTEGRATION_QUEUE.md` → "Next in queue — revised after Wave G3".
+Read `INTEGRATION_QUEUE.md` → "Next in queue — revised after Wave G4".
 
-- **G4 shared `fieldJobs` engine foundation.** The only engine with nothing built: intake,
-  dispatch and inspection are all planned with evidence `none`. Note the trap:
-  `fieldJobs:dispatch` is now the target of the capability-contract planned-capability negative
-  test, so making it real requires repointing that test. The non-vacuity assertion beside it
-  will fail loudly if you do not, and the new sweeping check will fail if any blueprint is left
-  listing it as planned.
-- **An API and Business OS panel for retainers or access levels.** Both engines exist with no
-  owner surface. Follow the Wave G pattern: `src/lib/<domain>/{http,runtime}.ts` for one
-  envelope and one resolve-then-authorize step, then a panel, then a11y assertions in
-  `check-business-os-a11y.ts`. No schema needed, so this fits a short window.
+- **`fieldJobs:inspection`** is the only unbuilt capability left in the `fieldJobs` engine, and
+  the only capability at `planned` anywhere in the registry. **Read this before starting it:**
+  promoting it leaves the capability-contract planned-capability negative test with nowhere to
+  point. That test has already been repointed four times
+  (`venueOrders:reservations` → `commerce:inventory` → `commerce:returns` →
+  `fieldJobs:dispatch` → `fieldJobs:inspection`), twice within one run. It will need
+  **rewriting against a synthetic engine descriptor**, not repointing. An assertion already
+  exists that fails loudly and prints the surviving planned capabilities when the list empties.
+- **An API and Business OS panel for retainers, access levels or field jobs.** Three engines now
+  exist with no owner surface. No schema needed, so any of them fits a short window. Follow the
+  Wave G pattern: `src/lib/<domain>/{http,runtime}.ts` for one envelope and one
+  resolve-then-authorize step, then a panel, then a11y assertions in
+  `check-business-os-a11y.ts`.
 - **G2 appointments reminders/deposits providers is OWNER-GATED.** Wiring a real messaging or
   payment provider means real messages and real money. Do not start it without explicit
   approval. `appointments:reminders` is the target of the partial-capability negative test.
@@ -121,12 +126,13 @@ Read `INTEGRATION_QUEUE.md` → "Next in queue — revised after Wave G3".
   properly, because both change behaviour.
 
 When a capability is promoted, expect to repoint the contract harness AND to move it out of any
-blueprint's planned backlog. It now carries non-vacuity assertions naming
-**`fieldJobs:dispatch`** (planned) and **`appointments:reminders`** (partial), assertions
-recording that `commerce:returns`, `casesProjects:retainers` and `contentCohorts:accessLevels`
-have become available, and a sweeping check that fails if any live blueprint lists an available
-capability as planned. `restaurant-venue-v2` is exempted from that sweep by name because it is a
-deprecated historical contract — do not "fix" it.
+blueprint's planned backlog. It now carries a non-vacuity assertion naming
+**`fieldJobs:inspection`** (planned) and **`appointments:reminders`** (partial), assertions
+recording that `commerce:returns`, `casesProjects:retainers`, `contentCohorts:accessLevels`,
+`fieldJobs:intake` and `fieldJobs:dispatch` have become available, a sweeping check that fails if
+any live blueprint lists an available capability as planned, and the empty-registry warning above.
+`restaurant-venue-v2` is exempted from the sweep by name because it is a deprecated historical
+contract — do not "fix" it.
 
 ### Step 2 — migration sequence, if the package needs one
 
@@ -152,7 +158,7 @@ node "$T\verify-no-renames.js"                                  # must report 0 
 
 The five pre-existing `profileId` `DropForeignKey` statements against `ActivityEvent`,
 `Contact`, `ContactSourceLink`, `WorkflowRun` and `Workspace` must be **excluded and
-count-asserted**, never applied. Eight waves have done this; the builder scripts already do.
+count-asserted**, never applied. Nine waves have done this; the builder scripts already do.
 
 **If a package cannot be purely additive, say so and enumerate it.** Wave G is the precedent:
 `InventoryItem.variantId` made G1.1 non-additive, so the five affected statements were lifted
@@ -167,7 +173,7 @@ npx prisma validate --schema prisma/schema.prisma
 npx prisma generate --schema prisma/schema.prisma
 npx tsc --noEmit -p tsconfig.json
 node "$T\verify-no-renames.js"
-pwsh -File "$T\run-wave-c-gates.ps1"      # all 48 check harnesses, skips only check-order-stream
+pwsh -File "$T\run-wave-c-gates.ps1"      # all 50 check harnesses, skips only check-order-stream
 npx eslint <touched paths>
 npm audit --omit=dev
 npm run build

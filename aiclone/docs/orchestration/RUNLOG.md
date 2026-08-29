@@ -2563,3 +2563,131 @@ removed through its own cleanup step, the append-only trigger was verified re-ar
 pre-existing counts were confirmed back at 4 courses / 6 modules / 18 lessons / 1 enrolment. That
 was harness residue, not a regression - but the distinction is only worth anything if it is
 written down.
+
+
+---
+
+## Wave G4 - the fieldJobs foundation: intake and dispatch
+
+Integrated at `ef17770` (merge, `--no-ff`) from base `61670da` via branch
+`feature/wave-g4-fieldjobs`. Root-serial. `fieldJobs` was the last engine in the registry with
+nothing built at all: intake, dispatch and inspection were all `planned` with evidence `none`.
+
+| Slice | Commit | What it is |
+|---|---|---|
+| G4.1 schema | `20c509e` | 4 tables, 7 enums, 6 CHECKs, 2 partial unique indexes, 2 triggers |
+| G4.2 runtime + promotion | `8d966af` | intake and dispatch engines; two capabilities promoted |
+
+### This is a foundation, and that is said out loud in five places
+
+`fieldJobs:inspection` is deliberately not built and stays `planned` with evidence `none`. Asset
+checks, parts, completion notes and invoice handoff are absent on purpose. The migration header,
+the capability description, both commit messages, `TASKS.json` and `NEXT_ACTION.md` all say so -
+because two available capabilities beside one planned one is exactly the shape that gets read as
+"the engine is done" six weeks later.
+
+### The technician already existed, so no technician was created
+
+A field technician **is** an `AppointmentResource` with kind `STAFF`. That table is already
+profile-scoped, already optionally tied to a `Location`, already carries `capacity` and
+`isActive`, and is already what `ServiceOffering` rows are made eligible for. A separate
+`Technician` table would have been a second answer to "who can do this work", and the two would
+have drifted the first time somebody was added to one and not the other. `ServiceOffering` is
+reused for the same reason.
+
+The consequence is not a preference: tenancy here **has to be** `profileId`, because sharing
+`AppointmentResource` means sharing its scope. The forbidden-table list in the schema harness is
+correspondingly long and deliberate - `Technician`, `FieldTechnician`, `Crew`, `CrewMember`,
+`WorkOrder`, `Job`, `JobCard` - and `AppointmentResource` is pinned at exactly nine columns, so
+reuse cannot quietly become extension. The runtime harness adds the other half of that proof: the
+technician count moves by exactly the five rows the fixture seeded, and no `Booking` row is
+created by any of it.
+
+**A job happens at a customer site, not at a `Location`.** `Location` models the owner's own
+premises and is read by the reservation, appointment and inventory engines. Creating `Location`
+rows for customer addresses would pollute it. So `FieldJob.siteAddress` is required free text and
+`originLocationId` is only the depot the job is dispatched *from*.
+
+**A request is not a job.** `FieldJobRequest` is separate for the same reason `CaseIntake` is
+separate from `CaseProject`: a declined request must remain a record, and a job that exists must
+mean somebody committed to it. Collapsing them would make "how many jobs do we have"
+unanswerable.
+
+### The design work is in the side conditions, not the status table
+
+A status table alone would let an owner dispatch a job with nobody assigned, start one before
+anybody arrived, or complete one while a technician was still mid-visit. Each condition is an
+exported named list in `lifecycle.ts` rather than an inline `if`, so the rule is readable without
+reading the method, and each one is measured:
+
+- a job with no visit window cannot be marked scheduled **or** dispatched;
+- a job cannot be dispatched without an accountable `LEAD` - **a helper alone is not enough**;
+- work cannot start until a technician is `ON_SITE`;
+- a job is not complete while any card is still `ASSIGNED`, `ACCEPTED`, `EN_ROUTE` or `ON_SITE`,
+  and the refusal names how many;
+- cancelling a job, declining a card and releasing a card all need a reason, and whitespace does
+  not count - the database rejects it too.
+
+**An assignment is a request until the technician answers it.** `ASSIGNED` cannot jump to
+`EN_ROUTE`; recording only `ASSIGNED` would make a silent refusal look like agreement. A
+technician who declined can be assigned again, and the declined row survives, because both
+partial unique indexes exclude `DECLINED` and `RELEASED`.
+
+Directionality is deliberate. `SCHEDULED` can return to `DRAFT`, because un-scheduling is normal
+when a customer moves. `DISPATCHED` cannot, because a technician has already been told. An
+`IN_PROGRESS` job can still be cancelled, because work does get abandoned. A `COMPLETED` job is
+terminal and cannot be cancelled.
+
+### What "dispatch" does not do, measured rather than promised
+
+No route is optimised, no distance or travel time is computed, no map provider is called, and no
+technician is notified. The schema harness asserts there is no `routeId`, `routeOrder`,
+`distanceMeters`, `travelMinutes`, `latitude`, `longitude`, `notifiedAt`, `smsSentAt`,
+`emailSentAt`, `pushSentAt` or `providerMessageId` column anywhere in the four tables, and that
+no `Route`, `Inspection`, `Part`, `Asset`, `Invoice` or `Notification` table exists. The runtime
+harness replaces global `fetch` with a counting blocker and asserts zero calls, and asserts every
+assignment event records `notified: false` - so the history cannot be read as a claim that
+somebody was told.
+
+### The fourth repoint of the planned negative test, and a warning about the fifth
+
+`fieldJobs:intake` and `fieldJobs:dispatch` moved `planned -> available`. The
+capability-contract planned-capability negative test therefore moved from `fieldJobs:dispatch` to
+`fieldJobs:inspection`.
+
+That is the **fourth** move in this program - `venueOrders:reservations` ->
+`commerce:inventory` -> `commerce:returns` -> `fieldJobs:dispatch` -> `fieldJobs:inspection` -
+and the **second within this single run**, because G3 promoted returns and G4 promoted dispatch.
+
+A new assertion now warns about the end of that road. If a future wave promotes `inspection`
+there will be **no planned capability left in the registry**, and the test will have to be
+rewritten against a synthetic descriptor rather than repointed. The assertion lists the surviving
+planned capabilities in its detail field, so the day it fails it will say exactly why rather than
+just going red.
+
+### Gates on the integrated tip `ef17770`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` / `generate` | 0 / 0 |
+| app `tsc --noEmit` | 0 |
+| targeted ESLint | 0 problems, 0 warnings |
+| repo-wide ESLint | 91 problems (39 errors, 52 warnings) - **still identical to `34f8561`** after four integrated waves |
+| check harnesses | **50 of 50 exit 0** (48 at Wave G3 plus 2 new) |
+| `check-fieldjob-schema-invariants` | 79/79; inverted 78/79 exit 1 |
+| `check-fieldjob-runtime` | 75/75; inverted 74/75 exit 1 |
+| `check-capability-contract` | PASS, 0 failures; inverted 19 failures, exit 1 |
+| relation-name verifier | 4 models added, 0 renamed, 0 dropped |
+| rehearsal | pre-g4 104 tables -> apply 108 -> rollback byte-identical `19214961de96a2d1` -> reapply normalized-identical |
+| post-apply drift | 0 of everything except the five pre-existing `profileId` `DROP CONSTRAINT` statements, ninth wave running |
+| external calls | zero, counted |
+| fixture residue | zero across 7 tracked tables; append-only trigger verified re-armed |
+| secret scan | 0 hits |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | exit 0 |
+| live `personalink` | untouched - 35 public tables, 0 wave tables, 16 `Profile` rows |
+| disposable DB | left fully applied at 108 tables, not mid-rehearsal |
+
+**No APIs and no owner surfaces, same as G3.** The brief asked to *begin* the foundation, and
+claiming a surface would have meant building one. That is recorded in `NEXT_ACTION.md` so two
+available capabilities are not read as two finished features.
