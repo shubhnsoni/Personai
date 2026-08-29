@@ -207,22 +207,27 @@ const builtInBlueprints: BusinessBlueprint[] = [
     ],
   },
   {
-    // DRAFT on purpose, and now for a NARROWER and more honest reason than before.
-    // Wave F made commerce:inventory genuinely available - stock per product per
-    // location, an append-only ledger, and reservations with a database-level oversell
-    // guard. What a storefront still cannot do is sell a size or a colour, tell a
-    // customer where their parcel is, or take anything back: variants and fulfilment are
-    // only partial, and returns is planned. Those three are therefore REQUIRED
-    // capabilities here rather than a planned backlog, which is what keeps this
-    // blueprint mechanically un-activatable until they are real. The contract harness
-    // asserts that activating it is still rejected, and names why.
+    // ACTIVE as of Wave G, and only because the three capabilities that were blocking it
+    // stopped being aspirational. Wave F made commerce:inventory real (stock per product
+    // per location, an append-only ledger, reservations with a database-level oversell
+    // guard). Wave G made commerce:variants, :fulfilment and :returns real: variants own
+    // stock and SKUs, shipments carry guarded transitions and partial quantities, and a
+    // return can be requested, decided, received and restocked idempotently. All six
+    // required capabilities are therefore "available" with an evidence file that exists,
+    // which is what validateBusinessBlueprint enforces - activation here is a consequence
+    // of that check passing, not a decision taken in this file.
+    //
+    // What this blueprint still does NOT claim: no carrier is contacted, so tracking is
+    // owner-entered text; no refund is executed, only referenced; no email, SMS or
+    // WhatsApp is sent. Those remain outside the blueprint rather than being implied by
+    // the word "storefront".
     id: "retail-storefront-v1",
     version: "1.0.0",
-    status: "draft",
+    status: "active",
     name: "Retail storefront",
     vertical: "retail-ecommerce",
     summary:
-      "Sells physical stock online. Catalog, orders and inventory are real; variants, fulfilment and returns are not, so this stays draft rather than promising a storefront that cannot ship or refund.",
+      "Sells physical stock online. Catalog, orders, inventory, variants, fulfilment and returns are all executable: stock is held per variant per location, shipments can be partial, and an accepted return restocks once. Carrier tracking is owner-entered and refunds are referenced rather than executed, so nothing here claims an integration that does not exist.",
     engines: [
       {
         engineId: "commerce",

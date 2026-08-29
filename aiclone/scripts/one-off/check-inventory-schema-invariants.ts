@@ -119,6 +119,12 @@ async function seed(tx: Tx, tag = "a"): Promise<Seeded> {
   await tx.$executeRawUnsafe(
     `insert into "DigitalProduct" ("id","profileId","title","updatedAt") values ('${pr}','${p}','Widget',CURRENT_TIMESTAMP)`,
   );
+  // Wave G moved inventory identity to the variant, so a stock record needs one. The id
+  // convention matches the migration's backfill and the engine's ensureDefaultVariant.
+  await tx.$executeRawUnsafe(
+    `insert into "ProductVariant" ("id","profileId","productId","isDefault","title","updatedAt")
+     values ('var_${pr}','${p}','${pr}',true,'Default',CURRENT_TIMESTAMP)`,
+  );
   await tx.$executeRawUnsafe(
     `insert into "Order" ("id","profileId","publicToken","number","businessDate","subtotalCents","totalCents","currency","updatedAt")
      values ('${o}','${p}','tok_${o}',1,CURRENT_DATE,1000,1000,'USD',CURRENT_TIMESTAMP)`,
@@ -128,8 +134,8 @@ async function seed(tx: Tx, tag = "a"): Promise<Seeded> {
      values ('${ol}','${o}','Widget',2,500,1000,CURRENT_TIMESTAMP)`,
   );
   await tx.$executeRawUnsafe(
-    `insert into "InventoryItem" ("id","profileId","productId","locationId","onHand","reserved","updatedAt")
-     values ('${it}','${p}','${pr}','${l}',10,0,CURRENT_TIMESTAMP)`,
+    `insert into "InventoryItem" ("id","profileId","productId","variantId","locationId","onHand","reserved","updatedAt")
+     values ('${it}','${p}','${pr}','var_${pr}','${l}',10,0,CURRENT_TIMESTAMP)`,
   );
   return { profileId: p, locationId: l, productId: pr, orderId: o, orderLineId: ol, itemId: it };
 }
@@ -398,12 +404,43 @@ async function main() {
 
     // ---- 8. uniqueness that makes the model coherent ---------------
     {
+      // Wave G moved this key from (product, location) to (variant, location). The
+      // invariant is unchanged in spirit - one stock record per sellable unit per place -
+      // but it is now expressed against the variant, so the assertion says so.
       const { refused, detail } = await refuses(async (tx, s) => {
         await tx.$executeRawUnsafe(
-          `insert into "InventoryItem" ("id","profileId","productId","locationId","updatedAt") values ('${RUN}_dup','${s.profileId}','${s.productId}','${s.locationId}',CURRENT_TIMESTAMP)`,
+          `insert into "InventoryItem" ("id","profileId","productId","variantId","locationId","updatedAt") values ('${RUN}_dup','${s.profileId}','${s.productId}','var_${s.productId}','${s.locationId}',CURRENT_TIMESTAMP)`,
         );
       }, "dupitem");
-      check("one stock record per product per location", refused && detail.length > 0, detail || "NO ERROR");
+      check("one stock record per variant per location", refused && detail.length > 0, detail || "NO ERROR");
+    }
+    {
+      // The capability the identity change unlocked: two variants of the SAME product can
+      // now hold separate stock at the same location, which is the whole point of variants.
+      let accepted = false;
+      let detail = "";
+      try {
+        await prisma.$transaction(async (tx) => {
+          const s = await seed(tx, "twovariants");
+          await tx.$executeRawUnsafe(
+            `insert into "ProductVariant" ("id","profileId","productId","isDefault","title","ordinal","updatedAt")
+             values ('${RUN}_v2','${s.profileId}','${s.productId}',false,'Large',1,CURRENT_TIMESTAMP)`,
+          );
+          await tx.$executeRawUnsafe(
+            `insert into "InventoryItem" ("id","profileId","productId","variantId","locationId","onHand","updatedAt")
+             values ('${RUN}_i2','${s.profileId}','${s.productId}','${RUN}_v2','${s.locationId}',4,CURRENT_TIMESTAMP)`,
+          );
+          const rows = await tx.$queryRawUnsafe<{ n: number }[]>(
+            `select count(*)::int n from "InventoryItem" where "productId"='${s.productId}' and "locationId"='${s.locationId}'`,
+          );
+          accepted = Number(rows[0].n) === 2;
+          detail = `stock rows for product at location=${rows[0].n}`;
+          throw new Rollback();
+        });
+      } catch (e) {
+        if (!(e instanceof Rollback)) detail = errLine(e);
+      }
+      check("two variants of one product hold separate stock at the same location", accepted, detail);
     }
     {
       const { refused, detail } = await refuses(async (tx, s) => {

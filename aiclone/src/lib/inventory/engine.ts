@@ -27,6 +27,7 @@ export type StockRecord = Readonly<{
     id: string
     profileId: string
     productId: string
+    variantId: string
     locationId: string
     onHand: number
     reserved: number
@@ -43,6 +44,7 @@ type RawItem = {
     id: string
     profileId: string
     productId: string
+    variantId: string
     locationId: string
     onHand: number
     reserved: number
@@ -61,6 +63,7 @@ export function toStockRecord(row: RawItem): StockRecord {
         id: row.id,
         profileId: row.profileId,
         productId: row.productId,
+        variantId: row.variantId,
         locationId: row.locationId,
         onHand,
         reserved,
@@ -150,15 +153,73 @@ export class InventoryService {
     // ---- stock records -------------------------------------------------
 
     /**
-     * Creates or returns the stock record for a product at a location. Idempotent by
-     * construction: the pair is unique, so a replay returns the existing record rather
-     * than failing or duplicating.
+     * Resolves a product's default variant, creating it if the product predates variants or
+     * was created after the migration ran.
+     *
+     * The id is `var_<productId>`, deterministically — the SAME convention the Wave G
+     * migration used when it backfilled 237 existing products. That is deliberate: a product
+     * created today and a product migrated yesterday end up with identically shaped default
+     * variants, so nothing downstream has to care which path a product took. A `cuid()` here
+     * would have made those two populations subtly different forever.
+     *
+     * priceCents is left NULL, meaning "inherit the product price". A default variant must
+     * not become a second, divergent price for the same thing.
+     */
+    async ensureDefaultVariant(profileId: string, productId: string): Promise<string> {
+        const existing = await this.ctx.db.productVariant.findFirst({
+            where: { productId, isDefault: true },
+            select: { id: true },
+        })
+        if (existing) return existing.id
+
+        const product = await this.ctx.db.digitalProduct.findUnique({
+            where: { id: productId },
+            select: { id: true, profileId: true, sku: true, isActive: true },
+        })
+        if (!product || product.profileId !== profileId) this.ctx.denied()
+
+        try {
+            const created = await this.ctx.db.productVariant.create({
+                data: {
+                    id: `var_${product.id}`,
+                    profileId,
+                    productId: product.id,
+                    isDefault: true,
+                    isActive: product.isActive,
+                    title: "Default",
+                    ordinal: 0,
+                    sku: product.sku,
+                },
+                select: { id: true },
+            })
+            return created.id
+        } catch (error) {
+            // A concurrent caller may have created it between the read and the write. The
+            // partial unique index makes that a collision rather than a duplicate, so the
+            // honest response is to re-read, not to invent a second default.
+            const raced = await this.ctx.db.productVariant.findFirst({
+                where: { productId: product.id, isDefault: true },
+                select: { id: true },
+            })
+            if (raced) return raced.id
+            throw error
+        }
+    }
+
+    /**
+     * Creates or returns the stock record for a sellable unit at a location.
+     *
+     * `variantId` is optional so every Wave F caller keeps working: omitting it resolves the
+     * product's default variant, which is exactly what a non-variant product means. Passing
+     * it addresses one specific variant. Idempotent by construction either way, because
+     * (variant, location) is unique.
      */
     async ensureItem(
         workspaceId: string,
         input: Readonly<{
             productId: string
             locationId: string
+            variantId?: string | null
             reorderPoint?: number | null
             safetyStock?: number | null
             trackingEnabled?: boolean
@@ -169,8 +230,23 @@ export class InventoryService {
         const product = await this.ctx.ownedProduct(profileId, input.productId)
         const location = await this.ctx.ownedLocation(profileId, input.locationId)
 
+        const named = input.variantId?.trim() || null
+        let variantId: string
+        if (named) {
+            const variant = await this.ctx.db.productVariant.findUnique({
+                where: { id: named },
+                select: { id: true, productId: true, profileId: true },
+            })
+            // A variant of another product, or another tenant, is refused identically to one
+            // that does not exist.
+            if (!variant || variant.profileId !== profileId || variant.productId !== product.id) this.ctx.denied()
+            variantId = variant.id
+        } else {
+            variantId = await this.ensureDefaultVariant(profileId, product.id)
+        }
+
         const existing = await this.ctx.db.inventoryItem.findUnique({
-            where: { productId_locationId: { productId: product.id, locationId: location.id } },
+            where: { variantId_locationId: { variantId, locationId: location.id } },
         })
         if (existing) return { record: toStockRecord(existing as RawItem), replayed: true }
 
@@ -185,6 +261,7 @@ export class InventoryService {
                     data: {
                         profileId,
                         productId: product.id,
+                        variantId,
                         locationId: location.id,
                         reorderPoint,
                         safetyStock,
