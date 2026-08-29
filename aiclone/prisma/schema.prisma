@@ -234,6 +234,7 @@ model Profile {
   appointmentDeposits  AppointmentDeposit[]
   appointmentReminders AppointmentReminder[]
   Cohort               Cohort[]
+  InventoryItem        InventoryItem[]
 }
 
 model ProfileEvent {
@@ -658,9 +659,10 @@ model DigitalProduct {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  purchases  ProductPurchase[]
-  reviews    OfferReview[]
-  orderLines OrderLine[]
+  purchases     ProductPurchase[]
+  reviews       OfferReview[]
+  orderLines    OrderLine[]
+  InventoryItem InventoryItem[]
 }
 
 model Course {
@@ -910,9 +912,10 @@ model Order {
   cancelReason   String?
   updatedAt      DateTime         @updatedAt
 
-  lines   OrderLine[]
-  events  OrderEvent[]
-  reviews OfferReview[]
+  lines             OrderLine[]
+  events            OrderEvent[]
+  reviews           OfferReview[]
+  InventoryMovement InventoryMovement[]
 
   @@unique([profileId, businessDate, number])
   @@unique([profileId, idempotencyKey])
@@ -940,7 +943,9 @@ model OrderLine {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
-  events OrderEvent[]
+  events               OrderEvent[]
+  InventoryMovement    InventoryMovement[]
+  InventoryReservation InventoryReservation?
 
   @@index([orderId])
   @@index([productId])
@@ -1201,6 +1206,7 @@ model Location {
   bookings             Booking[]
   appointmentResources AppointmentResource[]
   CohortSession        CohortSession[]
+  InventoryItem        InventoryItem[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -2029,4 +2035,152 @@ model CohortEvent {
   at       DateTime         @default(now())
 
   @@index([cohortId, seq])
+}
+
+// ---------------------------------------------------------------------------
+// Wave F / P2-010: commerce inventory hardening.
+//
+// WHAT EXISTED: DigitalProduct.stock, one nullable Int. Nothing decremented it,
+// nothing reserved against it, there was no location dimension, no movement history
+// and no oversell refusal. That column is left EXACTLY as it is here - not renamed,
+// not dropped, not migrated - because deciding what its existing values mean is a
+// data decision, not a schema one. The new tables are authoritative going forward.
+//
+// Reuse, not duplication: the product is the pre-existing DigitalProduct, the site is
+// the pre-existing Location, and demand is the pre-existing Order and OrderLine. No
+// parallel product, order or fulfilment model appears here.
+//
+// locationId is REQUIRED on purpose. Stock that is not anywhere is not stock, and a
+// nullable location would need either a partial unique index or a denormalized
+// discriminator column to keep "one record per product per place" enforceable. The
+// runtime refuses with a clear message when a workspace has no Location yet.
+//
+// The oversell guarantee is enforced by CHECK constraints in the migration, not only by
+// application code: onHand >= 0, reserved >= 0 and reserved <= onHand. That makes the
+// guarantee falsifiable at the storage layer, independent of the engine. Like the four
+// append-only triggers and the two exclusion constraints already in this database,
+// those constraints live in SQL rather than in this file.
+// ---------------------------------------------------------------------------
+
+enum InventoryMovementKind {
+  RECEIPT
+  ADJUSTMENT
+  RESERVE
+  RELEASE
+  CONSUME
+  RETURN
+  COUNT
+}
+
+enum InventoryMovementActor {
+  STAFF
+  SYSTEM
+  CUSTOMER
+}
+
+enum InventoryReservationState {
+  HELD
+  RELEASED
+  CONSUMED
+  EXPIRED
+}
+
+model InventoryItem {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  /// Physical units present. Never negative; enforced by a CHECK constraint.
+  onHand Int @default(0)
+
+  /// Units promised to an order line but not yet handed over. Never negative and never
+  /// greater than onHand; both enforced by CHECK constraints, so overselling is
+  /// impossible at the storage layer and not merely discouraged in code.
+  reserved Int @default(0)
+
+  reorderPoint Int?
+  safetyStock  Int  @default(0)
+
+  /// A product can opt out of stock control without losing its record, which is what a
+  /// made-to-order or digital item needs.
+  trackingEnabled Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements    InventoryMovement[]
+  reservations InventoryReservation[]
+
+  @@unique([productId, locationId])
+  @@index([profileId, locationId])
+  @@index([profileId, onHand])
+}
+
+/// Append-only movement ledger, enforced by a trigger rather than by convention.
+model InventoryMovement {
+  id     String        @id @default(cuid())
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  seq  BigInt                @default(autoincrement())
+  kind InventoryMovementKind
+
+  /// Signed effect on onHand and reserved. Storing the deltas AND the resulting
+  /// balances makes the ledger self-verifying: replaying the deltas must reproduce the
+  /// stored after-values, and the harness checks exactly that.
+  qtyDelta      Int
+  reservedDelta Int @default(0)
+  onHandAfter   Int
+  reservedAfter Int
+
+  reason  String?
+  actor   InventoryMovementActor @default(STAFF)
+  actorId String?
+
+  orderId     String?
+  order       Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderLineId String?
+  orderLine   OrderLine? @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+
+  reservationId String?
+
+  idempotencyKey String?
+  at             DateTime @default(now())
+
+  @@unique([itemId, idempotencyKey])
+  @@index([itemId, seq])
+  @@index([orderId])
+}
+
+/// A hold on stock for one order line. One line, one reservation.
+model InventoryReservation {
+  id     String        @id @default(cuid())
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  orderLineId String    @unique
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  qty   Int
+  state InventoryReservationState @default(HELD)
+
+  /// A hold that is never confirmed must not strand stock forever. Expiry is recorded
+  /// so a sweep can release it; nothing here expires a hold implicitly on read.
+  expiresAt  DateTime?
+  releasedAt DateTime?
+  consumedAt DateTime?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([itemId, idempotencyKey])
+  @@index([itemId, state])
+  @@index([state, expiresAt])
 }
