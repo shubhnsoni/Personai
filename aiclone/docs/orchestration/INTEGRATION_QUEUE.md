@@ -973,3 +973,119 @@ neither of which is reachable from inside a session.
 | G5 | `fieldJobs:inspection` | The last genuinely large package. Read the empty-registry warning in NEXT_ACTION **first**: it is the last `planned` capability anywhere, so promoting it means REWRITING the capability-contract planned negative test against a synthetic descriptor, not repointing it a fifth time. Needs a migration, so budget a full rehearsal cycle — it was deliberately NOT started in this run because a half-finished one would leave the disposable database mid-rehearsal, which the preservation invariants forbid. |
 | P1-009 slice 4 | repo-wide lint | 55 problems (16 errors, 39 warnings). `no-explicit-any` is down to **1**: `src/app/[slug]/page.tsx:70`, `profile={profile as any}`. It is a judgement call, not an oversight — `ProfileViewProps.profile` is a hand-written structural type and the page's query is a deep nested include, so making them agree is design work. `no-img-element` (25) is now the largest rule and every one of them changes layout behaviour. |
 | G2 | appointments providers | Still **owner-gated**. |
+
+
+---
+
+## Wave H0 + H1 integrated - fieldJobs:inspection is complete, and the registry has no planned capability left
+
+Resumed after the previous night-run died mid-flight. Base `435a5e9`, head `7b15cd3`.
+
+**The resume began by measuring, and three things the brief said turned out to be wrong.** They are
+worth reading before trusting any inherited state description:
+
+1. **The disposable database was NOT mid-rehearsal.** The brief implied inspection was in-progress
+   root work; in fact the schema and its migration had already landed in `8b33a6a` and the rehearsal
+   database was left **fully applied** - 18 migrations, all finished, none rolled back, 113 tables.
+   No rehearsal was redone, and none needed to be.
+2. **`wave-c\run-on-rehearsal.js` is hardwired to the STALE wave-c worktree** (`8d966af`, 17
+   migrations). Running `prisma migrate status` through it reports "17 migrations found" against a
+   database that has 18, which looks exactly like a missing migration and is not. This is the
+   documented sweep-driver trap, applied to the DB runner rather than the gate driver. Use
+   `wave-a-briefs\run-on-rehearsal-primary.js` for anything primary.
+3. **The first H0 rehearsal cycle proved nothing.** Snapshot `h0-rollback` is byte-identical to
+   `h0-post`, so that "rollback" was a no-op. The SECOND cycle is the real evidence: `h0-rollback2`
+   equals `h0-pre` exactly, and `h0-reapply2` equals `h0-post` apart from 39 OID-derived internal
+   NOT NULL constraint names on the recreated inspection tables - zero non-OID differences, 1194
+   constraints on both sides. A migration's invertibility evidence is only as good as the snapshot
+   that was taken AFTER the rollback actually ran.
+
+| Commit | Slice | Gate result |
+|---|---|---|
+| `0151575` | inspection runtime, 13 routes, two harnesses | runtime 96/96, routes 54/54, both invertible |
+| `7648473` | merge W4 owner panel (`7af39f8`) | a11y PASS, tsc 0, targeted lint 0 |
+| `be176d4` | mount the panel in the shell | a11y + render + surface all exit 0 |
+| `adebddd` | merge W5 lint slice 5 (`ea28089`) | repo-wide lint 45 -> 43, errors 16 -> 14 |
+| `7b15cd3` | promotion + `field-service-v1` blueprint | capability contract PASS, sweep 57/57 |
+
+Final combined suite: **57 of 57 check harnesses exit 0**, `tsc --noEmit` 0, repo-wide ESLint 43
+problems (down from 45), `npm audit --omit=dev` 0 vulnerabilities, production build exit 0 with all
+9 inspection route files registered as dynamic server routes, live `personalink` re-verified
+untouched (35 tables, no `_prisma_migrations`, 0 wave tables leaked, no `btree_gist`, `Profile` = 16).
+
+### The empty-registry trap never fired, because W1 had already defused it
+
+`fieldJobs:inspection` was the last `planned` capability, and promoting it leaves the
+capability-contract planned negative test with nothing real to point at. That was flagged for four
+waves. It cost nothing here: W1's synthetic engine descriptor (`9238270`, merged `d4322b2`) had
+already rewritten the test against a capability that is planned **by construction**. Nothing needed
+repointing. The registry now has zero `planned` capabilities and two `partial` ones, both
+owner-gated.
+
+### field-service-v1 exists because a working engine had no vertical
+
+No blueprint composed the `fieldJobs` engine at all. Intake and dispatch had been available since
+Wave G4 and nothing offered them. `field-service-v1` requires
+`fieldJobs:intake+dispatch+inspection` and composes `commerce:inventory` as **not required**,
+because a business that only wants a record of what was fitted does not need stock tracking.
+
+It also caught the `fieldJobs` engine **description** overclaiming: it read "Intake, quotes,
+technicians, routing, assets, inspections, parts, and invoices", naming two things the engine has
+never had and its own capabilities never claimed - no routing, and no invoices. Fixed.
+
+### A check that was measuring a gap instead of a behaviour
+
+Installing the blueprint turned `check-business-os-render` red on `marks unused engines honestly`.
+The assertion was `populated.includes("unused")` against the real registry, so it only passed while
+SOME engine had no blueprint. Closing the gap made the badge correctly stop saying "unused" and the
+check failed **on an improvement**.
+
+Rewritten to prove the badge rather than the gap: the real engine list is rendered against a
+blueprint list with every fieldJobs-composing blueprint removed - the pre-H1 situation reproduced
+deliberately - and the badge must then appear, with a companion assertion that no real engine is
+uncomposed and a third that a blueprint really was dropped. This is the same failure mode as the
+"ETA" string ban in Wave G4 and the `.every(async ...)` vacuity in G6: **an assertion that encodes
+today's shortcomings will fail the day they are fixed.**
+
+### Three gaps found while implementing, written down here rather than left to be discovered
+
+| Gap | Where | Why it matters |
+|---|---|---|
+| **The panel and the server disagree about when editing is possible** | `inspection-panel.tsx` vs `src/lib/fieldjobs/inspection.ts` | The server allows recording only in `DRAFT` and `IN_PROGRESS` (`RECORDABLE_STATUSES`); the panel disables its forms only once the inspection is **terminal**. On a `SUBMITTED` inspection the panel therefore offers enabled controls that the server refuses with 409. Nothing breaks, because the refusal message is rendered verbatim, but a disabled control is better than a refused one. The panel should gate on `allowedTransitions` containing `IN_PROGRESS`, or the server should expose a `canRecord` flag. |
+| **A lint-style string ban that will fail on honest copy** | `check-business-os-a11y.ts`, W4's block | One assertion bans the WORD `invoiced` from the panel and its shared module. By this file's own recorded lesson, a ban on a string is not a ban on a behaviour and it cuts both ways - copy that honestly explains nothing is invoiced would trip the check that exists to protect that property. It passes today. Harden it to ban the CONSTRUCTION (an invoice total, a payment call) rather than the word. |
+| **The wave-c rehearsal runner points at a stale worktree** | `<temp>\personalink-phase0\wave-c\run-on-rehearsal.js` | Hardwired `APP_DIR` to `personai-wave-c-cases-wt`, which is 12 commits behind. Any DB harness run through it executes the WRONG checkout against the current schema. It should be repointed at primary or deleted in favour of `run-on-rehearsal-primary.js`. This burned real time in this run. |
+
+### Worker evidence, stated honestly rather than levelled up
+
+Five worker packages were integrated across H0 and H1. Their evidence is **not** of equal quality
+and the difference is recorded rather than smoothed:
+
+- **W5** (`gpt-5.6-terra`, lint slice 5) is the strongest: a real shell PID (7668), a named model,
+  and it **corrected the brief's baseline** - the brief said 44 problems / 16 errors / 28 warnings,
+  W5 measured 45 / 16 / 29, and root's independent measurement at `435a5e9` was 45 / 16 / 29. W5 was
+  right and the brief was wrong.
+- **W4** (inspection panel) is weaker: its model was `claude-sonnet-5` **by brief instruction, not
+  by observation**, it said so explicitly, and it had **no observable PID**. It was also candid that
+  it could not exercise anything against a live route, because the routes did not exist yet.
+
+Root observed none of these workers executing - they ran in the run that failed. What root verified
+is artifacts, and W4 and W5 were each checked independently in their own worktrees before merging,
+including the cross-check W4 could not do: every URL, method and payload field name against the
+routes that now exist.
+
+**This also corrects a standing claim in `TASKS.json` and `NEXT_ACTION.md`.** Those say worker
+dispatch is hollow and "no parallelism was claimed or used". That remains true of the **MCP
+`spawn_run` path**. It is not true of the shell-launched worker path, which produced five clean
+single-commit branches in five worktrees. The cost of that path is the one already recorded: it
+exposes no `--model` argument, so a worker's model cannot be proved.
+
+### Next in queue
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| Panel/server recording mismatch | `inspection-panel.tsx` | Small and well understood. Gate the record forms on the server's answer rather than on `isTerminal`. The cheapest honest fix is a `canRecord` boolean on the inspection record, since the panel already renders every other action from server-computed state. |
+| Harden the `invoiced` string ban | `check-business-os-a11y.ts` | Ban the construction, not the word. See the gap table above. |
+| P1-009 slice 6 | repo-wide lint | 43 problems (14 errors, 29 warnings). What is left is the hard part: `no-img-element` 25 warnings where every conversion changes layout behaviour, `set-state-in-effect` 10 errors needing effect redesign, `preserve-manual-memoization` 3, `exhaustive-deps` 3, `no-explicit-any` 1 (the documented judgement call at `src/app/[slug]/page.tsx:70`), `no-unused-vars` 1. **There is no cheap slice left.** |
+| Repoint or delete `wave-c\run-on-rehearsal.js` | tooling, outside the repo | Prevents a whole class of misattributed failure. |
+| G2 | appointments providers | Still **owner-gated**: real messages and real money. |
+| P1-007 | live `personalink` cutover | Still **owner-gated**. |

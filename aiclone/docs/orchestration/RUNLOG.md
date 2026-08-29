@@ -3028,3 +3028,169 @@ Recorded because a run that only lists its successes is not a record.
 Nothing in the capability registry claims something that does not exist. Two capabilities are
 `available` on the strength of an engine plus enforcement rather than an owner surface, and
 `NEXT_ACTION.md` says so in the table rather than leaving it to be inferred.
+
+
+---
+
+# Run close - 2026-08-30, night-run resumed after failure, root-serial integration
+
+The previous night-run died mid-flight. This run resumed from primary `435a5e9`, finished
+`fieldJobs:inspection`, integrated the two worker packages that were complete but unintegrated, and
+promoted the capability. Final tip `7b15cd3` plus the docs commit that carries this section.
+
+## The resume began by measuring, and the inherited description was wrong in three places
+
+This is the most useful thing in this entry, because every one of these would have caused real
+damage if trusted.
+
+1. **The brief said the disposable database held in-progress inspection work.** It did not. The
+   schema and its migration had already landed in `8b33a6a`, and the rehearsal database was left
+   **fully applied**: 18 migrations, every one finished, none rolled back, 5/5 inspection tables,
+   4/4 inspection enums, 113 public tables. Had the run "resumed the rehearsal" it would have
+   re-applied an applied migration. Nothing was re-run.
+
+2. **A stale runner made a healthy database look broken.** `prisma migrate status` through
+   `wave-c\run-on-rehearsal.js` reports "17 migrations found" while the repository has 18 and the
+   database has 18. The runner hardcodes `APP_DIR` to the `personai-wave-c-cases-wt` worktree, which
+   sits 12 commits behind at `8d966af`. That is the documented sweep-driver trap wearing different
+   clothes: **a driver pinned to the wrong checkout does not error, it lies quietly.** Diagnosed by
+   querying `_prisma_migrations` directly with a purpose-written read-only probe rather than by
+   trusting the tool.
+
+3. **The migration's rollback evidence was half worthless.** Six H0 snapshots existed. Comparing
+   them by hash showed `h0-rollback` is **byte-identical to `h0-post`** - so the first rollback was a
+   no-op and proved nothing, which is presumably why a second cycle script exists. The second cycle
+   is genuine: `h0-rollback2` equals `h0-pre` exactly, and `h0-reapply2` equals `h0-post` apart from
+   39 OID-derived internal NOT NULL constraint names on the recreated inspection tables, with **zero**
+   non-OID differences and 1194 constraints on both sides. Rule earned: **invertibility evidence is
+   only as good as the snapshot taken after the rollback actually ran, and two snapshots with the same
+   hash either side of a rollback mean the rollback did not happen.**
+
+The 55 gate logs inherited from the failed run were also discarded as a baseline: every one predates
+the commit they were supposed to describe (written 00:50, `435a5e9` committed 01:14, and that commit
+changed harnesses). A fresh sweep was run instead - 55 checks, 0 failed - and that is what the rest of
+this run is measured against.
+
+## What was delivered
+
+| Package | Commits | What it is |
+|---|---|---|
+| Inspection runtime, routes, harnesses | `0151575` | two services, 13 endpoints across 9 route files, two adversarial harnesses |
+| Owner inspection panel | `7af39f8`, merge `7648473` | W4's 987-line panel plus its shared module and 24 a11y assertions |
+| Shell mount | `be176d4` | the panel was unreachable until root mounted it |
+| Lint slice 5 | `ea28089`, merge `adebddd` | W5 cleared both `react-hooks/refs` errors |
+| Promotion + blueprint | `7b15cd3` | `fieldJobs:inspection` to available, `field-service-v1` installed |
+
+## The design work worth keeping
+
+**Snapshotting is the whole point of the template.** Creating an inspection from a checklist copies
+the lines into rows rather than referencing them, so editing the checklist later cannot rewrite what
+a past inspection asked. The harness proves it by editing a template **after** an inspection is
+raised from it and re-reading the inspection.
+
+**An ASSET line had to be seeded to exist at all.** `FieldJobInspectionItem_asset_has_identity`
+requires every ASSET row to name its equipment from the moment it is inserted. Snapshotting an ASSET
+template line therefore seeds `assetLabel` from the checklist line's label. Without that, an ASSET
+template line could not be snapshotted - the constraint would refuse the row. This was found by
+reading the migration's CHECK constraints before writing the engine, not by hitting the error.
+
+**The part deduction is an ADJUSTMENT, not a CONSUME, because the inventory engine says so.**
+`applyMovement` deliberately refuses CONSUME as direct input: CONSUME only arises from settling a
+reservation, and a part taken off a van has no hold behind it, so accepting it would move the
+reserved balance with nothing backing it. Composing the existing engine meant obeying its rule rather
+than working around it.
+
+**The ordering of a part write is chosen for its failure mode.** The part row goes in first, so the
+database's boundary trigger validates tenant, depot and existence before any stock moves; then the
+movement is applied with an idempotency key **derived from the part id**; then the movement id is
+stored. A crash mid-way leaves a visible part line with no movement - recorded, stock not moved -
+rather than stock that vanished with nothing pointing at it. Because the key is the part id, a retry
+finishes the job and cannot deduct twice. There is no way to make this atomic across two engines'
+transactions, so the honest choice was to pick which half-done state a human would rather find.
+
+## Three places the implementation deliberately contradicts its own written contract
+
+`INSPECTION_API_CONTRACT.md` was written before the implementation so the UI could be built in
+parallel. Three of its statements were wrong, and the code is right:
+
+1. **A foreign or nonexistent stock record is 403, not 409.** The contract listed "belongs to another
+   tenant" among the 409 conditions. A foreign record answering 409 while a nonexistent one answers
+   403 would make the endpoint an **oracle for which stock records exist**, defeating the
+   non-enumeration property the whole platform is built on. Only the depot mismatch - stock the caller
+   demonstrably owns, at the wrong location - is a 409. The harness proves the two refusals are
+   byte-identical.
+2. **The 401 code is `UNAUTHORIZED`.** That is what `PersistedTenancy` throws platform-wide. Harmless
+   to the panel, confirmed by reading `inspectionErrorCopy` and finding it branches on
+   `error.status`, never on the code string.
+3. **Recording is allowed only in `DRAFT` and `IN_PROGRESS`.** The contract said recording was refused
+   only on a terminal inspection. The lifecycle module's own `RECORDABLE_STATUSES` is stricter and
+   coherent, because `SUBMITTED` can legally return to `IN_PROGRESS` precisely so the office can ask
+   for more detail. This leaves a real mismatch with the panel, which is recorded in
+   `INTEGRATION_QUEUE.md` rather than left to be found by a user.
+
+## Evidence
+
+Two new harnesses, and both were proven able to fail rather than merely observed passing:
+
+| harness | green | inverted |
+|---|---|---|
+| `check-fieldjob-inspection-runtime` | 96/96, exit 0 | 58/96, **exit 1**, 38 flipped red |
+| `check-fieldjob-inspection-routes` | 54/54, exit 0 | 30/54, **exit 1**, 24 flipped red |
+
+What they measure rather than assume: snapshot immunity to later template edits; that
+`NOT_APPLICABLE` is an answer and `PENDING` is not, including the refusal's `pendingRequired` **count**;
+that omitting `consumeStock` moves no stock, read from `onHand` rather than from the flag; that the
+deduction landed as an `ADJUSTMENT` with `qtyDelta` -3; that a replay cannot deduct twice; that the
+engine's open-status list matches the partial unique index **read out of `pg_indexes`**; that a handoff
+to `HANDED_OFF` writes no `Payment` and no `Order` row; that one inspection's timeline never returns
+another's events on the same job; and that across every observed response on the route surface a **404
+never occurs**, which is what makes "the UI must never say not found" safe to follow.
+
+## Final combined suite on `7b15cd3`
+
+| Gate | Result |
+|---|---|
+| `tsc --noEmit` | 0 |
+| check harnesses | **57 of 57 exit 0** (55 at `435a5e9`, +2 this run) |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings), down from 45 |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | exit 0, all 9 inspection route files registered as dynamic |
+| capability contract | PASS, and the registry now has **zero** planned capabilities |
+| live `personalink` | untouched - 35 tables, no `_prisma_migrations`, 0 wave tables, no `btree_gist`, `Profile` = 16 |
+| disposable DB | 18 migrations, all finished, none rolled back, 113 tables - fully applied, never left mid-rehearsal |
+| origin | nothing pushed |
+| frozen worktrees | all six `kirocrew/*` still at `ea69595` |
+| working tree | only the two expected untracked paths |
+
+## What this run got wrong, and what it cost
+
+1. **A new harness introduced a lint warning.** A ternary used as a statement
+   (`can(a,b) ? legal++ : illegal++`) tripped `no-unused-expressions` and took repo-wide lint from 45
+   to 46. Rewritten as an if/else, back to a **byte-identical** diff against the baseline. Caught by
+   comparing lint output line by line rather than by comparing totals - a total can hide a swap.
+2. **The route harness was written with four calls missing their path argument.** `addTemplateItem`
+   takes `(templateId, request)` and was called with only the request, four times. ts-node caught it
+   as TS2554 before anything ran. Cheap, but it is why the harness is run rather than reasoned about.
+3. **Changing the HTTP boundary's arity silently broke an existing harness.** `FieldJobApiService`
+   went from two constructor arguments to four, and `check-fieldjob-routes.ts` constructs it twice.
+   Neither is covered by `tsc -p tsconfig.json`, because scripts compile under a different tsconfig,
+   so the app typechecked clean while a harness was broken. Found by searching for every construction
+   site rather than by waiting for the sweep. **Widening a constructor is a repo-wide change even
+   when the type checker for the app says nothing.**
+4. **Installing a blueprint turned a green check red on an improvement.** `marks unused engines
+   honestly` asserted the literal word "unused" appears, which only held while some engine had no
+   blueprint. Rewritten to prove the badge by reproducing the gap deliberately. The lesson is already
+   in this file twice under different names; this is its third instance.
+
+## Honest limits of this run
+
+- **No worker was observed executing.** W1 through W5 ran in the run that failed. What was verified
+  is artifacts: branches, single clean commits, per-worktree `node_modules` copy logs, and written
+  reports. W4 and W5 were each independently re-checked in their own worktrees before merging.
+- **W4 could not prove its model or its PID**, and said so. Its evidence is the artifact, not its
+  identity claim. W5 reported a real PID and a model and corrected the brief's own baseline.
+- **No automated harness covers orb animation**, so W5's behavioural claim about `bloub-orb` and
+  `welcome-orb` rests on code review, not on a green test. The lint and type claims are measured.
+- **`check-business-os-render` does not enumerate the shell's panel tree**, so mounting the inspection
+  panel does not by itself place it under a render assertion. Its evidence remains the source-level
+  a11y assertions plus the route harness on the server side.
