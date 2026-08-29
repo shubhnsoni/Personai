@@ -2875,3 +2875,72 @@ exists to protect is worse than no assertion, and quietly deleting it would have
 
 **Still missing:** `contentCohorts:accessLevels` has an engine with no HTTP surface and no panel,
 and `fieldJobs:inspection` is still not built.
+
+
+---
+
+## Access tiers are now enforced, not merely enforceable
+
+Commit `581a03e`. Wave G3 made access tiers real and computed visibility correctly, and **nothing
+consulted it**. This gap was written into `INTEGRATION_QUEUE.md` as the most honest remaining gap
+in the program *before* it was closed, rather than found and quietly fixed — which is the only
+reason it is worth writing about now.
+
+### One rule, four callers
+
+`src/lib/cohorts/access.ts` now exports `lessonVisibleToEnrollment(db, lessonId, enrollmentId)`,
+typed against the narrowest client that can answer the question so it works inside a Prisma
+transaction as well as against the full client. The owner console, the learner surface, the library
+page and the completion route all call it.
+
+Restating the rule at each site was the alternative, and three copies of an access rule is three
+chances to disagree about what somebody paid for. The harness asserts that neither new call site
+restates it.
+
+### The library reader
+
+`src/app/library/courses/[id]/page.tsx` consulted nothing before this: any ACTIVE or COMPLETED
+enrolment returned every module and every lesson of the course.
+
+- A lesson with no access rule is visible to everybody, so **every course without tiers configured
+  behaves exactly as it did before**. No data migration, and no existing learner's view changed.
+- Locked lessons are **removed** rather than shown as locked, because `CourseViewer` has no locked
+  state and inventing one here would mean two components disagreeing about how a lock looks. That
+  reason is written into the file rather than left as a silent choice.
+- The **count is surfaced** instead: "N lessons are not included in your current access level."
+  Being quietly given less is worse than being told what you cannot see.
+- A module whose every lesson sits above the tier is dropped rather than rendered empty, because an
+  empty module reads as a broken course.
+- `completedLessonIds` is filtered too, so a lesson the learner can no longer see does not show as
+  complete in a course they can no longer finish.
+
+### The completion route
+
+`src/app/api/courses/complete-lesson/route.ts` now refuses a locked lesson, and refuses it with the
+**same** `ACCESS_DENIED` response a foreign enrolment gets. That is deliberate: a distinguishable
+refusal would let a learner map which lessons exist above their tier by trying to complete them one
+at a time.
+
+### A vacuous assertion, caught before it shipped
+
+One of the eight new assertions was written as `.every(async ...)`. That is **always truthy** — it
+would have shipped a check that cannot fail and reports success. It was replaced with an awaited
+per-lesson loop comparing the shared rule against the list computation across all four lessons. A
+vacuous assertion is worse than no assertion, because no assertion at least does not claim
+anything.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `check-course-access-runtime` | 87/87 (79 -> 87); inverted 86/87 exit 1 |
+| check harnesses | **52 of 52 exit 0** |
+| app `tsc --noEmit` | 0 |
+| targeted ESLint | 0 problems, 0 warnings |
+| repo-wide ESLint | 78 problems — unchanged |
+| production build | exit 0 |
+
+**Scope note.** This does not touch the capability registry.
+`contentCohorts:accessLevels` claims tiers, entitlements and visibility enforcement — which is now
+true in the two places content is actually served. It has never claimed an owner API or panel, and
+it still does not have one.

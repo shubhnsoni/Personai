@@ -1,6 +1,6 @@
 {
-  "milestone": "Field jobs and retainers are complete end to end at 3de518b - schema, runtime, HTTP surface and owner panel each. Waves A-G4 integrated; retail-storefront-v1 ACTIVE. Remaining: contentCohorts:accessLevels has an engine but no surface; fieldJobs:inspection is not built; appointments:reminders and :deposits stay owner-gated.",
-  "updatedAt": "2026-08-29 21:37 +05:30",
+  "milestone": "Course access tiers are now ENFORCED where content is served (581a03e), not merely enforceable. Retainers and field jobs are complete end to end. Waves A-G4 integrated; retail-storefront-v1 ACTIVE. Remaining: contentCohorts:accessLevels has no owner API or panel; fieldJobs:inspection is not built; appointments:reminders and :deposits stay owner-gated.",
+  "updatedAt": "2026-08-29 21:46 +05:30",
   "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -1408,6 +1408,33 @@
         "build": "exit 0; all 10 field-job routes emitted as dynamic server routes"
       },
       "stillMissing": "contentCohorts:accessLevels has an engine with no HTTP surface and no panel. fieldJobs:inspection is still not built."
+    },
+    {
+      "id": "P2-016",
+      "title": "Enforce course access tiers where content is actually served",
+      "status": "done",
+      "owner": "root (claude-opus-5)",
+      "workerIndependenceClaimed": false,
+      "dependencies": [
+        "P2-012"
+      ],
+      "commits": {
+        "enforcement": "581a03e"
+      },
+      "whyThisExisted": "Wave G3 made access tiers real and computed visibility correctly, and NOTHING CONSULTED IT. Tiers were enforceable and not enforced. This gap was written into INTEGRATION_QUEUE.md as the most honest remaining gap in the program before it was closed, rather than found and quietly fixed.",
+      "oneRuleThreeCallers": "src/lib/cohorts/access.ts now exports lessonVisibleToEnrollment(db, lessonId, enrollmentId), typed against the narrowest client that can answer the question so it works inside a Prisma transaction as well as against the full client. The owner console, the learner surface, the library page and the completion route all call it. Restating the rule at each site was the alternative, and three copies of an access rule is three chances to disagree about what somebody paid for. The harness asserts neither new call site restates it.",
+      "libraryReader": "src/app/library/courses/[id]/page.tsx consulted nothing before this: any ACTIVE or COMPLETED enrolment returned every module and every lesson. It now resolves visibility and filters the tree. A lesson with no access rule is visible to everybody, so every course without tiers configured behaves exactly as before - no data migration, and no existing learner's view changed. Locked lessons are REMOVED rather than shown as locked, because CourseViewer has no locked state and inventing one would mean two components disagreeing about how a lock looks; the reason is written in the file rather than left as a silent choice. The COUNT is surfaced instead - 'N lessons are not included in your current access level' - because being quietly given less is worse than being told what you cannot see. A module whose every lesson is above the tier is dropped rather than rendered empty, since an empty module reads as a broken course. completedLessonIds is filtered too, so a lesson the learner can no longer see does not show as complete.",
+      "completionRoute": "src/app/api/courses/complete-lesson/route.ts now refuses a locked lesson, and refuses it with the SAME ACCESS_DENIED response a foreign enrolment gets. Deliberate: a distinguishable refusal would let a learner map which lessons exist above their tier by trying to complete them.",
+      "vacuousAssertionCaught": "One of the eight new assertions was written as `.every(async ...)`, which is ALWAYS TRUTHY and would have shipped a check that cannot fail. It was replaced with an awaited per-lesson loop comparing the shared rule against the list computation across all four lessons. A vacuous assertion is worse than no assertion, because it reports success.",
+      "scopeNote": "This does not touch the capability registry. contentCohorts:accessLevels claims tiers, entitlements and visibility enforcement, which is now true in the two places content is actually served. It has never claimed an owner API or panel and still does not have one.",
+      "gates": {
+        "checkCourseAccessRuntime": "87/87 (79 -> 87); inverted 86/87 exit 1",
+        "checkHarnesses": "52 of 52 exit 0",
+        "tsc": 0,
+        "targetedLint": "0 problems, 0 warnings",
+        "repoWideLint": "78 problems, unchanged",
+        "build": "exit 0"
+      }
     }
   ],
   "laneState": {
