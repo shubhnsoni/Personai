@@ -5,12 +5,32 @@ Updated 2026-08-29, mid-run, root-serial. No worker independence claimed.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`7bfc868`** — Wave F integrated and green (ledger commit follows)
-- Origin `recovered/aug20-wt-pr-32`: `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`, unchanged
+- Primary HEAD: **`108846e`** — Waves C, D, E and F integrated green, plus the first P1-009
+  lint slice
+- Origin `recovered/aug20-wt-pr-32`: `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`, unchanged;
+  `origin/main`: `9e8a0fffb84937d809788ee4512884289c3132b8`, unchanged
 - Waves A, B, C, D, E and F complete. P2-005, P2-006, P2-008, P2-009, P2-010 are `done`.
-- Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**
-  at 85 tables, not mid-rehearsal. Live `personalink` untouched.
+  P1-009 is `in_progress_slice_1_done`.
+- Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**,
+  13 migrations, 85 tables / 931 columns / 190 enum labels / 14 triggers. Never
+  mid-rehearsal.
+- Live `personalink`: verified untouched — 35 tables, no `_prisma_migrations`, none of the
+  twelve tables this run created, no `btree_gist`, `Profile` = 16.
 - Gateway port 5476 absent; workers and crons empty. Every wave has been root-serial.
+
+### Lint inventory, measured at `108846e`
+
+Repo-wide: **39 errors, 52 warnings, 91 reports**. Targeted wave paths are at zero.
+
+| Rule | Count | Why it is still open |
+|---|---|---|
+| `@next/next/no-img-element` | 25 | swapping `<img>` for `next/image` changes layout behaviour |
+| `@typescript-eslint/no-unused-vars` | 24 | genuinely dead identifiers; deleting an export needs proof nobody depends on it |
+| `@typescript-eslint/no-explicit-any` | 24 | needs the intended type, not a cast |
+| `react-hooks/set-state-in-effect` | 10 | needs the effect redesigned |
+| `react-hooks/preserve-manual-memoization` | 3 | ditto |
+| `react-hooks/exhaustive-deps` | 3 | ditto |
+| `react-hooks/refs` | 2 | ditto |
 
 ### What is genuinely built, by wave
 
@@ -38,9 +58,16 @@ all of `fieldJobs` (planned).
 
 ```powershell
 cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
-git rev-parse HEAD                     # expect 7bfc868... or the ledger commit on top of it
+git rev-parse HEAD                     # expect 108846e... or the closing ledger commit on top of it
 git status --porcelain                 # expect only .codex-remote-attachments/ and P1_014_ACTION_INVENTORY.md untracked
 git rev-parse origin/recovered/aug20-wt-pr-32   # expect 4b386d1...
+```
+
+Preservation is re-checkable at any time:
+
+```powershell
+node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\check-live-readonly.js"
+# expects: 35 tables, _prisma_migrations absent, 0 wave tables leaked, btree_gist absent, Profile=16
 ```
 
 ### Step 1 — pick the next package
@@ -54,6 +81,10 @@ Read `INTEGRATION_QUEUE.md` → "Next in queue — three candidates, none starte
   approval.
 - **G3 retainers and access levels** are the two gaps Wave E split out of over-broad
   capability descriptions. Smaller; each needs schema plus runtime.
+- **P1-009 slice 2** is the safe fallback when no feature wave fits the window. The
+  inventory above says exactly what is left and why each item needs judgement. Pick one rule
+  and finish it; do not attempt `no-img-element` or `set-state-in-effect` without reading the
+  components properly, because both change behaviour.
 
 When a capability is promoted, expect to repoint the contract harness the same way Wave F
 did: `check-capability-contract` carries non-vacuity assertions naming

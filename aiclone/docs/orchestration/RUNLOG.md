@@ -2107,3 +2107,70 @@ Live `personalink` read-only. Disposable target left **fully applied** at 85 tab
 mid-rehearsal. Origin remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Frozen worktrees
 and attachments untouched; `P1_014_ACTION_INVENTORY.md` unchanged. No push, PR, deploy,
 tunnel, dev server or real external-provider call.
+
+
+---
+
+## 2026-08-29 · Run close — P1-009 first slice, and preservation verified
+
+### P1-009 first slice `108846e`
+Repo-wide lint went from **53 errors / 61 warnings / 114 reports across 54 files** to
+**39 errors / 52 warnings / 91 reports**, with no severity changed anywhere.
+
+The interesting part was not the count. Eight of the reported violations were
+`_request`, `_available` (twice), `_calendarId`, `_startDate`, `_endDate`, `_uuid` and
+`_RemovedProductsView` — identifiers already carrying this repository's own "deliberately
+unused" marker and being told off for it. The linter did not know the convention. Renaming
+them would have been churn; configuring `no-unused-vars` to honour `^_` was the actual fix.
+Genuinely dead identifiers without the underscore are still reported, so the remaining 24
+are signal rather than noise.
+
+Three `no-require-imports` errors were in `scripts/**/*.js`, which are CommonJS by
+extension. `require()` is correct there. The override is scoped to that glob so application
+code still cannot use it.
+
+Eleven real violations were fixed behaviour-preservingly: `window.location.href` →
+`router.push` in the error boundary (a full document load from an error boundary discards
+the React tree), two internal `<a>` links → `next/link`, two empty extending interfaces →
+type aliases with the exported names unchanged, and one bare apostrophe escaped.
+
+Deliberately not attempted: `no-img-element` (25), `no-explicit-any` (24), the remaining
+`no-unused-vars` (24) and the react-hooks family (18). Each needs judgement rather than a
+mechanical edit — swapping `<img>` for `next/image` changes layout behaviour, replacing
+`any` requires knowing the intended type, deleting a dead export requires knowing nobody
+depends on it, and `set-state-in-effect` needs the effect redesigned. Doing those blind is
+how a lint pass introduces a regression.
+
+Verified: app `tsc` 0 · 41/41 check harnesses exit 0, including all three Business OS
+surface harnesses that render the touched components · production build compiles · targeted
+`eslint` still 0 across the wave paths.
+
+### Run summary
+Six waves integrated on `recovered/aug20-wt-pr-32`, each with its own scoped gates and a
+combined suite on the integrated tip:
+
+| Wave | Tip | What shipped |
+|---|---|---|
+| C | `862e5ef` | cases/projects runtime, 18 routes, Business OS surface |
+| D | `c516703` | content/cohort schema, runtime, 15 routes, console |
+| E | `e91f6c7` | truthful vertical activation, falsifiable capability contract |
+| F | `7bfc868` | commerce inventory schema, runtime, 6 routes, stock panel |
+
+Final primary HEAD `108846e`. Harness count grew from 35 to 41; new assertion totals this
+run: cases 36 + 67 + 75, cohorts 60 + 114 + 87, inventory 50 + 85 + 58, plus 61 new explicit
+Business OS a11y assertions and eight new properties in the capability contract.
+
+### Preservation, verified not asserted
+- **Live `personalink`**: read-only checks only. 35 public tables, `_prisma_migrations`
+  absent, **zero** of the twelve tables this run created present, `btree_gist` absent,
+  `Profile` = 16. Identical to the start of the run.
+- **Disposable target** `personalink_phase0_rehearsal_20260826_210704`: `prisma migrate
+  status` reports "Database schema is up to date", 13 migrations applied, 85 tables / 931
+  columns / 190 enum labels / 14 triggers / 2 exclusion constraints / 2 extensions. **Fully
+  applied, never left mid-rehearsal.**
+- **Origin**: `origin/recovered/aug20-wt-pr-32` = `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`,
+  `origin/main` = `9e8a0fffb84937d809788ee4512884289c3132b8`. Both unchanged.
+- **Frozen worktrees**: all six `kirocrew/*` worktrees still at `ea69595`.
+- **Attachments** and `P1_014_ACTION_INVENTORY.md`: untouched, still untracked.
+- No push, PR, deploy, tunnel, dev server, real external-provider call, or destructive Git
+  operation at any point.

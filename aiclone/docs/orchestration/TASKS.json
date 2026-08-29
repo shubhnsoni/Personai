@@ -264,9 +264,22 @@
     {
       "id": "P1-009",
       "title": "Scoped repo-wide lint cleanup",
-      "status": "queued_separate_package",
+      "status": "in_progress_slice_1_done",
       "adr": "ADR-009",
-      "note": "Baseline 124 problems / 63 errors. Never bundled into feature work; restaurant-owned files need owner review."
+      "note": "Baseline 124 problems / 63 errors. Never bundled into feature work; restaurant-owned files need owner review.",
+      "owner": "root (claude-opus-5)",
+      "commits": {
+        "slice_1": "108846e"
+      },
+      "slice1": {
+        "before": "53 errors, 61 warnings, 114 reports across 54 files",
+        "after": "39 errors, 52 warnings, 91 reports",
+        "severityUnchanged": "no-unused-vars left at warn, which is what eslint-config-next sets. Verified by measurement: the pre-change error total of 53 was fully accounted for by no-explicit-any 24, set-state-in-effect 10, no-html-link-for-pages 8, preserve-manual-memoization 3, refs 2, no-empty-object-type 2, no-unescaped-entities 1 and no-require-imports 3. This slice neither lowers nor raises a gate.",
+        "configFixes": "no-unused-vars now honours the repository's own leading-underscore convention (argsIgnorePattern, varsIgnorePattern, caughtErrorsIgnorePattern, destructuredArrayIgnorePattern of ^_, plus ignoreRestSiblings), which cleared 8 reports that were already saying unused-on-purpose. no-require-imports is disabled only for scripts/**/*.js, which are CommonJS by extension.",
+        "realFixes": "11 violations fixed behaviour-preservingly: window.location.href -> router.push in src/app/error.tsx; two internal <a> links -> next/link in dashboard-layout-client.tsx and profile-view.tsx; empty extending interfaces -> type aliases in ui/input.tsx and ui/textarea.tsx with the exported names unchanged; one bare apostrophe escaped in product-form.tsx.",
+        "verified": "app tsc 0; 41/41 check harnesses exit 0 including all three Business OS surface harnesses that render the touched components; production build compiles; targeted eslint still 0 across src/lib/{cases,cohorts,inventory,business-os}, src/app/api/platform and src/components/business-os.",
+        "remaining": "no-img-element 25, no-explicit-any 24, no-unused-vars 24, react-hooks family 18. Each needs judgement, not a mechanical edit: swapping <img> for next/image changes layout behaviour, replacing any requires knowing the intended type, deleting a dead export requires knowing nobody depends on it, and set-state-in-effect needs the effect redesigned."
+      }
     },
     {
       "id": "P1-010",
