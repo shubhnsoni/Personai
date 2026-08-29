@@ -3194,3 +3194,93 @@ never occurs**, which is what makes "the UI must never say not found" safe to fo
 - **`check-business-os-render` does not enumerate the shell's panel tree**, so mounting the inspection
   panel does not by itself place it under a render assertion. Its evidence remains the source-level
   a11y assertions plus the route harness on the server side.
+
+
+## H1 follow-ups, same session - three gaps closed and the vertical join proved
+
+Base `b25b955`, head `f8ee611`. This is the part of the run that acted on what the previous section had
+just written down, rather than leaving it for a future run.
+
+| Commit | Slice |
+|---|---|
+| `a5906ab` | `canRecord` computed server-side; the panel stops guessing from `!isTerminal` |
+| `eea2f7b` | the `invoiced` ban rewritten to target behaviour, and proven able to fail |
+| `f8ee611` | the inspection/inventory join asserted from the inventory surface |
+
+### Two of these were fixing our own new work, not inherited debt
+
+Worth stating plainly. The `canRecord` mismatch was created in this run: root made the server stricter
+than the written contract (recording only in `DRAFT`/`IN_PROGRESS`) while W4's panel, built against
+that contract, gated on `!isTerminal`. Nobody was wrong in isolation; the contract was wrong, and the
+two halves were built in parallel against it. **Writing the gap down at merge time is what made it
+cheap to fix an hour later** - the alternative was a user discovering that a button always fails.
+
+The `invoiced` word-ban was W4's, and it passed. It was rewritten anyway because this repository has
+now paid for the same mistake three times - "ETA", `.every(async ...)`, and the `unused` badge earlier
+in this very run. A check that passes today and will fail on honest copy tomorrow is a liability even
+while it is green.
+
+### The cross-vertical assertion is the one that changes what is proven
+
+Every inspection assertion up to this point was measured from inside the fieldJobs surface. That
+cannot distinguish "composed the inventory engine" from "wrote a private part row while inventory
+carried on unaware" - both look identical from the fieldJobs side. The route harness now asks the
+inventory vertical's own HTTP boundary and gets four answers: the `-3` `ADJUSTMENT` is in that stock
+record's movements, its reason names the inspection, inventory's `onHand` equals the figure fieldJobs
+computed, and **the part recorded without `consumeStock` produced no movement at all**.
+
+That last assertion is what gives the `consumeStock: false` default meaning from the outside. A
+"recorded only" part must be invisible to inventory, and now that is measured rather than asserted by
+the module that would benefit from believing it.
+
+### Also fixed, outside the repository
+
+`wave-c\run-on-rehearsal.js` now prints which worktree it runs in and compares that worktree's
+migration count against the migrations actually applied in the target database. Run today it says:
+`*** MIGRATION DRIFT: this worktree has 17 migration(s) on disk, the database has 18 applied ***`.
+It deliberately does not abort, because a pre-migration comparison is a legitimate case where the
+counts differ. This is the trap that cost this run real time at the start; it can no longer be silent.
+
+### Gates at `f8ee611`
+
+| Gate | Result |
+|---|---|
+| `tsc --noEmit` | 0 |
+| check harnesses | 57 of 57 exit 0 |
+| `check-fieldjob-inspection-runtime` | 100/100; inverted exit 1, 41 flipped |
+| `check-fieldjob-inspection-routes` | 59/59; inverted exit 1, 29 flipped |
+| repo-wide ESLint | 43 problems, byte-identical diff to `b25b955` |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | exit 0 |
+| live `personalink` | untouched, re-verified |
+| disposable DB | `FULLY_APPLIED_WITH_INSPECTION`, 113 tables |
+
+### What was NOT done, and why - the approved sequence, answered honestly
+
+The remaining items in the approved sequence were measured before being started, and most turned out
+to be already done, undefined, or unsafe to do mechanically. Recording that is more useful than
+inventing work to fill the list:
+
+- **Daily operations** - no package by that name exists in this repository's ledgers. The operational
+  surfaces that do exist (the Business OS shell, the task queue, the approval inbox, the audit ledger)
+  are built and green.
+- **Wave-1 verticals** - already complete and integrated. `TASKS.json.wave1Result` records six accepted
+  packages merged at `4649ff1` with 10/10 harnesses.
+- **Onboarding** - the critical defect HANDOFF.md records, `createProfile(userId, data)` trusting a
+  caller-supplied owner, is **already fixed**: it derives the actor from `requireAuthenticatedUser()`.
+  Verified by reading the file. A new onboarding surface for `field-service-v1` is a genuine gap and is
+  now in the queue, but it is a greenfield package rather than a follow-up.
+- **Command-centre UI** - the Business OS shell IS this, and it was extended this run: the inspection
+  panel is mounted, and every engine is now composed by at least one blueprint.
+- **Cross-vertical E2E** - done, above.
+- **Safe lint reduction** - **there is no safe slice left**, and this is a refusal rather than an
+  omission. All 14 remaining errors and 29 warnings need per-component judgement: 25 `no-img-element`
+  each change layout and loading behaviour, 10 `set-state-in-effect` need effects redesigned, 3
+  `preserve-manual-memoization` need memoized-collection identity analysis, 3 `exhaustive-deps` need
+  per-effect analysis, 1 `no-explicit-any` is a documented design call, and 1 `no-unused-vars` is a
+  live DOM query. Clearing any of them to move a number would break this file's own standing rules,
+  which is why the count is being left at 43 rather than improved cosmetically.
+
+Also worth recording: **HANDOFF.md is stale and should not be used for planning.** All four entries in
+its critical/high defect table are closed, and its "next steps" list still describes P2-003 as blocked,
+which it has not been for several waves.

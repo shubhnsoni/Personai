@@ -9,7 +9,11 @@ last resume found wrong" below before acting on anything here.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`7b15cd3`** plus the docs commit carrying the run-close section
+- Primary HEAD: **`f8ee611`** plus the docs commit carrying the closing sections
+- The three gaps this run recorded were then CLOSED in the same run: `a5906ab` (server-computed
+  `canRecord`), `eea2f7b` (the `invoiced` ban rewritten to target behaviour), `f8ee611` (the
+  inspection/inventory join asserted from the inventory side), plus a migration-drift guard on the
+  wave-c rehearsal runner.
 - Origin unchanged; nothing was pushed.
 - Waves A-G4 complete, plus surfaces, plus **H1: `fieldJobs:inspection` is complete end to end** -
   schema, migration, runtime, 13 routes, an owner panel that is mounted and reachable, a promotion
@@ -24,12 +28,14 @@ last resume found wrong" below before acting on anything here.
   0 wave tables leaked, no `btree_gist`, `Profile` = 16.
 - Frozen worktrees intact: all six `kirocrew/*` still at `ea69595`.
 
-### Measured gates at `7b15cd3`
+### Measured gates at `f8ee611`
 
 | Gate | Result |
 |---|---|
 | `tsc --noEmit` | 0 |
 | check harnesses | 57 of 57 exit 0 |
+| `check-fieldjob-inspection-runtime` | 100/100; inverted exit 1, 41 flipped |
+| `check-fieldjob-inspection-routes` | 59/59; inverted exit 1, 29 flipped |
 | repo-wide ESLint | 43 problems (14 errors, 29 warnings) |
 | `npm audit --omit=dev` | 0 vulnerabilities |
 | production build | exit 0 |
@@ -98,20 +104,27 @@ node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\probe-rehearsa
 
 Read `INTEGRATION_QUEUE.md` -> the last "Next in queue" table. In priority order:
 
-- **Panel/server recording mismatch.** Small, well understood, and a real user-visible wart. The
-  server allows recording only in `DRAFT` and `IN_PROGRESS`; `inspection-panel.tsx` disables its
-  forms only when the inspection is terminal, so a `SUBMITTED` inspection shows enabled controls
-  that 409. Cheapest honest fix is a server-computed `canRecord` boolean on the inspection record,
-  since the panel already renders every other action from server state.
-- **Harden the `invoiced` string ban** in `check-business-os-a11y.ts`. It bans a WORD, and honest copy
-  saying nothing is invoiced would trip the check that protects that property. Ban the construction.
-- **P1-009 slice 6.** 43 problems. **There is no cheap slice left**: `no-img-element` 25 warnings
-  where every conversion changes layout behaviour, `set-state-in-effect` 10 errors needing effect
-  redesign, `preserve-manual-memoization` 3, `exhaustive-deps` 3, `no-explicit-any` 1 (a documented
-  judgement call at `src/app/[slug]/page.tsx:70`), `no-unused-vars` 1.
-- **Repoint or delete `wave-c\run-on-rehearsal.js`.** Prevents a whole class of misattributed failure.
+- **Template-authoring UI.** The five `/inspection-templates/**` endpoints have **no owner surface**,
+  so a checklist can currently only be created through the API. This is the honest remaining gap in
+  the H1 package and it is a real one: an owner cannot author a checklist from the product. The
+  inspection panel deliberately does not do it, and W4's brief never asked for it.
+- **An onboarding surface for `field-service-v1`.** The blueprint is active and selectable by the
+  registry, but nothing walks an owner through choosing it. Note that the critical `createProfile`
+  identity defect `HANDOFF.md` records is **already fixed** - it derives the actor from
+  `requireAuthenticatedUser()` and no longer accepts a caller-supplied `userId`.
+- **P1-009 slice 6.** 43 problems, and **there is no SAFE slice left** - treat this as a refusal, not
+  a backlog item to grind. `no-img-element` 25 warnings each change layout, loading and remote-image
+  configuration; `set-state-in-effect` 10 errors each need the effect redesigned per component;
+  `preserve-manual-memoization` 3 need memoized-collection identity analysis; `exhaustive-deps` 3 need
+  per-effect analysis; `no-explicit-any` 1 is the documented judgement call at
+  `src/app/[slug]/page.tsx:70`; `no-unused-vars` 1 is a live DOM query in a puppeteer script.
+  **Do not clear any of these to move the number.**
 - **G2 appointments providers is OWNER-GATED.** Do not start without explicit approval.
 - **P1-007 live cutover is OWNER-GATED.**
+
+**`HANDOFF.md` is stale - do not plan from it.** All four defects in its critical/high table are
+closed, and its "next steps" list still describes P2-003 as blocked, which it has not been for several
+waves.
 
 ### Step 2 - migration sequence, if the package needs one
 

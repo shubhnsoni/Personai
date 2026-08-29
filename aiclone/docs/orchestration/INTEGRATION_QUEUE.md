@@ -1089,3 +1089,67 @@ exposes no `--model` argument, so a worker's model cannot be proved.
 | Repoint or delete `wave-c\run-on-rehearsal.js` | tooling, outside the repo | Prevents a whole class of misattributed failure. |
 | G2 | appointments providers | Still **owner-gated**: real messages and real money. |
 | P1-007 | live `personalink` cutover | Still **owner-gated**. |
+
+
+---
+
+## H1 follow-ups: all three recorded gaps closed, plus the cross-vertical join proved
+
+Base `b25b955`, head `f8ee611`. Every item the previous section listed as "next in queue" that was
+not owner-gated or judgement-heavy is now done.
+
+| Commit | What | Evidence |
+|---|---|---|
+| `a5906ab` | server-computed `canRecord` replaces the panel's `!isTerminal` guess | runtime 100/100, routes 55/55, a11y PASS |
+| `eea2f7b` | the `invoiced` ban now targets the behaviour, not the word | proven able to fail by injecting a violation, then reverted |
+| `f8ee611` | the inspection/inventory join proved from the INVENTORY side | routes 59/59 |
+| (tooling, outside the repo) | drift guard on `wave-c\run-on-rehearsal.js` | fires correctly: "17 on disk, 18 applied" |
+
+### The canRecord fix, and why it was not cosmetic
+
+The panel gated five record forms on `!inspection.isTerminal`. `SUBMITTED` is not terminal but is not
+recordable either, so the panel offered enabled controls the server refused with 409. `canRecord` is
+now computed server-side from `RECORDABLE_STATUSES` and the panel renders from it; `isTerminal` is no
+longer referenced in the panel at all, and an a11y assertion enforces that.
+
+The load-bearing assertion is that **a SUBMITTED inspection reports `canRecord: false` while
+`isTerminal: false`** - the two flags must DISAGREE somewhere, or the new field would be redundant.
+A second assertion attempts a real `recordItem` on that inspection and requires the 409, so the flag
+is checked against behaviour rather than against the table it was derived from.
+
+### The string ban, third time this lesson has been paid for
+
+`!/\binvoiced\b/i` was a ban on a word. It now bans three constructions - a claim that this record was
+invoiced, a call to an invoicing/payment/charge endpoint, and the patterns are **self-tested in both
+directions**: they must match "this inspection was invoiced on Tuesday", and must NOT match "Nothing
+here creates an invoice and no money moves." Then the whole thing was proven able to fail by appending
+a violating line to the panel (exit 1, naming the assertion) and reverting it.
+
+### The cross-vertical join
+
+Every earlier inspection assertion was measured from inside fieldJobs, which cannot distinguish
+"composed the inventory engine" from "wrote its own private row while inventory carried on unaware".
+The route harness now asks the **inventory vertical's own HTTP surface**: the `-3` `ADJUSTMENT` appears
+in that stock record's movements, the movement's reason names the inspection, inventory reports the
+same `onHand` the fieldJobs side computed, and the part recorded WITHOUT `consumeStock` produced no
+movement at all - exactly one `ADJUSTMENT` across the whole record, not two.
+
+That last one is what makes the `consumeStock: false` default meaningful from the other side: a
+"recorded only" part is invisible to inventory, which is precisely what "stock did not move" has to
+mean.
+
+### Next in queue - and an honest note on what is left
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| P1-009 slice 6 | repo-wide lint | 43 problems (14 errors, 29 warnings). **There is no safe mechanical slice left.** `no-img-element` 25 warnings each change layout, loading and remote-image configuration; `set-state-in-effect` 10 errors each need the effect redesigned per component; `preserve-manual-memoization` 3 need memoized-collection identity analysis; `exhaustive-deps` 3 need per-effect behaviour analysis; `no-explicit-any` 1 is the documented judgement call at `src/app/[slug]/page.tsx:70`; `no-unused-vars` 1 is a live DOM query in a puppeteer script. Clearing any of these to move a number would violate this file's own standing rules. |
+| Template-authoring UI | `inspection-panel.tsx` or a sibling | The 5 template endpoints (`/inspection-templates/**`) have NO owner surface. Checklists can currently only be created through the API. This is the honest remaining gap in the H1 package and it is a real one - an owner cannot author a checklist from the product. |
+| Onboarding surface for `field-service-v1` | onboarding flow | The blueprint is active and selectable by the registry, but nothing walks an owner through choosing it. Note the critical `createProfile` identity defect HANDOFF.md records is **already fixed** - it derives the actor from `requireAuthenticatedUser()` and no longer accepts a caller-supplied `userId`. |
+| G2 | appointments providers | Still **owner-gated**: real messages and real money. |
+| P1-007 | live `personalink` cutover | Still **owner-gated**. |
+
+**HANDOFF.md is stale and should not be used for planning.** All four defects in its critical/high
+table are closed: `content.ts` and `image-to-3d` use `requireOwnedProfile`, `onboarding.ts` derives its
+actor from the session, and the chat route binds a conversation to a signed per-profile capability
+cookie covered by `check-conversation-authz`. Its "next steps" list still describes P2-003 as blocked,
+which it has not been for several waves.
