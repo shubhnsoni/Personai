@@ -10,7 +10,7 @@ Updated 2026-08-29, mid-run, root-serial. No worker independence claimed.
 - Origin `recovered/aug20-wt-pr-32`: `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`, unchanged;
   `origin/main`: `9e8a0fffb84937d809788ee4512884289c3132b8`, unchanged
 - Waves A–G complete. P2-005, P2-006, P2-008, P2-009, P2-010, **P2-011**, **P2-012**, **P2-013** are `done`.
-  P1-009 is `in_progress_slice_1_done`.
+  P1-009 is `in_progress_slice_2_done`.
 - Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**,
   17 migrations, 108 tables / 1221 columns / 292 enum labels / 35 trigger rows. Never
   mid-rehearsal.
@@ -31,13 +31,13 @@ forbidden.
 
 ### Lint inventory, measured at `dd84acc`
 
-Repo-wide: **39 errors, 52 warnings, 91 reports** — identical to `34f8561`, so Waves F and G
-added no lint debt. Targeted wave paths are at zero.
+Repo-wide: **39 errors, 39 warnings, 78 reports** — down from 91 by P1-009 slice 2 at `2804314`. Waves F, G, G3 and G4
+added no lint debt of their own; every report cleared was pre-existing. Targeted wave paths are at zero.
 
 | Rule | Count | Why it is still open |
 |---|---|---|
 | `@next/next/no-img-element` | 25 | swapping `<img>` for `next/image` changes layout behaviour |
-| `@typescript-eslint/no-unused-vars` | 24 | genuinely dead identifiers; deleting an export needs proof nobody depends on it |
+| `@typescript-eslint/no-unused-vars` | 11 | 13 cleared in slice 2; what is left is six live DOM queries in puppeteer scripts, three write-only state getters, and one webhook payload field |
 | `@typescript-eslint/no-explicit-any` | 24 | needs the intended type, not a cast |
 | `react-hooks/set-state-in-effect` | 10 | needs the effect redesigned |
 | `react-hooks/preserve-manual-memoization` | 3 | ditto |

@@ -1,6 +1,6 @@
 {
   "milestone": "Wave G4 COMPLETE - the fieldJobs foundation integrated at ef17770. Waves A-G4 complete; retail-storefront-v1 ACTIVE. The only remaining declared gaps are appointments:reminders and :deposits (owner-gated, inert providers) and fieldJobs:inspection (not built).",
-  "updatedAt": "2026-08-29 20:12 +05:30",
+  "updatedAt": "2026-08-29 20:26 +05:30",
   "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -264,12 +264,13 @@
     {
       "id": "P1-009",
       "title": "Scoped repo-wide lint cleanup",
-      "status": "in_progress_slice_1_done",
+      "status": "in_progress_slice_2_done",
       "adr": "ADR-009",
       "note": "Baseline 124 problems / 63 errors. Never bundled into feature work; restaurant-owned files need owner review.",
       "owner": "root (claude-opus-5)",
       "commits": {
-        "slice_1": "108846e"
+        "slice_1": "108846e",
+        "slice_2": "2804314"
       },
       "slice1": {
         "before": "53 errors, 61 warnings, 114 reports across 54 files",
@@ -279,6 +280,18 @@
         "realFixes": "11 violations fixed behaviour-preservingly: window.location.href -> router.push in src/app/error.tsx; two internal <a> links -> next/link in dashboard-layout-client.tsx and profile-view.tsx; empty extending interfaces -> type aliases in ui/input.tsx and ui/textarea.tsx with the exported names unchanged; one bare apostrophe escaped in product-form.tsx.",
         "verified": "app tsc 0; 41/41 check harnesses exit 0 including all three Business OS surface harnesses that render the touched components; production build compiles; targeted eslint still 0 across src/lib/{cases,cohorts,inventory,business-os}, src/app/api/platform and src/components/business-os.",
         "remaining": "no-img-element 25, no-explicit-any 24, no-unused-vars 24, react-hooks family 18. Each needs judgement, not a mechanical edit: swapping <img> for next/image changes layout behaviour, replacing any requires knowing the intended type, deleting a dead export requires knowing nobody depends on it, and set-state-in-effect needs the effect redesigned."
+      },
+      "slice2": {
+        "before": "39 errors, 52 warnings, 91 reports",
+        "after": "39 errors, 39 warnings, 78 reports",
+        "severityUnchanged": "No rule severity was changed and no config was touched. Errors stayed at exactly 39, so this neither raises nor lowers a gate; all thirteen cleared reports were warnings.",
+        "verificationMethod": "Every identifier was verified to appear exactly ONCE in the repository - at its own declaration - before being touched, using a repo-wide regex over src/** and scripts/**. That verification is the entire basis for calling the slice safe, so it is recorded rather than implied. One earlier attempt at the same check using PowerShell's Select-String with ** globs silently failed to recurse and reported zero hits even for the declaration lines themselves; the result was discarded and re-run with a recursive search, which is why the method is written down.",
+        "deletedImports": "5 reports. import fs in meshy-confirm.mjs and meshy-poll.mjs; sendPurchaseConfirmation narrowed out of the stripe route import, leaving sendCreatorNotification which IS used at line 109; the entire ./email import removed from webhook-handlers.ts, where BOTH senders were unused. That last one is worth naming: the file imported two email senders and called neither, so the import was implying behaviour the class does not have.",
+        "deletedDeclarations": "5 reports. htmlToText (a one-line regex helper) from src/app/actions/import.ts; isNoiseTitle (a pass-through to isChromeHeading, which is still used in 11 other places) from src/lib/import-extract.ts; concat (a Uint8Array joiner) from src/lib/photo-glb.ts; row2 (an unused Tailwind class string) from profile-editor.tsx; the isRestaurant import from profile-view.tsx, leaving isRestaurant itself in src/lib/menu.ts where it is defined and used.",
+        "renamedNotDeleted": "3 reports. CoursesView, EventsView and CommunitiesView in content-panel.tsx became _RemovedCoursesView, _RemovedEventsView and _RemovedCommunitiesView. These are ~180 lines of working UI that ContentPanel no longer mounts, and they were NOT deleted because the same file already contains _RemovedProductsView - the repository has visibly made this decision before and its convention is to PARK a view with a _Removed prefix rather than discard it. Following the project's own precedent is more honest than imposing a judgement that parked UI should be thrown away, and the prefix satisfies the ^_ pattern slice 1 configured, so a parked view no longer reads as an accidental leftover. A comment at the first of the three now says so.",
+        "deliberatelyLeftAlone": "Six unused locals in the meshy .mjs puppeteer scripts (thumbs, selectToggle, grid, tiles, modelTiles, rightPanel) - each right-hand side is a live DOM query and deciding whether removing it is observable needs the script read properly, not a mechanical edit. Three unused destructured state getters (isLoadingHistory, liveRequestedAt, isSaving) - the minimal fix is an array elision, but a write-only piece of state is a design smell and silencing it would hide the smell rather than fix it. profileSlug in the stripe route, destructured from a webhook payload where it may be documenting the shape.",
+        "verified": "app tsc 0; 50 of 50 check harnesses exit 0; production build exit 0; repo-wide eslint 78 problems, strictly down from 91.",
+        "remaining": "no-img-element 25, no-explicit-any 24, no-unused-vars 11, react-hooks family 18. Each still needs judgement: swapping <img> for next/image changes layout behaviour, replacing any requires knowing the intended type, and set-state-in-effect needs the effect redesigned."
       }
     },
     {
