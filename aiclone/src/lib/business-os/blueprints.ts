@@ -26,11 +26,38 @@ const restaurantOwnerCopilotPrompts = [
   "What did each table spend today?",
 ]
 
+const coachingWorkflows: BusinessBlueprint["workflows"] = [
+  {
+    id: "new-lead-intake",
+    name: "New lead intake",
+    trigger: { kind: "event", event: "lead.created" },
+    actions: [
+      { id: "create-follow-up", kind: "createTask", label: "Create owner follow-up task" },
+      {
+        id: "owner-approval",
+        kind: "requestApproval",
+        label: "Approve program recommendation",
+        approval: { required: true, approverRole: "owner", reason: "Lead receives personalized program guidance." },
+      },
+      { id: "audit-lead", kind: "recordAudit", label: "Record lead workflow", auditSubject: "lead" },
+    ],
+  },
+]
+
+const coachingOwnerCopilotPrompts = [
+  "Which leads need a human follow-up today?",
+  "Summarize cohort attendance risk and suggested interventions.",
+]
+
 const builtInBlueprints: BusinessBlueprint[] = [
   {
+    // Historical contract retained for addressability. Deprecated in Wave E because it
+    // REQUIRED appointments:reminders, which is still only partial: a reminder record is
+    // persisted and scheduled, but no messaging provider is wired, so nothing is sent.
+    // Superseded by coaching-studio-v2, which claims only what exists.
     id: "coaching-studio-v1",
     version: "1.0.0",
-    status: "draft",
+    status: "deprecated",
     name: "Coaching Studio",
     vertical: "coaching-training",
     summary: "Runs paid programs with cohorts, appointments, light commerce, and owner approval gates.",
@@ -39,37 +66,68 @@ const builtInBlueprints: BusinessBlueprint[] = [
       { engineId: "appointments", capabilities: ["services", "availability", "reminders"], required: true },
       { engineId: "commerce", capabilities: ["catalog", "orders"], required: false },
     ],
-    workflows: [
+    workflows: coachingWorkflows,
+    ownerCopilotPrompts: coachingOwnerCopilotPrompts,
+  },
+  {
+    id: "coaching-studio-v2",
+    version: "2.0.0",
+    status: "active",
+    name: "Coaching Studio",
+    vertical: "coaching-training",
+    summary:
+      "Runs paid programs as dated cohorts with attendance, assignments, derived progress, certificates and renewal tracking, plus bookable sessions and owner approval gates.",
+    engines: [
       {
-        id: "new-lead-intake",
-        name: "New lead intake",
-        trigger: { kind: "event", event: "lead.created" },
-        actions: [
-          { id: "create-follow-up", kind: "createTask", label: "Create owner follow-up task" },
-          {
-            id: "owner-approval",
-            kind: "requestApproval",
-            label: "Approve program recommendation",
-            approval: { required: true, approverRole: "owner", reason: "Lead receives personalized program guidance." },
-          },
-          { id: "audit-lead", kind: "recordAudit", label: "Record lead workflow", auditSubject: "lead" },
-        ],
+        engineId: "contentCohorts",
+        // All three became genuinely available in Wave D: courses/modules/lessons were
+        // already persisted, cohorts added dated runs with capacity, sessions,
+        // attendance, assignments and progress DERIVED from LessonCompletion, and
+        // memberships added renewal state and certificate eligibility and issuance.
+        capabilities: ["courses", "cohorts", "memberships"],
+        required: true,
+        // Tiered content gating is not built, so it is named rather than implied.
+        plannedCapabilities: ["accessLevels"],
       },
+      {
+        engineId: "appointments",
+        // services and availability became available in Wave B with real capacity and
+        // overlap refusal against persisted resources.
+        capabilities: ["services", "availability"],
+        required: true,
+        // reminders and deposits stay PLANNED here even though their records exist,
+        // because their provider boundaries are inert. A blueprint that required them
+        // would be promising delivery and payment that do not happen.
+        plannedCapabilities: ["reminders", "deposits"],
+      },
+      { engineId: "commerce", capabilities: ["catalog", "orders"], required: false },
     ],
-    ownerCopilotPrompts: [
-      "Which leads need a human follow-up today?",
-      "Summarize cohort attendance risk and suggested interventions.",
-    ],
+    workflows: coachingWorkflows,
+    ownerCopilotPrompts: coachingOwnerCopilotPrompts,
+    supersedes: "coaching-studio-v1",
   },
   {
     id: "consulting-agency-v1",
     version: "1.0.0",
-    status: "draft",
+    // Activated in Wave E. Every capability it already claimed became genuinely
+    // available in Wave C, so the contract did not need rewriting - only the status
+    // caught up with reality. pipeline is intake, qualification, brief and conversion;
+    // delivery is milestones, TaskJob-backed tasks, Approval-backed sign-off and
+    // approval-gated deliverables; billing is invoice records, case billing state and
+    // Payment linkage.
+    status: "active",
     name: "Consulting Agency",
     vertical: "consultants-agencies",
     summary: "Manages lead briefs, delivery milestones, approvals, retainers, and client handoffs.",
     engines: [
-      { engineId: "casesProjects", capabilities: ["pipeline", "delivery", "billing"], required: true },
+      {
+        engineId: "casesProjects",
+        capabilities: ["pipeline", "delivery", "billing"],
+        required: true,
+        // Retainer drawdown is not built, so it is named rather than implied by the
+        // billing capability.
+        plannedCapabilities: ["retainers"],
+      },
       { engineId: "appointments", capabilities: ["services", "availability"], required: false },
     ],
     workflows: [
@@ -92,6 +150,95 @@ const builtInBlueprints: BusinessBlueprint[] = [
     ownerCopilotPrompts: [
       "Which projects are blocked on client approval?",
       "What revenue is at risk this week?",
+    ],
+  },
+  {
+    // New in Wave E. A CA or accounting practice is the vertical the cases engine fits
+    // most exactly, because its core loop IS the document request: ask the client for a
+    // record, refuse to mark it received without the actual file, gate the filing on an
+    // approval, then invoice. All four required capabilities are available.
+    id: "ca-practice-v1",
+    version: "1.0.0",
+    status: "active",
+    name: "CA and accounting practice",
+    vertical: "ca-accounting",
+    summary:
+      "Runs client engagements as cases: intake and scope brief, document requests that cannot be closed without the actual file, filing milestones, partner approval before anything is filed, and invoicing.",
+    engines: [
+      {
+        engineId: "casesProjects",
+        capabilities: ["pipeline", "delivery", "billing", "documents"],
+        required: true,
+        plannedCapabilities: ["retainers"],
+      },
+    ],
+    workflows: [
+      {
+        id: "document-requested",
+        name: "Document requested",
+        trigger: { kind: "event", event: "case.document_requested" },
+        actions: [
+          { id: "chase-document", kind: "createTask", label: "Create client chase task" },
+          { id: "audit-request", kind: "recordAudit", label: "Record document request state", auditSubject: "document" },
+        ],
+      },
+      {
+        id: "filing-ready",
+        name: "Filing ready",
+        trigger: { kind: "event", event: "case.filing_ready" },
+        actions: [
+          {
+            id: "approve-filing",
+            kind: "requestApproval",
+            label: "Partner sign-off before filing",
+            approval: {
+              required: true,
+              approverRole: "owner",
+              reason: "A filing is externally visible and cannot be quietly withdrawn.",
+            },
+          },
+          { id: "audit-filing", kind: "recordAudit", label: "Record filing approval state", auditSubject: "filing" },
+        ],
+      },
+    ],
+    ownerCopilotPrompts: [
+      "Which client documents are still outstanding and how overdue are they?",
+      "Which filings are waiting on partner sign-off?",
+    ],
+  },
+  {
+    // DRAFT on purpose, and it must stay draft until commerce:inventory is real. A
+    // storefront that cannot say whether an item is in stock is not a storefront, and
+    // inventory is still a single nullable stock column. Registering it as draft keeps
+    // the gap addressable instead of leaving the vertical undocumented.
+    id: "retail-storefront-v1",
+    version: "1.0.0",
+    status: "draft",
+    name: "Retail storefront",
+    vertical: "retail-ecommerce",
+    summary:
+      "Sells physical stock online. Draft until inventory is genuinely persisted: catalog and orders exist, but stock rules, variants, fulfilment and returns do not.",
+    engines: [
+      {
+        engineId: "commerce",
+        capabilities: ["catalog", "orders", "inventory"],
+        required: true,
+        plannedCapabilities: ["variants", "fulfilment", "returns"],
+      },
+    ],
+    workflows: [
+      {
+        id: "order-placed",
+        name: "Order placed",
+        trigger: { kind: "event", event: "order.created" },
+        actions: [
+          { id: "audit-order", kind: "recordAudit", label: "Record order status history", auditSubject: "order" },
+        ],
+      },
+    ],
+    ownerCopilotPrompts: [
+      "Which products are close to running out?",
+      "Which orders are unfulfilled and how old are they?",
     ],
   },
   {
