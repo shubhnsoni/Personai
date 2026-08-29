@@ -129,12 +129,13 @@ export const businessEngineDescriptors: Record<BusinessEngineId, EngineDescripto
       {
         // Split out of `memberships` in Wave D rather than left implied by its
         // description, so the gap stays visible instead of being absorbed by a
-        // capability that was marked available for other reasons.
+        // capability that was marked available for other reasons. Wave G3 closed it.
         id: "accessLevels",
         label: "Access levels",
-        description: "Tiered entitlements that gate which content a member can reach.",
-        maturity: "planned",
-        evidence: "none",
+        description:
+          "Ranked tiers on a course, a minimum tier per lesson, and one entitlement per enrolment. This is the first real content-visibility decision in the system: before it, any active enrolment returned every lesson. A lesson with no rule stays visible to everybody, so existing courses are unchanged. An upgrade is requested, decided and then applied as three separate facts, and applying it moves the entitlement - no payment is executed at any step, and a suspended or expired entitlement falls back to the unruled lessons rather than to the lowest tier.",
+        maturity: "available",
+        evidence: "src/lib/cohorts/access.ts",
       },
     ],
   },
@@ -233,12 +234,13 @@ export const businessEngineDescriptors: Record<BusinessEngineId, EngineDescripto
       {
         // Split out of `billing` in Wave C rather than left implied by its description,
         // so the gap stays visible instead of being absorbed by a capability that was
-        // marked available for other reasons.
+        // marked available for other reasons. Wave G3 closed it.
         id: "retainers",
         label: "Retainers",
-        description: "Recurring engagement fees with drawdown against delivered work.",
-        maturity: "planned",
-        evidence: "none",
+        description:
+          "A retainer agreement plus a draw-down ledger: an allowance denominated in units or in money, dated periods that snapshot their own allowance, optional rollover of the unused remainder, and an append-only ledger that stores both the signed delta and the balance it produced. Overage is recorded and reported rather than refused, because refusing work that was actually done would misrepresent it. Billing state reuses the existing invoice vocabulary and may reference a CaseInvoice; no payment is executed anywhere.",
+        maturity: "available",
+        evidence: "src/lib/cases/retainers.ts",
       },
     ],
   },

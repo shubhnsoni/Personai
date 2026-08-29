@@ -84,10 +84,11 @@ const builtInBlueprints: BusinessBlueprint[] = [
         // already persisted, cohorts added dated runs with capacity, sessions,
         // attendance, assignments and progress DERIVED from LessonCompletion, and
         // memberships added renewal state and certificate eligibility and issuance.
-        capabilities: ["courses", "cohorts", "memberships"],
+        capabilities: ["courses", "cohorts", "memberships", "accessLevels"],
         required: true,
-        // Tiered content gating is not built, so it is named rather than implied.
-        plannedCapabilities: ["accessLevels"],
+        // accessLevels moved out of the planned backlog and into the required set in
+        // Wave G3. A backlog entry for something that exists is a false statement, which
+        // is the same correction restaurant-venue-v3 made for inventory in Wave F.
       },
       {
         engineId: "appointments",
@@ -122,11 +123,11 @@ const builtInBlueprints: BusinessBlueprint[] = [
     engines: [
       {
         engineId: "casesProjects",
-        capabilities: ["pipeline", "delivery", "billing"],
+        capabilities: ["pipeline", "delivery", "billing", "retainers"],
         required: true,
-        // Retainer drawdown is not built, so it is named rather than implied by the
-        // billing capability.
-        plannedCapabilities: ["retainers"],
+        // retainers moved out of the planned backlog in Wave G3, which is what a
+        // consulting agency blueprint always needed - the summary has claimed retainers
+        // since Wave E while the capability was still a backlog entry.
       },
       { engineId: "appointments", capabilities: ["services", "availability"], required: false },
     ],
@@ -167,9 +168,10 @@ const builtInBlueprints: BusinessBlueprint[] = [
     engines: [
       {
         engineId: "casesProjects",
-        capabilities: ["pipeline", "delivery", "billing", "documents"],
+        capabilities: ["pipeline", "delivery", "billing", "documents", "retainers"],
         required: true,
-        plannedCapabilities: ["retainers"],
+        // retainers moved out of the planned backlog in Wave G3. A practice on a monthly
+        // retainer is the ordinary case here, not an aspiration.
       },
     ],
     workflows: [
