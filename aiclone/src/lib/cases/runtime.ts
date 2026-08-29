@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 
 import { CaseIntakeService, CaseProjectService } from "./engine"
 import { CaseApiService } from "./http"
+import { CaseRetainerService } from "./retainers"
 import { CaseContext } from "./shared"
 import { CaseWorkflowService } from "./workflow"
 
@@ -14,7 +15,8 @@ import { CaseWorkflowService } from "./workflow"
  *
  * There are no external adapters here on purpose: the cases engine performs no storage,
  * payment, messaging or AI call. Invoices record state and reference existing Payment rows
- * rather than moving money.
+ * rather than moving money, and retainers do the same - a retainer period's billing state
+ * points at a CaseInvoice and never at a charge.
  */
 class ClerkPlatformIdentity implements PlatformIdentity {
     async userId(): Promise<string | null> {
@@ -29,4 +31,5 @@ export const caseApi = new CaseApiService(
     new CaseIntakeService(ctx),
     new CaseProjectService(ctx),
     new CaseWorkflowService(ctx),
+    new CaseRetainerService(ctx),
 )

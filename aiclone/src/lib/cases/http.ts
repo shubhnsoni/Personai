@@ -2,15 +2,34 @@ import { PersistenceError } from "@/lib/persistence/errors"
 
 import type { CaseIntakeService, CaseProjectService } from "./engine"
 import {
+    RETAINER_BASES,
+    RETAINER_DRAW_KINDS,
+    RETAINER_PERIOD_KINDS,
     caseFlow,
     deliverableFlow,
     documentRequestFlow,
     intakeFlow,
     invoiceFlow,
     milestoneFlow,
+    retainerFlow,
+    retainerPeriodFlow,
+    type RetainerBasisValue,
+    type RetainerDrawKindValue,
+    type RetainerPeriodKindValue,
 } from "./lifecycle"
+import type { CaseRetainerService } from "./retainers"
 import type { CaseActor } from "./shared"
 import type { CaseWorkflowService } from "./workflow"
+
+function isRetainerBasis(value: unknown): value is RetainerBasisValue {
+    return typeof value === "string" && (RETAINER_BASES as readonly string[]).includes(value)
+}
+function isRetainerPeriodKind(value: unknown): value is RetainerPeriodKindValue {
+    return typeof value === "string" && (RETAINER_PERIOD_KINDS as readonly string[]).includes(value)
+}
+function isRetainerDrawKind(value: unknown): value is RetainerDrawKindValue {
+    return typeof value === "string" && (RETAINER_DRAW_KINDS as readonly string[]).includes(value)
+}
 
 /**
  * HTTP boundary for the cases surface.
@@ -79,6 +98,17 @@ function optDate(value: unknown, field: string): Date | null {
     }
     return new Date(value)
 }
+/** An absent integer is null, but a present non-integer is a 400 rather than a silent coercion. */
+function optInt(value: unknown, field: string): number | null {
+    if (value === null || value === undefined || value === "") return null
+    if (!Number.isInteger(value)) throw new PersistenceError("BAD_REQUEST", `${field} must be an integer`, { field })
+    return value as number
+}
+function bool(value: unknown, field: string): boolean | undefined {
+    if (value === null || value === undefined) return undefined
+    if (typeof value !== "boolean") throw new PersistenceError("BAD_REQUEST", `${field} must be a boolean`, { field })
+    return value
+}
 
 /** Validates a status against the owning flow, so an unknown value is 400 not 409. */
 function status<T extends string>(
@@ -113,6 +143,7 @@ export class CaseApiService {
         private readonly intakes: CaseIntakeService,
         private readonly cases: CaseProjectService,
         private readonly flow: CaseWorkflowService,
+        private readonly retainers: CaseRetainerService,
     ) {}
 
     private run(op: () => Promise<Response>): Promise<Response> {
@@ -476,5 +507,206 @@ export class CaseApiService {
             )
             return success({ invoice: serialise({ ...row }) })
         })
+    }
+
+    // ---- retainers (Wave G4) ---------------------------------------------
+    //
+    // Retainers live on this service rather than a service of their own for the same reason
+    // CaseRetainerService composes CaseContext: the envelope, the status map, the server-derived
+    // actor and the 503 catch-all are all already here, and a second HTTP boundary would be a
+    // second place for them to drift.
+
+    listRetainers(request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({ retainers: serialiseAll(await this.retainers.list(param(request, "workspaceId"))) }),
+        )
+    }
+
+    getRetainer(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({ retainer: serialise({ ...(await this.retainers.get(param(request, "workspaceId"), retainerId)) }) }),
+        )
+    }
+
+    createRetainer(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const result = await this.retainers.create(
+                str(input.workspaceId, "workspaceId"),
+                {
+                    reference: str(input.reference, "reference"),
+                    title: str(input.title, "title"),
+                    basis: status(input.basis, isRetainerBasis, "retainer basis", "basis"),
+                    includedUnits: optInt(input.includedUnits, "includedUnits"),
+                    includedValueCents: optInt(input.includedValueCents, "includedValueCents"),
+                    currency: nullableStr(input.currency, "currency"),
+                    periodKind: input.periodKind === undefined || input.periodKind === null
+                        ? null
+                        : status(input.periodKind, isRetainerPeriodKind, "period kind", "periodKind"),
+                    periodDays: optInt(input.periodDays, "periodDays"),
+                    rolloverAllowed: bool(input.rolloverAllowed, "rolloverAllowed"),
+                    autoRenew: bool(input.autoRenew, "autoRenew"),
+                    contactId: nullableStr(input.contactId, "contactId"),
+                    idempotencyKey: nullableStr(input.idempotencyKey, "idempotencyKey"),
+                },
+                this.actor(),
+            )
+            return success(
+                { retainer: serialise({ ...result.record }), replayed: result.replayed },
+                result.replayed ? 200 : 201,
+            )
+        })
+    }
+
+    transitionRetainer(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const row = await this.retainers.transition(
+                str(input.workspaceId, "workspaceId"),
+                retainerId,
+                status(input.state, retainerFlow.is, "retainer", "state"),
+                this.actor(),
+                nullableStr(input.reason, "reason"),
+            )
+            return success({ retainer: serialise({ ...row }) })
+        })
+    }
+
+    listRetainerCases(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({ cases: serialiseAll(await this.retainers.listCases(param(request, "workspaceId"), retainerId)) }),
+        )
+    }
+
+    linkRetainerCase(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const result = await this.retainers.linkCase(
+                str(input.workspaceId, "workspaceId"),
+                retainerId,
+                str(input.caseId, "caseId"),
+                this.actor(),
+            )
+            // 200 rather than 201 when the link already existed, matching the replay convention
+            // used by every other idempotent write on this surface.
+            return success({ linked: result.linked }, result.linked ? 201 : 200)
+        })
+    }
+
+    unlinkRetainerCase(retainerId: string, caseId: string, request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({ unlinked: (await this.retainers.unlinkCase(param(request, "workspaceId"), retainerId, caseId, this.actor())).unlinked }),
+        )
+    }
+
+    listRetainerPeriods(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({ periods: serialiseAll(await this.retainers.listPeriods(param(request, "workspaceId"), retainerId)) }),
+        )
+    }
+
+    openRetainerPeriod(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const row = await this.retainers.openPeriod(
+                str(input.workspaceId, "workspaceId"),
+                retainerId,
+                { startsOn: optDate(input.startsOn, "startsOn") },
+                this.actor(),
+            )
+            return success({ period: serialise({ ...row }) }, 201)
+        })
+    }
+
+    transitionRetainerPeriod(retainerId: string, periodId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const result = await this.retainers.transitionPeriod(
+                str(input.workspaceId, "workspaceId"),
+                retainerId,
+                periodId,
+                status(input.state, retainerPeriodFlow.is, "retainer period", "state"),
+                this.actor(),
+            )
+            return success({
+                period: serialise({ ...result.period }),
+                next: result.next ? serialise({ ...result.next }) : null,
+            })
+        })
+    }
+
+    setRetainerBilling(retainerId: string, periodId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const row = await this.retainers.setBilling(
+                str(input.workspaceId, "workspaceId"),
+                retainerId,
+                periodId,
+                status(input.billingState, invoiceFlow.is, "invoice", "billingState"),
+                this.actor(),
+                { invoiceId: nullableStr(input.invoiceId, "invoiceId") },
+            )
+            return success({ period: serialise({ ...row }) })
+        })
+    }
+
+    listRetainerDraws(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const url = new URL(request.url)
+            return success({
+                draws: serialiseAll(
+                    await this.retainers.listDraws(
+                        param(request, "workspaceId"),
+                        retainerId,
+                        url.searchParams.get("periodId"),
+                    ),
+                ),
+            })
+        })
+    }
+
+    recordRetainerDraw(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const result = await this.retainers.recordDraw(
+                str(input.workspaceId, "workspaceId"),
+                retainerId,
+                {
+                    kind: status(input.kind, isRetainerDrawKind, "draw kind", "kind"),
+                    units: optInt(input.units, "units"),
+                    valueCents: optInt(input.valueCents, "valueCents"),
+                    caseId: nullableStr(input.caseId, "caseId"),
+                    note: nullableStr(input.note, "note"),
+                    idempotencyKey: nullableStr(input.idempotencyKey, "idempotencyKey"),
+                },
+                this.actor(),
+            )
+            return success(
+                {
+                    draw: serialise({ ...result.draw }),
+                    period: serialise({ ...result.period }),
+                    replayed: result.replayed,
+                },
+                result.replayed ? 200 : 201,
+            )
+        })
+    }
+
+    retainerBalance(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const balance = await this.retainers.balance(param(request, "workspaceId"), retainerId)
+            return success({
+                balance: serialise({
+                    ...balance,
+                    openPeriod: balance.openPeriod ? serialise({ ...balance.openPeriod }) : null,
+                }),
+            })
+        })
+    }
+
+    retainerTimeline(retainerId: string, request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({ events: serialiseAll(await this.retainers.timeline(param(request, "workspaceId"), retainerId)) }),
+        )
     }
 }

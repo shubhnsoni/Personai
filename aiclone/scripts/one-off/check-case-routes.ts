@@ -19,6 +19,7 @@ import { PrismaClient } from "@prisma/client"
 
 import { CaseIntakeService, CaseProjectService } from "../../src/lib/cases/engine"
 import { CaseApiService } from "../../src/lib/cases/http"
+import { CaseRetainerService } from "../../src/lib/cases/retainers"
 import { CaseContext } from "../../src/lib/cases/shared"
 import { CaseWorkflowService } from "../../src/lib/cases/workflow"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
@@ -106,6 +107,7 @@ async function main() {
         new CaseIntakeService(ctx),
         new CaseProjectService(ctx),
         new CaseWorkflowService(ctx),
+        new CaseRetainerService(ctx),
     )
 
     const live = await prisma.$queryRawUnsafe<{ db: string }[]>("select current_database() as db")
@@ -371,6 +373,7 @@ async function main() {
             new CaseIntakeService(new CaseContext(brokenPrisma, tenancy)),
             new CaseProjectService(new CaseContext(brokenPrisma, tenancy)),
             new CaseWorkflowService(new CaseContext(brokenPrisma, tenancy)),
+            new CaseRetainerService(new CaseContext(brokenPrisma, tenancy)),
         )
         const broken = await call(brokenApi.list(get(`${CASES}?workspaceId=${ids.wsA}`)))
         check("dependency failure is 503", broken.status === 503, `status=${broken.status}`)
