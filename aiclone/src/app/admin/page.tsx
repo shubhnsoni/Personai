@@ -8,7 +8,7 @@ export default async function AdminPage() {
         prisma.profile.count(),
         prisma.booking.count(),
         prisma.payment.aggregate({
-            where: { status: "SUCCEEDED" as any },
+            where: { status: "SUCCEEDED" },
             _sum: { amountCents: true }
         })
     ])

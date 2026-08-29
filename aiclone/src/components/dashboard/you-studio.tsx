@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { Profile, WelcomeAnimationPreset, ProfileDocument } from "@prisma/client"
+import { Profile, Project, WelcomeAnimationPreset, ProfileDocument, WorkExperience } from "@prisma/client"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { ProfileEditor } from "@/components/dashboard/profile-editor"
@@ -12,9 +12,12 @@ import { DockTabs } from "@/components/dashboard/dock-tabs"
 import { extrasOf } from "@/lib/surfaces"
 import { Brain, Upload, User } from "lucide-react"
 
+// The page that renders this queries the profile with `include: { workExperiences, projects }`,
+// so these are real rows. They were declared `unknown[]`, which made the editor below reach for
+// them through a cast; naming the types instead means a renamed relation is a type error.
 type FaceProfile = Profile & {
-    workExperiences: unknown[]
-    projects: unknown[]
+    workExperiences: WorkExperience[]
+    projects: Project[]
 }
 
 export function YouStudio({

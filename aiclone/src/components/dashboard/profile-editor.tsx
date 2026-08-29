@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Profile, WelcomeAnimationPreset } from "@prisma/client"
+import { Profile, Project, WelcomeAnimationPreset, WorkExperience } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -63,8 +63,14 @@ const profileSchema = z.object({
 
 type ProfileData = z.infer<typeof profileSchema>
 
+/**
+ * The two relations are declared optional rather than reached for through a cast. The editor
+ * already tolerates their absence and renders an empty list, so optional is the honest shape —
+ * and declaring them means the day one is renamed the type checker says so, instead of the tab
+ * silently going empty.
+ */
 interface ProfileEditorProps {
-    profile: Profile
+    profile: Profile & { workExperiences?: WorkExperience[]; projects?: Project[] }
     presets: WelcomeAnimationPreset[]
     onSavingChange?: (saving: boolean) => void
 }
@@ -99,17 +105,17 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
             welcomeMessageOverride: profile.welcomeMessageOverride || "",
             contentDisplayMode: profile.contentDisplayMode || "POPUP",
             personalityConfig: profile.personalityConfig || "",
-            aiModel: (profile as any).aiModel || "gpt-4o-mini",
-            imageUrl: (profile as any).imageUrl || "",
-            shopLogoUrl: (profile as any).shopLogoUrl || "",
-            chatAvatarMode: (profile as any).chatAvatarMode || "ORB",
-            autoMemoryEnabled: Boolean((profile as any).autoMemoryEnabled),
-            liveChatEnabled: Boolean((profile as any).liveChatEnabled),
-            liveChatSlaMinutes: (profile as any).liveChatSlaMinutes || 10,
-            whatsapp: (profile as any).whatsapp || "",
-            upiId: (profile as any).upiId || "",
-            gstin: (profile as any).gstin || "",
-            deliveryNote: (profile as any).deliveryNote || "",
+            aiModel: profile.aiModel || "gpt-4o-mini",
+            imageUrl: profile.imageUrl || "",
+            shopLogoUrl: profile.shopLogoUrl || "",
+            chatAvatarMode: profile.chatAvatarMode || "ORB",
+            autoMemoryEnabled: Boolean(profile.autoMemoryEnabled),
+            liveChatEnabled: Boolean(profile.liveChatEnabled),
+            liveChatSlaMinutes: profile.liveChatSlaMinutes || 10,
+            whatsapp: profile.whatsapp || "",
+            upiId: profile.upiId || "",
+            gstin: profile.gstin || "",
+            deliveryNote: profile.deliveryNote || "",
         }
     })
 
@@ -200,9 +206,6 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
             onSavingChange?.(false)
         }
     }
-
-    // Cast profile to any to access relations until types are generated
-    const profileWithRelations = profile as any
 
     return (
         <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-3">
@@ -324,13 +327,13 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
                         <TabsContent value="experience" className="space-y-3">
                             <ExperienceEditor
                                 profileId={profile.id}
-                                experiences={profileWithRelations.workExperiences || []}
+                                experiences={profile.workExperiences || []}
                             />
                         </TabsContent>
                         <TabsContent value="projects" className="space-y-3">
                             <ProjectEditor
                                 profileId={profile.id}
-                                projects={profileWithRelations.projects || []}
+                                projects={profile.projects || []}
                             />
                         </TabsContent>
                     </>

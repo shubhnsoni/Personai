@@ -31,10 +31,10 @@ export function ProductForm({ profileId, product }: ProductFormProps) {
 
     const [title, setTitle] = useState(product?.title || "")
     const [description, setDescription] = useState(product?.description || "")
-    const [subtitle, setSubtitle] = useState((product as any)?.subtitle || "")
-    const [body, setBody] = useState((product as any)?.body || "")
+    const [subtitle, setSubtitle] = useState(product?.subtitle || "")
+    const [body, setBody] = useState(product?.body || "")
     const [highlights, setHighlights] = useState(() => {
-        const raw = (product as any)?.highlights
+        const raw = product?.highlights
         if (!raw) return ""
         try {
             const parsed = JSON.parse(raw)
@@ -42,7 +42,7 @@ export function ProductForm({ profileId, product }: ProductFormProps) {
         } catch { return String(raw) }
     })
     const [compareAt, setCompareAt] = useState(
-        (product as any)?.compareAtCents ? String((product as any).compareAtCents / 100) : ""
+        product?.compareAtCents ? String(product.compareAtCents / 100) : ""
     )
     const [type, setType] = useState<ProductData["type"]>(
         (product?.type as ProductData["type"]) || "OTHER"

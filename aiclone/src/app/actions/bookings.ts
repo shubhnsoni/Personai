@@ -24,12 +24,15 @@ export async function getAvailableSlots(
                 startTime: { gte: date, lt: new Date(date.getTime() + 86400000) },
             },
         }),
-        (prisma as any).calendarOverride?.findMany?.({
-            where: {
-                profileId,
-                date: { gte: date, lt: new Date(date.getTime() + 86400000) },
-            },
-        }).catch(() => []) ?? Promise.resolve([]),
+        // CalendarOverride is a real model, so this needs no defensive optional call.
+        prisma.calendarOverride
+            .findMany({
+                where: {
+                    profileId,
+                    date: { gte: date, lt: new Date(date.getTime() + 86400000) },
+                },
+            })
+            .catch(() => []),
         opts?.serviceId
             ? prisma.serviceOffering.findUnique({ where: { id: opts.serviceId } })
             : Promise.resolve(null),

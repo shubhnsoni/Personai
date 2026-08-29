@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Trash2, Pencil } from "lucide-react"
 import { createWorkExperience, updateWorkExperience, deleteWorkExperience } from "@/app/actions/profile"
+import type { WorkExperience } from "@prisma/client"
 
 interface ExperienceEditorProps {
     profileId: string
-    experiences: any[]
+    experiences: WorkExperience[]
 }
 
 export function ExperienceEditor({ profileId, experiences }: ExperienceEditorProps) {
@@ -84,7 +85,7 @@ export function ExperienceEditor({ profileId, experiences }: ExperienceEditorPro
     )
 }
 
-function ExperienceForm({ profileId, initialData, onCancel, onSave }: { profileId: string, initialData?: any, onCancel: () => void, onSave: () => void }) {
+function ExperienceForm({ profileId, initialData, onCancel, onSave }: { profileId: string, initialData?: WorkExperience, onCancel: () => void, onSave: () => void }) {
     const [isLoading, setIsLoading] = useState(false)
 
     const handleSubmit = async (root: HTMLElement) => {
@@ -139,12 +140,12 @@ function ExperienceForm({ profileId, initialData, onCancel, onSave }: { profileI
                 </div>
                 <div className="space-y-1.5">
                     <Label>End</Label>
-                    <Input name="endDate" defaultValue={initialData?.endDate} placeholder="Leave empty for present" />
+                    <Input name="endDate" defaultValue={initialData?.endDate ?? ""} placeholder="Leave empty for present" />
                 </div>
             </div>
             <div className="space-y-1.5">
                 <Label>Description</Label>
-                <Textarea name="description" defaultValue={initialData?.description} rows={3} />
+                <Textarea name="description" defaultValue={initialData?.description ?? ""} rows={3} />
             </div>
             <div className="space-y-1.5">
                 <Label>Achievements</Label>

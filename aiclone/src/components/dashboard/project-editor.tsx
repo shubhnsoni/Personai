@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Trash2, Pencil } from "lucide-react"
 import { createProject, updateProject, deleteProject } from "@/app/actions/profile"
+import type { Project } from "@prisma/client"
 
 interface ProjectEditorProps {
     profileId: string
-    projects: any[]
+    projects: Project[]
 }
 
 export function ProjectEditor({ profileId, projects }: ProjectEditorProps) {
@@ -84,7 +85,7 @@ export function ProjectEditor({ profileId, projects }: ProjectEditorProps) {
     )
 }
 
-function ProjectForm({ profileId, initialData, onCancel, onSave }: { profileId: string, initialData?: any, onCancel: () => void, onSave: () => void }) {
+function ProjectForm({ profileId, initialData, onCancel, onSave }: { profileId: string, initialData?: Project, onCancel: () => void, onSave: () => void }) {
     const [isLoading, setIsLoading] = useState(false)
 
     const handleSubmit = async (root: HTMLElement) => {
@@ -124,26 +125,26 @@ function ProjectForm({ profileId, initialData, onCancel, onSave }: { profileId: 
                 </div>
                 <div className="space-y-1.5">
                     <Label>Client</Label>
-                    <Input name="client" defaultValue={initialData?.client} />
+                    <Input name="client" defaultValue={initialData?.client ?? ""} />
                 </div>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                     <Label>Year</Label>
-                    <Input name="year" defaultValue={initialData?.year} placeholder="2024" />
+                    <Input name="year" defaultValue={initialData?.year ?? ""} placeholder="2024" />
                 </div>
                 <div className="space-y-1.5">
                     <Label>Link</Label>
-                    <Input name="link" defaultValue={initialData?.link} placeholder="https://" />
+                    <Input name="link" defaultValue={initialData?.link ?? ""} placeholder="https://" />
                 </div>
             </div>
             <div className="space-y-1.5">
                 <Label>Image URL</Label>
-                <Input name="imageUrl" defaultValue={initialData?.imageUrl} placeholder="https://" />
+                <Input name="imageUrl" defaultValue={initialData?.imageUrl ?? ""} placeholder="https://" />
             </div>
             <div className="space-y-1.5">
                 <Label>Description</Label>
-                <Textarea name="description" defaultValue={initialData?.description} rows={3} />
+                <Textarea name="description" defaultValue={initialData?.description ?? ""} rows={3} />
             </div>
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={onCancel} disabled={isLoading}>Cancel</Button>
