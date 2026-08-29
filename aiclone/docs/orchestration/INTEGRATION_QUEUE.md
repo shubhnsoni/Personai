@@ -704,3 +704,50 @@ Do not begin any schema package with less than 90 minutes remaining.
 - `check-order-stream` precondition: still unmet, still non-blocking.
 - P1-009 repo-wide lint cleanup: still deferred.
 - Gateway on port 5476: still absent. Every wave has been root-serial.
+
+
+---
+
+## Wave G integrated - G1 is done, so the queue above is superseded
+
+Merge `dd84acc` on `recovered/aug20-wt-pr-32`, `--no-ff`, from base `34f8561` via
+`feature/wave-g-commerce`. Root-serial; gateway recovery attempted once, bounded, recorded
+`ORCHESTRATION_UNAVAILABLE`.
+
+| Commit | Slice | Gate result at commit time |
+|---|---|---|
+| `816b8f7` | G1.1 schema | `check-commerce-schema-invariants` 85/85; rollback byte-identical; reconciliation 10/10 / 7/7 / 10/10 |
+| `c0a183f` | G1.2 runtime | `check-commerce-runtime` 110/110 |
+| `37991e6` | G1.3 APIs + UI | `check-commerce-routes` 78/78 (inverted 77/78, exit 1); a11y 127 assertions; build 0 with 16 routes |
+| `5f189e6` | G1.4 capability | `check-capability-contract` PASS; inverted 18 failures; 44/44 sweep |
+| `dd84acc` | integration | full combined suite green - see RUNLOG for the table |
+
+**`retail-storefront-v1` is now ACTIVE.** That was the single item this queue listed as the
+highest-value remaining package, and it is closed. `commerce:variants`, `:fulfilment` and
+`:returns` are all `available` with evidence files that exist on disk.
+
+### Next in queue - revised after Wave G
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| G3 | `casesProjects:retainers`, `contentCohorts:accessLevels` | The two remaining truthful capability gaps. Each needs schema plus runtime, so allow 90+ minutes; one schema owner, same rehearsal discipline as G1. Promotion only after runtime evidence exists. Neither may execute a real payment. |
+| G4 | shared `fieldJobs` engine foundation | `fieldJobs:intake`, `:dispatch` and `:inspection` are all planned, and nothing in the repo implements them. Note that `fieldJobs:dispatch` is now the target of the capability-contract planned-capability negative test, so whoever makes it real must repoint that test again - the non-vacuity assertion will fail loudly if they do not. |
+| G2 | appointments reminders + deposits providers | Still **owner-gated**. Wiring a real messaging or payment provider means real messages and real money. `appointments:reminders` remains the target of the partial-capability negative test. |
+
+Do not begin any schema package with less than 90 minutes remaining.
+
+### Open items carried forward
+
+- P1-007 live cutover: still owner-gated, unchanged. Not executed.
+- Pre-existing `profileId` FK drift: five `DropForeignKey` statements, excluded and
+  count-asserted for **six** waves running. Untouched.
+- **New drift entry, deliberate:** `InventoryItem.productId` is kept alongside `variantId` and
+  their agreement is enforced by a trigger rather than a composite foreign key, because Prisma
+  cannot express one. This is a trigger the schema diff must keep surviving, like the five
+  before it.
+- `check-order-stream` precondition: still unmet, still non-blocking.
+- P1-009 repo-wide lint cleanup: slice 1 done at `108846e`; 91 problems remain and the count is
+  unchanged by Wave G. Slice 2 not started.
+- Gateway on port 5476: now **LISTENING** (pid 54756), but no KiroCrew MCP server is registered
+  with the client, so no model-pinned dispatch tool is exposed. Owner action: register it in
+  `~/.kiro/settings/mcp.json` and restart the client. Every wave so far has been root-serial.

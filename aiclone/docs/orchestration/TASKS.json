@@ -1,6 +1,6 @@
 {
-  "milestone": "Wave B COMPLETE; Wave C C1 schema integrated - C2/C3 runtime and UI remain",
-  "updatedAt": "2026-08-29 03:16 +05:30",
+  "milestone": "Wave G COMPLETE - commerce variants, fulfilment and returns integrated at dd84acc; retail-storefront-v1 ACTIVE. Waves A-F complete.",
+  "updatedAt": "2026-08-29 17:34 +05:30",
   "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -1074,6 +1074,94 @@
         "npmAuditOmitDev": "0 vulnerabilities",
         "build": "0, with all 6 inventory routes registered",
         "disposableDb": "left fully applied at 85 tables; live personalink untouched"
+      }
+    },
+    {
+      "id": "P2-011",
+      "title": "Commerce variants, fulfilment and returns, and retail activation",
+      "status": "done",
+      "owner": "root (claude-opus-5)",
+      "workerIndependenceClaimed": false,
+      "orchestration": "ORCHESTRATION_UNAVAILABLE. One bounded ten-minute recovery attempt started the gateway (port 5476 LISTENING, pid 54756, kirocrew status running) but ~/.kiro/settings/mcp.json holds an empty mcpServers map and no workspace mcp.json exists, so no model-pinned dispatch tool is exposed and conditions 3-5 are unreachable rather than failed. Recorded in RUNLOG.md at efb843f. Zero cron jobs and zero worker jobs existed, so there was no hollow job to remove. Every G1 slice below was executed root-serially in the same order the five planned workers would have run.",
+      "dependencies": [
+        "P2-009",
+        "P2-010"
+      ],
+      "base": "34f8561",
+      "branch": "feature/wave-g-commerce",
+      "mergeCommit": "dd84acc",
+      "commits": {
+        "G1_schema": "816b8f7",
+        "G1_runtime": "c0a183f",
+        "G1_apis_ui": "37991e6",
+        "G1_capability": "5f189e6",
+        "waveG_integration": "dd84acc"
+      },
+      "scope": "Close the three capability gaps that kept retail-storefront-v1 in draft: a product could not sell a size or a colour, an owner could not say where a parcel was, and nothing could be taken back. Composed over the existing product, order, payment and Wave F inventory systems; no second order or payment system was created.",
+      "g1": {
+        "migration": "20260829170000_commerce_variants_fulfilment_returns",
+        "added": "6 enums; 9 tables (ProductVariant, ProductOption, ProductOptionValue, ProductVariantOptionValue, Fulfilment, FulfilmentItem, ReturnRequest, ReturnItem, append-only CommerceEvent); 4 CHECK constraints; 1 partial unique index; 2 triggers.",
+        "nonAdditive": "ACCEPTED AND ENUMERATED, not hidden. InventoryItem gains variantId, so this migration is not purely additive. Forcing additivity was rejected because it would leave variants unable to own stock, which is the entire point of the wave. The five InventoryItem statements are relocated out of the generated diff and hand-ordered, because Prisma emits ADD COLUMN variantId TEXT NOT NULL, which is unsafe on a populated table. End state matches Prisma exactly.",
+        "populatedTable": "The rehearsal database held 237 pre-existing DigitalProduct rows, so this was a genuinely populated-table migration rather than a theoretical one.",
+        "defaultVariant": "Every pre-existing product receives one deterministic default variant with id var_<productId>. Deterministic rather than cuid() so that reconciliation is a join rather than an act of faith; the same convention is used by InventoryService.ensureDefaultVariant, so runtime and migration cannot diverge. The default variant leaves priceCents NULL and therefore INHERITS the product price - copying it was rejected because the two would drift the first time a product price changed.",
+        "productIdKept": "InventoryItem.productId is kept and consistency with variantId is enforced by reject_inventory_variant_product_mismatch() and trigger InventoryItem_variant_product_match. A composite FK (productId, variantId) was rejected because Prisma cannot express it and it would become a sixth permanent drift entry; dropping productId was rejected because it would fail the relation-name verifier.",
+        "guards": "ProductVariant_priceCents_nonnegative, ProductVariant_compareAtCents_nonnegative, FulfilmentItem_qty_positive, ReturnItem_qty_positive, partial unique index ProductVariant_one_default_per_product, and trigger CommerceEvent_append_only. App-only enforcement of one-default-per-product was rejected: five waves of triggers and CHECKs have now survived every diff, and the app is not the only writer.",
+        "downOrder": "down.sql drops the FK and the column BEFORE deleting the backfilled variants. Natural order was rejected because the CASCADE would delete every stock row.",
+        "rehearsal": "Backup sha256 78f9d8ae...; pre-g1 85 tables/931 columns/190 enum labels/14 triggers/236 constraints; post-apply 94/1024/214/18/277; rollback byte-identical (raw sha256 32cd0cbe98c06bd7); reapply normalized-identical.",
+        "reconciliation": "10/10 pre-existing rows mapped exactly once on apply, 7/7 on rollback, 10/10 on reapply, cleanup 1/1. No existing product or stock record was lost or silently reinterpreted.",
+        "fkDrift": "The five pre-existing profileId DropForeignKey statements excluded with the count asserted, for the sixth wave running.",
+        "legacyColumns": "DigitalProduct.variantsJson and DigitalProduct.stock left exactly as they are. Deciding what their existing values mean is a data decision, not a schema one.",
+        "gates": "check-commerce-schema-invariants 85/85, 0/1/0. check-inventory-schema-invariants extended 49 -> 51/51. check-inventory-runtime unchanged at 85/85. Relation-name verifier 0 renamed."
+      },
+      "g2": {
+        "files": "src/lib/commerce/{lifecycle,shared,variants,fulfilment,returns,index}.ts",
+        "composition": "No new order or payment system. Stock movement goes through the Wave F InventoryService; orders and payments are read, never re-implemented.",
+        "stockLeavesAtShipped": "Stock leaves at SHIPPED by consuming the existing hold. Pack-time was rejected because the goods are still on the shelf; delivery-time was rejected because they left days earlier. SHIPPED -> CANCELLED is therefore forbidden.",
+        "noDuplicateBalances": "Fulfilment and returns keep no balances of their own; duplicating inventory was rejected.",
+        "restockIdempotency": "Idempotency key return:<itemId> plus a stored restockMovementId. Returning CONFLICT on replay was rejected because the requirement is idempotence, not refusal.",
+        "eligibility": "Return eligibility is derived from what has shipped or been delivered minus what a live return already claims. Caching it was rejected.",
+        "immutability": "A variant cannot be created as the default, and product, default flag and option selection are immutable on update. Mutability was rejected because it would relocate stock and rewrite the meaning of past orders.",
+        "concurrency": "MEASURED with genuinely parallel operations: where stock is insufficient exactly one caller wins.",
+        "harness": "scripts/one-off/check-commerce-runtime.ts, 110 assertions, 0/1/0"
+      },
+      "g3": {
+        "files": "src/lib/commerce/{http,runtime}.ts; 16 routes under src/app/api/platform/** (products, products/[productId]/variants, products/[productId]/options, product-options/[optionId]/values, product-variants/[variantId], orders, orders/[orderId]/allocations, orders/[orderId]/return-eligibility, fulfilments, fulfilments/[id], fulfilments/[id]/items, returns, returns/[id], returns/[id]/items, returns/[id]/items/[itemId], commerce-events); src/components/business-os/{commerce-shared.ts,commerce-variants-panel.tsx,commerce-orders-panel.tsx,commerce-panel.tsx}; mounted in business-os-shell.tsx",
+        "byteIdenticalRefusal": "A foreign resource and a nonexistent resource both return 403 {\"ok\":false,\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Access denied\"}}. Proven by comparing the two serialized bodies, not by inspection. Same for orders, fulfilments and returns.",
+        "detailsMatter": "A 409 keeps its numbers - remaining, available, claimed - in machine-readable details, because a storefront cannot act on a bare conflict.",
+        "discovery": "Read-only /api/platform/products and /api/platform/orders lists added (VariantService.listProducts, FulfilmentService.listOrders). A surface with no discovery endpoint is not usable.",
+        "uiHonesty": "The UI states that stock leaves when a shipment is marked shipped and not when it is packed; that carrier and tracking are owner-entered and no carrier is contacted; that a restock with no workspace location is disabled rather than failing at the write boundary; and that a new variant inherits the product price and is never created as the default. Every transition button is rendered from server-computed allowedTransitions, so the UI cannot offer a move the runtime would refuse.",
+        "a11y": "23 new explicit assertions in check-business-os-a11y (104 -> 127). Non-vacuity proven by an inverted probe that failed and was then restored.",
+        "harness": "scripts/one-off/check-commerce-routes.ts, 78 assertions, 0/1/0"
+      },
+      "g4": {
+        "promotions": "commerce:variants partial -> available (src/lib/commerce/variants.ts); commerce:fulfilment partial -> available (src/lib/commerce/fulfilment.ts); commerce:returns planned -> available (src/lib/commerce/returns.ts). All three evidence paths exist on disk, which the contract harness checks rather than trusts.",
+        "retail": "retail-storefront-v1 draft -> ACTIVE. All six required capabilities (catalog, orders, inventory, variants, fulfilment, returns) are available with a runtime file present, so activation is a consequence of validateBusinessBlueprint passing rather than a decision in blueprints.ts.",
+        "negativeTestRepointed": "The planned-capability negative test moved from commerce:returns to fieldJobs:dispatch - the third such move (venueOrders:reservations -> commerce:inventory -> commerce:returns -> fieldJobs:dispatch). A second assertion records that commerce:returns is now available and can no longer serve as the planned example. The partial-capability negative test still targets appointments:reminders, which is genuinely still partial.",
+        "invertedAssertion": "\"activating retail is still rejected\" was INVERTED to \"activating retail is accepted\" rather than deleted, because the claim worth testing is what the validator produces from the real registry, not which status string sits in the blueprint.",
+        "downgradeTest": "New: each of the six required capabilities is temporarily downgraded in the REAL registry to both partial and planned, the real validator is re-run, and the rejection must name that capability and its maturity. 12 cases, all rejected, all naming the blocked capability. Every downgrade is reverted immediately and the restoration is asserted, so the test leaks no state.",
+        "notClaimed": "No carrier, payment or outbound messaging integration is claimed. Tracking is owner-entered text; a refund payment is referenced, never executed; no email, SMS or WhatsApp is sent. The blueprint summary and the capability descriptions state this, and the harness asserts that they state it."
+      },
+      "gatesWaveG": {
+        "tip": "dd84acc",
+        "prismaValidate": 0,
+        "prismaGenerate": 0,
+        "tsc": 0,
+        "targetedLint": 0,
+        "repoWideLint": "91 problems (39 errors, 52 warnings) - identical to 34f8561, so Wave G added no lint debt",
+        "checkHarnesses": "44 of 44 exit 0 (check-order-stream excluded as a known non-blocking precondition)",
+        "commerceSchema": "85/85",
+        "commerceRuntime": "110/110",
+        "commerceRoutes": "78/78; inverted 77/78 exit 1, the single failure being the byte-identical refusal assertion",
+        "capabilityContract": "PASS 0 failures; INVERT_ASSERTION=1 produces 18 failures, exit 1",
+        "a11y": "PASS, 127 assertions",
+        "relationRenameVerifier": "0 renamed, 0 dropped across 93 pre-existing models",
+        "fixtureResidue": "zero across all three commerce harnesses; append-only trigger verified re-armed each time",
+        "externalCalls": "zero, counted",
+        "secretScan": "0 real hits; the single match is a deliberate fake DSN in check-commerce-routes proving the 503 path leaks nothing",
+        "npmAuditOmitDev": "0 vulnerabilities",
+        "build": "0, with all 16 commerce routes emitted as dynamic server routes",
+        "disposableDb": "left fully applied at 94 tables; live personalink untouched (35 public tables, 0 wave tables, 16 Profile rows)",
+        "sweepDriverNote": "run-wave-c-gates.ps1 is hardwired to the primary worktree. While Wave G was still on its branch, running it against the migrated rehearsal database reported three inventory failures that were an artifact of the checkout being behind the database, not regressions. A worktree-scoped driver (run-wave-g-gates.ps1, outside the repository) was used for pre-merge sweeps; the post-merge sweep used the original driver, which is valid again now that the primary carries Wave G."
       }
     }
   ],

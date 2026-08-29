@@ -2236,3 +2236,155 @@ attempt this run. Wave G proceeds **root-serial**, and no worker independence is
 **Owner-only action to unblock parallelism:** register the KiroCrew MCP server in
 `~/.kiro/settings/mcp.json` (or a workspace `.kiro/settings/mcp.json`) and restart the Kiro
 client so the model-pinned dispatch tool is exposed. The gateway on 5476 is already up.
+
+
+---
+
+## Wave G - commerce variants, fulfilment and returns; retail activated
+
+Integrated at `dd84acc` (merge, `--no-ff`) on `recovered/aug20-wt-pr-32`, from base `34f8561`
+via branch `feature/wave-g-commerce`. Root-serial, `ORCHESTRATION_UNAVAILABLE` (see the
+preceding section). Four slices, each committed only after its own gates were green.
+
+| Slice | Commit | What it is |
+|---|---|---|
+| G1.1 schema | `816b8f7` | 6 enums, 9 tables, 4 CHECKs, 1 partial unique index, 2 triggers |
+| G1.2 runtime | `c0a183f` | variants / fulfilment / returns composed over inventory, orders, payments |
+| G1.3 APIs + UI | `37991e6` | 16 tenant-authorized routes, one refusal envelope, two owner panels |
+| G1.4 capability | `5f189e6` | three promotions, `retail-storefront-v1` activated, negatives repointed |
+
+### The migration was not additive, and that is stated rather than hidden
+
+`InventoryItem` gains `variantId`, so `20260829170000_commerce_variants_fulfilment_returns`
+is not a purely additive migration - the first in this program that is not. Forcing additivity
+was considered and rejected: a variant that cannot own stock is not a variant, and the whole
+point of the wave is that a size or a colour is the thing you actually sell.
+
+Five `InventoryItem` statements were therefore lifted out of the generated diff and
+hand-ordered. Prisma emits `ADD COLUMN "variantId" TEXT NOT NULL`, which is simply wrong on a
+populated table, and the rehearsal database held **237 pre-existing `DigitalProduct` rows**, so
+this was a real populated-table migration and not a theoretical one. The end state matches what
+Prisma would produce; only the order and safety of getting there differs.
+
+`down.sql` drops the foreign key and the column **before** deleting the backfilled variants.
+The natural order was rejected because the CASCADE would have deleted every stock row on
+rollback - the rollback would have been more destructive than the migration.
+
+### Existing products resolve, they are not rewritten
+
+Every pre-existing product receives one default variant with the deterministic id
+`var_<productId>`. Deterministic rather than `cuid()`, because reconciliation across
+apply/rollback/reapply then becomes a join rather than an act of faith; the same convention is
+used by `InventoryService.ensureDefaultVariant`, so the migration and the runtime cannot
+diverge on what "the default variant" means.
+
+The default variant leaves `priceCents` NULL and therefore **inherits** the product price.
+Copying the price was rejected: the two would drift the first time an owner edited a product.
+
+`InventoryItem.productId` is kept, and its agreement with `variantId` is enforced by
+`reject_inventory_variant_product_mismatch()` and trigger
+`InventoryItem_variant_product_match`. A composite foreign key `(productId, variantId)` would
+have been tidier in SQL but Prisma cannot express it, so it would have become a sixth permanent
+drift entry; dropping `productId` would have failed the relation-name verifier. The trigger is
+the option that costs nothing later.
+
+`DigitalProduct.variantsJson` and `DigitalProduct.stock` are untouched. What their existing
+values mean is a data decision, not a schema one.
+
+### Rehearsal, on the disposable target only
+
+Backup sha256 `78f9d8ae…`. Pre-G1 85 tables / 931 columns / 190 enum labels / 14 triggers /
+236 constraints -> post-apply 94 / 1024 / 214 / 18 / 277 -> rollback **byte-identical** to
+pre-G1 (raw sha256 `32cd0cbe98c06bd7`) -> reapply normalized-identical. Row reconciliation:
+10/10 pre-existing rows mapped exactly once on apply, 7/7 on rollback, 10/10 on reapply,
+cleanup 1/1. The five pre-existing `profileId` `DropForeignKey` statements were excluded with
+the count asserted, for the sixth wave running. Relation-name verifier: 0 renamed, 0 dropped
+across 93 pre-existing models.
+
+### Where stock leaves, and why it matters
+
+Stock leaves at **SHIPPED**, by consuming the hold Wave F already created. Pack time was
+rejected because the goods are still on the shelf; delivery time was rejected because they left
+days earlier. The consequence is that `SHIPPED -> CANCELLED` is forbidden, which is a real
+limitation and is stated in the UI rather than discovered at the write boundary.
+
+Fulfilment and returns keep **no balances of their own**. Duplicating inventory would have made
+two numbers that must agree, which is how the `DigitalProduct.stock` problem started.
+
+Restock is idempotent via key `return:<itemId>` plus a stored `restockMovementId`. Returning
+CONFLICT on replay was rejected: the requirement is idempotence, not refusal.
+
+### Concurrency and refusals
+
+Measured with genuinely parallel operations: where stock is insufficient exactly one caller
+wins. A variant cannot be created as the default, and product, default flag and option
+selection are immutable on update - mutability would relocate stock and rewrite the meaning of
+orders already placed.
+
+A foreign resource and a nonexistent resource return **byte-identical** refusals
+(`403 {"ok":false,"error":{"code":"FORBIDDEN","message":"Access denied"}}`), proven by
+comparing the two serialized bodies rather than by reading them. A 409 keeps its numbers in
+machine-readable `details`, because a storefront cannot act on a bare conflict.
+
+### Retail activation is a consequence, not a decision
+
+`commerce:variants` and `:fulfilment` moved partial -> available; `:returns` moved planned ->
+available. All three cite an evidence file that exists, which the contract harness checks.
+`retail-storefront-v1` moved draft -> **active** because all six required capabilities are
+available with a runtime file present - `validateBusinessBlueprint` is what decides that, not
+`blueprints.ts`.
+
+Three consequences for the contract harness, all of them maintenance the harness forces on
+itself:
+
+1. The planned-capability negative test moved from `commerce:returns` to
+   `fieldJobs:dispatch`. That is the third such move
+   (`venueOrders:reservations` -> `commerce:inventory` -> `commerce:returns` ->
+   `fieldJobs:dispatch`). A second assertion now records *why*: returns is available, so it
+   can no longer serve as the planned example.
+2. `"activating retail is still rejected"` was **inverted** to
+   `"activating retail is accepted"` rather than deleted. The claim worth testing is what the
+   validator produces from the real registry, not which status string sits in the blueprint.
+3. New, and required: activation must fail when **any one** required capability is downgraded.
+   Each of the six is temporarily downgraded in the real registry to both `partial` and
+   `planned`, the real validator is re-run, and the rejection must name that capability and its
+   maturity. 12 cases, all rejected, all naming the blocked capability. Every downgrade is
+   reverted immediately and the restoration is asserted, so the test leaks no state into later
+   assertions.
+
+### What Wave G does not claim
+
+No carrier is contacted - tracking is text the owner types. No refund is executed - a refund
+payment is only referenced. No email, SMS or WhatsApp is sent. The blueprint summary and the
+three capability descriptions say all of this, and the harness asserts that they say it, so an
+active retail storefront cannot quietly come to imply an integration that does not exist.
+
+### Gates on the integrated tip `dd84acc`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` / `generate` | 0 / 0 |
+| app `tsc --noEmit` | 0 |
+| targeted ESLint (all changed paths) | 0 problems |
+| repo-wide ESLint | 91 problems (39 errors, 52 warnings) - **identical to `34f8561`** |
+| check harnesses | **44 of 44 exit 0** (`check-order-stream` excluded, precondition still unmet) |
+| `check-commerce-schema-invariants` | 85/85 |
+| `check-commerce-runtime` | 110/110 |
+| `check-commerce-routes` | 78/78; inverted 77/78 exit 1 |
+| `check-capability-contract` | PASS, 0 failures; `INVERT_ASSERTION=1` -> 18 failures, exit 1 |
+| `check-business-os-a11y` | PASS, 127 assertions (104 -> 127); inverted probe failed then restored |
+| `check-inventory-*` | 51/51 schema, 85/85 runtime, 58/58 routes |
+| relation-name verifier | 0 renamed, 0 dropped across 93 models |
+| secret scan | 0 real hits; one deliberate fake DSN in `check-commerce-routes` |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | exit 0; all 16 commerce routes emitted as dynamic server routes |
+| live `personalink` | untouched - 35 public tables, 0 wave tables, 16 `Profile` rows |
+| disposable DB | left fully applied at 94 tables, not mid-rehearsal |
+
+**One honest note about the sweep driver.** `run-wave-c-gates.ps1` is hardwired to the primary
+worktree. While Wave G was still on its branch, running it against the already-migrated
+rehearsal database reported three inventory failures - an artifact of the *checkout* being
+behind the *database*, not regressions. A worktree-scoped driver (`run-wave-g-gates.ps1`, kept
+outside the repository) was used for pre-merge sweeps, and gave 44/44. The post-merge sweep used
+the original driver, which is valid again now that the primary carries Wave G, and also gave
+44/44. Recording the distinction rather than quietly picking whichever number looked better.
