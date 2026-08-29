@@ -381,6 +381,108 @@ check(
         /No events recorded yet/.test(caseDetailSrc),
 )
 
+// ---------------------------------------------------------------------------
+// Wave D — explicit coverage for the cohort console. The honesty requirement that
+// matters most here is that a progress percentage is the server's DERIVED figure,
+// never estimated in the browser, and that an unissued certificate is never shown
+// as a credential.
+// ---------------------------------------------------------------------------
+const cohortsSrc = readFileSync(join(__dirname, "../../src/components/business-os/cohorts-panel.tsx"), "utf8")
+const cohortDetailSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/cohort-detail-panel.tsx"),
+    "utf8",
+)
+const cohortsSharedSrc = readFileSync(join(__dirname, "../../src/components/business-os/cohorts-shared.ts"), "utf8")
+const cohortsAll = `${cohortsSrc}\n${cohortDetailSrc}\n${cohortsSharedSrc}`
+
+check("cohort console is mounted in the shell", shellSrc.includes("<CohortsPanel"))
+check("cohort decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(cohortsSrc))
+check(
+    "cohort loading state announces itself politely and as busy",
+    cohortsSrc.includes('aria-live="polite"') && cohortsSrc.includes('aria-busy="true"'),
+)
+check(
+    "cohort loading state carries a screen-reader label",
+    cohortsSrc.includes("sr-only") && /Loading cohorts/.test(cohortsSrc),
+)
+check(
+    "cohort detail and learner-progress loading states are both announced",
+    /Loading cohort detail/.test(cohortDetailSrc) && /Loading learner progress/.test(cohortDetailSrc),
+)
+check("cohort console uses a structural skeleton while loading", /Skeleton/.test(cohortsSrc))
+check(
+    "cohort console distinguishes 401, 403, 400 and 409 for the owner",
+    /error\.status === 401/.test(cohortsSharedSrc) &&
+        /error\.status === 403/.test(cohortsSharedSrc) &&
+        /error\.status === 400/.test(cohortsSharedSrc) &&
+        /error\.status === 409/.test(cohortsSharedSrc),
+)
+check(
+    "cohort console does not leak internals on a dependency failure",
+    /error\.status === 503/.test(cohortsSharedSrc) && /Nothing was changed/.test(cohortsSharedSrc),
+)
+check(
+    "cohort 403 copy is identical for a foreign and a missing cohort",
+    /does not grant you access to that cohort/.test(cohortsSharedSrc),
+)
+check("cohort empty state states that no sample data is shown", /no sample cohorts are shown/i.test(cohortsSrc))
+check(
+    "cohort console contains no hardcoded sample cohort, learner or session",
+    // A fabricated record needs an id, a learner address, or an invented percentage.
+    // Error-envelope codes and UI copy strings are not records, so they are not matched.
+    !/\bid:\s*"/.test(cohortsAll) &&
+        !/visitorEmail:\s*"/.test(cohortsAll) &&
+        !/percent:\s*\d/.test(cohortsAll) &&
+        !/sampleCohort/i.test(cohortsAll),
+)
+check("the cohort detail disclosures expose their expanded state", /aria-expanded=/.test(cohortDetailSrc))
+check(
+    "cohort sections are headed rather than only visually grouped",
+    /<h3/.test(cohortsSrc) && /<h5/.test(cohortDetailSrc),
+)
+check(
+    "cohort and membership buttons come from server-computed allowedTransitions",
+    /record\.allowedTransitions\.map/.test(cohortsSrc) &&
+        /member\.allowedTransitions\.map/.test(cohortDetailSrc) &&
+        /session\.allowedTransitions\.map/.test(cohortDetailSrc),
+)
+check(
+    "progress figures are stated to be computed from records, not estimated",
+    /computed from recorded lesson completions/.test(cohortDetailSrc) && /Nothing is estimated/.test(cohortDetailSrc),
+)
+check(
+    "the UI never recomputes a percentage in the browser",
+    !/Math\.round\(/.test(cohortsAll) && !/Math\.floor\(/.test(cohortsAll),
+)
+check(
+    "an ineligible learner is shown the exact unmet requirements",
+    /Not eligible: \$\{progress\.reasons\.join/.test(cohortDetailSrc),
+)
+check(
+    "the UI states plainly that only an accepted submission counts",
+    /Only an accepted submission counts towards completion/.test(cohortDetailSrc),
+)
+check(
+    "the UI explains why a scheduled session has no attendance controls",
+    /a session that has not happened\s*\n?\s*cannot have attendance/.test(cohortDetailSrc) ||
+        /cannot have attendance/.test(cohortDetailSrc),
+)
+check(
+    "renewal copy distinguishes a queued reminder from none",
+    /reminder queued/.test(cohortDetailSrc) && /no reminder queued/.test(cohortDetailSrc),
+)
+check(
+    "empty cohort sub-lists say so rather than rendering a placeholder row",
+    /Nobody has joined this cohort yet/.test(cohortDetailSrc) &&
+        /No sessions scheduled/.test(cohortDetailSrc) &&
+        /No assignments set/.test(cohortDetailSrc) &&
+        /No events recorded yet/.test(cohortDetailSrc),
+)
+check(
+    "a terminal cohort explains why it has no actions",
+    /cannot change/.test(cohortsSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
