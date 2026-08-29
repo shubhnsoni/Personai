@@ -240,6 +240,8 @@ model Profile {
   ReturnRequest        ReturnRequest[]
   CommerceEvent        CommerceEvent[]
   CourseAccessLevel    CourseAccessLevel[]
+  FieldJobRequest      FieldJobRequest[]
+  FieldJob             FieldJob[]
 }
 
 model ProfileEvent {
@@ -344,6 +346,8 @@ model ServiceOffering {
   bookings          Booking[]
   eligibleResources ServiceResource[]
   waitlistEntries   AppointmentWaitlistEntry[]
+  FieldJobRequest   FieldJobRequest[]
+  FieldJob          FieldJob[]
 }
 
 /// Appointment booking.
@@ -420,9 +424,10 @@ model AppointmentResource {
   createdAt  DateTime                @default(now())
   updatedAt  DateTime                @updatedAt
 
-  bookings        Booking[]
-  services        ServiceResource[]
-  waitlistEntries AppointmentWaitlistEntry[]
+  bookings           Booking[]
+  services           ServiceResource[]
+  waitlistEntries    AppointmentWaitlistEntry[]
+  FieldJobAssignment FieldJobAssignment[]
 
   @@unique([profileId, name])
   @@index([profileId, isActive])
@@ -1226,6 +1231,7 @@ model Location {
   CohortSession        CohortSession[]
   InventoryItem        InventoryItem[]
   Fulfilment           Fulfilment[]
+  FieldJob             FieldJob[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -2972,4 +2978,242 @@ model CaseRetainerEvent {
 
   @@index([retainerId, seq])
   @@index([retainerId, subjectType, subjectId])
+}
+
+// ---------------------------------------------------------------------------
+// Wave G4 - the shared fieldJobs engine foundation: intake and dispatch.
+//
+// This is the FOUNDATION, not the whole engine. `inspection` - asset checks, parts,
+// completion notes and invoice handoff - is deliberately left unbuilt and still declared
+// `planned` in the capability registry, because declaring it available would be a claim about
+// code that does not exist.
+//
+// IT REUSES THE TECHNICIAN MODEL THAT ALREADY EXISTS. A field technician is an
+// AppointmentResource with kind STAFF: profile-scoped, optionally tied to a Location, already
+// carrying capacity and an isActive flag, already the thing services are made eligible for. A
+// separate Technician table would have been a second answer to "who can do this work", and the
+// two would have drifted the first time someone was added to one and not the other. Same for
+// ServiceOffering, which already describes what is being sold and for how long.
+//
+// TENANCY IS profileId, bridged from Workspace.profileId - the same key the appointments and
+// cohort domains use, and a requirement rather than a preference: reusing AppointmentResource
+// means sharing its scope.
+//
+// A JOB HAPPENS AT A CUSTOMER SITE, NOT AT A Location. Location models the owner's own
+// premises, so the site is free text plus optional coordinates. Inventing Location rows for
+// customer addresses would pollute a table the reservation, appointment and inventory engines
+// all read.
+//
+// NO ROUTING, NO MAPS, NO MESSAGING. `dispatch` here means assignment and job-card state. No
+// route is optimised, no distance is computed, no technician is notified. Whoever adds those
+// must say so explicitly rather than letting the word "dispatch" imply them.
+// ---------------------------------------------------------------------------
+
+enum FieldJobRequestStatus {
+  NEW
+  QUALIFYING
+  QUOTED
+  ACCEPTED
+  DECLINED
+  CONVERTED
+}
+
+enum FieldJobStatus {
+  DRAFT
+  SCHEDULED
+  DISPATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum FieldJobPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+/// LEAD is the technician answerable for the job. A job may have many HELPERs but only one
+/// active LEAD, enforced by a partial unique index - two leads means nobody is accountable.
+enum FieldJobAssignmentRole {
+  LEAD
+  HELPER
+}
+
+/// The job-card states a technician actually moves through. ACCEPTED and DECLINED exist because
+/// an assignment is a request until the technician answers it; recording only ASSIGNED would
+/// make a silent refusal look like agreement.
+enum FieldJobAssignmentState {
+  ASSIGNED
+  ACCEPTED
+  DECLINED
+  EN_ROUTE
+  ON_SITE
+  COMPLETED
+  RELEASED
+}
+
+enum FieldJobEventKind {
+  CREATED
+  STATUS
+  ASSIGNMENT
+  SCHEDULE
+  ESTIMATE
+  NOTE
+}
+
+enum FieldJobEventActor {
+  CUSTOMER
+  TECHNICIAN
+  STAFF
+  SYSTEM
+}
+
+/// An inbound request for work, before anybody has agreed to do it.
+///
+/// Kept separate from FieldJob for the same reason CaseIntake is separate from CaseProject: a
+/// request that is declined must remain a record, and a job that exists must mean somebody
+/// committed to it. Collapsing the two would make "how many jobs do we have" unanswerable.
+model FieldJobRequest {
+  id                String           @id @default(cuid())
+  profileId         String
+  profile           Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  /// The offering the customer is asking about, when they named one. Reuses the existing
+  /// catalogue rather than describing the work again.
+  serviceOfferingId String?
+  serviceOffering   ServiceOffering? @relation(fields: [serviceOfferingId], references: [id], onDelete: SetNull)
+
+  source  String
+  summary String
+
+  requesterName  String?
+  requesterEmail String?
+  requesterPhone String?
+
+  siteAddress String?
+
+  status        FieldJobRequestStatus @default(NEW)
+  /// What the owner quoted, if they quoted anything. Nullable because most requests are
+  /// declined or converted before a number exists.
+  estimateCents Int?
+  currency      String                @default("USD")
+  declineReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  convertedJob FieldJob?
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status, createdAt])
+}
+
+/// Work somebody has committed to doing.
+model FieldJob {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  /// One request converts to at most one job, which is what makes the conversion auditable.
+  requestId String?          @unique
+  request   FieldJobRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  serviceOfferingId String?
+  serviceOffering   ServiceOffering? @relation(fields: [serviceOfferingId], references: [id], onDelete: SetNull)
+
+  /// The owner's own premises the job is dispatched FROM, when that matters. The job itself
+  /// happens at siteAddress.
+  originLocationId String?
+  originLocation   Location? @relation(fields: [originLocationId], references: [id], onDelete: SetNull)
+
+  reference String
+  title     String
+  status    FieldJobStatus   @default(DRAFT)
+  priority  FieldJobPriority @default(NORMAL)
+
+  siteAddress  String
+  siteNotes    String?
+  contactName  String?
+  contactPhone String?
+
+  /// Both or neither. A job with a start and no end has no duration, and a job with an end and
+  /// no start has no beginning - a CHECK constraint refuses either.
+  scheduledStartAt DateTime?
+  scheduledEndAt   DateTime?
+
+  estimateCents Int?
+  currency      String @default("USD")
+
+  dispatchedAt DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assignments FieldJobAssignment[]
+  events      FieldJobEvent[]
+
+  @@unique([profileId, reference])
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status, scheduledStartAt])
+  @@index([profileId, priority, status])
+}
+
+/// A technician on a job. The technician IS an AppointmentResource - see the block comment
+/// above for why there is no separate Technician table.
+model FieldJobAssignment {
+  id         String              @id @default(cuid())
+  jobId      String
+  job        FieldJob            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Cascade rather than SetNull: an assignment with no technician is not a record of anything,
+  /// and the job's event history keeps the fact that somebody was assigned.
+  resourceId String
+  resource   AppointmentResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  role  FieldJobAssignmentRole  @default(HELPER)
+  state FieldJobAssignmentState @default(ASSIGNED)
+
+  assignedAt    DateTime  @default(now())
+  respondedAt   DateTime?
+  enRouteAt     DateTime?
+  onSiteAt      DateTime?
+  completedAt   DateTime?
+  releasedAt    DateTime?
+  declineReason String?
+  releaseReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([jobId, idempotencyKey])
+  @@index([jobId, state])
+  @@index([resourceId, state])
+}
+
+/// Append-only job history. subjectType and subjectId say whether a row is about the request,
+/// the job, an assignment or the schedule, so one stream covers all four.
+model FieldJobEvent {
+  id          String             @id @default(cuid())
+  jobId       String
+  job         FieldJob           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  seq         BigInt             @default(autoincrement())
+  kind        FieldJobEventKind
+  subjectType String
+  subjectId   String
+  from        String?
+  to          String
+  actor       FieldJobEventActor
+  actorId     String?
+  metadata    Json?
+  at          DateTime           @default(now())
+
+  @@index([jobId, seq])
+  @@index([jobId, subjectType, subjectId])
 }
