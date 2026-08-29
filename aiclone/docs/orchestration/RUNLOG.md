@@ -2944,3 +2944,85 @@ anything.
 `contentCohorts:accessLevels` claims tiers, entitlements and visibility enforcement — which is now
 true in the two places content is actually served. It has never claimed an owner API or panel, and
 it still does not have one.
+
+
+---
+
+# Run close - 2026-08-29, seven hours, root-serial
+
+Started `2026-08-29 16:24:52 +05:30` from primary HEAD `34f8561`. Closing at `43d0fa5`.
+
+## What was delivered
+
+| Package | Commits | What it is |
+|---|---|---|
+| Orchestration recovery | `efb843f` | one bounded attempt, recorded `ORCHESTRATION_UNAVAILABLE` |
+| Wave G — commerce variants, fulfilment, returns | `816b8f7`, `c0a183f`, `37991e6`, `5f189e6`, merge `dd84acc` | 9 tables, 16 routes, 2 panels, `retail-storefront-v1` activated |
+| Wave G3 — retainers and course access levels | `c4fb417`, `d07c41d`, `dd5b9ee`, merge `5a26b6b` | 10 tables across two migrations, two engines, two promotions |
+| Wave G4 — fieldJobs foundation | `20c509e`, `8d966af`, merge `ef17770` | 4 tables, intake and dispatch, two promotions |
+| P1-009 slice 2 | `2804314` | repo-wide lint 91 -> 78, provably |
+| Retainer surface | `9ca772e`, `4ebaf2a` | 10 routes and an owner panel |
+| Field-job surface | `3185a58`, `3de518b` | 10 routes and an owner panel |
+| Access-tier enforcement | `581a03e` | tiers enforced where content is served, not merely enforceable |
+| Ledger reconciliation | `1f172eb`, `61670da`, `0427f25`, `edfd4c7`, `bb1548c`, `5d5d18f`, `43d0fa5` | seven ledger commits |
+
+Five capabilities promoted from `planned`/`partial` to `available`, each with an evidence file that
+exists: `commerce:variants`, `commerce:fulfilment`, `commerce:returns`,
+`casesProjects:retainers`, `contentCohorts:accessLevels`, `fieldJobs:intake`,
+`fieldJobs:dispatch` — seven, in fact. `retail-storefront-v1` went from draft to active, and **no
+blueprint is left in draft**.
+
+## Final combined suite on `43d0fa5`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` / `generate` | 0 / 0 |
+| app `tsc --noEmit` | 0 |
+| check harnesses | **52 of 52 exit 0** (41 at `34f8561`, +11 this run) |
+| relation-name verifier | 0 renamed, 0 dropped |
+| repo-wide ESLint | 78 problems (39 errors, 39 warnings), **down from 91** |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | exit 0 |
+| live `personalink` | untouched — 35 tables, no `_prisma_migrations`, 0 wave tables, no `btree_gist`, `Profile` = 16 |
+| origin | `4b386d1d…` and `origin/main` `9e8a0ff…`, both unchanged; nothing pushed |
+| frozen worktrees | all six `kirocrew/*` still at `ea69595` |
+| disposable DB | 17 migrations, `migrate status` up to date, 108 tables — fully applied, never mid-rehearsal |
+| working tree | only the two expected untracked paths |
+| `P1_014_ACTION_INVENTORY.md` | 6067 bytes, last written 2026-08-28 13:18 — before this run began |
+
+## What this run got wrong, and what that cost
+
+Recorded because a run that only lists its successes is not a record.
+
+1. **A vacuous assertion nearly shipped.** One access check was written as `.every(async ...)`,
+   which is always truthy. It would have reported success forever. Replaced with an awaited loop.
+2. **An assertion failed on the copy it existed to protect.** A check for the absence of the
+   string "ETA" failed because the field-jobs panel honestly says "no ETA". Rewritten to look for
+   eta-shaped identifiers instead of the word.
+3. **Two fixtures violated real constraints**, and the constraints caught them rather than review:
+   `OrderLine_amounts_check` and `CourseAccessGrant_expiry_after_grant`.
+4. **A verification command failed silently.** `Select-String -Path` with `**` globs does not
+   recurse and reported zero matches for identifiers that were provably present. The P1-009
+   verification was redone recursively; had it been trusted, the slice would have deleted code on
+   the strength of a search that never ran.
+5. **The first full sweep after Wave G3 failed on harness residue**, not a regression — a
+   reconciliation fixture left in the rehearsal database collided on a unique key. Cleaned up and
+   recorded rather than quietly re-run.
+6. **Two packages were committed directly to primary** rather than through a feature branch and
+   `--no-ff` merge. Neither carried a migration and every gate ran on the integrated tree, but it
+   is a deviation from the pattern the earlier waves used and it is recorded in both P2-014 and
+   P2-015.
+
+## Three things left honestly unfinished
+
+1. `fieldJobs:inspection` is not built and is declared `planned`. It is the **last** planned
+   capability in the registry, which makes the capability-contract negative test's next repoint
+   impossible — it will need rewriting against a synthetic descriptor. An assertion already warns
+   about this.
+2. `appointments:reminders` and `:deposits` remain `partial` with inert providers. Owner-gated.
+3. `contentCohorts:accessLevels` has an engine, enforcement and executable tests, but **no owner
+   API or panel**. Tiers can be defined only through the engine.
+
+Nothing in the capability registry claims something that does not exist. Two capabilities are
+`available` on the strength of an engine plus enforcement rather than an owner surface, and
+`NEXT_ACTION.md` says so in the table rather than leaving it to be inferred.
