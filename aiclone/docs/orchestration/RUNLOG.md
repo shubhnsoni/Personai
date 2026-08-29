@@ -2174,3 +2174,65 @@ Business OS a11y assertions and eight new properties in the capability contract.
 - **Attachments** and `P1_014_ACTION_INVENTORY.md`: untouched, still untracked.
 - No push, PR, deploy, tunnel, dev server, real external-provider call, or destructive Git
   operation at any point.
+
+
+---
+
+## 2026-08-29 16:25–16:35 · Bounded orchestration recovery attempt — `ORCHESTRATION_UNAVAILABLE`
+
+Ten-minute budget, one attempt, no patching or reinstalling. Result: **the gateway itself is
+recoverable and is now running, but this session cannot obtain a model-pinned dispatch tool,
+so no worker can be started.**
+
+### Evidence gathered
+- `C:\Users\shubh\.kiro\crew\run\gateway-5476.pid` held **39640**, last written 27 Aug
+  03:29. `Get-Process -Id 39640` now resolves to **`dllhost`** — the PID was recycled, so the
+  old gateway is definitively dead rather than wedged.
+- `crew\logs\crash-dumps\loopstall-20260826T215903Z.txt` records a loop-stall dump opened for
+  that same PID. `crash.log` then fills with repeated
+  `ConnectionResetError [WinError 10054]` inside
+  `_ProactorBasePipeTransport._call_connection_lost`, last entry 2026-08-27T06:49:04Z. The
+  event loop wedged and the process never recovered.
+
+### Supported start mechanism, used as-is
+`C:\Users\shubh\.kiro\crew-venv\Scripts\kirocrew.exe gateway` (the binary named by the
+existing `gateway-5476.bin` pointer). Nothing was patched, reinstalled or reconfigured.
+
+### Acceptance conditions, measured
+| Condition | Result |
+|---|---|
+| Port 5476 listening | **PASS** — listening 10s after launch, pid 54756; `kirocrew status` reports "gateway is running (token auth enabled)" |
+| Model-pinned dispatch tool genuinely exposed | **FAIL** |
+| Control worker has non-null start/PID/turns | not reached |
+| Control worker writes its expected report | not reached |
+| Requested and observed model match | not reached |
+
+### Why condition 2 fails, precisely
+`~/.kiro/settings/mcp.json` contains `"mcpServers": {}`. The only registered MCP servers are
+the two belonging to the `windows-computer-control` power. There is **no workspace-level
+`.kiro/settings/mcp.json`** either. No KiroCrew MCP server is registered with this session at
+all, which is why no model-pinned dispatch tool appears in the tool surface — and registering
+one would require editing MCP configuration plus a session-level MCP reconnect, neither of
+which is in scope for this run.
+
+This is the same conclusion every previous wave reached, but with a sharper cause: the gap is
+**client-side MCP registration**, not the gateway process. That distinction matters, because
+the previously assumed blocker — "the gateway will not start" — is now disproved.
+
+### Hollow or dead jobs
+None to remove. `kirocrew cron list` → "No cron jobs"; `~/.kiro` scheduled tasks file is 18
+bytes (empty); `kirocrew agent list` shows only the four built-in agent definitions and no
+running members. The one residual artifact is a zero-length
+`taskrunner_run_openai-kirocrew-master-orchestrator-prompt.jsonl.lock` from the 27 Aug crash;
+it is empty and was left in place rather than deleted, since removing files under `.kiro/crew`
+is closer to patching KiroCrew than to housekeeping.
+
+### Decision
+Recorded as `ORCHESTRATION_UNAVAILABLE`. The gateway is left **running**, because it started
+cleanly through the supported path and an owner-driven client can now register the MCP server
+against it — that is an owner-actionable next step rather than a dead end. No further recovery
+attempt this run. Wave G proceeds **root-serial**, and no worker independence is claimed.
+
+**Owner-only action to unblock parallelism:** register the KiroCrew MCP server in
+`~/.kiro/settings/mcp.json` (or a workspace `.kiro/settings/mcp.json`) and restart the Kiro
+client so the model-pinned dispatch tool is exposed. The gateway on 5476 is already up.
