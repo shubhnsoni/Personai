@@ -636,3 +636,71 @@ Do not begin F1 with less than 90 minutes remaining: it mutates a database.
   are inert. Wiring a real provider is a separate, owner-gated decision.
 - `casesProjects:retainers` and `contentCohorts:accessLevels` are newly visible planned gaps.
 - Gateway on port 5476: still absent. Every wave has been root-serial.
+
+
+---
+
+## Wave F COMPLETE — F1, F2 and F3 INTEGRATED 2026-08-29 at `7bfc868`
+
+| Pkg | Commit | Paths | Proof |
+|---|---|---|---|
+| F1 schema | `ca90b9a` | `prisma/schema.prisma`, `prisma/migrations/20260829150000_commerce_inventory_foundation`, `scripts/one-off/check-inventory-schema-invariants.ts` | 50 invariants, 0/1/0 |
+| F2 runtime | `0d59dc8` | `src/lib/inventory/{lifecycle,shared,engine,index}.ts`, `scripts/one-off/check-inventory-runtime.ts` | 85 assertions, 0/1/0 |
+| F3 APIs + console | `a723078` | `src/lib/inventory/{http,runtime}.ts`, 6 routes under `src/app/api/platform/inventory/**`, `src/components/business-os/inventory-panel.tsx`, shell mount, `scripts/one-off/check-inventory-routes.ts`, 20 new assertions in `check-business-os-a11y`, contract updates | 58 assertions, 0/1/0 |
+
+Disposable target left **fully applied** at 85 tables; rollback was byte-identical to the
+pre-migration snapshot.
+
+Combined gates on `7bfc868`: `prisma validate`/`generate` 0 · `tsc` 0 · targeted `eslint` 0 ·
+relation-rename verifier 0 renamed across 84 pre-existing models · **41/41** check harnesses
+exit 0 · `npm audit --omit=dev` 0 · `npm run build` 0 · secret scan 0 real hits.
+
+P2-010 is `done`. Active blueprints: `restaurant-venue-v3`, `coaching-studio-v2`,
+`consulting-agency-v1`, `ca-practice-v1`. Draft: `retail-storefront-v1`.
+
+### Standing rules earned in this package
+
+1. **Put a guarantee in a CHECK constraint, then prove the constraint refuses a direct
+   write.** `reserved <= onHand` is not a convention any more. The harness bypasses the
+   engine entirely to show the database enforces it, which means the guarantee survives a
+   future bug in application code.
+2. **Store deltas AND resulting balances in a ledger.** A delta-only ledger cannot be
+   checked against the row it explains. Both inventory harnesses replay the deltas and
+   require them to reproduce the stored after-values.
+3. **Measure a concurrency claim by running it concurrently.** Two parallel `reserve()`
+   calls at one unit of stock, asserting exactly one winner, is the only honest form of "we
+   take a row lock".
+4. **Refuse a state that asserts an effect the record cannot support.** An untracked stock
+   record cannot hold a reservation; a hold with no expiry cannot be expired.
+5. **A `plannedCapabilities` entry for something that now exists is a false statement.**
+   When Wave F made inventory real, restaurant v2 had to be superseded rather than quietly
+   edited, because its backlog entry became untrue.
+6. **When you promote a capability, re-point every negative test that depended on it being
+   unbuilt.** The planned-rejection test has now moved twice. The non-vacuity assertion
+   beside it is what makes that a build failure rather than a silent hole.
+7. **Avoid schema objects Prisma cannot express only when there is a real alternative.** A
+   required `locationId` was chosen over a partial unique index precisely because this
+   repository already pays a drift tax on every generated migration.
+
+---
+
+## Next in queue — three candidates, none started
+
+Base `7bfc868` or newer primary. In rough order of value:
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| G1 | commerce variants + fulfilment + returns | The last three capabilities blocking `retail-storefront-v1`. `variants` and `fulfilment` are currently *partial* with evidence pointing at a quick-add sheet; `returns` is planned. Needs schema, so allow 90+ minutes. Finishing all three is what lets retail become active, and the contract harness will then need its retail assertions repointed the same way Wave F repointed the inventory ones. |
+| G2 | appointments reminders + deposits providers | Both are *partial* because their provider boundaries are inert. Wiring a real messaging or payment provider is an **owner-gated** decision — it means real messages and real money — so this should not be started without explicit approval. Until then, `coaching-studio-v2` correctly lists them as planned. |
+| G3 | `casesProjects:retainers`, `contentCohorts:accessLevels` | The two gaps Wave E split out of over-broad capability descriptions. Smaller than G1; each needs schema plus runtime. |
+
+Do not begin any schema package with less than 90 minutes remaining.
+
+### Open items carried forward
+
+- P1-007 live cutover: still owner-gated, unchanged.
+- Pre-existing `profileId` FK drift: five `DropForeignKey` statements, excluded and
+  count-asserted for five waves running. Untouched.
+- `check-order-stream` precondition: still unmet, still non-blocking.
+- P1-009 repo-wide lint cleanup: still deferred.
+- Gateway on port 5476: still absent. Every wave has been root-serial.

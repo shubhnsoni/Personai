@@ -985,6 +985,83 @@
         "npmAuditOmitDev": "0 vulnerabilities",
         "build": 0
       }
+    },
+    {
+      "id": "P2-010",
+      "title": "Commerce inventory hardening",
+      "status": "done",
+      "owner": "root (claude-opus-5)",
+      "workerIndependenceClaimed": false,
+      "dependencies": [
+        "P2-002",
+        "P2-009"
+      ],
+      "base": "510c9ab",
+      "branch": "feature/wave-f-inventory",
+      "mergeCommit": "7bfc868",
+      "commits": {
+        "F1_schema": "ca90b9a",
+        "F2_runtime": "0d59dc8",
+        "F3_apis_ui": "a723078",
+        "waveF_integration": "7bfc868"
+      },
+      "scope": "Replace DigitalProduct.stock - one nullable Int that nothing decremented - with real per-location stock, an append-only movement ledger, and reservations that cannot oversell.",
+      "f1": {
+        "migration": "20260829150000_commerce_inventory_foundation",
+        "added": "3 enums; 3 tables (InventoryItem, append-only InventoryMovement, InventoryReservation); 4 CHECK constraints; 1 append-only trigger reusing reject_append_only_mutation(). ZERO columns added to and zero properties altered on any pre-existing table.",
+        "legacyColumn": "DigitalProduct.stock left exactly as it is - not renamed, dropped or migrated - because deciding what its existing values mean is a data decision, not a schema one. The harness asserts it is still a nullable integer.",
+        "reused": "InventoryItem -> DigitalProduct, Location, Profile. InventoryMovement -> Order, OrderLine. InventoryReservation -> OrderLine. All eight foreign keys verified by target name; ten forbidden fork tables asserted absent.",
+        "requiredLocation": "locationId is NOT NULL. Stock that is not anywhere is not stock, and a nullable location would need a partial unique index or a denormalized discriminator - both schema drift, which this database has already been bitten by.",
+        "oversellIsAConstraint": "InventoryItem_onHand_nonnegative, InventoryItem_reserved_nonnegative, InventoryItem_reserved_within_onHand, InventoryReservation_qty_positive. The harness proves all four refuse a DIRECT write with no engine involved, and that the boundary case - reserving exactly the whole on-hand quantity - is accepted.",
+        "selfVerifyingLedger": "InventoryMovement stores signed deltas AND resulting balances, so replaying the deltas must reproduce the after-values. Asserted, not assumed.",
+        "rehearsal": "pre-f1 82 tables/893 columns/176 enum labels/12 triggers; post-apply 85/931/190/14; rollback byte-identical to pre-f1 (raw sha256 24db167452bd7661); reapply normalized-identical. only_in_pre=0 in all six categories. Exclusion constraints stayed 2, extensions 2.",
+        "diffShape": "3 CREATE TABLE, 3 CREATE TYPE, 0 ADD COLUMN, 0 ALTER COLUMN, 0 DROP TABLE, 0 DROP COLUMN. The build tool asserts the exact table and enum counts and aborts on any ADD COLUMN at all.",
+        "fkDrift": "The five pre-existing profileId DropForeignKey statements excluded with the count asserted, for the fifth wave running.",
+        "formatProof": "Semantic block diff: 6 blocks added, 0 removed, and six auto-inserted opposite relation fields are the only change to pre-existing models. Relation-name verifier 0 renamed across 81 models.",
+        "gates": "check-inventory-schema-invariants 50/50, 0/1/0"
+      },
+      "f2": {
+        "files": "src/lib/inventory/{lifecycle,shared,engine,index}.ts",
+        "concurrency": "Every balance change runs inside a transaction that first takes SELECT ... FOR UPDATE on the stock record. MEASURED: two reserve() calls fired in parallel at a record holding one unit produce exactly one winner, one hold row, one unit reserved and zero available. That is the inverted assertion.",
+        "engineFirst": "The engine refuses an oversell before the database has to, and names the real number plus machine-readable detail. The CHECK constraints are the backstop, proven independently of this code.",
+        "threeRefusals": "RESERVE/RELEASE/CONSUME cannot be written as direct movements, because they only arise from a reservation transition. An untracked record cannot hold a reservation, because a reservation is a promise. EXPIRED requires the hold to have actually passed its expiry, and a hold with no expiry cannot be expired at all.",
+        "terminalOutcomes": "RELEASED, CONSUMED and EXPIRED are all terminal: re-releasing would double-credit stock, un-consuming would conjure units that already left the shelf.",
+        "derivedNotStored": "available and belowReorderPoint are computed on read. COUNT is absolute, not relative. An adjustment that would leave fewer units on hand than are already promised is refused with both numbers named.",
+        "harness": "scripts/one-off/check-inventory-runtime.ts, 85 assertions, 0/1/0"
+      },
+      "f3": {
+        "files": "src/lib/inventory/{http,runtime}.ts; 6 routes under src/app/api/platform/inventory/**; src/components/business-os/inventory-panel.tsx; mounted in business-os-shell.tsx",
+        "detailsMatter": "A 409 saying only-4-available is useless to a storefront unless the number arrives in a readable field, so details.available is asserted, not just the status code.",
+        "routeLayout": "availability is a static segment beside [id], so Next resolves it first and the id route only ever sees a stock record id.",
+        "uiHonesty": "No fabricated balance in source. The browser computes nothing. The ledger states its balances are the figures recorded at the time, not a recalculation. A record with promised units says a write-off below that figure will be refused. An untracked record says nothing can be reserved.",
+        "a11y": "20 new explicit assertions in check-business-os-a11y.",
+        "harness": "scripts/one-off/check-inventory-routes.ts, 58 assertions, 0/1/0"
+      },
+      "contractConsequences": {
+        "promotion": "commerce:inventory planned -> available, evidence src/lib/inventory/engine.ts.",
+        "restaurant": "restaurant-venue-v2 -> deprecated; NEW restaurant-venue-v3 active, requiring commerce catalog+orders+inventory. v1 always required inventory; v2 had to demote it to a planned backlog item because it was a single nullable column. A backlog entry for something that exists is a false statement, so v3 restores the original intent.",
+        "retail": "retail-storefront-v1 stays DRAFT for a narrower reason: inventory is no longer the blocker. variants and fulfilment are partial and returns is planned, so all three are now REQUIRED capabilities precisely to keep activation mechanically rejected. The harness asserts the rejection happens AND that it names variants, fulfilment and returns rather than inventory.",
+        "negativeTestRepointed": "The planned-capability negative test moved from commerce:inventory to commerce:returns. It had previously moved from venueOrders:reservations. Each time a wave made the target real the test would have become vacuous; the non-vacuity assertion beside it forces the maintenance."
+      },
+      "gatesWaveF": {
+        "tip": "7bfc868",
+        "prismaValidate": 0,
+        "prismaGenerate": 0,
+        "tsc": 0,
+        "targetedLint": 0,
+        "checkHarnesses": "41 of 41 exit 0 (check-order-stream excluded as a known non-blocking precondition)",
+        "inventorySchema": "50/50",
+        "inventoryRuntime": "85/85",
+        "inventoryRoutes": "58/58",
+        "capabilityContract": "PASS; INVERT_ASSERTION=1 fails all five overclaim guards",
+        "relationRenameVerifier": "0 renamed across 84 pre-existing models",
+        "fixtureResidue": "zero across all three inventory harnesses; append-only trigger verified re-armed each time",
+        "externalCalls": "zero, counted",
+        "secretScan": "0 real hits; the single match is a deliberate fake DSN in check-inventory-routes proving the 503 path leaks nothing",
+        "npmAuditOmitDev": "0 vulnerabilities",
+        "build": "0, with all 6 inventory routes registered",
+        "disposableDb": "left fully applied at 85 tables; live personalink untouched"
+      }
     }
   ],
   "laneState": {

@@ -5,33 +5,14 @@ Updated 2026-08-29, mid-run, root-serial. No worker independence claimed.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`c516703`** — Wave D fully integrated and green
+- Primary HEAD: **`7bfc868`** — Wave F integrated and green (ledger commit follows)
 - Origin `recovered/aug20-wt-pr-32`: `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`, unchanged
-- Waves A, B, C and D complete. P2-005, P2-006 and P2-008 are `done`.
+- Waves A, B, C, D, E and F complete. P2-005, P2-006, P2-008, P2-009, P2-010 are `done`.
 - Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**
-  at 82 tables, not mid-rehearsal. Live `personalink` untouched.
+  at 85 tables, not mid-rehearsal. Live `personalink` untouched.
 - Gateway port 5476 absent; workers and crons empty. Every wave has been root-serial.
 
-## Exact executable continuation — Wave E truthful vertical activation
-
-Read `INTEGRATION_QUEUE.md` → "Next in queue — Wave E truthful vertical activation, READY".
-
-### Step 0 — measure, do not assume
-
-```powershell
-cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
-git rev-parse HEAD                     # expect c516703...
-git status --porcelain                 # expect only .codex-remote-attachments/ and P1_014_ACTION_INVENTORY.md untracked
-git rev-parse origin/recovered/aug20-wt-pr-32   # expect 4b386d1...
-```
-
-### Step 1 — enumerate claims before changing any flag
-
-For restaurant, coaching, consulting and CA, list every capability the blueprint claims, then
-find the runtime and the route or surface for each one. Activate only the blueprints whose
-claims are all met; a blueprint with one unmet capability stays draft.
-
-What genuinely exists now, by wave:
+### What is genuinely built, by wave
 
 | Wave | Runtime | Routes | Surface |
 |---|---|---|---|
@@ -39,22 +20,47 @@ What genuinely exists now, by wave:
 | B appointments | `src/lib/appointments/**` | `/api/platform/appointments/**` | `appointments-panel.tsx` |
 | C cases and projects | `src/lib/cases/**` | `/api/platform/cases/**`, `/case-intakes/**` | `cases-panel.tsx`, `case-detail-panel.tsx` |
 | D cohorts | `src/lib/cohorts/**` | `/api/platform/cohorts/**`, `/course-enrollments` | `cohorts-panel.tsx`, `cohort-detail-panel.tsx` |
+| F inventory | `src/lib/inventory/**` | `/api/platform/inventory/**` | `inventory-panel.tsx` |
 
-`commerce.inventory` is still **planned, not built**. Retail therefore stays draft. Do not
-activate it to make a table look complete.
+Active blueprints: `restaurant-venue-v3`, `coaching-studio-v2`, `consulting-agency-v1`,
+`ca-practice-v1`. Draft: `retail-storefront-v1`. Deprecated: `restaurant-venue-v1`,
+`restaurant-venue-v2`, `coaching-studio-v1`.
 
-### Step 2 — make the contract harness falsifiable
+Still not built, and named as such in the capability registry: `commerce:variants`
+(partial), `commerce:fulfilment` (partial), `commerce:returns` (planned),
+`appointments:reminders` (partial, inert provider), `appointments:deposits` (partial, inert
+provider), `casesProjects:retainers` (planned), `contentCohorts:accessLevels` (planned),
+all of `fieldJobs` (planned).
 
-`check-capability-contract` must FAIL if a blueprint is marked active while any capability it
-claims has no runtime. Prove that by inverting it, exactly as every other harness in this
-repo does.
+## Exact executable continuation
 
-### Step 3 — after Wave E
+### Step 0 — measure, do not assume
 
-Commerce inventory hardening. It touches schema, so do not start it with under 90 minutes
-remaining; follow the D1 migration sequence below.
+```powershell
+cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
+git rev-parse HEAD                     # expect 7bfc868... or the ledger commit on top of it
+git status --porcelain                 # expect only .codex-remote-attachments/ and P1_014_ACTION_INVENTORY.md untracked
+git rev-parse origin/recovered/aug20-wt-pr-32   # expect 4b386d1...
+```
 
-## Migration sequence, if a package needs one
+### Step 1 — pick the next package
+
+Read `INTEGRATION_QUEUE.md` → "Next in queue — three candidates, none started".
+
+- **G1 commerce variants + fulfilment + returns** is the highest-value package: those three
+  are the only things keeping `retail-storefront-v1` in draft. Needs schema.
+- **G2 appointments reminders/deposits providers is OWNER-GATED.** Wiring a real messaging
+  or payment provider means real messages and real money. Do not start it without explicit
+  approval.
+- **G3 retainers and access levels** are the two gaps Wave E split out of over-broad
+  capability descriptions. Smaller; each needs schema plus runtime.
+
+When a capability is promoted, expect to repoint the contract harness the same way Wave F
+did: `check-capability-contract` carries non-vacuity assertions naming
+`commerce:returns` (planned) and `appointments:reminders` (partial), and they will fail on
+purpose the moment either becomes real.
+
+### Step 2 — migration sequence, if the package needs one
 
 ```powershell
 $T = "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c"
@@ -64,11 +70,11 @@ node "$T\rehearse.js" snapshot pre-<pkg>
 npx prisma format --schema prisma/schema.prisma
 node "$T\schema-semantic-diff.js"          # must show 0 removed blocks
 node "$T\run-on-rehearsal.js" -- node "$T\build-raw-diff.js"
-# copy build-migration-d1.js, change OUT_DIR, header and the allowed ADD COLUMN set
+# copy build-migration-f1.js, change OUT_DIR, header, footer and the asserted diff shape
 node "$T\run-on-rehearsal.js" -- npx prisma migrate deploy
 node "$T\rehearse.js" snapshot post-<pkg>-apply
 node "$T\run-on-rehearsal.js" -- npx prisma db execute --file "<migration dir>/down.sql" --schema prisma/schema.prisma
-node "$T\run-on-rehearsal.js" -- npx prisma db execute --file "$T\forget-d1-migration.sql" --schema prisma/schema.prisma
+# then delete the _prisma_migrations row for that migration name and:
 node "$T\rehearse.js" snapshot post-<pkg>-rollback
 node "$T\rehearse.js" compare pre-<pkg> post-<pkg>-rollback     # must be IDENTICAL
 node "$T\run-on-rehearsal.js" -- npx prisma migrate deploy
@@ -78,7 +84,21 @@ node "$T\verify-no-renames.js"                                  # must report 0 
 
 The five pre-existing `profileId` `DropForeignKey` statements against `ActivityEvent`,
 `Contact`, `ContactSourceLink`, `WorkflowRun` and `Workspace` must be **excluded and
-count-asserted**, never applied.
+count-asserted**, never applied. Five waves have done this; the builder scripts already do.
+
+### Step 3 — gates before integrating
+
+```powershell
+cd "C:\Users\shubh\Desktop\Projects\personal projects\personai\aiclone"
+npx prisma validate --schema prisma/schema.prisma
+npx prisma generate --schema prisma/schema.prisma
+npx tsc --noEmit -p tsconfig.json
+node "$T\verify-no-renames.js"
+pwsh -File "$T\run-wave-c-gates.ps1"      # all 41 check harnesses, skips only check-order-stream
+npx eslint <touched paths>
+npm audit --omit=dev
+npm run build
+```
 
 ## Non-obvious rules that will cost time if forgotten
 
@@ -86,37 +106,43 @@ count-asserted**, never applied.
    `TS_NODE_PROJECT=scripts/tsconfig.checks.json` must be set. The rehearsal runner sets the
    latter; a bare `npx ts-node script.ts` fails with `ERR_MODULE_NOT_FOUND`.
 2. **Run every DB harness through a runner**, never with the ambient `DATABASE_URL`:
-   - `...\wave-c\run-on-rehearsal.js -- <cmd>` (the cases/cohorts worktree)
-   - `...\wave-a-briefs\run-on-rehearsal-primary.js -- <cmd>` (primary)
-   - Full sweep of all 38 checks: `pwsh -File ...\wave-c\run-wave-c-gates.ps1`
-     (it globs `check-*.ts` and skips only `check-order-stream`)
+   `...\wave-c\run-on-rehearsal.js -- <cmd>` for the feature worktree,
+   `...\wave-a-briefs\run-on-rehearsal-primary.js -- <cmd>` for primary.
 3. **Git pathspecs are relative to the repo root, which is the folder *above* `aiclone`.**
-   `git -C aiclone add aiclone/...` fails; run git from the worktree root.
-4. **PowerShell has no heredoc.** Long commit messages go through `git commit -F <file>`.
+   `git -C aiclone add aiclone/...` fails; run git from the worktree root. Prisma commands,
+   by contrast, must run from inside `aiclone`.
+4. **PowerShell has no heredoc**, and embedding double quotes inside a `node -e` string
+   breaks. Long commit messages go through `git commit -F <file>`; non-trivial node scripts
+   go in a file, not `-e`.
 5. **Read exit codes by redirecting to a file first.** Piping into `Select-Object` yields the
    pipeline's exit code, not the command's.
 6. **All time comparisons use Prisma's typed API.** Raw SQL `Date` parameters bind as local
    wall-clock against `timestamp without time zone` while Prisma writes UTC components. This
    silently disabled an overlap check in Wave A.
-7. **Validate enum inputs at the HTTP boundary against the lifecycle table**, so 400 (unknown
-   value) stays distinct from 409 (illegal transition).
+7. **Validate enum inputs at the HTTP boundary against the lifecycle table**, so 400
+   (unknown value) stays distinct from 409 (illegal transition).
 8. **Prove non-enumeration by byte-comparing whole response bodies**, not by asserting two
    403s.
-9. **Let the server compute `allowedTransitions`** and have the UI render only those, so a
-   client cannot offer a move the write boundary refuses.
+9. **Let the server compute `allowedTransitions`** and have the UI render only those.
 10. **`spawnSync` for `npx` on Windows needs `shell: true`**, otherwise it fails with no
     stdout and no stderr.
+11. **Put hard guarantees in CHECK constraints and prove the constraint refuses a direct
+    write.** Prisma's diff leaves CHECK constraints, triggers and exclusion constraints
+    alone — demonstrated across five migrations, not assumed.
+12. **Measure a concurrency claim concurrently.** `Promise.allSettled` over two competing
+    writes, asserting exactly one winner.
 
 ## Do not spend a run on
 
 Gateway repair, worker-dispatch experiments, tunnel or live preview, push/PR/deploy, live
-`personalink` cutover (P1-007, owner-gated), repo-wide lint cleanup (P1-009), rewriting old
-orchestration history, the `check-order-stream` precondition, or the pre-existing `profileId`
-FK drift unless it actually blocks a migration.
+`personalink` cutover (P1-007, owner-gated), wiring a real messaging or payment provider
+(owner-gated), repo-wide lint cleanup (P1-009), rewriting old orchestration history, the
+`check-order-stream` precondition, or the pre-existing `profileId` FK drift unless it
+actually blocks a migration.
 
 ## Preservation invariants
 
 Live `personalink` read-only. Only `personalink_phase0_rehearsal_20260826_210704` may be
-mutated, and it must be left fully applied or fully rolled back — never mid-rehearsal. Origin
-unchanged. Frozen worktrees and attachments untouched. `P1_014_ACTION_INVENTORY.md`
+mutated, and it must be left fully applied or fully rolled back — never mid-rehearsal.
+Origin unchanged. Frozen worktrees and attachments untouched. `P1_014_ACTION_INVENTORY.md`
 unchanged. No destructive Git operation. Preserve unrelated user changes.

@@ -1987,3 +1987,123 @@ app `tsc` 0 · targeted `eslint` 0 · `check-capability-contract` PASS, and
 No schema change, no database contact beyond the harness sweep against the disposable
 target. Origin remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Live `personalink`
 untouched.
+
+
+---
+
+## 2026-08-29 · Wave F complete — commerce inventory hardening at `7bfc868`
+
+Root-serial. Branch `feature/wave-f-inventory` from `510c9ab`, merged `--no-ff` at
+**`7bfc868`**.
+
+| Package | Commit | Harness |
+|---|---|---|
+| F1 additive schema | `ca90b9a` | `check-inventory-schema-invariants` 50 invariants, 0/1/0 |
+| F2 runtime | `0d59dc8` | `check-inventory-runtime` 85 assertions, 0/1/0 |
+| F3 APIs + console | `a723078` | `check-inventory-routes` 58 assertions, 0/1/0 |
+
+### What existed before
+`DigitalProduct.stock`, one nullable `Int`. Nothing decremented it, nothing reserved
+against it, there was no location dimension, no movement history and no oversell refusal.
+That column is left **exactly** as it is — not renamed, dropped or migrated — because
+deciding what its existing values mean is a data decision, not a schema one. The harness
+asserts it is still a nullable integer.
+
+### Overselling is now impossible at the storage layer
+Four CHECK constraints do the work that comments used to:
+
+```
+InventoryItem_onHand_nonnegative      onHand   >= 0
+InventoryItem_reserved_nonnegative    reserved >= 0
+InventoryItem_reserved_within_onHand  reserved <= onHand
+InventoryReservation_qty_positive     qty      >  0
+```
+
+The schema harness proves all four **refuse a direct write with no engine involved**, and
+that the boundary case — reserving exactly the whole on-hand quantity — is accepted. The
+engine refuses first and names the real number, so a caller gets "Only 4 units are
+available; 99 were requested" rather than a bare 409; the constraints are the backstop that
+holds even if the engine is wrong.
+
+Like the five append-only triggers and two exclusion constraints already here, these live
+in SQL rather than `schema.prisma`. That is safe by demonstration, not assumption: the
+earlier triggers have survived four generated migrations untouched.
+
+### The concurrency claim is measured
+Every balance change runs inside a transaction that first takes `SELECT ... FOR UPDATE` on
+the stock record. The runtime harness fires **two `reserve()` calls in parallel** at a
+record holding exactly one unit and asserts one is fulfilled and one rejected, that exactly
+one hold row exists, and that the record ends with one reserved and zero available. That is
+the inverted assertion, so the row lock cannot quietly stop working.
+
+### The ledger verifies itself
+`InventoryMovement` stores the signed deltas **and** the resulting balances. Both harnesses
+replay the deltas and require them to reproduce the stored after-values and match the live
+record. A ledger that only stored deltas would be unfalsifiable against the row it explains.
+
+### Three refusals where the permissive version would record something false
+- **`RESERVE`, `RELEASE` and `CONSUME` cannot be written as direct movements.** They arise
+  only from a reservation transition, so accepting them as input would let a caller move
+  the reserved balance with no hold behind it. Only `RECEIPT`, `ADJUSTMENT`, `RETURN` and
+  `COUNT` are direct.
+- **An untracked stock record refuses to hold a reservation.** A reservation is a promise,
+  and a record that does not count units cannot make one.
+- **`EXPIRED` requires the hold to have actually passed its expiry**, and a hold with no
+  expiry cannot be expired at all. Otherwise the state would be a quiet way to cancel a
+  live reservation. All three settled states are terminal: re-releasing would double-credit
+  stock, un-consuming would conjure units that have already left the shelf.
+
+### One design decision worth recording
+`locationId` is **NOT NULL**. Stock that is not anywhere is not stock, and a nullable
+location would need either a partial unique index or a denormalized discriminator to keep
+"one record per product per place" enforceable. Both are schema drift, and this repository
+already pays a drift tax every wave: five `profileId` `DropForeignKey` statements have to be
+filtered out of every generated migration. The runtime refuses with a clear message when a
+workspace has no `Location` yet.
+
+### Migration rehearsal, disposable target only
+Fresh external backup before any DDL. `pre-f1` 82 tables / 893 columns / 176 enum labels /
+12 triggers → `post-f1-apply` 85 / 931 / 190 / 14 → `post-f1-rollback` **byte-identical to
+`pre-f1`** (raw sha256 `24db167452bd7661`) → `post-f1-reapply` normalized-identical.
+`only_in_pre-f1=0` in all six categories. Exclusion constraints stayed at 2, extensions at 2.
+
+`prisma migrate diff` produced 3 `CREATE TABLE`, 3 `CREATE TYPE`, **0 `ADD COLUMN`**, 0
+`ALTER COLUMN`, 0 `DROP TABLE`, 0 `DROP COLUMN`. The build tool asserts the exact table and
+enum counts and aborts on any `ADD COLUMN` at all. The five `profileId` `DropForeignKey`
+statements were excluded with the count asserted, for the fifth wave running. A semantic
+block diff shows 6 blocks added, 0 removed, and six auto-inserted opposite relation fields
+as the only change to pre-existing models.
+
+### Making inventory available had consequences, and they were followed through
+- **`commerce:inventory` planned → available**, evidence `src/lib/inventory/engine.ts`.
+- **`restaurant-venue-v2` → deprecated; new `restaurant-venue-v3` active**, requiring
+  `commerce` catalog + orders + inventory. v1 always *required* inventory; v2 had to demote
+  it to a planned backlog item because it was a single nullable column. A backlog entry for
+  something that exists is a false statement, so v3 restores the original intent.
+- **`retail-storefront-v1` stays draft, for a narrower reason.** Inventory is no longer the
+  blocker. What a storefront still cannot do is sell a size or a colour, tell a customer
+  where their parcel is, or take anything back: `variants` and `fulfilment` are partial and
+  `returns` is planned. All three are now **required** capabilities on the blueprint
+  precisely so activation is mechanically rejected — and the harness asserts the rejection
+  happens *and* that its message names variants, fulfilment and returns rather than
+  inventory.
+- **The planned-capability negative test was repointed** from `commerce:inventory` to
+  `commerce:returns`. It had already moved once, from `venueOrders:reservations`. Each time
+  a wave makes the target real the test would silently become vacuous; the non-vacuity
+  assertion beside it is what forces the maintenance.
+
+### Combined gates on integrated tip `7bfc868`
+`prisma validate` 0 · `prisma generate` 0 · app `tsc` 0 · targeted `eslint` 0 ·
+relation-rename verifier **0 renamed across 84 pre-existing models** · **41/41** check
+harnesses exit 0, including inventory schema 50/50, runtime 85/85, routes 58/58, cohort
+60/114/87, case 36/67/75, appointments 43/49/56/39, reservations 36/36/21,
+`check-capability-contract` PASS with `INVERT_ASSERTION=1` failing all five overclaim
+guards, `check-business-os-a11y` PASS with 20 new explicit stock assertions ·
+`npm audit --omit=dev` 0 vulnerabilities · `npm run build` 0 with all 6 inventory routes
+registered · secret scan 0 real hits.
+
+### Preservation
+Live `personalink` read-only. Disposable target left **fully applied** at 85 tables, not
+mid-rehearsal. Origin remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Frozen worktrees
+and attachments untouched; `P1_014_ACTION_INVENTORY.md` unchanged. No push, PR, deploy,
+tunnel, dev server or real external-provider call.
