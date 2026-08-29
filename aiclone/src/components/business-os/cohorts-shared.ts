@@ -216,3 +216,131 @@ export function titleCase(value: string): string {
         .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
         .join(" ")
 }
+
+
+// ---------------------------------------------------------------------------
+// Course access levels (G3/G6 owner surface).
+//
+// These mirror the owner endpoints under /api/platform/course-access, whose envelope and
+// status map are asserted by scripts/one-off/check-course-access-api.ts. As above, nothing
+// here fabricates a record: an absent tier list is empty and an unentitled learner has a
+// null grant, never a placeholder.
+//
+// `priceCents` describes a tier so an owner can label it. Nothing in this file or on the
+// server reads it to charge anybody.
+// ---------------------------------------------------------------------------
+
+export type AccessLevelView = Readonly<{
+    id: string
+    courseId: string
+    key: string
+    label: string
+    rank: number
+    description: string | null
+    priceCents: number | null
+    currency: string
+    isActive: boolean
+}>
+
+export type AccessGrantView = Readonly<{
+    id: string
+    enrollmentId: string
+    accessLevelId: string
+    accessLevelKey: string
+    accessLevelRank: number
+    courseId: string
+    state: string
+    source: string
+    grantedAt: string | null
+    suspendedAt: string | null
+    expiresAt: string | null
+    revokedAt: string | null
+    revokeReason: string | null
+    paymentId: string | null
+    /** Computed by the server. The panel renders these and never derives its own. */
+    allowedTransitions: readonly string[]
+    /** Computed by the server: the state entitles AND the expiry has not passed. */
+    entitles: boolean
+}>
+
+export type AccessChangeView = Readonly<{
+    id: string
+    grantId: string
+    fromAccessLevelId: string
+    toAccessLevelId: string
+    direction: string
+    state: string
+    reason: string | null
+    decisionNote: string | null
+    decidedBy: string | null
+    decidedAt: string | null
+    appliedAt: string | null
+    invoiceRef: string | null
+    paymentId: string | null
+    allowedTransitions: readonly string[]
+}>
+
+export type AccessCourseView = Readonly<{
+    id: string
+    title: string
+    isPublished: boolean
+    lessonCount: number
+    enrollmentCount: number
+    levelCount: number
+}>
+
+export type AccessConsoleLessonView = Readonly<{
+    lessonId: string
+    title: string
+    orderIndex: number
+    accessLevelId: string | null
+    requiredLevelKey: string | null
+    requiredRank: number | null
+}>
+
+export type AccessConsoleModuleView = Readonly<{
+    id: string
+    title: string
+    orderIndex: number
+    lessons: readonly AccessConsoleLessonView[]
+}>
+
+export type AccessConsoleEnrolmentView = Readonly<{
+    enrollmentId: string
+    visitorEmail: string
+    visitorName: string | null
+    memberId: string | null
+    status: string
+    entitlable: boolean
+    grant: AccessGrantView | null
+}>
+
+export type AccessConsoleView = Readonly<{
+    courseId: string
+    courseTitle: string
+    modules: readonly AccessConsoleModuleView[]
+    enrolments: readonly AccessConsoleEnrolmentView[]
+}>
+
+export type AccessEventView = Readonly<{
+    id: string
+    seq: string
+    kind: string
+    subjectType: string
+    subjectId: string
+    from: string | null
+    to: string
+    actor: string
+    at: string
+}>
+
+/**
+ * Formats a tier price for display. Returns the honest "no price recorded" rather than a zero,
+ * because a tier with no price and a tier that is free are different statements and an owner
+ * needs to be able to tell them apart.
+ */
+export function tierPrice(priceCents: number | null, currency: string): string {
+    if (priceCents === null) return "no price recorded"
+    if (priceCents === 0) return "free"
+    return `${(priceCents / 100).toFixed(2)} ${currency}`
+}

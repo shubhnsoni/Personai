@@ -137,6 +137,55 @@ export type VisibilityReport = Readonly<{
     lockedCount: number
 }>
 
+/** A course an owner may configure tiers on, with counts read from the rows themselves. */
+export type CourseSummaryRecord = Readonly<{
+    id: string
+    title: string
+    isPublished: boolean
+    lessonCount: number
+    enrollmentCount: number
+    levelCount: number
+}>
+
+export type ConsoleLesson = Readonly<{
+    lessonId: string
+    title: string
+    orderIndex: number
+    /** Null means the lesson carries no rule, which is the default and means "visible to all". */
+    accessLevelId: string | null
+    requiredLevelKey: string | null
+    requiredRank: number | null
+}>
+
+export type ConsoleModule = Readonly<{
+    id: string
+    title: string
+    orderIndex: number
+    lessons: readonly ConsoleLesson[]
+}>
+
+export type ConsoleEnrolment = Readonly<{
+    enrollmentId: string
+    visitorEmail: string
+    visitorName: string | null
+    memberId: string | null
+    status: string
+    entitlable: boolean
+    grant: AccessGrantRecord | null
+}>
+
+/**
+ * Everything the owner console needs for ONE course in a single read: the full lesson tree with
+ * each lesson's current rule (including the absent ones, which an editor needs and
+ * `listLessonRules` cannot supply), and the enrolments with their current entitlement.
+ */
+export type CourseConsoleRecord = Readonly<{
+    courseId: string
+    courseTitle: string
+    modules: readonly ConsoleModule[]
+    enrolments: readonly ConsoleEnrolment[]
+}>
+
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]
 
 const GRANT_INCLUDE = {
@@ -655,6 +704,141 @@ export class CourseAccessService {
                 }),
             ),
         )
+    }
+
+    // -----------------------------------------------------------------------
+    // Console reads
+    //
+    // Two read-only projections the owner console needs and provably cannot assemble from
+    // the methods above.
+    //
+    // `listLevels` and `listLessonRules` are both scoped to one course, and `listLessonRules`
+    // deliberately returns ONLY lessons that already carry a rule. That is right for
+    // reporting and useless for an editor: an owner would have no way to add the first
+    // rule, because the lesson would not be in the list. So the console needs the full
+    // lesson tree with each lesson's current rule attached, including the null ones.
+    //
+    // Neither method takes anything the caller has not already had to prove: both go
+    // through requireProfile, and the course-scoped one through ownedCourse, so a foreign
+    // course is refused identically to one that does not exist.
+    // -----------------------------------------------------------------------
+
+    async listCourses(workspaceId: string): Promise<readonly CourseSummaryRecord[]> {
+        const profileId = await this.ctx.requireProfile(workspaceId, "profile.read")
+        const rows = await this.ctx.db.course.findMany({
+            where: { profileId },
+            orderBy: [{ title: "asc" }, { id: "asc" }],
+            select: {
+                id: true,
+                title: true,
+                isPublished: true,
+                _count: { select: { enrollments: true, CourseAccessLevel: true } },
+                modules: { select: { _count: { select: { lessons: true } } } },
+            },
+        })
+        return Object.freeze(
+            rows.map((row) =>
+                Object.freeze({
+                    id: row.id,
+                    title: row.title,
+                    isPublished: row.isPublished,
+                    // Counted from the rows, not read from Course.totalLessons: that column is a
+                    // denormalised counter this engine does not maintain, so trusting it here
+                    // would let the console disagree with the lesson list on the next screen.
+                    lessonCount: row.modules.reduce((sum, module) => sum + module._count.lessons, 0),
+                    enrollmentCount: row._count.enrollments,
+                    levelCount: row._count.CourseAccessLevel,
+                }),
+            ),
+        )
+    }
+
+    async courseConsole(workspaceId: string, courseId: string): Promise<CourseConsoleRecord> {
+        const profileId = await this.ctx.requireProfile(workspaceId, "profile.read")
+        const course = await this.ctx.ownedCourse(profileId, courseId)
+
+        const modules = await this.ctx.db.courseModule.findMany({
+            where: { courseId: course.id },
+            orderBy: [{ orderIndex: "asc" }, { id: "asc" }],
+            select: {
+                id: true,
+                title: true,
+                orderIndex: true,
+                lessons: {
+                    orderBy: [{ orderIndex: "asc" }, { id: "asc" }],
+                    select: {
+                        id: true,
+                        title: true,
+                        orderIndex: true,
+                        CourseLessonAccess: {
+                            select: {
+                                accessLevelId: true,
+                                accessLevel: { select: { key: true, rank: true, courseId: true } },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        const enrolments = await this.ctx.db.courseEnrollment.findMany({
+            where: { courseId: course.id },
+            orderBy: [{ enrolledAt: "asc" }, { id: "asc" }],
+            select: {
+                id: true,
+                visitorEmail: true,
+                visitorName: true,
+                memberId: true,
+                status: true,
+                CourseAccessGrant: {
+                    include: { accessLevel: { select: { id: true, key: true, rank: true, courseId: true } } },
+                },
+            },
+        })
+
+        return Object.freeze({
+            courseId: course.id,
+            courseTitle: course.title,
+            modules: Object.freeze(
+                modules.map((module) =>
+                    Object.freeze({
+                        id: module.id,
+                        title: module.title,
+                        orderIndex: module.orderIndex,
+                        lessons: Object.freeze(
+                            module.lessons.map((lesson) => {
+                                // A rule pointing at another course's tier would be a tenancy
+                                // break, so it is refused rather than rendered.
+                                const rule = lesson.CourseLessonAccess
+                                if (rule && rule.accessLevel.courseId !== course.id) this.ctx.denied()
+                                return Object.freeze({
+                                    lessonId: lesson.id,
+                                    title: lesson.title,
+                                    orderIndex: lesson.orderIndex,
+                                    accessLevelId: rule?.accessLevelId ?? null,
+                                    requiredLevelKey: rule?.accessLevel.key ?? null,
+                                    requiredRank: rule?.accessLevel.rank ?? null,
+                                })
+                            }),
+                        ),
+                    }),
+                ),
+            ),
+            enrolments: Object.freeze(
+                enrolments.map((enrolment) =>
+                    Object.freeze({
+                        enrollmentId: enrolment.id,
+                        visitorEmail: enrolment.visitorEmail,
+                        visitorName: enrolment.visitorName,
+                        memberId: enrolment.memberId,
+                        status: enrolment.status,
+                        /** Whether this enrolment is in a state a tier may be granted against. */
+                        entitlable: ENTITLABLE_ENROLLMENT_STATUSES.includes(enrolment.status),
+                        grant: enrolment.CourseAccessGrant ? this.toGrant(enrolment.CourseAccessGrant) : null,
+                    }),
+                ),
+            ),
+        })
     }
 
     // -----------------------------------------------------------------------

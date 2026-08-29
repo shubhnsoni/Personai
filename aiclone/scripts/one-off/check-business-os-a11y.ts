@@ -903,6 +903,120 @@ check(
     /Nobody is assigned to this job yet/.test(fieldJobsSrc) && /No history recorded/.test(fieldJobsSrc),
 )
 
+// ---------------------------------------------------------------------------
+// Wave G6 — the course access-level panel. This screen decides what a learner who has paid
+// can see, so its honesty requirements are about the three things it would be easiest to
+// let an owner assume: that the price charges somebody, that visibility is stored, and that
+// approving an upgrade applies it. All three are false and all three are stated on screen.
+// ---------------------------------------------------------------------------
+const accessSrc = readFileSync(join(__dirname, "../../src/components/business-os/access-levels-panel.tsx"), "utf8")
+
+check("access-level panel is mounted in the shell", shellSrc.includes("<AccessLevelsPanel"))
+check("access-level decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(accessSrc))
+check(
+    "access-level loading states announce themselves politely and as busy",
+    accessSrc.includes('aria-live="polite"') && accessSrc.includes('aria-busy="true"'),
+)
+check(
+    "every access-level loading state carries a screen-reader label",
+    /Loading courses/.test(accessSrc) &&
+        /Loading tiers, lessons and entitlements/.test(accessSrc) &&
+        /Loading tier changes/.test(accessSrc) &&
+        /Loading access history/.test(accessSrc),
+)
+check("access-level panel uses a structural skeleton while loading", /Skeleton/.test(accessSrc))
+check(
+    "access-level refusals are split by status through the shared cohort error copy",
+    /error\.status === 401/.test(cohortsSharedSrc) &&
+        /error\.status === 403/.test(cohortsSharedSrc) &&
+        /error\.status === 400/.test(cohortsSharedSrc) &&
+        /error\.status === 409/.test(cohortsSharedSrc) &&
+        /error\.status === 503/.test(cohortsSharedSrc),
+)
+check(
+    "access-level empty states state that no sample data is shown",
+    /no sample courses are shown/i.test(accessSrc) &&
+        /no sample tiers are shown/i.test(accessSrc) &&
+        /no sample learners are shown/i.test(accessSrc) &&
+        /No sample lessons are\s*\n?\s*shown/i.test(accessSrc),
+)
+check(
+    "the access-level panel contains no fabricated tier, learner or lesson",
+    !/\bid:\s*"/.test(accessSrc) && !/sampleTier/i.test(accessSrc) && !/rank:\s*\d/.test(accessSrc),
+)
+check("access-level disclosures expose their expanded state", /aria-expanded=/.test(accessSrc))
+check(
+    "access-level sections are headed rather than only visually grouped",
+    /<h3/.test(accessSrc) && /<h5/.test(accessSrc),
+)
+check(
+    "entitlement buttons come from server-computed allowedTransitions",
+    /grant\.allowedTransitions\.map/.test(accessSrc),
+)
+check(
+    "a terminal entitlement explains why it has no actions",
+    /grant\.allowedTransitions\.length === 0/.test(accessSrc) && /and cannot\s*\n?\s*change/.test(accessSrc),
+)
+check(
+    "MEASURED: the panel performs no arithmetic at all - a tier price is formatted in the shared module, so the browser never works out money",
+    !/Math\.(round|floor|max|min|abs)\(/.test(accessSrc) &&
+        !/priceCents\s*\/\s*100/.test(accessSrc) &&
+        /tierPrice\(/.test(accessSrc) &&
+        /export function tierPrice/.test(cohortsSharedSrc),
+)
+check(
+    "MEASURED: the panel states that a tier price charges nobody, where an owner reads the price",
+    /nothing here\s*\n?\s*charges anybody/.test(accessSrc),
+)
+check(
+    "the panel states that visibility is computed on every read rather than stored",
+    /Visibility is computed on every read, not stored/.test(accessSrc),
+)
+check(
+    "MEASURED: the panel states that approving is not applying, next to the approve control",
+    /Approving is not\s*\n?\s*applying/.test(accessSrc) &&
+        /records an invoice reference rather\s*\n?\s*than taking a payment/.test(accessSrc),
+)
+check(
+    "the panel states that a lesson with no tier is visible to everyone, which is the default",
+    /A lesson with no tier is visible to everyone/.test(accessSrc) && /Visible to everyone/.test(accessSrc),
+)
+check(
+    "the panel states that granting notifies nobody",
+    /Granting records the entitlement and notifies nobody/.test(accessSrc),
+)
+check(
+    "the panel explains why retiring a held tier is refused instead of only failing",
+    /Retiring a tier is refused while a learner still holds it/.test(accessSrc),
+)
+check(
+    "the panel explains the rank rule rather than letting an owner discover it by being refused",
+    /Rank is what makes an upgrade and a downgrade derivable/.test(accessSrc),
+)
+check(
+    "the panel says the upgrade direction is worked out by the server, not chosen in the browser",
+    /worked out from the\s*\n?\s*tier ranks by the server, not chosen here/.test(accessSrc),
+)
+check(
+    "the panel states the history is append-only and database-enforced",
+    /append-only and enforced by the database/.test(accessSrc),
+)
+check(
+    "an enrolment that cannot hold a tier says why, rather than showing a control that would be refused",
+    /so a tier\s*\n?\s*cannot be granted against it yet/.test(accessSrc),
+)
+check(
+    "empty access-level sub-lists say so rather than rendering a placeholder row",
+    /No tiers defined for this course/.test(accessSrc) &&
+        /No tier changes requested yet/.test(accessSrc) &&
+        /No access history recorded yet/.test(accessSrc) &&
+        /No lessons in this module/.test(accessSrc),
+)
+check(
+    "MEASURED: the panel never constructs the learner service and never sends a learner cookie - it is the owner surface only",
+    !/LearnerAccessService/.test(accessSrc) && !/pl_member/.test(accessSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"

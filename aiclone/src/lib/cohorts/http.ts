@@ -758,6 +758,40 @@ export class CohortApiService {
 
     // ---- owner views ---------------------------------------------------
 
+    listAccessCourses(request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({ courses: serialiseAll(await this.access.listCourses(param(request, "workspaceId"))) }),
+        )
+    }
+
+    /**
+     * One read that returns the lesson tree with every lesson's current rule and the enrolments
+     * with their current entitlement. The rule editor needs the lessons that have NO rule, which
+     * is exactly what the reporting endpoint omits.
+     */
+    accessConsole(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const console_ = await this.access.courseConsole(
+                param(request, "workspaceId"),
+                param(request, "courseId"),
+            )
+            return success({
+                console: {
+                    courseId: console_.courseId,
+                    courseTitle: console_.courseTitle,
+                    modules: console_.modules.map((module) => ({
+                        ...module,
+                        lessons: module.lessons.map((lesson) => ({ ...lesson })),
+                    })),
+                    enrolments: console_.enrolments.map((enrolment) => ({
+                        ...enrolment,
+                        grant: enrolment.grant ? serialise({ ...enrolment.grant }) : null,
+                    })),
+                },
+            })
+        })
+    }
+
     accessVisibility(request: Request): Promise<Response> {
         return this.run(async () => {
             const report = await this.access.visibilityFor(

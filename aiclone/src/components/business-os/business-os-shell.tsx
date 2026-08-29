@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { ErrorState } from "@/components/ui/error-state"
 import { Input } from "@/components/ui/input"
 import { ReservationsPanel } from "@/components/business-os/reservations-panel"
+import { AccessLevelsPanel } from "@/components/business-os/access-levels-panel"
 import { AppointmentsPanel } from "@/components/business-os/appointments-panel"
 import { CasesPanel } from "@/components/business-os/cases-panel"
 import { CohortsPanel } from "@/components/business-os/cohorts-panel"
@@ -630,6 +631,8 @@ export function BusinessOsShell({
                             <FieldJobsPanel workspaceId={selectedWorkspaceId} />
 
                             <CohortsPanel workspaceId={selectedWorkspaceId} />
+
+                            <AccessLevelsPanel workspaceId={selectedWorkspaceId} />
 
                             <InventoryPanel workspaceId={selectedWorkspaceId} />
 

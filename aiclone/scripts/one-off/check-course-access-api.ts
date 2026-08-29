@@ -49,6 +49,8 @@ const GRANTS = "http://127.0.0.1/api/platform/course-access/grants"
 const CHANGES = "http://127.0.0.1/api/platform/course-access/changes"
 const VISIBILITY = "http://127.0.0.1/api/platform/course-access/visibility"
 const TIMELINE = "http://127.0.0.1/api/platform/course-access/timeline"
+const COURSES = "http://127.0.0.1/api/platform/course-access/courses"
+const CONSOLE = "http://127.0.0.1/api/platform/course-access/console"
 
 const results: Array<{ name: string; pass: boolean; detail: string }> = []
 function check(name: string, pass: boolean, detail = "") {
@@ -269,6 +271,8 @@ async function main() {
             ),
             visibility: await call(api.accessVisibility(get(`${VISIBILITY}?${q}&enrollmentId=${ids.enrolA}`))),
             timeline: await call(api.accessTimeline(get(`${TIMELINE}?${q}`))),
+            courses: await call(api.listAccessCourses(get(`${COURSES}?workspaceId=${ids.wsA}`))),
+            board: await call(api.accessConsole(get(`${CONSOLE}?${q}`))),
         }
         const notUnauthorized = Object.entries(anon)
             .filter(([, v]) => v.status !== 401)
@@ -617,6 +621,52 @@ async function main() {
         const changeList = await call(api.listAccessChanges(grantId, get(`${GRANTS}/${grantId}/changes?${q}`)))
         check("the change history lists for the grant", pickArray(changeList.body, "data", "changes").length === 1, `n=${pickArray(changeList.body, "data", "changes").length}`)
 
+        // ---- 8b. the console reads the owner UI depends on ----------------
+        // The rule editor needs the lessons that have NO rule. /lesson-rules cannot supply them
+        // by design, so if the console ever stops returning them the editor silently loses the
+        // ability to add a first rule.
+        const courseList = await call(api.listAccessCourses(get(`${COURSES}?workspaceId=${ids.wsA}`)))
+        check("the owner can list the courses tiers attach to", courseList.status === 200, `status=${courseList.status}`)
+        const listedCourse = pickArray(courseList.body, "data", "courses").find((c) => pickString(c, "id") === ids.courseA)
+        check(
+            "the course list counts lessons and enrolments from the rows",
+            pickNumber(listedCourse, "lessonCount") === 2 && pickNumber(listedCourse, "enrollmentCount") === 1,
+            `lessons=${pickNumber(listedCourse, "lessonCount")} enrolled=${pickNumber(listedCourse, "enrollmentCount")}`,
+        )
+        check(
+            "the course list never contains another owner's course",
+            !pickArray(courseList.body, "data", "courses").some((c) => pickString(c, "id") === ids.courseB),
+            `n=${pickArray(courseList.body, "data", "courses").length}`,
+        )
+
+        const board = await call(api.accessConsole(get(`${CONSOLE}?${q}`)))
+        check("the console read succeeds", board.status === 200, `status=${board.status}`)
+        const boardModules = pickArray(board.body, "data", "console", "modules")
+        const boardLessons = pickArray(boardModules[0], "lessons")
+        check(
+            "MEASURED: the console returns lessons that carry NO rule, which is what an editor needs and the reporting endpoint omits",
+            boardLessons.length === 2 &&
+                boardLessons.some((l) => pick(l, "accessLevelId") === null) &&
+                boardLessons.some((l) => pickString(l, "requiredLevelKey") === "pro"),
+            `n=${boardLessons.length} nulls=${boardLessons.filter((l) => pick(l, "accessLevelId") === null).length}`,
+        )
+        const boardEnrolments = pickArray(board.body, "data", "console", "enrolments")
+        check(
+            "the console reports the current entitlement against each enrolment",
+            boardEnrolments.length === 1 && pickString(boardEnrolments[0], "grant", "accessLevelKey") === "pro",
+            `n=${boardEnrolments.length} key=${pickString(boardEnrolments[0], "grant", "accessLevelKey")}`,
+        )
+        check(
+            "the console says whether an enrolment may be granted a tier at all",
+            pick(boardEnrolments[0], "entitlable") === true,
+            String(pick(boardEnrolments[0], "entitlable")),
+        )
+        check(
+            "the console reports a serialized grant, so the client never receives a raw Date",
+            typeof pick(boardEnrolments[0], "grant", "grantedAt") === "string",
+            typeof pick(boardEnrolments[0], "grant", "grantedAt"),
+        )
+
         // ---- 9. retiring a tier ------------------------------------------
         const retireHeld = await call(api.retireAccessLevel(proId, del(`${LEVELS}/${proId}?${q}`)))
         check("a tier a learner still holds cannot be retired", retireHeld.status === 409, `status=${retireHeld.status}`)
@@ -666,8 +716,19 @@ async function main() {
             foreignGrant.status === absentGrant.status && foreignGrant.text === absentGrant.text,
             `${foreignGrant.status}/${absentGrant.status}`,
         )
-        const foreignMutate = await call(
-            api.transitionAccessGrant(
+        const foreignConsole = await call(api.accessConsole(get(`${CONSOLE}?${qb}${ids.courseA}`)))
+        const absentConsole = await call(api.accessConsole(get(`${CONSOLE}?${qb}${RUN}_absent`)))
+        check(
+            "a foreign console read and a nonexistent one are byte-identical",
+            foreignConsole.status === absentConsole.status && foreignConsole.text === absentConsole.text,
+            `${foreignConsole.status}/${absentConsole.status}`,
+        )
+        check(
+            "the foreign console read leaked no lesson title",
+            !/Deep dive|Intro/.test(foreignConsole.text),
+            foreignConsole.text.slice(0, 80),
+        )
+        const foreignMutate = await call(            api.transitionAccessGrant(
                 grantId,
                 send(`${GRANTS}/${grantId}`, { workspaceId: ids.wsB, courseId: ids.courseA, state: "REVOKED" }, "PATCH"),
             ),
@@ -769,6 +830,8 @@ async function main() {
             join(routeRoot, "changes", "[changeId]", "apply", "route.ts"),
             join(routeRoot, "visibility", "route.ts"),
             join(routeRoot, "timeline", "route.ts"),
+            join(routeRoot, "courses", "route.ts"),
+            join(routeRoot, "console", "route.ts"),
         ]
         const routeSources = routeFiles.map((f) => readFileSync(f, "utf8"))
         check(
