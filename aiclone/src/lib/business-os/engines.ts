@@ -175,18 +175,23 @@ export const businessEngineDescriptors: Record<BusinessEngineId, EngineDescripto
       {
         id: "intake",
         label: "Intake",
-        description: "Requests, qualification, and estimate capture.",
-        maturity: "planned",
-        evidence: "none",
+        description:
+          "Inbound requests with qualification, an optional quote, and conversion into a job. A request is a separate record from the job it becomes, so a declined request stays a record and a job that exists means somebody committed to it. One request converts to at most one job, and a request with no site address cannot be converted without one being supplied, because a job with no address cannot be visited.",
+        maturity: "available",
+        evidence: "src/lib/fieldjobs/engine.ts",
       },
       {
         id: "dispatch",
         label: "Dispatch",
-        description: "Technician assignment, routes, and job cards.",
-        maturity: "planned",
-        evidence: "none",
+        description:
+          "Technician assignment and job-card state. A technician IS an AppointmentResource, so there is no second answer to who can do the work. A job cannot be dispatched without a visit window or without an accountable lead; work cannot start until somebody is on site; and a job is not complete while a technician is still mid-visit. NO ROUTING AND NO NOTIFICATION: no route is optimised, no distance or travel time is computed, no map provider is called, and no technician is told - every assignment event records notified: false.",
+        maturity: "available",
+        evidence: "src/lib/fieldjobs/engine.ts",
       },
       {
+        // Deliberately left unbuilt by the Wave G4 foundation. Declaring it available would be a
+        // claim about code that does not exist, and it is the current target of the
+        // capability-contract planned-capability negative test.
         id: "inspection",
         label: "Inspection",
         description: "Asset checks, parts, completion notes, and invoice handoff.",

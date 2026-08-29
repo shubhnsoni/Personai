@@ -119,13 +119,16 @@ check(
 check("all registry blueprints validate", listBusinessBlueprints().every((blueprint) => validateBusinessBlueprint(blueprint).ok))
 
 // Negative test: an active blueprint may not REQUIRE a capability whose maturity is
-// still planned. It targets fieldJobs:dispatch, which is genuinely planned. It previously
-// targeted venueOrders.reservations, then commerce:inventory, then commerce:returns; each
-// time a wave made the target real the assertion would have become vacuous, so it is
-// repointed at a capability that is still actually planned rather than left to pass for
-// free. Wave G is the third such repoint: returns became available, so it can no longer
-// serve as the planned example. The non-vacuity assertion below is what forces that
-// maintenance.
+// still planned. It targets fieldJobs:inspection, which is genuinely planned. It previously
+// targeted venueOrders.reservations, then commerce:inventory, then commerce:returns, then
+// fieldJobs:dispatch; each time a wave made the target real the assertion would have become
+// vacuous, so it is repointed at a capability that is still actually planned rather than left
+// to pass for free.
+//
+// Wave G4 is the FOURTH such repoint, and it happened in the same run as the third: G3
+// promoted commerce:returns, G4 promoted fieldJobs:dispatch. The non-vacuity assertion below
+// is what forces the maintenance each time, and a further assertion now warns when the
+// registry is about to run out of planned capabilities entirely.
 const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   id: "invalid-active-planned-capability",
   version: "1.0.0",
@@ -133,7 +136,7 @@ const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   name: "Invalid active blueprint",
   vertical: "contract-test",
   summary: "Negative test: active blueprints cannot require planned capabilities.",
-  engines: [{ engineId: "fieldJobs", capabilities: ["dispatch"], required: true }],
+  engines: [{ engineId: "fieldJobs", capabilities: ["inspection"], required: true }],
   workflows: [],
   ownerCopilotPrompts: [],
 }
@@ -278,8 +281,27 @@ check(
   businessEngineDescriptors.contentCohorts.capabilities.find((c) => c.id === "accessLevels")?.maturity === "available",
 )
 check(
-  "fieldJobs dispatch is still planned, so the planned negative test is not vacuous",
-  businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "dispatch")?.maturity === "planned",
+  "fieldJobs dispatch is now available, so it can no longer serve as the planned example either",
+  businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "dispatch")?.maturity === "available",
+)
+check(
+  "fieldJobs intake is now available too",
+  businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "intake")?.maturity === "available",
+)
+check(
+  "fieldJobs inspection is still planned, so the planned negative test is not vacuous",
+  businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "inspection")?.maturity === "planned",
+)
+// The planned target has now moved four times in this program, twice in a single run. If a
+// future wave promotes inspection there will be NO planned capability left in the registry, and
+// the negative test will have to be rewritten against a synthetic descriptor rather than
+// repointed. This assertion is the early warning for that day.
+check(
+  "at least one capability somewhere is still planned, so the negative test has somewhere to point",
+  Object.values(businessEngineDescriptors).some((engine) => engine.capabilities.some((c) => c.maturity === "planned")),
+  Object.values(businessEngineDescriptors)
+    .flatMap((engine) => engine.capabilities.filter((c) => c.maturity === "planned").map((c) => `${engine.id}:${c.id}`))
+    .join(", ") || "NONE LEFT",
 )
 
 // Wave G3 promoted two capabilities that three ACTIVE blueprints were carrying as planned
