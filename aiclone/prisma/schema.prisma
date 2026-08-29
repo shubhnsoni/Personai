@@ -235,6 +235,10 @@ model Profile {
   appointmentReminders AppointmentReminder[]
   Cohort               Cohort[]
   InventoryItem        InventoryItem[]
+  ProductVariant       ProductVariant[]
+  Fulfilment           Fulfilment[]
+  ReturnRequest        ReturnRequest[]
+  CommerceEvent        CommerceEvent[]
 }
 
 model ProfileEvent {
@@ -522,18 +526,19 @@ model AppointmentEvent {
 }
 
 model Payment {
-  id                String   @id @default(cuid())
+  id                String          @id @default(cuid())
   profileId         String
-  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  bookingId         String?  @unique
+  profile           Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  bookingId         String?         @unique
   booking           Booking?
   amountCents       Int
   currency          String
-  status            String   @default("PENDING") // Enum
-  provider          String   @default("STRIPE") // Enum
+  status            String          @default("PENDING") // Enum
+  provider          String          @default("STRIPE") // Enum
   providerPaymentId String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  ReturnRequest     ReturnRequest[]
 }
 
 model Conversation {
@@ -659,10 +664,12 @@ model DigitalProduct {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  purchases     ProductPurchase[]
-  reviews       OfferReview[]
-  orderLines    OrderLine[]
-  InventoryItem InventoryItem[]
+  purchases      ProductPurchase[]
+  reviews        OfferReview[]
+  orderLines     OrderLine[]
+  InventoryItem  InventoryItem[]
+  ProductOption  ProductOption[]
+  ProductVariant ProductVariant[]
 }
 
 model Course {
@@ -916,6 +923,9 @@ model Order {
   events            OrderEvent[]
   reviews           OfferReview[]
   InventoryMovement InventoryMovement[]
+  Fulfilment        Fulfilment[]
+  ReturnRequest     ReturnRequest[]
+  CommerceEvent     CommerceEvent[]
 
   @@unique([profileId, businessDate, number])
   @@unique([profileId, idempotencyKey])
@@ -946,6 +956,8 @@ model OrderLine {
   events               OrderEvent[]
   InventoryMovement    InventoryMovement[]
   InventoryReservation InventoryReservation?
+  FulfilmentItem       FulfilmentItem[]
+  ReturnItem           ReturnItem[]
 
   @@index([orderId])
   @@index([productId])
@@ -1207,6 +1219,7 @@ model Location {
   appointmentResources AppointmentResource[]
   CohortSession        CohortSession[]
   InventoryItem        InventoryItem[]
+  Fulfilment           Fulfilment[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -2096,6 +2109,13 @@ model InventoryItem {
   locationId String
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
+  /// Wave G: the sellable unit. Backfilled to each product's deterministic default variant
+  /// during the migration, then made NOT NULL, and the unique key moved from
+  /// (productId, locationId) to (variantId, locationId). productId is kept as a
+  /// denormalized parent and guarded by a composite foreign key so the two cannot disagree.
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
   /// Physical units present. Never negative; enforced by a CHECK constraint.
   onHand Int @default(0)
 
@@ -2117,9 +2137,10 @@ model InventoryItem {
   movements    InventoryMovement[]
   reservations InventoryReservation[]
 
-  @@unique([productId, locationId])
+  @@unique([variantId, locationId])
   @@index([profileId, locationId])
   @@index([profileId, onHand])
+  @@index([productId])
 }
 
 /// Append-only movement ledger, enforced by a trigger rather than by convention.
@@ -2151,7 +2172,8 @@ model InventoryMovement {
   reservationId String?
 
   idempotencyKey String?
-  at             DateTime @default(now())
+  at             DateTime    @default(now())
+  ReturnItem     ReturnItem?
 
   @@unique([itemId, idempotencyKey])
   @@index([itemId, seq])
@@ -2183,4 +2205,340 @@ model InventoryReservation {
   @@unique([itemId, idempotencyKey])
   @@index([itemId, state])
   @@index([state, expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Wave G / P2-011: commerce variants, fulfilment and returns.
+//
+// WHAT EXISTED: DigitalProduct."variantsJson", a JSON blob of `[{name}]` objects. It
+// carried a NAME and nothing else - no SKU, no price, no stock, no identity an order line
+// or a stock record could point at. Three UI files parse it back into a newline-joined
+// string. That is why commerce:variants was declared `partial` rather than available, and
+// it is why this wave adds real variants instead of extending the blob.
+//
+// The blob is left EXACTLY as it is, like DigitalProduct."stock" before it: still written
+// by src/app/actions/products.ts, still read by the product form, the quick-add sheet and
+// the public shop page. Reinterpreting its contents is a data decision, not a schema one.
+//
+// THE SELLABLE UNIT IS NOW ProductVariant. Every existing product receives exactly one
+// deterministic default variant in the migration, so nothing that used to be sellable
+// stops being sellable, and the reconciliation proof can be exact rather than approximate.
+//
+// INVENTORY IDENTITY MOVES from (product, location) to (variant, location). That is the
+// one non-additive change in this wave and it is enumerated statement by statement in the
+// migration. productId stays on InventoryItem as a denormalized parent, guarded by a
+// COMPOSITE foreign key (productId, variantId) -> ProductVariant(productId, id) so the
+// pair cannot drift apart.
+//
+// Reuse, not duplication: orders stay Order and OrderLine, money stays Payment, sites stay
+// Location, stock stays InventoryItem with its existing CHECK constraints. There is no new
+// order, cart, payment or carrier table here. Tracking fields are owner-entered metadata;
+// nothing in this wave calls a carrier, a payment processor or a messaging provider.
+// ---------------------------------------------------------------------------
+
+enum FulfilmentState {
+  DRAFT
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ReturnRequestState {
+  REQUESTED
+  APPROVED
+  REJECTED
+  RECEIVED
+  CANCELLED
+}
+
+/// PENDING is the honest default: a received return has not been restocked until someone
+/// decides whether the goods are resellable.
+enum ReturnItemRestockState {
+  PENDING
+  RESTOCKED
+  DISCARDED
+}
+
+enum CommerceEventKind {
+  VARIANT
+  FULFILMENT
+  RETURN
+  RESTOCK
+  NOTE
+}
+
+enum CommerceEventSubject {
+  VARIANT
+  FULFILMENT
+  RETURN
+}
+
+enum CommerceEventActor {
+  STAFF
+  SYSTEM
+  CUSTOMER
+}
+
+/// An axis of choice on a product, such as Size or Colour.
+model ProductOption {
+  id        String         @id @default(cuid())
+  productId String
+  product   DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  name    String
+  ordinal Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  values            ProductOptionValue[]
+  variantSelections ProductVariantOptionValue[]
+
+  @@unique([productId, name])
+  @@index([productId, ordinal])
+}
+
+/// One selectable value on an option, such as Medium.
+model ProductOptionValue {
+  id       String        @id @default(cuid())
+  optionId String
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  value   String
+  ordinal Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variantSelections ProductVariantOptionValue[]
+
+  @@unique([optionId, value])
+  @@index([optionId, ordinal])
+}
+
+/// The sellable unit. Stock, reservations, fulfilment lines and return lines all point here.
+model ProductVariant {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Every product has exactly one default variant, enforced by a partial unique index in
+  /// the migration. It is what a non-variant product resolves through, so existing
+  /// products keep working without any caller having to know about variants.
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  title   String
+  ordinal Int    @default(0)
+
+  /// NULL means "inherit the product price", which is what a default variant does. A
+  /// non-null value must be non-negative; enforced by a CHECK constraint.
+  priceCents     Int?
+  compareAtCents Int?
+  weightGrams    Int?
+
+  /// Unique per profile when set. NULLs are distinct in Postgres, so variants without a
+  /// SKU coexist freely.
+  sku String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  optionValues    ProductVariantOptionValue[]
+  inventoryItems  InventoryItem[]
+  fulfilmentItems FulfilmentItem[]
+  returnItems     ReturnItem[]
+
+  /// Target of the composite foreign key from InventoryItem, so a stock record's
+  /// productId and variantId cannot disagree.
+  @@unique([productId, id])
+  @@unique([profileId, sku])
+  @@unique([profileId, idempotencyKey])
+  @@index([productId, ordinal])
+  @@index([profileId, isActive])
+}
+
+/// Which option value a variant selects. optionId is denormalized on purpose: it is the
+/// only way to say "at most one value per option per variant" as a database constraint.
+model ProductVariantOptionValue {
+  id        String         @id @default(cuid())
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  optionId String
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  optionValueId String
+  optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([variantId, optionId])
+  @@unique([variantId, optionValueId])
+  @@index([optionValueId])
+}
+
+/// A shipment of part or all of an order. Carrier and tracking are owner-entered strings;
+/// nothing here contacts a carrier.
+model Fulfilment {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+
+  reference String
+  state     FulfilmentState @default(DRAFT)
+
+  /// Owner-entered metadata. There is no carrier integration in this wave, and the UI says
+  /// so, so a tracking number here means "the owner typed this", not "we queried anyone".
+  carrier        String?
+  trackingNumber String?
+  trackingUrl    String?
+
+  packedAt     DateTime?
+  shippedAt    DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items FulfilmentItem[]
+
+  @@unique([profileId, reference])
+  @@unique([profileId, idempotencyKey])
+  @@index([orderId, state])
+  @@index([profileId, state])
+}
+
+/// One order line, partially or wholly, on one shipment.
+model FulfilmentItem {
+  id           String     @id @default(cuid())
+  fulfilmentId String
+  fulfilment   Fulfilment @relation(fields: [fulfilmentId], references: [id], onDelete: Cascade)
+
+  orderLineId String
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  /// Positive; enforced by a CHECK constraint. The engine additionally refuses a quantity
+  /// that would take the line's cumulative fulfilled total past its ordered quantity.
+  qty Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([fulfilmentId, orderLineId])
+  @@index([orderLineId])
+  @@index([variantId])
+}
+
+/// A customer's request to send goods back.
+model ReturnRequest {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  reference String
+  state     ReturnRequestState @default(REQUESTED)
+
+  reason       String?
+  decisionNote String?
+  decidedBy    String?
+
+  requestedAt DateTime  @default(now())
+  decidedAt   DateTime?
+  receivedAt  DateTime?
+
+  /// A pointer to a refund that happened elsewhere. This wave executes no payment; the
+  /// field records that a refund exists, and is null until someone links one.
+  refundPaymentId String?
+  refundPayment   Payment? @relation(fields: [refundPaymentId], references: [id])
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items ReturnItem[]
+
+  @@unique([profileId, reference])
+  @@unique([profileId, idempotencyKey])
+  @@index([orderId, state])
+  @@index([profileId, state])
+}
+
+/// One order line on a return, with its own restock decision.
+model ReturnItem {
+  id              String        @id @default(cuid())
+  returnRequestId String
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+
+  orderLineId String
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  /// Positive; enforced by a CHECK constraint. The engine refuses more than was fulfilled.
+  qty Int
+
+  restockState ReturnItemRestockState @default(PENDING)
+  restockedAt  DateTime?
+
+  /// The movement that actually put the units back. Its presence is what makes restocking
+  /// idempotent: a second attempt finds this set and refuses to move stock again.
+  restockMovementId String?            @unique
+  restockMovement   InventoryMovement? @relation(fields: [restockMovementId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([returnRequestId, orderLineId])
+  @@index([orderLineId])
+  @@index([restockState])
+}
+
+/// Append-only commerce timeline for variants, fulfilments and returns, enforced by a
+/// trigger. Inventory balance changes keep their own ledger in InventoryMovement; this one
+/// records the commerce decisions that drive them.
+model CommerceEvent {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  seq         BigInt               @default(autoincrement())
+  kind        CommerceEventKind
+  subjectType CommerceEventSubject
+  subjectId   String
+
+  from    String?
+  to      String
+  actor   CommerceEventActor @default(STAFF)
+  actorId String?
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  metadata Json?
+  at       DateTime @default(now())
+
+  @@index([profileId, seq])
+  @@index([subjectType, subjectId])
+  @@index([orderId])
 }
