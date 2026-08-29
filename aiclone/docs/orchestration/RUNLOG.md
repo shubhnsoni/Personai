@@ -2388,3 +2388,178 @@ behind the *database*, not regressions. A worktree-scoped driver (`run-wave-g-ga
 outside the repository) was used for pre-merge sweeps, and gave 44/44. The post-merge sweep used
 the original driver, which is valid again now that the primary carries Wave G, and also gave
 44/44. Recording the distinction rather than quietly picking whichever number looked better.
+
+
+---
+
+## Wave G3 - retainers, course access levels, two capability promotions
+
+Integrated at `5a26b6b` (merge, `--no-ff`) from base `1f172eb` via branch
+`feature/wave-g3-retainers-access`. Root-serial. Three slices, each committed only after its
+own gates were green.
+
+| Slice | Commit | What it is |
+|---|---|---|
+| G3.1 schema | `c4fb417` | 9 tables, 11 enums, 14 CHECKs, 2 partial unique indexes, 6 triggers |
+| G3.2 runtime | `d07c41d` | retainer + course-access engines, and a second additive migration |
+| G3.3 capability | `dd5b9ee` | two promotions; three blueprints stop calling them planned |
+
+### Two migrations, and why the second one exists
+
+`20260829190000_retainers_and_course_access_levels` shipped the retainer tables, including
+`CaseRetainerDraw`, which records every movement of the allowance. What it cannot record is a
+**state** change - activating an agreement, closing or renewing a period, linking a case. And
+`CaseEvent` could not be reused, because `CaseEvent."caseId"` is NOT NULL while a retainer
+legitimately exists before any case is linked to it.
+
+Two alternatives were considered and rejected. Fanning agreement events out to every linked
+case would leave a retainer with no links yet holding no history at all - exactly the moment an
+owner most wants one. Requiring a linked case before activation would have made that gap
+unreachable rather than absent, which is worse: the hole would still be there, just harder to
+find. So `20260829200000_retainer_event_history` adds `CaseRetainerEvent`, strictly additively,
+reusing `CaseEventKind` and `CaseEventActor` so it adds no vocabulary.
+
+This is recorded as two migrations rather than folded into one because that is what actually
+happened, and because the second one is the honest consequence of noticing the gap while
+writing the runtime.
+
+### The one non-additive statement, and the position that matters
+
+```
+ALTER TYPE "CaseEventKind" ADD VALUE 'RETAINER' BEFORE 'NOTE';
+```
+
+Reusing `'NOTE'` with a discriminator smuggled into the free-text `to` column - the way brief
+events already do - was rejected. A query for retainer history would become
+`WHERE kind = 'NOTE' AND "to" LIKE 'RETAINER%'`, which is the sort of encoding that quietly
+becomes a lie. `CohortEventKind` already carries a domain-specific `RENEWAL`, so a
+domain-specific kind is the established shape here.
+
+`BEFORE 'NOTE'` is not decoration. Prisma emits a bare `ADD VALUE`, which Postgres appends at
+the **end**, leaving the database reading `(APPROVAL, NOTE, RETAINER)` while `schema.prisma`
+reads `(APPROVAL, RETAINER, NOTE)`. Postgres cannot reorder an enum afterwards, so the position
+is decided at insertion time or never. The build tool rewrites the statement with the
+substitution counted and asserted. Verified in the database, and by a post-apply `migrate diff`
+that shows zero enum churn.
+
+**Rolling back an enum value is not a no-op, and `down.sql` says so.** Postgres cannot remove a
+value, so the rollback recreates the type in its original member order, and refuses to run if
+any `CaseEvent` row already uses `RETAINER` - a migration whose new value is in use cannot be
+rolled back without destroying history. The rolled-back catalog came out byte-identical and the
+enum read as its original nine labels.
+
+### A retainer is an agreement plus a ledger, not a payment
+
+Workspace-scoped, linked to cases through `CaseRetainerCaseLink` rather than owning a single
+`caseId`. A retainer is an agreement with a client that work from several cases draws against;
+tying it to one case would make "renewal period" meaningless, because you would be renewing per
+case rather than per agreement.
+
+Each period **snapshots** its own included allowance rather than reading the agreement, so
+amending the agreement cannot rewrite what a closed period included.
+
+**Overage is accepted and reported, not prevented.** `used` may exceed `included`. Refusing a
+draw once an allowance is spent would misrepresent work that was actually done, and an owner who
+cannot see overage cannot bill for it. What *is* constrained: used can never go negative; a draw
+must be denominated in the same basis as its period; a draw may only name a case the retainer
+covers; a draw may only belong to a period of its own retainer; and a retainer and its linked
+cases must share a workspace. The last four are triggers, because a composite foreign key would
+express them and Prisma cannot describe one.
+
+The draw ledger stores the signed delta **and** the resulting balance, so replaying it must
+reproduce the period - measured over a four-row ledger including a credit.
+
+### Consumption is additive, so both parallel writers must win
+
+Measured with genuinely parallel operations: two draws fired at one open period **both land**,
+and their after-balances chain correctly. This is the **opposite** of the Wave F inventory case,
+where exactly one writer wins because stock is finite. Consumption is additive, so a lost writer
+would silently forget real work. The period row is locked `FOR UPDATE` first, so the two
+serialise rather than racing.
+
+### Content visibility is a new decision, not a changed one
+
+Before this wave there was **no content-visibility check anywhere in the repository**. Any
+ACTIVE or COMPLETED enrolment returned every module and every lesson, and `CourseLesson.isFree`
+was written by importers and enforced by nothing.
+
+So the risk was never that an existing rule would break - there was none - but that adding rules
+would silently change what existing learners can see. The design makes that impossible: a lesson
+with no `CourseLessonAccess` row is unrestricted, no existing lesson has one, and there is
+therefore **no backfill to get wrong**. That is measured, not asserted: on a seeded three-tier
+course, a learner holding no tier at all - the state every existing learner is in - still sees
+every unruled lesson.
+
+A **SUSPENDED or EXPIRED** grant falls back to the unruled lessons, **not** to the lowest tier.
+Expiry is computed on read rather than swept, so a grant past its expiry stops entitling
+immediately while its state remains ACTIVE, and the report says so.
+
+Two services, because there are two principals. `CourseAccessService` is the owner surface and
+composes `CohortContext`. `LearnerAccessService` takes **no** `workspaceId` at all - a learner is
+a `Member` with a cookie session, not a Clerk user with a workspace membership, and letting a
+learner name a workspace would hand them a probe. Both call **one** visibility function, so the
+console and the learner surface cannot disagree; that is asserted by comparing their outputs.
+
+**Approving is not applying.** Requesting changes nothing, approving changes nothing, only
+applying moves the entitlement - all three measured separately. Applying is refused if the
+entitlement moved since approval, so an approval cannot overwrite a tier it was never agreed
+against. Direction is derived by comparing ranks, so a downgrade cannot be presented as an
+upgrade. Removing a rule restores the original behaviour, so the whole feature can be backed out
+without a data migration.
+
+### No payment execution, measured on both sides
+
+The retainer's full billing lifecycle - `DRAFT`, `ISSUED` against a real `CaseInvoice`, `PAID` -
+leaves the `Payment` row count unmoved. A complete course upgrade, with an invoice reference
+recorded, does the same. Every change event stores `paymentExecuted: false`, so the history
+cannot be read as a charge.
+
+### Three blueprints had to stop calling these planned
+
+A backlog entry for something that exists is a false statement - the same correction
+`restaurant-venue-v3` made for inventory in Wave F. `coaching-studio-v2` now requires
+`contentCohorts:accessLevels`; `consulting-agency-v1` and `ca-practice-v1` now require
+`casesProjects:retainers`. `consulting-agency-v1` is the pointed one: its summary has claimed
+retainers since Wave E while the capability sat in a backlog.
+
+A new invertible check now sweeps **every** blueprint for a planned entry naming an available
+capability. It immediately found one: `restaurant-venue-v2` lists `commerce:inventory` as
+planned, available since Wave F. **It is exempted by name, and the reasoning is recorded rather
+than buried.** v2 is retained for addressability as a *historical* contract, and its backlog was
+accurate when written; editing it to match today would be claiming the historical contract said
+something it did not. A live blueprint is a claim about now, a deprecated one is a record of
+then. A second assertion proves every exempted entry belongs to a deprecated blueprint on the
+named list, so the exemption cannot quietly grow.
+
+### Gates on the integrated tip `5a26b6b`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` / `generate` | 0 / 0 |
+| app `tsc --noEmit` | 0 |
+| targeted ESLint (all changed paths) | 0 problems, 0 warnings |
+| repo-wide ESLint | 91 problems (39 errors, 52 warnings) - **identical to `34f8561`** |
+| check harnesses | **48 of 48 exit 0** (44 at Wave G plus 4 new) |
+| `check-retainer-schema-invariants` | 77/77; inverted 76/77 exit 1 |
+| `check-retainer-runtime` | 87/87; inverted 86/87 exit 1 |
+| `check-course-access-schema-invariants` | 72/72; inverted 71/72 exit 1 |
+| `check-course-access-runtime` | 79/79; inverted 78/79 exit 1 |
+| `check-capability-contract` | PASS, 0 failures; inverted 19 failures, exit 1 |
+| `check-case-schema-invariants` | 37/37 (was 36/36 - `CaseEventKind` now pinned as an ordered list, not a count) |
+| relation-name verifier | 0 renamed, 0 dropped; 10 new models across the two migrations |
+| row reconciliation | content md5 of 12 pre-existing tables identical at apply, rollback **and** reapply |
+| external calls | zero, counted |
+| fixture residue | zero across 16 tracked tables; every append-only trigger verified re-armed |
+| secret scan | 0 hits |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | exit 0 |
+| live `personalink` | untouched - 35 public tables, 0 wave tables, 16 `Profile` rows |
+| disposable DB | left fully applied at 104 tables, not mid-rehearsal |
+
+**One failure worth recording rather than quietly re-running.** The first full sweep failed on
+`check-schema-invariants` because the G3 reconciliation fixture was still resident in the
+rehearsal database and collided on `Workspace.profileId`, which is unique. The fixture was
+removed through its own cleanup step, the append-only trigger was verified re-armed, and the
+pre-existing counts were confirmed back at 4 courses / 6 modules / 18 lessons / 1 enrolment. That
+was harness residue, not a regression - but the distinction is only worth anything if it is
+written down.

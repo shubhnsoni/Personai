@@ -5,17 +5,17 @@ Updated 2026-08-29, mid-run, root-serial. No worker independence claimed.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`dd84acc`** — Waves C, D, E, F and **G** integrated green, plus the first
-  P1-009 lint slice and the Wave G ledger commits
+- Primary HEAD: **`5a26b6b`** — Waves C, D, E, F, **G** and **G3** integrated green, plus the
+  first P1-009 lint slice and the Wave G/G3 ledger commits
 - Origin `recovered/aug20-wt-pr-32`: `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`, unchanged;
   `origin/main`: `9e8a0fffb84937d809788ee4512884289c3132b8`, unchanged
-- Waves A–G complete. P2-005, P2-006, P2-008, P2-009, P2-010, **P2-011** are `done`.
+- Waves A–G complete. P2-005, P2-006, P2-008, P2-009, P2-010, **P2-011**, **P2-012** are `done`.
   P1-009 is `in_progress_slice_1_done`.
 - Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**,
-  14 migrations, 94 tables / 1024 columns / 214 enum labels / 18 triggers / 277 constraints.
-  Never mid-rehearsal.
+  16 migrations, 104 tables / 1140+ columns / 257 enum labels / 31 trigger rows. Never
+  mid-rehearsal.
 - Live `personalink`: verified untouched — 35 tables, no `_prisma_migrations`, none of the
-  twenty-one tables this run created, no `btree_gist`, `Profile` = 16.
+  thirty-one tables this run created, no `btree_gist`, `Profile` = 16.
 - Gateway port 5476: **LISTENING** (pid 54756) after one bounded recovery attempt, but no
   KiroCrew MCP server is registered with the client, so no model-pinned dispatch tool is
   exposed. Recorded `ORCHESTRATION_UNAVAILABLE` at `efb843f`. Workers and crons empty. Every
@@ -54,15 +54,24 @@ added no lint debt. Targeted wave paths are at zero.
 | D cohorts | `src/lib/cohorts/**` | `/api/platform/cohorts/**`, `/course-enrollments` | `cohorts-panel.tsx`, `cohort-detail-panel.tsx` |
 | F inventory | `src/lib/inventory/**` | `/api/platform/inventory/**` | `inventory-panel.tsx` |
 | G variants, fulfilment, returns | `src/lib/commerce/**` | 16 routes under `/api/platform/**` | `commerce-variants-panel.tsx`, `commerce-orders-panel.tsx` |
+| G3 retainers | `src/lib/cases/retainers.ts` | none yet — engine and harnesses only | none yet |
+| G3 course access levels | `src/lib/cohorts/access.ts` | none yet — engine and harnesses only | none yet |
+
+**G3 shipped runtime without APIs or UI, on purpose.** The wave brief for retainers and access
+levels asked for schema, runtime and executable tests, and said to promote capabilities only
+after runtime evidence exists. It did not ask for owner surfaces, and claiming one would have
+meant building it. So the two capabilities are `available` on the strength of engines plus 405
+executable assertions, and the honest next step for either is an API and a Business OS panel
+following the Wave G pattern in `src/lib/commerce/{http,runtime}.ts`.
 
 Active blueprints: `restaurant-venue-v3`, `coaching-studio-v2`, `consulting-agency-v1`,
 `ca-practice-v1`, **`retail-storefront-v1`**. Deprecated: `restaurant-venue-v1`,
 `restaurant-venue-v2`, `coaching-studio-v1`. No blueprint is in draft.
 
 Still not built, and named as such in the capability registry: `appointments:reminders`
-(partial, inert provider), `appointments:deposits` (partial, inert provider),
-`casesProjects:retainers` (planned), `contentCohorts:accessLevels` (planned), all of
-`fieldJobs` — `intake`, `dispatch`, `inspection` (planned).
+(partial, inert provider), `appointments:deposits` (partial, inert provider), and all of
+`fieldJobs` — `intake`, `dispatch`, `inspection` (planned, evidence `none`). That is the whole
+remaining list.
 
 ### What Wave G deliberately does not claim
 
@@ -77,7 +86,7 @@ retail storefront cannot drift into implying an integration that does not exist.
 
 ```powershell
 cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
-git rev-parse HEAD                     # expect dd84acc... or a ledger commit on top of it
+git rev-parse HEAD                     # expect 5a26b6b... or a ledger commit on top of it
 git status --porcelain                 # expect only .codex-remote-attachments/ and P1_014_ACTION_INVENTORY.md untracked
 git rev-parse origin/recovered/aug20-wt-pr-32   # expect 4b386d1...
 ```
@@ -91,29 +100,33 @@ node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\check-live-rea
 
 ### Step 1 — pick the next package
 
-Read `INTEGRATION_QUEUE.md` → "Next in queue — revised after Wave G".
+Read `INTEGRATION_QUEUE.md` → "Next in queue — revised after Wave G3".
 
-- **G3 `casesProjects:retainers` + `contentCohorts:accessLevels`** is next: the two remaining
-  truthful capability gaps. Each needs schema plus runtime. Neither may execute a real
-  payment — a retainer draws down against recorded units or value, and an access-level
-  upgrade changes entitlement state; billing integration stays a reference, not a charge.
-- **G4 shared `fieldJobs` engine foundation.** Nothing in the repo implements intake,
-  dispatch or inspection. Note the trap: `fieldJobs:dispatch` is now the target of the
-  capability-contract planned-capability negative test, so whoever makes it real must repoint
-  that test. The non-vacuity assertion beside it will fail loudly if they do not.
-- **G2 appointments reminders/deposits providers is OWNER-GATED.** Wiring a real messaging
-  or payment provider means real messages and real money. Do not start it without explicit
+- **G4 shared `fieldJobs` engine foundation.** The only engine with nothing built: intake,
+  dispatch and inspection are all planned with evidence `none`. Note the trap:
+  `fieldJobs:dispatch` is now the target of the capability-contract planned-capability negative
+  test, so making it real requires repointing that test. The non-vacuity assertion beside it
+  will fail loudly if you do not, and the new sweeping check will fail if any blueprint is left
+  listing it as planned.
+- **An API and Business OS panel for retainers or access levels.** Both engines exist with no
+  owner surface. Follow the Wave G pattern: `src/lib/<domain>/{http,runtime}.ts` for one
+  envelope and one resolve-then-authorize step, then a panel, then a11y assertions in
+  `check-business-os-a11y.ts`. No schema needed, so this fits a short window.
+- **G2 appointments reminders/deposits providers is OWNER-GATED.** Wiring a real messaging or
+  payment provider means real messages and real money. Do not start it without explicit
   approval. `appointments:reminders` is the target of the partial-capability negative test.
 - **P1-009 slice 2** is the safe fallback when no feature wave fits the window. The inventory
   above says exactly what is left and why each item needs judgement. Pick one rule and finish
   it; do not attempt `no-img-element` or `set-state-in-effect` without reading the components
   properly, because both change behaviour.
 
-When a capability is promoted, expect to repoint the contract harness. It now carries
-non-vacuity assertions naming **`fieldJobs:dispatch`** (planned) and
-**`appointments:reminders`** (partial), plus an assertion recording that `commerce:returns`
-has become available and can no longer serve as the planned example. Wave G had to move that
-test for the third time; the pattern is deliberate.
+When a capability is promoted, expect to repoint the contract harness AND to move it out of any
+blueprint's planned backlog. It now carries non-vacuity assertions naming
+**`fieldJobs:dispatch`** (planned) and **`appointments:reminders`** (partial), assertions
+recording that `commerce:returns`, `casesProjects:retainers` and `contentCohorts:accessLevels`
+have become available, and a sweeping check that fails if any live blueprint lists an available
+capability as planned. `restaurant-venue-v2` is exempted from that sweep by name because it is a
+deprecated historical contract — do not "fix" it.
 
 ### Step 2 — migration sequence, if the package needs one
 
@@ -125,7 +138,7 @@ node "$T\rehearse.js" snapshot pre-<pkg>
 npx prisma format --schema prisma/schema.prisma
 node "$T\schema-semantic-diff.js"          # must show 0 removed blocks
 node "$T\run-on-rehearsal.js" -- node "$T\build-raw-diff.js"
-# copy build-migration-g1.js, change OUT_DIR, header, footer and the asserted diff shape
+# copy build-migration-g3.js, change OUT_DIR, header, footer and the asserted diff shape
 node "$T\run-on-rehearsal.js" -- npx prisma migrate deploy
 node "$T\rehearse.js" snapshot post-<pkg>-apply
 node "$T\run-on-rehearsal.js" -- npx prisma db execute --file "<migration dir>/down.sql" --schema prisma/schema.prisma
@@ -139,7 +152,7 @@ node "$T\verify-no-renames.js"                                  # must report 0 
 
 The five pre-existing `profileId` `DropForeignKey` statements against `ActivityEvent`,
 `Contact`, `ContactSourceLink`, `WorkflowRun` and `Workspace` must be **excluded and
-count-asserted**, never applied. Six waves have done this; the builder scripts already do.
+count-asserted**, never applied. Eight waves have done this; the builder scripts already do.
 
 **If a package cannot be purely additive, say so and enumerate it.** Wave G is the precedent:
 `InventoryItem.variantId` made G1.1 non-additive, so the five affected statements were lifted
@@ -154,7 +167,7 @@ npx prisma validate --schema prisma/schema.prisma
 npx prisma generate --schema prisma/schema.prisma
 npx tsc --noEmit -p tsconfig.json
 node "$T\verify-no-renames.js"
-pwsh -File "$T\run-wave-c-gates.ps1"      # all 44 check harnesses, skips only check-order-stream
+pwsh -File "$T\run-wave-c-gates.ps1"      # all 48 check harnesses, skips only check-order-stream
 npx eslint <touched paths>
 npm audit --omit=dev
 npm run build
@@ -197,7 +210,7 @@ merging.
     stdout and no stderr.
 11. **Put hard guarantees in CHECK constraints and prove the constraint refuses a direct
     write.** Prisma's diff leaves CHECK constraints, triggers and exclusion constraints
-    alone — demonstrated across six migrations, not assumed.
+    alone — demonstrated across eight migrations, not assumed.
 12. **Measure a concurrency claim concurrently.** `Promise.allSettled` over two competing
     writes, asserting exactly one winner.
 13. **A fixture that violates a CHECK constraint fails in the harness, not in review.**

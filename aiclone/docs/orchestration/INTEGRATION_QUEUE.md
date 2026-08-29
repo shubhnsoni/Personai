@@ -751,3 +751,51 @@ Do not begin any schema package with less than 90 minutes remaining.
 - Gateway on port 5476: now **LISTENING** (pid 54756), but no KiroCrew MCP server is registered
   with the client, so no model-pinned dispatch tool is exposed. Owner action: register it in
   `~/.kiro/settings/mcp.json` and restart the client. Every wave so far has been root-serial.
+
+
+---
+
+## Wave G3 integrated - the last two truthful capability gaps are closed
+
+Merge `5a26b6b` on `recovered/aug20-wt-pr-32`, `--no-ff`, from base `1f172eb` via
+`feature/wave-g3-retainers-access`. Root-serial.
+
+| Commit | Slice | Gate result at commit time |
+|---|---|---|
+| `c4fb417` | G3.1 schema | retainer 73/73 and access 72/72 invariants; rollback byte-identical; 12-table row md5 identical at every stage |
+| `d07c41d` | G3.2 runtime | retainer runtime 87/87, access runtime 79/79; second additive migration proven apply/rollback/reapply |
+| `dd5b9ee` | G3.3 capability | `check-capability-contract` PASS, inverted 19 failures; 48/48 sweep |
+| `5a26b6b` | integration | full combined suite green - see RUNLOG for the table |
+
+`casesProjects:retainers` and `contentCohorts:accessLevels` are now `available` with evidence
+files that exist. Three active blueprints stopped listing them as planned backlog entries.
+
+### Next in queue - revised after Wave G3
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| G4 | shared `fieldJobs` engine foundation | The only engine with nothing built: `intake`, `dispatch` and `inspection` are all planned with evidence `none`. **Trap:** `fieldJobs:dispatch` is the current target of the capability-contract planned-capability negative test, so whoever makes it real must repoint that test. The non-vacuity assertion beside it will fail loudly if they do not, and the new sweeping check will fail if any blueprint is left listing it as planned. |
+| P1-009 slice 2 | repo-wide lint | 91 problems remain and the count is unchanged by Waves F, G and G3. `no-unused-vars` (24) is the safest slice; `no-img-element` (25) and the react-hooks family (18) change behaviour and need judgement. |
+| G2 | appointments reminders + deposits providers | Still **owner-gated**. Wiring a real messaging or payment provider means real messages and real money. `appointments:reminders` remains the target of the partial-capability negative test. |
+
+Do not begin any schema package with less than 90 minutes remaining.
+
+### Open items carried forward
+
+- P1-007 live cutover: still owner-gated, unchanged. Not executed.
+- Pre-existing `profileId` FK drift: five `DropForeignKey` statements, excluded and
+  count-asserted for **eight** waves running. Untouched.
+- `InventoryItem.productId` alongside `variantId`, agreement enforced by trigger because Prisma
+  cannot express the composite key. Introduced in Wave G, unchanged.
+- **New in G3, same category:** four cross-row invariants are triggers rather than composite
+  foreign keys - a draw's period must belong to its retainer, a draw's case must be covered by
+  it, a case link must not cross workspaces, and an entitlement's tier must belong to the
+  enrolment's course. Each is a rule a composite FK would express if Prisma could describe one.
+- **`restaurant-venue-v2` lists `commerce:inventory` as planned, and that is left alone on
+  purpose.** It is a deprecated historical contract whose backlog was accurate when written. The
+  capability-contract harness exempts it by name and asserts the exemption only ever covers
+  deprecated blueprints.
+- `check-order-stream` precondition: still unmet, still non-blocking.
+- Gateway on port 5476: LISTENING (pid 54756), but no KiroCrew MCP server is registered with the
+  client, so no model-pinned dispatch tool is exposed. Owner action: register it in
+  `~/.kiro/settings/mcp.json` and restart the client. Every wave so far has been root-serial.
