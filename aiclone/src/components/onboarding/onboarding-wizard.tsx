@@ -20,6 +20,7 @@ import {
     Store,
     Ticket,
     UtensilsCrossed,
+    Wrench,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +51,7 @@ const NEED_ICON: Record<NeedId, typeof Store> = {
     hire: Briefcase,
     show: FolderKanban,
     leads: Gift,
+    field: Wrench,
     page: Sparkles,
 }
 
