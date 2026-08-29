@@ -54,7 +54,11 @@ export function BloubOrb({
 }) {
     const uid = useId().replace(/:/g, "")
     const maskId = `bloub-mask-${uid}`
-    const engineRef = useRef<BotEngine | null>(null)
+    const [engine] = useState(() => {
+        const radii = SHAPE_BY_ID.get(resolveBloubShape(shape))?.radii ?? null
+        const expr = EXPRESSION_BY_ID.get(resolveBloubExpression(expression)) ?? null
+        return new BotEngine(RAYON, "idle", radii, expr)
+    })
     const clockRef = useRef(0)
     const [frame, setFrame] = useState<BotFrame | null>(null)
     const [wink, setWink] = useState(false)
@@ -68,30 +72,22 @@ export function BloubOrb({
 
     useEffect(() => {
         if (!reactToken) return
-        setWink(true)
+        const raf = window.requestAnimationFrame(() => setWink(true))
         const clear = window.setTimeout(() => setWink(false), 1600)
-        return () => window.clearTimeout(clear)
+        return () => {
+            window.cancelAnimationFrame(raf)
+            window.clearTimeout(clear)
+        }
     }, [reactToken])
 
-    if (!engineRef.current) {
-        const radii = SHAPE_BY_ID.get(shapeId)?.radii ?? null
-        const expr = EXPRESSION_BY_ID.get(restExpr) ?? null
-        engineRef.current = new BotEngine(RAYON, "idle", radii, expr)
-    }
-
     useEffect(() => {
-        const engine = engineRef.current
-        if (!engine) return
         const now = clockRef.current
         engine.setShape(SHAPE_BY_ID.get(shapeId)?.radii ?? null, now)
         engine.setExpression(EXPRESSION_BY_ID.get(liveExprId) ?? null, now)
         engine.setState(liveState, now)
-        if (frozenAt !== undefined) setFrame(engine.sample(frozenAt))
-    }, [shapeId, liveExprId, liveState, frozenAt])
+    }, [engine, shapeId, liveExprId, liveState, frozenAt])
 
     useEffect(() => {
-        const engine = engineRef.current
-        if (!engine) return
         if (gaze) {
             engine.setLook(
                 {
@@ -106,17 +102,17 @@ export function BloubOrb({
         } else {
             engine.setLook(null, clockRef.current)
         }
-    }, [gaze])
+    }, [engine, gaze])
 
     useEffect(() => {
         if (frozenAt !== undefined) {
-            setFrame(engineRef.current!.sample(frozenAt))
-            return
+            const raf = requestAnimationFrame(() => setFrame(engine.sample(frozenAt)))
+            return () => cancelAnimationFrame(raf)
         }
         const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
         if (reduced) {
-            setFrame(engineRef.current!.sample(0.8))
-            return
+            const raf = requestAnimationFrame(() => setFrame(engine.sample(0.8)))
+            return () => cancelAnimationFrame(raf)
         }
         let raf = 0
         let last = 0
@@ -125,11 +121,11 @@ export function BloubOrb({
             const dt = last ? Math.min((ms - last) / 1000, 0.064) : 0
             last = ms
             clockRef.current += dt
-            setFrame(engineRef.current!.sample(clockRef.current))
+            setFrame(engine.sample(clockRef.current))
         }
         raf = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(raf)
-    }, [frozenAt])
+    }, [engine, frozenAt])
 
     if (!frame) {
         return <div className={className} style={{ width: size, height: size }} aria-hidden />

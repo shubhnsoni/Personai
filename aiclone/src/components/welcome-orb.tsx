@@ -51,17 +51,20 @@ export function WelcomeOrb({
     const [delighted, setDelighted] = useState(false)
     const gazeRef = useRef(gaze)
     const delightedRef = useRef(false)
-    gazeRef.current = gaze
     const resolved = resolveOrbVariant(colors, variant)
     const resolvedLook = resolveOrbLook(lookStyle)
     const resolvedSkin = resolvePixelSkin(skin)
 
     useEffect(() => {
+        gazeRef.current = gaze
+    }, [gaze])
+
+    useEffect(() => {
         if (!reactToken) return
         delightedRef.current = true
-        setDelighted(false)
         let raf2 = 0
         const raf1 = window.requestAnimationFrame(() => {
+            setDelighted(false)
             raf2 = window.requestAnimationFrame(() => setDelighted(true))
         })
         const clear = window.setTimeout(() => {
