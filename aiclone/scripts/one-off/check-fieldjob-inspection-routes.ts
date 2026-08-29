@@ -34,6 +34,9 @@ import { FieldJobApiService } from "../../src/lib/fieldjobs/http"
 import { FieldJobInspectionService, FieldJobInspectionTemplateService } from "../../src/lib/fieldjobs/inspection"
 import { FieldJobContext } from "../../src/lib/fieldjobs/shared"
 import { InventoryService } from "../../src/lib/inventory/engine"
+// The INVENTORY vertical's own HTTP boundary, used for the cross-vertical assertions in section 10b:
+// the deduction an inspection caused has to be visible from the other side, not just from this one.
+import { InventoryApiService } from "../../src/lib/inventory/http"
 import { InventoryContext } from "../../src/lib/inventory/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
@@ -471,6 +474,51 @@ async function main() {
             "a non-boolean consumeStock is 400 rather than being coerced into a silent false",
             badBool.status === 400,
             `status=${badBool.status}`,
+        )
+
+        /*
+         * ---- 10b. CROSS-VERTICAL: the deduction is visible to the inventory surface ----
+         *
+         * Everything above proves the inspection surface behaved. This proves the two verticals
+         * actually JOIN: a part consumed on a field-job inspection must appear in the INVENTORY
+         * vertical's own read API as a real movement, and inventory's stock record must report the
+         * reduced quantity. Without this, "composes the existing inventory engine" would be a claim
+         * about imports rather than about observable state, and an inspection could plausibly have
+         * written its own private row while inventory carried on unaware.
+         */
+        const invApi = new InventoryApiService(inventory)
+        const invMovements = await call(
+            invApi.movements(stock.record.id, get(`${API}/inventory/${stock.record.id}/movements?workspaceId=${ids.wsA}`)),
+        )
+        const movementRows = (dataOf(invMovements).movements ?? []) as Array<{
+            kind: string
+            qtyDelta: number
+            reason: string | null
+        }>
+        const inspectionDeduction = movementRows.filter((m) => m.kind === "ADJUSTMENT" && Number(m.qtyDelta) === -3)
+        checkInvertible(
+            "the inspection's stock deduction is visible through the INVENTORY surface, not only inside fieldJobs",
+            invMovements.status === 200 && inspectionDeduction.length === 1,
+            `status=${invMovements.status} matching movements=${inspectionDeduction.length} of ${movementRows.length}`,
+        )
+        checkInvertible(
+            "that movement names the inspection that caused it, so an auditor can trace stock back to the visit",
+            (inspectionDeduction[0]?.reason ?? "").includes("Inspection"),
+            `reason=${String(inspectionDeduction[0]?.reason)}`,
+        )
+        const invItem = await call(
+            invApi.get(stock.record.id, get(`${API}/inventory/${stock.record.id}?workspaceId=${ids.wsA}`)),
+        )
+        const invRecord = dataOf(invItem).item as { onHand: number } | undefined
+        checkInvertible(
+            "the inventory surface reports the reduced quantity, so the two verticals agree on the number",
+            invItem.status === 200 && Number(invRecord?.onHand) === onHandConsumed,
+            `inventory onHand=${String(invRecord?.onHand)} expected=${onHandConsumed}`,
+        )
+        checkInvertible(
+            "the part recorded WITHOUT consumeStock produced no movement, so the ledgers agree it did not move",
+            movementRows.filter((m) => m.kind === "ADJUSTMENT").length === 1,
+            `ADJUSTMENT movements=${movementRows.filter((m) => m.kind === "ADJUSTMENT").length} (expected exactly the one consuming part)`,
         )
 
         // ---- 11. no 404, and byte-identical refusals ------------------------
