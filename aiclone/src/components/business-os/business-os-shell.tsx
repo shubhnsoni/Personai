@@ -29,6 +29,7 @@ import { CasesPanel } from "@/components/business-os/cases-panel"
 import { CohortsPanel } from "@/components/business-os/cohorts-panel"
 import { CommercePanel } from "@/components/business-os/commerce-panel"
 import { FieldJobsPanel } from "@/components/business-os/fieldjobs-panel"
+import { InspectionPanel } from "@/components/business-os/inspection-panel"
 import { RetainersPanel } from "@/components/business-os/retainers-panel"
 import { InventoryPanel } from "@/components/business-os/inventory-panel"
 import { Label } from "@/components/ui/label"
@@ -629,6 +630,8 @@ export function BusinessOsShell({
                             <RetainersPanel workspaceId={selectedWorkspaceId} />
 
                             <FieldJobsPanel workspaceId={selectedWorkspaceId} />
+
+                            <InspectionPanel workspaceId={selectedWorkspaceId} />
 
                             <CohortsPanel workspaceId={selectedWorkspaceId} />
 

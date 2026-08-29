@@ -147,7 +147,7 @@ export function isAbort(cause: unknown): boolean {
 /**
  * A 403 here is deliberately the same copy for a foreign inspection and a nonexistent one - the
  * contract says there is no 404, because a 404 would let a caller discover which ids exist. The
- * The UI must never claim the id is absent. A 409 and 400 are shown verbatim because they carry
+ * UI must never claim the id is absent. A 409 and 400 are shown verbatim because they carry
  * the numbers (pendingRequired, stock quantities) an owner needs to act. A 503 blames nobody.
  */
 export function inspectionErrorCopy(error: unknown): { title: string; description: string } {
