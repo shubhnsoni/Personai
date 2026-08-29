@@ -426,3 +426,70 @@ live rather than masked by a database constraint.
 Then Wave D content/cohorts, Wave E truthful vertical activation, commerce inventory
 hardening, P1-009 scoped lint. Healthcare/clinics/hospitals remain blueprint-only. P1-007
 live cutover is NOT executed.
+
+
+---
+
+## Wave C COMPLETE — C2 and C3 INTEGRATED 2026-08-29 at `862e5ef`
+
+| Pkg | Commit | Paths | Proof |
+|---|---|---|---|
+| C2 runtime | `9bd9529` | `src/lib/cases/{lifecycle,shared,engine,workflow,index}.ts`, `scripts/one-off/check-case-runtime.ts` | 67 assertions, 0/1/0 |
+| C3 APIs + UI | `6187893` | `src/lib/cases/{http,runtime}.ts`, 18 routes under `src/app/api/platform/cases/**` and `/case-intakes/**`, `src/components/business-os/{cases-panel,case-detail-panel,cases-shared}`, shell mount, `scripts/one-off/check-case-routes.ts`, 19 new assertions in `check-business-os-a11y` | 75 assertions, 0/1/0 |
+
+Neither package required a migration. The disposable rehearsal database is **fully applied**
+and was used only to run harnesses.
+
+Combined gates on `862e5ef`: `prisma validate`/`generate` 0 · `tsc` 0 · targeted `eslint` 0 ·
+relation-rename verifier 0 renamed across 73 pre-existing models · **35/35** check harnesses
+exit 0 · `npm audit --omit=dev` 0 · `npm run build` 0 · secret scan 0 real hits.
+`check-order-stream` remains excluded as a known non-blocking precondition.
+
+P2-006 is `done`.
+
+### Standing rules earned in this package
+
+1. **Validate an enum against its lifecycle table at the HTTP boundary, not in the engine.**
+   Otherwise "that is not a status" and "that is not a legal move from here" collapse into one
+   409 and the owner cannot tell a typo from a workflow error. `http.ts` does this with a
+   single `status()` helper that takes the flow's own type guard.
+2. **Let the server compute `allowedTransitions` and have the UI render only those.** A client
+   that re-derives the transition table will eventually offer a button the write boundary
+   refuses. `CaseRecord.allowedTransitions` closes that gap for cases; the sub-flows import the
+   same `lifecycle.ts` the server enforces.
+3. **Compare non-enumerating refusals by string equality of the whole body.** Asserting two
+   403s is not the same claim as asserting two *identical* 403s, and only the second one is
+   falsifiable.
+4. **Where a NOT NULL foreign key forces a parent row, create the real parent.** `Approval`
+   requires a `WorkflowRun`, so case approvals create one. Inventing a nullable column or a
+   placeholder row would have forked the approval ledger.
+
+---
+
+## Next in queue — Wave D content/cohorts, READY
+
+Base `862e5ef` or newer primary.
+
+Before writing any schema, inspect the existing `Course`, `CourseModule`, `CourseLesson`,
+`CourseEnrollment`, `LessonCompletion` and `Member` models plus
+`check-course-profile-actions-authz`. Promote what exists behind shared content/cohort
+contracts. **Do not create a coaching-only fork**, and do not rename a pre-existing model or
+Prisma relation field.
+
+| Pkg | Owner paths | Required proof |
+|---|---|---|
+| D1 | `prisma/schema.prisma`, one migration, `scripts/one-off/check-cohort-schema-invariants.ts` | only the genuinely missing persistence for programs/courses, cohorts/batches, enrolment/membership, attendance, assignments and submissions, progress, certificates, renewal/reminder state, append-only cohort events, idempotency and tenant scoping; fresh external backup; exact disposable-target guard; apply → rollback → reapply; catalog comparison; relation-name verifier; exclude and count-assert the five known pre-existing `profileId` `DropForeignKey` statements against `ActivityEvent`, `Contact`, `ContactSourceLink`, `WorkflowRun`, `Workspace` |
+| D2 | `src/lib/cohorts/**` + harness | enrolment lifecycle, cohort membership, attendance, assignment submission, progress computed from persisted records only, certificate eligibility/issuance state, renewal/reminder scheduling, tenant isolation, idempotency, append-only history, zero provider calls; `0/non-zero/0` |
+| D3 | cohort console + learner-safe APIs + harnesses | four principal classes, byte-identical foreign-vs-nonexistent, 400/409/503 split, explicit loading/empty/401/403/dependency states, persisted data only. The coaching blueprint stays **draft** until every capability it claims is genuinely available |
+
+Do not begin D1 with less than 90 minutes of safe time remaining: it is the only package in
+this wave that mutates a database.
+
+### Open items carried forward
+
+- P1-007 live cutover: still owner-gated, unchanged.
+- Pre-existing `profileId` FK drift: still five `DropForeignKey` statements that any generated
+  migration will include. Excluded and count-asserted, never applied. Untouched here.
+- `check-order-stream` precondition: still unmet, still non-blocking.
+- P1-009 repo-wide lint cleanup: still deferred until feature waves cannot safely start.
+- Gateway on port 5476: still absent. Every wave so far has been root-serial.

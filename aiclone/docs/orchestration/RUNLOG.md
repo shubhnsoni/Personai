@@ -1715,3 +1715,92 @@ Live `personalink` untouched: 35 public tables, `_prisma_migrations` absent, no
 reservation, appointment or case tables, no `btree_gist`, `Profile`=16. Origin remains
 `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Six frozen worktrees at `ea69595`, dirty
 4/3/4/1/0/1. No push, PR, deploy, tunnel or dev server.
+
+
+---
+
+## 2026-08-29 · Wave C complete — cases/projects runtime, APIs and Business OS surface
+
+Root-serial. No worker independence claimed. Continuation branch
+`feature/wave-c-cases-runtime` cut from primary `c8df279` in the existing clean Wave C
+worktree, then merged `--no-ff` onto `recovered/aug20-wt-pr-32` at **`862e5ef`**.
+
+| Package | Commit | Harness |
+|---|---|---|
+| C2 cases/projects runtime | `9bd9529` | `check-case-runtime` 67 assertions, 0/1/0 |
+| C3 APIs + Business OS surface | `6187893` | `check-case-routes` 75 assertions, 0/1/0 |
+
+Neither package needed a migration. C1's schema already carried everything, so the
+rehearsal database was not touched beyond running harnesses against it, and it remains
+fully applied.
+
+### C2 — composition, not duplication
+The engine writes to the records the platform already owns: `TaskJob` for background work,
+`Approval` + `WorkflowRun` for approvals, `ProfileDocument` for uploads, `Contact` for the
+client, `Location` for the site boundary, and `Payment` referenced by `CaseInvoice.paymentId`.
+The C1 harness already asserts foreign-key *targets* by name, so a parallel table cannot
+pass, and it fails if any `Case*` table grows an `email`, `phone`, `payload`, `attempts`,
+`leaseToken` or `embedding` column — the shape a duplicate system would need.
+
+Three decisions worth recording because the cheap alternative was wrong:
+
+- **`Approval.workflowRunId` is NOT NULL.** A case approval therefore creates a real
+  `WorkflowRun` (`workflowKey: cases.approval`, `state: awaiting_approval`) rather than a
+  synthetic placeholder row. The approval ledger stays one ledger.
+- **`DELIVERED` is approval-gated.** Handing a deliverable to a client is externally visible
+  and cannot be quietly undone, so it requires a linked `Approval` in state `approved`.
+  Ungated delivery was rejected.
+- **`RECEIVED` requires a real `documentId`.** An optimistic accept would write a false
+  record — a document request marked satisfied with nothing behind it.
+
+All time comparisons use Prisma's typed API. Raw SQL `Date` parameters bind as local
+wall-clock against `timestamp without time zone` while Prisma writes UTC components; that
+mismatch silently disabled an overlap check in an earlier wave and is not repeated.
+
+### C3 — boundary and surface
+`CaseApiService` covers intakes, cases, briefs, milestones, document requests, deliverables,
+tasks, approvals, billing state and the timeline, behind 18 thin route re-exports. Intakes
+live under `/api/platform/case-intakes` rather than `/cases/intakes` so a static segment can
+never shadow the `[id]` parameter.
+
+Unknown enum values are validated against the owning lifecycle flow before the engine sees
+them, which keeps **400 "that is not a status"** distinct from **409 "that is not a legal
+move from here"** — a distinction the owner needs and a single 409 would destroy.
+
+The UI is `cases-panel.tsx` (intake queue + case list) and `case-detail-panel.tsx` (brief,
+milestones, document requests, deliverables, linked tasks, approvals, billing, timeline).
+Case status buttons render from server-computed `allowedTransitions`, so the UI cannot offer
+a transition the write boundary would refuse; the remaining sub-flows import the same
+`lifecycle.ts` tables the server enforces, so there is no second copy to drift.
+`CaseRecord` now projects `openedAt`/`deliveredAt`/`closedAt`/`cancelledAt` — additive, the
+rows were already selected in full and the surface needs them to state when a case actually
+opened.
+
+### Measured, not asserted
+- Anonymous is 401 across all 16 endpoints, with **zero rows written, zero `CaseEvent`s
+  appended and zero external calls** — counted before/after, not described.
+- An authenticated non-member is 403 on read and on write.
+- A foreign case and a nonexistent case are compared by **string equality of the response
+  body**; they are byte-identical on read and on mutation. This is the inverted assertion,
+  and `INVERT_ASSERTION=1` fails exactly it (74/75).
+- `globalThis.fetch` is replaced by a counting blocker for the whole run. Total calls: 0.
+- Every fixture row is removed, six case tables return to baseline, and the `CaseEvent`
+  append-only trigger is verified re-armed after being disabled for cleanup.
+
+### Combined gates on integrated tip `862e5ef`
+`prisma validate` 0 · `prisma generate` 0 · app `tsc` 0 · targeted `eslint` 0 ·
+relation-rename verifier **0 renamed across 73 pre-existing models** · **35/35** check
+harnesses exit 0 (`check-order-stream` excluded as the known non-blocking precondition),
+including case schema 36/36, case runtime 67/67, case routes 75/75, appointments 43/49/56/39,
+reservations 36/36/21, `check-schema-invariants` 18/18, `check-business-os-a11y` PASS with 19
+new explicit cases assertions · `npm audit --omit=dev` 0 vulnerabilities · `npm run build` 0
+with all 18 routes registered · secret scan 0 real hits (the one match is a deliberate fake
+DSN inside `check-case-routes` that proves the 503 path leaks neither message nor connection
+string).
+
+### Preservation
+Live `personalink` read-only. Disposable target
+`personalink_phase0_rehearsal_20260826_210704` left **fully applied**, no mid-rehearsal
+state. Origin remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Frozen worktrees and
+attachments untouched; `P1_014_ACTION_INVENTORY.md` unchanged. No push, PR, deploy, tunnel,
+dev server or real external-provider call.

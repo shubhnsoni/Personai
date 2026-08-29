@@ -391,7 +391,11 @@
           "services.ts",
           "short-links.ts"
         ],
-        "laneAFixedFromList": ["content.ts", "onboarding.ts", "short-links.ts"],
+        "laneAFixedFromList": [
+          "content.ts",
+          "onboarding.ts",
+          "short-links.ts"
+        ],
         "laneAAdditionalFindingFixed": "products.ts",
         "remainingOwnerMutations": [],
         "explicitCapabilityDecision": "library.ts keeps non-enumerating anonymous login-link request; dashboard resend is authenticated and ownership-scoped",
@@ -479,7 +483,10 @@
           "retryCount": 1,
           "rootAuthorizedCorrection": "decoded HMAC signature byte 0 XOR 0x01, canonical base64url re-encode, decoded-byte inequality assertion; production verifier unchanged",
           "rootVerdict": "ACCEPTED after direct-owner-authorized evidence correction and independent inspection",
-          "mergeCommits": ["4435da648752d5dadcbecab42d62632b19256eca", "05ead37ed39a7a926786419f4fc0e108d9a440b9"]
+          "mergeCommits": [
+            "4435da648752d5dadcbecab42d62632b19256eca",
+            "05ead37ed39a7a926786419f4fc0e108d9a440b9"
+          ]
         },
         "laneE": {
           "status": "integrated_green",
@@ -671,7 +678,9 @@
       "status": "done",
       "owner": "root (claude-opus-5)",
       "workerIndependenceClaimed": false,
-      "dependencies": ["P1-006"],
+      "dependencies": [
+        "P1-006"
+      ],
       "base": "7701963721ef485ca743c0886efd61cf9313ce37",
       "branch": "feature/wave-b-appointments then feature/wave-b-appointments-completion",
       "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-wave-b-appointments-wt",
@@ -751,15 +760,23 @@
     {
       "id": "P2-006",
       "title": "Shared cases and projects engine",
-      "status": "in_progress_c1_integrated",
+      "status": "done",
       "owner": "root (claude-opus-5)",
       "workerIndependenceClaimed": false,
-      "dependencies": ["P2-002"],
+      "dependencies": [
+        "P2-002"
+      ],
       "base": "872fed1f2e77c4981ca4a2f43115957657652439",
-      "branch": "feature/wave-c-cases",
+      "branch": "feature/wave-c-cases-runtime",
       "worktree": "C:\\Users\\shubh\\Desktop\\Projects\\personal projects\\personai-wave-c-cases-wt",
-      "mergeCommit": "d08a5a4aa18ac33c1fb2f8374e03ce3cf4a1ede6",
-      "commits": { "C1_schema": "fc5bceff9a944eddf78a7365cc58953344b2606e" },
+      "mergeCommit": "862e5ef",
+      "commits": {
+        "C1_schema": "fc5bceff9a944eddf78a7365cc58953344b2606e",
+        "C1_integration": "d08a5a4aa18ac33c1fb2f8374e03ce3cf4a1ede6",
+        "C2_runtime": "9bd9529",
+        "C3_apis_ui": "6187893",
+        "waveC_integration": "862e5ef"
+      },
       "scope": "One cases/projects engine for consultants, agencies, CA/accounting practices, events and real estate. No per-industry fork.",
       "c1": {
         "added": "8 enums; 10 tables (CaseIntake, CaseProject, CaseBrief, CaseMilestone, CaseDeliverable, CaseDocumentRequest, CaseInvoice, CaseTaskLink, CaseApprovalLink, append-only CaseEvent); one append-only trigger reusing reject_append_only_mutation().",
@@ -796,7 +813,46 @@
           "secretScan": "0 hits"
         }
       },
-      "remaining": "C2 cases runtime and C3 APIs plus Business OS UI are NOT implemented. The schema exists, so both are runtime/surface work needing no further migration."
+      "c2": {
+        "files": "src/lib/cases/{lifecycle,shared,engine,workflow,index}.ts",
+        "composes": "TaskJob for background work, Approval+WorkflowRun for approvals, ProfileDocument for uploads, Contact for clients, Location for the site boundary, Payment via CaseInvoice.paymentId. No parallel task, approval, contact, document or accounting table.",
+        "approvalGating": "CaseDeliverable DELIVERED requires a CaseApprovalLink whose Approval.state is approved. Delivery is externally visible and irreversible, so it is gated rather than optimistic.",
+        "documentGating": "CaseDocumentRequest RECEIVED requires a real ProfileDocument id; an empty receipt is refused as CONFLICT rather than recorded falsely.",
+        "timeComparisons": "Prisma typed queries only. Raw SQL Date parameters bind as local wall-clock against timestamp-without-time-zone while Prisma writes UTC, which silently disabled an overlap check in an earlier wave.",
+        "workflowRunNote": "Approval.workflowRunId is NOT NULL, so a case approval creates a real WorkflowRun (workflowKey cases.approval, state awaiting_approval) instead of a synthetic row.",
+        "harness": "scripts/one-off/check-case-runtime.ts, 67 assertions, normal 0 / inverted 1 / restored 0",
+        "externalCalls": "globalThis.fetch replaced by a counting blocker for the whole run; 0 calls measured, not asserted in prose"
+      },
+      "c3": {
+        "files": "src/lib/cases/{http,runtime}.ts; 18 routes under src/app/api/platform/cases/** and /case-intakes/**; src/components/business-os/{cases-panel,case-detail-panel,cases-shared}.{tsx,ts}; mounted in business-os-shell.tsx",
+        "routeLayout": "Intakes live under /api/platform/case-intakes rather than /cases/intakes so a static segment can never shadow the [id] parameter.",
+        "errorSplit": "Unknown enum values are validated against the owning lifecycle flow before the engine sees them, keeping 400 (not a status) distinct from 409 (not a legal move from here).",
+        "nonEnumeration": "A foreign case and a nonexistent case are byte-identical on read and on mutation, asserted by string equality of the response body, not by convention.",
+        "uiHonesty": "No sample case, intake, milestone or invoice in source. Empty sub-lists say they are empty. Billing copy states no money moves from the screen. Case status buttons come from server-computed allowedTransitions so the UI cannot offer a transition the write boundary would refuse.",
+        "a11y": "aria-live=polite + aria-busy=true + sr-only labels on both loading states, aria-expanded on the detail disclosure, every Input has an associated Label, h4/h5 section headings. 19 new explicit assertions in check-business-os-a11y.",
+        "engineChange": "CaseRecord now projects openedAt/deliveredAt/closedAt/cancelledAt. Additive: the rows were already selected in full.",
+        "harness": "scripts/one-off/check-case-routes.ts, 75 assertions, normal 0 / inverted 1 / restored 0"
+      },
+      "gatesWaveC": {
+        "tip": "862e5ef",
+        "prismaValidate": 0,
+        "prismaGenerate": 0,
+        "tsc": 0,
+        "targetedLint": 0,
+        "checkHarnesses": "35 of 35 exit 0 (check-order-stream excluded as a known non-blocking precondition)",
+        "caseSchemaInvariants": "36/36",
+        "caseRuntime": "67/67",
+        "caseRoutes": "75/75",
+        "appointments": "authz 43/43, lifecycle 49/49, routes 56/56, schema invariants 39/39",
+        "reservations": "authz 36/36, routes 36/36, schema invariants 21/21",
+        "schemaInvariants": "18/18",
+        "relationRenameVerifier": "0 renamed across 73 pre-existing models, 0 new models this package",
+        "fixtureResidue": "zero; six case tables verified back to baseline and the CaseEvent append-only trigger verified re-armed",
+        "externalCalls": "zero, counted",
+        "secretScan": "0 real hits; the single match is a deliberate fake DSN in check-case-routes proving the 503 path leaks nothing",
+        "npmAuditOmitDev": "0 vulnerabilities",
+        "build": 0
+      }
     },
     {
       "id": "P2-004",
