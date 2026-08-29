@@ -2950,7 +2950,9 @@ it still does not have one.
 
 # Run close - 2026-08-29, seven hours, root-serial
 
-Started `2026-08-29 16:24:52 +05:30` from primary HEAD `34f8561`. Closing at `43d0fa5`.
+Started `2026-08-29 16:24:52 +05:30` from primary HEAD `34f8561`. The combined suite below was run
+on `43d0fa5`; this closing section and the `NEXT_ACTION.md` rewrite land on top of it as
+docs-only commits, so the final tip is `31957f7` and the gate results still hold.
 
 ## What was delivered
 
@@ -2966,11 +2968,11 @@ Started `2026-08-29 16:24:52 +05:30` from primary HEAD `34f8561`. Closing at `43
 | Access-tier enforcement | `581a03e` | tiers enforced where content is served, not merely enforceable |
 | Ledger reconciliation | `1f172eb`, `61670da`, `0427f25`, `edfd4c7`, `bb1548c`, `5d5d18f`, `43d0fa5` | seven ledger commits |
 
-Five capabilities promoted from `planned`/`partial` to `available`, each with an evidence file that
-exists: `commerce:variants`, `commerce:fulfilment`, `commerce:returns`,
-`casesProjects:retainers`, `contentCohorts:accessLevels`, `fieldJobs:intake`,
-`fieldJobs:dispatch` — seven, in fact. `retail-storefront-v1` went from draft to active, and **no
-blueprint is left in draft**.
+**Seven** capabilities moved from `planned` or `partial` to `available`, each citing an evidence
+file that exists: `commerce:variants`, `commerce:fulfilment`, `commerce:returns`,
+`casesProjects:retainers`, `contentCohorts:accessLevels`, `fieldJobs:intake` and
+`fieldJobs:dispatch`. `retail-storefront-v1` went from draft to active, and **no blueprint is left
+in draft**.
 
 ## Final combined suite on `43d0fa5`
 
