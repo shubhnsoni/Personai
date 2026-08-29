@@ -17,6 +17,7 @@
  */
 import { PrismaClient } from "@prisma/client"
 
+import { CourseAccessService } from "../../src/lib/cohorts/access"
 import { CohortService } from "../../src/lib/cohorts/engine"
 import { CohortApiService } from "../../src/lib/cohorts/http"
 import { CohortProgressService } from "../../src/lib/cohorts/progress"
@@ -108,7 +109,12 @@ async function main() {
     const tenancy = new PersistedTenancy(prisma, identity)
     const ctx = new CohortContext(prisma, tenancy)
     const progress = new CohortProgressService(ctx)
-    const api = new CohortApiService(new CohortService(ctx, progress), new CohortWorkflowService(ctx, progress))
+    const api = new CohortApiService(
+        new CohortService(ctx, progress),
+        new CohortWorkflowService(ctx, progress),
+        new CourseAccessService(ctx),
+        identity,
+    )
 
     const live = await prisma.$queryRawUnsafe<{ db: string }[]>("select current_database() as db")
     if (live[0].db !== AUTHORIZED_TARGET) {
@@ -437,6 +443,8 @@ async function main() {
         const brokenApi = new CohortApiService(
             new CohortService(brokenCtx, brokenProgress),
             new CohortWorkflowService(brokenCtx, brokenProgress),
+            new CourseAccessService(brokenCtx),
+            identity,
         )
         const broken = await call(brokenApi.list(get(`${COHORTS}?${q}`)))
         check("dependency failure is 503", broken.status === 503, `status=${broken.status}`)

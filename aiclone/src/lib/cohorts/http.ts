@@ -1,13 +1,18 @@
 import { PersistenceError } from "@/lib/persistence/errors"
+import type { PlatformIdentity } from "@/lib/persistence/tenancy"
 
+import type { CourseAccessService } from "./access"
 import type { CohortService } from "./engine"
 import {
+    ACCESS_GRANT_SOURCES,
+    accessGrantFlow,
     certificateFlow,
     cohortFlow,
     membershipFlow,
     renewalFlow,
     sessionFlow,
     submissionFlow,
+    type AccessGrantSourceValue,
 } from "./lifecycle"
 import type { CohortActor } from "./shared"
 import type { CohortWorkflowService } from "./workflow"
@@ -113,6 +118,19 @@ function status<T extends string>(
     return raw
 }
 
+function isGrantSource(value: unknown): value is AccessGrantSourceValue {
+    return typeof value === "string" && (ACCESS_GRANT_SOURCES as readonly string[]).includes(value)
+}
+
+/**
+ * A decision is not a lifecycle state the caller may name freely: only APPROVED and REJECTED are
+ * decisions. APPLIED and CANCELLED are reached through their own endpoints, so accepting them here
+ * would let a caller skip the apply step that moves the entitlement.
+ */
+function isChangeDecision(value: unknown): value is "APPROVED" | "REJECTED" {
+    return value === "APPROVED" || value === "REJECTED"
+}
+
 function serialise(value: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(value)) {
@@ -135,6 +153,8 @@ export class CohortApiService {
     constructor(
         private readonly cohorts: CohortService,
         private readonly flow: CohortWorkflowService,
+        private readonly access: CourseAccessService,
+        private readonly identity: PlatformIdentity,
     ) {}
 
     private run(op: () => Promise<Response>): Promise<Response> {
@@ -142,6 +162,19 @@ export class CohortApiService {
     }
     private actor(): CohortActor {
         return { actorType: "STAFF", actorId: null }
+    }
+
+    /**
+     * Who decided an access change, resolved from the server session and never from the body.
+     * A caller-supplied `decidedBy` would let an owner attribute their own decision to somebody
+     * else, which is exactly the kind of field an audit trail must not accept from outside.
+     */
+    private async decidedBy(): Promise<string> {
+        const userId = await this.identity.userId()
+        if (!userId) {
+            throw new PersistenceError("UNAUTHORIZED", "Authentication is required")
+        }
+        return userId
     }
 
     // ---- cohorts -------------------------------------------------------
@@ -498,5 +531,256 @@ export class CohortApiService {
             )
             return success({ membership: serialise({ ...row }) })
         })
+    }
+
+    // ====================================================================
+    // Course access levels (G3/G6 owner surface)
+    //
+    // These endpoints are the OWNER path only. They all route through
+    // CourseAccessService, which composes CohortContext, so tenancy is the same profileId
+    // bridge as every other method above and a foreign resource is refused identically to
+    // one that does not exist.
+    //
+    // The learner path is deliberately absent from this class. LearnerAccessService takes
+    // no workspaceId and is reached from the library page with a Member cookie; exposing it
+    // here would put a learner behind the workspace-scoped tenancy bridge and hand them a
+    // probe for other tenants.
+    // ====================================================================
+
+    // ---- tiers ---------------------------------------------------------
+
+    listAccessLevels(request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({
+                levels: serialiseAll(
+                    await this.access.listLevels(param(request, "workspaceId"), param(request, "courseId")),
+                ),
+            }),
+        )
+    }
+
+    defineAccessLevel(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const record = await this.access.defineLevel(
+                str(input.workspaceId, "workspaceId"),
+                {
+                    courseId: str(input.courseId, "courseId"),
+                    key: str(input.key, "key"),
+                    label: str(input.label, "label"),
+                    rank: int(input.rank, "rank"),
+                    description: nullableStr(input.description, "description"),
+                    priceCents: optInt(input.priceCents, "priceCents"),
+                },
+                this.actor(),
+            )
+            return success({ level: serialise({ ...record }) }, 201)
+        })
+    }
+
+    retireAccessLevel(accessLevelId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const record = await this.access.deactivateLevel(
+                param(request, "workspaceId"),
+                param(request, "courseId"),
+                accessLevelId,
+                this.actor(),
+            )
+            return success({ level: serialise({ ...record }) })
+        })
+    }
+
+    // ---- lesson visibility rules ---------------------------------------
+
+    listAccessLessonRules(request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({
+                rules: serialiseAll(
+                    await this.access.listLessonRules(param(request, "workspaceId"), param(request, "courseId")),
+                ),
+            }),
+        )
+    }
+
+    setAccessLessonRule(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const rule = await this.access.setLessonRule(
+                str(input.workspaceId, "workspaceId"),
+                {
+                    courseId: str(input.courseId, "courseId"),
+                    lessonId: str(input.lessonId, "lessonId"),
+                    // Null is meaningful: it removes the rule and returns the lesson to being
+                    // visible to everybody, so it must not be conflated with "missing".
+                    accessLevelId: nullableStr(input.accessLevelId, "accessLevelId"),
+                },
+                this.actor(),
+            )
+            return success({ rule: serialise({ ...rule }) })
+        })
+    }
+
+    // ---- entitlements --------------------------------------------------
+
+    getAccessGrant(request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({
+                grant: serialise({
+                    ...(await this.access.getGrant(
+                        param(request, "workspaceId"),
+                        param(request, "courseId"),
+                        param(request, "enrollmentId"),
+                    )),
+                }),
+            }),
+        )
+    }
+
+    createAccessGrant(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const result = await this.access.grant(
+                str(input.workspaceId, "workspaceId"),
+                {
+                    courseId: str(input.courseId, "courseId"),
+                    enrollmentId: str(input.enrollmentId, "enrollmentId"),
+                    accessLevelId: str(input.accessLevelId, "accessLevelId"),
+                    source:
+                        input.source === undefined || input.source === null || input.source === ""
+                            ? null
+                            : status(input.source, isGrantSource, "grant source", "source"),
+                    expiresAt: optDate(input.expiresAt, "expiresAt"),
+                    paymentId: nullableStr(input.paymentId, "paymentId"),
+                },
+                this.actor(),
+            )
+            // One grant per enrolment, so a repeat is a replay of the same row rather than a
+            // refusal or a duplicate; 200 distinguishes it from the 201 that created it.
+            return success(
+                { grant: serialise({ ...result.grant }), replayed: result.replayed },
+                result.replayed ? 200 : 201,
+            )
+        })
+    }
+
+    transitionAccessGrant(grantId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const record = await this.access.transitionGrant(
+                str(input.workspaceId, "workspaceId"),
+                str(input.courseId, "courseId"),
+                grantId,
+                status(input.state, accessGrantFlow.is, "access grant", "state"),
+                this.actor(),
+                nullableStr(input.reason, "reason"),
+            )
+            return success({ grant: serialise({ ...record }) })
+        })
+    }
+
+    // ---- upgrades and downgrades ---------------------------------------
+
+    listAccessChanges(grantId: string, request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({
+                changes: serialiseAll(
+                    await this.access.listChanges(
+                        param(request, "workspaceId"),
+                        param(request, "courseId"),
+                        grantId,
+                    ),
+                ),
+            }),
+        )
+    }
+
+    requestAccessChange(grantId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            // The direction is derived from the ranks by the engine, never taken from the caller,
+            // so a downgrade cannot be presented as an upgrade.
+            const result = await this.access.requestChange(
+                str(input.workspaceId, "workspaceId"),
+                str(input.courseId, "courseId"),
+                grantId,
+                {
+                    toAccessLevelId: str(input.toAccessLevelId, "toAccessLevelId"),
+                    reason: nullableStr(input.reason, "reason"),
+                    idempotencyKey: nullableStr(input.idempotencyKey, "idempotencyKey"),
+                },
+                this.actor(),
+            )
+            return success(
+                { change: serialise({ ...result.change }), replayed: result.replayed },
+                result.replayed ? 200 : 201,
+            )
+        })
+    }
+
+    decideAccessChange(changeId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const decision = status(input.decision, isChangeDecision, "decision", "decision")
+            const record = await this.access.decideChange(
+                str(input.workspaceId, "workspaceId"),
+                str(input.courseId, "courseId"),
+                changeId,
+                decision,
+                await this.decidedBy(),
+                this.actor(),
+                nullableStr(input.note, "note"),
+            )
+            return success({ change: serialise({ ...record }) })
+        })
+    }
+
+    applyAccessChange(changeId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            // NOTHING HERE TAKES A PAYMENT. invoiceRef and paymentId are strings an owner may
+            // record after settling up elsewhere; no Payment row is read or written.
+            const result = await this.access.applyChange(
+                str(input.workspaceId, "workspaceId"),
+                str(input.courseId, "courseId"),
+                changeId,
+                this.actor(),
+                {
+                    invoiceRef: nullableStr(input.invoiceRef, "invoiceRef"),
+                    paymentId: nullableStr(input.paymentId, "paymentId"),
+                },
+            )
+            return success({
+                change: serialise({ ...result.change }),
+                grant: serialise({ ...result.grant }),
+            })
+        })
+    }
+
+    // ---- owner views ---------------------------------------------------
+
+    accessVisibility(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const report = await this.access.visibilityFor(
+                param(request, "workspaceId"),
+                param(request, "courseId"),
+                param(request, "enrollmentId"),
+            )
+            return success({
+                visibility: {
+                    ...report,
+                    lessons: report.lessons.map((lesson) => ({ ...lesson })),
+                },
+            })
+        })
+    }
+
+    accessTimeline(request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({
+                events: serialiseAll(
+                    await this.access.timeline(param(request, "workspaceId"), param(request, "courseId")),
+                ),
+            }),
+        )
     }
 }
