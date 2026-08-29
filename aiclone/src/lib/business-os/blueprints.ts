@@ -334,7 +334,7 @@ const builtInBlueprints: BusinessBlueprint[] = [
  * are not owner-authored configuration. Each is validated at module load, so a malformed
  * template fails the build rather than reaching a request.
  */
-export const businessBlueprintRegistry = builtInBlueprints.map(assertValidBusinessBlueprint)
+export const businessBlueprintRegistry = builtInBlueprints.map((blueprint) => assertValidBusinessBlueprint(blueprint))
 
 const duplicateBlueprintIds = businessBlueprintRegistry
   .map((blueprint) => blueprint.id)

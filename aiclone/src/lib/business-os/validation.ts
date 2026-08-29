@@ -83,19 +83,11 @@ export function validateBusinessBlueprint(
   return { ok: issues.length === 0, issues }
 }
 
-export function assertValidBusinessBlueprint(blueprint: BusinessBlueprint): BusinessBlueprint
 export function assertValidBusinessBlueprint(
   blueprint: BusinessBlueprint,
-  registry: Readonly<Record<string, EngineDescriptor>>,
-): BusinessBlueprint
-export function assertValidBusinessBlueprint(
-  blueprint: BusinessBlueprint,
-  registry: Readonly<Record<string, EngineDescriptor>> | number = businessEngineDescriptors,
+  registry: Readonly<Record<string, EngineDescriptor>> = businessEngineDescriptors,
 ) {
-  const result = validateBusinessBlueprint(
-    blueprint,
-    typeof registry === "number" ? businessEngineDescriptors : registry,
-  )
+  const result = validateBusinessBlueprint(blueprint, registry)
   if (!result.ok) {
     throw new Error(result.issues.map((item) => `${item.path}: ${item.message}`).join("\n"))
   }
