@@ -2691,3 +2691,93 @@ just going red.
 **No APIs and no owner surfaces, same as G3.** The brief asked to *begin* the foundation, and
 claiming a surface would have meant building one. That is recorded in `NEXT_ACTION.md` so two
 available capabilities are not read as two finished features.
+
+
+---
+
+## Retainers, end to end - the HTTP surface and the owner panel
+
+Two commits on `recovered/aug20-wt-pr-32`: `9ca772e` (10 routes) and `4ebaf2a` (owner panel).
+The retainer engine landed in Wave G3 with no way to reach it; this closes that.
+
+**An integration deviation, recorded rather than glossed.** Both commits went **directly onto
+the primary branch**, not through a feature branch and `--no-ff` merge like Waves G, G3 and G4.
+The branch-then-merge pattern exists to keep unvalidated work off the integration tip, and every
+gate below was run on exactly this tree, so that protection was obtained a different way. Neither
+commit carried a migration; a schema-bearing package would still warrant the branch.
+
+### The HTTP layer went where the existing one is
+
+The retainer methods live on `CaseApiService` rather than on a service of their own, for the same
+reason `CaseRetainerService` composes `CaseContext`: the envelope, the status map, the
+server-derived actor and the 503 catch-all are already there, and a second HTTP boundary would be
+a second place for them to drift. `CaseApiService` gained a fourth constructor argument, so
+`check-case-routes` needed updating — it still passes 75/75, which is the point of touching it
+rather than working around it.
+
+### What the route harness measures rather than asserts
+
+- **Non-enumeration, byte for byte.** A foreign retainer and a nonexistent one produce an
+  identical status *and* an identical body, compared by serializing both rather than by asserting
+  two 403s. Checked twice: once for a signed-in owner naming someone else's workspace, and once
+  for a genuinely different signed-in tenant.
+- **400 is not 409, on the same field.** `basis: "HOURS"` is 400 because the vocabulary check runs
+  before the state machine; units *and* money together is 409 because the value was understood and
+  refused. Likewise `state: "SLEEPING"` is 400 while a legal-but-out-of-order `"PAUSED"` is 409.
+  Two different mistakes, two different answers, one field.
+- **A 409 keeps its numbers.** The over-credit refusal is asserted to contain the actual used
+  figure, not just a status code.
+- **Overage is accepted over HTTP too.** A draw past the allowance returns 201 and the body
+  reports `overage: 16`.
+- **No payment route exists.** The `Payment` row count is captured and re-checked after `DRAFT`,
+  `ISSUED` against a real `CaseInvoice`, and `PAID` have all been driven through HTTP.
+- **The 503 leaks nothing.** A broken client whose underlying error contains a fake DSN produces
+  `DEPENDENCY_UNAVAILABLE` with no DSN, host or driver text in the body.
+- **One envelope shape.** The 200, 201, 400, 401, 403, 409 and 503 responses are each asserted to
+  carry exactly `{ok,data}` or `{ok,error}` and nothing else.
+
+Re-linking a case returns 200 with `linked: false` rather than an error, matching the replay
+convention every other idempotent write on this surface already uses.
+
+### The panel's job is mostly to stop a retainer looking like a payment
+
+Billing state is stated to be a record and not a charge **twice** — in the card description and
+again beside the buttons that change it, because the second is where an owner actually reads it.
+Overage is shown with its reason: "recorded rather than refused, so it can be billed". An owner
+who cannot see overage cannot bill for it.
+
+The balance section says its figures are recomputed from the ledger on every read rather than
+stored. The ledger section says each row holds the balance it produced at the time rather than a
+recalculation. Auto-renew is disclosed as intent only, so the word does not imply a timer that
+does not exist.
+
+**The panel performs no arithmetic on any balance, and that is asserted rather than intended.**
+No `Math.round`, no `Math.max`, no subtracting remaining from included — every number is rendered
+as the server computed it, and the harness checks for the *absence* of those operations. The
+moment a browser starts working out a balance there are two answers to what the client owes.
+
+One helper formats an allowance by basis, so a units agreement is never printed as money and a
+money agreement never as a count. Printing "USD 0.20" where the contract says twenty units would
+be a quiet lie about the contract.
+
+Every action button — retainer, period and billing — renders from server-computed
+`allowedTransitions`. A terminal retainer and a terminal period each explain why they have no
+actions rather than simply showing none. A retainer with no open period says so instead of showing
+a draw form that would be refused, and the draw form states the two rules a caller would otherwise
+discover by being refused.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `check-retainer-routes` | 62/62; inverted 61/62 exit 1 |
+| `check-case-routes` | 75/75 after the constructor change |
+| `check-business-os-a11y` | PASS, 150 assertions (127 -> 150) |
+| check harnesses | **51 of 51 exit 0** |
+| app `tsc --noEmit` | 0 |
+| targeted ESLint | 0 problems, 0 warnings |
+| repo-wide ESLint | 78 problems - unchanged by either commit |
+| production build | exit 0; all 10 retainer routes emitted as dynamic server routes |
+
+**Still missing, and named so nobody has to discover it:** course access levels and field jobs
+have engines with no HTTP surface and no owner panel. No capability description claims otherwise.

@@ -842,3 +842,34 @@ Do not begin any schema package with less than 90 minutes remaining.
 - `check-order-stream` precondition: still unmet, still non-blocking.
 - Gateway on port 5476: LISTENING (pid 54756), no KiroCrew MCP server registered with the client.
   Owner action. Every wave in this run has been root-serial.
+
+
+---
+
+## Retainers completed end to end
+
+Two commits directly on `recovered/aug20-wt-pr-32`, not through a feature branch. That deviation
+is recorded in RUNLOG and in P2-014 rather than glossed; neither commit carried a migration, and
+every gate was run on exactly the integrated tree.
+
+| Commit | Slice | Gate result |
+|---|---|---|
+| `9ca772e` | 10 HTTP routes | `check-retainer-routes` 62/62 (inverted 61/62); `check-case-routes` 75/75; 51/51 sweep |
+| `4ebaf2a` | owner panel | `check-business-os-a11y` PASS at 150 assertions; 51/51 sweep; build 0 |
+
+Retainers now have schema, runtime, an HTTP surface and an owner panel.
+
+### Next in queue
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| Access-level surface | API + panel for `contentCohorts:accessLevels` | The engine exists with no surface. **Extra wrinkle:** there are TWO principals. `CourseAccessService` is the owner path and composes `CohortContext`; `LearnerAccessService` takes no `workspaceId` at all and must not start accepting one, because that would hand a learner a probe for other people's tenancy. Two route trees, not one. |
+| Field-job surface | API + panel for `fieldJobs:intake` and `:dispatch` | The engine exists with no surface. Single principal, so simpler than access levels. |
+| G5 | `fieldJobs:inspection` | Read the empty-registry warning in NEXT_ACTION first: it is the last `planned` capability anywhere, so promoting it means REWRITING the capability-contract planned negative test against a synthetic descriptor, not repointing it. |
+| P1-009 slice 3 | repo-wide lint | 78 problems. `no-unused-vars` is down to 11 and the survivors are documented in P1-009 as needing judgement; `no-explicit-any` (24) is the next largest tractable rule. |
+| G2 | appointments providers | Still **owner-gated**. |
+
+The retainer package is the worked example for the two surface packages above, and it shows the
+cheaper route: add methods to the domain's EXISTING api service rather than creating a second HTTP
+boundary, because a second boundary is a second place for the envelope, the status map and the
+server-derived actor to drift.
