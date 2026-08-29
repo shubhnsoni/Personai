@@ -119,11 +119,13 @@ check(
 check("all registry blueprints validate", listBusinessBlueprints().every((blueprint) => validateBusinessBlueprint(blueprint).ok))
 
 // Negative test: an active blueprint may not REQUIRE a capability whose maturity is
-// still planned. It targets commerce:returns, which is genuinely planned. It previously
-// targeted venueOrders.reservations, then commerce:inventory; each time a wave made the
-// target real the assertion would have become vacuous, so it is repointed at a capability
-// that is still actually planned rather than left to pass for free. The non-vacuity
-// assertion below is what forces that maintenance.
+// still planned. It targets fieldJobs:dispatch, which is genuinely planned. It previously
+// targeted venueOrders.reservations, then commerce:inventory, then commerce:returns; each
+// time a wave made the target real the assertion would have become vacuous, so it is
+// repointed at a capability that is still actually planned rather than left to pass for
+// free. Wave G is the third such repoint: returns became available, so it can no longer
+// serve as the planned example. The non-vacuity assertion below is what forces that
+// maintenance.
 const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   id: "invalid-active-planned-capability",
   version: "1.0.0",
@@ -131,7 +133,7 @@ const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   name: "Invalid active blueprint",
   vertical: "contract-test",
   summary: "Negative test: active blueprints cannot require planned capabilities.",
-  engines: [{ engineId: "commerce", capabilities: ["returns"], required: true }],
+  engines: [{ engineId: "fieldJobs", capabilities: ["dispatch"], required: true }],
   workflows: [],
   ownerCopilotPrompts: [],
 }
@@ -264,8 +266,12 @@ check(
   businessEngineDescriptors.appointments.capabilities.find((c) => c.id === "reminders")?.maturity === "partial",
 )
 check(
-  "commerce returns is still planned, so the planned negative test is not vacuous",
-  businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "returns")?.maturity === "planned",
+  "commerce returns is now available, so it can no longer serve as the planned example",
+  businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "returns")?.maturity === "available",
+)
+check(
+  "fieldJobs dispatch is still planned, so the planned negative test is not vacuous",
+  businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "dispatch")?.maturity === "planned",
 )
 
 // Wave E and F activations, asserted individually so a silent status regression is caught.
@@ -277,17 +283,18 @@ for (const [blueprintId, expectedStatus] of [
   ["coaching-studio-v2", "active"],
   ["consulting-agency-v1", "active"],
   ["ca-practice-v1", "active"],
-  ["retail-storefront-v1", "draft"],
+  ["retail-storefront-v1", "active"],
 ] as Array<[string, string]>) {
   const blueprint = getBusinessBlueprint(blueprintId)
   check(`${blueprintId} exists`, blueprint !== null)
   check(`${blueprintId} status is ${expectedStatus}`, blueprint?.status === expectedStatus, blueprint?.status)
 }
 
-// Retail must stay draft, and now for a narrower reason: inventory became real in Wave F,
-// so the thing blocking it is variants, fulfilment and returns. Those are REQUIRED
-// capabilities on the blueprint precisely so that activating it is mechanically rejected,
-// which is proven here rather than trusted.
+// Retail is active as of Wave G. The previous version of this block asserted the opposite —
+// "activating retail is still rejected" — and named variants, fulfilment and returns as the
+// reason. That assertion is now inverted rather than deleted, because the interesting claim
+// is not "retail is active" (a string in blueprints.ts) but "retail activation is what the
+// validator produces given the real capability registry".
 const retail = getBusinessBlueprint("retail-storefront-v1")
 check("retail storefront requires inventory", retail?.engines[0]?.capabilities.includes("inventory") === true)
 check(
@@ -295,19 +302,95 @@ check(
   ["variants", "fulfilment", "returns"].every((c) => retail?.engines[0]?.capabilities.includes(c) === true),
 )
 const retailActivation = retail === null ? null : validateBusinessBlueprint({ ...retail, status: "active" })
-check("activating retail is still rejected", retailActivation !== null && !retailActivation.ok)
+checkInvertible("activating retail is accepted", retailActivation !== null && retailActivation.ok)
 check(
-  "the retail rejection names variants, fulfilment and returns, not inventory",
-  (() => {
-    const messages = (retailActivation?.issues ?? []).map((i) => i.message).join(" | ")
-    return (
-      /variants/.test(messages) &&
-      /fulfilment/.test(messages) &&
-      /returns/.test(messages) &&
-      !/inventory/.test(messages)
-    )
-  })(),
+  "retail activation carries no outstanding issue",
+  (retailActivation?.issues ?? []).length === 0,
   (retailActivation?.issues ?? []).map((i) => i.message).join(" | ").slice(0, 200),
+)
+check(
+  "every capability retail requires is available with an evidence file that exists",
+  (retail?.engines[0]?.capabilities ?? []).every((capabilityId) => {
+    const capability = businessEngineDescriptors.commerce.capabilities.find((c) => c.id === capabilityId)
+    return capability?.maturity === "available" && existsSync(join(APP_ROOT, capability.evidence))
+  }),
+)
+
+// Required by the wave brief: activation must fail when ANY ONE required capability is
+// downgraded. Asserted by temporarily downgrading each of the six in the real registry and
+// re-running the real validator, rather than by constructing a fake registry — a fake one
+// would only prove that the fake is wired up. Each downgrade is reverted immediately and
+// the revert is verified at the end, so this test cannot leak state into later assertions.
+const retailRequired = retail?.engines[0]?.capabilities ?? []
+const downgradeEvidence: Array<{ capability: string; downgradedTo: string; rejected: boolean; named: boolean }> = []
+for (const capabilityId of retailRequired) {
+  const capability = businessEngineDescriptors.commerce.capabilities.find((c) => c.id === capabilityId)
+  if (!capability || retail === null) continue
+  for (const downgradedTo of ["partial", "planned"] as const) {
+    const original = capability.maturity
+    capability.maturity = downgradedTo
+    const result = validateBusinessBlueprint({ ...retail, status: "active" })
+    capability.maturity = original
+    const messages = result.issues.map((i) => i.message).join(" | ")
+    downgradeEvidence.push({
+      capability: capabilityId,
+      downgradedTo,
+      rejected: !result.ok,
+      named: messages.includes(`commerce:${capabilityId}`),
+    })
+    checkInvertible(
+      `downgrading commerce:${capabilityId} to ${downgradedTo} blocks retail activation`,
+      !result.ok,
+    )
+    check(
+      `the ${capabilityId}/${downgradedTo} rejection names the capability it blocked on`,
+      messages.includes(`commerce:${capabilityId}`) && messages.includes(`maturity is ${downgradedTo}`),
+      messages.slice(0, 160),
+    )
+  }
+}
+check(
+  "the downgrade test covered all six required retail capabilities in both directions",
+  downgradeEvidence.length === 12 && new Set(downgradeEvidence.map((d) => d.capability)).size === 6,
+  `${downgradeEvidence.length} cases`,
+)
+// The registry must be exactly as it was before the downgrade loop ran, or every assertion
+// after this point would be reading mutated state.
+check(
+  "the capability registry is restored after the downgrade test",
+  ["catalog", "orders", "inventory", "variants", "fulfilment", "returns"].every(
+    (c) => businessEngineDescriptors.commerce.capabilities.find((x) => x.id === c)?.maturity === "available",
+  ),
+)
+const retailAfterDowngradeTest = retail === null ? null : validateBusinessBlueprint({ ...retail, status: "active" })
+check(
+  "retail still activates cleanly after the downgrade test restored the registry",
+  retailAfterDowngradeTest !== null && retailAfterDowngradeTest.ok,
+)
+
+// Wave G must not let an activation imply an integration. These three are the claims a
+// reader would most reasonably assume from an active retail storefront, and none of them
+// is true, so the blueprint text has to say so.
+const retailProse = `${retail?.summary ?? ""}`
+check(
+  "the retail summary does not claim a carrier integration",
+  !/\b(carrier api|carrier integration|live tracking|real-time tracking)\b/i.test(retailProse),
+)
+check(
+  "the retail summary states that tracking is owner-entered and refunds are not executed",
+  /owner-entered/i.test(retailProse) && /referenced rather than executed/i.test(retailProse),
+)
+check(
+  "the fulfilment capability description states that no carrier is contacted",
+  /No carrier is contacted/i.test(
+    businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "fulfilment")?.description ?? "",
+  ),
+)
+check(
+  "the returns capability description states that no refund is executed",
+  /No refund is executed/i.test(
+    businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "returns")?.description ?? "",
+  ),
 )
 
 report.granularCapabilities = requiredGranularCapabilities
@@ -327,6 +410,13 @@ report.restaurantBlueprint = {
 report.negativeTest = {
   rejected: !negativeResult.ok,
   issues: negativeResult.issues,
+}
+report.retailActivation = {
+  status: retail?.status,
+  accepted: retailActivation?.ok === true,
+  required: retail?.engines[0]?.capabilities,
+  downgradeCases: downgradeEvidence.length,
+  downgradeAllRejected: downgradeEvidence.every((d) => d.rejected && d.named),
 }
 report.waveE = {
   activeBlueprints: activeBlueprints.map((blueprint) => ({

@@ -31,23 +31,26 @@ export const businessEngineDescriptors: Record<BusinessEngineId, EngineDescripto
       {
         id: "variants",
         label: "Variants",
-        description: "Independently selectable product options and pricing variants.",
-        maturity: "partial",
-        evidence: "src/components/dashboard/quick-add-sheet.tsx",
+        description:
+          "Independently sellable variants of a product, with option sets, ordinals, per-variant SKU and optional per-variant price. A variant with no price inherits the product price rather than copying it, so a product price change is not silently forked. Every pre-existing product resolves through one deterministic default variant (var_<productId>), stock is held against the variant rather than the product, and a partial unique index enforces one default per product in the database.",
+        maturity: "available",
+        evidence: "src/lib/commerce/variants.ts",
       },
       {
         id: "fulfilment",
         label: "Fulfilment",
-        description: "Physical and digital delivery state after an order is placed.",
-        maturity: "partial",
-        evidence: "src/components/dashboard/quick-add-sheet.tsx",
+        description:
+          "Shipments against an order, including partial shipments, guarded state transitions, and owner-entered carrier and tracking metadata. No carrier is contacted: tracking is whatever the owner types. Stock leaves at SHIPPED by consuming the existing inventory hold, not at pack time, and a shipped shipment cannot be cancelled.",
+        maturity: "available",
+        evidence: "src/lib/commerce/fulfilment.ts",
       },
       {
         id: "returns",
         label: "Returns",
-        description: "Return requests, approvals, item receipt, and refunds.",
-        maturity: "planned",
-        evidence: "none",
+        description:
+          "Return requests, approval, rejection and item receipt, with eligibility derived from what has actually shipped or been delivered minus what a live return already claims. Restock is idempotent per return item via a stored movement id, so replaying a receipt does not double-count stock. No refund is executed here; a refund payment is only referenced.",
+        maturity: "available",
+        evidence: "src/lib/commerce/returns.ts",
       },
     ],
   },
