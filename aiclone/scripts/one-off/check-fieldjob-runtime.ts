@@ -22,6 +22,16 @@
  *
  *   ts-node -r tsconfig-paths/register scripts/one-off/check-fieldjob-runtime.ts
  */
+// The blocker MUST be the first import: its side effect has to run before any module under test
+// is evaluated. W3 audit finding 8 - the previous in-file blocker installed after these imports had
+// already been evaluated, so "zero external calls" described only the window it was watching.
+import {
+    EXTERNAL_CALL_BLOCKER_INSTALLED,
+    externalCallCount,
+    externalCallLog,
+    restoreExternalCalls,
+} from "../lib/external-call-blocker"
+
 import { PrismaClient } from "@prisma/client"
 
 import { FieldJobIntakeService, FieldJobService } from "../../src/lib/fieldjobs/engine"
@@ -46,13 +56,14 @@ const results: Array<{ name: string; pass: boolean; detail: string }> = []
 function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
+/**
+ * Flipped at RECORD time by INVERT_ASSERTION=1, so each load-bearing assertion's ability to fail is
+ * individually proven. Identical to check() when the variable is unset.
+ */
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    results.push({ name, pass: INVERT ? !pass : pass, detail })
+}
 
-let fetchCalls = 0
-const realFetch = globalThis.fetch
-globalThis.fetch = (async (...args: unknown[]) => {
-    fetchCalls += 1
-    throw new Error(`BLOCKED external call: ${String(args[0])}`)
-}) as unknown as typeof fetch
 
 class ControlledIdentity implements PlatformIdentity {
     current: string | null = null
@@ -76,6 +87,23 @@ function why(o: Envelope): string {
 }
 function envelope(o: Envelope): string {
     return JSON.stringify(o)
+}
+
+/**
+ * Like attempt(), but keeps the WHOLE driver message.
+ *
+ * Deliberately separate from Envelope: envelope() is serialized for the byte-identical
+ * non-enumeration comparison, and raw driver text contains row ids, so folding it into that type
+ * would make a foreign refusal and a ghost refusal differ and silently break the very property
+ * that comparison exists to prove.
+ */
+async function attemptRaw(fn: () => Promise<unknown>): Promise<{ ok: boolean; raw: string }> {
+    try {
+        await fn()
+        return { ok: true, raw: "" }
+    } catch (e) {
+        return { ok: false, raw: String((e as Error).message).replace(/\s+/g, " ") }
+    }
 }
 
 const actor = { actorType: "STAFF" as const, actorId: "harness" }
@@ -332,7 +360,7 @@ async function main() {
 
         await jobs.transition(ids.wsA, job.id, "SCHEDULED", actor)
         const noLead = await attempt(() => jobs.transition(ids.wsA, job.id, "DISPATCHED", actor))
-        check(
+        checkInvertible(
             "MEASURED: a job cannot be dispatched with nobody assigned - a status table alone would allow it",
             !noLead.ok && noLead.code === "CONFLICT",
             why(noLead),
@@ -353,7 +381,7 @@ async function main() {
 
         await jobs.transition(ids.wsA, job.id, "DISPATCHED", actor)
         const noOnSite = await attempt(() => jobs.transition(ids.wsA, job.id, "IN_PROGRESS", actor))
-        check(
+        checkInvertible(
             "MEASURED: work cannot start until a technician is actually on site",
             !noOnSite.ok && noOnSite.code === "CONFLICT",
             why(noOnSite),
@@ -370,7 +398,7 @@ async function main() {
         const foreignTech = await attempt(() => jobs.assign(ids.wsA, job.id, { resourceId: ids.techB }, actor))
         const ghostTech = await attempt(() => jobs.assign(ids.wsA, job.id, { resourceId: `${RUN}_ghosttech` }, actor))
         check("another profile's technician cannot be assigned", !foreignTech.ok && foreignTech.code === "FORBIDDEN", why(foreignTech))
-        check(
+        checkInvertible(
             "a foreign technician and a nonexistent one produce byte-identical refusals",
             envelope(foreignTech) === envelope(ghostTech),
             `${envelope(foreignTech)} vs ${envelope(ghostTech)}`,
@@ -405,7 +433,7 @@ async function main() {
 
         await jobs.transition(ids.wsA, job.id, "IN_PROGRESS", actor)
         const earlyComplete = await attempt(() => jobs.transition(ids.wsA, job.id, "COMPLETED", actor))
-        check(
+        checkInvertible(
             "MEASURED: a job is not complete while a technician is still mid-visit, and the refusal names how many",
             !earlyComplete.ok && earlyComplete.code === "CONFLICT" && /still mid-visit/.test((earlyComplete as { message: string }).message),
             why(earlyComplete),
@@ -447,17 +475,33 @@ async function main() {
             actors.has("STAFF") && actors.has("TECHNICIAN"),
             [...actors].join(","),
         )
-        const rewrite = await attempt(() =>
+        // W3 audit finding 3: this asserted only `!rewrite.ok`. attempt() maps ANY unexpected
+        // error to UNEXPECTED, so a missing trigger plus a malformed query, a dropped connection
+        // or any unrelated database error would have satisfied it. The trigger's own stable
+        // message is now required, so the refusal must come from the ledger guard itself.
+        const rewrite = await attemptRaw(() =>
             prisma.$executeRawUnsafe(`update "FieldJobEvent" set "to" = 'TAMPERED' where "jobId" = '${job.id}'`),
         )
-        check("the database refuses to rewrite the job history", !rewrite.ok, why(rewrite))
+        check(
+            "the database refuses to rewrite the job history, and the refusal comes from the append-only trigger itself",
+            !rewrite.ok && /is append-only; UPDATE is forbidden/.test(rewrite.raw),
+            rewrite.ok ? "ACCEPTED - the history was rewritten" : rewrite.raw.slice(0, 160),
+        )
+        const erase = await attemptRaw(() =>
+            prisma.$executeRawUnsafe(`delete from "FieldJobEvent" where "jobId" = '${job.id}'`),
+        )
+        check(
+            "the database refuses to erase the job history, by the same trigger",
+            !erase.ok && /is append-only; DELETE is forbidden/.test(erase.raw),
+            erase.ok ? "ACCEPTED - the history was erased" : erase.raw.slice(0, 160),
+        )
 
         // ---- 9. tenant isolation and non-enumeration ---------------------
         identity.current = `clerk_${ids.userB}`
         const foreignJob = await attempt(() => jobs.get(ids.wsB, job.id))
         const ghostJob = await attempt(() => jobs.get(ids.wsB, `${RUN}_ghostjob`))
         check("another profile cannot read the job", !foreignJob.ok && foreignJob.code === "FORBIDDEN", why(foreignJob))
-        check(
+        checkInvertible(
             "a foreign job and a nonexistent one produce byte-identical refusals",
             envelope(foreignJob) === envelope(ghostJob),
             envelope(ghostJob),
@@ -482,16 +526,32 @@ async function main() {
         const bookingsNow = await prisma.booking.count()
         check("no Booking row was created by any of this", bookingsNow === base.bookings, `bookings ${base.bookings} -> ${bookingsNow}`)
 
-        check("zero external calls were made by the fieldJobs runtime", fetchCalls === 0, `fetchCalls=${fetchCalls}`)
+        check(
+            "the external-call blocker was actually installed, rather than assumed",
+            EXTERNAL_CALL_BLOCKER_INSTALLED,
+            "installed at import time, before any module under test evaluated",
+        )
+        checkInvertible(
+            "zero fetch, http or https calls were made by the fieldJobs runtime",
+            externalCallCount() === 0,
+            externalCallCount() === 0 ? "0 attempts across fetch, http.request/get and https.request/get" : externalCallLog().join("; "),
+        )
     } finally {
-        globalThis.fetch = realFetch
+        restoreExternalCalls()
         const profileList = `'${ids.profileA}','${ids.profileB}'`
         try {
             await prisma.$executeRawUnsafe(`alter table "FieldJobEvent" disable trigger "FieldJobEvent_append_only"`)
-            await prisma.$executeRawUnsafe(
-                `delete from "FieldJobEvent" where "jobId" in (select "id" from "FieldJob" where "profileId" in (${profileList}))`,
-            )
-            await prisma.$executeRawUnsafe(`alter table "FieldJobEvent" enable trigger "FieldJobEvent_append_only"`)
+            try {
+                await prisma.$executeRawUnsafe(
+                    `delete from "FieldJobEvent" where "jobId" in (select "id" from "FieldJob" where "profileId" in (${profileList}))`,
+                )
+            } finally {
+                // W3 audit finding 12: the re-enable used to sit after the delete in the SAME try
+                // block. A throw in the delete left the ledger unguarded on the shared rehearsal
+                // database, and every later append-only assertion - in this harness and in every
+                // other one - would then have passed while proving nothing at all.
+                await prisma.$executeRawUnsafe(`alter table "FieldJobEvent" enable trigger "FieldJobEvent_append_only"`)
+            }
             await prisma.$executeRawUnsafe(
                 `delete from "FieldJobAssignment" where "jobId" in (select "id" from "FieldJob" where "profileId" in (${profileList}))`,
             )
@@ -527,12 +587,10 @@ async function main() {
         await prisma.$disconnect()
     }
 
-    let failed = results.filter((r) => !r.pass)
-    if (INVERT) {
-        const target = results.find((r) => r.name.startsWith("MEASURED: a job cannot be dispatched"))
-        if (target) target.pass = !target.pass
-        failed = results.filter((r) => !r.pass)
-    }
+    const failed = results.filter((r) => !r.pass)
+    // The post-hoc single-flip block that used to sit here was removed: inversion is now
+    // per-assertion via checkInvertible, and flipping one result again afterwards would have
+    // turned it back into a pass.
     for (const r of results) console.log(`${r.pass ? "PASS" : "FAIL"}  ${r.name}${r.detail ? `  (${r.detail})` : ""}`)
     console.log(`\n${results.length - failed.length}/${results.length} assertions passed`)
     if (INVERT) console.log("INVERT_ASSERTION=1 was set - a failure here is the expected proof")

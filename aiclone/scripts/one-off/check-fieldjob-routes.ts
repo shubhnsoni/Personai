@@ -43,6 +43,14 @@ const results: Array<{ name: string; pass: boolean; detail: string }> = []
 function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
+/**
+ * Flipped at RECORD time by INVERT_ASSERTION=1, so each load-bearing assertion's ability to fail is
+ * individually proven. Identical to check() when the variable is unset.
+ */
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    results.push({ name, pass: INVERT ? !pass : pass, detail })
+}
+
 
 class ControlledIdentity implements PlatformIdentity {
     current: string | null = null
@@ -157,13 +165,13 @@ async function main() {
         check("a replayed request create is 200 with replayed true", replay.status === 200 && dataOf(replay).replayed === true)
 
         const badStatus = await call(api.transitionRequest(requestId, send(`${REQ}/${requestId}`, { workspaceId: ids.wsA, status: "MAYBE" }, "PATCH")))
-        check(
+        checkInvertible(
             "MEASURED: an unrecognised request status is 400, because the vocabulary check runs before the state machine",
             badStatus.status === 400 && /status/.test(errMessage(badStatus)),
             `${badStatus.status} ${errMessage(badStatus)}`,
         )
         const illegalStatus = await call(api.transitionRequest(requestId, send(`${REQ}/${requestId}`, { workspaceId: ids.wsA, status: "QUOTED" }, "PATCH")))
-        check(
+        checkInvertible(
             "MEASURED: a recognised status in the wrong order is 409 - same field, two different answers",
             illegalStatus.status === 409,
             `${illegalStatus.status} ${errMessage(illegalStatus)}`,
@@ -203,7 +211,7 @@ async function main() {
         const customerActor = await call(
             api.transitionJob(jobId, send(`${JOBS}/${jobId}`, { workspaceId: ids.wsA, status: "SCHEDULED", actorType: "CUSTOMER" }, "PATCH")),
         )
-        check(
+        checkInvertible(
             "MEASURED: a request cannot claim to be the CUSTOMER - only STAFF and TECHNICIAN are accepted",
             customerActor.status === 400 && /actorType/.test(errMessage(customerActor)),
             `${customerActor.status} ${errMessage(customerActor)}`,
@@ -246,7 +254,7 @@ async function main() {
 
         await call(api.transitionJob(jobId, send(`${JOBS}/${jobId}`, { workspaceId: ids.wsA, status: "SCHEDULED" }, "PATCH")))
         const noLead = await call(api.transitionJob(jobId, send(`${JOBS}/${jobId}`, { workspaceId: ids.wsA, status: "DISPATCHED" }, "PATCH")))
-        check(
+        checkInvertible(
             "MEASURED: a job still cannot be dispatched with nobody assigned - the side condition is not bypassed by the route",
             noLead.status === 409 && /lead technician/.test(errMessage(noLead)),
             `${noLead.status} ${errMessage(noLead)}`,
@@ -256,7 +264,7 @@ async function main() {
         const foreignTech = await call(api.assign(jobId, send(`${JOBS}/${jobId}/assignments`, { workspaceId: ids.wsA, resourceId: ids.techB })))
         const ghostTech = await call(api.assign(jobId, send(`${JOBS}/${jobId}/assignments`, { workspaceId: ids.wsA, resourceId: `${RUN}_ghost` })))
         check("another profile's technician is 403", foreignTech.status === 403, `status=${foreignTech.status}`)
-        check(
+        checkInvertible(
             "MEASURED: a foreign technician and a nonexistent one are BYTE-IDENTICAL",
             refusal(foreignTech) === refusal(ghostTech),
             `${refusal(foreignTech)} vs ${refusal(ghostTech)}`,
@@ -303,24 +311,53 @@ async function main() {
         check("sequence numbers are serialised as strings", events.every((e) => typeof e.seq === "string"))
 
         // ---- 7. tenant isolation ----------------------------------------
+        // W3 audit finding 10: these two calls used workspaceId=wsB while identity was still user
+        // A, so BOTH failed at workspace authorization and neither ever reached job ownership. The
+        // byte-identical comparison was real but it compared two authorization refusals, which is
+        // not the property being claimed. Identity now switches to user B FIRST, so user B is
+        // legitimately inside workspace B and the refusal can only come from the job check.
+        identity.current = `clerk_${ids.userB}`
         const foreignJob = await call(api.getJob(jobId, get(`${JOBS}/${jobId}?workspaceId=${ids.wsB}`)))
         const ghostJob = await call(api.getJob(`${RUN}_ghostjob`, get(`${JOBS}/${RUN}_ghostjob?workspaceId=${ids.wsB}`)))
         check("reading another profile's job is 403", foreignJob.status === 403, `status=${foreignJob.status}`)
-        check(
+        checkInvertible(
             "MEASURED: a foreign job and a nonexistent job are BYTE-IDENTICAL",
             refusal(foreignJob) === refusal(ghostJob),
             refusal(ghostJob),
         )
-        identity.current = `clerk_${ids.userB}`
         const bList = await call(api.listJobs(get(`${JOBS}?workspaceId=${ids.wsB}`)))
         check("the other profile's job list is 200 and empty", bList.status === 200 && (dataOf(bList).jobs as unknown[]).length === 0)
+        // Proof that the refusal above was NOT a workspace-authorization failure: the same
+        // identity, in the same workspace, can read its own list successfully.
+        check(
+            "user B really did have access to workspace B, so the 403 above came from job ownership and not from tenancy",
+            bList.status === 200,
+            `bList=${bList.status}`,
+        )
         identity.current = `clerk_${ids.userA}`
 
         // ---- 8. status filter -------------------------------------------
         const badFilter = await call(api.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}&status=NOPE`)))
         check("an unrecognised status filter is 400 rather than silently ignored", badFilter.status === 400, `${badFilter.status} ${errMessage(badFilter)}`)
-        const filtered = await call(api.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}&status=SCHEDULED`)))
-        check("a valid status filter is applied", filtered.status === 200 && (dataOf(filtered).jobs as Array<{ status: string }>).every((j) => j.status === "SCHEDULED"))
+        // W3 audit finding 4: this asserted `.every(...)` over the filtered rows, which is
+        // vacuously true on an empty result. The filter is now chosen from a status that a real
+        // job actually holds, and the row count is compared against an independently computed
+        // expectation, so an empty result fails instead of passing.
+        const allJobs = await call(api.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}`)))
+        const allRows = dataOf(allJobs).jobs as Array<{ id: string; status: string }>
+        const presentStatus = allRows[0]?.status ?? "SCHEDULED"
+        const expectedForStatus = allRows.filter((j) => j.status === presentStatus).length
+        const filtered = await call(api.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}&status=${presentStatus}`)))
+        const filteredRows = dataOf(filtered).jobs as Array<{ status: string }>
+        check(
+            "a valid status filter is applied, and the result is NON-EMPTY so the assertion cannot pass on an empty set",
+            filtered.status === 200 &&
+                allRows.length > 0 &&
+                filteredRows.length > 0 &&
+                filteredRows.length === expectedForStatus &&
+                filteredRows.every((j) => j.status === presentStatus),
+            `status=${presentStatus} filtered=${filteredRows.length} expected=${expectedForStatus} total=${allRows.length}`,
+        )
 
         // ---- 9. dependency failure --------------------------------------
         const brokenPrisma = {
@@ -336,7 +373,7 @@ async function main() {
         )
         const broken = await call(brokenApi.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}`)))
         check("a dependency failure is 503", broken.status === 503, `status=${broken.status}`)
-        check(
+        checkInvertible(
             "MEASURED: the 503 body leaks no DSN, host or driver text",
             !/SECRET_DETAIL|postgres:\/\//.test(broken.raw) && errCode(broken) === "DEPENDENCY_UNAVAILABLE",
             broken.raw.slice(0, 100),
@@ -360,10 +397,17 @@ async function main() {
         const profileList = `'${ids.profileA}','${ids.profileB}'`
         try {
             await prisma.$executeRawUnsafe(`alter table "FieldJobEvent" disable trigger "FieldJobEvent_append_only"`)
-            await prisma.$executeRawUnsafe(
-                `delete from "FieldJobEvent" where "jobId" in (select "id" from "FieldJob" where "profileId" in (${profileList}))`,
-            )
-            await prisma.$executeRawUnsafe(`alter table "FieldJobEvent" enable trigger "FieldJobEvent_append_only"`)
+            try {
+                await prisma.$executeRawUnsafe(
+                    `delete from "FieldJobEvent" where "jobId" in (select "id" from "FieldJob" where "profileId" in (${profileList}))`,
+                )
+            } finally {
+                // W3 audit finding 12: the re-enable used to sit after the delete in the SAME try
+                // block. A throw in the delete left the ledger unguarded on the shared rehearsal
+                // database, and every later append-only assertion - in this harness and in every
+                // other one - would then have passed while proving nothing at all.
+                await prisma.$executeRawUnsafe(`alter table "FieldJobEvent" enable trigger "FieldJobEvent_append_only"`)
+            }
             await prisma.$executeRawUnsafe(
                 `delete from "FieldJobAssignment" where "jobId" in (select "id" from "FieldJob" where "profileId" in (${profileList}))`,
             )
@@ -390,12 +434,10 @@ async function main() {
         await prisma.$disconnect()
     }
 
-    let failed = results.filter((r) => !r.pass)
-    if (INVERT) {
-        const target = results.find((r) => r.name.includes("still cannot be dispatched"))
-        if (target) target.pass = !target.pass
-        failed = results.filter((r) => !r.pass)
-    }
+    const failed = results.filter((r) => !r.pass)
+    // The post-hoc single-flip block that used to sit here was removed: inversion is now
+    // per-assertion via checkInvertible, and flipping one result again afterwards would have
+    // turned it back into a pass.
     for (const r of results) console.log(`${r.pass ? "PASS" : "FAIL"}  ${r.name}${r.detail ? `  (${r.detail})` : ""}`)
     console.log(`\n${results.length - failed.length}/${results.length} assertions passed`)
     if (INVERT) console.log("INVERT_ASSERTION=1 was set - a failure here is the expected proof")

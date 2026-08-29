@@ -112,6 +112,14 @@ const results: Array<{ name: string; pass: boolean; detail: string }> = []
 function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
+/**
+ * Flipped at RECORD time by INVERT_ASSERTION=1, so each load-bearing assertion's ability to fail is
+ * individually proven. Identical to check() when the variable is unset.
+ */
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    results.push({ name, pass: INVERT ? !pass : pass, detail })
+}
+
 
 function errLine(e: unknown): string {
     const lines = String((e as Error).message)
@@ -214,27 +222,70 @@ async function seed(tx: Tx, tag: string): Promise<Seeded> {
 
 let prismaRef: PrismaClient | null = null
 
-async function refuses(tag: string, body: (tx: Tx, s: Seeded) => Promise<void>): Promise<{ refused: boolean; detail: string }> {
+/**
+ * W3 audit findings 1 and 2, fixed together.
+ *
+ * FINDING 1: a seed failure was reported as a refusal. Every negative test in this file would then
+ * have passed the moment the fixtures broke - the harness would go green while proving nothing.
+ * This is not hypothetical: the same defect in the sibling inspection harness flipped thirteen
+ * verdicts when a fixture violated an unrelated unique key, without one rule under test changing.
+ *
+ * A seed failure is a HARNESS BUG, not a test outcome, so it now THROWS rather than being returned
+ * as a verdict. That is deliberately not a per-call-site change: there are thirty-odd call sites
+ * and any one of them could have been missed, whereas a throw cannot be ignored by construction.
+ *
+ * FINDING 2: `refused` alone does not say WHAT refused. `refusesBy` requires the driver message to
+ * match, so a test cannot pass because something unrelated threw first.
+ */
+class SeedFailure extends Error {}
+
+async function refuses(tag: string, body: (tx: Tx, s: Seeded) => Promise<void>): Promise<{ refused: boolean; detail: string; raw: string }> {
     let refused = false
     let detail = ""
+    let raw = ""
+    let seedError: unknown = null
     try {
         await prismaRef!.$transaction(async (tx) => {
-            const s = await seed(tx, tag)
+            let s: Seeded
+            try {
+                s = await seed(tx, tag)
+            } catch (e) {
+                seedError = e
+                throw new Rollback()
+            }
             try {
                 await body(tx, s)
             } catch (e) {
                 refused = true
                 detail = errLine(e)
+                raw = String((e as Error).message).replace(/\s+/g, " ")
             }
             throw new Rollback()
         })
     } catch (e) {
-        if (!(e instanceof Rollback) && !refused) {
-            refused = true
-            detail = errLine(e)
+        // Deliberately NOT classified as a refusal. A non-Rollback error escaping the transaction
+        // means the transaction itself failed - a connection drop, a deadlock, a harness bug - and
+        // calling that "the rule refused the write" is exactly how a negative test starts passing
+        // for the wrong reason. The body's own catch above is the only place a refusal is recorded.
+        if (!(e instanceof Rollback) && seedError === null) {
+            throw new Error(`transaction failed for "${tag}", so the rule under test was not exercised: ${errLine(e)}`)
         }
     }
-    return { refused, detail }
+    if (seedError !== null) {
+        throw new SeedFailure(`fixture setup failed for "${tag}", so the rule under test was never reached: ${errLine(seedError)}`)
+    }
+    return { refused, detail, raw }
+}
+
+/** Refused, AND refused by the rule named. */
+async function refusesBy(name: string, tag: string, pattern: RegExp, body: (tx: Tx, s: Seeded) => Promise<void>) {
+    const r = await refuses(tag, body)
+    const matched = r.refused && pattern.test(r.raw)
+    check(
+        name,
+        matched,
+        !r.refused ? "ACCEPTED - no refusal" : matched ? `refused by ${pattern.source}` : `WRONG REFUSAL: ${r.raw.slice(0, 140)}`,
+    )
 }
 
 async function counts(prisma: PrismaClient): Promise<Record<string, number>> {
@@ -382,7 +433,7 @@ async function main() {
               where tc.constraint_type = 'FOREIGN KEY' and tc.table_schema = 'public'`,
         )
         for (const [tbl, col, ref] of REUSE_FKS) {
-            check(`${tbl}.${col} points at the pre-existing ${ref}`, fks.some((f) => f.tbl === tbl && f.col === col && f.ref === ref))
+            checkInvertible(`${tbl}.${col} points at the pre-existing ${ref}`, fks.some((f) => f.tbl === tbl && f.col === col && f.ref === ref))
         }
 
         // ---- 6. constraints, indexes, triggers -----------------------------
@@ -426,7 +477,7 @@ async function main() {
                  values ('${RUN}_ne_x','${s.profileA}','web','X',-1,CURRENT_TIMESTAMP)`,
             )
         })
-        check("a request with a negative estimate is refused", negEstimate.refused, negEstimate.detail)
+        check("a request with a negative estimate is refused", negEstimate.refused && /FieldJobRequest_estimateCents_nonnegative/.test(negEstimate.raw), negEstimate.refused ? `FieldJobRequest_estimateCents_nonnegative | ${negEstimate.detail}` : "ACCEPTED - no refusal")
 
         const halfSchedule = await refuses("hs", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -435,19 +486,19 @@ async function main() {
         })
         check(
             "a job with a start and no end is refused, because it has no duration",
-            halfSchedule.refused,
-            halfSchedule.detail,
+            halfSchedule.refused && /FieldJob_schedule_complete/.test(halfSchedule.raw),
+            halfSchedule.refused ? `FieldJob_schedule_complete | ${halfSchedule.detail}` : "ACCEPTED - no refusal",
         )
         const halfSchedule2 = await refuses("hs2", async (tx, s) => {
             await tx.$executeRawUnsafe(`update "FieldJob" set "scheduledEndAt" = CURRENT_TIMESTAMP where "id" = '${s.jobA}'`)
         })
-        check("a job with an end and no start is refused too", halfSchedule2.refused, halfSchedule2.detail)
+        check("a job with an end and no start is refused too", halfSchedule2.refused && /FieldJob_schedule_complete/.test(halfSchedule2.raw), halfSchedule2.refused ? `FieldJob_schedule_complete | ${halfSchedule2.detail}` : "ACCEPTED - no refusal")
         const backwards = await refuses("bw", async (tx, s) => {
             await tx.$executeRawUnsafe(
                 `update "FieldJob" set "scheduledStartAt" = CURRENT_TIMESTAMP, "scheduledEndAt" = CURRENT_TIMESTAMP - interval '1 hour' where "id" = '${s.jobA}'`,
             )
         })
-        check("a job that ends before it starts is refused", backwards.refused, backwards.detail)
+        check("a job that ends before it starts is refused", backwards.refused && /FieldJob_schedule_ordered/.test(backwards.raw), backwards.refused ? `FieldJob_schedule_ordered | ${backwards.detail}` : "ACCEPTED - no refusal")
         const goodSchedule = await refuses("gs", async (tx, s) => {
             await tx.$executeRawUnsafe(
                 `update "FieldJob" set "scheduledStartAt" = CURRENT_TIMESTAMP, "scheduledEndAt" = CURRENT_TIMESTAMP + interval '2 hours' where "id" = '${s.jobA}'`,
@@ -461,8 +512,8 @@ async function main() {
         })
         check(
             "declining an assignment without saying why is refused - an unexplained refusal reads as a mistake later",
-            silentDecline.refused,
-            silentDecline.detail,
+            silentDecline.refused && /FieldJobAssignment_decline_has_reason/.test(silentDecline.raw),
+            silentDecline.refused ? `FieldJobAssignment_decline_has_reason | ${silentDecline.detail}` : "ACCEPTED - no refusal",
         )
         const explainedDecline = await refuses("ed", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -476,7 +527,7 @@ async function main() {
                 `update "FieldJobAssignment" set "state" = 'RELEASED', "releaseReason" = '   ' where "id" = '${s.leadA}'`,
             )
         })
-        check("releasing with a whitespace-only reason is refused, not just a NULL one", blankRelease.refused, blankRelease.detail)
+        check("releasing with a whitespace-only reason is refused, not just a NULL one", blankRelease.refused && /FieldJobAssignment_release_has_reason/.test(blankRelease.raw), blankRelease.refused ? `FieldJobAssignment_release_has_reason | ${blankRelease.detail}` : "ACCEPTED - no refusal")
 
         const twoLeads = await refuses("tl", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -484,7 +535,7 @@ async function main() {
                  values ('${RUN}_tl_x','${s.jobA}','${s.techA2}','LEAD','ASSIGNED',CURRENT_TIMESTAMP)`,
             )
         })
-        check("a second active LEAD on one job is refused, because two leads means nobody is accountable", twoLeads.refused, twoLeads.detail)
+        check("a second active LEAD on one job is refused, because two leads means nobody is accountable", twoLeads.refused && /Key \("jobId"\)=/.test(twoLeads.raw), twoLeads.refused ? `Key ("jobId")= | ${twoLeads.detail}` : "ACCEPTED - no refusal")
 
         const leadAfterRelease = await refuses("lar", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -519,8 +570,8 @@ async function main() {
         })
         check(
             "assigning the same technician to the same job twice while both are active is refused",
-            doubleAssign.refused,
-            doubleAssign.detail,
+            doubleAssign.refused && /Key \("jobId", "resourceId"\)=/.test(doubleAssign.raw),
+            doubleAssign.refused ? `Key ("jobId", "resourceId")= | ${doubleAssign.detail}` : "ACCEPTED - no refusal",
         )
 
         const crossProfile = await refuses("cp", async (tx, s) => {
@@ -529,10 +580,10 @@ async function main() {
                  values ('${RUN}_cp_x','${s.jobA}','${s.techB}','HELPER','ASSIGNED',CURRENT_TIMESTAMP)`,
             )
         })
-        check(
+        checkInvertible(
             "assigning another profile's technician is refused by trigger, so tenant isolation is a database rule too",
-            crossProfile.refused,
-            crossProfile.detail,
+            crossProfile.refused && /belongs to profile/.test(crossProfile.raw),
+            crossProfile.refused ? `belongs to profile | ${crossProfile.detail}` : "ACCEPTED - no refusal",
         )
 
         const twoJobsOneRequest = await refuses("tj", async (tx, s) => {
@@ -541,7 +592,7 @@ async function main() {
                  values ('${RUN}_tj_x','${s.profileA}','${s.requestA}','${RUN}_tj_x','Second job','1 Other Street',CURRENT_TIMESTAMP)`,
             )
         })
-        check("one request cannot convert into two jobs", twoJobsOneRequest.refused, twoJobsOneRequest.detail)
+        check("one request cannot convert into two jobs", twoJobsOneRequest.refused && /Key \("requestId"\)=/.test(twoJobsOneRequest.raw), twoJobsOneRequest.refused ? `Key ("requestId")= | ${twoJobsOneRequest.detail}` : "ACCEPTED - no refusal")
 
         const dupReference = await refuses("dr", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -549,7 +600,7 @@ async function main() {
                  values ('${RUN}_dr_x','${s.profileA}','${s.jobA}','Clash','2 Other Street',CURRENT_TIMESTAMP)`,
             )
         })
-        check("two jobs cannot share a reference within a profile", dupReference.refused, dupReference.detail)
+        check("two jobs cannot share a reference within a profile", dupReference.refused && /Key \("profileId", reference\)=/.test(dupReference.raw), dupReference.refused ? `Key ("profileId", reference)= | ${dupReference.detail}` : "ACCEPTED - no refusal")
 
         // ---- 8. the history cannot be rewritten ----------------------------
         const rewrite = await refuses("aw", async (tx, s) => {
@@ -559,7 +610,7 @@ async function main() {
             )
             await tx.$executeRawUnsafe(`update "FieldJobEvent" set "to" = 'TAMPERED' where "id" = '${RUN}_aw_x'`)
         })
-        check("the database refuses to rewrite a job event", rewrite.refused, rewrite.detail)
+        checkInvertible("the database refuses to rewrite a job event", rewrite.refused && /is append-only; UPDATE is forbidden/.test(rewrite.raw), rewrite.refused ? `is append-only; UPDATE is forbidden | ${rewrite.detail}` : "ACCEPTED - no refusal")
         const erase = await refuses("ae", async (tx, s) => {
             await tx.$executeRawUnsafe(
                 `insert into "FieldJobEvent" ("id","jobId","kind","subjectType","subjectId","from","to","actor")
@@ -567,24 +618,22 @@ async function main() {
             )
             await tx.$executeRawUnsafe(`delete from "FieldJobEvent" where "id" = '${RUN}_ae_x'`)
         })
-        check("the database refuses to erase a job event", erase.refused, erase.detail)
+        check("the database refuses to erase a job event", erase.refused && /is append-only; DELETE is forbidden/.test(erase.raw), erase.refused ? `is append-only; DELETE is forbidden | ${erase.detail}` : "ACCEPTED - no refusal")
 
         // ---- 9. residue ----------------------------------------------------
         const after = await counts(prisma)
         const residue = Object.entries(after)
             .filter(([k, v]) => v !== baseline[k])
             .map(([k, v]) => `${k}:${baseline[k]}->${v}`)
-        check("harness left zero residue", residue.length === 0, residue.join(", ") || "clean")
+        checkInvertible("harness left zero residue", residue.length === 0, residue.join(", ") || "clean")
     } finally {
         await prisma.$disconnect()
     }
 
-    let failed = results.filter((r) => !r.pass)
-    if (INVERT) {
-        const target = results.find((r) => r.name.includes("points at the pre-existing AppointmentResource"))
-        if (target) target.pass = !target.pass
-        failed = results.filter((r) => !r.pass)
-    }
+    const failed = results.filter((r) => !r.pass)
+    // The post-hoc single-flip block that used to sit here was removed: inversion is now
+    // per-assertion via checkInvertible, and flipping one result again afterwards would have
+    // turned it back into a pass.
     for (const r of results) console.log(`${r.pass ? "PASS" : "FAIL"}  ${r.name}${r.detail ? `  (${r.detail})` : ""}`)
     console.log(`\n${results.length - failed.length}/${results.length} invariants passed`)
     if (INVERT) console.log("INVERT_ASSERTION=1 was set - a failure here is the expected proof")

@@ -209,19 +209,27 @@ for (const assertionName of schemaRefusalChecks) {
     const condition = call?.arguments[1]
     check(
         `schema: refusal assertion identifies the expected database rule: ${assertionName}`,
-        condition !== undefined && conditionMentions(condition, ["detail", "code", "constraint"]),
+        // "raw" is the identifier the schema harness uses for the full driver text; the earlier
+        // list predated it and so rejected the very fix it was asking for.
+        condition !== undefined && conditionMentions(condition, ["detail", "code", "constraint", "raw"]),
         call ? `schema:${lineOf(sources.schema, call)} condition is ${condition?.getText(sources.schema) ?? "missing"}` : "assertion missing",
     )
 }
 
-const runtimeRewrite = namedCheck(sources.runtime, "the database refuses to rewrite the job history")
+const runtimeRewrite = namedCheck(
+    sources.runtime,
+    "the database refuses to rewrite the job history, and the refusal comes from the append-only trigger itself",
+)
 check(
     "runtime: append-only refusal identifies the expected error rather than accepting any throw",
-    runtimeRewrite !== null && runtimeRewrite.arguments[1] !== undefined && conditionMentions(runtimeRewrite.arguments[1], ["message", "code"]),
+    runtimeRewrite !== null && runtimeRewrite.arguments[1] !== undefined && conditionMentions(runtimeRewrite.arguments[1], ["message", "code", "raw"]),
     runtimeRewrite ? `runtime:${lineOf(sources.runtime, runtimeRewrite)} condition is ${runtimeRewrite.arguments[1]?.getText(sources.runtime)}` : "assertion missing",
 )
 
-const filtered = namedCheck(sources.routes, "a valid status filter is applied")
+const filtered = namedCheck(
+    sources.routes,
+    "a valid status filter is applied, and the result is NON-EMPTY so the assertion cannot pass on an empty set",
+)
 check(
     "routes: status-filter assertion proves at least one result was filtered",
     filtered !== null && filtered.arguments[1] !== undefined && hasPositiveLengthGuard(filtered.arguments[1]),
@@ -241,7 +249,7 @@ const loadBearing: Record<TargetName, readonly string[]> = {
         "MEASURED: a job is not complete while a technician is still mid-visit, and the refusal names how many",
         "a foreign technician and a nonexistent one produce byte-identical refusals",
         "a foreign job and a nonexistent one produce byte-identical refusals",
-        "zero external calls were made by the fieldJobs runtime",
+        "zero fetch, http or https calls were made by the fieldJobs runtime",
     ],
     routes: [
         "MEASURED: an unrecognised request status is 400, because the vocabulary check runs before the state machine",
@@ -274,18 +282,41 @@ for (const [target, assertionNames] of Object.entries(loadBearing) as Array<[Tar
     }
 }
 
-const runtimeValueImports = sources.runtime.statements.filter((statement): statement is ts.ImportDeclaration => {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) return false
-    if (!statement.moduleSpecifier.text.includes("src/lib/fieldjobs")) return false
-    const clause = statement.importClause
-    if (!clause || clause.isTypeOnly) return false
-    if (clause.name) return true
-    return clause.namedBindings === undefined || !ts.isNamedImports(clause.namedBindings) || clause.namedBindings.elements.some((element) => !element.isTypeOnly)
-})
+// The original form of this assertion required ZERO value imports from src/lib/fieldjobs, which is
+// a proxy rather than the property: it would also reject a correct design that installs the blocker
+// in a module imported first. What actually matters is ORDER, so that is what is checked - the
+// blocker's import must appear before the first module-under-test import, because both ESM and
+// ts-node CommonJS evaluate imported modules in source order before the importing body runs.
+const runtimeStatements = sources.runtime.statements
+const blockerImportIndex = runtimeStatements.findIndex(
+    (statement) =>
+        ts.isImportDeclaration(statement) &&
+        ts.isStringLiteral(statement.moduleSpecifier) &&
+        statement.moduleSpecifier.text.includes("external-call-blocker"),
+)
+const firstUnderTestIndex = runtimeStatements.findIndex(
+    (statement) =>
+        ts.isImportDeclaration(statement) &&
+        ts.isStringLiteral(statement.moduleSpecifier) &&
+        statement.moduleSpecifier.text.includes("src/lib/fieldjobs"),
+)
 check(
-    "runtime: fetch blocker is installed before code-under-test modules evaluate",
-    runtimeValueImports.length === 0,
-    runtimeValueImports.map((node) => `runtime:${lineOf(sources.runtime, node)} ${node.moduleSpecifier.getText(sources.runtime)}`).join(", "),
+    "runtime: external-call blocker is imported before any module under test, so it is installed before they evaluate",
+    blockerImportIndex >= 0 && firstUnderTestIndex >= 0 && blockerImportIndex < firstUnderTestIndex,
+    blockerImportIndex < 0
+        ? "no external-call-blocker import found"
+        : firstUnderTestIndex < 0
+          ? "no src/lib/fieldjobs import found"
+          : `blocker at statement ${blockerImportIndex}, first module under test at ${firstUnderTestIndex}`,
+)
+check(
+    "runtime: the blocker installation is asserted by the harness rather than assumed",
+    texts.runtime.includes("EXTERNAL_CALL_BLOCKER_INSTALLED"),
+)
+check(
+    "runtime: the external-call claim is scoped to what the blocker actually covers",
+    texts.runtime.includes("zero fetch, http or https calls"),
+    "claim names fetch/http/https rather than the unprovable 'no external calls at all'",
 )
 
 const routeForeignJob = texts.routes.indexOf("const foreignJob = await call(api.getJob")
@@ -293,7 +324,11 @@ const routeSwitchToB = texts.routes.indexOf("identity.current = `clerk_${ids.use
 check(
     "routes: foreign-job non-enumeration reaches job ownership under tenant B",
     routeSwitchToB >= 0 && routeForeignJob >= 0 && routeSwitchToB < routeForeignJob,
-    "identity switches to user B only after the foreign/ghost job comparison, so both requests can fail at workspace authorization",
+    // The detail used to state the failure unconditionally, so a PASS printed text claiming the
+    // opposite of the verdict beside it.
+    routeSwitchToB >= 0 && routeForeignJob >= 0 && routeSwitchToB < routeForeignJob
+        ? "identity switches to user B before the foreign/ghost comparison, so the refusal comes from job ownership"
+        : "identity switches to user B only after the foreign/ghost job comparison, so both requests can fail at workspace authorization",
 )
 check(
     "runtime: foreign-job comparison uses serialized envelopes",
@@ -317,21 +352,36 @@ check(
 )
 
 for (const target of ["runtime", "routes"] as const) {
-    let unsafeTriggerTry: ts.TryStatement | null = null
+    // The property is not "the try that mentions both has a finally" - that flagged a CORRECT
+    // design, where an outer try holds the disable and an inner try/finally guarantees the enable.
+    // What matters is that the enable statement is lexically inside a finally block, so no throw
+    // between the two can skip it.
+    let enableNode: ts.Node | null = null
+    let enableInFinally = false
     visit(sources[target], (node) => {
         if (
-            ts.isTryStatement(node) &&
-            node.getText(sources[target]).includes('disable trigger "FieldJobEvent_append_only"') &&
+            ts.isCallExpression(node) &&
             node.getText(sources[target]).includes('enable trigger "FieldJobEvent_append_only"') &&
-            !node.finallyBlock
+            !node.getText(sources[target]).includes("disable trigger")
         ) {
-            unsafeTriggerTry = node
+            enableNode = node
+            for (let current: ts.Node | undefined = node; current; current = current.parent) {
+                const parent: ts.Node | undefined = current.parent
+                if (parent && ts.isTryStatement(parent) && parent.finallyBlock === current) {
+                    enableInFinally = true
+                    break
+                }
+            }
         }
     })
     check(
         `${target}: teardown structurally guarantees the append-only trigger is re-enabled`,
-        unsafeTriggerTry === null,
-        unsafeTriggerTry ? `${target}:${lineOf(sources[target], unsafeTriggerTry)} disable/enable share a try with no finally` : "",
+        enableNode !== null && enableInFinally,
+        enableNode === null
+            ? "no enable-trigger statement found"
+            : enableInFinally
+              ? "the re-enable is inside a finally block, so no throw can skip it"
+              : "the re-enable is not inside a finally block",
     )
 }
 
