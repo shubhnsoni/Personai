@@ -242,6 +242,9 @@ model Profile {
   CourseAccessLevel    CourseAccessLevel[]
   FieldJobRequest      FieldJobRequest[]
   FieldJob             FieldJob[]
+
+  fieldJobInspectionTemplates FieldJobInspectionTemplate[]
+  fieldJobInspections         FieldJobInspection[]
 }
 
 model ProfileEvent {
@@ -348,6 +351,8 @@ model ServiceOffering {
   waitlistEntries   AppointmentWaitlistEntry[]
   FieldJobRequest   FieldJobRequest[]
   FieldJob          FieldJob[]
+
+  fieldJobInspectionTemplates FieldJobInspectionTemplate[]
 }
 
 /// Appointment booking.
@@ -2151,8 +2156,11 @@ model InventoryItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  movements    InventoryMovement[]
-  reservations InventoryReservation[]
+  movements       InventoryMovement[]
+  reservations    InventoryReservation[]
+  /// Parts consumed on field-job inspections. The inspection engine does not restate variant,
+  /// product or location: it points at this row and reads them from here.
+  inspectionParts FieldJobInspectionPart[]
 
   @@unique([variantId, locationId])
   @@index([profileId, locationId])
@@ -2189,8 +2197,11 @@ model InventoryMovement {
   reservationId String?
 
   idempotencyKey String?
-  at             DateTime    @default(now())
+  at             DateTime                @default(now())
   ReturnItem     ReturnItem?
+  /// The inspection part row this CONSUME movement settled, when it came from an inspection.
+  /// One movement settles at most one part line.
+  inspectionPart FieldJobInspectionPart?
 
   @@unique([itemId, idempotencyKey])
   @@index([itemId, seq])
@@ -3158,6 +3169,7 @@ model FieldJob {
 
   assignments FieldJobAssignment[]
   events      FieldJobEvent[]
+  inspections FieldJobInspection[]
 
   @@unique([profileId, reference])
   @@unique([profileId, idempotencyKey])
@@ -3192,6 +3204,10 @@ model FieldJobAssignment {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  /// Inspections produced during this technician's visit. Nullable on the inspection side: an
+  /// inspection can exist for a job before anybody has been assigned to it.
+  inspections FieldJobInspection[]
+
   @@unique([jobId, idempotencyKey])
   @@index([jobId, state])
   @@index([resourceId, state])
@@ -3216,4 +3232,301 @@ model FieldJobEvent {
 
   @@index([jobId, seq])
   @@index([jobId, subjectType, subjectId])
+}
+
+// ---------------------------------------------------------------------------
+// Wave H0 / P2-017: fieldJobs:inspection - asset checks, checklists, parts,
+// completion notes and invoice HANDOFF.
+//
+// This is the capability the G4 foundation deliberately left unbuilt. G4's migration header, the
+// capability registry and the schema-invariant harness all said so out loud, and the harness
+// listed FieldJobInspection, FieldJobPart and FieldJobAsset as tables that must NOT exist. Three
+// of those names are now built, so that list is revised rather than quietly dropped - and the
+// names that stay forbidden stay forbidden for the same reasons as before.
+//
+// WHAT IS STILL NOT BUILT, stated here so the word "inspection" does not carry a claim:
+//   * No Asset registry. An ASSET item records the identity of the equipment it inspected
+//     (label, serial, where on site) as columns on the item. There is no Asset table, no asset
+//     lifecycle and no service history per asset. Building one would be a second answer to
+//     "what equipment do we own", and nothing here needs that answer yet.
+//   * No invoice and no payment. invoiceHandoffState is a HANDOFF FLAG - it records that the
+//     owner considers the inspection billable and has passed it on. No FieldJobInvoice table
+//     exists, no Payment row is written, and nothing calls a payment provider.
+//   * No file storage and no upload. evidenceManifest is owner-entered METADATA about evidence
+//     held somewhere else. Nothing in this wave stores, fetches or serves a byte of it.
+//   * No routing and no notification, unchanged from G4.
+//
+// THE EVENT LEDGER IS REUSED, NOT FORKED. FieldJobEvent's own comment says subjectType and
+// subjectId are what let one stream cover the request, the job, an assignment and the schedule.
+// Inspection is the fifth subject, so it uses subjectType "inspection", "inspectionItem",
+// "inspectionPart" and "inspectionHandoff" with the EXISTING kinds. That deliberately avoids
+// ALTER TYPE ... ADD VALUE on FieldJobEventKind: an enum value cannot be removed in Postgres, so
+// adding one would force the rollback to recreate the type and the apply/rollback/reapply proof
+// would no longer be able to show byte-identical catalog state. Extending by subjectType is both
+// the designed extension point and the only strictly additive one.
+//
+// PARTS COMPOSE THE INVENTORY ENGINE. FieldJobInspectionPart points at an InventoryItem and at
+// the InventoryMovement that consumed it. It does not restate variant, product, location, price
+// or stock level - those are read through InventoryItem, whose CHECK constraints already make
+// overselling impossible. A part line without a movement is a recorded intent; a part line with
+// one has moved real stock through the existing ledger.
+//
+// TENANCY is profileId, bridged from Workspace.profileId, exactly as G4. FieldJobInspection
+// carries a denormalized profileId for profile-scoped queries and a trigger guarantees it agrees
+// with its job - the same shape as InventoryItem's denormalized productId.
+// ---------------------------------------------------------------------------
+
+/// The states an inspection actually moves through.
+///
+/// SUBMITTED exists because a technician finishing on site and the office accepting the result
+/// are two different facts. Collapsing them would make "who said this passed" unanswerable, and
+/// it is the office that hands the job to billing.
+enum FieldJobInspectionStatus {
+  DRAFT
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  CANCELLED
+}
+
+/// ADVISORY is not a pass with extra words: it means nothing failed but the owner was told
+/// something. Folding it into PASS would lose the only record that a recommendation was made.
+enum FieldJobInspectionOutcome {
+  PASS
+  FAIL
+  ADVISORY
+}
+
+/// CHECK is a yes/no line. MEASUREMENT carries a reading and must carry a unit. ASSET names the
+/// specific equipment it looked at - which is how equipment checks are persisted without an
+/// Asset registry existing.
+enum FieldJobInspectionItemKind {
+  CHECK
+  MEASUREMENT
+  ASSET
+}
+
+/// PENDING is the default and is distinct from NOT_APPLICABLE: "nobody has looked yet" and
+/// "this does not apply here" are different answers, and only one of them blocks completion.
+enum FieldJobInspectionItemResult {
+  PENDING
+  PASS
+  FAIL
+  NOT_APPLICABLE
+}
+
+/// Invoice HANDOFF, not invoicing. NOT_READY is the default; READY means the owner marked it
+/// billable; HANDED_OFF means they passed it to whatever actually bills; DECLINED means they
+/// decided not to bill it. No invoice record is created by any of these and no money moves.
+enum FieldJobInvoiceHandoffState {
+  NOT_READY
+  READY
+  HANDED_OFF
+  DECLINED
+}
+
+/// A reusable checklist. Profile-scoped, and optionally tied to the ServiceOffering it inspects,
+/// reusing the existing catalogue rather than describing the work a second time.
+model FieldJobInspectionTemplate {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  serviceOfferingId String?
+  serviceOffering   ServiceOffering? @relation(fields: [serviceOfferingId], references: [id], onDelete: SetNull)
+
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+
+  /// Owner-visible bookkeeping only. History is preserved by SNAPSHOTTING template lines into
+  /// FieldJobInspectionItem when an inspection is created, so editing a template never rewrites
+  /// what a past inspection actually asked.
+  revision Int @default(1)
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items       FieldJobInspectionTemplateItem[]
+  inspections FieldJobInspection[]
+
+  @@unique([profileId, name])
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, isActive])
+  @@index([serviceOfferingId])
+}
+
+/// One line of a checklist template.
+model FieldJobInspectionTemplateItem {
+  id         String                     @id @default(cuid())
+  templateId String
+  template   FieldJobInspectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  position Int
+  kind     FieldJobInspectionItemKind @default(CHECK)
+  label    String
+  guidance String?
+  /// A required line must be answered before the inspection can complete. PENDING on a required
+  /// line is what blocks it; NOT_APPLICABLE is a real answer and does not.
+  required Boolean                    @default(true)
+
+  /// MEASUREMENT only. A number with no unit is not a reading, which a CHECK constraint enforces.
+  unit        String?
+  expectedMin Decimal? @db.Decimal(14, 4)
+  expectedMax Decimal? @db.Decimal(14, 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items FieldJobInspectionItem[]
+
+  @@unique([templateId, position])
+  @@index([templateId])
+}
+
+/// An inspection carried out on a job.
+model FieldJobInspection {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       FieldJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Denormalized tenant, so "every inspection for this profile" needs no join. A trigger
+  /// guarantees it equals the job's profileId, because the engine is not the only possible writer.
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  /// The checklist this was built from, kept for provenance. SetNull rather than Cascade: an
+  /// inspection whose template was deleted is still a record of what was found, and its lines
+  /// were snapshotted anyway.
+  templateId String?
+  template   FieldJobInspectionTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  /// Which technician's visit produced it. Nullable because an inspection can be raised on a job
+  /// before anybody is assigned.
+  assignmentId String?
+  assignment   FieldJobAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
+  reference String
+  status    FieldJobInspectionStatus   @default(DRAFT)
+  /// Null until there is a verdict. A COMPLETED inspection with no outcome is refused by a CHECK
+  /// constraint - it would be a finished inspection that says nothing.
+  outcome   FieldJobInspectionOutcome?
+
+  startedAt   DateTime?
+  submittedAt DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  cancelReason    String?
+  /// Required to complete. An inspection that passed without a word is indistinguishable from one
+  /// nobody filled in.
+  completionNotes String?
+
+  /// Owner-entered metadata ABOUT evidence held elsewhere: a list of
+  /// { kind, label, reference, capturedAt } objects. No byte is stored, uploaded or fetched here,
+  /// and nothing in the runtime dereferences a value in this column.
+  evidenceManifest Json?
+
+  invoiceHandoffState     FieldJobInvoiceHandoffState @default(NOT_READY)
+  invoiceHandoffAt        DateTime?
+  /// Whatever the owner's billing system calls it. Free text on purpose: this schema does not
+  /// know what is on the other side of the handoff and does not pretend to.
+  invoiceHandoffReference String?
+  invoiceHandoffNote      String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items FieldJobInspectionItem[]
+  parts FieldJobInspectionPart[]
+
+  @@unique([profileId, reference])
+  @@unique([jobId, idempotencyKey])
+  @@index([profileId, status, createdAt])
+  @@index([jobId, status])
+  @@index([templateId])
+  @@index([assignmentId])
+}
+
+/// One answered line of an inspection. Snapshotted from the template line, so editing the
+/// template later cannot rewrite what a past inspection asked or answered.
+model FieldJobInspectionItem {
+  id           String             @id @default(cuid())
+  inspectionId String
+  inspection   FieldJobInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  /// Provenance only. SetNull: the answer survives its template line being deleted.
+  templateItemId String?
+  templateItem   FieldJobInspectionTemplateItem? @relation(fields: [templateItemId], references: [id], onDelete: SetNull)
+
+  position Int
+  kind     FieldJobInspectionItemKind   @default(CHECK)
+  label    String
+  guidance String?
+  required Boolean                      @default(true)
+  result   FieldJobInspectionItemResult @default(PENDING)
+  /// A FAIL must say why, enforced by a CHECK constraint. An unexplained failure reads as a
+  /// mistake when somebody opens the inspection a week later - the same rule as a declined
+  /// assignment.
+  notes    String?
+
+  measuredValue Decimal? @db.Decimal(14, 4)
+  unit          String?
+  expectedMin   Decimal? @db.Decimal(14, 4)
+  expectedMax   Decimal? @db.Decimal(14, 4)
+
+  /// ASSET identity. These columns are the whole of this schema's answer to "which equipment" -
+  /// there is deliberately no Asset table behind them.
+  assetLabel        String?
+  assetSerial       String?
+  assetLocationHint String?
+
+  recordedAt DateTime?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([inspectionId, position])
+  @@unique([inspectionId, idempotencyKey])
+  @@index([inspectionId, result])
+  @@index([templateItemId])
+}
+
+/// A part used on an inspection.
+///
+/// Points at InventoryItem, which already knows the variant, the product, the location and the
+/// stock levels, and at the InventoryMovement that consumed it. Nothing here duplicates the
+/// inventory engine: quantity leaves stock through InventoryMovement with its existing
+/// append-only trigger and non-negative CHECK constraints, or it does not leave stock at all.
+model FieldJobInspectionPart {
+  id           String             @id @default(cuid())
+  inspectionId String
+  inspection   FieldJobInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  /// Restrict, not Cascade or SetNull: a part line whose stock record vanished would be a claim
+  /// about a part nobody can identify.
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  /// The CONSUME movement that settled this line, when stock has actually moved. Unique, so one
+  /// movement cannot be claimed by two part lines. SetNull is impossible to reach in practice
+  /// because InventoryMovement is append-only.
+  movementId String?            @unique
+  movement   InventoryMovement? @relation(fields: [movementId], references: [id], onDelete: SetNull)
+
+  qty           Int
+  /// Owner-entered cost for the record. No money moves and no Payment row is written.
+  unitCostCents Int?
+  currency      String  @default("USD")
+  notes         String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([inspectionId, idempotencyKey])
+  @@index([inspectionId])
+  @@index([inventoryItemId])
 }

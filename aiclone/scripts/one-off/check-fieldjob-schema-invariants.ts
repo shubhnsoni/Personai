@@ -45,17 +45,33 @@ const FORBIDDEN_TABLES = [
     "WorkOrderLine",
     "Job",
     "JobCard",
-    // Capabilities this foundation does not have. inspection is still planned.
+    // Capabilities this engine still does not have.
+    //
+    // Wave H0 built inspection under the FieldJobInspection* prefix, so that ONE name left this
+    // list. Every other name here stays forbidden for exactly the reason it always had:
+    //
+    //   Route / RouteStop / FieldJobRoute - no route is optimised and no distance is computed.
+    //   FieldJobNotification              - nobody is notified, by any channel.
+    //   FieldJobInvoice / Invoice         - inspection records an invoice HANDOFF flag on the
+    //                                       inspection row. No invoice is created and no money moves.
+    //   Asset / FieldJobAsset             - an ASSET inspection item carries the equipment's
+    //                                       identity (label, serial, location hint) as columns.
+    //                                       There is deliberately no asset registry behind it.
+    //   Part / FieldJobPart               - parts are FieldJobInspectionPart rows pointing at the
+    //                                       existing InventoryItem. There is no second parts
+    //                                       catalogue and no second stock ledger.
+    //   Inspection                        - the bare name would be a domain-free fork; the real
+    //                                       table is scoped to a field job.
     "FieldJobRoute",
     "Route",
     "RouteStop",
-    "FieldJobInspection",
     "Inspection",
     "FieldJobPart",
     "Part",
     "FieldJobAsset",
     "Asset",
     "FieldJobInvoice",
+    "Invoice",
     "FieldJobNotification",
 ] as const
 
