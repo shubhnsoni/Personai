@@ -1017,6 +1017,118 @@ check(
     !/LearnerAccessService/.test(accessSrc) && !/pl_member/.test(accessSrc),
 )
 
+// ---------------------------------------------------------------------------
+// Wave H1 (W4) — explicit coverage for the inspection owner panel. Root is wiring the
+// runtime, routes and shell mount in parallel, so this panel is not mounted in
+// BusinessOsShell yet and is checked directly against its own source rather than through a
+// render of the shell. The honesty requirements specific to this package: a foreign and a
+// nonexistent inspection are indistinguishable (no 404, never "not found"), a null
+// isWithinExpectedRange is stated to mean "not applicable" rather than "out of range", a
+// part's stock is shown to have moved only when movementId is set, and invoice handoff is
+// stated to be a flag rather than an invoice.
+// ---------------------------------------------------------------------------
+const inspectionSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/inspection-panel.tsx"),
+    "utf8",
+)
+const inspectionSharedSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/inspection-shared.ts"),
+    "utf8",
+)
+const inspectionAll = `${inspectionSrc}\n${inspectionSharedSrc}`
+
+check("inspection decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(inspectionSrc))
+check(
+    "inspection loading states announce themselves politely and as busy",
+    inspectionSrc.includes('aria-live="polite"') && inspectionSrc.includes('aria-busy="true"'),
+)
+check(
+    "every inspection loading state carries a screen-reader label",
+    /Loading inspections/.test(inspectionSrc) && /Loading inspection detail/.test(inspectionSrc) && /Loading inspection history/.test(inspectionSrc),
+)
+check("inspection panel uses a structural skeleton while loading", /Skeleton/.test(inspectionSrc))
+check(
+    "inspection refusals are split by status, with 503 leaking nothing",
+    /error\.status === 401/.test(inspectionSharedSrc) &&
+        /error\.status === 403/.test(inspectionSharedSrc) &&
+        /error\.status === 400/.test(inspectionSharedSrc) &&
+        /error\.status === 409/.test(inspectionSharedSrc) &&
+        /error\.status === 503/.test(inspectionSharedSrc) &&
+        /Nothing was changed/.test(inspectionSharedSrc),
+)
+check(
+    "the inspection 403 copy never says not found, for a foreign or a nonexistent inspection alike",
+    /you do not have access to this inspection/i.test(inspectionSharedSrc) && !/not found/i.test(inspectionSharedSrc),
+)
+check("inspection empty state states that no sample data is shown", /no sample inspections are shown/i.test(inspectionSrc))
+check(
+    "the inspection panel contains no fabricated inspection, item or part",
+    !/\bid:\s*"/.test(inspectionAll) && !/sampleInspection/i.test(inspectionAll) && !/reference:\s*"[A-Z]/.test(inspectionSrc),
+)
+check("inspection disclosures expose their expanded state", /aria-expanded=/.test(inspectionSrc))
+check(
+    "inspection sections are headed rather than only visually grouped",
+    /<h3/.test(inspectionSrc) && /<h5/.test(inspectionSrc),
+)
+check(
+    "inspection status, item and handoff buttons all come from server-computed allowedTransitions",
+    /inspection\.allowedTransitions/.test(inspectionSrc) &&
+        /inspection\.allowedTransitions\.includes\("COMPLETED"\)/.test(inspectionSrc) &&
+        /inspection\.allowedTransitions\.includes\("CANCELLED"\)/.test(inspectionSrc),
+)
+check(
+    "a terminal inspection explains why it has no actions",
+    /inspection\.allowedTransitions\.length === 0/.test(inspectionSrc) && /cannot change/.test(inspectionSrc),
+)
+check(
+    "MEASURED: a null isWithinExpectedRange is shown as not applicable, never as out of range",
+    /isWithinExpectedRange === null/.test(inspectionSrc) && /Range not applicable/.test(inspectionSrc),
+)
+check(
+    "measured values are parsed for display only, never assumed to be number",
+    /formatDecimal/.test(inspectionAll) && /serialised as \*\*strings\*\*|serialised as STRINGS/i.test(inspectionSharedSrc),
+)
+check(
+    "a part is shown to have moved stock only when movementId is set",
+    /part\.movementId/.test(inspectionSrc) && /stock did not move/.test(inspectionSrc) && /stock moved \(movement/.test(inspectionSrc),
+)
+check(
+    "recording a part is stated to never move stock by itself",
+    /Recording a part never moves stock by itself/.test(inspectionSrc),
+)
+check(
+    "invoice handoff is rendered as a flag and the word invoiced never appears",
+    /HANDOFF FLAG, not an invoice/.test(inspectionSrc) && !/\binvoiced\b/i.test(inspectionAll),
+)
+check(
+    "the handoff section never renders a currency total as if a bill exists",
+    !/handoff[\s\S]{0,400}\$\{[^}]*Cents/i.test(inspectionSrc),
+)
+check(
+    "no upload control or thumbnail is rendered for evidenceManifest",
+    !/type="file"/.test(inspectionSrc) && !/<img\b/i.test(inspectionSrc) && !/evidenceManifest[\s\S]{0,120}<input/i.test(inspectionSrc),
+)
+check(
+    "asset items disclose there is no asset registry or per-asset service history",
+    /no asset registry behind this field/.test(inspectionSrc),
+)
+check(
+    "a required item's fail path requires notes before it can be marked",
+    /disabled=\{busy \|\| \(next === "FAIL" && !\(itemNotes\[item\.id\] \?\? item\.notes \?\? ""\)\.trim\(\)\)\}/.test(inspectionSrc),
+)
+check(
+    "completion is described as refused while required items are pending, with the count shown",
+    /pendingRequired/.test(inspectionSrc) && /still pending/.test(inspectionSrc),
+)
+check(
+    "empty inspection sub-lists say so rather than rendering a placeholder row",
+    /No asset checks on this inspection/.test(inspectionSrc) &&
+        /No measurements on this inspection/.test(inspectionSrc) &&
+        /No parts recorded against this inspection/.test(inspectionSrc) &&
+        /No completion notes recorded yet/.test(inspectionSrc) &&
+        /No history recorded yet/.test(inspectionSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
