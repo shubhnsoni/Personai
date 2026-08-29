@@ -16,9 +16,10 @@ export const businessEngineDescriptors: Record<BusinessEngineId, EngineDescripto
       {
         id: "inventory",
         label: "Inventory",
-        description: "Stock rules, reservations, and availability signals.",
-        maturity: "planned",
-        evidence: "none",
+        description:
+          "Stock per product per location, an append-only movement ledger, and reservations that make overselling impossible: on-hand and reserved are separate balances, and reserved <= onHand is a database CHECK constraint, not a convention.",
+        maturity: "available",
+        evidence: "src/lib/inventory/engine.ts",
       },
       {
         id: "orders",
