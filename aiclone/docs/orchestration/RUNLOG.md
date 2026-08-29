@@ -1804,3 +1804,112 @@ Live `personalink` read-only. Disposable target
 state. Origin remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Frozen worktrees and
 attachments untouched; `P1_014_ACTION_INVENTORY.md` unchanged. No push, PR, deploy, tunnel,
 dev server or real external-provider call.
+
+
+---
+
+## 2026-08-29 · Wave D complete — content and cohort schema, runtime, APIs and console
+
+Root-serial. No worker independence claimed. Branch `feature/wave-d-cohorts` cut from
+primary `a353770` in the reused Wave C worktree, then merged `--no-ff` onto
+`recovered/aug20-wt-pr-32` at **`c516703`**.
+
+| Package | Commit | Harness |
+|---|---|---|
+| D1 additive schema | `48e448d` | `check-cohort-schema-invariants` 60 invariants, 0/1/0 |
+| D2 cohort runtime | `4d35deb` | `check-cohort-runtime` 114 assertions, 0/1/0 |
+| D3 APIs + console | `12d3f2f` | `check-cohort-routes` 87 assertions, 0/1/0 |
+
+### What was promoted rather than forked
+The **program is the pre-existing `Course`**, with its `CourseModule` and `CourseLesson`
+children. Learner identity stays `Member`. The learner's relation to a program stays
+`CourseEnrollment`. Per-lesson progress stays `LessonCompletion`.
+
+The genuinely missing concept was a **cohort**: a dated, capacity-bounded run of a course
+that people attend together. Eight tables hang off it, and every one of them points at the
+records that already exist — `CohortMembership` → `CourseEnrollment`, `CohortSession` →
+`Location`, `CohortSubmission` and `CohortCertificate` → `ProfileDocument`,
+`CohortMembership` → `TaskJob` for renewal reminders. The schema harness verifies those
+foreign-key targets by name and fails if any of twelve forbidden fork tables appears.
+
+**There is no progress table.** Progress is computed from `LessonCompletion`,
+`CohortSubmission` and `CohortAttendance` on every read. A cached percentage would be a
+second source of truth that can silently disagree with the rows it summarises, so the
+harness fails if any `Cohort*` table grows a `progress`, `percent` or `completedLessons`
+column.
+
+Certificate policy is **data, not code**: `Cohort.attendanceThresholdPct`,
+`requireAllAssignments` and `requireAllLessons` are stored, so eligibility is evaluated
+against a published rule rather than a threshold buried in a function.
+
+### The one column added to a pre-existing table
+`CourseEnrollment.idempotencyKey TEXT NULL`, with a unique index on
+`(courseId, idempotencyKey)`. Enrolment previously had **no idempotency key at all**, so a
+retried enrolment created a duplicate row. NULLs are distinct in Postgres, so the index
+constrains only rows that carry a key — the harness proves three NULL-key enrolments in one
+course coexist. The alternative, a cohort-only enrolment table, would have forked the
+learner's relationship to a course, which is the duplication this wave exists to avoid.
+
+### Migration rehearsal, disposable target only
+Fresh external backup before any DDL. `pre-d1` 74 tables / 799 columns / 130 enum labels /
+10 triggers → `post-d1-apply` 82 / 893 / 176 / 12 → `post-d1-rollback` **byte-identical to
+`pre-d1`** (raw sha256 `9f09cd30f5c2b1d9`) → `post-d1-reapply` normalized-identical to
+`post-d1-apply`. Catalog comparison reports `only_in_pre-d1=0` for tables, columns,
+constraints, indexes, enums and triggers — nothing was removed in any category. Exclusion
+constraints stayed at 2 and extensions at 2 throughout.
+
+`prisma migrate diff` produced 8 `CREATE TABLE`, 9 `CREATE TYPE`, 1 `ADD COLUMN`, 0
+`ALTER COLUMN`, 0 `DROP TABLE`, 0 `DROP COLUMN`. The build tool asserts that exact shape and
+aborts on any `ADD COLUMN` other than the one named above. The five pre-existing `profileId`
+`DropForeignKey` statements were excluded with the count asserted, for the fourth wave
+running.
+
+`prisma format` inserted five opposite relation fields. A semantic block diff over the whole
+schema shows **17 blocks added, 0 removed**, and confirms those five fields plus the one
+column and its index are the only changes to pre-existing models; every other textual
+difference is whitespace realignment. The relation-name verifier reports **0 renamed across
+81 pre-existing models**.
+
+### Four gates where the cheap version would have recorded something false
+- **Membership `COMPLETED`** is evaluated against the cohort's own policy using persisted
+  rows, and the refusal names the unmet requirements. Marking a learner complete is a claim
+  that outlives the cohort, so it is not allowed to be optimistic.
+- **Certificate `ELIGIBLE`** is recomputed, never accepted from the caller. The serial is
+  minted server-side at issue from the cohort code and membership id, so a caller can
+  neither choose nor collide with one, and an eligible-but-unissued certificate keeps a null
+  serial and null `issuedAt` so it cannot be mistaken for a credential.
+- **Attendance** requires a session that has actually started. Recording attendance against
+  a `SCHEDULED` or `CANCELLED` session is refused, because either would be fabricated.
+- **Renewal `REMINDED`** requires a linked `TaskJob`. Scheduling enqueues a real `QUEUED`
+  row with `nextAttemptAt` set to the requested remind time and sends nothing; without the
+  rule the state would assert a delivery that never happened.
+
+### Measured, not asserted
+- Anonymous is 401 across all 24 endpoints, with zero cohorts, zero enrolments, zero
+  `CohortEvent`s and zero external calls — counted before/after.
+- A foreign cohort and a nonexistent cohort are compared by **string equality of the
+  response body**: byte-identical on read and on mutation. Wrong-tenant progress is 403 and
+  leaks no figures. This is the inverted assertion in both cohort harnesses.
+- `globalThis.fetch` is replaced by a counting blocker for the whole run. Total calls: 0.
+- Capacity is enforced inside the transaction against a locked cohort row; a withdrawal
+  genuinely frees the seat, proven by rejoining.
+- Every fixture row is removed, eleven tables return to baseline, and the `CohortEvent`
+  append-only trigger is verified re-armed after being disabled for cleanup.
+
+### Combined gates on integrated tip `c516703`
+`prisma validate` 0 · `prisma generate` 0 · app `tsc` 0 · targeted `eslint` 0 ·
+relation-rename verifier **0 renamed across 81 pre-existing models** · **38/38** check
+harnesses exit 0 (`check-order-stream` excluded as the known non-blocking precondition),
+including cohort schema 60/60, cohort runtime 114/114, cohort routes 87/87, case 36/67/75,
+appointments 43/49/56/39, reservations 36/36/21, `check-schema-invariants` 18/18,
+`check-business-os-a11y` PASS with 22 new explicit cohort assertions · `npm audit
+--omit=dev` 0 vulnerabilities · `npm run build` 0 with all 15 cohort routes and all 18 case
+routes registered · secret scan 0 real hits (the one match is a deliberate fake DSN inside
+`check-cohort-routes` that proves the 503 path leaks neither message nor connection string).
+
+### Preservation
+Live `personalink` read-only. Disposable target
+`personalink_phase0_rehearsal_20260826_210704` left **fully applied** at 82 tables, not
+mid-rehearsal. Origin remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Frozen worktrees
+and attachments untouched; `P1_014_ACTION_INVENTORY.md` unchanged. No push, PR, deploy,
+tunnel, dev server or real external-provider call.

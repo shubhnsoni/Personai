@@ -5,63 +5,80 @@ Updated 2026-08-29, mid-run, root-serial. No worker independence claimed.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`862e5ef`** — Wave C fully integrated and green
+- Primary HEAD: **`c516703`** — Wave D fully integrated and green
 - Origin `recovered/aug20-wt-pr-32`: `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`, unchanged
-- Waves A, B and C complete. P2-005 and P2-006 are `done`.
-- Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**,
-  not mid-rehearsal. Live `personalink` untouched.
+- Waves A, B, C and D complete. P2-005, P2-006 and P2-008 are `done`.
+- Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**
+  at 82 tables, not mid-rehearsal. Live `personalink` untouched.
 - Gateway port 5476 absent; workers and crons empty. Every wave has been root-serial.
 
-## Exact executable continuation — Wave D content/cohorts
+## Exact executable continuation — Wave E truthful vertical activation
 
-Read `INTEGRATION_QUEUE.md` → "Next in queue — Wave D content/cohorts, READY" for the
-package table and proof requirements.
+Read `INTEGRATION_QUEUE.md` → "Next in queue — Wave E truthful vertical activation, READY".
 
 ### Step 0 — measure, do not assume
 
 ```powershell
 cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
-git rev-parse HEAD                     # expect 862e5ef...
+git rev-parse HEAD                     # expect c516703...
 git status --porcelain                 # expect only .codex-remote-attachments/ and P1_014_ACTION_INVENTORY.md untracked
 git rev-parse origin/recovered/aug20-wt-pr-32   # expect 4b386d1...
 ```
 
-### Step 1 — inspect before designing
+### Step 1 — enumerate claims before changing any flag
 
-The existing content models are `Course`, `CourseModule`, `CourseLesson`,
-`CourseEnrollment`, `LessonCompletion` and `Member`. Read them in
-`aiclone/prisma/schema.prisma` and read `scripts/one-off/check-course-profile-actions-authz.ts`
-for the authorization contract they already have. Promote these behind shared content/cohort
-contracts; do not fork a coaching-only stack, and do not rename a pre-existing model or
-Prisma relation field.
+For restaurant, coaching, consulting and CA, list every capability the blueprint claims, then
+find the runtime and the route or surface for each one. Activate only the blueprints whose
+claims are all met; a blueprint with one unmet capability stays draft.
 
-### Step 2 — D1 additive schema (only package here that mutates a database)
+What genuinely exists now, by wave:
 
-Do not start D1 with under 90 minutes of safe time. Sequence, in order:
+| Wave | Runtime | Routes | Surface |
+|---|---|---|---|
+| A restaurant reservations | `src/lib/reservations/**` | `/api/platform/reservations/**` | `reservations-panel.tsx` |
+| B appointments | `src/lib/appointments/**` | `/api/platform/appointments/**` | `appointments-panel.tsx` |
+| C cases and projects | `src/lib/cases/**` | `/api/platform/cases/**`, `/case-intakes/**` | `cases-panel.tsx`, `case-detail-panel.tsx` |
+| D cohorts | `src/lib/cohorts/**` | `/api/platform/cohorts/**`, `/course-enrollments` | `cohorts-panel.tsx`, `cohort-detail-panel.tsx` |
+
+`commerce.inventory` is still **planned, not built**. Retail therefore stays draft. Do not
+activate it to make a table look complete.
+
+### Step 2 — make the contract harness falsifiable
+
+`check-capability-contract` must FAIL if a blueprint is marked active while any capability it
+claims has no runtime. Prove that by inverting it, exactly as every other harness in this
+repo does.
+
+### Step 3 — after Wave E
+
+Commerce inventory hardening. It touches schema, so do not start it with under 90 minutes
+remaining; follow the D1 migration sequence below.
+
+## Migration sequence, if a package needs one
 
 ```powershell
 $T = "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c"
 node "$T\rehearse.js" backup
-node "$T\rehearse.js" snapshot pre-d1
-# edit prisma/schema.prisma, generate the migration, then:
-node "$T\rehearse.js" snapshot post-d1
-node "$T\rehearse.js" compare pre-d1 post-d1
-node "$T\verify-no-renames.js"            # must report 0 renamed
+node "$T\rehearse.js" snapshot pre-<pkg>
+# edit prisma/schema.prisma, then:
+npx prisma format --schema prisma/schema.prisma
+node "$T\schema-semantic-diff.js"          # must show 0 removed blocks
+node "$T\run-on-rehearsal.js" -- node "$T\build-raw-diff.js"
+# copy build-migration-d1.js, change OUT_DIR, header and the allowed ADD COLUMN set
+node "$T\run-on-rehearsal.js" -- npx prisma migrate deploy
+node "$T\rehearse.js" snapshot post-<pkg>-apply
+node "$T\run-on-rehearsal.js" -- npx prisma db execute --file "<migration dir>/down.sql" --schema prisma/schema.prisma
+node "$T\run-on-rehearsal.js" -- npx prisma db execute --file "$T\forget-d1-migration.sql" --schema prisma/schema.prisma
+node "$T\rehearse.js" snapshot post-<pkg>-rollback
+node "$T\rehearse.js" compare pre-<pkg> post-<pkg>-rollback     # must be IDENTICAL
+node "$T\run-on-rehearsal.js" -- npx prisma migrate deploy
+node "$T\rehearse.js" compare post-<pkg>-apply post-<pkg>-reapply
+node "$T\verify-no-renames.js"                                  # must report 0 renamed
 ```
 
-Then apply → roll back with the migration's own `down.sql` → reapply, and confirm the
-catalog comparison is identical across the cycle. The five pre-existing `profileId`
-`DropForeignKey` statements against `ActivityEvent`, `Contact`, `ContactSourceLink`,
-`WorkflowRun` and `Workspace` must be **excluded and count-asserted**, never applied.
-
-### Step 3 — D2 runtime, then D3 APIs/UI
-
-Follow the Wave C shape exactly; it is proven and its harnesses are the template:
-
-- `scripts/one-off/check-case-runtime.ts` — engine harness, 67 assertions
-- `scripts/one-off/check-case-routes.ts` — HTTP harness, 75 assertions
-- `src/lib/cases/{lifecycle,shared,engine,workflow,http,runtime}.ts` — layering
-- `src/components/business-os/{cases-panel,case-detail-panel,cases-shared}` — surface
+The five pre-existing `profileId` `DropForeignKey` statements against `ActivityEvent`,
+`Contact`, `ContactSourceLink`, `WorkflowRun` and `Workspace` must be **excluded and
+count-asserted**, never applied.
 
 ## Non-obvious rules that will cost time if forgotten
 
@@ -69,9 +86,10 @@ Follow the Wave C shape exactly; it is proven and its harnesses are the template
    `TS_NODE_PROJECT=scripts/tsconfig.checks.json` must be set. The rehearsal runner sets the
    latter; a bare `npx ts-node script.ts` fails with `ERR_MODULE_NOT_FOUND`.
 2. **Run every DB harness through a runner**, never with the ambient `DATABASE_URL`:
-   - `...\personalink-phase0\wave-c\run-on-rehearsal.js -- <cmd>` (Wave C worktree)
-   - `...\personalink-phase0\wave-a-briefs\run-on-rehearsal-primary.js -- <cmd>` (primary)
-   - The full 35-check sweep: `pwsh -File ...\wave-c\run-wave-c-gates.ps1`
+   - `...\wave-c\run-on-rehearsal.js -- <cmd>` (the cases/cohorts worktree)
+   - `...\wave-a-briefs\run-on-rehearsal-primary.js -- <cmd>` (primary)
+   - Full sweep of all 38 checks: `pwsh -File ...\wave-c\run-wave-c-gates.ps1`
+     (it globs `check-*.ts` and skips only `check-order-stream`)
 3. **Git pathspecs are relative to the repo root, which is the folder *above* `aiclone`.**
    `git -C aiclone add aiclone/...` fails; run git from the worktree root.
 4. **PowerShell has no heredoc.** Long commit messages go through `git commit -F <file>`.
@@ -84,6 +102,10 @@ Follow the Wave C shape exactly; it is proven and its harnesses are the template
    value) stays distinct from 409 (illegal transition).
 8. **Prove non-enumeration by byte-comparing whole response bodies**, not by asserting two
    403s.
+9. **Let the server compute `allowedTransitions`** and have the UI render only those, so a
+   client cannot offer a move the write boundary refuses.
+10. **`spawnSync` for `npx` on Windows needs `shell: true`**, otherwise it fails with no
+    stdout and no stderr.
 
 ## Do not spend a run on
 

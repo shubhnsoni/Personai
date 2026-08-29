@@ -493,3 +493,77 @@ this wave that mutates a database.
 - `check-order-stream` precondition: still unmet, still non-blocking.
 - P1-009 repo-wide lint cleanup: still deferred until feature waves cannot safely start.
 - Gateway on port 5476: still absent. Every wave so far has been root-serial.
+
+
+---
+
+## Wave D COMPLETE — D1, D2 and D3 INTEGRATED 2026-08-29 at `c516703`
+
+| Pkg | Commit | Paths | Proof |
+|---|---|---|---|
+| D1 schema | `48e448d` | `prisma/schema.prisma`, `prisma/migrations/20260829130000_content_cohorts_foundation`, `scripts/one-off/check-cohort-schema-invariants.ts` | 60 invariants, 0/1/0 |
+| D2 runtime | `4d35deb` | `src/lib/cohorts/{lifecycle,shared,progress,engine,workflow,index}.ts`, `scripts/one-off/check-cohort-runtime.ts` | 114 assertions, 0/1/0 |
+| D3 APIs + console | `12d3f2f` | `src/lib/cohorts/{http,runtime}.ts`, 15 routes under `src/app/api/platform/cohorts/**` and `/course-enrollments`, `src/components/business-os/{cohorts-panel,cohort-detail-panel,cohorts-shared}`, shell mount, `scripts/one-off/check-cohort-routes.ts`, 22 new assertions in `check-business-os-a11y` | 87 assertions, 0/1/0 |
+
+D1 rehearsed apply → rollback → reapply on the disposable target only, left **fully
+applied** at 82 tables. Rollback was byte-identical to the pre-migration snapshot.
+
+Combined gates on `c516703`: `prisma validate`/`generate` 0 · `tsc` 0 · targeted `eslint` 0 ·
+relation-rename verifier 0 renamed across 81 pre-existing models · **38/38** check harnesses
+exit 0 · `npm audit --omit=dev` 0 · `npm run build` 0 · secret scan 0 real hits.
+
+P2-008 is `done`.
+
+### Standing rules earned in this package
+
+1. **`prisma migrate diff` is not proof that a `prisma format` run was cosmetic.** Diff the
+   schema *semantically*: parse every `model` and `enum` block, normalize whitespace, and
+   report which blocks changed. That is how this wave showed the five auto-inserted opposite
+   relation fields plus one deliberate column were the only changes to pre-existing models.
+   The tool is at `%TEMP%\personalink-phase0\wave-c\schema-semantic-diff.js`.
+2. **Assert the exact expected diff shape in the migration builder, not just the absence of
+   drops.** This wave's builder aborts unless it sees exactly one `ADD COLUMN`, and only the
+   named one. A generic "no DROP" filter would have let an unintended column through.
+3. **A nullable column plus a unique index is a safe way to add idempotency to a legacy
+   table** — but prove it, because the claim rests on NULLs being distinct in Postgres. The
+   harness inserts three NULL-key rows in the same course.
+4. **Do not cache a derived figure.** Progress has no column; it is computed from the
+   completion, submission and attendance rows on every read, and the schema harness fails if
+   a `progress` or `percent` column ever appears on a cohort table.
+5. **Store the policy, not the threshold.** Certificate eligibility reads
+   `attendanceThresholdPct`, `requireAllAssignments` and `requireAllLessons` off the cohort,
+   so an owner can see and change the rule instead of it living in a function.
+6. **A state that asserts an external effect must require the record of that effect.**
+   `REMINDED` requires a linked `TaskJob`; without that rule the state would claim a
+   reminder that was never queued.
+
+---
+
+## Next in queue — Wave E truthful vertical activation, READY
+
+Base `c516703` or newer primary.
+
+Wave A gave restaurants reservations, Wave B gave appointments, Wave C gave cases and
+projects, Wave D gave cohorts. That is enough for four blueprints to stop being aspirational,
+**provided each claimed capability is checked against what actually exists** rather than
+against what a wave was named after.
+
+| Pkg | Owner paths | Required proof |
+|---|---|---|
+| E1 | blueprint/capability definitions + `check-capability-contract` | for each of restaurant, coaching, consulting and CA: enumerate the capabilities the blueprint claims, and show a persisted runtime and a route or surface for every one. Activate only those. A blueprint with one unmet capability stays draft. |
+| E2 | `check-capability-contract`, `check-business-os-surface` | the contract harness must FAIL if a blueprint is marked active while any capability it claims has no runtime. Prove it by inverting. |
+
+**Retail stays draft** while `commerce.inventory` is planned rather than built. Do not
+activate it to make a table look complete.
+
+Commerce inventory hardening is the next feature package after Wave E, and needs at least 90
+minutes because it touches schema.
+
+### Open items carried forward
+
+- P1-007 live cutover: still owner-gated, unchanged.
+- Pre-existing `profileId` FK drift: still five `DropForeignKey` statements that any generated
+  migration will include. Excluded and count-asserted for the fourth wave. Untouched.
+- `check-order-stream` precondition: still unmet, still non-blocking.
+- P1-009 repo-wide lint cleanup: still deferred until feature waves cannot safely start.
+- Gateway on port 5476: still absent. Every wave so far has been root-serial.

@@ -868,6 +868,81 @@
       "observedModel": "gpt-5.6-sol",
       "rootVerdict": "ACCEPTED AS READ-ONLY REVIEW - no repository mutation",
       "externalReport": "C:\\Users\\shubh\\AppData\\Local\\Temp\\personalink-phase0\\wave2-reports\\LANE-6-INTEGRATION-REVIEW.md"
+    },
+    {
+      "id": "P2-008",
+      "title": "Shared content and cohort engine",
+      "status": "done",
+      "owner": "root (claude-opus-5)",
+      "workerIndependenceClaimed": false,
+      "dependencies": [
+        "P2-002",
+        "P2-006"
+      ],
+      "base": "a35377023759cb5f29b0f63748cd5d59ed3fb354",
+      "branch": "feature/wave-d-cohorts",
+      "worktree": "C:\\\\Users\\\\shubh\\\\Desktop\\\\Projects\\\\personal projects\\\\personai-wave-c-cases-wt",
+      "mergeCommit": "c516703",
+      "commits": {
+        "D1_schema": "48e448d",
+        "D2_runtime": "4d35deb",
+        "D3_apis_ui": "12d3f2f",
+        "waveD_integration": "c516703"
+      },
+      "scope": "One content and cohort engine for coaching, training, education and membership programs. Promotes the existing Course/CourseModule/CourseLesson tree rather than forking a coaching-only stack.",
+      "d1": {
+        "migration": "20260829130000_content_cohorts_foundation",
+        "added": "9 enums; 8 tables (Cohort, CohortMembership, CohortSession, CohortAttendance, CohortAssignment, CohortSubmission, CohortCertificate, append-only CohortEvent); one append-only trigger reusing reject_append_only_mutation(); ONE nullable column CourseEnrollment.idempotencyKey with a unique index on (courseId, idempotencyKey).",
+        "reused": "Course is the program. Member is the learner. CourseEnrollment is the learner-to-program record. LessonCompletion is per-lesson progress, so NO progress table exists. ProfileDocument carries submissions and certificates. Location is the session venue. TaskJob carries renewal reminders. Payment stays reachable through CourseEnrollment.paymentId.",
+        "promotionProven": "The harness verifies foreign key TARGETS by name (Cohort->Course, Cohort->Profile, CohortMembership->CourseEnrollment, CohortMembership->TaskJob, CohortSession->Location, CohortSubmission->ProfileDocument, CohortCertificate->ProfileDocument) and fails if any of 12 forbidden fork tables appears or if any Cohort* table grows a learner, lesson-content, payment, task-queue or cached-progress column.",
+        "tenancy": "profileId, bridged from the caller workspace exactly as the appointment domain does, because Course is already profileId-scoped and Workspace.profileId is unique.",
+        "policyIsData": "Cohort carries attendanceThresholdPct, requireAllAssignments and requireAllLessons so certificate eligibility is computed against a configured rule rather than a constant in code.",
+        "rehearsal": "Fresh external backup; pre-d1 74 tables/799 columns/130 enum labels/10 triggers; post-apply 82/893/176/12; rollback byte-identical to pre-d1 (raw sha256 9f09cd30f5c2b1d9); reapply normalized-identical to apply. only_in_pre=0 for tables, columns, constraints, indexes, enums and triggers. Exclusion constraints stayed 2, extensions stayed 2.",
+        "diffShape": "8 CREATE TABLE, 9 CREATE TYPE, 1 ADD COLUMN, 0 ALTER COLUMN, 0 DROP TABLE, 0 DROP COLUMN; the build tool asserts that exact shape and aborts on any other ADD COLUMN.",
+        "fkDrift": "The five pre-existing profileId DropForeignKey statements were excluded with the count asserted, for the fourth wave running.",
+        "formatProof": "A semantic block diff over the whole schema shows 17 blocks added, 0 removed, and only 5 opposite relation fields plus the one column and its unique index changed on pre-existing models; every other difference is whitespace realignment.",
+        "gates": "check-cohort-schema-invariants 60/60, 0/1/0"
+      },
+      "d2": {
+        "files": "src/lib/cohorts/{lifecycle,shared,progress,engine,workflow,index}.ts",
+        "derivedProgress": "No progress column exists. Lesson progress from LessonCompletion, assignment progress from CohortSubmission, attendance from CohortAttendance. Percentages floored, not rounded. CANCELLED and SCHEDULED sessions excluded from the attendance denominator; EXCUSED absences removed from it rather than credited.",
+        "gates": "Membership COMPLETED evaluated against the cohort policy with the unmet requirements named in the refusal. Certificate ELIGIBLE recomputed, never accepted from the caller; serial minted server-side at issue. Attendance requires a started session. Renewal REMINDED requires a linked TaskJob.",
+        "concurrency": "Capacity enforced inside the transaction against a locked Cohort row; capacity counts live members so a withdrawal frees a place.",
+        "idempotency": "(profileId,key) cohorts, (courseId,key) enrolments, (cohortId,key) memberships, (assignmentId,key) submissions; reminders reuse their TaskJob by idempotency key.",
+        "harness": "scripts/one-off/check-cohort-runtime.ts, 114 assertions, 0/1/0",
+        "externalCalls": "globalThis.fetch replaced by a counting blocker for the whole run; 0 calls measured"
+      },
+      "d3": {
+        "files": "src/lib/cohorts/{http,runtime}.ts; 15 routes under src/app/api/platform/cohorts/** and /course-enrollments; src/components/business-os/{cohorts-panel,cohort-detail-panel,cohorts-shared}; mounted in business-os-shell.tsx",
+        "routeLayout": "Enrolment lives at /course-enrollments because an enrolment is a learner-to-program record; joining a cohort is a separate step against a separate record.",
+        "errorSplit": "Enum inputs validated against the owning lifecycle flow at the boundary, keeping 400 distinct from 409. Attendance is the exception by design: the engine owns that vocabulary and returns BAD_REQUEST, asserted to surface as 400.",
+        "nonEnumeration": "A foreign cohort and a nonexistent cohort are byte-identical on read and on mutation; wrong-tenant progress is 403 and leaks no figures.",
+        "uiHonesty": "No literal id, learner email or invented percentage in source. The browser computes no percentage; every figure is the server derived value and the screen says nothing is estimated. An ineligible learner sees the exact unmet requirements.",
+        "a11y": "22 new explicit assertions in check-business-os-a11y covering aria-live/aria-busy/sr-only on three loading states, aria-expanded on both disclosures, headings, and the honesty copy.",
+        "harness": "scripts/one-off/check-cohort-routes.ts, 87 assertions, 0/1/0"
+      },
+      "gatesWaveD": {
+        "tip": "c516703",
+        "prismaValidate": 0,
+        "prismaGenerate": 0,
+        "tsc": 0,
+        "targetedLint": 0,
+        "checkHarnesses": "38 of 38 exit 0 (check-order-stream excluded as a known non-blocking precondition)",
+        "cohortSchemaInvariants": "60/60",
+        "cohortRuntime": "114/114",
+        "cohortRoutes": "87/87",
+        "caseHarnesses": "schema 36/36, runtime 67/67, routes 75/75",
+        "appointments": "authz 43/43, lifecycle 49/49, routes 56/56, schema invariants 39/39",
+        "reservations": "authz 36/36, routes 36/36, schema invariants 21/21",
+        "schemaInvariants": "18/18",
+        "relationRenameVerifier": "0 renamed across 81 pre-existing models",
+        "fixtureResidue": "zero across all three cohort harnesses; append-only trigger verified re-armed each time",
+        "externalCalls": "zero, counted",
+        "secretScan": "0 real hits; the single match is a deliberate fake DSN in check-cohort-routes proving the 503 path leaks nothing",
+        "npmAuditOmitDev": "0 vulnerabilities",
+        "build": "0, with all 15 cohort routes and all 18 case routes registered",
+        "disposableDb": "left fully applied at 82 tables; live personalink untouched"
+      }
     }
   ],
   "laneState": {
