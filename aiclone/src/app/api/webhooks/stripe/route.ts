@@ -2,7 +2,7 @@ import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { getUncachableStripeClient, requireStripeWebhookSecret, StripeNotConfiguredError } from "@/lib/stripe"
 import { prisma } from "@/lib/prisma"
-import { sendPurchaseConfirmation, sendCreatorNotification } from "@/lib/email"
+import { sendCreatorNotification } from "@/lib/email"
 import Stripe from "stripe"
 
 export async function POST(req: Request) {

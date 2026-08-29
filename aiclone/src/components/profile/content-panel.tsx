@@ -507,7 +507,14 @@ function _RemovedProductsView({ data, onPurchase }: { data: ContentPanelProps["d
     )
 }
 
-function CoursesView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
+/**
+ * PARKED VIEWS. `ContentPanel` no longer mounts these three, in the same way it no longer mounts
+ * `_RemovedProductsView` above. They are kept rather than deleted because they are working
+ * implementations somebody may want back, and the `_Removed` prefix is this file's existing
+ * convention for saying so - it also satisfies the repository's `^_` unused-vars pattern, so a
+ * parked view no longer reads as an accidental leftover.
+ */
+function _RemovedCoursesView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
     const courses = data.courses || []
 
     if (courses.length === 0) {
@@ -564,7 +571,7 @@ function CoursesView({ data, onPurchase }: { data: ContentPanelProps["data"]; on
     )
 }
 
-function EventsView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
+function _RemovedEventsView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
     const events = data.events || []
 
     if (events.length === 0) {
@@ -633,7 +640,7 @@ function EventsView({ data, onPurchase }: { data: ContentPanelProps["data"]; onP
     )
 }
 
-function CommunitiesView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
+function _RemovedCommunitiesView({ data, onPurchase }: { data: ContentPanelProps["data"]; onPurchase?: (itemType: string, itemId: string) => void }) {
     const communities = data.communities || []
 
     if (communities.length === 0) {

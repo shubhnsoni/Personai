@@ -535,7 +535,6 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
     )
 }
 
-const row2 = "grid grid-cols-1 gap-3 sm:grid-cols-2"
 const ghostInput = "h-auto rounded-none border-0 border-b border-border/70 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
 
 const ROLES = [

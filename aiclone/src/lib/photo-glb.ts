@@ -4,17 +4,6 @@ function pad4(n: number) {
     return (4 - (n % 4)) % 4
 }
 
-function concat(parts: Uint8Array[]) {
-    const len = parts.reduce((s, p) => s + p.length, 0)
-    const out = new Uint8Array(len)
-    let o = 0
-    for (const p of parts) {
-        out.set(p, o)
-        o += p.length
-    }
-    return out
-}
-
 function f32(arr: number[]) {
     return new Uint8Array(new Float32Array(arr).buffer)
 }

@@ -628,10 +628,6 @@ function normalizeUrl(input: string) {
     return `https://${trimmed}`
 }
 
-function htmlToText(html: string) {
-    return html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 12000)
-}
-
 function norm(s: string) {
     return s.toLowerCase().replace(/[^a-z0-9]+/g, "")
 }

@@ -1,7 +1,6 @@
 import Stripe from 'stripe'
 import { getUncachableStripeClient, requireStripeWebhookSecret } from './stripe'
 import { prisma } from './prisma'
-import { sendPurchaseConfirmation, sendCreatorNotification } from './email'
 
 export class WebhookHandlers {
     static async processWebhook(payload: Buffer, signature: string, _uuid?: string): Promise<void> {

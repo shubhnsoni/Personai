@@ -1147,10 +1147,6 @@ function cleanHeading(raw: string) {
     return stripTags(raw || "").replace(/\s+/g, " ").trim()
 }
 
-function isNoiseTitle(s: string) {
-    return isChromeHeading(s)
-}
-
 function firstPrice(text: string) {
     const m = text.match(/(?:\$|usd\s*|₹|inr\s*)\s?(\d[\d,]*(?:\.\d{1,2})?)/i)
     return m ? parseFloat(m[1].replace(/,/g, "")) : undefined
