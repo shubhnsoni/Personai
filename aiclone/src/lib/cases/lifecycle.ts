@@ -171,3 +171,90 @@ export const CASE_TIMESTAMP_FIELD: Readonly<
     CLOSED: "closedAt",
     CANCELLED: "cancelledAt",
 })
+
+
+// ---------------------------------------------------------------------------
+// Retainers (Wave G3)
+//
+// A retainer has two independent state machines: the AGREEMENT, which is what the client
+// signed, and the PERIOD, which is one concrete billing window inside it. Keeping them apart
+// is what lets a period be closed without ending the agreement, and an agreement be paused
+// without pretending its open period never happened.
+// ---------------------------------------------------------------------------
+
+export const RETAINER_STATES = ["DRAFT", "ACTIVE", "PAUSED", "EXPIRED", "CANCELLED"] as const
+export type RetainerStateValue = (typeof RETAINER_STATES)[number]
+
+const RETAINER_TRANSITIONS: Readonly<Record<RetainerStateValue, readonly RetainerStateValue[]>> = Object.freeze({
+    DRAFT: Object.freeze(["ACTIVE", "CANCELLED"] as const),
+    // PAUSED, not CANCELLED, is the reversible one. A cancelled agreement stays cancelled,
+    // because reviving it would make the draw ledger ambiguous about which engagement a draw
+    // belonged to.
+    ACTIVE: Object.freeze(["PAUSED", "EXPIRED", "CANCELLED"] as const),
+    PAUSED: Object.freeze(["ACTIVE", "EXPIRED", "CANCELLED"] as const),
+    EXPIRED: Object.freeze([] as const),
+    CANCELLED: Object.freeze([] as const),
+})
+
+/** Only an ACTIVE agreement may open a period or accept a draw. */
+export const DRAWABLE_RETAINER_STATES: readonly RetainerStateValue[] = Object.freeze(["ACTIVE"])
+
+export const RETAINER_PERIOD_STATES = ["OPEN", "CLOSED", "RENEWED", "LAPSED"] as const
+export type RetainerPeriodStateValue = (typeof RETAINER_PERIOD_STATES)[number]
+
+const RETAINER_PERIOD_TRANSITIONS: Readonly<Record<RetainerPeriodStateValue, readonly RetainerPeriodStateValue[]>> =
+    Object.freeze({
+        // CLOSED means "this window is finished and was not continued". RENEWED means "finished
+        // and the next window exists". LAPSED means "finished, not continued, and that was not
+        // the intention" - the distinction matters because only LAPSED is a problem to report.
+        OPEN: Object.freeze(["CLOSED", "RENEWED", "LAPSED"] as const),
+        CLOSED: Object.freeze([] as const),
+        RENEWED: Object.freeze([] as const),
+        LAPSED: Object.freeze([] as const),
+    })
+
+/** Renewing is the only period outcome that creates the next period. */
+export const RENEWING_PERIOD_STATES: readonly RetainerPeriodStateValue[] = Object.freeze(["RENEWED"])
+
+export const RETAINER_BASES = ["UNITS", "VALUE"] as const
+export type RetainerBasisValue = (typeof RETAINER_BASES)[number]
+
+export const RETAINER_PERIOD_KINDS = ["WEEKLY", "MONTHLY", "QUARTERLY", "ANNUAL", "CUSTOM"] as const
+export type RetainerPeriodKindValue = (typeof RETAINER_PERIOD_KINDS)[number]
+
+/** Days in one period. CUSTOM has no entry, because its length lives on the row. */
+export const RETAINER_PERIOD_DAYS: Readonly<Partial<Record<RetainerPeriodKindValue, number>>> = Object.freeze({
+    WEEKLY: 7,
+    MONTHLY: 30,
+    QUARTERLY: 91,
+    ANNUAL: 365,
+})
+
+export const RETAINER_DRAW_KINDS = ["DRAW", "CREDIT", "ADJUSTMENT"] as const
+export type RetainerDrawKindValue = (typeof RETAINER_DRAW_KINDS)[number]
+
+/** A DRAW consumes; a CREDIT returns. ADJUSTMENT may go either way and says so out loud. */
+export const CONSUMING_DRAW_KINDS: readonly RetainerDrawKindValue[] = Object.freeze(["DRAW"])
+export const RETURNING_DRAW_KINDS: readonly RetainerDrawKindValue[] = Object.freeze(["CREDIT"])
+
+export const retainerFlow = make<RetainerStateValue>(RETAINER_TRANSITIONS, RETAINER_STATES)
+export const retainerPeriodFlow = make<RetainerPeriodStateValue>(RETAINER_PERIOD_TRANSITIONS, RETAINER_PERIOD_STATES)
+
+/** Timestamp column set when a retainer reaches a given state. */
+export const RETAINER_TIMESTAMP_FIELD: Readonly<
+    Partial<Record<RetainerStateValue, "activatedAt" | "pausedAt" | "expiredAt" | "cancelledAt">>
+> = Object.freeze({
+    ACTIVE: "activatedAt",
+    PAUSED: "pausedAt",
+    EXPIRED: "expiredAt",
+    CANCELLED: "cancelledAt",
+})
+
+/** Timestamp column set when a period reaches a given state. */
+export const RETAINER_PERIOD_TIMESTAMP_FIELD: Readonly<
+    Partial<Record<RetainerPeriodStateValue, "closedAt" | "renewedAt" | "lapsedAt">>
+> = Object.freeze({
+    CLOSED: "closedAt",
+    RENEWED: "renewedAt",
+    LAPSED: "lapsedAt",
+})

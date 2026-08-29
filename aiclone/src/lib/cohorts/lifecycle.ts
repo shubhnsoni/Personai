@@ -154,3 +154,84 @@ export const MEMBERSHIP_TIMESTAMP_FIELD: Readonly<
     COMPLETED: "completedAt",
     WITHDRAWN: "leftAt",
 })
+
+
+// ---------------------------------------------------------------------------
+// Course access levels (Wave G3)
+//
+// Two state machines again, for the same reason as retainers: the ENTITLEMENT is what a learner
+// holds, and the CHANGE is one requested move between tiers. Separating them is what lets an
+// upgrade be approved and then applied as distinct facts, so "we agreed to this" and "this is
+// now true" are never the same record.
+// ---------------------------------------------------------------------------
+
+export const ACCESS_GRANT_STATES = ["PENDING", "ACTIVE", "SUSPENDED", "EXPIRED", "REVOKED"] as const
+export type AccessGrantStateValue = (typeof ACCESS_GRANT_STATES)[number]
+
+const ACCESS_GRANT_TRANSITIONS: Readonly<Record<AccessGrantStateValue, readonly AccessGrantStateValue[]>> =
+    Object.freeze({
+        PENDING: Object.freeze(["ACTIVE", "REVOKED"] as const),
+        ACTIVE: Object.freeze(["SUSPENDED", "EXPIRED", "REVOKED"] as const),
+        // SUSPENDED is the reversible one. REVOKED is not: reviving a revoked entitlement would
+        // make the access history ambiguous about which grant a past view was authorised by.
+        SUSPENDED: Object.freeze(["ACTIVE", "EXPIRED", "REVOKED"] as const),
+        EXPIRED: Object.freeze(["ACTIVE", "REVOKED"] as const),
+        REVOKED: Object.freeze([] as const),
+    })
+
+/**
+ * The only state that actually entitles a learner to anything. A SUSPENDED or EXPIRED grant does
+ * NOT silently fall back to the lowest tier - it falls back to the lessons that carry no rule at
+ * all, which is a different and more honest thing.
+ */
+export const ENTITLING_GRANT_STATES: readonly AccessGrantStateValue[] = Object.freeze(["ACTIVE"])
+
+export const ACCESS_GRANT_SOURCES = ["MANUAL", "PURCHASE", "COHORT"] as const
+export type AccessGrantSourceValue = (typeof ACCESS_GRANT_SOURCES)[number]
+
+export const ACCESS_CHANGE_STATES = ["REQUESTED", "APPROVED", "REJECTED", "APPLIED", "CANCELLED"] as const
+export type AccessChangeStateValue = (typeof ACCESS_CHANGE_STATES)[number]
+
+const ACCESS_CHANGE_TRANSITIONS: Readonly<Record<AccessChangeStateValue, readonly AccessChangeStateValue[]>> =
+    Object.freeze({
+        REQUESTED: Object.freeze(["APPROVED", "REJECTED", "CANCELLED"] as const),
+        // APPROVED is not APPLIED. Agreeing to an upgrade and moving the entitlement are separate
+        // facts, because in between them is where a payment would happen if one ever did.
+        APPROVED: Object.freeze(["APPLIED", "CANCELLED"] as const),
+        REJECTED: Object.freeze([] as const),
+        APPLIED: Object.freeze([] as const),
+        CANCELLED: Object.freeze([] as const),
+    })
+
+/** Only an APPROVED change may be applied. */
+export const APPLIABLE_CHANGE_STATES: readonly AccessChangeStateValue[] = Object.freeze(["APPROVED"])
+/** A change in either of these still occupies the one in-flight slot per grant. */
+export const IN_FLIGHT_CHANGE_STATES: readonly AccessChangeStateValue[] = Object.freeze(["REQUESTED", "APPROVED"])
+
+export const ACCESS_CHANGE_DIRECTIONS = ["UPGRADE", "DOWNGRADE"] as const
+export type AccessChangeDirectionValue = (typeof ACCESS_CHANGE_DIRECTIONS)[number]
+
+export const accessGrantFlow = make<AccessGrantStateValue>(ACCESS_GRANT_TRANSITIONS, ACCESS_GRANT_STATES)
+export const accessChangeFlow = make<AccessChangeStateValue>(ACCESS_CHANGE_TRANSITIONS, ACCESS_CHANGE_STATES)
+
+/** Timestamp column set when a grant reaches a given state. */
+export const ACCESS_GRANT_TIMESTAMP_FIELD: Readonly<
+    Partial<Record<AccessGrantStateValue, "grantedAt" | "suspendedAt" | "revokedAt">>
+> = Object.freeze({
+    ACTIVE: "grantedAt",
+    SUSPENDED: "suspendedAt",
+    REVOKED: "revokedAt",
+})
+
+/** Timestamp column set when a change reaches a given state. */
+export const ACCESS_CHANGE_TIMESTAMP_FIELD: Readonly<
+    Partial<Record<AccessChangeStateValue, "decidedAt" | "appliedAt" | "cancelledAt">>
+> = Object.freeze({
+    APPROVED: "decidedAt",
+    REJECTED: "decidedAt",
+    APPLIED: "appliedAt",
+    CANCELLED: "cancelledAt",
+})
+
+/** Enrolment statuses that can hold an entitlement at all. */
+export const ENTITLABLE_ENROLLMENT_STATUSES: readonly string[] = Object.freeze(["ACTIVE", "COMPLETED"])

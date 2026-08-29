@@ -36,7 +36,17 @@ const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
 const RUN = `wg3r_${Date.now()}_${Math.floor(Math.random() * 1e6)}`
 
-const NEW_TABLES = ["CaseRetainer", "CaseRetainerCaseLink", "CaseRetainerPeriod", "CaseRetainerDraw"] as const
+const NEW_TABLES = [
+    "CaseRetainer",
+    "CaseRetainerCaseLink",
+    "CaseRetainerPeriod",
+    "CaseRetainerDraw",
+    // Added by the second G3 migration, 20260829200000_retainer_event_history. It exists because
+    // the draw ledger records movements of the allowance but cannot record a state change, and
+    // CaseEvent could not be reused: CaseEvent.caseId is NOT NULL while a retainer legitimately
+    // exists before any case is linked.
+    "CaseRetainerEvent",
+] as const
 
 /** Tables that must NOT exist, because the pre-existing ones already do the job. */
 const FORBIDDEN_TABLES = [
@@ -74,6 +84,7 @@ const REUSE_FKS: Array<[string, string, string]> = [
     ["CaseRetainerDraw", "retainerId", "CaseRetainer"],
     ["CaseRetainerDraw", "periodId", "CaseRetainerPeriod"],
     ["CaseRetainerDraw", "caseId", "CaseProject"],
+    ["CaseRetainerEvent", "retainerId", "CaseRetainer"],
 ]
 
 const CHECK_CONSTRAINTS = [
@@ -282,7 +293,7 @@ async function main() {
             )
         ).map((r) => r.table_name)
         const missing = NEW_TABLES.filter((t) => !tables.includes(t))
-        check("all 4 retainer tables present", missing.length === 0, missing.length ? `missing: ${missing}` : "4/4")
+        check("all 5 retainer tables present", missing.length === 0, missing.length ? `missing: ${missing}` : "5/5")
         const forked = FORBIDDEN_TABLES.filter((t) => tables.includes(t))
         check(
             "no parallel subscription, plan, credit, wallet, time-entry or retainer-invoice table was created",
@@ -355,7 +366,12 @@ async function main() {
                 "select tgname from pg_trigger where not tgisinternal",
             )
         ).map((r) => r.tgname)
-        for (const t of ["CaseRetainerDraw_append_only", "CaseRetainerDraw_mismatch_guard", "CaseRetainerCaseLink_tenant_guard"]) {
+        for (const t of [
+            "CaseRetainerDraw_append_only",
+            "CaseRetainerEvent_append_only",
+            "CaseRetainerDraw_mismatch_guard",
+            "CaseRetainerCaseLink_tenant_guard",
+        ]) {
             check(`trigger ${t} is attached`, triggers.includes(t))
         }
         check(
@@ -600,6 +616,19 @@ async function main() {
         })
         check("the database refuses to erase a draw", erase.refused, erase.detail)
 
+        const eventRewrite = await refuses("er", async (tx, s) => {
+            await tx.$executeRawUnsafe(
+                `insert into "CaseRetainerEvent" ("id","retainerId","kind","subjectType","subjectId","from","to","actor")
+                 values ('${RUN}_er_x','${s.retainerUnits}','RETAINER','agreement','${s.retainerUnits}',null,'ACTIVE','STAFF')`,
+            )
+            await tx.$executeRawUnsafe(`update "CaseRetainerEvent" set "to" = 'TAMPERED' where "id" = '${RUN}_er_x'`)
+        })
+        check("the database refuses to rewrite the agreement history", eventRewrite.refused, eventRewrite.detail)
+        check(
+            "CaseRetainerEvent reuses the pre-existing CaseEventKind enum, so the second migration added no vocabulary",
+            enums.some((e) => e.typname === "CaseEventKind" && e.enumlabel === "RETAINER"),
+        )
+
         // ---- 10. tenant isolation is a database rule, not only an engine one --
         const crossTenantLink = await refuses("ct", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -679,6 +708,7 @@ async function counts(prisma: PrismaClient): Promise<Record<string, number>> {
         "CaseRetainerCaseLink",
         "CaseRetainerPeriod",
         "CaseRetainerDraw",
+        "CaseRetainerEvent",
         "CaseProject",
         "CaseInvoice",
         "CaseEvent",

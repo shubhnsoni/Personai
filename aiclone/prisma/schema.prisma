@@ -2646,9 +2646,10 @@ model CaseRetainer {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  periods   CaseRetainerPeriod[]
-  caseLinks CaseRetainerCaseLink[]
-  draws     CaseRetainerDraw[]
+  periods           CaseRetainerPeriod[]
+  caseLinks         CaseRetainerCaseLink[]
+  draws             CaseRetainerDraw[]
+  CaseRetainerEvent CaseRetainerEvent[]
 
   @@unique([workspaceId, reference])
   @@unique([workspaceId, idempotencyKey])
@@ -2942,4 +2943,33 @@ model CourseAccessEvent {
 
   @@index([courseId, seq])
   @@index([courseId, subjectType, subjectId])
+}
+
+/// Append-only history for a retainer AGREEMENT and its periods.
+///
+/// CaseRetainerDraw already records every movement of the allowance, but it cannot record a
+/// state change, and CaseEvent cannot be used either: CaseEvent.caseId is NOT NULL, while a
+/// retainer legitimately exists before any case is linked to it. Fanning an agreement event out
+/// to every linked case was considered and rejected - a retainer with no links yet would have no
+/// history at all, which is precisely the moment an owner most wants one.
+///
+/// subjectType and subjectId say whether a row is about the agreement, a period, a case link or
+/// a draw, so one stream covers all four.
+model CaseRetainerEvent {
+  id          String         @id @default(cuid())
+  retainerId  String
+  retainer    CaseRetainer   @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+  seq         BigInt         @default(autoincrement())
+  kind        CaseEventKind
+  subjectType String
+  subjectId   String
+  from        String?
+  to          String
+  actor       CaseEventActor
+  actorId     String?
+  metadata    Json?
+  at          DateTime       @default(now())
+
+  @@index([retainerId, seq])
+  @@index([retainerId, subjectType, subjectId])
 }
