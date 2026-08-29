@@ -40,6 +40,49 @@ export class FulfilmentService {
 
     // ---- reads ---------------------------------------------------------
 
+    /**
+     * The owner's orders, so a console can pick one to ship or accept a return against.
+     * Read-only and profile-scoped; nothing else in the platform exposes this list.
+     */
+    async listOrders(workspaceId: string) {
+        const profileId = await this.ctx.requireProfile(workspaceId, "profile.read")
+        const rows = await this.ctx.db.order.findMany({
+            where: { profileId },
+            select: {
+                id: true,
+                number: true,
+                status: true,
+                payStatus: true,
+                channel: true,
+                totalCents: true,
+                currency: true,
+                guestName: true,
+                placedAt: true,
+                _count: { select: { lines: true, Fulfilment: true, ReturnRequest: true } },
+            },
+            orderBy: [{ placedAt: "desc" }, { id: "asc" }],
+            take: 200,
+        })
+        return Object.freeze(
+            rows.map((r) =>
+                Object.freeze({
+                    id: r.id,
+                    number: Number(r.number),
+                    status: r.status,
+                    payStatus: r.payStatus,
+                    channel: r.channel,
+                    totalCents: Number(r.totalCents),
+                    currency: r.currency,
+                    guestName: r.guestName,
+                    placedAt: r.placedAt,
+                    lineCount: r._count.lines,
+                    fulfilmentCount: r._count.Fulfilment,
+                    returnCount: r._count.ReturnRequest,
+                }),
+            ),
+        )
+    }
+
     async list(workspaceId: string, orderId?: string | null) {
         const profileId = await this.ctx.requireProfile(workspaceId, "profile.read")
         const scoped = orderId?.trim() || null

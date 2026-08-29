@@ -158,6 +158,44 @@ export class VariantService {
 
     // ---- variants ------------------------------------------------------
 
+    /**
+     * The owner's products, so a console can offer a choice without inventing one. Read-only
+     * and profile-scoped; it exists because a variant surface needs to know which products
+     * there are, and nothing else in the platform exposes that list.
+     */
+    async listProducts(workspaceId: string) {
+        const profileId = await this.ctx.requireProfile(workspaceId, "profile.read")
+        const rows = await this.ctx.db.digitalProduct.findMany({
+            where: { profileId },
+            select: {
+                id: true,
+                title: true,
+                sku: true,
+                priceCents: true,
+                currency: true,
+                isActive: true,
+                fulfillment: true,
+                _count: { select: { ProductVariant: true } },
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+            take: 200,
+        })
+        return Object.freeze(
+            rows.map((r) =>
+                Object.freeze({
+                    id: r.id,
+                    title: r.title,
+                    sku: r.sku,
+                    priceCents: Number(r.priceCents),
+                    currency: r.currency,
+                    isActive: r.isActive,
+                    fulfillment: r.fulfillment,
+                    variantCount: r._count.ProductVariant,
+                }),
+            ),
+        )
+    }
+
     async list(workspaceId: string, productId: string): Promise<readonly VariantRecord[]> {
         const profileId = await this.ctx.requireProfile(workspaceId, "profile.read")
         const product = await this.ctx.ownedProduct(profileId, productId)

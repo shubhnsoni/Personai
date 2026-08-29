@@ -557,6 +557,133 @@ check(
     /No units are held for orders/.test(inventorySrc) && /No movements recorded/.test(inventorySrc),
 )
 
+// ---------------------------------------------------------------------------
+// Wave G — the commerce surface: what you sell (variants) and what happens after it is
+// bought (shipments and returns). The honesty requirements specific to this package are
+// that stock is stated to leave at shipped rather than at packed, that carrier and tracking
+// are disclosed as owner-entered rather than fetched, that a restock without a location says
+// so instead of failing at the write boundary, and that a default variant is described as
+// inheriting the product price rather than copying it.
+// ---------------------------------------------------------------------------
+const variantsSrc = readFileSync(join(__dirname, "../../src/components/business-os/commerce-variants-panel.tsx"), "utf8")
+const ordersSrc = readFileSync(join(__dirname, "../../src/components/business-os/commerce-orders-panel.tsx"), "utf8")
+const commerceSharedSrc = readFileSync(join(__dirname, "../../src/components/business-os/commerce-shared.ts"), "utf8")
+const commerceAll = `${variantsSrc}\n${ordersSrc}\n${commerceSharedSrc}`
+
+check("commerce panel is mounted in the shell", shellSrc.includes("<CommercePanel"))
+check(
+    "commerce decorative icons are hidden from assistive tech",
+    /aria-hidden="true"/.test(variantsSrc) && /aria-hidden="true"/.test(ordersSrc),
+)
+check(
+    "commerce loading states announce themselves politely and as busy",
+    variantsSrc.includes('aria-live="polite"') &&
+        variantsSrc.includes('aria-busy="true"') &&
+        ordersSrc.includes('aria-live="polite"') &&
+        ordersSrc.includes('aria-busy="true"'),
+)
+check(
+    "every commerce loading state carries a screen-reader label",
+    /Loading products/.test(variantsSrc) &&
+        /Loading variants/.test(variantsSrc) &&
+        /Loading orders/.test(ordersSrc) &&
+        /Loading shipments and returns/.test(ordersSrc) &&
+        /Loading shipment history/.test(ordersSrc),
+)
+check(
+    "commerce panels use a structural skeleton while loading",
+    /Skeleton/.test(variantsSrc) && /Skeleton/.test(ordersSrc),
+)
+check(
+    "commerce distinguishes 401, 403, 400 and 409 for the owner",
+    /error\.status === 401/.test(commerceSharedSrc) &&
+        /error\.status === 403/.test(commerceSharedSrc) &&
+        /error\.status === 400/.test(commerceSharedSrc) &&
+        /error\.status === 409/.test(commerceSharedSrc),
+)
+check(
+    "commerce does not leak internals on a dependency failure",
+    /error\.status === 503/.test(commerceSharedSrc) && /Nothing was changed/.test(commerceSharedSrc),
+)
+check(
+    "commerce 403 copy is identical for a foreign and a missing record",
+    /does not grant you access to that record/.test(commerceSharedSrc),
+)
+check(
+    "the 409 refusal is surfaced verbatim, because it carries the remaining quantity",
+    /That change is not allowed/.test(commerceSharedSrc) &&
+        /description: error\.message/.test(commerceSharedSrc),
+)
+check(
+    "commerce empty states state that no sample data is shown",
+    /no sample products are shown/i.test(variantsSrc) && /no sample orders are shown/i.test(ordersSrc),
+)
+check(
+    "commerce panels contain no fabricated product, variant, order or shipment",
+    !/\bid:\s*"/.test(commerceAll) &&
+        !/sku:\s*"/.test(commerceAll) &&
+        !/trackingNumber:\s*"/.test(commerceAll) &&
+        !/sample(Product|Variant|Order|Return)/i.test(commerceAll),
+)
+check(
+    "the UI never derives a shippable or returnable quantity in the browser",
+    !/Math\.(round|floor|max|min)\(/.test(variantsSrc) && !/Math\.(round|floor|max|min)\(/.test(ordersSrc),
+)
+check(
+    "commerce disclosures expose their expanded state",
+    /aria-expanded=/.test(variantsSrc) && /aria-expanded=/.test(ordersSrc),
+)
+check(
+    "commerce sections are headed rather than only visually grouped",
+    /<h3/.test(variantsSrc) && /<h5/.test(variantsSrc) && /<h3/.test(ordersSrc) && /<h5/.test(ordersSrc),
+)
+check(
+    "shipment, return and restock buttons come from server-computed allowedTransitions",
+    /f\.allowedTransitions\.map/.test(ordersSrc) &&
+        /r\.allowedTransitions\.map/.test(ordersSrc) &&
+        /item\.allowedRestockTransitions\.map/.test(ordersSrc),
+)
+check(
+    "a terminal shipment explains why it has no actions",
+    /cannot change/.test(ordersSrc),
+)
+check(
+    "the UI states that stock leaves when a shipment is shipped, not when it is packed",
+    /Stock leaves when a\s*\n?\s*shipment is marked shipped, not when it is packed/.test(ordersSrc),
+)
+check(
+    "the UI discloses that carrier and tracking are owner-entered and no carrier is contacted",
+    /no carrier is contacted/.test(ordersSrc) && /entered by hand/.test(ordersSrc),
+)
+check(
+    "a shipment without tracking says so rather than showing a blank field",
+    /no tracking entered/.test(ordersSrc),
+)
+check(
+    "a restock without a workspace location says why it is disabled instead of failing at the write",
+    /Restocking needs a location/.test(ordersSrc),
+)
+check(
+    "the UI states that a default variant inherits the product price rather than copying it",
+    /inherits the product price rather than copying it/.test(variantsSrc) &&
+        /It is never created as the default/.test(variantsSrc),
+)
+check(
+    "a product with no options is explained rather than shown as broken",
+    /A product without options still sells/.test(variantsSrc) && /through its default variant/.test(variantsSrc),
+)
+check(
+    "empty commerce sub-lists say so rather than rendering a placeholder row",
+    /Nothing has been shipped for this order/.test(ordersSrc) &&
+        /No returns requested for this order/.test(ordersSrc) &&
+        /No history recorded/.test(ordersSrc) &&
+        /either it has not shipped, or a live return already claims it/.test(ordersSrc),
+)
+check(
+    "a stock promise is described as blocking a conflicting variant change",
+    /promised to orders, so a live promise cannot/.test(variantsSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
