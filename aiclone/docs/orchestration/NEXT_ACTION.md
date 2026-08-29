@@ -1,48 +1,88 @@
 # Next action
 
-Updated 2026-08-29 at the close of a seven-hour root-serial run. No worker independence claimed.
+Updated 2026-08-29, later the same day, at the close of a root-serial run that began by measuring
+orchestration rather than assuming it. Worker dispatch is exposed but broken; no worker
+independence is claimed.
 
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`43d0fa5`**
+- Primary HEAD: **`2b76c3e`**
 - Origin `recovered/aug20-wt-pr-32`: `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`, unchanged;
   `origin/main`: `9e8a0fffb84937d809788ee4512884289c3132b8`, unchanged. Nothing was pushed.
-- Waves A–G4 complete, plus surfaces. Done: P2-005, P2-006, P2-008, P2-009, P2-010, P2-011,
-  P2-012, P2-013, P2-014, P2-015, P2-016. P1-009 is `in_progress_slice_2_done`.
+- Waves A–G4 complete, plus surfaces. Done: P2-005, P2-006, P2-008 through P2-016, and the
+  access-level owner surface (`4ad49f3`, `3891e8b`). P1-009 is `in_progress_slice_3_done`.
+- **The check sweep is now 53, not 52.** `check-course-access-api.ts` is matched by the
+  `check-*.ts` glob in `run-wave-c-gates.ps1`, so the driver's own count moved.
 - Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**,
-  17 migrations, 108 tables / 1221 columns / 292 enum labels / 35 trigger rows /
-  1120 constraints / 333 indexes. `prisma migrate status` reports up to date. Never left
-  mid-rehearsal.
-- Live `personalink`: verified untouched — 35 tables, no `_prisma_migrations`, none of the
-  thirty-five tables this run created, no `btree_gist`, `Profile` = 16.
-- Frozen worktrees intact: all six `kirocrew/*` worktrees still at `ea69595`.
-- Gateway port 5476: **LISTENING** (pid 54756) after one bounded recovery attempt. No KiroCrew
-  MCP server is registered with the client, so no model-pinned dispatch tool is exposed.
-  Recorded `ORCHESTRATION_UNAVAILABLE` at `efb843f`. Every wave in this run was root-serial.
+  17 migrations, `prisma migrate status` up to date. This run added no migration, so the
+  rehearsal state is exactly where the previous run left it. Never left mid-rehearsal.
+- Live `personalink`: verified untouched again at the end of this run — 35 tables, no
+  `_prisma_migrations`, 0 wave tables leaked, no `btree_gist`, `Profile` = 16.
+- Frozen worktrees intact: all six `kirocrew/*` worktrees still at `ea69595`, re-verified.
+- Gateway port 5476: **LISTENING** (pid 54756), untouched by this run and verified still listening
+  after it. The KiroCrew MCP servers ARE now registered client-side and every dispatch tool
+  responds — but dispatch itself does not work. See the orchestration section below.
+
+### Orchestration: the tools are exposed now, and dispatch still does not work
+
+The previous run's blocker is gone: the MCP servers are registered and `spawn_run`, `spawn_list`,
+`spawn_status`, `spawn_continue`, `resource_status`, `cron_add` and `cron_list` all respond. So
+`ORCHESTRATION_UNAVAILABLE` is no longer the right label, and the reason has moved one layer down.
+
+A read-only control worker was dispatched before any product work — requested `gpt-5.6-terra`,
+`keep: true`, cwd = repo root, whose entire task was three `git rev-parse` calls. It never executed
+a turn:
+
+- `spawn_run` warned `parent_session UNRESOLVED`, so completion events cannot be delivered.
+- The OS process was real: `kiro-cli.exe acp --agent kirocrew`, PID 28588, child of gateway 54756.
+  It froze at **1.6 s CPU over six minutes** while `spawn_list` kept reporting `[running]`. Elapsed
+  time in that readout is not evidence of work.
+- `spawn_status` returned no transcript; no result directory was ever created.
+- `spawn_release` refused with `conversation_busy` — a hollow run cannot be released.
+- `spawn_steer` gave the diagnosis: `session_starting: the run is alive but its session has not
+  registered within 15.0s`.
+- The launch command carries **no `--model` argument**. Even a working worker could not have its
+  observed model proved, which is disqualifying for a model-pinned run specifically.
+
+Root cause: the process starts, its ACP session never registers, so no turn runs, no model binds and
+the run can never be released. Repair stopped at 6.5 of a 15-minute budget. The hollow process was
+terminated and the gateway was left alone and re-verified. **No parallelism was claimed or used.**
+
+Also worth knowing: `resource_status` reports a concurrent sub-agent cap of **3**, and reports host
+memory as unmeasurable on this machine (`Posture: UNKNOWN`), so any plan that assumes four
+simultaneous workers is already wrong on this host.
 
 ### Owner action that would unblock parallelism
 
-Register the KiroCrew MCP server in `~/.kiro/settings/mcp.json` (or a workspace
-`.kiro/settings/mcp.json`) and restart the Kiro client. The gateway on 5476 is already up; the
-missing piece is client-side MCP registration, not the gateway process. Until then a model-pinned
-worker cannot be dispatched, and CLI dispatch without a model argument stays forbidden.
+Client-side registration is done; do not redo it. What remains is inside the gateway: the identity
+plumbing that leaves `parent_session` unresolved and the ACP session unregistered
+(`KIROCREW_HOST_PID` / `session_pid` / claim-push), and the missing `--model` argument on the
+subagent launch. Neither is reachable from inside a session, so do not spend another run on it.
 
-### Lint inventory, measured at `43d0fa5`
+### Lint inventory, measured at `2b76c3e`
 
-Repo-wide: **39 errors, 39 warnings, 78 reports** — down from 91 at `34f8561` by P1-009 slice 2
-at `2804314`. Every feature wave in this run added **zero** lint debt of its own; the 13 cleared
-reports were all pre-existing. Targeted wave paths are at zero.
+Repo-wide: **16 errors, 39 warnings, 55 reports** — down from 78 at `43d0fa5` by P1-009 slice 3 at
+`2b76c3e`. The two access-level feature commits added **zero** lint debt of their own; the seven
+`react-hooks/exhaustive-deps` warnings the panel's first draft introduced were fixed with `useMemo`
+before commit rather than banked. Targeted wave paths are at zero.
+
+Slice 3 cleared **23 of the 24** `no-explicit-any`. Every one was the same stale claim: the casts
+carried comments like "until types are generated", but the client HAS been generated and every field
+they reached for exists on the model, so the fix was to delete the cast rather than write a better
+one. Typing them properly then surfaced **seven latent bugs the `any` had been hiding** — nullable
+columns being passed straight into `defaultValue` on `Input`/`Textarea`, where React does not accept
+null.
 
 | Rule | Count | Why it is still open |
 |---|---|---|
-| `@next/next/no-img-element` | 25 | swapping `<img>` for `next/image` changes layout behaviour |
-| `@typescript-eslint/no-explicit-any` | 24 | needs the intended type, not a cast — the next largest tractable rule |
+| `@next/next/no-img-element` | 25 | swapping `<img>` for `next/image` changes layout behaviour. Now the largest rule |
 | `@typescript-eslint/no-unused-vars` | 11 | six live DOM queries in puppeteer scripts, three write-only state getters, one webhook payload field. Each documented in P1-009 |
 | `react-hooks/set-state-in-effect` | 10 | needs the effect redesigned |
 | `react-hooks/preserve-manual-memoization` | 3 | ditto |
 | `react-hooks/exhaustive-deps` | 3 | ditto |
 | `react-hooks/refs` | 2 | ditto |
+| `@typescript-eslint/no-explicit-any` | 1 | `src/app/[slug]/page.tsx:70`. A judgement call, not an oversight: `ProfileViewProps.profile` is a hand-written structural type and the page's query is a deep nested include, so making them agree is design work, and forcing it would only move the cast |
 
 ## What is genuinely built
 
@@ -55,24 +95,40 @@ reports were all pre-existing. Targeted wave paths are at zero.
 | F inventory | `src/lib/inventory/**` | `/api/platform/inventory/**` | `inventory-panel.tsx` |
 | G variants, fulfilment, returns | `src/lib/commerce/**` | 16 routes | `commerce-variants-panel.tsx`, `commerce-orders-panel.tsx` |
 | G3 + G5 retainers | `src/lib/cases/retainers.ts` | 10 routes under `/api/platform/retainers/**` | `retainers-panel.tsx` |
-| G3 + G6 course access levels | `src/lib/cohorts/access.ts` | none — engine and enforcement only | none |
+| G3 + G6 course access levels | `src/lib/cohorts/access.ts` | 12 routes under `/api/platform/course-access/**` | `access-levels-panel.tsx` |
 | G4 + G6 field jobs | `src/lib/fieldjobs/**` | 10 routes under `/api/platform/field-job*/**` | `fieldjobs-panel.tsx` |
 
 Active blueprints: `restaurant-venue-v3`, `coaching-studio-v2`, `consulting-agency-v1`,
 `ca-practice-v1`, `retail-storefront-v1`. Deprecated: `restaurant-venue-v1`,
 `restaurant-venue-v2`, `coaching-studio-v1`. **No blueprint is in draft.**
 
-### The three things that are still honestly missing
+### The two things that are still honestly missing
 
 1. **`fieldJobs:inspection`** — asset checks, parts, completion notes, invoice handoff. Declared
    `planned` with evidence `none`. It is the **only** `planned` capability left anywhere in the
-   registry, which is a trap: see the warning below.
+   registry, which is a trap: see the warning below. It was deliberately **not started** in the
+   root-serial run that shipped access levels, because it needs a migration and a half-finished
+   rehearsal would leave the disposable database mid-rehearsal, which the preservation invariants
+   forbid. Budget a full rehearsal cycle for it or do not begin.
 2. **`appointments:reminders` and `appointments:deposits`** — `partial`, because their provider
    boundaries are inert. Wiring a real messaging or payment provider is **owner-gated**: it means
    real messages and real money.
-3. **An owner API and panel for `contentCohorts:accessLevels`.** The engine exists and is now
-   enforced where content is served, but an owner has no surface for defining tiers or granting
-   entitlements — they can only be created through the engine directly.
+
+An owner API and panel for `contentCohorts:accessLevels` used to be the third item here. It is now
+built — `4ad49f3` (10 routes, 14 api methods) and `3891e8b` (panel, plus two read-only console
+endpoints). Two decisions in it are worth carrying forward:
+
+- It went into the **existing** `CohortApiService`, not a second HTTP boundary. The earlier plan said
+  "two route trees, one per principal"; that was wrong. The learner path was already in the right
+  place — the library page with its `pl_member` cookie — and the property "two trees" was meant to
+  buy is bought instead by an assertion that the boundary never imports or constructs
+  `LearnerAccessService`.
+- Two read-only endpoints were unavoidable and are worth understanding before touching them.
+  `/course-access/courses` exists because there was no tenant-scoped course list anywhere under
+  `/api/platform`. `/course-access/console` exists because `listLessonRules` returns ONLY lessons
+  that already carry a rule — right for reporting, useless for an editor, since an owner could never
+  add the first rule. The console read returns the null-rule lessons too, and the harness measures
+  exactly that rather than trusting it.
 
 Nothing else in the registry claims something that does not exist.
 
@@ -94,7 +150,7 @@ why.
 
 ```powershell
 cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
-git rev-parse HEAD                     # expect 43d0fa5...
+git rev-parse HEAD                     # expect 2b76c3e...
 git status --porcelain                 # expect only .codex-remote-attachments/ and P1_014_ACTION_INVENTORY.md untracked
 git rev-parse origin/recovered/aug20-wt-pr-32   # expect 4b386d1...
 node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\check-live-readonly.js"
@@ -105,21 +161,17 @@ node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\check-live-rea
 
 Read `INTEGRATION_QUEUE.md` → the last "Next in queue" table.
 
-- **An owner API and panel for `contentCohorts:accessLevels`.** No schema needed, so it fits a
-  short window. Worked examples: `src/lib/cases/http.ts` plus `retainers-panel.tsx`, and
-  `src/lib/fieldjobs/http.ts` plus `fieldjobs-panel.tsx`. The cheaper route is to add methods to
-  the domain's **existing** api service rather than create a second HTTP boundary, because a
-  second boundary is a second place for the envelope, the status map and the server-derived actor
-  to drift. **The wrinkle specific to this one:** there are two principals.
-  `CourseAccessService` is the owner path and composes `CohortContext`; `LearnerAccessService`
-  takes no `workspaceId` at all and must not start accepting one, because that would hand a
-  learner a probe for other people's tenancy. The learner identity source is also different —
-  `Member` via the `pl_member` cookie, not Clerk — so it cannot reuse `PersistedTenancy`.
-- **`fieldJobs:inspection`.** Read the empty-registry trap above first.
-- **P1-009 slice 3.** `no-explicit-any` (24) is the next largest tractable rule. The eleven
-  remaining `no-unused-vars` are documented in P1-009 as needing judgement; do not clear them
-  mechanically.
+- **`fieldJobs:inspection`.** The last genuinely large package, and the last `planned` capability.
+  Read the empty-registry trap below **before** starting. It needs a migration, so it needs a full
+  rehearsal cycle — apply, rollback, compare, reapply — and it must not be started unless that can
+  be finished, because a half-done rehearsal leaves the disposable database mid-rehearsal.
+- **P1-009 slice 4.** `no-img-element` (25) is now the largest rule, and every one of them changes
+  layout behaviour, so this is no longer a cheap slice. `no-explicit-any` is down to 1 and that one
+  is a documented judgement call. The eleven remaining `no-unused-vars` need judgement; do not clear
+  them mechanically.
 - **G2 appointments providers is OWNER-GATED.** Do not start without explicit approval.
+- **Worker dispatch repair is NOT a package.** It was measured this run and the failure is inside
+  the gateway. See the orchestration section above.
 
 When a capability is promoted, expect to do **three** things, not one: repoint the contract
 harness, move the capability out of any blueprint's planned backlog, and check the sweeping
@@ -173,7 +225,7 @@ npx prisma validate --schema prisma/schema.prisma
 npx prisma generate --schema prisma/schema.prisma
 npx tsc --noEmit -p tsconfig.json
 node "$T\verify-no-renames.js"
-pwsh -File "$T\run-wave-c-gates.ps1"      # all 52 check harnesses, skips only check-order-stream
+pwsh -File "$T\run-wave-c-gates.ps1"      # all 53 check harnesses, skips only check-order-stream
 npx eslint <touched paths>
 npx eslint .                              # repo-wide count must not increase
 npm audit --omit=dev
@@ -237,12 +289,27 @@ checkout being behind the database. Use a worktree-scoped copy for pre-merge swe
 17. **An assertion that can never fail is worse than no assertion.** `.every(async ...)` is always
     truthy; an assertion on the absence of a string the honesty copy itself uses fails on the
     thing it protects. Both happened in this run and both were rewritten rather than deleted.
+18. **A ban on a STRING is not a ban on a BEHAVIOUR, and the difference bites both ways.** An
+    assertion that `http.ts` must not contain `LearnerAccessService` failed the moment the file
+    grew a comment explaining why the learner service is excluded — the documentation that
+    protects the property tripped the check that guards it. The fix is to ban the construction and
+    the import (`new LearnerAccessService`, `import ... LearnerAccessService`), not the word.
+19. **Elapsed time in `spawn_list` is not evidence of work.** A hollow subagent reported
+    `[running] 349s` while its process sat at 1.6 s of CPU. Judge a worker by CPU consumed, a
+    transcript, or a result file — never by the orchestrator's own clock.
+20. **Typing an `any` properly will find bugs, so budget for them.** Slice 3 removed 23 casts and
+    immediately surfaced seven places where a nullable column was being handed to `defaultValue`.
+    Those are the point of the exercise, not a reason to put the cast back.
+21. **Check the generated client before believing a cast's comment.** Every `as any` cleared in
+    slice 3 was justified in-code by "until types are generated". The types had been generated;
+    the comments were years of copy-paste. Grep the schema for the field before writing a type.
 
 ## Do not spend a run on
 
-Gateway repair (one bounded attempt was made and recorded), worker-dispatch experiments, tunnel or
-live preview, push/PR/deploy, live `personalink` cutover (P1-007, owner-gated), wiring a real
-messaging or payment provider (owner-gated), rewriting old orchestration history, the
+Gateway repair and worker-dispatch experiments (both were measured properly this run; the failure is
+inside the gateway's identity plumbing and the missing `--model` argument, neither reachable from a
+session), tunnel or live preview, push/PR/deploy, live `personalink` cutover (P1-007, owner-gated),
+wiring a real messaging or payment provider (owner-gated), rewriting old orchestration history, the
 `check-order-stream` precondition, the pre-existing `profileId` FK drift unless it actually blocks
 a migration, or "fixing" `restaurant-venue-v2`'s stale planned entry.
 

@@ -894,3 +894,82 @@ Field jobs and retainers now each have schema, runtime, an HTTP surface and an o
 | Wire visibility into the reader | `src/app/library/courses/[id]/page.tsx` | The access-level engine exists and computes visibility, but the actual learner content page still returns every lesson. Until that page calls `LearnerAccessService`, tiers are enforceable but not enforced. **This is the most honest remaining gap in the whole program** and it is not a capability-registry problem - `contentCohorts:accessLevels` claims tiers and entitlements, which exist, not that the library page consults them. |
 | P1-009 slice 3 | repo-wide lint | 78 problems. `no-explicit-any` (24) is the next largest tractable rule. |
 | G2 | appointments providers | Still **owner-gated**. |
+
+
+---
+
+## Access levels completed end to end — and orchestration measured, not assumed
+
+Three commits directly on `recovered/aug20-wt-pr-32`, root-serial. Base `d04644f`, head `2b76c3e`.
+
+| Commit | Slice | Gate result |
+|---|---|---|
+| `4ad49f3` | 10 owner routes + 14 api methods | new `check-course-access-api` 86/86 (inverted → exit 1); `check-cohort-routes` 87/87 after the widened ctor |
+| `3891e8b` | owner panel + 2 console reads | `check-course-access-api` 96/96; `check-business-os-a11y` PASS with a new 24-assertion G6 block; render + surface PASS |
+| `2b76c3e` | P1-009 slice 3 | repo-wide lint 78 → 55, errors 39 → 16; 53/53 sweep |
+
+`contentCohorts:accessLevels` now has engine, enforcement, an HTTP surface and an owner panel. That
+was the last of the three gaps NEXT_ACTION listed as honestly missing; the other two are the
+owner-gated appointment providers.
+
+The check sweep is now **53**, not 52. `check-course-access-api.ts` is picked up by the
+`check-*.ts` glob, so the driver count moved on its own.
+
+### Two things this package changed about the plan
+
+**One HTTP boundary, not two.** The queue entry above said "two route trees". That was wrong, and
+the retainer lesson quoted at the top of this file is why: the owner path was added to the EXISTING
+`CohortApiService`, and the learner path was left exactly where it already was, at the library page
+with its `pl_member` cookie. Two route trees would have meant two envelopes and two status maps to
+keep in step. The harness asserts the boundary never imports or constructs `LearnerAccessService`,
+which is the property "two trees" was trying to buy, bought more cheaply.
+
+**Two read-only endpoints were unavoidable.** `/course-access/courses` exists because there was no
+tenant-scoped course list anywhere under `/api/platform`, so a course picker had nothing to read.
+`/course-access/console` exists because `listLessonRules` returns ONLY lessons that already carry a
+rule — correct for reporting, and useless for an editor, since an owner could never add the first
+rule. Widening the reporting endpoint would have blurred what it means, so the console read returns
+the null-rule lessons too and the harness measures exactly that.
+
+### Correction to an earlier entry in this file
+
+The section above lists "Wire visibility into the reader" as the most honest remaining gap. That is
+**stale**. `src/app/library/courses/[id]/page.tsx` calls `LearnerAccessService.visibleLessons`;
+P2-016 closed it. Left in place rather than edited, because rewriting old orchestration history is
+on the do-not-do list — this note is the correction.
+
+### Orchestration: dispatch tools are exposed and still do not work
+
+The KiroCrew MCP servers are now registered client-side and `spawn_run`, `spawn_list`,
+`spawn_status`, `spawn_continue`, `resource_status`, `cron_add` and `cron_list` all respond. The
+previous run recorded `ORCHESTRATION_UNAVAILABLE` because no dispatch tool was exposed at all. That
+is no longer the reason, and the reason has moved:
+
+A read-only control worker was dispatched (requested `gpt-5.6-terra`, `keep: true`, cwd = repo root)
+whose whole job was three `git rev-parse` calls. It never executed a turn.
+
+- `spawn_run` returned `parent_session UNRESOLVED`, so completion events cannot arrive.
+- The OS process was real — `kiro-cli.exe acp --agent kirocrew`, child of the gateway — and froze at
+  **1.6 s CPU over six minutes**, while `spawn_list` kept reporting `[running]`. False liveness.
+- `spawn_status` returned no transcript and no result directory was ever created.
+- `spawn_release` refused with `conversation_busy`; `spawn_steer` returned
+  `session_starting: the run is alive but its session has not registered within 15.0s`.
+- The launch command line carries **no `--model` argument**, so even a working worker could not have
+  its observed model proved — which is fatal for a model-pinned run specifically.
+
+Root cause: the worker process starts but its ACP session never registers with the gateway, so no
+turn can run, no model can bind, and the run can never be released. Repair was stopped at 6.5 of the
+15-minute budget. **No parallelism was claimed and none was used.** The hollow process was
+terminated; the gateway on 5476 was left alone and verified still listening afterwards.
+
+Do not spend another run on worker dispatch without owner involvement: the failure is in identity
+plumbing (`KIROCREW_HOST_PID` / `session_pid` / claim-push) and in the missing `--model` argument,
+neither of which is reachable from inside a session.
+
+### Next in queue
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| G5 | `fieldJobs:inspection` | The last genuinely large package. Read the empty-registry warning in NEXT_ACTION **first**: it is the last `planned` capability anywhere, so promoting it means REWRITING the capability-contract planned negative test against a synthetic descriptor, not repointing it a fifth time. Needs a migration, so budget a full rehearsal cycle — it was deliberately NOT started in this run because a half-finished one would leave the disposable database mid-rehearsal, which the preservation invariants forbid. |
+| P1-009 slice 4 | repo-wide lint | 55 problems (16 errors, 39 warnings). `no-explicit-any` is down to **1**: `src/app/[slug]/page.tsx:70`, `profile={profile as any}`. It is a judgement call, not an oversight — `ProfileViewProps.profile` is a hand-written structural type and the page's query is a deep nested include, so making them agree is design work. `no-img-element` (25) is now the largest rule and every one of them changes layout behaviour. |
+| G2 | appointments providers | Still **owner-gated**. |
