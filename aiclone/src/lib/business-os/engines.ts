@@ -170,7 +170,13 @@ export const businessEngineDescriptors: Record<BusinessEngineId, EngineDescripto
   fieldJobs: {
     id: "fieldJobs",
     label: "Field jobs",
-    description: "Intake, quotes, technicians, routing, assets, inspections, parts, and invoices.",
+    // Was "Intake, quotes, technicians, routing, assets, inspections, parts, and invoices." That
+    // named two things this engine does not have and never claimed in its capabilities: there is no
+    // ROUTING - no route is optimised and no distance is computed - and there are no INVOICES, only
+    // a handoff flag. The engine-level summary is what an owner reads first, so it was the one place
+    // still promising both.
+    description:
+      "Intake, quotes, technicians, job cards, inspections and parts used. No routing, no invoicing and no notifications.",
     capabilities: [
       {
         id: "intake",
@@ -189,14 +195,12 @@ export const businessEngineDescriptors: Record<BusinessEngineId, EngineDescripto
         evidence: "src/lib/fieldjobs/engine.ts",
       },
       {
-        // Deliberately left unbuilt by the Wave G4 foundation. Declaring it available would be a
-        // claim about code that does not exist, and it is the current target of the
-        // capability-contract planned-capability negative test.
         id: "inspection",
         label: "Inspection",
-        description: "Asset checks, parts, completion notes, and invoice handoff.",
-        maturity: "planned",
-        evidence: "none",
+        description:
+          "Reusable checklists, asset checks, measurements with expected ranges, parts used, completion notes and an invoice handoff flag. A checklist's lines are SNAPSHOTTED onto the inspection when it is raised, so editing the checklist later cannot rewrite what a past inspection asked. At most one inspection is open per job. A required line left PENDING blocks submission and completion, while NOT_APPLICABLE is a real answer and does not; completion needs both an outcome and notes. Parts point at existing InventoryItem stock and recording one does NOT move stock unless consumeStock is asked for, in which case the existing inventory engine deducts it and the movement is linked. NO ASSET REGISTRY: an asset check carries the equipment's identity in its own columns, and there is no asset list or per-asset service history. NO INVOICE AND NO PAYMENT: the handoff is a flag stating the owner passed the work to whatever bills, and no invoice row is written and no money moves. NO FILE UPLOAD and NO NOTIFICATION.",
+        maturity: "available",
+        evidence: "src/lib/fieldjobs/inspection.ts",
       },
     ],
   },

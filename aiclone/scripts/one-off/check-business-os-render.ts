@@ -35,7 +35,44 @@ for (const engine of engines) {
 }
 check("renders an approval indicator", populated.includes("needs approval"))
 check("renders copilot prompts", populated.includes("Owner copilot prompts"))
-check("marks unused engines honestly", populated.includes("unused"))
+
+/*
+ * "marks unused engines honestly" used to be `populated.includes("unused")` against the real
+ * registry. That passed only while SOME engine had no blueprint, so Wave H1 broke it by closing the
+ * gap: `field-service-v1` was the first blueprint to compose `fieldJobs`, and once every engine had
+ * at least one blueprint the word "unused" correctly stopped appearing - the check went red on an
+ * improvement, which means it was measuring the gap rather than the badge.
+ *
+ * Rewritten to prove the badge itself, by rendering the real engine list against a blueprint list
+ * with the composing blueprints REMOVED. No cast and no synthetic type is needed: `BusinessEngineId`
+ * is a closed union, so inventing an engine id would require one. The real registry is then asserted
+ * POSITIVELY - every engine is composed, so nothing is marked unused - and that assertion names any
+ * engine that regresses.
+ */
+const uncomposedEngineIds = engines
+    .filter((engine) => !blueprints.some((b) => b.engines.some((e) => e.engineId === engine.id)))
+    .map((engine) => engine.id)
+check(
+    "every engine is composed by at least one blueprint, so nothing is marked unused",
+    uncomposedEngineIds.length === 0 && !populated.includes("unused"),
+    uncomposedEngineIds.join(", "),
+)
+
+// Drop every blueprint that composes fieldJobs, and the badge must say so. This is exactly the
+// pre-Wave-H1 situation, reproduced deliberately rather than relied upon.
+const withoutFieldJobs = blueprints.filter((blueprint) => !blueprint.engines.some((e) => e.engineId === "fieldJobs"))
+const unusedRender = renderToStaticMarkup(
+    createElement(BusinessOsShell, { blueprints: withoutFieldJobs, engines }),
+)
+check(
+    "an engine no blueprint composes is marked unused",
+    unusedRender.includes("unused"),
+    `dropped ${blueprints.length - withoutFieldJobs.length} blueprint(s) that compose fieldJobs`,
+)
+check(
+    "the unused-badge check is not vacuous: at least one blueprint really was dropped",
+    withoutFieldJobs.length < blueprints.length,
+)
 
 // Rejected mock strings must not appear.
 for (const banned of ["Launch Readiness", "bp-launch", "Client Intake Operating System", "estimatedMinutes"]) {

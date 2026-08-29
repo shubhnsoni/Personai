@@ -253,6 +253,80 @@ const builtInBlueprints: BusinessBlueprint[] = [
     ],
   },
   {
+    // ACTIVE as of Wave H1, and the first blueprint to compose the fieldJobs engine at all.
+    // Intake and dispatch have been available since Wave G4 and inspection since H1, but no
+    // blueprint installed them, so a working engine had no vertical that offered it. That gap was
+    // the reason to add this, not a desire for another blueprint.
+    //
+    // What this blueprint deliberately does NOT claim, because the engine does not do it:
+    // no route is planned and no travel time is estimated; no technician is notified by any
+    // channel; no invoice is raised and no payment is taken - the billing step records that the
+    // owner handed the work to whatever bills, and nothing more. `commerce` is composed but NOT
+    // required, because a field business that does not track parts stock is still a field
+    // business; parts can be recorded without stock moving at all.
+    id: "field-service-v1",
+    version: "1.0.0",
+    status: "active",
+    name: "Field service",
+    vertical: "field-service",
+    summary:
+      "Runs visiting work: a request comes in, is qualified and optionally quoted, becomes a job with a visit window and an accountable lead technician, and is inspected on site against a reusable checklist. Checklist lines are snapshotted onto each inspection, so editing a checklist never rewrites what a past visit asked. Asset checks name the equipment in their own fields, measurements carry expected ranges, and parts used point at real stock - though recording a part only moves stock when that is explicitly asked for. Finishing an inspection can flag the work as ready to bill; no invoice is created, no money moves, and nobody is notified.",
+    engines: [
+      {
+        engineId: "fieldJobs",
+        capabilities: ["intake", "dispatch", "inspection"],
+        required: true,
+      },
+      {
+        // Optional on purpose: parts are recorded against InventoryItem stock, so a business that
+        // wants stock deducted needs this, and one that only wants a record of what was fitted
+        // does not.
+        engineId: "commerce",
+        capabilities: ["inventory"],
+        required: false,
+      },
+    ],
+    workflows: [
+      {
+        id: "field-job-completed",
+        name: "Job completed",
+        trigger: { kind: "event", event: "fieldJob.completed" },
+        actions: [
+          { id: "audit-field-job", kind: "recordAudit", label: "Record job status history", auditSubject: "fieldJob" },
+        ],
+      },
+      {
+        id: "inspection-billing-handoff",
+        name: "Inspection ready to bill",
+        trigger: { kind: "event", event: "inspection.completed" },
+        actions: [
+          {
+            id: "approve-billing-handoff",
+            kind: "requestApproval",
+            label: "Owner sign-off before the work is handed to billing",
+            approval: {
+              required: true,
+              approverRole: "owner",
+              reason:
+                "Handing work to billing is a claim that the job is finished and chargeable, and the inspection is the only record of what was actually found.",
+            },
+          },
+          {
+            id: "audit-inspection-handoff",
+            kind: "recordAudit",
+            label: "Record the invoice handoff state",
+            auditSubject: "inspection",
+          },
+        ],
+      },
+    ],
+    ownerCopilotPrompts: [
+      "Which inspections are still waiting on required checks?",
+      "Which completed inspections are ready to bill but have not been handed off?",
+      "Which jobs used parts that were never deducted from stock?",
+    ],
+  },
+  {
     // Historical contract retained for addressability. It is deprecated because it
     // claimed reservations and real inventory before either capability was available.
     id: "restaurant-venue-v1",
