@@ -72,24 +72,27 @@ for (const engine of Object.values(businessEngineDescriptors)) {
 
 const restaurantV1 = getBusinessBlueprint("restaurant-venue-v1")
 const restaurantV2 = getBusinessBlueprint("restaurant-venue-v2")
+const restaurantV3 = getBusinessBlueprint("restaurant-venue-v3")
 check("restaurant v1 remains addressable", restaurantV1?.id === "restaurant-venue-v1")
 check("restaurant v1 is historical", restaurantV1?.status === "deprecated")
-check("restaurant v2 exists", restaurantV2?.version === "2.0.0")
-check("restaurant v2 is active", restaurantV2?.status === "active")
-check("restaurant v2 links to v1", restaurantV2?.supersedes === "restaurant-venue-v1")
+check("restaurant v2 remains addressable", restaurantV2?.version === "2.0.0")
+check("restaurant v2 is historical now that v3 exists", restaurantV2?.status === "deprecated")
+check("restaurant v3 exists", restaurantV3?.version === "3.0.0")
+check("restaurant v3 is active", restaurantV3?.status === "active")
+check("restaurant v3 links to v2", restaurantV3?.supersedes === "restaurant-venue-v2")
 
 function composition(engineId: "venueOrders" | "commerce") {
-  return restaurantV2?.engines.find((engine) => engine.engineId === engineId)
+    return restaurantV3?.engines.find((engine) => engine.engineId === engineId)
 }
 
 check(
-  "restaurant v2 venue required capabilities are exact",
+  "restaurant v3 venue required capabilities are exact",
   JSON.stringify(composition("venueOrders")?.capabilities) ===
     JSON.stringify(["qrOrdering", "guestTracking", "reservations"]),
 )
 check(
-  "restaurant v2 commerce required capabilities are exact",
-  JSON.stringify(composition("commerce")?.capabilities) === JSON.stringify(["catalog", "orders"]),
+  "restaurant v3 commerce required capabilities now include inventory",
+  JSON.stringify(composition("commerce")?.capabilities) === JSON.stringify(["catalog", "orders", "inventory"]),
 )
 check(
   "restaurant reservations are no longer a planned backlog item",
@@ -103,20 +106,24 @@ check(
   })(),
 )
 check(
-  "restaurant real inventory is STILL in planned backlog",
-  JSON.stringify(composition("commerce")?.plannedCapabilities) === JSON.stringify(["inventory"]),
+  "restaurant inventory is no longer a planned backlog item either",
+  composition("commerce")?.plannedCapabilities === undefined,
 )
 check(
-  "commerce inventory capability is still declared planned",
-  businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "inventory")?.maturity === "planned",
+  "commerce inventory capability is now declared available with real evidence",
+  (() => {
+    const capability = businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "inventory")
+    return capability?.maturity === "available" && capability.evidence !== "none"
+  })(),
 )
 check("all registry blueprints validate", listBusinessBlueprints().every((blueprint) => validateBusinessBlueprint(blueprint).ok))
 
 // Negative test: an active blueprint may not REQUIRE a capability whose maturity is
-// still planned. This deliberately targets commerce.inventory, which remains planned.
-// It previously targeted venueOrders.reservations; Wave A made reservations genuinely
-// available, which would have turned this assertion vacuous, so it was repointed at a
-// capability that is still actually planned rather than left to pass for free.
+// still planned. It targets commerce:returns, which is genuinely planned. It previously
+// targeted venueOrders.reservations, then commerce:inventory; each time a wave made the
+// target real the assertion would have become vacuous, so it is repointed at a capability
+// that is still actually planned rather than left to pass for free. The non-vacuity
+// assertion below is what forces that maintenance.
 const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   id: "invalid-active-planned-capability",
   version: "1.0.0",
@@ -124,7 +131,7 @@ const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   name: "Invalid active blueprint",
   vertical: "contract-test",
   summary: "Negative test: active blueprints cannot require planned capabilities.",
-  engines: [{ engineId: "commerce", capabilities: ["inventory"], required: true }],
+  engines: [{ engineId: "commerce", capabilities: ["returns"], required: true }],
   workflows: [],
   ownerCopilotPrompts: [],
 }
@@ -257,13 +264,15 @@ check(
   businessEngineDescriptors.appointments.capabilities.find((c) => c.id === "reminders")?.maturity === "partial",
 )
 check(
-  "commerce inventory is still planned, so the planned negative test is not vacuous",
-  businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "inventory")?.maturity === "planned",
+  "commerce returns is still planned, so the planned negative test is not vacuous",
+  businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "returns")?.maturity === "planned",
 )
 
-// Wave E activations, asserted individually so a silent status regression is caught.
+// Wave E and F activations, asserted individually so a silent status regression is caught.
 for (const [blueprintId, expectedStatus] of [
-  ["restaurant-venue-v2", "active"],
+  ["restaurant-venue-v1", "deprecated"],
+  ["restaurant-venue-v2", "deprecated"],
+  ["restaurant-venue-v3", "active"],
   ["coaching-studio-v1", "deprecated"],
   ["coaching-studio-v2", "active"],
   ["consulting-agency-v1", "active"],
@@ -275,20 +284,37 @@ for (const [blueprintId, expectedStatus] of [
   check(`${blueprintId} status is ${expectedStatus}`, blueprint?.status === expectedStatus, blueprint?.status)
 }
 
-// Retail must stay draft precisely because inventory is planned. If someone activates it
-// without building inventory, validation rejects it - proven here rather than trusted.
+// Retail must stay draft, and now for a narrower reason: inventory became real in Wave F,
+// so the thing blocking it is variants, fulfilment and returns. Those are REQUIRED
+// capabilities on the blueprint precisely so that activating it is mechanically rejected,
+// which is proven here rather than trusted.
 const retail = getBusinessBlueprint("retail-storefront-v1")
 check("retail storefront requires inventory", retail?.engines[0]?.capabilities.includes("inventory") === true)
 check(
-  "activating retail while inventory is planned would be rejected",
-  retail !== null && !validateBusinessBlueprint({ ...retail, status: "active" }).ok,
+  "retail storefront also requires variants, fulfilment and returns",
+  ["variants", "fulfilment", "returns"].every((c) => retail?.engines[0]?.capabilities.includes(c) === true),
+)
+const retailActivation = retail === null ? null : validateBusinessBlueprint({ ...retail, status: "active" })
+check("activating retail is still rejected", retailActivation !== null && !retailActivation.ok)
+check(
+  "the retail rejection names variants, fulfilment and returns, not inventory",
+  (() => {
+    const messages = (retailActivation?.issues ?? []).map((i) => i.message).join(" | ")
+    return (
+      /variants/.test(messages) &&
+      /fulfilment/.test(messages) &&
+      /returns/.test(messages) &&
+      !/inventory/.test(messages)
+    )
+  })(),
+  (retailActivation?.issues ?? []).map((i) => i.message).join(" | ").slice(0, 200),
 )
 
 report.granularCapabilities = requiredGranularCapabilities
 report.restaurantBlueprint = {
-  historicalId: restaurantV1?.id,
-  activeId: restaurantV2?.id,
-  version: restaurantV2?.version,
+  historicalIds: [restaurantV1?.id, restaurantV2?.id],
+  activeId: restaurantV3?.id,
+  version: restaurantV3?.version,
   required: {
     venueOrders: composition("venueOrders")?.capabilities,
     commerce: composition("commerce")?.capabilities,

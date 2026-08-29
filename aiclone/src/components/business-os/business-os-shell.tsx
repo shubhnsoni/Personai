@@ -26,6 +26,7 @@ import { ReservationsPanel } from "@/components/business-os/reservations-panel"
 import { AppointmentsPanel } from "@/components/business-os/appointments-panel"
 import { CasesPanel } from "@/components/business-os/cases-panel"
 import { CohortsPanel } from "@/components/business-os/cohorts-panel"
+import { InventoryPanel } from "@/components/business-os/inventory-panel"
 import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/ui/page-header"
 import {
@@ -622,6 +623,8 @@ export function BusinessOsShell({
                             <CasesPanel workspaceId={selectedWorkspaceId} />
 
                             <CohortsPanel workspaceId={selectedWorkspaceId} />
+
+                            <InventoryPanel workspaceId={selectedWorkspaceId} />
 
                             <Card>
                                 <CardHeader>

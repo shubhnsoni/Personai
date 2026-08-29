@@ -483,6 +483,80 @@ check(
     /cannot change/.test(cohortsSrc),
 )
 
+// ---------------------------------------------------------------------------
+// Wave F — explicit coverage for the stock panel. The honesty requirements here are
+// that a balance is the recorded figure rather than a recalculation, that promised
+// stock is visibly distinct from stock you can sell, and that an oversell refusal
+// reaches the owner with its numbers intact.
+// ---------------------------------------------------------------------------
+const inventorySrc = readFileSync(join(__dirname, "../../src/components/business-os/inventory-panel.tsx"), "utf8")
+
+check("stock panel is mounted in the shell", shellSrc.includes("<InventoryPanel"))
+check("stock decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(inventorySrc))
+check(
+    "stock loading state announces itself politely and as busy",
+    inventorySrc.includes('aria-live="polite"') && inventorySrc.includes('aria-busy="true"'),
+)
+check(
+    "stock list and ledger loading states both carry screen-reader labels",
+    /Loading stock records/.test(inventorySrc) && /Loading stock ledger/.test(inventorySrc),
+)
+check("stock panel uses a structural skeleton while loading", /Skeleton/.test(inventorySrc))
+check(
+    "stock panel distinguishes 401, 403, 400 and 409 for the owner",
+    /error\.status === 401/.test(inventorySrc) &&
+        /error\.status === 403/.test(inventorySrc) &&
+        /error\.status === 400/.test(inventorySrc) &&
+        /error\.status === 409/.test(inventorySrc),
+)
+check(
+    "stock panel does not leak internals on a dependency failure",
+    /error\.status === 503/.test(inventorySrc) && /Nothing was changed/.test(inventorySrc),
+)
+check(
+    "stock 403 copy is identical for a foreign and a missing record",
+    /does not grant you access to that stock record/.test(inventorySrc),
+)
+check("stock empty state states that no sample data is shown", /no sample stock is shown/i.test(inventorySrc))
+check(
+    "stock panel contains no fabricated balance",
+    !/onHand:\s*\d/.test(inventorySrc) && !/available:\s*\d/.test(inventorySrc) && !/sampleStock/i.test(inventorySrc),
+)
+check("the stock ledger disclosure exposes its expanded state", /aria-expanded=/.test(inventorySrc))
+check("stock sections are headed rather than only visually grouped", /<h3/.test(inventorySrc) && /<h5/.test(inventorySrc))
+check(
+    "the oversell and strand refusals are surfaced verbatim, because they carry the numbers",
+    /That stock change is not allowed/.test(inventorySrc) && /description: error\.message/.test(inventorySrc),
+)
+check(
+    "promised stock is shown as distinct from sellable stock",
+    /promised to orders/.test(inventorySrc) && /available/.test(inventorySrc),
+)
+check(
+    "the UI states that a write-off below the promised quantity will be refused",
+    /will be refused/.test(inventorySrc),
+)
+check(
+    "the UI states that the ledger is append-only and its balances are recorded, not recalculated",
+    /append-only/.test(inventorySrc) && /not a recalculation/.test(inventorySrc),
+)
+check(
+    "an untracked record says plainly that nothing can be reserved against it",
+    /units are not tracked, so nothing can be reserved/.test(inventorySrc),
+)
+check(
+    "hold buttons come from server-computed allowedTransitions",
+    /reservation\.allowedTransitions\.map/.test(inventorySrc),
+)
+check(
+    "a settled hold explains why it has no actions",
+    /settled, cannot change/.test(inventorySrc),
+)
+check(
+    "empty stock sub-lists say so rather than rendering a placeholder row",
+    /No units are held for orders/.test(inventorySrc) && /No movements recorded/.test(inventorySrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"

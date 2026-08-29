@@ -207,23 +207,27 @@ const builtInBlueprints: BusinessBlueprint[] = [
     ],
   },
   {
-    // DRAFT on purpose, and it must stay draft until commerce:inventory is real. A
-    // storefront that cannot say whether an item is in stock is not a storefront, and
-    // inventory is still a single nullable stock column. Registering it as draft keeps
-    // the gap addressable instead of leaving the vertical undocumented.
+    // DRAFT on purpose, and now for a NARROWER and more honest reason than before.
+    // Wave F made commerce:inventory genuinely available - stock per product per
+    // location, an append-only ledger, and reservations with a database-level oversell
+    // guard. What a storefront still cannot do is sell a size or a colour, tell a
+    // customer where their parcel is, or take anything back: variants and fulfilment are
+    // only partial, and returns is planned. Those three are therefore REQUIRED
+    // capabilities here rather than a planned backlog, which is what keeps this
+    // blueprint mechanically un-activatable until they are real. The contract harness
+    // asserts that activating it is still rejected, and names why.
     id: "retail-storefront-v1",
     version: "1.0.0",
     status: "draft",
     name: "Retail storefront",
     vertical: "retail-ecommerce",
     summary:
-      "Sells physical stock online. Draft until inventory is genuinely persisted: catalog and orders exist, but stock rules, variants, fulfilment and returns do not.",
+      "Sells physical stock online. Catalog, orders and inventory are real; variants, fulfilment and returns are not, so this stays draft rather than promising a storefront that cannot ship or refund.",
     engines: [
       {
         engineId: "commerce",
-        capabilities: ["catalog", "orders", "inventory"],
+        capabilities: ["catalog", "orders", "inventory", "variants", "fulfilment", "returns"],
         required: true,
-        plannedCapabilities: ["variants", "fulfilment", "returns"],
       },
     ],
     workflows: [
@@ -258,19 +262,18 @@ const builtInBlueprints: BusinessBlueprint[] = [
     ownerCopilotPrompts: restaurantOwnerCopilotPrompts,
   },
   {
+    // Superseded by v3. Deprecated in Wave F, not because anything it claimed was
+    // false, but because it listed inventory in the planned backlog - and inventory is
+    // now real, so that backlog entry became a false statement about the product.
     id: "restaurant-venue-v2",
     version: "2.0.0",
-    status: "active",
+    status: "deprecated",
     name: "Restaurant and cloud kitchen",
     vertical: "restaurant-cloud-kitchen",
     summary: "QR dine-in and takeaway ordering with a live service queue, guest status history, and payment capture.",
     engines: [
       {
         engineId: "venueOrders",
-        // reservations moved from plannedCapabilities to a required capability in
-        // Wave A, when it became genuinely persisted against RestaurantTable with
-        // tenant isolation, capacity limits, overlap refusal and an append-only
-        // ledger. Before that it was a JSON blob on a generic Booking.
         capabilities: ["qrOrdering", "guestTracking", "reservations"],
         required: true,
       },
@@ -278,14 +281,44 @@ const builtInBlueprints: BusinessBlueprint[] = [
         engineId: "commerce",
         capabilities: ["catalog", "orders"],
         required: true,
-        // inventory stays PLANNED on purpose. It is still a single nullable stock
-        // column, so claiming it would overstate what is built.
         plannedCapabilities: ["inventory"],
       },
     ],
     workflows: restaurantWorkflows,
     ownerCopilotPrompts: restaurantOwnerCopilotPrompts,
     supersedes: "restaurant-venue-v1",
+  },
+  {
+    // v1 always REQUIRED commerce:inventory; v2 had to demote it to a planned backlog
+    // item because it was a single nullable stock column. Wave F built it properly, so
+    // v3 restores the original intent rather than leaving the claim parked in a backlog.
+    // Stock per product per location, an append-only movement ledger, and a
+    // database-level oversell guard are exactly what a kitchen needs to say "we are out
+    // of that" truthfully.
+    id: "restaurant-venue-v3",
+    version: "3.0.0",
+    status: "active",
+    name: "Restaurant and cloud kitchen",
+    vertical: "restaurant-cloud-kitchen",
+    summary:
+      "QR dine-in and takeaway ordering with a live service queue, guest status history, table reservations, payment capture, and real stock control with reservations that cannot oversell.",
+    engines: [
+      {
+        engineId: "venueOrders",
+        capabilities: ["qrOrdering", "guestTracking", "reservations"],
+        required: true,
+      },
+      {
+        engineId: "commerce",
+        capabilities: ["catalog", "orders", "inventory"],
+        required: true,
+        // Variants, fulfilment and returns are a retail concern, not a kitchen one, so
+        // they are not named here at all rather than parked in this blueprint's backlog.
+      },
+    ],
+    workflows: restaurantWorkflows,
+    ownerCopilotPrompts: restaurantOwnerCopilotPrompts,
+    supersedes: "restaurant-venue-v2",
   },
 ]
 
