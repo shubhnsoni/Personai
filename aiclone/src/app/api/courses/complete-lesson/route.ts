@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
+import { lessonVisibleToEnrollment } from '@/lib/cohorts/access'
 import { prisma } from '@/lib/prisma'
 import {
     ownershipRefusalResponse,
@@ -17,7 +18,13 @@ const ACCESS_DENIED: OwnershipRefusal = Object.freeze({
 
 type CompletionDb = Pick<
     Prisma.TransactionClient,
-    'user' | 'member' | 'courseEnrollment' | 'courseLesson' | 'lessonCompletion'
+    | 'user'
+    | 'member'
+    | 'courseEnrollment'
+    | 'courseLesson'
+    | 'lessonCompletion'
+    | 'courseLessonAccess'
+    | 'courseAccessGrant'
 >
 
 type CompleteLessonDependencies = Readonly<{
@@ -93,6 +100,17 @@ export function createCompleteLessonPost(
                     select: { id: true, courseId: true },
                 })
                 if (!enrollment) return null
+
+                // Wave G3 made access tiers real; this is where the completion route starts
+                // honouring them. Returning null lands on the SAME ACCESS_DENIED refusal as a
+                // foreign enrolment, so a locked lesson is indistinguishable from one that does
+                // not belong to the caller - a learner cannot use this endpoint to map which
+                // lessons exist above their tier.
+                //
+                // The rule is imported rather than restated. Three copies of an access rule is
+                // three chances to disagree about what somebody paid for.
+                const allowed = await lessonVisibleToEnrollment(db, lessonId, enrollment.id)
+                if (!allowed) return null
 
                 await db.lessonCompletion.upsert({
                     where: {

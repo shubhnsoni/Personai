@@ -24,8 +24,10 @@
  *   ts-node -r tsconfig-paths/register scripts/one-off/check-course-access-runtime.ts
  */
 import { PrismaClient } from "@prisma/client"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
-import { CourseAccessService, LearnerAccessService } from "../../src/lib/cohorts/access"
+import { CourseAccessService, LearnerAccessService, lessonVisibleToEnrollment } from "../../src/lib/cohorts/access"
 import {
     ACCESS_CHANGE_STATES,
     ACCESS_GRANT_STATES,
@@ -553,7 +555,68 @@ async function main() {
             `visible=${afterRemoval.visibleCount}`,
         )
 
-        // ---- 16. zero external calls ------------------------------------
+        // ---- 16. the shared per-lesson rule, and the two call sites that use it ----
+        //
+        // The engine computing visibility is not the same as the product enforcing it. These
+        // assertions cover the exported rule that the library content reader and the
+        // complete-lesson route both call, so all three answers come from one place.
+        const shared = {
+            unruled: await lessonVisibleToEnrollment(prisma, lessons[0], ids.enrolNone),
+            basicOnBasic: await lessonVisibleToEnrollment(prisma, lessons[1], ids.enrolBasic),
+            proOnBasic: await lessonVisibleToEnrollment(prisma, lessons[2], ids.enrolBasic),
+            proOnPro: await lessonVisibleToEnrollment(prisma, lessons[2], ids.enrolPro),
+            noGrant: await lessonVisibleToEnrollment(prisma, lessons[2], ids.enrolNone),
+        }
+        check(
+            "MEASURED: the shared per-lesson rule agrees with the list computation on all five cases",
+            shared.unruled === true &&
+                shared.basicOnBasic === true &&
+                shared.proOnBasic === false &&
+                shared.proOnPro === true &&
+                shared.noGrant === false,
+            JSON.stringify(shared),
+        )
+        // A real per-lesson comparison, awaited properly. An `.every(async ...)` here would always
+        // be truthy and would have shipped a check that cannot fail.
+        const listAnswer = await learner.visibleLessons({ courseId: ids.courseA, memberId: ids.memberBasic })
+        const perLessonAgreement: string[] = []
+        for (const lesson of listAnswer.lessons) {
+            const direct = await lessonVisibleToEnrollment(prisma, lesson.lessonId, ids.enrolBasic)
+            if (direct !== lesson.visible) perLessonAgreement.push(`${lesson.lessonId}: rule=${direct} list=${lesson.visible}`)
+        }
+        check(
+            "the shared rule and the list agree on every lesson, which is the point of exporting it rather than restating it",
+            perLessonAgreement.length === 0 && listAnswer.lessons.length === 4,
+            perLessonAgreement.join("; ") || `${listAnswer.lessons.length} lessons compared`,
+        )
+        const readerSrc = readFileSync(join(__dirname, "../../src/app/library/courses/[id]/page.tsx"), "utf8")
+        const completionSrc = readFileSync(join(__dirname, "../../src/app/api/courses/complete-lesson/route.ts"), "utf8")
+        check(
+            "MEASURED: the library content reader actually consults the access engine - tiers are enforced, not merely enforceable",
+            /LearnerAccessService/.test(readerSrc) && /visibleLessons/.test(readerSrc),
+        )
+        check(
+            "the reader filters the lesson tree rather than passing it through",
+            /visible\.has\(lesson\.id\)/.test(readerSrc),
+        )
+        check(
+            "the reader tells a learner that content exists above their tier rather than silently serving a shorter course",
+            /not included in your current access/.test(readerSrc),
+        )
+        check(
+            "MEASURED: the completion route refuses a locked lesson, using the same imported rule",
+            /lessonVisibleToEnrollment/.test(completionSrc) && /if \(!allowed\) return null/.test(completionSrc),
+        )
+        check(
+            "the completion route's locked refusal is the SAME refusal as a foreign enrolment, so it cannot be used to map lessons above a tier",
+            /return null/.test(completionSrc) && /ACCESS_DENIED/.test(completionSrc),
+        )
+        check(
+            "neither call site restates the rule - both import it",
+            !/accessLevel.*rank\s*>=/.test(readerSrc) && !/accessLevel.*rank\s*>=/.test(completionSrc),
+        )
+
+        // ---- 17. zero external calls ------------------------------------
         check("zero external calls were made by the access runtime", fetchCalls === 0, `fetchCalls=${fetchCalls}`)
     } finally {
         globalThis.fetch = realFetch

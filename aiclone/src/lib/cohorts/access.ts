@@ -899,6 +899,37 @@ async function computeVisibility(db: PrismaClient, courseId: string, enrollmentI
 }
 
 /**
+ * The single per-lesson visibility decision, exported so the content reader and the completion
+ * route call the SAME rule the owner console and the learner surface call.
+ *
+ * Deliberately typed against the narrowest client that can answer the question, so it works
+ * inside a Prisma transaction as well as against the full client. Duplicating the rule at the
+ * three call sites was the alternative, and three copies of an access rule is three chances to
+ * disagree about what somebody paid for.
+ */
+export async function lessonVisibleToEnrollment(
+    db: Pick<PrismaClient, "courseLessonAccess" | "courseAccessGrant">,
+    lessonId: string,
+    enrollmentId: string,
+): Promise<boolean> {
+    const rule = await db.courseLessonAccess.findUnique({
+        where: { lessonId },
+        select: { accessLevel: { select: { rank: true } } },
+    })
+    // No rule means unrestricted. That is the pre-existing behaviour of every lesson in the
+    // database, and it is why adding tiers changed nothing for anybody.
+    if (!rule) return true
+
+    const grant = await db.courseAccessGrant.findUnique({
+        where: { enrollmentId },
+        select: { state: true, expiresAt: true, accessLevel: { select: { rank: true } } },
+    })
+    if (!grant) return false
+    if (!entitles(grant.state as AccessGrantStateValue, grant.expiresAt, new Date())) return false
+    return grant.accessLevel.rank >= rule.accessLevel.rank
+}
+
+/**
  * The learner surface. Takes NO workspaceId: a learner has no workspace membership, and accepting
  * one would hand them a probe for other people's tenancy.
  *
