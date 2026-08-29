@@ -32,8 +32,25 @@ const NEW_ENUMS: Array<[string, number]> = [
   ["CaseDeliverableStatus", 5],
   ["CaseDocumentRequestStatus", 4],
   ["CaseInvoiceState", 7],
-  ["CaseEventKind", 9],
+  // 10, not 9, since Wave G3, whose one non-additive statement appended RETAINER to this enum.
+  // The count is not simply bumped: the assertion below names the label and pins its position,
+  // so a reshuffle cannot hide behind a matching total.
+  ["CaseEventKind", 10],
   ["CaseEventActor", 3],
+];
+
+/** Wave G3's single change to a pre-existing object, pinned by label and by position. */
+const CASE_EVENT_KIND_ORDER = [
+  "CREATED",
+  "STATUS",
+  "MILESTONE",
+  "DELIVERABLE",
+  "DOCUMENT",
+  "INVOICE",
+  "TASK",
+  "APPROVAL",
+  "RETAINER",
+  "NOTE",
 ];
 
 /** The composition contract: each link must point at the PRE-EXISTING model. */
@@ -108,13 +125,28 @@ async function main() {
     check("no table named CaseProjects or Cases was created by accident", !tables.includes("CaseProjects") && !tables.includes("Cases"));
 
     // ---- 2. all eight enums with correct label counts ---------------------
-    const enums = await prisma.$queryRawUnsafe<{ typname: string; enumlabel: string }[]>(
-      "select t.typname, e.enumlabel from pg_type t join pg_enum e on e.enumtypid=t.oid",
+    const enums = await prisma.$queryRawUnsafe<{ typname: string; enumlabel: string; ord: number }[]>(
+      "select t.typname, e.enumlabel, e.enumsortorder::float8 as ord from pg_type t join pg_enum e on e.enumtypid=t.oid",
     );
     for (const [name, expected] of NEW_ENUMS) {
       const n = enums.filter((e) => e.typname === name).length;
       check(`enum ${name} has ${expected} labels`, n === expected, `count=${n}`);
     }
+
+    // Wave G3 appended RETAINER to CaseEventKind. Pinning the whole ordered list, rather than
+    // only the count, is what stops a future wave from swapping a label and leaving the total
+    // unchanged. The order also matters because it is the order in schema.prisma - Postgres
+    // cannot reorder an enum after the fact, so a mismatch here would be permanent.
+    const caseKindOrder = enums
+      .filter((e) => e.typname === "CaseEventKind")
+      .sort((a, b) => a.ord - b.ord)
+      .map((e) => e.enumlabel);
+    check(
+      "CaseEventKind reads exactly as schema.prisma declares it, RETAINER included and in position",
+      caseKindOrder.length === CASE_EVENT_KIND_ORDER.length &&
+        CASE_EVENT_KIND_ORDER.every((label, i) => caseKindOrder[i] === label),
+      caseKindOrder.join(","),
+    );
 
     // ---- 3. COMPOSITION: links point at the pre-existing models ----------
     const fks = await prisma.$queryRawUnsafe<{ tbl: string; def: string; conname: string }[]>(
