@@ -1,11 +1,14 @@
 import { businessEngineDescriptors } from "./engines"
-import type { BusinessBlueprint, ValidationIssue, ValidationResult } from "./types"
+import type { BusinessBlueprint, EngineDescriptor, ValidationIssue, ValidationResult } from "./types"
 
 function issue(path: string, message: string): ValidationIssue {
   return { path, message }
 }
 
-export function validateBusinessBlueprint(blueprint: BusinessBlueprint): ValidationResult {
+export function validateBusinessBlueprint(
+  blueprint: BusinessBlueprint,
+  registry: Readonly<Record<string, EngineDescriptor>> = businessEngineDescriptors,
+): ValidationResult {
   const issues: ValidationIssue[] = []
 
   if (!blueprint.id.trim()) issues.push(issue("id", "Blueprint id is required."))
@@ -40,7 +43,7 @@ export function validateBusinessBlueprint(blueprint: BusinessBlueprint): Validat
   })
 
   blueprint.engines.forEach((composition, engineIndex) => {
-    const engine = businessEngineDescriptors[composition.engineId]
+    const engine = registry[composition.engineId]
     const enginePath = `engines.${engineIndex}`
     if (!engine) {
       issues.push(issue(`${enginePath}.engineId`, "Unknown engine id."))
@@ -80,8 +83,19 @@ export function validateBusinessBlueprint(blueprint: BusinessBlueprint): Validat
   return { ok: issues.length === 0, issues }
 }
 
-export function assertValidBusinessBlueprint(blueprint: BusinessBlueprint) {
-  const result = validateBusinessBlueprint(blueprint)
+export function assertValidBusinessBlueprint(blueprint: BusinessBlueprint): BusinessBlueprint
+export function assertValidBusinessBlueprint(
+  blueprint: BusinessBlueprint,
+  registry: Readonly<Record<string, EngineDescriptor>>,
+): BusinessBlueprint
+export function assertValidBusinessBlueprint(
+  blueprint: BusinessBlueprint,
+  registry: Readonly<Record<string, EngineDescriptor>> | number = businessEngineDescriptors,
+) {
+  const result = validateBusinessBlueprint(
+    blueprint,
+    typeof registry === "number" ? businessEngineDescriptors : registry,
+  )
   if (!result.ok) {
     throw new Error(result.issues.map((item) => `${item.path}: ${item.message}`).join("\n"))
   }

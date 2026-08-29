@@ -4,7 +4,7 @@ import {
   listBusinessBlueprints,
   validateBusinessBlueprint,
 } from "../../src/lib/business-os"
-import type { BusinessBlueprint, CapabilityMaturity } from "../../src/lib/business-os/types"
+import type { BusinessBlueprint, CapabilityMaturity, EngineDescriptor } from "../../src/lib/business-os/types"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
@@ -119,16 +119,33 @@ check(
 check("all registry blueprints validate", listBusinessBlueprints().every((blueprint) => validateBusinessBlueprint(blueprint).ok))
 
 // Negative test: an active blueprint may not REQUIRE a capability whose maturity is
-// still planned. It targets fieldJobs:inspection, which is genuinely planned. It previously
-// targeted venueOrders.reservations, then commerce:inventory, then commerce:returns, then
-// fieldJobs:dispatch; each time a wave made the target real the assertion would have become
-// vacuous, so it is repointed at a capability that is still actually planned rather than left
-// to pass for free.
-//
-// Wave G4 is the FOURTH such repoint, and it happened in the same run as the third: G3
-// promoted commerce:returns, G4 promoted fieldJobs:dispatch. The non-vacuity assertion below
-// is what forces the maintenance each time, and a further assertion now warns when the
-// registry is about to run out of planned capabilities entirely.
+// planned. The descriptor is synthetic by construction so this remains meaningful after
+// the real registry has no planned capabilities.
+const syntheticFieldJobsDescriptor: EngineDescriptor = {
+  id: "fieldJobs",
+  label: "Synthetic contract-test engine",
+  description: "Test-only descriptor for capability maturity validation.",
+  capabilities: [
+    {
+      id: "__contractTestPlanned",
+      label: "Synthetic planned capability",
+      description: "A capability that remains planned by test construction.",
+      maturity: "planned",
+      evidence: "none",
+    },
+    {
+      id: "__contractTestAvailable",
+      label: "Synthetic available capability",
+      description: "A capability that is available by test construction.",
+      maturity: "available",
+      evidence: "scripts/one-off/check-capability-contract.ts",
+    },
+  ],
+}
+const syntheticRegistry: Readonly<Record<string, EngineDescriptor>> = {
+  ...businessEngineDescriptors,
+  fieldJobs: syntheticFieldJobsDescriptor,
+}
 const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   id: "invalid-active-planned-capability",
   version: "1.0.0",
@@ -136,20 +153,25 @@ const activeWithPlannedRequiredCapability: BusinessBlueprint = {
   name: "Invalid active blueprint",
   vertical: "contract-test",
   summary: "Negative test: active blueprints cannot require planned capabilities.",
-  engines: [{ engineId: "fieldJobs", capabilities: ["inspection"], required: true }],
+  engines: [{ engineId: "fieldJobs", capabilities: ["__contractTestPlanned"], required: true }],
   workflows: [],
   ownerCopilotPrompts: [],
 }
-const negativeResult = validateBusinessBlueprint(activeWithPlannedRequiredCapability)
-checkInvertible("active blueprint requiring planned capability is rejected", !negativeResult.ok)
+const negativeResult = validateBusinessBlueprint(activeWithPlannedRequiredCapability, syntheticRegistry)
+checkInvertible("active blueprint requiring synthetic planned capability is rejected", !negativeResult.ok)
 check(
-  "negative rejection identifies maturity enforcement",
+  "synthetic planned rejection identifies maturity enforcement",
   negativeResult.issues.some(
     (validationIssue) =>
       validationIssue.path === "engines.0.capabilities.0" &&
       validationIssue.message.includes("maturity is planned") &&
       validationIssue.message.includes("must be available"),
   ),
+)
+check(
+  "synthetic planned capability remains planned, so the negative test is not vacuous",
+  syntheticFieldJobsDescriptor.capabilities.find((capability) => capability.id === "__contractTestPlanned")?.maturity ===
+    "planned",
 )
 
 const draftWithPlannedRequiredCapability: BusinessBlueprint = {
@@ -158,8 +180,35 @@ const draftWithPlannedRequiredCapability: BusinessBlueprint = {
   status: "draft",
 }
 check(
-  "draft blueprint may reference planned capability",
-  validateBusinessBlueprint(draftWithPlannedRequiredCapability).ok,
+  "draft blueprint may reference synthetic planned capability",
+  validateBusinessBlueprint(draftWithPlannedRequiredCapability, syntheticRegistry).ok,
+)
+
+const proposedWithPlannedRequiredCapability: BusinessBlueprint = {
+  ...activeWithPlannedRequiredCapability,
+  id: "valid-proposed-planned-capability",
+  status: "proposed",
+}
+check(
+  "proposed blueprint may reference synthetic planned capability",
+  validateBusinessBlueprint(proposedWithPlannedRequiredCapability, syntheticRegistry).ok,
+)
+
+const activeWithAvailableRequiredCapability: BusinessBlueprint = {
+  ...activeWithPlannedRequiredCapability,
+  id: "valid-active-available-capability",
+  engines: [{ engineId: "fieldJobs", capabilities: ["__contractTestAvailable"], required: true }],
+}
+check(
+  "active blueprint requiring synthetic available capability is allowed",
+  validateBusinessBlueprint(activeWithAvailableRequiredCapability, syntheticRegistry).ok,
+)
+
+const defaultRegistryResult = validateBusinessBlueprint(activeWithPlannedRequiredCapability)
+const explicitRegistryResult = validateBusinessBlueprint(activeWithPlannedRequiredCapability, businessEngineDescriptors)
+check(
+  "validator default registry matches the explicit real registry",
+  JSON.stringify(defaultRegistryResult) === JSON.stringify(explicitRegistryResult),
 )
 
 // ---------------------------------------------------------------------------
@@ -287,21 +336,6 @@ check(
 check(
   "fieldJobs intake is now available too",
   businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "intake")?.maturity === "available",
-)
-check(
-  "fieldJobs inspection is still planned, so the planned negative test is not vacuous",
-  businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "inspection")?.maturity === "planned",
-)
-// The planned target has now moved four times in this program, twice in a single run. If a
-// future wave promotes inspection there will be NO planned capability left in the registry, and
-// the negative test will have to be rewritten against a synthetic descriptor rather than
-// repointed. This assertion is the early warning for that day.
-check(
-  "at least one capability somewhere is still planned, so the negative test has somewhere to point",
-  Object.values(businessEngineDescriptors).some((engine) => engine.capabilities.some((c) => c.maturity === "planned")),
-  Object.values(businessEngineDescriptors)
-    .flatMap((engine) => engine.capabilities.filter((c) => c.maturity === "planned").map((c) => `${engine.id}:${c.id}`))
-    .join(", ") || "NONE LEFT",
 )
 
 // Wave G3 promoted two capabilities that three ACTIVE blueprints were carrying as planned
