@@ -195,3 +195,108 @@ export function titleCase(value: string): string {
         .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
         .join(" ")
 }
+
+
+// ---------------------------------------------------------------------------
+// Retainers (Wave G5). Same rule as everything above: every field is a projection of a
+// persisted row. `remaining` and `overage` arrive computed from the server rather than being
+// worked out in the browser, because the server is where the ledger is.
+// ---------------------------------------------------------------------------
+
+export type RetainerView = Readonly<{
+    id: string
+    reference: string
+    title: string
+    state: string
+    basis: string
+    includedUnits: number | null
+    includedValueCents: number | null
+    currency: string
+    periodKind: string
+    periodDays: number | null
+    periodLengthDays: number | null
+    rolloverAllowed: boolean
+    autoRenew: boolean
+    contactId: string | null
+    activatedAt: string | null
+    pausedAt: string | null
+    expiredAt: string | null
+    cancelledAt: string | null
+    cancelReason: string | null
+    allowedTransitions: readonly string[]
+    createdAt: string
+}>
+
+export type RetainerPeriodView = Readonly<{
+    id: string
+    ordinal: number
+    startsOn: string
+    endsOn: string
+    basis: string
+    includedUnits: number | null
+    includedValueCents: number | null
+    usedUnits: number
+    usedValueCents: number
+    remaining: number
+    overage: number
+    state: string
+    billingState: string
+    invoiceId: string | null
+    allowedTransitions: readonly string[]
+    allowedBillingTransitions: readonly string[]
+}>
+
+export type RetainerDrawView = Readonly<{
+    id: string
+    seq: string
+    kind: string
+    periodId: string
+    caseId: string | null
+    unitsDelta: number | null
+    valueDeltaCents: number | null
+    usedUnitsAfter: number
+    usedValueCentsAfter: number
+    note: string | null
+    actor: string
+    at: string
+}>
+
+export type RetainerCaseView = Readonly<{
+    caseId: string
+    reference: string
+    title: string
+    status: string
+    linkedAt: string
+}>
+
+export type RetainerBalanceView = Readonly<{
+    retainerId: string
+    basis: string
+    currency: string
+    openPeriod: RetainerPeriodView | null
+    lifetimeUsed: number
+    lifetimeIncluded: number
+    lifetimeOverage: number
+    periodCount: number
+}>
+
+export type RetainerEventView = Readonly<{
+    id: string
+    seq: string
+    kind: string
+    subjectType: string
+    subjectId: string
+    from: string | null
+    to: string
+    actor: string
+    at: string
+}>
+
+/**
+ * A retainer allowance is either a count of units or an amount of money, never both, so it needs
+ * one formatter that knows which. Showing "20" where the agreement is denominated in money, or
+ * "USD 0.20" where it is denominated in units, would be a quiet lie about the contract.
+ */
+export function allowance(basis: string, units: number, cents: number, currency: string): string {
+    return basis === "UNITS" ? `${units} units` : money(cents, currency)
+}

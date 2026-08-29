@@ -684,6 +684,106 @@ check(
     /promised to orders, so a live promise cannot/.test(variantsSrc),
 )
 
+// ---------------------------------------------------------------------------
+// Wave G5 — the retainer panel. A retainer looks like a payment and is not one, so the honesty
+// requirements here are mostly about money: that billing state is stated to be a record rather
+// than a charge, that overage is shown rather than hidden, and that no balance is worked out in
+// the browser.
+// ---------------------------------------------------------------------------
+const retainersSrc = readFileSync(join(__dirname, "../../src/components/business-os/retainers-panel.tsx"), "utf8")
+
+check("retainer panel is mounted in the shell", shellSrc.includes("<RetainersPanel"))
+check("retainer decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(retainersSrc))
+check(
+    "retainer loading states announce themselves politely and as busy",
+    retainersSrc.includes('aria-live="polite"') && retainersSrc.includes('aria-busy="true"'),
+)
+check(
+    "every retainer loading state carries a screen-reader label",
+    /Loading retainers/.test(retainersSrc) &&
+        /Loading periods, cases and draws/.test(retainersSrc) &&
+        /Loading retainer history/.test(retainersSrc),
+)
+check("retainer panel uses a structural skeleton while loading", /Skeleton/.test(retainersSrc))
+check(
+    "retainer refusals are split by status through the shared cases error copy",
+    /error\.status === 401/.test(casesSharedSrc) &&
+        /error\.status === 403/.test(casesSharedSrc) &&
+        /error\.status === 400/.test(casesSharedSrc) &&
+        /error\.status === 409/.test(casesSharedSrc) &&
+        /error\.status === 503/.test(casesSharedSrc),
+)
+check("retainer empty state states that no sample data is shown", /no sample retainers are shown/i.test(retainersSrc))
+check(
+    "the retainer panel contains no fabricated retainer, period or draw",
+    !/\bid:\s*"/.test(retainersSrc) && !/usedUnits:\s*\d/.test(retainersSrc) && !/sampleRetainer/i.test(retainersSrc),
+)
+check(
+    "MEASURED: the retainer panel performs no arithmetic on any balance - the ledger is the only place those numbers are worked out",
+    !/Math\.(round|floor|max|min|abs)\(/.test(retainersSrc) &&
+        !/remaining\s*[-+]/.test(retainersSrc) &&
+        !/usedUnits\s*[-+]/.test(retainersSrc) &&
+        !/includedUnits\s*-/.test(retainersSrc),
+)
+check("retainer disclosures expose their expanded state", /aria-expanded=/.test(retainersSrc))
+check(
+    "retainer sections are headed rather than only visually grouped",
+    /<h3/.test(retainersSrc) && /<h5/.test(retainersSrc),
+)
+check(
+    "retainer, period and billing buttons all come from server-computed allowedTransitions",
+    /retainer\.allowedTransitions\.map/.test(retainersSrc) &&
+        /period\.allowedTransitions\.map/.test(retainersSrc) &&
+        /period\.allowedBillingTransitions\.map/.test(retainersSrc),
+)
+check(
+    "a terminal retainer and a terminal period each explain why they have no actions",
+    /and cannot change/.test(retainersSrc) &&
+        /retainer\.allowedTransitions\.length === 0/.test(retainersSrc) &&
+        /period\.allowedTransitions\.length === 0/.test(retainersSrc),
+)
+check(
+    "the panel states that billing state is a record and not a charge, where an owner will read it",
+    /Billing state is a record, not a charge/.test(retainersSrc) && /nothing here\s*\n?\s*charges anybody/.test(retainersSrc),
+)
+check(
+    "overage is stated to be shown rather than blocked, and given a reason",
+    /Overage is shown rather than blocked/.test(retainersSrc) &&
+        /Overage is recorded rather than refused, so it can be billed/.test(retainersSrc),
+)
+check(
+    "the panel says the balance figures are recomputed from the ledger rather than stored",
+    /recomputed from the ledger on every\s*\n?\s*read, not stored/.test(retainersSrc),
+)
+check(
+    "the ledger is described as append-only and its balances as recorded at the time",
+    /The ledger is append-only/.test(retainersSrc) && /not a\s*\n?\s*recalculation/.test(retainersSrc),
+)
+check(
+    "auto-renew is disclosed as intent only, so the word does not imply a timer",
+    /records intent only/.test(retainersSrc) && /nothing renews this agreement on a\s*\n?\s*timer/.test(retainersSrc),
+)
+check(
+    "the draw form states the two rules a caller would otherwise discover by being refused",
+    /must name one this retainer covers/.test(retainersSrc) &&
+        /accepted and shown as overage rather than\s*\n?\s*refused/.test(retainersSrc),
+)
+check(
+    "an allowance is formatted by basis, so units are never printed as money or the reverse",
+    /export function allowance/.test(casesSharedSrc) && /basis === "UNITS"/.test(casesSharedSrc),
+)
+check(
+    "empty retainer sub-lists say so rather than rendering a placeholder row",
+    /No periods opened yet/.test(retainersSrc) &&
+        /No cases linked yet/.test(retainersSrc) &&
+        /Nothing drawn yet/.test(retainersSrc) &&
+        /No history recorded/.test(retainersSrc),
+)
+check(
+    "a retainer with no open period says so rather than showing a draw form that would be refused",
+    /No period is open, so nothing can be drawn right now/.test(retainersSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
