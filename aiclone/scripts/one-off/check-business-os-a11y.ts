@@ -290,6 +290,97 @@ check(
     /Waitlist/.test(appointmentsSrc) && /Waitlisted for/.test(appointmentsSrc),
 )
 
+// ---------------------------------------------------------------------------
+// Wave C — explicit coverage for the cases/projects panel and its detail view,
+// so "a11y 0" says something about the cases surface rather than only about the
+// panels that came before it.
+// ---------------------------------------------------------------------------
+const shellSrc = readFileSync(join(__dirname, "../../src/components/business-os/business-os-shell.tsx"), "utf8")
+const casesSrc = readFileSync(join(__dirname, "../../src/components/business-os/cases-panel.tsx"), "utf8")
+const caseDetailSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/case-detail-panel.tsx"),
+    "utf8",
+)
+const casesSharedSrc = readFileSync(join(__dirname, "../../src/components/business-os/cases-shared.ts"), "utf8")
+const casesAll = `${casesSrc}\n${caseDetailSrc}\n${casesSharedSrc}`
+
+check("cases panel is mounted in the shell", shellSrc.includes("<CasesPanel"))
+check("cases decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(casesSrc))
+check(
+    "cases loading state announces itself politely and as busy",
+    casesSrc.includes('aria-live="polite"') && casesSrc.includes('aria-busy="true"'),
+)
+check(
+    "cases loading state carries a screen-reader label",
+    casesSrc.includes("sr-only") && /Loading cases and intakes/.test(casesSrc),
+)
+check(
+    "case detail loading state announces itself politely and as busy",
+    caseDetailSrc.includes('aria-live="polite"') &&
+        caseDetailSrc.includes('aria-busy="true"') &&
+        /Loading case detail/.test(caseDetailSrc),
+)
+check("cases panel uses a structural skeleton while loading", /Skeleton/.test(casesSrc))
+check(
+    "cases panel distinguishes 401, 403, 400 and 409 for the owner",
+    /error\.status === 401/.test(casesSharedSrc) &&
+        /error\.status === 403/.test(casesSharedSrc) &&
+        /error\.status === 400/.test(casesSharedSrc) &&
+        /error\.status === 409/.test(casesSharedSrc),
+)
+check(
+    "cases panel does not leak internals on a dependency failure",
+    /error\.status === 503/.test(casesSharedSrc) && /Nothing was changed/.test(casesSharedSrc),
+)
+check(
+    "cases 403 copy is identical for a foreign and a missing case",
+    /does not grant you access to that case/.test(casesSharedSrc),
+)
+check(
+    "cases empty state states that no sample data is shown",
+    /No sample cases are shown/.test(casesSrc),
+)
+check(
+    "cases panel contains no hardcoded sample case or intake",
+    !/reference:\s*"[A-Z]{2,}-/.test(casesAll) && !/sampleCase/i.test(casesAll) && !/summary:\s*"[A-Z]/.test(casesAll),
+)
+check(
+    "every case text input has an associated label",
+    (casesAll.match(/<Input\b/g) ?? []).length === (casesAll.match(/htmlFor=/g) ?? []).length,
+    `inputs=${(casesAll.match(/<Input\b/g) ?? []).length} labels=${(casesAll.match(/htmlFor=/g) ?? []).length}`,
+)
+check(
+    "the case detail disclosure exposes its expanded state",
+    /aria-expanded=/.test(casesSrc),
+)
+check(
+    "case sections are headed rather than only visually grouped",
+    /<h4/.test(casesSrc) && /<h5/.test(caseDetailSrc),
+)
+check(
+    "case status buttons come from server-computed allowedTransitions",
+    /record\.allowedTransitions\.map/.test(casesSrc),
+)
+check(
+    "the deliverable UI states plainly that delivery needs an approval",
+    /requires an approved approval/i.test(caseDetailSrc),
+)
+check(
+    "the document-request UI states plainly that receipt needs a real document",
+    /needs an uploaded document/i.test(caseDetailSrc),
+)
+check(
+    "the billing UI states plainly that no money is moved from this screen",
+    /No money is moved from this screen/.test(caseDetailSrc),
+)
+check(
+    "empty case sub-lists say so rather than rendering a placeholder row",
+    /No milestones recorded/.test(caseDetailSrc) &&
+        /No deliverables recorded/.test(caseDetailSrc) &&
+        /No approvals have been requested/.test(caseDetailSrc) &&
+        /No events recorded yet/.test(caseDetailSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"

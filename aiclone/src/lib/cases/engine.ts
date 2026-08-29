@@ -23,6 +23,10 @@ export type CaseRecord = Readonly<{
     title: string
     status: CaseStatusValue
     invoiceState: InvoiceStateValue
+    openedAt: Date | null
+    deliveredAt: Date | null
+    closedAt: Date | null
+    cancelledAt: Date | null
     cancelReason: string | null
     createdAt: Date
     updatedAt: Date
@@ -39,6 +43,10 @@ type RawCase = {
     title: string
     status: string
     invoiceState: string
+    openedAt: Date | null
+    deliveredAt: Date | null
+    closedAt: Date | null
+    cancelledAt: Date | null
     cancelReason: string | null
     createdAt: Date
     updatedAt: Date
@@ -56,6 +64,10 @@ export function toCaseRecord(row: RawCase): CaseRecord {
         title: row.title,
         status,
         invoiceState: row.invoiceState as InvoiceStateValue,
+        openedAt: row.openedAt,
+        deliveredAt: row.deliveredAt,
+        closedAt: row.closedAt,
+        cancelledAt: row.cancelledAt,
         cancelReason: row.cancelReason,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
