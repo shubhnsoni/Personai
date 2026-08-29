@@ -166,7 +166,7 @@ export function ProductForm({ profileId, product }: ProductFormProps) {
                         <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} placeholder="Longer copy for the shop page" />
                     </div>
                     <div className="space-y-2">
-                        <Label>What's included (one per line)</Label>
+                        <Label>What&apos;s included (one per line)</Label>
                         <Textarea value={highlights} onChange={(e) => setHighlights(e.target.value)} rows={3} />
                     </div>
                     <div className="space-y-2">

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, type ReactNode } from "react"
+import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
@@ -45,12 +46,12 @@ export function DashboardLayoutClient({ children, slug, name, counts, role, extr
             />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                 {slug.startsWith("try-") ? (
-                    <a
+                    <Link
                         href="/qa"
                         className="shrink-0 bg-cyan-400/15 px-3 py-1.5 text-center text-[11px] font-medium text-cyan-300"
                     >
                         Trying {role || "kit"} · back to all kits
-                    </a>
+                    </Link>
                 ) : null}
                 <Header slug={slug} role={role} extras={extras} onMenuClick={() => setMobileMenuOpen(true)} />
                 <main

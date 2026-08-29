@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { animate, motion, useMotionTemplate, useMotionValue } from "framer-motion"
+import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { ChatInterface, type ChatChip } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"
@@ -189,7 +190,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                         <div>
                             <p className="font-medium">You&apos;re in</p>
                             <p className="text-sm text-green-100">
-                                Check your email, or <a href="/library/login" className="underline">open your library</a>.
+                                Check your email, or <Link href="/library/login" className="underline">open your library</Link>.
                             </p>
                         </div>
                         <button

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle } from "lucide-react"
 
@@ -11,6 +12,8 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  const router = useRouter()
+
   useEffect(() => {
     console.error("Global error:", error)
   }, [error])
@@ -31,7 +34,7 @@ export default function GlobalError({
           <Button onClick={reset} className="bg-purple-600 hover:bg-purple-500">
             Try Again
           </Button>
-          <Button variant="outline" onClick={() => window.location.href = "/"} className="border-zinc-700">
+          <Button variant="outline" onClick={() => router.push("/")} className="border-zinc-700">
             Go Home
           </Button>
         </div>
