@@ -175,6 +175,17 @@ export type InspectionRecord = Readonly<
         /** How many REQUIRED lines are still unanswered. 0 does not imply completable. */
         pendingRequired: number
         isTerminal: boolean
+        /**
+         * Whether items and parts may be recorded RIGHT NOW, computed from RECORDABLE_STATUSES.
+         *
+         * This is NOT `!isTerminal`, and the difference is the whole reason it exists. SUBMITTED is
+         * not terminal - it can go back to IN_PROGRESS - but it is not recordable either, because
+         * the office accepting a result is a different fact from the technician still filling it in.
+         * A UI that gated on `!isTerminal` would offer enabled controls on a SUBMITTED inspection
+         * that the server then refuses with 409, so the server answers the question instead of
+         * leaving the client to re-derive it.
+         */
+        canRecord: boolean
     }
 >
 
@@ -195,6 +206,7 @@ export function toInspectionRecord(row: RawInspection, pendingRequired: number):
                   ),
         pendingRequired,
         isTerminal: inspectionFlow.isTerminal(row.status),
+        canRecord: RECORDABLE_STATUSES.includes(row.status),
     })
 }
 

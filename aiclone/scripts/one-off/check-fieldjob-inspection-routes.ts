@@ -285,6 +285,7 @@ async function main() {
             allowedHandoffStates: string[]
             pendingRequired: number
             isTerminal: boolean
+            canRecord: boolean
         }
         const itemsOut = dataOf(created).items as Array<{ id: string; kind: string; label: string }>
         check("the created inspection carries its snapshotted lines", itemsOut.length === 2, `lines=${itemsOut.length}`)
@@ -377,6 +378,11 @@ async function main() {
             "a refused submission is 409 and its details carry the number of unanswered required lines",
             submitBlocked.status === 409 && errDetails(submitBlocked)?.pendingRequired === 2,
             `status=${submitBlocked.status} details=${JSON.stringify(errDetails(submitBlocked) ?? null)}`,
+        )
+        checkInvertible(
+            "canRecord is on the wire, so the panel never has to re-derive when recording is allowed",
+            /"canRecord":true/.test(created.raw) && inspection.canRecord === true,
+            created.raw.slice(0, 200),
         )
 
         // ---- 9. readings as strings ----------------------------------------

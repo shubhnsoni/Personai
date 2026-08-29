@@ -56,6 +56,13 @@ export type InspectionView = Readonly<{
     allowedTransitions: readonly string[]
     pendingRequired: number
     isTerminal: boolean
+    /**
+     * Whether the server will accept item and part writes right now. Deliberately NOT the same as
+     * `!isTerminal`: a SUBMITTED inspection is not terminal but is not recordable either, because it
+     * has to go back to IN_PROGRESS to be edited. Gate every record form on THIS, so the UI never
+     * offers a control the server would refuse with 409.
+     */
+    canRecord: boolean
 }>
 
 export type InspectionItemView = Readonly<{

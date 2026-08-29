@@ -356,7 +356,7 @@ export function InspectionPanel({ workspaceId }: { workspaceId: string }) {
                                                                         <Badge variant={itemResultVariant(item.result)}>{titleCase(item.result)}</Badge>
                                                                         {item.required ? <Badge variant="outline">Required</Badge> : null}
                                                                     </div>
-                                                                    {!inspection.isTerminal ? (
+                                                                    {inspection.canRecord ? (
                                                                         <div className="mt-2 flex flex-wrap items-end gap-2">
                                                                             <div>
                                                                                 <Label htmlFor={`asset-label-${item.id}`} className="text-xs">
@@ -462,7 +462,7 @@ export function InspectionPanel({ workspaceId }: { workspaceId: string }) {
                                                                             <Badge variant="destructive">Outside expected range</Badge>
                                                                         )}
                                                                     </div>
-                                                                    {!inspection.isTerminal ? (
+                                                                    {inspection.canRecord ? (
                                                                         <div className="mt-2 flex flex-wrap items-end gap-2">
                                                                             <div>
                                                                                 <Label htmlFor={`measured-${item.id}`} className="text-xs">
@@ -535,7 +535,7 @@ export function InspectionPanel({ workspaceId }: { workspaceId: string }) {
                                                                         <Badge variant={itemResultVariant(item.result)}>{titleCase(item.result)}</Badge>
                                                                         {item.required ? <Badge variant="outline">Required</Badge> : null}
                                                                     </div>
-                                                                    {!inspection.isTerminal ? (
+                                                                    {inspection.canRecord ? (
                                                                         <div className="mt-2 flex flex-wrap items-end gap-2">
                                                                             <div>
                                                                                 <Label htmlFor={`check-notes-${item.id}`} className="text-xs">
@@ -580,7 +580,7 @@ export function InspectionPanel({ workspaceId }: { workspaceId: string }) {
                                                                 </div>
                                                             ))
                                                     )}
-                                                    {inspection.isTerminal ? (
+                                                    {!inspection.canRecord ? (
                                                         <p className="text-xs text-muted-foreground">
                                                             This inspection is {inspection.status.toLowerCase()}, so items cannot be recorded.
                                                         </p>
@@ -608,7 +608,7 @@ export function InspectionPanel({ workspaceId }: { workspaceId: string }) {
                                                             </div>
                                                         ))
                                                     )}
-                                                    {!inspection.isTerminal ? (
+                                                    {inspection.canRecord ? (
                                                         <div className="mt-2 flex flex-wrap items-end gap-2">
                                                             <div>
                                                                 <Label htmlFor={`part-inv-${inspection.id}`} className="text-xs">

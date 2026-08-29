@@ -582,6 +582,33 @@ async function main() {
             `allowed=[${submitted.allowedTransitions.join(",")}]`,
         )
 
+        /*
+         * canRecord is the assertion that stops a UI re-deriving the recording rule and getting it
+         * wrong. SUBMITTED is the case that matters: it is NOT terminal, so `!isTerminal` would say
+         * recording is fine, and the server would then refuse the write with 409. The two flags must
+         * DISAGREE here, and that disagreement is the whole point of shipping canRecord.
+         */
+        checkInvertible(
+            "a SUBMITTED inspection reports canRecord false even though it is not terminal, so !isTerminal is not a safe substitute",
+            submitted.canRecord === false && submitted.isTerminal === false,
+            `canRecord=${submitted.canRecord} isTerminal=${submitted.isTerminal}`,
+        )
+        // canRecord must agree with what the server actually accepts, not merely with the lifecycle
+        // table. Probed with recordItem because it needs no stock fixture at this point.
+        const recordOnSubmitted = await attempt(() =>
+            inspections.recordItem(ids.wsA, created.inspection.id, afterEdit.items[0].id, { result: "PASS" }, actor),
+        )
+        checkInvertible(
+            "canRecord agrees with what the server actually accepts: recording on SUBMITTED is refused",
+            submitted.canRecord === false && !recordOnSubmitted.ok && recordOnSubmitted.code === "CONFLICT",
+            `canRecord=${submitted.canRecord} write=${why(recordOnSubmitted)}`,
+        )
+        checkInvertible(
+            "a DRAFT inspection reports canRecord true, so the flag is not simply always false",
+            created.inspection.canRecord === true && created.inspection.status === "DRAFT",
+            `canRecord=${created.inspection.canRecord} status=${created.inspection.status}`,
+        )
+
         const noOutcome = await attempt(() =>
             inspections.transition(ids.wsA, created.inspection.id, { status: "COMPLETED", completionNotes: "All fine" }, actor),
         )
@@ -794,6 +821,11 @@ async function main() {
             "a completed inspection cannot be changed afterwards",
             !afterTerminal.ok && afterTerminal.code === "CONFLICT",
             why(afterTerminal),
+        )
+        check(
+            "a completed inspection reports canRecord false and isTerminal true, so both flags agree here",
+            completed.canRecord === false && completed.isTerminal === true,
+            `canRecord=${completed.canRecord} isTerminal=${completed.isTerminal}`,
         )
         const partAfterTerminal = await attempt(() =>
             inspections.addPart(ids.wsA, created.inspection.id, { inventoryItemId: stockA.record.id, qty: 1 }, actor),

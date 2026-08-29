@@ -1080,6 +1080,22 @@ check(
     "a terminal inspection explains why it has no actions",
     /inspection\.allowedTransitions\.length === 0/.test(inspectionSrc) && /cannot change/.test(inspectionSrc),
 )
+// Wave H1 follow-up. The panel originally gated its record forms on !isTerminal, which is WRONG for a
+// SUBMITTED inspection: not terminal, but not recordable either, so the server refused writes the UI
+// had offered. The server now answers the question with canRecord, and this asserts the panel asks it
+// rather than re-deriving it - including that isTerminal is no longer used for form gating at all.
+check(
+    "inspection record forms are gated on the server's canRecord, not on the client re-deriving it",
+    /\{inspection\.canRecord \? \(/.test(inspectionSrc) && !/\{!inspection\.isTerminal \? \(/.test(inspectionSrc),
+)
+check(
+    "the inspection panel no longer uses isTerminal to decide whether recording is possible",
+    !/inspection\.isTerminal/.test(inspectionSrc),
+)
+check(
+    "a non-recordable inspection says which status is blocking recording",
+    /\{!inspection\.canRecord \? \(/.test(inspectionSrc) && /so items cannot be recorded/.test(inspectionSrc),
+)
 check(
     "MEASURED: a null isWithinExpectedRange is shown as not applicable, never as out of range",
     /isWithinExpectedRange === null/.test(inspectionSrc) && /Range not applicable/.test(inspectionSrc),
