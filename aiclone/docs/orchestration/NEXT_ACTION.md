@@ -56,13 +56,13 @@ added no lint debt of their own; every report cleared was pre-existing. Targeted
 | G variants, fulfilment, returns | `src/lib/commerce/**` | 16 routes under `/api/platform/**` | `commerce-variants-panel.tsx`, `commerce-orders-panel.tsx` |
 | G3+G5 retainers | `src/lib/cases/retainers.ts` | 10 routes under `/api/platform/retainers/**` | `retainers-panel.tsx` |
 | G3 course access levels | `src/lib/cohorts/access.ts` | none yet — engine and harnesses only | none yet |
-| G4 field jobs (intake, dispatch) | `src/lib/fieldjobs/**` | none yet — engine and harnesses only | none yet |
+| G4+G6 field jobs (intake, dispatch) | `src/lib/fieldjobs/**` | 10 routes under `/api/platform/field-job*/**` | `fieldjobs-panel.tsx` |
 
-**G3 and G4 shipped runtime without APIs or UI, on purpose. Retainers have since been completed end to end (`9ca772e`, `4ebaf2a`); course access levels and field jobs have not.** Their briefs asked for schema,
+**G3 and G4 shipped runtime without APIs or UI, on purpose. Retainers (`9ca772e`, `4ebaf2a`) and field jobs (`3185a58`, `3de518b`) have since been completed end to end; course access levels have not.** Their briefs asked for schema,
 runtime and executable tests, and said to promote capabilities only after runtime evidence
-exists. Neither asked for owner surfaces, and claiming one would have meant building it. So two of the four
-capabilities promoted in G3 and G4 — `contentCohorts:accessLevels` and the two `fieldJobs` ones —
-are still `available` on the strength of engines plus executable assertions alone, with no surface.
+exists. Neither asked for owner surfaces, and claiming one would have meant building it. So one of the four
+capabilities promoted in G3 and G4 — `contentCohorts:accessLevels` — is still `available` on the
+strength of an engine plus executable assertions alone, with no surface.
 The honest next step for either is an API and a Business OS panel; `src/lib/cases/http.ts` plus
 `retainers-panel.tsx` is now the closest worked example, and it shows the cheaper route: add the
 methods to the domain's EXISTING api service rather than creating a second HTTP boundary.
@@ -114,8 +114,8 @@ Read `INTEGRATION_QUEUE.md` → "Next in queue — revised after Wave G4".
   `fieldJobs:dispatch` → `fieldJobs:inspection`), twice within one run. It will need
   **rewriting against a synthetic engine descriptor**, not repointing. An assertion already
   exists that fails loudly and prints the surviving planned capabilities when the list empties.
-- **An API and Business OS panel for course access levels or field jobs.** Retainers are done
-  (`9ca772e`, `4ebaf2a`); these two are not. No schema needed, so either fits a short window.
+- **An API and Business OS panel for course access levels.** Retainers (`9ca772e`, `4ebaf2a`)
+  and field jobs (`3185a58`, `3de518b`) are done; this one is not. No schema needed, so either fits a short window.
   The retainer package is the worked example: add methods to the domain's EXISTING api service
   (a second HTTP boundary would be a second place for the envelope to drift), one route file per
   resource, then a panel, then a11y assertions in `check-business-os-a11y.ts`. For access levels

@@ -1,6 +1,6 @@
 {
-  "milestone": "Retainers complete end to end at 4ebaf2a - schema, runtime, HTTP surface and owner panel. Waves A-G4 integrated; retail-storefront-v1 ACTIVE. Remaining declared gaps: appointments:reminders and :deposits (owner-gated) and fieldJobs:inspection (not built). Course access levels and field jobs have engines but no surface.",
-  "updatedAt": "2026-08-29 20:50 +05:30",
+  "milestone": "Field jobs and retainers are complete end to end at 3de518b - schema, runtime, HTTP surface and owner panel each. Waves A-G4 integrated; retail-storefront-v1 ACTIVE. Remaining: contentCohorts:accessLevels has an engine but no surface; fieldJobs:inspection is not built; appointments:reminders and :deposits stay owner-gated.",
+  "updatedAt": "2026-08-29 21:37 +05:30",
   "updatedBy": "root orchestrator (claude-opus-5)",
   "baseline": "a4d9fba",
   "maxParallelWorkers": 6,
@@ -1366,6 +1366,48 @@
         "build": "exit 0; all 10 retainer routes emitted as dynamic server routes"
       },
       "stillMissing": "Course access levels and field jobs still have engines with no HTTP surface and no owner panel. No capability description claims otherwise."
+    },
+    {
+      "id": "P2-015",
+      "title": "Field-job HTTP surface and owner panel",
+      "status": "done",
+      "owner": "root (claude-opus-5)",
+      "workerIndependenceClaimed": false,
+      "dependencies": [
+        "P2-013"
+      ],
+      "commits": {
+        "api": "3185a58",
+        "ui": "3de518b"
+      },
+      "integrationDeviation": "Committed directly on recovered/aug20-wt-pr-32, same as P2-014 and for the same reason: no migration, and every gate ran on exactly this tree.",
+      "scope": "The fieldJobs engine landed in Wave G4 with no way to reach it and no owner surface. This is both.",
+      "api": {
+        "routes": "10 routes: field-job-requests (GET/POST), [requestId] (PATCH status), [requestId]/quote (PATCH), [requestId]/convert (POST), field-jobs (GET with a status filter, POST), [jobId] (GET/PATCH), [jobId]/schedule (PATCH), [jobId]/assignments (GET/POST), [jobId]/assignments/[assignmentId] (PATCH), [jobId]/timeline (GET).",
+        "conversionIsItsOwnRoute": "Conversion is a POST to its own route rather than a status PATCH, because a request becomes CONVERTED by a job existing. The status route refuses CONVERTED with a 409 that says so, so there is exactly one way to do it and the wrong way explains itself.",
+        "theActorBoundary": "THE ONE THING THIS SURFACE DOES DIFFERENTLY. Cases and cohorts derive a fixed STAFF actor and offer no way to name yourself. Field jobs genuinely have two actors: an office staffer moving a job card on a technician's behalf is a different fact from the technician moving it, and a history that cannot tell them apart is worth less. So a write may declare actorType: 'TECHNICIAN'. That makes the actor an INPUT, which is exactly what an audit trail must not over-trust, so the boundary is narrow and proven: STAFF and TECHNICIAN accepted, CUSTOMER and SYSTEM refused with 400, actorId never taken from the caller whatever is sent. A request asserting it came from the system is precisely what a record should not believe.",
+        "measured": "400 IS NOT 409 on the same field, three times: an unrecognised request status is 400 and a legal-but-out-of-order one is 409; a non-integer quote is 400 and a negative one is 409; unrecognised priority and role are 400 and list the accepted values. THE SIDE CONDITIONS SURVIVE THE ROUTE - a job with no visit window still cannot be scheduled, a job with nobody assigned still cannot be dispatched, and the refusal still names the missing lead. A route that quietly widened an engine rule would be the easiest thing here to miss. NON-ENUMERATION byte for byte, twice: foreign versus nonexistent technician, and foreign versus nonexistent job. NOTHING IS NOTIFIED - every assignment event carries notified: false, asserted from the timeline the route returns rather than from the engine. AN UNRECOGNISED STATUS FILTER IS 400, not silently ignored, because a list endpoint that drops a filter it does not understand returns the wrong rows and says nothing. THE 503 LEAKS NOTHING. ONE ENVELOPE SHAPE across 200/201/400/401/403/409/503.",
+        "noAdapters": "runtime.ts has no adapters and its comment says why that is the design rather than an omission: a field service product is exactly where you would expect a map provider, a routing engine and an SMS gateway, and the composition root is the one place a reviewer has to look to know none are wired.",
+        "harness": "scripts/one-off/check-fieldjob-routes.ts, 53 assertions, 0/1/0"
+      },
+      "ui": {
+        "files": "src/components/business-os/{fieldjobs-shared.ts,fieldjobs-panel.tsx}, mounted in business-os-shell.tsx between the retainers and cohorts panels.",
+        "fourThingsDispatchDoesNotDo": "Assigning tells nobody, stated TWICE - in the card description and again beside the assign control, because the second is where an owner is standing when they do it. No route is planned and no travel time is estimated, so there is no ordering control, no map and no ETA field. The visit window is what the owner typed, not a slot the system found. Inspection, parts and completion notes are NOT BUILT and the panel says so outright rather than leaving an owner hunting for a tab that does not exist.",
+        "explainsRatherThanDisables": "An undated job says 'dispatching an undated job tells nobody when to turn up'. An accepted request with no site address says 'a job with no address cannot be visited'. The assign control says a technician is an existing staff resource so nobody is created here - the Wave G4 reuse decision surfacing where it matters. The one-lead rule carries its reason. A declined request is described as still a record, because declining should not erase that somebody asked.",
+        "convertedFiltered": "CONVERTED is filtered out of the request transition buttons, because a request becomes converted by a job existing. Offering it would offer a move the engine refuses.",
+        "a11y": "24 new assertions in check-business-os-a11y (150 -> 175).",
+        "badAssertionRewritten": "One assertion was written badly and REWRITTEN rather than relaxed. The first attempt asserted the absence of the bare string 'ETA', which failed because the panel's own honesty copy says 'no ETA'. It now looks for eta-shaped identifiers and map libraries, and separately proves every mention of a route sits in a line saying no route is planned. An assertion that fails on the copy it is meant to protect is worse than no assertion."
+      },
+      "gates": {
+        "checkFieldjobRoutes": "53/53; inverted 52/53 exit 1",
+        "checkBusinessOsA11y": "PASS, 175 assertions",
+        "checkHarnesses": "52 of 52 exit 0",
+        "tsc": 0,
+        "targetedLint": "0 problems, 0 warnings",
+        "repoWideLint": "78 problems, unchanged by either commit",
+        "build": "exit 0; all 10 field-job routes emitted as dynamic server routes"
+      },
+      "stillMissing": "contentCohorts:accessLevels has an engine with no HTTP surface and no panel. fieldJobs:inspection is still not built."
     }
   ],
   "laneState": {

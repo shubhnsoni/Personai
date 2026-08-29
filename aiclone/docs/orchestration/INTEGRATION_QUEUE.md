@@ -873,3 +873,24 @@ The retainer package is the worked example for the two surface packages above, a
 cheaper route: add methods to the domain's EXISTING api service rather than creating a second HTTP
 boundary, because a second boundary is a second place for the envelope, the status map and the
 server-derived actor to drift.
+
+
+---
+
+## Field jobs completed end to end
+
+Two commits directly on `recovered/aug20-wt-pr-32`: `3185a58` (10 routes,
+`check-fieldjob-routes` 53/53) and `3de518b` (owner panel, `check-business-os-a11y` at 175
+assertions). 52/52 sweep on both.
+
+Field jobs and retainers now each have schema, runtime, an HTTP surface and an owner panel.
+
+### Next in queue
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| Access-level surface | API + panel for `contentCohorts:accessLevels` | The last promoted capability with no surface. **TWO principals:** `CourseAccessService` is the owner path and composes `CohortContext`; `LearnerAccessService` takes no `workspaceId` at all and must not start accepting one. Two route trees. The learner tree also has a different identity source — `Member` via the `pl_member` cookie, not Clerk — so it cannot reuse `PersistedTenancy` at all. |
+| G5 | `fieldJobs:inspection` | Read the empty-registry warning first: it is the last `planned` capability anywhere, so promoting it means REWRITING the capability-contract planned negative test against a synthetic descriptor, not repointing it. |
+| Wire visibility into the reader | `src/app/library/courses/[id]/page.tsx` | The access-level engine exists and computes visibility, but the actual learner content page still returns every lesson. Until that page calls `LearnerAccessService`, tiers are enforceable but not enforced. **This is the most honest remaining gap in the whole program** and it is not a capability-registry problem - `contentCohorts:accessLevels` claims tiers and entitlements, which exist, not that the library page consults them. |
+| P1-009 slice 3 | repo-wide lint | 78 problems. `no-explicit-any` (24) is the next largest tractable rule. |
+| G2 | appointments providers | Still **owner-gated**. |

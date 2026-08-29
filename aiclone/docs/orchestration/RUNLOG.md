@@ -2781,3 +2781,97 @@ discover by being refused.
 
 **Still missing, and named so nobody has to discover it:** course access levels and field jobs
 have engines with no HTTP surface and no owner panel. No capability description claims otherwise.
+
+
+---
+
+## Field jobs, end to end - the HTTP surface and the owner panel
+
+Two commits on `recovered/aug20-wt-pr-32`: `3185a58` (10 routes) and `3de518b` (owner panel).
+Same direct-commit deviation as the retainer surface, for the same reason: no migration, and
+every gate ran on exactly this tree.
+
+### This surface has two actors, and that is the interesting part
+
+Cases and cohorts derive a fixed `STAFF` actor and offer no way to name yourself. Field jobs
+genuinely have two: an office staffer moving a job card **on a technician's behalf** is a
+different fact from the technician moving it, and a history that cannot tell them apart is worth
+less. So a write may declare `actorType: "TECHNICIAN"`.
+
+That makes the actor an **input**, which is exactly the kind of input an audit trail must not
+over-trust. So the boundary is deliberately narrow, and the harness proves it rather than the
+comment asserting it: `STAFF` and `TECHNICIAN` are accepted, **`CUSTOMER` and `SYSTEM` are
+refused with 400**, and `actorId` is never taken from the caller whatever is sent. A request
+asserting that it came from the system is precisely what a record should not believe.
+
+### Conversion is a POST, not a status change
+
+A request becomes `CONVERTED` by a job existing. So conversion has its own route, and the status
+route **refuses** `CONVERTED` with a 409 that says exactly that. There is one way to do it, and
+the wrong way explains itself instead of half-working. The panel filters `CONVERTED` out of its
+transition buttons for the same reason.
+
+### What the route harness measures
+
+- **400 is not 409, on the same field, three times over.** An unrecognised request status is 400
+  and a legal-but-out-of-order one is 409. A non-integer quote is 400 and a negative one is 409.
+  An unrecognised priority or role is 400 *and lists the accepted values*.
+- **The side conditions survive the route.** A job with no visit window still cannot be scheduled;
+  a job with nobody assigned still cannot be dispatched, and the refusal still names the missing
+  lead technician. A route that quietly widened an engine rule would be the easiest thing in this
+  codebase to miss, so it is checked at the boundary rather than assumed from the engine test.
+- **Non-enumeration, byte for byte, twice.** Foreign versus nonexistent technician, and foreign
+  versus nonexistent job.
+- **Nothing is notified.** Every assignment event carries `notified: false`, asserted from the
+  timeline the *route* returns rather than from the engine.
+- **An unrecognised status filter is 400, not silently ignored.** A list endpoint that drops a
+  filter it does not understand returns the wrong rows and says nothing about it.
+- **The 503 leaks nothing**, and **one envelope shape** across 200/201/400/401/403/409/503.
+
+`runtime.ts` has no adapters, and its comment says why that is the design rather than an
+omission: a field-service product is *exactly* where you would expect a map provider, a routing
+engine and an SMS gateway, and the composition root is the one place a reviewer has to look to
+know that none are wired.
+
+### The panel's whole job is saying what dispatch does not do
+
+Four things, because a field-service panel that stays quiet about them gets read as having them:
+
+1. **Assigning a technician tells nobody.** Stated twice — in the card description and again
+   beside the assign control, because the second is where an owner is standing when they do it.
+2. **No route is planned and no travel time is estimated.** No ordering control, no map, no ETA
+   field. Asserted by looking for map-library imports, eta-shaped identifiers and
+   `routeOrder`/`travelMinutes`/`distanceMeters`, and by proving every line mentioning a route is
+   copy saying there isn't one.
+3. **The visit window is what the owner typed**, not a slot the system found.
+4. **Inspection, parts and completion notes are not built**, said outright rather than leaving an
+   owner hunting for a tab that does not exist.
+
+It also **explains rules instead of only enforcing them**, which is the difference between a
+disabled button and a usable surface: an undated job says dispatching it would tell nobody when to
+turn up; an accepted request with no site address says a job with no address cannot be visited;
+the assign control says a technician is an existing staff resource so nobody is created here — the
+Wave G4 reuse decision surfacing where it actually matters; the one-lead rule carries its reason;
+and a declined request is described as still a record, because declining should not erase that
+somebody asked.
+
+**One assertion was written badly and rewritten rather than relaxed.** The first attempt asserted
+the absence of the bare string "ETA", which failed — because the panel's own honesty copy says
+"no ETA". It now looks for eta-shaped identifiers and map libraries, and separately proves every
+route mention sits in a line saying no route is planned. An assertion that fails on the copy it
+exists to protect is worse than no assertion, and quietly deleting it would have been worse still.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `check-fieldjob-routes` | 53/53; inverted 52/53 exit 1 |
+| `check-business-os-a11y` | PASS, 175 assertions (150 -> 175) |
+| check harnesses | **52 of 52 exit 0** |
+| app `tsc --noEmit` | 0 |
+| targeted ESLint | 0 problems, 0 warnings |
+| repo-wide ESLint | 78 problems — unchanged by either commit |
+| production build | exit 0; all 10 field-job routes emitted as dynamic server routes |
+
+**Still missing:** `contentCohorts:accessLevels` has an engine with no HTTP surface and no panel,
+and `fieldJobs:inspection` is still not built.
