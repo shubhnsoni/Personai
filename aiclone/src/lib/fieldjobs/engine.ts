@@ -10,8 +10,10 @@
  * technician is notified by email, SMS or push. `dispatch` here is assignment plus job-card state.
  * There is no fetch, no provider client and no queue write anywhere in this file.
  *
- * INSPECTION IS NOT BUILT. Asset checks, parts and completion notes are absent on purpose, and
- * fieldJobs:inspection stays declared planned.
+ * INSPECTION LIVES IN inspection.ts, not here. Asset checks, checklists, parts and invoice handoff
+ * are Wave H1 and are deliberately a separate module with its own two state machines: this file is
+ * about getting a technician to a site, that one is about what they found. They share the
+ * FieldJobEvent ledger and the FieldJobContext tenancy bridge, and nothing else.
  *
  * The interesting design work is in the SIDE CONDITIONS on job transitions. A status table alone
  * would let an owner dispatch a job with nobody assigned, or complete one while a technician is

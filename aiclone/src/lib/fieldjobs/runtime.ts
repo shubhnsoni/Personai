@@ -3,8 +3,12 @@ import { auth } from "@clerk/nextjs/server"
 import { PersistedTenancy, type PlatformIdentity } from "@/lib/persistence/tenancy"
 import { prisma } from "@/lib/prisma"
 
+import { InventoryService } from "@/lib/inventory/engine"
+import { InventoryContext } from "@/lib/inventory/shared"
+
 import { FieldJobIntakeService, FieldJobService } from "./engine"
 import { FieldJobApiService } from "./http"
+import { FieldJobInspectionService, FieldJobInspectionTemplateService } from "./inspection"
 import { FieldJobContext } from "./shared"
 
 /**
@@ -24,6 +28,20 @@ class ClerkPlatformIdentity implements PlatformIdentity {
     }
 }
 
-const ctx = new FieldJobContext(prisma, new PersistedTenancy(prisma, new ClerkPlatformIdentity()))
+const tenancy = new PersistedTenancy(prisma, new ClerkPlatformIdentity())
+const ctx = new FieldJobContext(prisma, tenancy)
 
-export const fieldJobApi = new FieldJobApiService(new FieldJobIntakeService(ctx), new FieldJobService(ctx))
+/**
+ * The inventory engine is composed, not reimplemented, exactly as commerce/runtime.ts does it. It
+ * is the ONLY collaborator inspection adds, and it is a local engine rather than a provider client:
+ * a part leaves stock through InventoryService's own locking and CHECK constraints, or it does not
+ * leave stock at all. Nothing here reaches the network.
+ */
+const inventory = new InventoryService(new InventoryContext(prisma, tenancy))
+
+export const fieldJobApi = new FieldJobApiService(
+    new FieldJobIntakeService(ctx),
+    new FieldJobService(ctx),
+    new FieldJobInspectionTemplateService(ctx),
+    new FieldJobInspectionService(ctx, inventory),
+)

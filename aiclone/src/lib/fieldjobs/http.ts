@@ -1,6 +1,14 @@
 import { PersistenceError } from "@/lib/persistence/errors"
 
 import type { FieldJobIntakeService, FieldJobService } from "./engine"
+import type { FieldJobInspectionService, FieldJobInspectionTemplateService } from "./inspection"
+import {
+    handoffFlow,
+    inspectionFlow,
+    isInspectionItemKind,
+    isInspectionItemResult,
+    isInspectionOutcome,
+} from "./inspection-lifecycle"
 import {
     JOB_PRIORITIES,
     assignmentFlow,
@@ -114,10 +122,33 @@ function optRole(value: unknown): AssignmentRoleValue | null {
     return value
 }
 
+/**
+ * A Prisma Decimal, detected structurally. `toFixed` is the discriminator because a JSON metadata
+ * object or an array does not have one, and importing the Decimal class here to use `instanceof`
+ * would drag the runtime into a module the client can import.
+ */
+function isDecimal(value: unknown): value is { toString(): string } {
+    return typeof value === "object" && value !== null && typeof (value as { toFixed?: unknown }).toFixed === "function"
+}
+
+/**
+ * Dates become ISO strings; BigInt and Decimal become STRINGS.
+ *
+ * Decimal is serialised as a string deliberately: `measuredValue`, `expectedMin` and `expectedMax`
+ * are Decimal(14,4), and turning them into JSON numbers would silently lose precision on exactly
+ * the readings an inspection exists to record. Consumers parse them for display.
+ */
 function serialise(value: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(value)) {
-        out[k] = v instanceof Date ? v.toISOString() : typeof v === "bigint" ? String(v) : v
+        out[k] =
+            v instanceof Date
+                ? v.toISOString()
+                : typeof v === "bigint"
+                  ? String(v)
+                  : isDecimal(v)
+                    ? v.toString()
+                    : v
     }
     return out
 }
@@ -128,10 +159,42 @@ function param(request: Request, name: string): string {
     return str(new URL(request.url).searchParams.get(name), name)
 }
 
+/** An optional boolean. Absent means "not stated"; a non-boolean is a 400, never a silent false. */
+function optBool(value: unknown, field: string): boolean | null {
+    if (value === null || value === undefined || value === "") return null
+    if (typeof value !== "boolean") {
+        throw new PersistenceError("BAD_REQUEST", `${field} must be a boolean`, { field })
+    }
+    return value
+}
+
+/**
+ * An optional Decimal input. Accepts a number or a numeric string and hands the engine a string, so
+ * a reading typed by a human never round-trips through a float on the way in either.
+ */
+function optDecimal(value: unknown, field: string): number | string | null {
+    if (value === null || value === undefined || value === "") return null
+    if (typeof value === "number") {
+        if (!Number.isFinite(value)) {
+            throw new PersistenceError("BAD_REQUEST", `${field} must be a finite number`, { field })
+        }
+        return value
+    }
+    if (typeof value === "string") {
+        if (!Number.isFinite(Number(value))) {
+            throw new PersistenceError("BAD_REQUEST", `${field} must be a numeric value`, { field })
+        }
+        return value
+    }
+    throw new PersistenceError("BAD_REQUEST", `${field} must be a number or a numeric string`, { field })
+}
+
 export class FieldJobApiService {
     constructor(
         private readonly intake: FieldJobIntakeService,
         private readonly jobs: FieldJobService,
+        private readonly templates: FieldJobInspectionTemplateService,
+        private readonly inspections: FieldJobInspectionService,
     ) {}
 
     private run(op: () => Promise<Response>): Promise<Response> {
@@ -335,6 +398,239 @@ export class FieldJobApiService {
     timeline(jobId: string, request: Request): Promise<Response> {
         return this.run(async () =>
             success({ events: serialiseAll(await this.jobs.timeline(param(request, "workspaceId"), jobId)) }),
+        )
+    }
+
+    // ---- inspection templates -------------------------------------------
+
+    listTemplates(request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({ templates: serialiseAll(await this.templates.list(param(request, "workspaceId"))) }),
+        )
+    }
+
+    createTemplate(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const result = await this.templates.create(str(input.workspaceId, "workspaceId"), {
+                name: str(input.name, "name"),
+                description: nullableStr(input.description, "description"),
+                serviceOfferingId: nullableStr(input.serviceOfferingId, "serviceOfferingId"),
+                idempotencyKey: nullableStr(input.idempotencyKey, "idempotencyKey"),
+            })
+            return success(
+                { template: serialise({ ...result.template }), replayed: result.replayed },
+                result.replayed ? 200 : 201,
+            )
+        })
+    }
+
+    getTemplate(templateId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const result = await this.templates.get(param(request, "workspaceId"), templateId)
+            return success({ template: serialise({ ...result.template }), items: serialiseAll(result.items) })
+        })
+    }
+
+    addTemplateItem(templateId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const row = await this.templates.addItem(str(input.workspaceId, "workspaceId"), templateId, {
+                label: str(input.label, "label"),
+                kind:
+                    input.kind === null || input.kind === undefined || input.kind === ""
+                        ? null
+                        : vocab(input.kind, isInspectionItemKind, "inspection line kind", "kind"),
+                guidance: nullableStr(input.guidance, "guidance"),
+                required: optBool(input.required, "required"),
+                unit: nullableStr(input.unit, "unit"),
+                expectedMin: optDecimal(input.expectedMin, "expectedMin"),
+                expectedMax: optDecimal(input.expectedMax, "expectedMax"),
+                position: optInt(input.position, "position"),
+            })
+            return success({ item: serialise({ ...row }) }, 201)
+        })
+    }
+
+    updateTemplate(templateId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const row = await this.templates.update(str(input.workspaceId, "workspaceId"), templateId, {
+                name: input.name === undefined ? null : nullableStr(input.name, "name"),
+                ...(input.description !== undefined ? { description: nullableStr(input.description, "description") } : {}),
+                isActive: optBool(input.isActive, "isActive"),
+            })
+            return success({ template: serialise({ ...row }) })
+        })
+    }
+
+    // ---- inspections -----------------------------------------------------
+
+    listInspections(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const url = new URL(request.url)
+            const rawStatus = url.searchParams.get("status")
+            const rawJob = url.searchParams.get("jobId")
+            return success({
+                inspections: serialiseAll(
+                    await this.inspections.list(param(request, "workspaceId"), {
+                        status:
+                            rawStatus === null || rawStatus === ""
+                                ? null
+                                : vocab(rawStatus, inspectionFlow.is, "inspection status", "status"),
+                        jobId: rawJob === null || rawJob === "" ? null : rawJob,
+                    }),
+                ),
+            })
+        })
+    }
+
+    createInspection(request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const result = await this.inspections.create(
+                str(input.workspaceId, "workspaceId"),
+                {
+                    jobId: str(input.jobId, "jobId"),
+                    reference: str(input.reference, "reference"),
+                    templateId: nullableStr(input.templateId, "templateId"),
+                    assignmentId: nullableStr(input.assignmentId, "assignmentId"),
+                    idempotencyKey: nullableStr(input.idempotencyKey, "idempotencyKey"),
+                },
+                this.actor(input),
+            )
+            return success(
+                {
+                    inspection: serialise({ ...result.inspection }),
+                    items: serialiseAll(result.items),
+                    replayed: result.replayed,
+                },
+                result.replayed ? 200 : 201,
+            )
+        })
+    }
+
+    getInspection(inspectionId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const result = await this.inspections.get(param(request, "workspaceId"), inspectionId)
+            return success({
+                inspection: serialise({ ...result.inspection }),
+                items: serialiseAll(result.items),
+                parts: serialiseAll(result.parts),
+            })
+        })
+    }
+
+    transitionInspection(inspectionId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const row = await this.inspections.transition(
+                str(input.workspaceId, "workspaceId"),
+                inspectionId,
+                {
+                    status: vocab(input.status, inspectionFlow.is, "inspection status", "status"),
+                    outcome:
+                        input.outcome === null || input.outcome === undefined || input.outcome === ""
+                            ? null
+                            : vocab(input.outcome, isInspectionOutcome, "inspection outcome", "outcome"),
+                    completionNotes: nullableStr(input.completionNotes, "completionNotes"),
+                    cancelReason: nullableStr(input.cancelReason, "cancelReason"),
+                },
+                this.actor(input),
+            )
+            return success({ inspection: serialise({ ...row }) })
+        })
+    }
+
+    recordInspectionItem(inspectionId: string, itemId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const row = await this.inspections.recordItem(
+                str(input.workspaceId, "workspaceId"),
+                inspectionId,
+                itemId,
+                {
+                    result:
+                        input.result === null || input.result === undefined || input.result === ""
+                            ? null
+                            : vocab(input.result, isInspectionItemResult, "inspection line result", "result"),
+                    ...(input.notes !== undefined ? { notes: nullableStr(input.notes, "notes") } : {}),
+                    ...(input.measuredValue !== undefined
+                        ? { measuredValue: optDecimal(input.measuredValue, "measuredValue") }
+                        : {}),
+                    ...(input.assetLabel !== undefined ? { assetLabel: nullableStr(input.assetLabel, "assetLabel") } : {}),
+                    ...(input.assetSerial !== undefined
+                        ? { assetSerial: nullableStr(input.assetSerial, "assetSerial") }
+                        : {}),
+                    ...(input.assetLocationHint !== undefined
+                        ? { assetLocationHint: nullableStr(input.assetLocationHint, "assetLocationHint") }
+                        : {}),
+                },
+                this.actor(input),
+            )
+            return success({ item: serialise({ ...row }) })
+        })
+    }
+
+    addInspectionPart(inspectionId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const result = await this.inspections.addPart(
+                str(input.workspaceId, "workspaceId"),
+                inspectionId,
+                {
+                    inventoryItemId: str(input.inventoryItemId, "inventoryItemId"),
+                    qty: int(input.qty, "qty"),
+                    unitCostCents: optInt(input.unitCostCents, "unitCostCents"),
+                    currency: nullableStr(input.currency, "currency"),
+                    notes: nullableStr(input.notes, "notes"),
+                    consumeStock: optBool(input.consumeStock, "consumeStock"),
+                    idempotencyKey: nullableStr(input.idempotencyKey, "idempotencyKey"),
+                },
+                this.actor(input),
+            )
+            return success(
+                {
+                    part: serialise({ ...result.part }),
+                    stock: result.stock ? serialise({ ...result.stock }) : null,
+                    replayed: result.replayed,
+                },
+                result.replayed ? 200 : 201,
+            )
+        })
+    }
+
+    setInspectionHandoff(inspectionId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const row = await this.inspections.setHandoff(
+                str(input.workspaceId, "workspaceId"),
+                inspectionId,
+                {
+                    invoiceHandoffState: vocab(
+                        input.invoiceHandoffState,
+                        handoffFlow.is,
+                        "invoice handoff state",
+                        "invoiceHandoffState",
+                    ),
+                    ...(input.invoiceHandoffReference !== undefined
+                        ? { invoiceHandoffReference: nullableStr(input.invoiceHandoffReference, "invoiceHandoffReference") }
+                        : {}),
+                    ...(input.invoiceHandoffNote !== undefined
+                        ? { invoiceHandoffNote: nullableStr(input.invoiceHandoffNote, "invoiceHandoffNote") }
+                        : {}),
+                },
+                this.actor(input),
+            )
+            return success({ inspection: serialise({ ...row }) })
+        })
+    }
+
+    inspectionTimeline(inspectionId: string, request: Request): Promise<Response> {
+        return this.run(async () =>
+            success({
+                events: serialiseAll(await this.inspections.timeline(param(request, "workspaceId"), inspectionId)),
+            }),
         )
     }
 }

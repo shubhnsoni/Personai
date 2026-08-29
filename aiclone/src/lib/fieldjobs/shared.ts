@@ -72,8 +72,13 @@ export class FieldJobContext {
         return v
     }
 
-    conflict(message: string): never {
-        throw new PersistenceError("CONFLICT", message)
+    /**
+     * `details` is optional and additive: the inspection surface needs to tell the caller HOW MANY
+     * required lines are still unanswered, so the owner sees "3 still pending" rather than a bare
+     * refusal. Existing callers pass no details and behave exactly as before.
+     */
+    conflict(message: string, details?: Readonly<Record<string, unknown>>): never {
+        throw new PersistenceError("CONFLICT", message, details)
     }
 
     rethrowUnique(error: unknown, message: string): never {

@@ -28,7 +28,10 @@ import { PrismaClient } from "@prisma/client"
 
 import { FieldJobIntakeService, FieldJobService } from "../../src/lib/fieldjobs/engine"
 import { FieldJobApiService } from "../../src/lib/fieldjobs/http"
+import { FieldJobInspectionService, FieldJobInspectionTemplateService } from "../../src/lib/fieldjobs/inspection"
 import { FieldJobContext } from "../../src/lib/fieldjobs/shared"
+import { InventoryService } from "../../src/lib/inventory/engine"
+import { InventoryContext } from "../../src/lib/inventory/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
 
@@ -103,7 +106,15 @@ async function main() {
     const identity = new ControlledIdentity()
     const tenancy = new PersistedTenancy(prisma, identity)
     const ctx = new FieldJobContext(prisma, tenancy)
-    const api = new FieldJobApiService(new FieldJobIntakeService(ctx), new FieldJobService(ctx))
+    // The inspection services are part of the same HTTP boundary from Wave H1 onward. This harness
+    // does not exercise them - check-fieldjob-inspection-routes.ts does - but the boundary is one
+    // object, so they have to be supplied to construct it.
+    const api = new FieldJobApiService(
+        new FieldJobIntakeService(ctx),
+        new FieldJobService(ctx),
+        new FieldJobInspectionTemplateService(ctx),
+        new FieldJobInspectionService(ctx, new InventoryService(new InventoryContext(prisma, tenancy))),
+    )
 
     const live = await prisma.$queryRawUnsafe<{ db: string }[]>("select current_database() as db")
     if (live[0].db !== AUTHORIZED_TARGET) {
@@ -370,6 +381,11 @@ async function main() {
         const brokenApi = new FieldJobApiService(
             new FieldJobIntakeService(new FieldJobContext(brokenPrisma, tenancy)),
             new FieldJobService(new FieldJobContext(brokenPrisma, tenancy)),
+            new FieldJobInspectionTemplateService(new FieldJobContext(brokenPrisma, tenancy)),
+            new FieldJobInspectionService(
+                new FieldJobContext(brokenPrisma, tenancy),
+                new InventoryService(new InventoryContext(brokenPrisma, tenancy)),
+            ),
         )
         const broken = await call(brokenApi.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}`)))
         check("a dependency failure is 503", broken.status === 503, `status=${broken.status}`)
