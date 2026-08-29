@@ -233,6 +233,7 @@ model Profile {
   appointmentWaitlist  AppointmentWaitlistEntry[]
   appointmentDeposits  AppointmentDeposit[]
   appointmentReminders AppointmentReminder[]
+  Cohort               Cohort[]
 }
 
 model ProfileEvent {
@@ -309,6 +310,8 @@ model ProfileDocument {
   updatedAt           DateTime              @updatedAt
   CaseDeliverable     CaseDeliverable[]
   CaseDocumentRequest CaseDocumentRequest[]
+  CohortSubmission    CohortSubmission[]
+  CohortCertificate   CohortCertificate[]
 
   @@index([profileId, visitorKey])
 }
@@ -683,6 +686,7 @@ model Course {
 
   modules     CourseModule[]
   enrollments CourseEnrollment[]
+  Cohort      Cohort[]
 }
 
 model CourseModule {
@@ -1070,20 +1074,27 @@ model ProfileImage {
 }
 
 model CourseEnrollment {
-  id           String    @id @default(cuid())
-  courseId     String
-  course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  memberId     String?
-  member       Member?   @relation(fields: [memberId], references: [id])
-  visitorEmail String
-  visitorName  String?
-  paymentId    String?
-  status       String    @default("PENDING") // "PENDING" | "ACTIVE" | "COMPLETED" | "CANCELLED"
-  progress     String? // JSON object tracking lesson completion
-  enrolledAt   DateTime  @default(now())
-  completedAt  DateTime?
+  id             String    @id @default(cuid())
+  courseId       String
+  course         Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  memberId       String?
+  member         Member?   @relation(fields: [memberId], references: [id])
+  visitorEmail   String
+  visitorName    String?
+  paymentId      String?
+  status         String    @default("PENDING") // "PENDING" | "ACTIVE" | "COMPLETED" | "CANCELLED"
+  progress       String? // JSON object tracking lesson completion
+  /// Wave D: additive and nullable. Enrolment had no idempotency key, so a retried
+  /// enrolment created a duplicate row. NULLs are distinct in Postgres, so the unique
+  /// index below constrains only rows that actually carry a key.
+  idempotencyKey String?
+  enrolledAt     DateTime  @default(now())
+  completedAt    DateTime?
 
   lessonCompletions LessonCompletion[]
+  CohortMembership  CohortMembership[]
+
+  @@unique([courseId, idempotencyKey])
 }
 
 model LessonCompletion {
@@ -1189,6 +1200,7 @@ model Location {
   caseProjects         CaseProject[]
   bookings             Booking[]
   appointmentResources AppointmentResource[]
+  CohortSession        CohortSession[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -1276,19 +1288,20 @@ model ActivityEvent {
 }
 
 model TaskJob {
-  id             String         @id @default(cuid())
-  idempotencyKey String?        @unique
-  payload        String
-  state          String
-  attempts       Int            @default(0)
-  maxAttempts    Int
-  nextAttemptAt  DateTime
-  leaseExpiresAt DateTime?
-  leaseToken     String?
-  lastError      String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  CaseTaskLink   CaseTaskLink[]
+  id               String             @id @default(cuid())
+  idempotencyKey   String?            @unique
+  payload          String
+  state            String
+  attempts         Int                @default(0)
+  maxAttempts      Int
+  nextAttemptAt    DateTime
+  leaseExpiresAt   DateTime?
+  leaseToken       String?
+  lastError        String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  CaseTaskLink     CaseTaskLink[]
+  CohortMembership CohortMembership[]
 
   @@index([state, nextAttemptAt])
 }
@@ -1708,4 +1721,312 @@ model CaseEvent {
   at       DateTime       @default(now())
 
   @@index([caseId, seq])
+}
+
+// ---------------------------------------------------------------------------
+// Wave D / P2-008: shared content and cohort persistence.
+//
+// The PROGRAM is the pre-existing Course, with its CourseModule and CourseLesson
+// children. Nothing here forks a coaching-only content tree. Learner identity stays
+// Member, the learner's relation to a program stays CourseEnrollment, and per-lesson
+// progress stays LessonCompletion, which is why no progress table is added: progress
+// is computed from the completion rows that already exist.
+//
+// A Cohort is the missing concept - a dated, capacity-bounded run of a Course that
+// people attend together. Everything below hangs off it.
+//
+// Tenancy is profileId, bridged from the caller's workspace exactly as the appointment
+// domain does, because Course is already profileId-scoped and Workspace.profileId is
+// unique. Inventing a second tenant key for cohorts would have split the course tree.
+//
+// Reuse, not duplication:
+//   - uploads are ProfileDocuments (submissions, certificates)
+//   - reminder dispatch is a TaskJob, pointed at from the membership
+//   - venues are Locations
+//   - money stays on CourseEnrollment.paymentId
+// ---------------------------------------------------------------------------
+
+enum CohortStatus {
+  PLANNED
+  ENROLLING
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+enum CohortMembershipStatus {
+  INVITED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  WITHDRAWN
+}
+
+enum CohortSessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  HELD
+  CANCELLED
+}
+
+enum CohortAttendanceStatus {
+  PRESENT
+  LATE
+  EXCUSED
+  ABSENT
+}
+
+enum CohortSubmissionState {
+  DRAFT
+  SUBMITTED
+  RETURNED
+  ACCEPTED
+  REJECTED
+}
+
+enum CohortCertificateState {
+  INELIGIBLE
+  ELIGIBLE
+  ISSUED
+  REVOKED
+}
+
+/// NONE is the default because most memberships never renew; a renewal is opt-in state.
+enum CohortRenewalState {
+  NONE
+  SCHEDULED
+  REMINDED
+  RENEWED
+  LAPSED
+  CANCELLED
+}
+
+enum CohortEventKind {
+  CREATED
+  STATUS
+  MEMBERSHIP
+  SESSION
+  ATTENDANCE
+  ASSIGNMENT
+  SUBMISSION
+  CERTIFICATE
+  RENEWAL
+  NOTE
+}
+
+enum CohortEventActor {
+  LEARNER
+  STAFF
+  SYSTEM
+}
+
+model Cohort {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  code  String
+  title String
+
+  status   CohortStatus @default(PLANNED)
+  timezone String       @default("UTC")
+  startsOn DateTime?
+  endsOn   DateTime?
+  capacity Int?
+
+  /// Certificate policy, stored so eligibility is computed from persisted records
+  /// against a configured rule rather than a constant buried in code.
+  attendanceThresholdPct Int     @default(0)
+  requireAllAssignments  Boolean @default(false)
+  requireAllLessons      Boolean @default(false)
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  memberships CohortMembership[]
+  sessions    CohortSession[]
+  assignments CohortAssignment[]
+  events      CohortEvent[]
+
+  @@unique([courseId, code])
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status])
+}
+
+model CohortMembership {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  /// The learner's relation to the PROGRAM already exists as CourseEnrollment. This row
+  /// is their relation to one RUN of it, so it points at the enrollment rather than
+  /// copying the learner's email, name or payment reference.
+  enrollmentId String
+  enrollment   CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  status      CohortMembershipStatus @default(INVITED)
+  joinedAt    DateTime?
+  completedAt DateTime?
+  leftAt      DateTime?
+  leaveReason String?
+
+  /// Renewal and reminder state lives on the membership because that is what it is
+  /// state about. Actual dispatch is a TaskJob, not a second queue.
+  renewalState     CohortRenewalState @default(NONE)
+  renewalDueAt     DateTime?
+  renewalRemindAt  DateTime?
+  renewalTaskJobId String?
+  renewalTaskJob   TaskJob?           @relation(fields: [renewalTaskJobId], references: [id])
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  attendance  CohortAttendance[]
+  submissions CohortSubmission[]
+  certificate CohortCertificate?
+
+  @@unique([cohortId, enrollmentId])
+  @@unique([cohortId, idempotencyKey])
+  @@index([cohortId, status])
+  @@index([renewalState, renewalRemindAt])
+}
+
+model CohortSession {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  ordinal Int
+  title   String
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  status CohortSessionStatus @default(SCHEDULED)
+
+  /// Venues reuse the existing Location model instead of a free-text venue column.
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+
+  heldAt       DateTime?
+  cancelReason String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  attendance CohortAttendance[]
+
+  @@unique([cohortId, ordinal])
+  @@index([cohortId, startsAt])
+}
+
+model CohortAttendance {
+  id        String        @id @default(cuid())
+  sessionId String
+  session   CohortSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  membershipId String
+  membership   CohortMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  status     CohortAttendanceStatus
+  note       String?
+  recordedAt DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@unique([sessionId, membershipId])
+  @@index([membershipId, status])
+}
+
+model CohortAssignment {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  ordinal      Int
+  title        String
+  instructions String?
+  dueAt        DateTime?
+  maxPoints    Int       @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submissions CohortSubmission[]
+
+  @@unique([cohortId, ordinal])
+}
+
+model CohortSubmission {
+  id           String           @id @default(cuid())
+  assignmentId String
+  assignment   CohortAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  membershipId String
+  membership   CohortMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  state CohortSubmissionState @default(DRAFT)
+
+  /// An attached submission is a ProfileDocument, the same upload store the rest of the
+  /// platform uses. There is no parallel file table.
+  documentId String?
+  document   ProfileDocument? @relation(fields: [documentId], references: [id])
+
+  notes       String?
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  points      Int?
+  feedback    String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([assignmentId, membershipId])
+  @@unique([assignmentId, idempotencyKey])
+  @@index([membershipId, state])
+}
+
+model CohortCertificate {
+  id           String           @id @default(cuid())
+  membershipId String           @unique
+  membership   CohortMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  state CohortCertificateState @default(INELIGIBLE)
+
+  /// Only set once the certificate is actually issued, so an unissued row cannot be
+  /// mistaken for a real credential.
+  serial    String?   @unique
+  issuedAt  DateTime?
+  revokedAt DateTime?
+  reason    String?
+
+  documentId String?
+  document   ProfileDocument? @relation(fields: [documentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([state])
+}
+
+/// Append-only cohort timeline, enforced by a trigger rather than by convention.
+model CohortEvent {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  seq      BigInt           @default(autoincrement())
+  kind     CohortEventKind
+  from     String?
+  to       String
+  actor    CohortEventActor
+  actorId  String?
+  metadata Json?
+  at       DateTime         @default(now())
+
+  @@index([cohortId, seq])
 }
