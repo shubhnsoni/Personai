@@ -1112,9 +1112,45 @@ check(
     "recording a part is stated to never move stock by itself",
     /Recording a part never moves stock by itself/.test(inspectionSrc),
 )
+/*
+ * This assertion used to be `!/\binvoiced\b/i.test(inspectionAll)` - a ban on the WORD "invoiced".
+ *
+ * By this repository's own recorded lesson, a ban on a string is not a ban on a behaviour and it cuts
+ * both ways: copy that HONESTLY explains nothing is invoiced would contain the word and would trip
+ * the check that exists to protect that property. The same mistake shipped once before as a ban on
+ * the string "ETA", which failed the moment the field-jobs panel honestly said "no ETA".
+ *
+ * So the ban is now on the CONSTRUCTION - the three things that would mean an invoice really exists:
+ * a claim that this record was invoiced, a call to an invoicing or payment endpoint, and a money
+ * total rendered in the handoff section. Each pattern is SELF-TESTED below against a string that
+ * should match and against the panel's real honesty copy, so the ban cannot quietly become vacuous.
+ */
+const invoiceClaimPattern = /\b(?:was|were|is|are|has been|have been|been)\s+invoiced\b|\binvoiced\s+(?:on|at|for)\b/i
+const invoicingCallPattern = /\/api\/[^"'`\s]*(?:invoice|payment|charge)|createInvoice|capturePayment|chargeCard/i
+
 check(
-    "invoice handoff is rendered as a flag and the word invoiced never appears",
-    /HANDOFF FLAG, not an invoice/.test(inspectionSrc) && !/\binvoiced\b/i.test(inspectionAll),
+    "the invoice-claim pattern matches an actual claim, so the ban is not vacuous",
+    invoiceClaimPattern.test("this inspection was invoiced on Tuesday") &&
+        invoiceClaimPattern.test("the visit has been invoiced"),
+)
+check(
+    "the invoice-claim pattern does NOT fire on honest copy that mentions invoicing to deny it",
+    !invoiceClaimPattern.test("Nothing here creates an invoice and no money moves.") &&
+        !invoiceClaimPattern.test("HANDOFF FLAG, not an invoice."),
+)
+check(
+    "the invoicing-call pattern matches a real endpoint call, so that ban is not vacuous either",
+    invoicingCallPattern.test('fetch("/api/platform/invoices")') && invoicingCallPattern.test("createInvoice(id)"),
+)
+
+check("invoice handoff is rendered as a flag", /HANDOFF FLAG, not an invoice/.test(inspectionSrc))
+check(
+    "the inspection surface never claims this record was invoiced",
+    !invoiceClaimPattern.test(inspectionAll),
+)
+check(
+    "the inspection surface calls no invoicing, payment or charge endpoint",
+    !invoicingCallPattern.test(inspectionAll),
 )
 check(
     "the handoff section never renders a currency total as if a bill exists",
