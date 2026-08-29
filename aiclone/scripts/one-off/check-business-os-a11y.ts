@@ -784,6 +784,125 @@ check(
     /No period is open, so nothing can be drawn right now/.test(retainersSrc),
 )
 
+// ---------------------------------------------------------------------------
+// The field-jobs panel. Its honesty requirements are all about what "dispatch" does not do:
+// nobody is notified, no route is planned, no travel time is estimated, and inspection is not
+// built. A field-service panel that stays quiet about those four things is read as having them.
+// ---------------------------------------------------------------------------
+const fieldJobsSrc = readFileSync(join(__dirname, "../../src/components/business-os/fieldjobs-panel.tsx"), "utf8")
+const fieldJobsSharedSrc = readFileSync(join(__dirname, "../../src/components/business-os/fieldjobs-shared.ts"), "utf8")
+
+check("field-jobs panel is mounted in the shell", shellSrc.includes("<FieldJobsPanel"))
+check("field-job decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(fieldJobsSrc))
+check(
+    "field-job loading states announce themselves politely and as busy",
+    fieldJobsSrc.includes('aria-live="polite"') && fieldJobsSrc.includes('aria-busy="true"'),
+)
+check(
+    "every field-job loading state carries a screen-reader label",
+    /Loading requests and jobs/.test(fieldJobsSrc) &&
+        /Loading job cards/.test(fieldJobsSrc) &&
+        /Loading job history/.test(fieldJobsSrc),
+)
+check("field-jobs panel uses a structural skeleton while loading", /Skeleton/.test(fieldJobsSrc))
+check(
+    "field-job refusals are split by status, with 503 leaking nothing",
+    /error\.status === 401/.test(fieldJobsSharedSrc) &&
+        /error\.status === 403/.test(fieldJobsSharedSrc) &&
+        /error\.status === 400/.test(fieldJobsSharedSrc) &&
+        /error\.status === 409/.test(fieldJobsSharedSrc) &&
+        /Nothing was changed/.test(fieldJobsSharedSrc),
+)
+check(
+    "the field-job 403 copy is identical for a foreign record and a missing one",
+    /does not grant you access to that record/.test(fieldJobsSharedSrc),
+)
+check(
+    "field-job empty states state that no sample data is shown",
+    /no sample requests are shown/i.test(fieldJobsSrc) && /no sample jobs are shown/i.test(fieldJobsSrc),
+)
+check(
+    "the field-jobs panel contains no fabricated request, job or technician",
+    !/\bid:\s*"/.test(fieldJobsSrc) && !/resourceName:\s*"/.test(fieldJobsSrc) && !/sampleJob/i.test(fieldJobsSrc),
+)
+check("field-job disclosures expose their expanded state", /aria-expanded=/.test(fieldJobsSrc))
+check(
+    "field-job sections are headed rather than only visually grouped",
+    /<h3/.test(fieldJobsSrc) && /<h5/.test(fieldJobsSrc),
+)
+check(
+    "job, request and job-card buttons all come from server-computed allowedTransitions",
+    /request\.allowedTransitions/.test(fieldJobsSrc) &&
+        /job\.allowedTransitions\.map/.test(fieldJobsSrc) &&
+        /assignment\.allowedTransitions\.map/.test(fieldJobsSrc),
+)
+check(
+    "a terminal request, job and job card each explain why they have no actions",
+    /request\.allowedTransitions\.length === 0/.test(fieldJobsSrc) &&
+        /job\.allowedTransitions\.length === 0/.test(fieldJobsSrc) &&
+        /assignment\.allowedTransitions\.length === 0/.test(fieldJobsSrc),
+)
+check(
+    "MEASURED: the panel states that assigning a technician notifies nobody, twice - in the description and beside the control",
+    /records the assignment and tells nobody/.test(fieldJobsSrc) &&
+        /Assigning records the job card and notifies nobody/.test(fieldJobsSrc),
+)
+check(
+    "the panel states that no route is planned and no travel time is estimated",
+    /No route is planned and no travel time is estimated/.test(fieldJobsSrc),
+)
+check(
+    "the panel says the visit window is what the owner typed, not a slot the system found",
+    /the visit window is\s*\n?\s*what you type here/.test(fieldJobsSrc),
+)
+check(
+    "MEASURED: the panel says outright that inspection, parts and completion notes are not built, rather than leaving an owner hunting",
+    /Inspection, parts and completion notes are not built yet/.test(fieldJobsSrc),
+)
+check(
+    "the panel wires no map library and no route or ETA field - every mention of either is in copy saying there isn't one",
+    !/mapbox|googlemaps|google-maps|leaflet|@react-google-maps/i.test(fieldJobsSrc) &&
+        !/\betaMinutes\b|\beta:\s|\betaAt\b/i.test(fieldJobsSrc) &&
+        !/routeOrder|optimi[sz]eRoute|travelMinutes|distanceMeters/i.test(fieldJobsSrc) &&
+        fieldJobsSrc
+            .split("\n")
+            .filter((line) => /route/i.test(line))
+            .every((line) => /no route is planned/i.test(line)),
+    fieldJobsSrc
+        .split("\n")
+        .filter((line) => /route/i.test(line))
+        .map((line) => line.trim().slice(0, 40))
+        .join(" | "),
+)
+check(
+    "the panel explains why an undated job cannot be dispatched instead of just disabling the button",
+    /dispatching an undated job tells nobody when to turn up/.test(fieldJobsSrc),
+)
+check(
+    "a request with no site address says why it cannot be converted",
+    /a job with no address cannot be visited/.test(fieldJobsSrc),
+)
+check(
+    "the panel states that a technician is an existing resource, so nobody is created here",
+    /A technician is an existing staff resource, so nobody is created/.test(fieldJobsSrc),
+)
+check(
+    "the one-lead rule is explained rather than only enforced",
+    /two leads means nobody is accountable/.test(fieldJobsSrc),
+)
+check(
+    "the panel states that a declined request stays a record",
+    /A request is not a job/.test(fieldJobsSrc) && /does not erase that somebody asked/.test(fieldJobsSrc),
+)
+check(
+    "CONVERTED is filtered out of the request transition buttons, because conversion creates a job",
+    /filter\(\(next\) => next !== "CONVERTED"\)/.test(fieldJobsSrc),
+)
+check(
+    "empty field-job sub-lists say so rather than rendering a placeholder row",
+    /Nobody is assigned to this job yet/.test(fieldJobsSrc) && /No history recorded/.test(fieldJobsSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
