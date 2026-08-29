@@ -943,6 +943,48 @@
         "build": "0, with all 15 cohort routes and all 18 case routes registered",
         "disposableDb": "left fully applied at 82 tables; live personalink untouched"
       }
+    },
+    {
+      "id": "P2-009",
+      "title": "Truthful vertical activation and a falsifiable capability contract",
+      "status": "done",
+      "owner": "root (claude-opus-5)",
+      "workerIndependenceClaimed": false,
+      "dependencies": [
+        "P2-005",
+        "P2-006",
+        "P2-008"
+      ],
+      "base": "fa36d26",
+      "branch": "feature/wave-e-blueprints",
+      "mergeCommit": "e91f6c7",
+      "commits": {
+        "E1_E2": "239a4e0",
+        "waveE_integration": "e91f6c7"
+      },
+      "scope": "Correct what the product claims about itself after four delivery waves, and make the claim testable rather than declarative. No migration and no runtime change.",
+      "promoted": "casesProjects pipeline/delivery/billing/documents -> available (Wave C). contentCohorts courses/cohorts/memberships -> available (Wave D). appointments services/availability/waitlist -> available (Wave B).",
+      "deliberatelyNotPromoted": "appointments:reminders and appointments:deposits are PARTIAL, not available: the records and state machines are persisted but their provider boundaries are inert, so nothing is sent and no money moves. Calling them available would tell an owner otherwise.",
+      "gapsSplitOut": "casesProjects:retainers and contentCohorts:accessLevels were extracted as their own planned capabilities, because they were previously only words inside the description of a capability that is now available. A description is not checked by anything; a capability is.",
+      "blueprints": {
+        "restaurant-venue-v2": "active, unchanged",
+        "consulting-agency-v1": "draft -> active. Contract needed no rewriting; every capability it already claimed became available in Wave C.",
+        "coaching-studio-v1": "draft -> deprecated. It REQUIRED appointments:reminders, which is only partial.",
+        "coaching-studio-v2": "new, active. Requires only what exists; names accessLevels, reminders and deposits as planned.",
+        "ca-practice-v1": "new, active. The cases engine fits a CA practice most exactly because its core loop IS the document request.",
+        "retail-storefront-v1": "new, DRAFT and must stay draft while commerce:inventory is a single nullable stock column."
+      },
+      "harnessStrengthening": "check-capability-contract gained three properties: every implemented capability must cite an evidence path that exists on disk; every capability an active blueprint requires must be available AND have that file present; and two active blueprints may not claim the same vertical, with a superseded blueprint required to be deprecated. A second negative test proves PARTIAL is rejected as well as planned. Both negative tests carry non-vacuity assertions so they cannot start passing for free.",
+      "realRotCaught": "appointments:availability cited src/app/api/bookings/route.ts, a path that no longer existed. Nothing had noticed, because a maturity flag is just a string.",
+      "gates": {
+        "tip": "e91f6c7",
+        "tsc": 0,
+        "targetedLint": 0,
+        "capabilityContract": "PASS; INVERT_ASSERTION=1 fails all five overclaim guards",
+        "checkHarnesses": "38 of 38 exit 0",
+        "npmAuditOmitDev": "0 vulnerabilities",
+        "build": 0
+      }
     }
   ],
   "laneState": {

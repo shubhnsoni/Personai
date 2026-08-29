@@ -1913,3 +1913,77 @@ Live `personalink` read-only. Disposable target
 mid-rehearsal. Origin remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Frozen worktrees
 and attachments untouched; `P1_014_ACTION_INVENTORY.md` unchanged. No push, PR, deploy,
 tunnel, dev server or real external-provider call.
+
+
+---
+
+## 2026-08-29 · Wave E complete — truthful vertical activation at `e91f6c7`
+
+Root-serial. Branch `feature/wave-e-blueprints` from `fa36d26`, commit `239a4e0`, merged
+`--no-ff` at **`e91f6c7`**. No migration and no runtime change: this package corrects what
+the product *claims* about itself after four delivery waves, and makes the claim testable.
+
+### What was promoted, and what was not
+Ten capabilities became `available` with evidence pointing at the runtime that now exists:
+all four `casesProjects` capabilities (Wave C), all three `contentCohorts` capabilities
+(Wave D), and `appointments` services, availability and waitlist (Wave B).
+
+**Two were deliberately left `partial`.** `appointments:reminders` and
+`appointments:deposits` have persisted records and real state machines, but their provider
+boundaries are inert — nothing is sent and no money moves. Marking them available would
+have told an owner the opposite of the truth. That decision is what forced
+`coaching-studio-v1` to be deprecated rather than activated, because it *required*
+reminders.
+
+### Two gaps were split out instead of being absorbed
+`casesProjects:billing` previously described "retainers, invoices, and payment follow-up".
+Invoices and payment linkage are built; retainer drawdown is not. Rather than mark the
+capability available and leave "retainers" sitting in its description, **retainers is now
+its own planned capability**. Same for `contentCohorts:memberships`, whose description
+promised "access levels" — `accessLevels` is now its own planned capability.
+
+This is the substantive point: a description is not checked by anything. A capability is.
+Leaving a gap inside the prose of a capability that has just been marked available is how
+an overclaim survives a review.
+
+### Blueprint status changes
+| Blueprint | Change | Why |
+|---|---|---|
+| `restaurant-venue-v2` | active, unchanged | already truthful |
+| `consulting-agency-v1` | draft → **active** | its contract needed no rewriting; every capability it already claimed became available in Wave C, so only the status caught up |
+| `coaching-studio-v1` | draft → **deprecated** | required `appointments:reminders`, which is only partial |
+| `coaching-studio-v2` | **new, active** | requires only what exists; names `accessLevels`, `reminders` and `deposits` as planned |
+| `ca-practice-v1` | **new, active** | the cases engine fits a CA practice most exactly, because its core loop *is* the document request: ask for a record, refuse to close it without the actual file, gate the filing on partner approval, then invoice |
+| `retail-storefront-v1` | **new, draft** | a storefront that cannot say whether an item is in stock is not a storefront; `commerce:inventory` is still a single nullable `stock` column |
+
+Registering retail as a draft rather than omitting it keeps the gap addressable instead of
+leaving the vertical undocumented. Its draft status is now *proven*: the harness builds an
+active copy and asserts validation rejects it while inventory is planned.
+
+### The contract is now falsifiable
+`check-capability-contract` gained three properties, because a maturity flag is just a
+string and nothing was checking whether it meant anything:
+
+1. **Every implemented capability must cite an evidence path that exists on disk.** This
+   immediately caught real rot: `appointments:availability` cited
+   `src/app/api/bookings/route.ts`, a file that no longer exists. Nothing had noticed.
+2. **Every capability an active blueprint requires must be `available` and have its
+   evidence file present.** This is the assertion that fails if a blueprint is activated
+   ahead of its runtime.
+3. **Two active blueprints may not claim the same vertical**, and a superseded blueprint
+   must be deprecated, so two versions of one vertical cannot both be live.
+
+A second negative test proves `partial` is rejected as well as `planned`. Both negative
+tests carry a non-vacuity assertion — the harness fails if `reminders` stops being partial
+or `inventory` stops being planned — so neither can quietly start passing for free. Each
+Wave E status is asserted individually so a silent regression is caught.
+
+### Gates on integrated tip `e91f6c7`
+app `tsc` 0 · targeted `eslint` 0 · `check-capability-contract` PASS, and
+`INVERT_ASSERTION=1` fails **all five** overclaim guards · **38/38** check harnesses exit 0 ·
+`npm audit --omit=dev` 0 vulnerabilities · `npm run build` 0.
+
+### Preservation
+No schema change, no database contact beyond the harness sweep against the disposable
+target. Origin remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. Live `personalink`
+untouched.

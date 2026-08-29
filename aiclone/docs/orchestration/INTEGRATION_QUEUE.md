@@ -567,3 +567,72 @@ minutes because it touches schema.
 - `check-order-stream` precondition: still unmet, still non-blocking.
 - P1-009 repo-wide lint cleanup: still deferred until feature waves cannot safely start.
 - Gateway on port 5476: still absent. Every wave so far has been root-serial.
+
+
+---
+
+## Wave E COMPLETE — INTEGRATED 2026-08-29 at `e91f6c7`
+
+Single package `239a4e0`. No migration, no runtime change. P2-009 is `done`.
+
+Active blueprints after this wave: `restaurant-venue-v2`, `coaching-studio-v2`,
+`consulting-agency-v1`, `ca-practice-v1`. Deprecated: `restaurant-venue-v1`,
+`coaching-studio-v1`. Draft: `retail-storefront-v1`.
+
+Gates on `e91f6c7`: `tsc` 0 · targeted `eslint` 0 · `check-capability-contract` PASS with
+`INVERT_ASSERTION=1` failing all five overclaim guards · 38/38 check harnesses exit 0 ·
+`npm audit --omit=dev` 0 · `npm run build` 0.
+
+### Standing rules earned in this package
+
+1. **A maturity flag is not evidence; check the evidence path exists on disk.** This caught
+   `appointments:availability` citing a file that had been deleted. Nothing else had noticed.
+2. **`partial` must be rejected for an active blueprint's required capability, not just
+   `planned`.** A persisted record with an inert provider is exactly the case a single
+   planned/available split cannot express.
+3. **When a capability is promoted, split out anything its description promised but does not
+   do.** `retainers` and `accessLevels` became their own planned capabilities rather than
+   staying as words inside a capability now marked available. A description is unchecked; a
+   capability is checked.
+4. **Give every negative test a non-vacuity assertion.** The planned-rejection test targets
+   `commerce:inventory` and the partial-rejection test targets `appointments:reminders`; the
+   harness fails if either stops having that maturity, so the test cannot start passing for
+   free the way the original reservations-based test would have.
+5. **Prefer a new version over rewriting a contract that overclaimed.** `coaching-studio-v1`
+   is deprecated and retained; `v2` claims only what exists. Same pattern as restaurant
+   v1→v2.
+
+---
+
+## Next in queue — commerce inventory hardening, READY
+
+Base `e91f6c7` or newer primary. This is the last thing blocking a truthful retail vertical.
+
+**What exists today:** `DigitalProduct.stock Int?` — one nullable column. Nothing decrements
+it, nothing reserves against it, there is no location dimension, no movement history and no
+oversell refusal. `OrderLine` carries `qty` and adjusts no stock.
+
+| Pkg | Owner paths | Required proof |
+|---|---|---|
+| F1 | `prisma/schema.prisma`, one migration, `scripts/one-off/check-inventory-schema-invariants.ts` | per-location stock records; an append-only movement ledger; reservations with expiry tied to an order line; idempotency and tenant scoping; reuse `DigitalProduct`, `Order`, `OrderLine` and `Location` rather than forking a product or order model; full apply → rollback → reapply rehearsal on the disposable target with catalog comparison and the relation-name verifier; the five known `profileId` `DropForeignKey` statements excluded and count-asserted |
+| F2 | `src/lib/inventory/**` + harness | reserve, release and consume against a locked row so two concurrent orders cannot oversell the last unit; refuse oversell at the write boundary; idempotent replay; tenant isolation; non-enumerating refusal; append-only movements; zero residue on refusal; no external call |
+| F3 | routes + Business OS panel + harnesses | four principal classes, byte-identical foreign-vs-nonexistent, 400/409/503 split, explicit loading/empty/401/403/dependency states, persisted data only |
+
+**Only after F3 exists may `commerce:inventory` become `available` and
+`retail-storefront-v1` become active.** After F1 and F2 alone it should be `partial`, which
+the contract harness will automatically keep retail in draft for, because a required
+capability of an active blueprint must be `available`.
+
+Do not begin F1 with less than 90 minutes remaining: it mutates a database.
+
+### Open items carried forward
+
+- P1-007 live cutover: still owner-gated, unchanged.
+- Pre-existing `profileId` FK drift: five `DropForeignKey` statements, excluded and
+  count-asserted for four waves running. Untouched.
+- `check-order-stream` precondition: still unmet, still non-blocking.
+- P1-009 repo-wide lint cleanup: still deferred.
+- `appointments:reminders` and `appointments:deposits` are partial because their providers
+  are inert. Wiring a real provider is a separate, owner-gated decision.
+- `casesProjects:retainers` and `contentCohorts:accessLevels` are newly visible planned gaps.
+- Gateway on port 5476: still absent. Every wave has been root-serial.
