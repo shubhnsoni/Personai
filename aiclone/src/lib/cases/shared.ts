@@ -33,7 +33,7 @@ export type CaseActor = Readonly<{ actorType: "CLIENT" | "STAFF" | "SYSTEM"; act
 
 export type CaseEventKindValue =
     | "CREATED" | "STATUS" | "MILESTONE" | "DELIVERABLE"
-    | "DOCUMENT" | "INVOICE" | "TASK" | "APPROVAL" | "NOTE"
+    | "DOCUMENT" | "INVOICE" | "TASK" | "APPROVAL" | "RETAINER" | "NOTE"
 
 type EventWriter = Pick<PrismaClient, "caseEvent">
 

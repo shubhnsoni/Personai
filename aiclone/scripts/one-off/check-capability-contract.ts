@@ -270,8 +270,68 @@ check(
   businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "returns")?.maturity === "available",
 )
 check(
+  "casesProjects retainers is now available, so it can no longer serve as the planned example either",
+  businessEngineDescriptors.casesProjects.capabilities.find((c) => c.id === "retainers")?.maturity === "available",
+)
+check(
+  "contentCohorts accessLevels is now available, so it can no longer serve as the planned example either",
+  businessEngineDescriptors.contentCohorts.capabilities.find((c) => c.id === "accessLevels")?.maturity === "available",
+)
+check(
   "fieldJobs dispatch is still planned, so the planned negative test is not vacuous",
   businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "dispatch")?.maturity === "planned",
+)
+
+// Wave G3 promoted two capabilities that three ACTIVE blueprints were carrying as planned
+// backlog entries. A backlog entry for something that exists is a false statement, so they
+// had to move into the required set - the same correction restaurant-venue-v3 made for
+// inventory in Wave F. This asserts the move happened rather than trusting the comment.
+for (const [blueprintId, engineId, capabilityId] of [
+  ["coaching-studio-v2", "contentCohorts", "accessLevels"],
+  ["consulting-agency-v1", "casesProjects", "retainers"],
+  ["ca-practice-v1", "casesProjects", "retainers"],
+] as Array<[string, string, string]>) {
+  const blueprint = getBusinessBlueprint(blueprintId)
+  const composition = blueprint?.engines.find((e) => e.engineId === engineId)
+  check(
+    `${blueprintId} now requires ${engineId}:${capabilityId} instead of listing it as planned`,
+    composition?.capabilities.includes(capabilityId) === true &&
+      (composition?.plannedCapabilities ?? []).includes(capabilityId) === false,
+    `required=${composition?.capabilities.join("+")} planned=${(composition?.plannedCapabilities ?? []).join("+") || "none"}`,
+  )
+}
+// The remaining planned backlog entries must all still be genuinely unbuilt, or the same
+// false-statement problem is back somewhere else.
+//
+// DEPRECATED blueprints are exempt, and the exemption is the interesting part. This check
+// caught restaurant-venue-v2 listing commerce:inventory as planned, which became available in
+// Wave F. v2 is retained for addressability as a HISTORICAL contract, and its backlog was
+// accurate when it was written; editing it to match today would be claiming the historical
+// contract said something it did not. A live blueprint is a claim about now, a deprecated one is
+// a record of then. The exemption is listed by name below so it cannot quietly grow.
+const HISTORICAL_BACKLOG_EXEMPTIONS = ["restaurant-venue-v2"]
+const falseBacklog: string[] = []
+const exemptedBacklog: string[] = []
+for (const blueprint of listBusinessBlueprints()) {
+  for (const composition of blueprint.engines) {
+    for (const capabilityId of composition.plannedCapabilities ?? []) {
+      const capability = businessEngineDescriptors[composition.engineId].capabilities.find((c) => c.id === capabilityId)
+      if (capability?.maturity !== "available") continue
+      const entry = `${blueprint.id} lists ${composition.engineId}:${capabilityId} as planned, but it is available`
+      if (blueprint.status === "deprecated") exemptedBacklog.push(entry)
+      else falseBacklog.push(entry)
+    }
+  }
+}
+checkInvertible(
+  "no LIVE blueprint carries a planned backlog entry for a capability that is already available",
+  falseBacklog.length === 0,
+  falseBacklog.join("; ") || "none",
+)
+check(
+  "every stale backlog entry belongs to a deprecated blueprint, and to one this harness already knows about",
+  exemptedBacklog.every((entry) => HISTORICAL_BACKLOG_EXEMPTIONS.some((id) => entry.startsWith(`${id} `))),
+  exemptedBacklog.join("; ") || "none",
 )
 
 // Wave E and F activations, asserted individually so a silent status regression is caught.

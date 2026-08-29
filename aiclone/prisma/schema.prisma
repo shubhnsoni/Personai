@@ -239,6 +239,7 @@ model Profile {
   Fulfilment           Fulfilment[]
   ReturnRequest        ReturnRequest[]
   CommerceEvent        CommerceEvent[]
+  CourseAccessLevel    CourseAccessLevel[]
 }
 
 model ProfileEvent {
@@ -693,9 +694,11 @@ model Course {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  modules     CourseModule[]
-  enrollments CourseEnrollment[]
-  Cohort      Cohort[]
+  modules           CourseModule[]
+  enrollments       CourseEnrollment[]
+  Cohort            Cohort[]
+  CourseAccessLevel CourseAccessLevel[]
+  CourseAccessEvent CourseAccessEvent[]
 }
 
 model CourseModule {
@@ -712,21 +715,22 @@ model CourseModule {
 }
 
 model CourseLesson {
-  id              String       @id @default(cuid())
-  moduleId        String
-  module          CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  title           String
-  description     String?
-  contentType     String       @default("VIDEO") // "VIDEO" | "TEXT" | "PDF"
-  contentUrl      String?
-  videoUrl        String?
-  body            String?
-  fileUrl         String?
-  durationMinutes Int          @default(0)
-  orderIndex      Int          @default(0)
-  isFree          Boolean      @default(false)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id                 String              @id @default(cuid())
+  moduleId           String
+  module             CourseModule        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  contentType        String              @default("VIDEO") // "VIDEO" | "TEXT" | "PDF"
+  contentUrl         String?
+  videoUrl           String?
+  body               String?
+  fileUrl            String?
+  durationMinutes    Int                 @default(0)
+  orderIndex         Int                 @default(0)
+  isFree             Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  CourseLessonAccess CourseLessonAccess?
 }
 
 model Event {
@@ -1110,6 +1114,7 @@ model CourseEnrollment {
 
   lessonCompletions LessonCompletion[]
   CohortMembership  CohortMembership[]
+  CourseAccessGrant CourseAccessGrant?
 
   @@unique([courseId, idempotencyKey])
 }
@@ -1199,6 +1204,7 @@ model Workspace {
   caseProjects CaseProject[]
   contacts     Contact[]
   workflowRuns WorkflowRun[]
+  CaseRetainer CaseRetainer[]
 
   @@index([profileId])
 }
@@ -1267,6 +1273,7 @@ model Contact {
   caseProjects CaseProject[]
   sourceLinks  ContactSourceLink[]
   activities   ActivityEvent[]
+  CaseRetainer CaseRetainer[]
 
   @@index([workspaceId, email])
   @@index([workspaceId, phone])
@@ -1534,6 +1541,7 @@ enum CaseEventKind {
   INVOICE
   TASK
   APPROVAL
+  RETAINER
   NOTE
 }
 
@@ -1590,14 +1598,16 @@ model CaseProject {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  brief            CaseBrief?
-  milestones       CaseMilestone[]
-  deliverables     CaseDeliverable[]
-  documentRequests CaseDocumentRequest[]
-  invoices         CaseInvoice[]
-  events           CaseEvent[]
-  taskLinks        CaseTaskLink[]
-  approvalLinks    CaseApprovalLink[]
+  brief                CaseBrief?
+  milestones           CaseMilestone[]
+  deliverables         CaseDeliverable[]
+  documentRequests     CaseDocumentRequest[]
+  invoices             CaseInvoice[]
+  events               CaseEvent[]
+  taskLinks            CaseTaskLink[]
+  approvalLinks        CaseApprovalLink[]
+  CaseRetainerCaseLink CaseRetainerCaseLink[]
+  CaseRetainerDraw     CaseRetainerDraw[]
 
   @@unique([workspaceId, reference])
   @@unique([workspaceId, idempotencyKey])
@@ -1677,19 +1687,20 @@ model CaseDocumentRequest {
 /// Invoice STATE for a case. `paymentId` links to the existing Payment row when one
 /// exists; this table never holds amounts that contradict it.
 model CaseInvoice {
-  id             String           @id @default(cuid())
-  caseId         String
-  case           CaseProject      @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  reference      String
-  amountCents    Int
-  currency       String           @default("USD")
-  state          CaseInvoiceState @default(DRAFT)
-  issuedAt       DateTime?
-  paidAt         DateTime?
-  paymentId      String?
-  idempotencyKey String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id                 String               @id @default(cuid())
+  caseId             String
+  case               CaseProject          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  reference          String
+  amountCents        Int
+  currency           String               @default("USD")
+  state              CaseInvoiceState     @default(DRAFT)
+  issuedAt           DateTime?
+  paidAt             DateTime?
+  paymentId          String?
+  idempotencyKey     String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  CaseRetainerPeriod CaseRetainerPeriod[]
 
   @@unique([caseId, reference])
   @@index([caseId, state])
@@ -2541,4 +2552,424 @@ model CommerceEvent {
   @@index([profileId, seq])
   @@index([subjectType, subjectId])
   @@index([orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Wave G3 - part one: retainers for cases and projects.
+//
+// A retainer is an AGREEMENT plus a DRAW-DOWN LEDGER, not a payment. Money movement stays
+// where it already lives: CaseInvoice records billing state and Payment records the charge.
+// Nothing in this block charges anything, and no row here can cause a charge.
+//
+// The retainer is workspace-scoped and associated to cases through a link table rather than
+// owning a single caseId, because a retainer is an agreement with a client that work from
+// several cases draws against. A one-case retainer would make "renewal period" meaningless -
+// you would be renewing per case rather than per agreement.
+// ---------------------------------------------------------------------------
+
+enum CaseRetainerState {
+  DRAFT
+  ACTIVE
+  PAUSED
+  EXPIRED
+  CANCELLED
+}
+
+/// Whether the agreement is denominated in units of work or in money. Exactly one of the two
+/// included columns may be set, enforced by a CHECK constraint, because a retainer that is
+/// both is a retainer nobody can reconcile.
+enum CaseRetainerBasis {
+  UNITS
+  VALUE
+}
+
+enum CaseRetainerPeriodKind {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  CUSTOM
+}
+
+enum CaseRetainerPeriodState {
+  OPEN
+  CLOSED
+  RENEWED
+  LAPSED
+}
+
+/// A DRAW consumes the allowance, a CREDIT gives some back (a cancelled engagement), and an
+/// ADJUSTMENT is a deliberate correction that is recorded rather than hidden by editing a
+/// balance. All three are append-only.
+enum CaseRetainerDrawKind {
+  DRAW
+  CREDIT
+  ADJUSTMENT
+}
+
+model CaseRetainer {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contactId   String?
+  contact     Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  reference String
+  title     String
+  state     CaseRetainerState @default(DRAFT)
+
+  basis              CaseRetainerBasis
+  includedUnits      Int?
+  includedValueCents Int?
+  currency           String            @default("USD")
+
+  /// The length of one period. CUSTOM is the only kind that carries periodDays, and it must
+  /// carry one - a CHECK constraint enforces both halves of that.
+  periodKind CaseRetainerPeriodKind @default(MONTHLY)
+  periodDays Int?
+
+  /// Whether an unused allowance survives into the next period. Recorded on the agreement so
+  /// that a period can be closed without re-deciding the policy.
+  rolloverAllowed Boolean @default(false)
+
+  /// Declares intent only. Nothing in this schema or its runtime renews a retainer on a
+  /// timer; renewal is an explicit operation, and a lapsed retainer is left lapsed.
+  autoRenew Boolean @default(false)
+
+  activatedAt  DateTime?
+  pausedAt     DateTime?
+  expiredAt    DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  periods           CaseRetainerPeriod[]
+  caseLinks         CaseRetainerCaseLink[]
+  draws             CaseRetainerDraw[]
+  CaseRetainerEvent CaseRetainerEvent[]
+
+  @@unique([workspaceId, reference])
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, state])
+  @@index([contactId])
+}
+
+/// Which cases may draw against a retainer. A compound primary key with no surrogate id, the
+/// same shape as CaseTaskLink and CaseApprovalLink, because the pair IS the fact.
+model CaseRetainerCaseLink {
+  retainerId String
+  retainer   CaseRetainer @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+  caseId     String
+  case       CaseProject  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+
+  @@id([retainerId, caseId])
+  @@index([caseId])
+}
+
+/// One concrete billing period. The included allowance is SNAPSHOT here rather than read from
+/// the agreement, so amending the agreement cannot rewrite what a closed period included.
+model CaseRetainerPeriod {
+  id         String       @id @default(cuid())
+  retainerId String
+  retainer   CaseRetainer @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+
+  ordinal  Int
+  startsOn DateTime
+  endsOn   DateTime
+
+  includedUnits      Int?
+  includedValueCents Int?
+
+  /// Maintained by the draw ledger inside the same transaction as the draw. Overage is
+  /// allowed - used may exceed included - because refusing a draw once an allowance is spent
+  /// would misrepresent work that was actually done. Overage is reported, not prevented.
+  usedUnits      Int @default(0)
+  usedValueCents Int @default(0)
+
+  state CaseRetainerPeriodState @default(OPEN)
+
+  /// Billing STATE only, mirroring the CaseProject.invoiceState convention. The invoice is a
+  /// real CaseInvoice row against one of the retainer's linked cases; this column never moves
+  /// money and no payment is executed by anything in this block.
+  billingState CaseInvoiceState @default(NONE)
+  invoiceId    String?
+  invoice      CaseInvoice?     @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  closedAt  DateTime?
+  renewedAt DateTime?
+  lapsedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  draws CaseRetainerDraw[]
+
+  @@unique([retainerId, ordinal])
+  @@index([retainerId, state])
+  @@index([invoiceId])
+}
+
+/// Append-only consumption ledger. Stores the signed delta AND the resulting used balance, so
+/// replaying the deltas must reproduce the stored after-values - the same self-verifying shape
+/// as InventoryMovement. A row here is never updated or deleted; a trigger enforces that.
+model CaseRetainerDraw {
+  id         String             @id @default(cuid())
+  retainerId String
+  retainer   CaseRetainer       @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+  periodId   String
+  period     CaseRetainerPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  /// Which case the work was done for. Nullable and SetNull on delete, because the ledger has
+  /// to survive a case being removed - the allowance really was consumed.
+  caseId String?
+  case   CaseProject? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  seq  BigInt               @default(autoincrement())
+  kind CaseRetainerDrawKind
+
+  unitsDelta          Int?
+  valueDeltaCents     Int?
+  usedUnitsAfter      Int
+  usedValueCentsAfter Int
+
+  note           String?
+  idempotencyKey String?
+  actor          CaseEventActor
+  actorId        String?
+  at             DateTime       @default(now())
+
+  @@unique([periodId, idempotencyKey])
+  @@index([retainerId, seq])
+  @@index([periodId, seq])
+  @@index([caseId])
+}
+
+// ---------------------------------------------------------------------------
+// Wave G3 - part two: access levels for courses and cohorts.
+//
+// This is the first real content-visibility decision in the repository. Until now any
+// ACTIVE or COMPLETED enrolment on a course returned every module and every lesson, and
+// CourseLesson.isFree was written by importers but never enforced anywhere.
+//
+// Tenancy follows the cohort domain exactly: profileId, bridged from Workspace.profileId.
+// No Cohort* or Course* table gains a workspaceId.
+//
+// Nothing here executes a payment. A tier may carry a price so an owner can describe it, and
+// an upgrade records that it was requested, decided and applied - but the charge itself stays
+// with Payment, referenced by id and never created here.
+// ---------------------------------------------------------------------------
+
+enum CourseAccessGrantState {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  REVOKED
+}
+
+/// Where an entitlement came from. PURCHASE means a payment row is referenced, not that this
+/// schema charged anybody.
+enum CourseAccessGrantSource {
+  MANUAL
+  PURCHASE
+  COHORT
+}
+
+enum CourseAccessChangeDirection {
+  UPGRADE
+  DOWNGRADE
+}
+
+enum CourseAccessChangeState {
+  REQUESTED
+  APPROVED
+  REJECTED
+  APPLIED
+  CANCELLED
+}
+
+enum CourseAccessEventKind {
+  LEVEL
+  VISIBILITY
+  GRANT
+  CHANGE
+  NOTE
+}
+
+enum CourseAccessEventActor {
+  LEARNER
+  STAFF
+  SYSTEM
+}
+
+/// A tier on a course. rank orders the tiers, so an upgrade is a move to a higher rank and a
+/// downgrade a move to a lower one - the direction is derived from data rather than trusted
+/// from the caller.
+model CourseAccessLevel {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  key         String
+  label       String
+  rank        Int
+  description String?
+
+  /// Describes the tier for an owner. It is not a checkout price and nothing reads it to
+  /// charge anybody.
+  priceCents Int?
+  currency   String  @default("USD")
+  isActive   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lessonAccess CourseLessonAccess[]
+  grants       CourseAccessGrant[]
+  changesFrom  CourseAccessChange[] @relation("CourseAccessChangeFrom")
+  changesTo    CourseAccessChange[] @relation("CourseAccessChangeTo")
+
+  @@unique([courseId, key])
+  @@unique([courseId, rank])
+  @@index([profileId, isActive])
+}
+
+/// The minimum tier a lesson requires. A lesson with no row here is visible to every tier,
+/// which keeps every existing course behaving exactly as it does today.
+model CourseLessonAccess {
+  id            String            @id @default(cuid())
+  lessonId      String            @unique
+  lesson        CourseLesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  accessLevelId String
+  accessLevel   CourseAccessLevel @relation(fields: [accessLevelId], references: [id], onDelete: Cascade)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([accessLevelId])
+}
+
+/// What a learner is entitled to. Keyed on the enrolment, one grant per enrolment, because the
+/// enrolment is already the learner-to-course record the content reader resolves. Making the
+/// enrolment the identity means the grant needs no idempotency key of its own: asking twice
+/// finds the same row.
+model CourseAccessGrant {
+  id            String            @id @default(cuid())
+  enrollmentId  String            @unique
+  enrollment    CourseEnrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  accessLevelId String
+  accessLevel   CourseAccessLevel @relation(fields: [accessLevelId], references: [id], onDelete: Cascade)
+
+  state  CourseAccessGrantState  @default(PENDING)
+  source CourseAccessGrantSource @default(MANUAL)
+
+  grantedAt    DateTime?
+  suspendedAt  DateTime?
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  revokeReason String?
+
+  /// A reference to an existing Payment row when one exists. Deliberately a bare string with
+  /// no foreign key, because Payment is profile-scoped while this tree hangs off a course -
+  /// the same reason CaseInvoice.paymentId is a bare string.
+  paymentId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  changes CourseAccessChange[]
+
+  @@index([accessLevelId, state])
+  @@index([state, expiresAt])
+}
+
+/// One requested move between tiers. This is where "upgrade and downgrade state without real
+/// payment execution" actually lives: the change is REQUESTED, then decided, then APPLIED, and
+/// applying it rewrites the grant's tier. No money moves at any step.
+model CourseAccessChange {
+  id      String            @id @default(cuid())
+  grantId String
+  grant   CourseAccessGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  fromAccessLevelId String
+  fromAccessLevel   CourseAccessLevel @relation("CourseAccessChangeFrom", fields: [fromAccessLevelId], references: [id], onDelete: Cascade)
+  toAccessLevelId   String
+  toAccessLevel     CourseAccessLevel @relation("CourseAccessChangeTo", fields: [toAccessLevelId], references: [id], onDelete: Cascade)
+
+  direction CourseAccessChangeDirection
+  state     CourseAccessChangeState     @default(REQUESTED)
+
+  reason       String?
+  decisionNote String?
+  decidedBy    String?
+  decidedAt    DateTime?
+  appliedAt    DateTime?
+  cancelledAt  DateTime?
+
+  /// Both are references an owner may record after settling up elsewhere. Nothing here reads
+  /// them to decide anything, and nothing here writes a Payment.
+  invoiceRef String?
+  paymentId  String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([grantId, idempotencyKey])
+  @@index([grantId, state])
+}
+
+/// Append-only history for tiers, visibility rules, entitlements and changes. subjectType and
+/// subjectId say what the row is about, so one stream covers all four without a fifth table.
+model CourseAccessEvent {
+  id          String                 @id @default(cuid())
+  courseId    String
+  course      Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  seq         BigInt                 @default(autoincrement())
+  kind        CourseAccessEventKind
+  subjectType String
+  subjectId   String
+  from        String?
+  to          String
+  actor       CourseAccessEventActor
+  actorId     String?
+  metadata    Json?
+  at          DateTime               @default(now())
+
+  @@index([courseId, seq])
+  @@index([courseId, subjectType, subjectId])
+}
+
+/// Append-only history for a retainer AGREEMENT and its periods.
+///
+/// CaseRetainerDraw already records every movement of the allowance, but it cannot record a
+/// state change, and CaseEvent cannot be used either: CaseEvent.caseId is NOT NULL, while a
+/// retainer legitimately exists before any case is linked to it. Fanning an agreement event out
+/// to every linked case was considered and rejected - a retainer with no links yet would have no
+/// history at all, which is precisely the moment an owner most wants one.
+///
+/// subjectType and subjectId say whether a row is about the agreement, a period, a case link or
+/// a draw, so one stream covers all four.
+model CaseRetainerEvent {
+  id          String         @id @default(cuid())
+  retainerId  String
+  retainer    CaseRetainer   @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+  seq         BigInt         @default(autoincrement())
+  kind        CaseEventKind
+  subjectType String
+  subjectId   String
+  from        String?
+  to          String
+  actor       CaseEventActor
+  actorId     String?
+  metadata    Json?
+  at          DateTime       @default(now())
+
+  @@index([retainerId, seq])
+  @@index([retainerId, subjectType, subjectId])
 }
