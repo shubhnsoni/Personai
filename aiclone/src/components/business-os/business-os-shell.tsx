@@ -31,6 +31,7 @@ import { CommercePanel } from "@/components/business-os/commerce-panel"
 import { FieldJobsPanel } from "@/components/business-os/fieldjobs-panel"
 import { InspectionPanel } from "@/components/business-os/inspection-panel"
 import { InspectionTemplatesPanel } from "@/components/business-os/inspection-templates-panel"
+import { OperationsPanel } from "@/components/business-os/operations-panel"
 import { RetainersPanel } from "@/components/business-os/retainers-panel"
 import { InventoryPanel } from "@/components/business-os/inventory-panel"
 import { Label } from "@/components/ui/label"
@@ -621,6 +622,8 @@ export function BusinessOsShell({
                                     </ul>
                                 </CardContent>
                             </Card>
+
+                            <OperationsPanel workspaceId={selectedWorkspaceId} />
 
                             <ReservationsPanel workspaceId={selectedWorkspaceId} />
 

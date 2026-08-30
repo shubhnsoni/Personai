@@ -1255,6 +1255,83 @@ check(
         /inspection-templates-panel/.test(shellSrc),
 )
 
+// ---------------------------------------------------------------------------
+// The operations command centre.
+//
+// A cross-engine total is the most dangerous number in this product: an owner reads "0" as "nothing
+// anywhere" and stops looking. The view covers seven domains and deliberately does not cover three,
+// so these assertions exist mainly to guarantee the panel SAYS what it excludes - always, and
+// especially when the total is zero, which is exactly when a bare zero would mislead.
+//
+// The rest follow from the view being read-only: no action control on any item, `overdue` read from
+// the server rather than recomputed against a second clock, and a null due date rendered as a real
+// state rather than as unknown.
+// ---------------------------------------------------------------------------
+const operationsSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/operations-panel.tsx"),
+    "utf8",
+)
+const operationsSharedSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/operations-shared.ts"),
+    "utf8",
+)
+
+check("operations decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(operationsSrc))
+check(
+    "the operations loading state announces itself politely and as busy",
+    operationsSrc.includes('aria-live="polite"') && operationsSrc.includes('aria-busy="true"'),
+)
+check("the operations loading state carries a screen-reader label", /Loading operations summary/.test(operationsSrc))
+check("operations panel uses a structural skeleton while loading", /Skeleton/.test(operationsSrc))
+check(
+    "operations refusals are split by status, with 503 leaking nothing",
+    /error\.status === 401/.test(operationsSharedSrc) &&
+        /error\.status === 403/.test(operationsSharedSrc) &&
+        /error\.status === 400/.test(operationsSharedSrc) &&
+        /error\.status === 503/.test(operationsSharedSrc),
+)
+check(
+    "the operations 503 copy states nothing was changed, which a read-only view can say truthfully",
+    /Nothing was changed - this view only reads/.test(operationsSharedSrc),
+)
+check(
+    "the operations panel contains no fabricated record",
+    !/\bid:\s*"/.test(`${operationsSrc}\n${operationsSharedSrc}`) && !/sampleItem/i.test(operationsSrc),
+)
+check(
+    "the operations empty state says nothing here is sample data",
+    /Nothing here is sample data/.test(operationsSrc),
+)
+// The load-bearing one. A cross-engine zero without stated exclusions is a lie by omission.
+check(
+    "MEASURED: the panel always renders what the total does NOT include, so a zero cannot be read as nothing anywhere",
+    /What this total does not include/.test(operationsSrc) &&
+        /summary\.doesNotCover/.test(operationsSrc) &&
+        /check them separately/.test(operationsSrc),
+)
+check(
+    "the excluded-domain list comes from the server rather than being restated in the panel",
+    /Object\.entries\(summary\.doesNotCover\)/.test(operationsSrc) && /summary\.covers/.test(operationsSrc),
+)
+// A read-only view must not offer a control that cannot work.
+check(
+    "the operations panel offers no write action on any item",
+    !/method:\s*"(POST|PATCH|PUT|DELETE)"/.test(operationsSrc),
+    "no write verb in the panel",
+)
+check(
+    "overdue is read from the server rather than recomputed against a second clock",
+    /item\.overdue/.test(operationsSrc) && !/Date\.now\(\)/.test(operationsSrc),
+)
+check(
+    "a null due date is rendered as a real state rather than as unknown or an error",
+    /no due date/.test(operationsSharedSrc),
+)
+check(
+    "the operations panel is mounted in the shell",
+    /<OperationsPanel workspaceId=\{selectedWorkspaceId\} \/>/.test(shellSrc) && /operations-panel/.test(shellSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
