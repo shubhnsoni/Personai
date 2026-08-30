@@ -1606,3 +1606,106 @@ report.failures = failures
 
 console.log(JSON.stringify(report, null, 2))
 if (failures.length > 0) process.exitCode = 1
+
+// ---------------------------------------------------------------------------
+// S2-A — the workspace-aware surfaces panel. Root is building the
+// GET /api/platform/workspaces/{workspaceId}/surfaces endpoint in parallel, so this panel is not
+// mounted in BusinessOsShell yet and is checked directly against its own source, matching how BP1's
+// preview panel and BP3's install panel were checked before their runtimes existed.
+//
+// The honesty requirements specific to this package: "no active installation" is the COMMON case
+// (every workspace today) and must render as a calm empty state, never as an error; `unknownSurfaces`
+// is disclosed by name rather than silently dropped or treated as an error; `businessOs` is never
+// listed as a workspace surface, because it is never installation-derived; and the 403 copy for a
+// foreign or a nonexistent workspace never says "not found", matching the byte-identical refusal the
+// contract requires.
+//
+// The genuine security property this package must hold: a slow response for workspace A must never
+// land in workspace B's view after the user switches. These assertions check the SOURCE for the
+// mechanism (state keyed by workspace id, read back out only when the key matches the current prop)
+// rather than trying to race a fetch in a static harness, which cannot exercise timing at all.
+// ---------------------------------------------------------------------------
+const workspaceSurfacesSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/workspace-surfaces-panel.tsx"),
+    "utf8",
+)
+const workspaceSurfacesSharedSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/workspace-surfaces-shared.ts"),
+    "utf8",
+)
+const workspaceSurfacesAll = `${workspaceSurfacesSrc}\n${workspaceSurfacesSharedSrc}`
+
+check("workspace surfaces decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(workspaceSurfacesSrc))
+check(
+    "the workspace surfaces loading state announces itself politely and as busy",
+    workspaceSurfacesSrc.includes('aria-live="polite"') && workspaceSurfacesSrc.includes('aria-busy="true"'),
+)
+check(
+    "the workspace surfaces loading state carries a screen-reader label",
+    /Loading workspace surfaces/.test(workspaceSurfacesSrc),
+)
+check("workspace surfaces panel uses a structural skeleton while loading", /Skeleton/.test(workspaceSurfacesSrc))
+check(
+    "workspace surfaces refusals are split by status, with 503 leaking nothing",
+    /error\.status === 401/.test(workspaceSurfacesSharedSrc) &&
+        /error\.status === 403/.test(workspaceSurfacesSharedSrc) &&
+        /error\.status === 400/.test(workspaceSurfacesSharedSrc) &&
+        /error\.status === 503/.test(workspaceSurfacesSharedSrc),
+)
+const workspaceSurfacesErrorCopyFnMatch = workspaceSurfacesSharedSrc.match(
+    /export function workspaceSurfacesErrorCopy[\s\S]*?\n}/,
+)
+const workspaceSurfacesErrorCopyFnBody = workspaceSurfacesErrorCopyFnMatch ? workspaceSurfacesErrorCopyFnMatch[0] : ""
+check("workspaceSurfacesErrorCopy function body found for scoped checks", workspaceSurfacesErrorCopyFnMatch !== null)
+check(
+    "MEASURED: the 403 copy never says not found, for a foreign or a nonexistent workspace alike",
+    /Workspace access required/.test(workspaceSurfacesErrorCopyFnBody) && !/not found/i.test(workspaceSurfacesErrorCopyFnBody),
+)
+check(
+    "the workspace surfaces panel contains no fabricated resolution or surface list",
+    !/\bid:\s*"/.test(workspaceSurfacesAll) && !/sampleSurface/i.test(workspaceSurfacesAll),
+)
+check(
+    "MEASURED: no active installation renders as a calm empty state, not an error, and states this is the common case",
+    /title="No blueprint installed"/.test(workspaceSurfacesSrc) &&
+        /the common state/.test(workspaceSurfacesSrc) &&
+        !/no-active-blueprint-installation[\s\S]{0,120}ErrorState/.test(workspaceSurfacesSrc),
+)
+check(
+    "the empty-installation copy does not imply the workspace is broken or misconfigured",
+    !/not (configured|set up) correctly|misconfigured|broken/i.test(workspaceSurfacesSrc),
+)
+check(
+    "MEASURED: unknownSurfaces is disclosed by name and framed as an outlived config, never as an error",
+    /resolution\.unknownSurfaces\.length > 0/.test(workspaceSurfacesSrc) &&
+        /unknownSurfaces\.join/.test(workspaceSurfacesSrc) &&
+        /outlived a product change/.test(workspaceSurfacesSrc) &&
+        /it is not an error/.test(workspaceSurfacesSrc),
+)
+check(
+    "MEASURED: businessOs is never rendered as a workspace surface",
+    !/"businessOs"/.test(workspaceSurfacesSrc) && !/businessOs/.test(workspaceSurfacesSharedSrc),
+)
+check(
+    "surfaces are presented as recorded configuration, not a permission grant",
+    /not a permission/.test(workspaceSurfacesSrc),
+)
+check(
+    "the resolution type is imported from the contract, never redeclared",
+    /from "@\/lib\/business-os\/workspace-surface-types"/.test(workspaceSurfacesSharedSrc) &&
+        !/type WorkspaceSurfaceResolution\s*=/.test(workspaceSurfacesSharedSrc),
+)
+check(
+    "MEASURED: panel state is keyed by workspace id, and the render only reads back a value whose key matches the current prop",
+    /Keyed<WorkspaceSurfaceResolution>/.test(workspaceSurfacesSrc) &&
+        /loaded\.key === workspaceId/.test(workspaceSurfacesSrc) &&
+        /failed\.key === workspaceId/.test(workspaceSurfacesSrc),
+)
+check(
+    "the fetch effect aborts the in-flight request for the previous workspace before the next one starts",
+    /new AbortController\(\)/.test(workspaceSurfacesSrc) && /controller\.abort\(\)/.test(workspaceSurfacesSrc),
+)
+check(
+    "the mount effect depends only on workspaceId, so a workspace change re-runs it",
+    /\}, \[workspaceId\]\)/.test(workspaceSurfacesSrc),
+)
