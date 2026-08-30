@@ -52,3 +52,41 @@ only the new assertion (`exit 1`), and restored production code returns the harn
 
 - Capability contract: normal `0`; inversion `1`; post-fix source discriminator removal `1`; restored normal `0`.
 - Production `src/**` changes: temporary only; none are intended to survive.
+
+
+## Group A ΓÇö S1-C fieldjob inspection runtime
+
+### Scope and method
+
+Audited `check-fieldjob-inspection-runtime.ts` using the CWD-respecting rehearsal
+runner from the assigned `s1c/vacuity-group-a` worktree. The runner reported that
+same worktree as its app directory and the authorized rehearsal database as its
+target. I tested the server-computed `canRecord` property by temporarily replacing
+its `RECORDABLE_STATUSES.includes(row.status)` implementation with `false`, then
+restored the original source exactly.
+
+### Evidence
+
+| Assertion / coverage claim | Harness location | Protected code | Break performed | Before fix | After fix |
+| --- | --- | --- | --- | --- | --- |
+| A DRAFT inspection reports `canRecord: true`, so the flag is not always false | `check-fieldjob-inspection-runtime.ts:721` | `src/lib/fieldjobs/inspection.ts:209`, `canRecord: RECORDABLE_STATUSES.includes(row.status)` | Temporarily changed the source expression to `false` | Mutation run failed `1`, 111/112; this exact assertion failed with `canRecord=false status=DRAFT` | No harness fix required; source restored and normal run passed `0`, 112/112 |
+
+### Conclusion
+
+This tested assertion is real, not vacuous. The DRAFT fixture is qualifying and
+the source mutation makes the named assertion red. No harness change is warranted.
+
+### Validation
+
+- Normal rehearsal run: `0` (112/112).
+- `INVERT_ASSERTION=1`: `1` (expected control failure).
+- Temporary source mutation: `1` (111/112); the named DRAFT assertion failed.
+- Restored normal rehearsal run: `0` (112/112).
+- `npx eslint scripts/one-off/check-fieldjob-inspection-runtime.ts`: `0`.
+- `git diff --stat -- src`: no output; no `src/**` changes survive.
+
+### Group A file status
+
+- `check-fieldjob-inspection-runtime.ts`: audited-and-all-real for the source-broken `canRecord` assertion.
+- `check-fieldjob-runtime.ts`: not-reached.
+- `check-operations-runtime.ts`: not-reached.
