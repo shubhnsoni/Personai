@@ -146,6 +146,51 @@ async function seed(tx: Tx) {
     }
 }
 
+/**
+ * A COMMITTED fixture, deliberately not inside the rollback transaction.
+ *
+ * The no-write proof cannot live inside a rolled-back transaction: the rollback would erase any write
+ * it was looking for. So this seeds real rows, commits them, and is torn down explicitly afterwards.
+ * Ids are prefixed with the run id so a crash leaves identifiable rows rather than anonymous residue.
+ */
+const COMMITTED = {
+    user: `${RUN}_cu`,
+    profile: `${RUN}_cp`,
+    workspace: `${RUN}_cw`,
+    membership: `${RUN}_cm`,
+    job: `${RUN}_cj`,
+}
+
+async function seedCommitted(prisma: PrismaClient) {
+    const mk = (sql: string) => prisma.$executeRawUnsafe(sql)
+    await mk(
+        `insert into "User" ("id","clerkId","email","updatedAt") values ('${COMMITTED.user}','clerk_${COMMITTED.user}','${COMMITTED.user}@example.test',CURRENT_TIMESTAMP)`,
+    )
+    await mk(
+        `insert into "Profile" ("id","userId","slug","displayName","updatedAt") values ('${COMMITTED.profile}','${COMMITTED.user}','${COMMITTED.profile}','P',CURRENT_TIMESTAMP)`,
+    )
+    await mk(
+        `insert into "Workspace" ("id","profileId","name","slug","updatedAt") values ('${COMMITTED.workspace}','${COMMITTED.profile}','WS','${COMMITTED.workspace}',CURRENT_TIMESTAMP)`,
+    )
+    await mk(
+        `insert into "Membership" ("id","workspaceId","userId","role","updatedAt") values ('${COMMITTED.membership}','${COMMITTED.workspace}','${COMMITTED.user}','OWNER',CURRENT_TIMESTAMP)`,
+    )
+    await mk(
+        `insert into "FieldJob" ("id","profileId","reference","title","status","priority","siteAddress","scheduledStartAt","scheduledEndAt","updatedAt")
+         values ('${COMMITTED.job}','${COMMITTED.profile}','${COMMITTED.job}','Committed callout','SCHEDULED','NORMAL','3 Example Street',CURRENT_TIMESTAMP - interval '2 days',CURRENT_TIMESTAMP - interval '2 days' + interval '1 hour',CURRENT_TIMESTAMP)`,
+    )
+    return { user: `clerk_${COMMITTED.user}`, workspace: COMMITTED.workspace }
+}
+
+async function cleanupCommitted(prisma: PrismaClient) {
+    const mk = (sql: string) => prisma.$executeRawUnsafe(sql)
+    await mk(`delete from "FieldJob" where "id" = '${COMMITTED.job}'`)
+    await mk(`delete from "Membership" where "id" = '${COMMITTED.membership}'`)
+    await mk(`delete from "Workspace" where "id" = '${COMMITTED.workspace}'`)
+    await mk(`delete from "Profile" where "id" = '${COMMITTED.profile}'`)
+    await mk(`delete from "User" where "id" = '${COMMITTED.user}'`)
+}
+
 async function main() {
     const url = process.env.DATABASE_URL
     const db = parseDatabaseName(url)
@@ -214,14 +259,31 @@ async function main() {
             process.exit(1)
         }
 
+        /**
+         * Counts for the no-write proof.
+         *
+         * Widened after review. The first version counted five tables, four of which were TENANCY
+         * tables rather than anything this domain reads, and none of which was an append-only event
+         * log. The write the contract most specifically forbids - "a surface that logged its own
+         * invocation would be a write path" - would land in an event table and be invisible to a
+         * fieldJob/workspace/profile/membership/user count. Every append-only log this schema has is
+         * now counted, so that write cannot hide.
+         */
         const countAll = async () => ({
             fieldJob: await prisma.fieldJob.count(),
             workspace: await prisma.workspace.count(),
             profile: await prisma.profile.count(),
             membership: await prisma.membership.count(),
             user: await prisma.user.count(),
+            activityEvent: await prisma.activityEvent.count(),
+            copilotAuditEvent: await prisma.copilotAuditEvent.count(),
+            fieldJobEvent: await prisma.fieldJobEvent.count(),
+            reservationEvent: await prisma.reservationEvent.count(),
+            appointmentEvent: await prisma.appointmentEvent.count(),
+            caseEvent: await prisma.caseEvent.count(),
+            cohortEvent: await prisma.cohortEvent.count(),
+            inventoryMovement: await prisma.inventoryMovement.count(),
         })
-        const before = await countAll()
 
         try {
             await prisma.$transaction(async (tx) => {
@@ -342,13 +404,26 @@ async function main() {
                 )
                 check(
                     "every item carries the OWNING engine's attention reason",
-                    items.every((i) => typeof i.attentionReason === "string" && String(i.attentionReason).length > 0),
+                    items.length > 0 && items.every((i) => typeof i.attentionReason === "string" && String(i.attentionReason).length > 0),
                 )
                 check(
                     "every item's date is an ISO string or null, never a Date object",
-                    items.every((i) => i.at === null || typeof i.at === "string"),
+                    items.length > 0 && items.every((i) => i.at === null || typeof i.at === "string"),
                 )
-                check("the response is round-trippable JSON", JSON.stringify(JSON.parse(ok.raw)) === JSON.stringify(ok.body))
+                // Deliberately NOT `JSON.stringify(JSON.parse(ok.raw)) === JSON.stringify(ok.body)`:
+                // `ok.body` IS `JSON.parse(ok.raw)`, so that comparison is `x === x` and cannot fail.
+                // What is worth asserting is that the wire bytes are valid JSON carrying the envelope.
+                check(
+                    "the response body is valid JSON on the wire and carries the envelope key",
+                    (() => {
+                        try {
+                            const parsed = JSON.parse(ok.raw) as Record<string, unknown>
+                            return parsed.ok === true && typeof parsed.data === "object" && parsed.data !== null
+                        } catch {
+                            return false
+                        }
+                    })(),
+                )
 
                 // ---- determinism ----------------------------------------------
                 // The contract's claim is about ONE summary: the same summary and the same asOf give a
@@ -432,15 +507,22 @@ async function main() {
                 )
 
                 // ---- envelope, one per status ----------------------------------
-                for (const [label, called] of [
-                    ["200", ok],
-                    ["400", noWorkspace],
-                    ["401", anon],
-                    ["403", foreign],
-                ] as Array<[string, Called]>) {
+                // The expected status is FIXED per case, not derived from the observed one. Deriving it
+                // (`called.status < 400 ? … : …`) meant a 403 regressing to a 200 flipped the
+                // expectation with it and the loop still passed.
+                for (const [label, called, expectedStatus] of [
+                    ["200", ok, 200],
+                    ["400", noWorkspace, 400],
+                    ["401", anon, 401],
+                    ["403", foreign, 403],
+                ] as Array<[string, Called, number]>) {
                     const keys = Object.keys(called.body).sort().join(",")
-                    const expected = called.status < 400 ? "data,ok" : "error,ok"
-                    check(`the ${label} response uses the shared envelope shape`, keys === expected, `keys=${keys}`)
+                    const expected = expectedStatus < 400 ? "data,ok" : "error,ok"
+                    checkInvertible(
+                        `the ${label} response really is ${label} and uses the shared envelope shape`,
+                        called.status === expectedStatus && keys === expected,
+                        `status=${called.status} keys=${keys}`,
+                    )
                 }
 
                 throw new Rollback()
@@ -450,9 +532,28 @@ async function main() {
         }
 
         // ---- 503, and the leak assertion that is its point ---------------------
+        // THE MOCK MUST REACH THE THROW. The first version defined only `workspace.findUnique`, but
+        // requireScope goes through PersistedTenancy first: `user.findUnique` (tenancy.ts:75) then
+        // `membership.findUnique` (tenancy.ts:78), and only then `workspace.findUnique`
+        // (shared.ts:45). With those undefined the call died as a TypeError before the DSN-bearing
+        // error was ever thrown, so all seven fragment assertions below were passing against an error
+        // that contained no secret. They asserted nothing. The chain is now satisfied so the injected
+        // secret is genuinely produced and genuinely has to be suppressed.
+        const leakProbe = { workspaceLookups: 0 }
         const brokenPrisma = {
+            user: {
+                findUnique: async () => ({ id: `${RUN}_leak_user` }),
+            },
+            membership: {
+                findUnique: async () => ({
+                    id: `${RUN}_leak_member`,
+                    role: "OWNER",
+                    membershipLocations: [] as Array<{ locationId: string }>,
+                }),
+            },
             workspace: {
                 findUnique: async () => {
+                    leakProbe.workspaceLookups += 1
                     throw new Error("SECRET_DETAIL postgres://user:pw@dbhost:5432/personalink?sslmode=require")
                 },
             },
@@ -463,6 +564,14 @@ async function main() {
             new OperationsService(new OperationsContext(brokenPrisma, new PersistedTenancy(brokenPrisma, brokenIdentity))),
         )
         const broken = await call(brokenApi.preview(get(`${BASE}?workspaceId=whatever`)))
+        // The precondition for every leak assertion below. Without this the mock can silently stop
+        // reaching the throw again - a refactor of the tenancy chain would do it - and the leak
+        // assertions would go back to passing against an error containing no secret.
+        checkInvertible(
+            "MEASURED: the injected secret was actually produced - the failure path reached the throw",
+            leakProbe.workspaceLookups === 1,
+            `workspace lookups=${leakProbe.workspaceLookups}`,
+        )
         checkInvertible(
             "a dependency failure is 503 rather than a 500 or a stack trace",
             broken.status === 503 && errCode(broken) === "DEPENDENCY_UNAVAILABLE",
@@ -488,13 +597,46 @@ async function main() {
             `keys=${Object.keys(broken.body).sort().join(",")}`,
         )
 
-        // ---- the strongest no-write claim: nothing changed, anywhere -----------
-        const after = await countAll()
-        checkInvertible(
-            "MEASURED: requesting a preview wrote nothing - every table this domain reaches is unchanged",
-            JSON.stringify(before) === JSON.stringify(after),
-            `${JSON.stringify(before)} -> ${JSON.stringify(after)}`,
-        )
+        // ---- the strongest no-write claim, measured on COMMITTED data ----------
+        //
+        // THIS USED TO PROVE NOTHING. `before` was taken before prisma.$transaction opened, every real
+        // request ran inside that transaction, and the transaction ended in `throw new Rollback()`. So
+        // if `preview` had written a row, the rollback would have erased it and the counts would still
+        // have matched. The assertion was guaranteed to pass by its own test harness.
+        //
+        // The envelope and authorization work above still uses the rollback, which is correct - it
+        // needs seeded tenants and must leave none behind. But the no-write claim has to be measured
+        // against data the request can actually persist against, so it gets its own committed fixture
+        // and its own explicit cleanup.
+        const committed = await seedCommitted(prisma)
+        try {
+            const beforeCommitted = await countAll()
+            const identity = new ControlledIdentity()
+            identity.current = committed.user
+            const committedApi = new DueWorkApiService(
+                new OperationsService(new OperationsContext(prisma, new PersistedTenancy(prisma, identity))),
+            )
+            const persisted = await call(committedApi.preview(get(`${BASE}?workspaceId=${committed.workspace}`)))
+            checkInvertible(
+                "the committed-fixture request really succeeded, so the no-write claim is measured on a 200",
+                persisted.status === 200,
+                `status=${persisted.status} ${String((persisted.body.error as { message?: string } | undefined)?.message ?? "")}`,
+            )
+            const afterCommitted = await countAll()
+            checkInvertible(
+                "MEASURED: a committed, non-rolled-back preview request wrote nothing to any counted table",
+                JSON.stringify(beforeCommitted) === JSON.stringify(afterCommitted),
+                Object.keys(beforeCommitted)
+                    .filter(
+                        (k) =>
+                            (beforeCommitted as Record<string, number>)[k] !==
+                            (afterCommitted as Record<string, number>)[k],
+                    )
+                    .join(",") || "all counts identical",
+            )
+        } finally {
+            await cleanupCommitted(prisma)
+        }
     } finally {
         await prisma.$disconnect()
     }

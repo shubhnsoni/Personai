@@ -142,7 +142,9 @@ export const FORBIDDEN_PREVIEW_WORDS: readonly string[] = Object.freeze([
     "queued",
     "dispatched",
     "processing",
+    "running",
     "automatic",
+    "will",
 ])
 
 /** Words this surface is expected to use, so honest wording is a positive requirement too. */
@@ -156,7 +158,7 @@ export const REQUIRED_PREVIEW_WORDS: readonly string[] = Object.freeze(["plan", 
  */
 export const DUE_WORK_PREVIEW_LIMITATIONS: readonly string[] = Object.freeze([
     "This preview is a plan, not an action. Nothing here has been sent, charged, dispatched or handed to any provider, and requesting it changed no data.",
-    "Nothing runs on its own. There is no timer, interval, cron or background worker behind this surface - it produced this plan because somebody asked for it, and it will not produce another until somebody asks again.",
+    "Nothing runs on its own. There is no timer, interval, cron or background worker behind this surface - it produced this plan because somebody asked for it, and it produces another only when somebody asks again.",
     "The ordering is a proposal. Overdue work precedes dated work precedes undated work, and every item carries the reason for its position, but nothing here knows your priorities.",
     "Coverage is inherited from the operations view and is not everything. Read covers and doesNotCover before treating the total as a total.",
     "Where covered domains do not share one tenant boundary, comparing positions across them compares two different populations. mixedScope says when that is the case.",
