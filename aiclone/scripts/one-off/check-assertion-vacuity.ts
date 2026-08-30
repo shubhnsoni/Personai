@@ -32,6 +32,13 @@
  * Under `||` the whole condition is judged together, because one always-true disjunct makes the
  * entire assertion unfalsifiable.
  *
+ * A SECOND PASS runs over the wrappers that BUILD a condition rather than forwarding one
+ * (`expectOrder(domain, expected, why)`). Their bodies are scanned in place like any other code, but
+ * in the body the expected value is an opaque parameter, so a defect-3 introduced at the CALLSITE is
+ * invisible there. Each callsite argument is therefore substituted for the parameter and the SAME
+ * detector chain re-run, reporting only what the in-place scan could not reach. See
+ * `scanBuilderCallsites`.
+ *
  * PRECEDENCE. A conjunct gets exactly one class, tried in this order, so nothing is double counted:
  * LITERAL, TAUTOLOGY, SELF_COMPARISON, DERIVED_EXPECTATION, CONDITIONAL_INIT, UNGUARDED_EVERY.
  * `typeof x === typeof x` therefore lands in TAUTOLOGY rather than SELF_COMPARISON, matching the way
@@ -84,11 +91,31 @@ type Finding = Readonly<{
  */
 const COVERAGE_LIMITS: readonly string[] = [
     "a helper reached only through a value: passed as a callback, stored in an object or array, or selected by index or computed key",
-    "a condition-forwarding wrapper more than 2 levels above a real helper",
-    "a wrapper that BUILDS its condition from a non-boolean argument (expectOrder, protectedCase, expectRuntimeError) - deliberately not registered, because the callsite argument is not the condition; the real condition inside the wrapper body IS scanned, in place",
+    "an argument to a condition-BUILDING wrapper (expectOrder, protectedCase, expectRuntimeError, and the drivers that take an observation handle) whose derivation from the code under test cannot be settled on source text: the callsite argument IS now substituted into the wrapper's own condition and re-classified, but substitution stops where canonicalisation stops - an argument computed inside ANOTHER function, or one that becomes textually identical to the observation through calls this scanner cannot prove side-effect free, is reported UNRESOLVED rather than counted",
+    "a condition-building wrapper whose condition parameter shares its NAME with a file-level binding: substitution is keyed by name, so it is skipped rather than risk reasoning about the wrong value (reported per file when it happens)",
     "a helper imported from another module: `import` bindings are not resolved (no harness in this tree shares a helper file today)",
     "a condition assembled at runtime - built by string, selected from a table of predicates, or produced by a factory called with different arguments per callsite",
 ]
+
+/**
+ * Safety bound on wrapper-discovery rounds. This is NOT a coverage limit, and it is deliberately not
+ * listed as one.
+ *
+ * The loop's real terminator is the FIXED POINT: a round that registers nothing. It was previously
+ * bounded at 2 rounds as well, which was the only thing stopping the chain closing, and that bound
+ * WAS a coverage hole - a wrapper three levels above a real helper was silently not a helper, so every
+ * assertion made through it was not an assertion as far as this scanner was concerned. Nothing about
+ * the algorithm needed it: each round can only register a wrapper whose callee is already known, so
+ * the number of rounds a file needs is the depth of its longest wrapper chain plus one, and a round
+ * that registers nothing proves no deeper chain exists.
+ *
+ * The bound survives only so that a pathological input cannot spin forever. It is REPORTED when it is
+ * reached (`wrapperRoundsExhausted`), and reaching it FAILS the run, because a silently truncated
+ * discovery is exactly the kind of undeclared hole this scanner exists to prevent. MEASURED: the
+ * deepest chain in this tree is 1 wrapper, which converges in 2 rounds; the depth-4 self-test fixture
+ * converges in 5.
+ */
+const MAX_WRAPPER_ROUNDS = 16
 
 const SELF_NAME = "check-assertion-vacuity.ts"
 const MANIFEST_PATH = join(__dirname, "..", "gates", "gates.manifest.json")
@@ -293,6 +320,9 @@ type HelperDiscovery = Readonly<{
     aliases: readonly string[]
     /** Names covered ONLY because FALLBACK_HELPERS names them: a discovery miss worth seeing. */
     fallbackUsed: readonly string[]
+    /** Rounds the wrapper fixed point actually took, and whether it converged inside the safety bound. */
+    wrapperRounds: number
+    wrapperRoundsExhausted: boolean
     notes: readonly string[]
 }>
 
@@ -316,6 +346,15 @@ type HelperDiscovery = Readonly<{
  * be in the fallback map. Rename it and eight harnesses would have gone silently unscanned. Wrappers
  * are now derived, so the coverage no longer depends on a name.
  *
+ * WRAPPERS OF WRAPPERS, TO A FIXED POINT. A round can only register a wrapper whose callee is ALREADY
+ * a known helper, and the walk visits declarations in source order, so a chain declared outermost
+ * first needs one round per link. The loop iterates until a round registers nothing - the fixed point,
+ * which PROVES no deeper chain exists - bounded only by `MAX_WRAPPER_ROUNDS` as a runaway guard that
+ * fails loudly if it is ever reached. It was previously bounded at 2 rounds, and that bound was a real
+ * hole: a wrapper three links above a real helper was not a helper, so every assertion made through it
+ * was invisible. The depth-3 and depth-4 self-test fixtures register at rounds 3 and 4, which no
+ * two-round loop can produce, so they cannot pass under the old bound.
+ *
  * THE SOUNDNESS RULE. A wrapper is registered only when a parameter reaches the base helper's
  * condition slot in BOOLEAN POSITION - as the whole condition, under `!`, as an operand of
  * `&&`/`||`/`??`, or as a branch or test of `?:`. A parameter appearing as an operand of `===`, or as
@@ -329,6 +368,15 @@ type HelperDiscovery = Readonly<{
  * or a fixture handle. Registering them would hand a non-boolean to the detectors, and `fold` would
  * report a string argument as a constant-true VACUOUS_LITERAL - a fabricated defect. Their real
  * conditions are already scanned in place, inside the wrapper body, where they are written.
+ *
+ * AND IN-PLACE IS NOT ENOUGH, WHICH IS WHY `scanBuilderCallsites` EXISTS. Scanning the body covers the
+ * condition's SHAPE, but inside the body the callsite argument is an OPAQUE PARAMETER: it has no
+ * definition, so `resolveToExpression` returns null and `observationRoots` sees a bare name. A
+ * VACUOUS_DERIVED_EXPECTATION introduced at the CALLSITE - an expected value computed from the very
+ * observation the body compares it against - is therefore structurally invisible to the in-place scan,
+ * and that is the subtlest of the three classes and the one this repository has actually shipped. So
+ * these wrappers are found separately, by `discoverConditionBuilders`, and each callsite argument is
+ * substituted into the wrapper's own condition and put through the SAME detector chain.
  */
 function discoverHelpers(source: ts.SourceFile): HelperDiscovery {
     const helpers = new Map<string, number>()
@@ -346,9 +394,12 @@ function discoverHelpers(source: ts.SourceFile): HelperDiscovery {
     })
     const direct = new Set(helpers.keys())
 
-    // ---- tier 2: condition-forwarding wrappers, then wrappers of wrappers ----------------------
+    // ---- tier 2: condition-forwarding wrappers, to a fixed point -------------------------------
     const wrappers: string[] = []
-    for (let round = 0; round < 2; round += 1) {
+    let wrapperRounds = 0
+    let converged = false
+    while (wrapperRounds < MAX_WRAPPER_ROUNDS) {
+        wrapperRounds += 1
         let grew = false
         walk(source, (node) => {
             const candidate = asFunctionLike(node)
@@ -378,10 +429,13 @@ function discoverHelpers(source: ts.SourceFile): HelperDiscovery {
             })
             if (registered === null) return
             helpers.set(candidate.name, registered)
-            wrappers.push(`${candidate.name} @cond=${registered} via ${via} (round ${round + 1})`)
+            wrappers.push(`${candidate.name} @cond=${registered} via ${via} (round ${wrapperRounds})`)
             grew = true
         })
-        if (!grew) break
+        if (!grew) {
+            converged = true
+            break
+        }
     }
 
     // ---- tier 3: direct identifier aliases -----------------------------------------------------
@@ -414,7 +468,16 @@ function discoverHelpers(source: ts.SourceFile): HelperDiscovery {
     }
 
     for (const name of direct) notes.push(`${name} @cond=${helpers.get(name)} (declared, records a verdict)`)
-    return { helpers, direct, wrappers, aliases, fallbackUsed, notes }
+    return {
+        helpers,
+        direct,
+        wrappers,
+        aliases,
+        fallbackUsed,
+        wrapperRounds,
+        wrapperRoundsExhausted: !converged,
+        notes,
+    }
 }
 
 function calleeName(node: ts.CallExpression): string | null {
@@ -433,7 +496,8 @@ type Definition = Readonly<{
     stable: boolean
     /** Plain `x = ...` reassignments only. The detectors that read `.right` need that shape. */
     assignments: readonly ts.BinaryExpression[]
-    declaration: ts.VariableDeclaration
+    /** Absent for a SYNTHESISED binding, i.e. a wrapper parameter bound to a callsite argument. */
+    declaration?: ts.VariableDeclaration
 }>
 
 /**
@@ -1358,6 +1422,260 @@ function hasNonEmptyGuard(context: Context, scope: ts.Node, receiverText: string
 }
 
 // ---------------------------------------------------------------------------------------------
+// the detector chain, in precedence order
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * ONE chain, used by both the in-place scan and the callsite-substitution pass.
+ *
+ * They must not diverge. Every soundness argument in this file, and every self-test fixture that
+ * proves one, is an argument about this chain; a second copy for the callsite pass would be a second
+ * thing to trust. The pass changes only the `definitions` it hands in.
+ */
+function classifyConjunct(
+    context: Context,
+    conjunct: ts.Expression,
+    whole: ts.Expression,
+    assertion: ts.CallExpression,
+    siblings: readonly ts.Expression[],
+): Verdict {
+    return detectLiteral(context, conjunct, assertion)
+        ?? detectTautology(context, conjunct)
+        ?? detectSelfComparison(context, conjunct)
+        ?? detectDerivedExpectation(context, conjunct)
+        ?? detectConditionalInit(context, conjunct, siblings)
+        ?? detectUnguardedEvery(context, conjunct, whole, assertion)
+}
+
+// ---------------------------------------------------------------------------------------------
+// condition-BUILDING wrappers, and what their callsites pass
+// ---------------------------------------------------------------------------------------------
+
+type ConditionBuilder = Readonly<{
+    wrapper: string
+    parameter: string
+    parameterIndex: number
+    /** The assertion call inside the wrapper body, and the condition it is given. */
+    assertion: ts.CallExpression
+    condition: ts.Expression
+    /** Span of the wrapper's own declaration, so its recursive self-calls are not treated as callsites. */
+    start: number
+    end: number
+}>
+
+/**
+ * Wrappers that BUILD a condition out of one parameter rather than forwarding a boolean.
+ *
+ * The complement of the tier-2 set: the same walk, but kept when `collectBooleanPositions` finds
+ * NOTHING - the parameter reaches the helper's condition slot only as an operand of a comparison, or
+ * as a receiver, so the argument at the callsite is a string, an array or a fixture handle, never the
+ * condition. `expectOrder`, `protectedCase` and `expectRuntimeError` are the shapes the review named.
+ *
+ * The set is WIDER than those three, and deliberately so: it also picks up a driver that takes an
+ * observation handle and asserts on it (`runChecks(db)`, `runSuite(tx)`), because the risk is the same
+ * one - a value chosen at the callsite reaching a condition the callsite cannot be seen from. A name
+ * that is only ever used AS a value, never called (`flakyAction`, passed to a service), yields an entry
+ * with zero callsites; that is reported as zero rather than hidden, so the difference between "checked
+ * and clean" and "never reached" stays visible.
+ *
+ * One builder is recorded per (function, assertion call), so a wrapper whose body asserts three times
+ * has each of its three conditions substituted independently.
+ *
+ * Exactly one parameter may be involved. With two, "which argument is the expectation" is a guess, and
+ * a guess is how a scanner fabricates a defect.
+ */
+function discoverConditionBuilders(source: ts.SourceFile, helpers: ReadonlyMap<string, number>): ConditionBuilder[] {
+    const builders: ConditionBuilder[] = []
+    walk(source, (node) => {
+        const candidate = asFunctionLike(node)
+        if (!candidate || !candidate.body) return
+        // A name that IS a helper was registered by tier 2: it forwards a condition, so its callsite
+        // argument is already scanned as a condition and there is nothing to substitute.
+        if (helpers.has(candidate.name)) return
+        const parameters = new Map<string, number>()
+        candidate.parameters.forEach((parameter, index) => {
+            if (ts.isIdentifier(parameter.name)) parameters.set(parameter.name.text, index)
+        })
+        if (parameters.size === 0) return
+        walk(candidate.body as ts.Node, (inner) => {
+            if (!ts.isCallExpression(inner)) return
+            const callee = calleeName(inner)
+            if (!callee) return
+            const conditionIndex = helpers.get(callee)
+            if (conditionIndex === undefined) return
+            const condition = inner.arguments[conditionIndex]
+            if (!condition) return
+            const forwarded = new Set<string>()
+            collectBooleanPositions(condition, new Set(parameters.keys()), forwarded)
+            if (forwarded.size > 0) return
+            const used = [...parameters.keys()].filter((name) => readsName(condition, name))
+            if (used.length !== 1) return
+            builders.push({
+                wrapper: candidate.name,
+                parameter: used[0],
+                parameterIndex: parameters.get(used[0]) as number,
+                assertion: inner,
+                condition,
+                start: node.getStart(source),
+                end: node.getEnd(),
+            })
+        })
+    })
+    return builders
+}
+
+/** Does `expression` READ the binding `name`? A property called `name` is not a read of it. */
+function readsName(expression: ts.Node, name: string): boolean {
+    return contains(expression, (candidate) => {
+        if (!ts.isIdentifier(candidate) || candidate.text !== name) return false
+        const parent = candidate.parent
+        if (parent && ts.isPropertyAccessExpression(parent) && parent.name === candidate) return false
+        if (parent && ts.isPropertyAssignment(parent) && parent.name === candidate) return false
+        return true
+    })
+}
+
+/**
+ * The one thing in-place scanning of a condition-building wrapper cannot see: what the CALLSITE passed.
+ *
+ * Substitute the callsite argument for the wrapper's parameter - as a synthesised stable binding, so
+ * `canonical`, `resolveToExpression` and `observationRoots` all follow it exactly as they follow a real
+ * `const` - and re-run the SAME detector chain on the wrapper's own condition. A verdict is emitted
+ * only when it is NOT already reachable in place, so every finding here is by construction one the
+ * body-only scan could not have produced, and is attributed to the callsite line that caused it.
+ *
+ * WHY THIS IS SOUND AND NOT A SHARED-ROOT GUESS. Nothing new is asserted about derivation. The chain's
+ * own rules decide, and they already refuse a shared root on its own: `detectDerivedExpectation`
+ * requires the expectation to be a BRANCH on the observation with constant results, and
+ * `detectSelfComparison` requires textual identity after inlining plus provable purity. Substitution
+ * only makes the argument visible to those rules. Concretely, this is what keeps a real assertion out
+ * of the count: `expectOrder(d, sorted(idsIn(a, d)), why)` against a body comparing `idsIn(a, d)`
+ * shares the root `a`, and canonicalises to `[...idsIn(a,d)].sort(byId)` versus `idsIn(a,d)` - not
+ * identical, not a branch, so not flagged. It is a live assertion that the response is already sorted.
+ *
+ * MEASURED at Q4-B: 18 builder entries, 87 callsite arguments substituted, 0 findings - read the
+ * current numbers off a run rather than trusting this line. The review that asked for this walked every
+ * `expectOrder` callsite by hand and found no live instance either, so agreement with a hand audit is
+ * the only evidence available that the pass is not silently vacuous. Which is why the self-test carries
+ * a fixture it MUST catch, a control whose callsite argument shares an observation root with the body
+ * and must stay live, and a mutation - emptying the builder set - under which the fixture goes back to
+ * being invisible.
+ */
+function scanBuilderCallsites(
+    context: Context,
+    builders: readonly ConditionBuilder[],
+): Readonly<{ findings: Finding[]; notes: string[]; skipped: string[]; callsiteCount: number }> {
+    const findings: Finding[] = []
+    const notes: string[] = []
+    const skipped: string[] = []
+    let callsiteCount = 0
+
+    for (const builder of builders) {
+        // Substitution is keyed by NAME, over a file-wide definition map. If the parameter's name is
+        // also a real binding in this file, overriding it could make the detectors reason about the
+        // wrong value somewhere else in the same condition. Skip and say so.
+        if (context.definitions.has(builder.parameter)) {
+            skipped.push(
+                `${builder.wrapper}(arg${builder.parameterIndex} = \`${builder.parameter}\`): the parameter name is also a file-level binding, so callsite substitution was skipped rather than risk resolving the wrong one`,
+            )
+            continue
+        }
+        const callsites: ts.CallExpression[] = []
+        walk(context.source, (node) => {
+            if (!ts.isCallExpression(node) || calleeName(node) !== builder.wrapper) return
+            const start = node.getStart(context.source)
+            if (start >= builder.start && start < builder.end) return
+            if (node.arguments.length <= builder.parameterIndex) return
+            callsites.push(node)
+        })
+        notes.push(
+            `${builder.wrapper}(arg${builder.parameterIndex} = \`${builder.parameter}\`) builds its condition at line ${lineOf(context.source, builder.condition)}; ${callsites.length} callsite argument(s) substituted`,
+        )
+        callsiteCount += callsites.length
+
+        const parts = conjuncts(builder.condition)
+        for (const callsite of callsites) {
+            const argument = callsite.arguments[builder.parameterIndex]
+            const extended = new Map(context.definitions)
+            extended.set(builder.parameter, { initializer: argument, stable: true, assignments: [] })
+            const substituted: Context = { ...context, definitions: extended }
+            for (const conjunct of parts) {
+                const inPlace = classifyConjunct(context, conjunct, builder.condition, builder.assertion, parts)
+                const withArgument = classifyConjunct(substituted, conjunct, builder.condition, builder.assertion, parts)
+                const verdict = withArgument && inPlace?.classification !== withArgument.classification
+                    ? withArgument
+                    : identicalAfterSubstitution(substituted, conjunct, inPlace)
+                if (!verdict) continue
+                const finding: Finding = {
+                    file: context.file,
+                    line: lineOf(context.source, callsite),
+                    helper: builder.wrapper,
+                    assertion: builderAssertionName(context, builder),
+                    conjunct: `${oneLine(textOf(context.source, conjunct), 80)}  [with \`${builder.parameter}\` = ${oneLine(textOf(context.source, argument), 60)}]`,
+                    classification: verdict.classification,
+                    evidence: `CALLSITE-DERIVED, invisible to the in-place scan of \`${builder.wrapper}\` because \`${builder.parameter}\` is an opaque parameter there. ${verdict.evidence}`,
+                }
+                if (finding.classification === "UNRESOLVED") {
+                    findings.push(finding)
+                    continue
+                }
+                // Evidence is taken at the CALLSITE, which is where the argument was chosen; a
+                // deliberate bad argument in a self-test is marked there, not in the wrapper.
+                const deliberate = fixtureEvidence(context, callsite)
+                findings.push(
+                    deliberate
+                        ? {
+                            ...finding,
+                            classification: "INTENTIONAL_FIXTURE_SELF_CHECK",
+                            evidence: `${finding.evidence} RECLASSIFIED as deliberate: ${deliberate}`,
+                        }
+                        : finding,
+                )
+            }
+        }
+    }
+    return { findings, notes, skipped, callsiteCount }
+}
+
+/**
+ * The interprocedural `x === x`: both operands become the same text once the callsite argument is in,
+ * but purity cannot be established, so it is DECLARED rather than counted.
+ *
+ * `detectSelfComparison` already counts this when both sides are provably side-effect free, and
+ * already reports it UNRESOLVED when they resolve equal through pure bindings. What is left is the
+ * common real shape - the derivation runs through a locally declared function this scanner cannot
+ * prove pure - where the honest answer is that source text cannot settle whether the two evaluations
+ * could differ. A declared unknown; never a clean.
+ */
+function identicalAfterSubstitution(substituted: Context, conjunct: ts.Expression, inPlace: Verdict): Verdict {
+    if (inPlace) return null
+    const target = unwrap(conjunct)
+    if (!ts.isBinaryExpression(target)) return null
+    if (!ALWAYS_TRUE_WHEN_IDENTICAL.has(target.operatorToken.kind)) return null
+    const left = canonical(substituted.source, target.left, substituted.definitions)
+    const right = canonical(substituted.source, target.right, substituted.definitions)
+    if (left !== right) return null
+    if (deeplyPure(target.left, substituted.definitions) && deeplyPure(target.right, substituted.definitions)) {
+        // Provably pure and identical: the chain itself reaches a verdict, so this tier adds nothing.
+        return null
+    }
+    return {
+        classification: "UNRESOLVED",
+        evidence: `Once the callsite argument is substituted both operands are the same expression text (\`${oneLine(left, 90)}\`), which LOOKS like x === x across the call boundary. Not counted: the text contains at least one call this scanner cannot prove side-effect free, so whether the two evaluations could differ needs the runtime. Worth a human read.`,
+    }
+}
+
+/** The name string the wrapper's own assertion is given, for the report line. */
+function builderAssertionName(context: Context, builder: ConditionBuilder): string {
+    const nameArgument = builder.assertion.arguments.find(
+        (argument) => ts.isStringLiteral(argument)
+            || ts.isTemplateExpression(argument)
+            || ts.isNoSubstitutionTemplateLiteral(argument),
+    )
+    return nameArgument ? oneLine(textOf(context.source, nameArgument), 90) : "(unnamed)"
+}
+
+// ---------------------------------------------------------------------------------------------
 // deliberate-fixture evidence
 // ---------------------------------------------------------------------------------------------
 
@@ -1404,6 +1722,10 @@ type ScanResult = Readonly<{
     assertionCount: number
     helpers: readonly string[]
     discovery: HelperDiscovery
+    /** Condition-building wrappers whose callsite arguments were substituted, and any that were not. */
+    builderNotes: readonly string[]
+    builderSkipped: readonly string[]
+    builderCallsites: number
 }>
 
 function scan(file: string, text: string): ScanResult {
@@ -1439,12 +1761,7 @@ function scan(file: string, text: string): ScanResult {
         const emitted: Finding[] = []
 
         for (const conjunct of parts) {
-            const verdict = detectLiteral(context, conjunct, assertion)
-                ?? detectTautology(context, conjunct)
-                ?? detectSelfComparison(context, conjunct)
-                ?? detectDerivedExpectation(context, conjunct)
-                ?? detectConditionalInit(context, conjunct, parts)
-                ?? detectUnguardedEvery(context, conjunct, condition, assertion)
+            const verdict = classifyConjunct(context, conjunct, condition, assertion, parts)
             if (!verdict) continue
             emitted.push({
                 file,
@@ -1475,7 +1792,19 @@ function scan(file: string, text: string): ScanResult {
         }
     }
 
-    return { findings, assertionCount: assertions.length, helpers: [...helpers.keys()].sort(), discovery }
+    const builders = discoverConditionBuilders(source, helpers)
+    const builderPass = scanBuilderCallsites(context, builders)
+    findings.push(...builderPass.findings)
+
+    return {
+        findings,
+        assertionCount: assertions.length,
+        helpers: [...helpers.keys()].sort(),
+        discovery,
+        builderNotes: builderPass.notes,
+        builderSkipped: builderPass.skipped,
+        builderCallsites: builderPass.callsiteCount,
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1626,6 +1955,54 @@ const VACUOUS_FIXTURES: readonly Fixture[] = [
             "function checkNamed(name: string, ok: boolean, detail = '') { checkInverted(name, ok, detail) }",
             "function checkInverted(name: string, pass: boolean, detail = '') { check(name, pass, detail) }",
             "checkNamed('a variant can be renamed', true, observedTitle)",
+        ].join("\n"),
+    },
+    {
+        name: "forwarding-wrapper-three-levels",
+        expect: "VACUOUS_LITERAL",
+        body: [
+            "declare const observedTitle: string",
+            "// Declared OUTERMOST FIRST, which is what makes the depth load-bearing. A round can only",
+            "// register a wrapper whose callee is ALREADY a known helper, and the walk visits these in",
+            "// source order, so round 1 reaches only `checkL1`, round 2 reaches `checkL2`, and `checkL3`",
+            "// is not a helper until round 3. Under the old fixed bound of two rounds this callsite was",
+            "// not an assertion at all, so the constant `true` in it was invisible.",
+            "function checkL3(name: string, ok: boolean, detail = '') { checkL2(name, ok, detail) }",
+            "function checkL2(name: string, ok: boolean, detail = '') { checkL1(name, ok, detail) }",
+            "function checkL1(name: string, pass: boolean, detail = '') { check(name, pass, detail) }",
+            "checkL3('a variant can be renamed', true, observedTitle)",
+        ].join("\n"),
+    },
+    {
+        name: "forwarding-wrapper-four-levels",
+        expect: "VACUOUS_LITERAL",
+        body: [
+            "declare const observedTitle: string",
+            "// One link deeper again, registered in round 4. Two fixtures rather than one because a",
+            "// single depth-3 case cannot show that the loop closes whatever the depth - it could be",
+            "// read as a bound of 3 rather than as a fixed point.",
+            "function checkD4(name: string, ok: boolean, detail = '') { checkD3(name, ok, detail) }",
+            "function checkD3(name: string, ok: boolean, detail = '') { checkD2(name, ok, detail) }",
+            "function checkD2(name: string, ok: boolean, detail = '') { checkD1(name, ok, detail) }",
+            "function checkD1(name: string, pass: boolean, detail = '') { check(name, pass, detail) }",
+            "checkD4('a variant can be renamed', true, observedTitle)",
+        ].join("\n"),
+    },
+    {
+        name: "callsite-derived-expectation-through-a-builder-wrapper",
+        expect: "VACUOUS_DERIVED_EXPECTATION",
+        body: [
+            "declare const called: { status: number; body: Record<string, unknown> }",
+            "const gotKeys = Object.keys(called.body).sort().join(',')",
+            "// `expectEnvelope` BUILDS its condition, so it is not registered as a helper and its",
+            "// callsite argument is never scanned as a condition. In the body `want` is an opaque",
+            "// parameter with no definition, so the in-place scan sees `gotKeys === want` and can say",
+            "// nothing at all about it. The vacuity is entirely in what the callsite below passes: an",
+            "// expectation that branches on the very response `gotKeys` was read from.",
+            "const expectEnvelope = (why: string, want: string) => {",
+            "    checkInvertible(`the response uses the shared envelope shape, ${why}`, gotKeys === want, gotKeys)",
+            "}",
+            "expectEnvelope('a refusal keeps the error envelope', called.status < 400 ? 'data,ok' : 'error,ok')",
         ].join("\n"),
     },
     {
@@ -1841,6 +2218,36 @@ const LIVE_CONTROLS: readonly Fixture[] = [
         ].join("\n"),
     },
     {
+        name: "live-callsite-expectation-independent-of-the-observation",
+        expect: "LIVE",
+        body: [
+            "declare const called: { status: number; body: Record<string, unknown> }",
+            "declare const expectedStatus: number",
+            "const gotKeys = Object.keys(called.body).sort().join(',')",
+            "const expectEnvelope = (why: string, want: string) => {",
+            "    checkInvertible(`the response uses the shared envelope shape, ${why}`, gotKeys === want, gotKeys)",
+            "}",
+            "expectEnvelope('a refusal keeps the error envelope', expectedStatus < 400 ? 'data,ok' : 'error,ok')",
+        ].join("\n"),
+    },
+    {
+        name: "live-callsite-argument-shares-a-root-with-the-observation",
+        expect: "LIVE",
+        body: [
+            "declare const a: { items: ReadonlyArray<{ domain: string; id: string }> }",
+            "// The trap the callsite-substitution pass must NOT fall into, and the reason a shared",
+            "// observation root can never be the test on its own. Both sides read `a`, so a root-sharing",
+            "// rule would flag this - and it is one of the strongest assertions in the tree: that the",
+            "// response already comes back in sorted order. Sorting is not the identity, so the two",
+            "// canonical texts differ, the argument is not a branch on the observation, and it stays live.",
+            "const idsIn = (domain: string) => a.items.filter((i) => i.domain === domain).map((i) => i.id)",
+            "const expectOrder = (domain: string, expected: readonly string[]) => {",
+            "    checkInvertible(`${domain} come back in the one order a total ordering permits`, idsIn(domain).join(',') === expected.join(','), domain)",
+            "}",
+            "expectOrder('reservations', [...idsIn('reservations')].sort())",
+        ].join("\n"),
+    },
+    {
         name: "live-counter-mutated-by-increment",
         expect: "LIVE",
         body: [
@@ -1927,6 +2334,70 @@ function runSelfTest(): boolean {
         ok = false
     } else {
         console.log(`PASS self-test coverage-wrapper: followed ${wrapperResult.discovery.wrappers.join("; ")}`)
+    }
+
+    // ---- the wrapper fixed point, proven by the ROUND each chain closes in ----------------------
+    // This is the load-bearing part of the depth proof. The round number is recorded when a wrapper is
+    // registered, and a loop bounded at two rounds cannot produce `(round 3)` or `(round 4)` at all -
+    // so a fixture that reports one is a fixture the old bound could not have followed. Checking only
+    // that the finding appears would be weaker: it would also pass for a fixture the old bound handled.
+    for (const depth of [
+        { fixture: "forwarding-wrapper-three-levels", outermost: "checkL3", round: 3, rounds: 4 },
+        { fixture: "forwarding-wrapper-four-levels", outermost: "checkD4", round: 4, rounds: 5 },
+    ]) {
+        const result = scan(`coverage-wrapper-depth-${depth.round}.ts`, fixtureSource(fixtureNamed(depth.fixture)))
+        const note = result.discovery.wrappers.find((wrapper) => wrapper.startsWith(`${depth.outermost} `))
+        if (!note || !note.includes(`(round ${depth.round})`)) {
+            console.error(
+                `FAIL self-test coverage-wrapper-depth-${depth.round}: expected \`${depth.outermost}\` to be registered in round ${depth.round}, saw ${result.discovery.wrappers.join("; ") || "no wrappers"}`,
+            )
+            ok = false
+            continue
+        }
+        if (result.discovery.wrapperRounds !== depth.rounds || result.discovery.wrapperRoundsExhausted) {
+            console.error(
+                `FAIL self-test coverage-wrapper-depth-${depth.round}: expected the fixed point in ${depth.rounds} round(s) with the safety bound untouched, saw ${result.discovery.wrapperRounds} round(s), exhausted=${String(result.discovery.wrapperRoundsExhausted)}`,
+            )
+            ok = false
+            continue
+        }
+        const hit = result.findings.find((finding) => finding.classification === "VACUOUS_LITERAL")
+        if (!hit) {
+            console.error(
+                `FAIL self-test coverage-wrapper-depth-${depth.round}: the chain was registered but the assertion made through it was not classified, so the depth buys nothing`,
+            )
+            ok = false
+            continue
+        }
+        console.log(
+            `PASS self-test coverage-wrapper-depth-${depth.round}: ${note}, fixed point in ${result.discovery.wrapperRounds} round(s) inside the bound of ${MAX_WRAPPER_ROUNDS}, and the assertion made through the chain is caught (${hit.classification} at fixture line ${hit.line})`,
+        )
+    }
+
+    // ---- the callsite-substitution pass, and the two things it must get right -------------------
+    const builderResult = scan(
+        "coverage-builder-callsite.ts",
+        fixtureSource(fixtureNamed("callsite-derived-expectation-through-a-builder-wrapper")),
+    )
+    if (builderResult.builderCallsites === 0) {
+        console.error("FAIL self-test coverage-builder-callsite: no condition-building wrapper callsite was substituted, so the pass is not wired")
+        ok = false
+    }
+    const lifted = builderResult.findings.find((finding) => finding.classification === "VACUOUS_DERIVED_EXPECTATION")
+    if (!lifted) {
+        console.error("FAIL self-test coverage-builder-callsite: the callsite-derived expectation was not caught")
+        ok = false
+    } else if (!lifted.evidence.startsWith("CALLSITE-DERIVED")) {
+        console.error(`FAIL self-test coverage-builder-callsite: the finding was not attributed to the callsite: ${lifted.evidence}`)
+        ok = false
+    } else {
+        console.log(
+            `PASS self-test coverage-builder-callsite: ${builderResult.builderNotes.join("; ")}, and the callsite-derived expectation is caught at fixture line ${lifted.line} (the callsite, not the wrapper body)`,
+        )
+    }
+    if (builderResult.builderSkipped.length > 0) {
+        console.error(`FAIL self-test coverage-builder-callsite: substitution was skipped: ${builderResult.builderSkipped.join("; ")}`)
+        ok = false
     }
     const rejectResult = scan("coverage-reject.ts", fixtureSource(
         LIVE_CONTROLS.find((control) => control.name === "live-wrapper-that-builds-its-own-condition") as Fixture,
@@ -2115,6 +2586,28 @@ console.log(`  discovered as direct aliases: ${aliasNotes.length > 0 ? aliasNote
 console.log(
     `  covered ONLY by the hardcoded fallback (a discovery miss, not a pass): ${fallbackNotes.size > 0 ? [...fallbackNotes].sort().map(([name, count]) => `${name} in ${count} file(s)`).join("; ") : "none"}.`,
 )
+const builderNotes = new Map<string, number>()
+for (const result of results) {
+    for (const note of result.builderNotes) builderNotes.set(note, (builderNotes.get(note) ?? 0) + 1)
+}
+const builderSkipped = [...new Set(results.flatMap((result) => result.builderSkipped))]
+const builderCallsiteTotal = results.reduce((sum, result) => sum + result.builderCallsites, 0)
+console.log(
+    `  condition-BUILDING wrappers, callsite arguments substituted into the wrapper's own condition (${builderCallsiteTotal} callsite(s)): ${builderNotes.size > 0 ? [...builderNotes].sort().map(([note, count]) => `${note} [${count} file(s)]`).join("; ") : "none"}.`,
+)
+console.log(
+    `  builder callsites NOT substituted: ${builderSkipped.length > 0 ? builderSkipped.join("; ") : "none"}.`,
+)
+const roundsUsed = Math.max(0, ...results.map((result) => result.discovery.wrapperRounds))
+const exhausted = results.filter((result) => result.discovery.wrapperRoundsExhausted)
+console.log(
+    `  wrapper discovery ran to a fixed point: deepest file needed ${roundsUsed} round(s), safety bound ${MAX_WRAPPER_ROUNDS}, files that hit the bound without converging: ${exhausted.length}.`,
+)
+for (const result of exhausted) {
+    console.log(
+        `INTEGRITY WRAPPER_DISCOVERY_TRUNCATED: ${result.discovery.wrapperRounds} rounds of wrapper discovery still registered new helpers when the safety bound was reached, so the helper set for a file may be incomplete and assertions made through the deepest wrappers may be unscanned. Raise MAX_WRAPPER_ROUNDS or find the cycle.`,
+    )
+}
 console.log(`  NOT followed: ${COVERAGE_LIMITS.map((item, index) => `(${index + 1}) ${item}`).join(" ")}`)
 const perClass = VACUOUS.map(
     (classification) => `${classification}=${findings.filter((finding) => finding.classification === classification).length}`,
@@ -2161,6 +2654,6 @@ const selfTestOk = argv.includes("--self-test") ? runSelfTest() : true
 for (const problem of declaredInventory.integrity) console.log(`INTEGRITY ${problem.kind}: ${problem.detail}`)
 console.log(`Inventory integrity findings: ${declaredInventory.integrity.length}.`)
 
-if (gatingDefects.length > 0 || !selfTestOk || missing.length > 0 || declaredInventory.integrity.length > 0) {
+if (gatingDefects.length > 0 || !selfTestOk || missing.length > 0 || declaredInventory.integrity.length > 0 || exhausted.length > 0) {
     process.exitCode = 1
 }
