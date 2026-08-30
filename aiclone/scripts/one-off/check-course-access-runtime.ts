@@ -537,7 +537,7 @@ async function main() {
             ["LEVEL", "VISIBILITY", "GRANT", "CHANGE"].every((k) => kinds.has(k)),
             [...kinds].join(","),
         )
-        checkInvertible("history is ordered by a monotonic sequence", timeline.every((e, i) => i === 0 || BigInt(e.seq) > BigInt(timeline[i - 1].seq)))
+        checkInvertible("history is ordered by a monotonic sequence", timeline.length > 0 && timeline.every((e, i) => i === 0 || BigInt(e.seq) > BigInt(timeline[i - 1].seq)))
         const changeEvents = timeline.filter((e) => e.kind === "CHANGE")
         checkInvertible(
             "every change event records that no payment was executed, so the history cannot be read as a charge",

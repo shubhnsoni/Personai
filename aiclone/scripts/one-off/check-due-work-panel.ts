@@ -453,11 +453,11 @@ async function main() {
         )
         checkInvertible(
             "every item's position is explained rather than asserted - the response's ordering reason is rendered",
-            CLEAN_ITEMS.every((entry) => populatedText.includes(entry.orderingReason)),
+            CLEAN_ITEMS.length > 0 && CLEAN_ITEMS.every((entry) => populatedText.includes(entry.orderingReason)),
         )
         checkInvertible(
             "every item carries the engine's own attention reason, copied not re-derived",
-            CLEAN_ITEMS.every((entry) => populatedText.includes(entry.attentionReason)),
+            CLEAN_ITEMS.length > 0 && CLEAN_ITEMS.every((entry) => populatedText.includes(entry.attentionReason)),
         )
         checkInvertible(
             "an item with no date says so rather than inventing one",
@@ -502,7 +502,8 @@ async function main() {
         )
         checkInvertible(
             "the limitations are ordinary list items an owner reads, not a tooltip or a collapsed section",
-            limitationItems.length === DUE_WORK_PREVIEW_LIMITATIONS.length &&
+            limitationItems.length > 0 &&
+                limitationItems.length === DUE_WORK_PREVIEW_LIMITATIONS.length &&
                 limitationItems.every((element) => !isConcealed(element)),
             `${limitationItems.length} readable list item(s)`,
         )
@@ -522,9 +523,10 @@ async function main() {
         )
         checkInvertible(
             "MEASURED: every stated absence is rendered with the server's own reason",
-            Object.entries(DOES_NOT_COVER).every(
-                ([key, reason]) => populatedText.includes(readableKey(key)) && populatedText.includes(reason),
-            ),
+            Object.entries(DOES_NOT_COVER).length > 0 &&
+                Object.entries(DOES_NOT_COVER).every(
+                    ([key, reason]) => populatedText.includes(readableKey(key)) && populatedText.includes(reason),
+                ),
             Object.keys(DOES_NOT_COVER).join(","),
         )
         checkInvertible(
@@ -600,7 +602,8 @@ async function main() {
         )
         checkInvertible(
             "MEASURED: an empty plan STILL renders what it does not cover, so zero cannot be read as nothing anywhere",
-            Object.values(DOES_NOT_COVER).every((reason) => emptyText.includes(reason)) &&
+            Object.values(DOES_NOT_COVER).length > 0 &&
+                Object.values(DOES_NOT_COVER).every((reason) => emptyText.includes(reason)) &&
                 emptyText.includes(domainLabel("fieldJobs")),
         )
         checkInvertible(
@@ -683,7 +686,7 @@ async function main() {
             const others = markers.filter(([otherState]) => otherState !== state)
             checkInvertible(
                 `MEASURED: the ${state} state carries its own marker and none of the other four states' markers`,
-                own.includes(marker) && others.every(([, otherMarker]) => !own.includes(otherMarker)),
+                own.includes(marker) && others.length > 0 && others.every(([, otherMarker]) => !own.includes(otherMarker)),
                 others
                     .filter(([, otherMarker]) => own.includes(otherMarker))
                     .map(([otherState]) => `also looks like ${otherState}`)
@@ -855,7 +858,7 @@ async function main() {
         )
         checkInvertible(
             "MEASURED: across the whole run, no request was issued with a blank or missing workspaceId",
-            panelCalls.every((call) => typeof call.workspaceId === "string" && call.workspaceId.length > 0),
+            panelCalls.length > 0 && panelCalls.every((call) => typeof call.workspaceId === "string" && call.workspaceId.length > 0),
             `${panelCalls.filter((call) => !call.workspaceId).length} blank-id request(s)`,
         )
         checkInvertible(

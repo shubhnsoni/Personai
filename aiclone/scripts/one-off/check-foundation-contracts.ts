@@ -139,7 +139,7 @@ section("identity_resolution", () => {
     const anonResolved = resolveContacts([anonA, anonB])
     assert(anonResolved.length === 2, "two anonymous guests with no email/phone must resolve to two separate contacts")
     assert(
-        anonResolved.every((c) => c.confidence === "ANONYMOUS"),
+        anonResolved.length > 0 && anonResolved.every((c) => c.confidence === "ANONYMOUS"),
         "guests with neither email nor phone must be ANONYMOUS",
     )
 

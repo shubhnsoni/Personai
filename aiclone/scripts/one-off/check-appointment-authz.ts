@@ -379,7 +379,7 @@ async function main() {
         const history = await engine.history(ids.wsA, bookingId)
         const seqs = history.map((h) => Number(h.seq))
         check("ledger is monotonic", seqs.length >= 3 && seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `seqs=${seqs.join(",")}`)
-        check("ledger starts with CREATED then STATUS", history[0]?.kind === "CREATED" && history.slice(1).every((h) => h.kind === "STATUS"), history.map((h) => h.kind).join(","))
+        check("ledger starts with CREATED then STATUS", history[0]?.kind === "CREATED" && history.slice(1).length > 0 && history.slice(1).every((h) => h.kind === "STATUS"), history.map((h) => h.kind).join(","))
 
         let immutable = false
         try {

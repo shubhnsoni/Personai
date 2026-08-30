@@ -468,7 +468,7 @@ async function main() {
             ["CREATED", "STATUS", "SCHEDULE", "ASSIGNMENT"].every((k) => kinds.has(k)),
             [...kinds].join(","),
         )
-        check("history is ordered by a monotonic sequence", timeline.every((e, i) => i === 0 || BigInt(e.seq) > BigInt(timeline[i - 1].seq)))
+        check("history is ordered by a monotonic sequence", timeline.length > 0 && timeline.every((e, i) => i === 0 || BigInt(e.seq) > BigInt(timeline[i - 1].seq)))
         const actors = new Set(timeline.map((e) => e.actor))
         check(
             "both STAFF and TECHNICIAN appear as actors, so who did what survives in the record",

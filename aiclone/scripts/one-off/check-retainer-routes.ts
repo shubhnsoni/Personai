@@ -381,7 +381,7 @@ async function main() {
         const timeline = await call(api.retainerTimeline(retainerId, get(`${RET}/${retainerId}/timeline?workspaceId=${ids.wsA}`)))
         const events = dataOf(timeline).events as Array<{ subjectType: string; seq: unknown }>
         checkInvertible("the timeline is 200 and non-empty", timeline.status === 200 && events.length > 0, `n=${events.length}`)
-        checkInvertible("its sequence numbers are serialised as strings, not bigints", events.every((e) => typeof e.seq === "string"))
+        checkInvertible("its sequence numbers are serialised as strings, not bigints", events.length > 0 && events.every((e) => typeof e.seq === "string"))
         checkInvertible(
             "it covers the agreement, its periods, its case links, its billing and its draws",
             ["agreement", "period", "caseLink", "billing", "draw"].every((s) => events.some((e) => e.subjectType === s)),
@@ -422,7 +422,7 @@ async function main() {
         ] as Array<[string, Called]>) {
             const keys = Object.keys(c.body).sort().join(",")
             // The expectation comes from the LABEL, which is a literal, not from the observed
-            // status. Deriving it from $(System.Collections.Hashtable.v).status meant a 403 regressing to a 200 flipped the
+            // status. Deriving it from the observed `c.status` meant a 403 regressing to a 200 flipped the
             // expectation with it and this assertion still passed.
             const expectedStatus = Number(label)
             const expected = expectedStatus < 400 ? "data,ok" : "error,ok"

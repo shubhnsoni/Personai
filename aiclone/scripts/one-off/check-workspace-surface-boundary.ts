@@ -366,6 +366,7 @@ async function main() {
                         "5. install/read keeps PERMISSION_KEYS byte-identical and returns no role or permission field",
                         permissionsBefore === permissionsAfter &&
                             !permissionValueReturned &&
+                            roleResponses.length > 0 &&
                             roleResponses.every(({ response }) => !hasForbiddenResponseField(response.body)),
                         `catalogSame=${permissionsBefore === permissionsAfter} permissionValueReturned=${permissionValueReturned}`,
                     )

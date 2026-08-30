@@ -517,6 +517,7 @@ async function runSuite(tx: Prisma.TransactionClient): Promise<void> {
   const detail = dataOf(detailEnvelope)
   check("Copilot detail returns contiguous persisted approval and tool audit records",
     detailResponse.status === 200
+      && detail.audit.length > 0
       && detail.audit.some((event) => event.eventType === "approval.granted")
       && detail.audit.some((event) => event.eventType === "tool_call.completed")
       && detail.audit.every((event, index) => event.sequence === index + 1))

@@ -485,7 +485,7 @@ async function main() {
         const timeline = await cohorts.timeline(ids.wsA, cohortId)
         const seqs = timeline.map((e) => Number(e.seq))
         checkInvertible("the cohort timeline recorded every accepted change", timeline.length >= 20, `events=${timeline.length}`)
-        checkInvertible("timeline seq is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
+        checkInvertible("timeline seq is strictly increasing", seqs.length > 0 && seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
         const kinds = new Set<string>(timeline.map((e) => String(e.kind)))
         for (const kind of ["CREATED", "STATUS", "MEMBERSHIP", "SESSION", "ATTENDANCE", "ASSIGNMENT", "SUBMISSION", "CERTIFICATE", "RENEWAL"]) {
             checkInvertible(`timeline contains a ${kind} event`, kinds.has(kind), [...kinds].join(","))

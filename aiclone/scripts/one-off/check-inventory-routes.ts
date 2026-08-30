@@ -280,8 +280,8 @@ async function main() {
         const movements = await call(api.movements(itemId, get(`${INV}/${itemId}/movements?${q}`)))
         const rows = pickArray(movements.body, "data", "movements")
         const seqs = rows.map((m) => Number(pickString(m, "seq")))
-        check("the ledger is returned in sequence order", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
-        check("ledger seq serialises as a string not a BigInt", rows.every((m) => typeof pick(m, "seq") === "string"), typeof pick(rows[0], "seq"))
+        check("the ledger is returned in sequence order", seqs.length > 0 && seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
+        check("ledger seq serialises as a string not a BigInt", rows.length > 0 && rows.every((m) => typeof pick(m, "seq") === "string"), typeof pick(rows[0], "seq"))
         let onHand = 0
         let reserved = 0
         let consistent = rows.length > 0

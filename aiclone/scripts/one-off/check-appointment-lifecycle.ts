@@ -187,7 +187,7 @@ async function main() {
             }
         }
         check("deposit transition table is total over all state pairs", depositLegal + depositIllegal === DEPOSIT_STATES.length ** 2, `legal=${depositLegal} illegal=${depositIllegal}`)
-        check("terminal deposit states allow nothing", DEPOSIT_STATES.filter((s) => ["REFUNDED", "FORFEITED"].includes(s)).every((s) => DEPOSIT_STATES.every((t) => !canTransitionDeposit(s, t))))
+        check("terminal deposit states allow nothing", DEPOSIT_STATES.filter((s) => ["REFUNDED", "FORFEITED"].includes(s)).length > 0 && DEPOSIT_STATES.filter((s) => ["REFUNDED", "FORFEITED"].includes(s)).every((s) => DEPOSIT_STATES.every((t) => !canTransitionDeposit(s, t))))
         check("waitlist terminal states allow nothing", (["CONVERTED", "EXPIRED", "CANCELLED"] as WaitlistStatus[]).every((s) => WAITLIST_STATUSES.every((t) => !canTransitionWaitlist(s, t))))
 
         // ---- 2. anonymous is refused everywhere, zero provider calls -------

@@ -515,7 +515,7 @@ async function main() {
                 pickNumber(vis.body, "data", "visibility", "lockedCount") === 1,
             `visible=${pickNumber(vis.body, "data", "visibility", "visibleCount")} locked=${pickNumber(vis.body, "data", "visibility", "lockedCount")}`,
         )
-        check("every lesson states a reason rather than leaving the UI to guess", pickArray(vis.body, "data", "visibility", "lessons").every((l) => pickString(l, "reason") !== ""), "reasons present")
+        check("every lesson states a reason rather than leaving the UI to guess", pickArray(vis.body, "data", "visibility", "lessons").length > 0 && pickArray(vis.body, "data", "visibility", "lessons").every((l) => pickString(l, "reason") !== ""), "reasons present")
 
         // ---- 8. upgrade: request, decide, apply --------------------------
         const requested = await call(
@@ -678,8 +678,8 @@ async function main() {
         const events = pickArray(timeline.body, "data", "events")
         const seqs = events.map((e) => Number(pickString(e, "seq")))
         check("the timeline returns the course's access events", events.length >= 8, `n=${events.length}`)
-        check("timeline seq serialises as a string not a BigInt", events.every((e) => typeof pick(e, "seq") === "string"), typeof pick(events[0], "seq"))
-        check("timeline sequence is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
+        check("timeline seq serialises as a string not a BigInt", events.length > 0 && events.every((e) => typeof pick(e, "seq") === "string"), typeof pick(events[0], "seq"))
+        check("timeline sequence is strictly increasing", seqs.length > 0 && seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
         const applyEvent = events.find((e) => pickString(e, "subjectType") === "change" && pickString(e, "to") === "APPLIED")
         check(
             "the apply event records paymentExecuted false, so no reader can conclude money moved",

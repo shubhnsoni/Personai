@@ -410,7 +410,7 @@ async function main() {
                 )
                 check(
                     "every comparison in one response is made against a single clock reading",
-                    a.asOf instanceof Date && a.items.every((i) => i.at === null || i.at instanceof Date),
+                    a.asOf instanceof Date && a.items.length > 0 && a.items.every((i) => i.at === null || i.at instanceof Date),
                 )
 
                 // A signed-out caller must not get a summary at all.

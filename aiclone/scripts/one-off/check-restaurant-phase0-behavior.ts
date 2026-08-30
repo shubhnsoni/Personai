@@ -276,12 +276,12 @@ async function main() {
             (_, index) => allocationBase + index + 1,
         )
         assert(
-            allocatedNumbers.every((number, index) => number === expectedNumbers[index]),
+            allocatedNumbers.length > 0 && allocatedNumbers.every((number, index) => number === expectedNumbers[index]),
             `Concurrent numbers were not contiguous: ${allocatedNumbers.join(", ")}.`,
         )
         assert(new Set(concurrentResults.map((result) => result.id)).size === CONCURRENT_ORDER_COUNT,
             "Concurrent requests did not create distinct orders.")
-        assert(concurrentResults.every((result) => !result.replayed),
+        assert(concurrentResults.length > 0 && concurrentResults.every((result) => !result.replayed),
             "A fresh concurrent request was unexpectedly treated as a replay.")
 
         const table = await prisma.restaurantTable.create({

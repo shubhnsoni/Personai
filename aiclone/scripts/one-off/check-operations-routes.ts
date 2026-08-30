@@ -176,7 +176,7 @@ async function main() {
                 )
                 check(
                     "every item's due date is an ISO string or null, never a Date object",
-                    items.every((item) => item.at === null || typeof item.at === "string"),
+                    items.length > 0 && items.every((item) => item.at === null || typeof item.at === "string"),
                 )
                 // NOT `JSON.stringify(JSON.parse(raw)) === JSON.stringify(body)`: `body` IS
                 // `JSON.parse(raw)`, produced by the `call()` helper, so that comparison is x === x and

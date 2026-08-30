@@ -251,6 +251,7 @@ async function main() {
                     check(
                         "every history line's occurredAt is an ISO string too",
                         Array.isArray(installation.history) &&
+                            (installation.history as Array<{ occurredAt: unknown }>).length > 0 &&
                             (installation.history as Array<{ occurredAt: unknown }>).every(
                                 (h) => typeof h.occurredAt === "string" && !Number.isNaN(Date.parse(h.occurredAt as string)),
                             ),

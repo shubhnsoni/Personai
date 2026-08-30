@@ -458,9 +458,10 @@ async function main() {
             survivor?.templateItemId === null,
             `templateItemId=${String(survivor?.templateItemId)}`,
         )
+        const templateAfterRemoval = await templates.get(ids.wsA, tpl.template.id)
         check(
             "the template itself lost the line",
-            (await templates.get(ids.wsA, tpl.template.id)).items.every((item) => item.id !== li0.id),
+            templateAfterRemoval.items.length > 0 && templateAfterRemoval.items.every((item) => item.id !== li0.id),
         )
 
         // Refusals on the new paths. The workspace-level refusal and the LINE-level refusal are
@@ -1023,7 +1024,7 @@ async function main() {
         check("the timeline is not empty", timeline.length > 0, `events=${timeline.length}`)
         checkInvertible(
             "seq is serialised as a string, so a BigInt cannot lose precision as a JSON number",
-            timeline.every((e) => typeof e.seq === "string"),
+            timeline.length > 0 && timeline.every((e) => typeof e.seq === "string"),
             `first seq type=${typeof timeline[0]?.seq}`,
         )
         check(

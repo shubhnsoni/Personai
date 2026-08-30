@@ -514,19 +514,24 @@ async function main() {
             releaseFirst: deferred<void>(),
         }
         interleaving = gate
-        // WHAT THIS SECTION ESTABLISHES, measured rather than assumed.
+        // WHAT THIS SECTION ESTABLISHES, measured rather than assumed, and NARROWED after review.
         //
-        // Root removed each of the four `for update` clauses in src/lib/cases/retainers.ts one at a
-        // time and this harness stayed GREEN every time, at 90/90 exit 0. Removing all four together
-        // turns it red: lockWaiters drops to 0 and `used` goes 0->3 instead of 0->8, which is the lost
-        // update - one draw's absolute write overwriting the other's.
+        // `recordDraw` executes exactly two of the four `for update` clauses in
+        // src/lib/cases/retainers.ts: the open-period lock at :713 and the retainer lock at :928. The
+        // other two (:542 in transitionPeriod, :623 in setBilling) are NOT on this path, so removing
+        // them could not have changed the result and is no evidence of anything. An earlier version of
+        // this comment claimed all four were individually redundant on the strength of four mutations,
+        // two of which were vacuous by construction - the same overclaim this harness's own defect was.
         //
-        // So the retainer locks are JOINTLY NECESSARY AND INDIVIDUALLY REDUNDANT: any one of them is
-        // sufficient to serialise these two draws, and therefore no single one is load-bearing on its
-        // own. That is a materially different situation from inventory, where the single `for update`
-        // in InventoryContext.lockItem() IS individually necessary and removing just that one flips
-        // the result. A reader of the old assertion name would have concluded each retainer lock was
-        // load-bearing; it is not, and the name now says what was actually measured.
+        // What the mutations actually show: removing either :713 or :928 alone leaves this harness green
+        // at 90/90 exit 0, and removing both together turns it red - lockWaiters drops to 0 and `used`
+        // goes 0->3 instead of 0->8, which is the lost update, one draw's absolute write overwriting the
+        // other's. So of the two locks recordDraw executes, EITHER ALONE serialises these two draws.
+        //
+        // That is still materially different from inventory, where the single `for update` in
+        // InventoryContext.lockItem() is individually necessary and removing just that one flips the
+        // result. Note also that joint necessity is established by an out-of-band mutation this
+        // assertion cannot see; the assertion below measures serialisation, and its name says so.
         const t1 = retainers.recordDraw(ids.wsA, interleaved.record.id, { kind: "DRAW", units: 3 }, actor)
         const firstReadReached = await settlesWithin(gate.firstRead.promise, 1_500)
         let t2: Promise<unknown> | null = null
@@ -556,17 +561,23 @@ async function main() {
         interleaving = null
         const interleaveAfter = (await prisma.caseRetainerPeriod.findUniqueOrThrow({ where: { id: interleavedPeriod.id } })).usedUnits
         checkInvertible(
-            "MEASURED: while T1 is parked, Postgres reports T2 blocked in a LOCK wait - not merely absent",
-            firstReadReached && retainerLockEvidence.lockWaiters >= 1,
+            "MEASURED: while T1 is parked, Postgres reports T2 blocked on a TRANSACTIONID lock - not merely absent",
+            firstReadReached &&
+                retainerLockEvidence.lockWaiters >= 1 &&
+                retainerLockEvidence.lockTypes.includes("transactionid"),
             `lockWaiters=${retainerLockEvidence.lockWaiters} ungranted=${retainerLockEvidence.ungranted} types=${retainerLockEvidence.lockTypes}`,
         )
         checkInvertible(
             "MEASURED: T2 reached the database, so it was not starved of a pooled connection",
-            retainerLockEvidence.backends >= 2 && retainerLockEvidence.idleInTransaction >= 1,
+            // >= 3, not >= 2. The observer client running this probe always counts itself, and the
+            // second conjunct already requires a distinct backend for parked T1, so `>= 2` was entailed
+            // by its own sibling and could never fail. See the same correction in
+            // check-inventory-runtime.ts, from which this probe was copied along with the defect.
+            retainerLockEvidence.backends >= 3 && retainerLockEvidence.idleInTransaction >= 1,
             `backends=${retainerLockEvidence.backends} idleInTx=${retainerLockEvidence.idleInTransaction} (pool pinned to 5)`,
         )
         checkInvertible(
-            "MEASURED: recordDraw's FOR UPDATE locks are JOINTLY necessary - with all of them removed the two draws stop serializing",
+            "MEASURED: the two draws serialize - one lands, the other reads the updated balance, and the total is 8",
             firstReadReached &&
                 !secondReadBeforeRelease &&
                 outcomes.length === 2 &&
@@ -690,7 +701,7 @@ async function main() {
             ["agreement", "period", "caseLink", "billing", "draw"].every((s) => subjects.has(s)),
             [...subjects].join(","),
         )
-        checkInvertible("history is ordered by a monotonic sequence", timeline.every((e, i) => i === 0 || BigInt(e.seq) > BigInt(timeline[i - 1].seq)))
+        checkInvertible("history is ordered by a monotonic sequence", timeline.length > 0 && timeline.every((e, i) => i === 0 || BigInt(e.seq) > BigInt(timeline[i - 1].seq)))
         const rewrite = await attempt(() =>
             prisma.$executeRawUnsafe(`update "CaseRetainerEvent" set "to" = 'TAMPERED' where "retainerId" = '${retainerId}'`),
         )

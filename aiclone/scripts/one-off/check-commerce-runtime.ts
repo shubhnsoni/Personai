@@ -460,7 +460,7 @@ async function main() {
         const timeline = await variants.events(ids.wsA, "FULFILMENT", shipment.fulfilment.id)
         const seqs = timeline.map((e) => Number(e.seq))
         checkInvertible("the shipment timeline recorded every accepted change", timeline.length >= 5, `events=${timeline.length}`)
-        checkInvertible("timeline seq is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
+        checkInvertible("timeline seq is strictly increasing", seqs.length > 0 && seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
         const kinds = new Set<string>(
             (await prisma.commerceEvent.findMany({ where: { profileId: ids.profileA }, select: { kind: true } })).map((e) => String(e.kind)),
         )

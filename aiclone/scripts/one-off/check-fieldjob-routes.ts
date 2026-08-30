@@ -319,7 +319,7 @@ async function main() {
             `assignEvents=${assignEvents.length}`,
         )
         checkInvertible("both STAFF and TECHNICIAN appear as actors in the history", new Set(events.map((e) => e.actor)).size >= 2, [...new Set(events.map((e) => e.actor))].join(","))
-        checkInvertible("sequence numbers are serialised as strings", events.every((e) => typeof e.seq === "string"))
+        checkInvertible("sequence numbers are serialised as strings", events.length > 0 && events.every((e) => typeof e.seq === "string"))
 
         // ---- 7. tenant isolation ----------------------------------------
         // W3 audit finding 10: these two calls used workspaceId=wsB while identity was still user
@@ -407,7 +407,7 @@ async function main() {
         ] as Array<[string, Called]>) {
             const keys = Object.keys(c.body).sort().join(",")
             // The expectation comes from the LABEL, which is a literal, not from the observed
-            // status. Deriving it from $(System.Collections.Hashtable.v).status meant a 403 regressing to a 200 flipped the
+            // status. Deriving it from the observed `c.status` meant a 403 regressing to a 200 flipped the
             // expectation with it and this assertion still passed.
             const expectedStatus = Number(label)
             const expected = expectedStatus < 400 ? "data,ok" : "error,ok"

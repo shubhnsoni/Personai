@@ -141,7 +141,7 @@ async function main() {
         )
         checkInvertible(
             "MEASURED: no request was ever issued with a blank or missing workspace id",
-            requested.every((r) => typeof r.workspaceId === "string" && r.workspaceId.length > 0),
+            requested.length > 0 && requested.every((r) => typeof r.workspaceId === "string" && r.workspaceId.length > 0),
             `${requested.filter((r) => !r.workspaceId).length} blank-id request(s)`,
         )
 

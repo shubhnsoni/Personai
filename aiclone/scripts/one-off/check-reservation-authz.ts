@@ -416,7 +416,7 @@ async function main() {
         checkInvertible("event ledger is monotonic", monotonic && seqs.length >= 3, `seqs=${seqs.join(",")}`)
         checkInvertible(
             "ledger records the CREATED event then STATUS events",
-            history[0]?.kind === "CREATED" && history.slice(1).every((h) => h.kind === "STATUS"),
+            history[0]?.kind === "CREATED" && history.slice(1).length > 0 && history.slice(1).every((h) => h.kind === "STATUS"),
             history.map((h) => h.kind).join(","),
         )
 

@@ -233,7 +233,7 @@ async function main() {
         // ---- 4. scoped reads only see this workspace --------------------
         const listA = await call(api.list(get(`${CASES}?workspaceId=${ids.wsA}`)))
         check("member list is 200", listA.status === 200, `status=${listA.status}`)
-        check("member list contains only this workspace's cases", pickArray(listA.body, "data", "cases").every((c) => pickString(c, "workspaceId") === ids.wsA), `n=${pickArray(listA.body, "data", "cases").length}`)
+        check("member list contains only this workspace's cases", pickArray(listA.body, "data", "cases").length > 0 && pickArray(listA.body, "data", "cases").every((c) => pickString(c, "workspaceId") === ids.wsA), `n=${pickArray(listA.body, "data", "cases").length}`)
         const missingParam = await call(api.list(get(CASES)))
         check("a missing workspaceId query parameter is 400", missingParam.status === 400, `status=${missingParam.status}`)
         const badBody = await call(api.create(malformed(CASES)))
@@ -333,8 +333,8 @@ async function main() {
         const events = pickArray(timeline.body, "data", "events")
         const seqs = events.map((e) => Number(pickString(e, "seq")))
         check("timeline returns events for the case", events.length >= 8, `n=${events.length}`)
-        check("timeline sequence is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), seqs.join(","))
-        check("timeline seq serialises as a string not a BigInt", events.every((e) => typeof pick(e, "seq") === "string"), typeof pick(events[0], "seq"))
+        check("timeline sequence is strictly increasing", seqs.length > 0 && seqs.every((v, i) => i === 0 || v > seqs[i - 1]), seqs.join(","))
+        check("timeline seq serialises as a string not a BigInt", events.length > 0 && events.every((e) => typeof pick(e, "seq") === "string"), typeof pick(events[0], "seq"))
 
         // ---- 12. wrong tenant is indistinguishable from nonexistent ---
         identity.current = `clerk_${ids.userB}`

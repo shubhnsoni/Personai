@@ -382,7 +382,7 @@ async function main() {
             const got = enumRows.filter((r) => r.typname === name).map((r) => r.enumlabel)
             check(
                 `enum ${name} has exactly ${labels.length} values in order`,
-                got.length === labels.length && got.every((g, i) => g === labels[i]),
+                got.length > 0 && got.length === labels.length && got.every((g, i) => g === labels[i]),
                 got.join(",") || "MISSING",
             )
         }

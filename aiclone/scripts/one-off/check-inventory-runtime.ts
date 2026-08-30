@@ -564,13 +564,24 @@ async function main() {
                 /Only 2 units are available/.test(outcome.reason.message),
         ).length
         checkInvertible(
-            "MEASURED: while T1 is parked, Postgres reports T2 blocked in a LOCK wait - not merely absent",
-            firstPrewriteReached && lockEvidence.lockWaiters >= 1,
+            "MEASURED: while T1 is parked, Postgres reports T2 blocked on a TRANSACTIONID lock - not merely absent",
+            // The locktype is asserted, not just printed. `lockWaiters >= 1` alone counts any backend in
+            // this database in any heavyweight Lock wait, which is weaker than the name claimed: a row
+            // -lock waiter blocks on the holder's `transactionid`, so that is the reading that
+            // discriminates. It was already collected and echoed and simply never checked.
+            firstPrewriteReached && lockEvidence.lockWaiters >= 1 && lockEvidence.lockTypes.includes("transactionid"),
             `first=${firstPrewriteReached} lockWaiters=${lockEvidence.lockWaiters} ungranted=${lockEvidence.ungranted} types=${lockEvidence.lockTypes}`,
         )
         checkInvertible(
             "MEASURED: T2 reached the database, so it was not starved of a pooled connection",
-            lockEvidence.backends >= 2 && lockEvidence.idleInTransaction >= 1,
+            // >= 3, not >= 2, and the difference is the whole assertion. The observer client runs this
+            // probe and therefore always counts ITSELF in pg_stat_activity for this database, and the
+            // second conjunct already requires a distinct backend holding the parked T1's transaction.
+            // So `backends >= 2` was entailed by its own sibling and could never be the reason this
+            // failed - the same "conjunct forced true by a neighbour" defect this harness's commit
+            // existed to remove, reintroduced by that commit. Three backends is what the claim needs:
+            // observer, parked T1, and blocked T2.
+            lockEvidence.backends >= 3 && lockEvidence.idleInTransaction >= 1,
             `backends=${lockEvidence.backends} idleInTx=${lockEvidence.idleInTransaction} (pool pinned to 5)`,
         )
         checkInvertible(
@@ -609,7 +620,7 @@ async function main() {
         checkInvertible("replaying the ledger reproduces every stored balance", consistent, `replayed=${onHand}/${reserved}`)
         checkInvertible("the replayed total matches the live record", onHand === finalRecord.onHand && reserved === finalRecord.reserved, `${onHand}/${reserved} vs ${finalRecord.onHand}/${finalRecord.reserved}`)
         const seqs = movements.map((m) => Number(m.seq))
-        checkInvertible("movement seq is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
+        checkInvertible("movement seq is strictly increasing", seqs.length > 0 && seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
         const kinds = new Set<string>(movements.map((m) => String(m.kind)))
         for (const kind of ["RECEIPT", "ADJUSTMENT", "COUNT", "RETURN", "RESERVE", "RELEASE", "CONSUME"]) {
             checkInvertible(`the ledger contains a ${kind} movement`, kinds.has(kind), [...kinds].join(","))

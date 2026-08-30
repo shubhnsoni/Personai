@@ -400,8 +400,8 @@ async function main() {
         const events = pickArray(timeline.body, "data", "events")
         const seqs = events.map((e) => Number(pickString(e, "seq")))
         check("timeline returns the cohort's events", events.length >= 12, `n=${events.length}`)
-        check("timeline sequence is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
-        check("timeline seq serialises as a string not a BigInt", events.every((e) => typeof pick(e, "seq") === "string"), typeof pick(events[0], "seq"))
+        check("timeline sequence is strictly increasing", seqs.length > 0 && seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
+        check("timeline seq serialises as a string not a BigInt", events.length > 0 && events.every((e) => typeof pick(e, "seq") === "string"), typeof pick(events[0], "seq"))
 
         // ---- 12. wrong tenant is indistinguishable from nonexistent ---
         identity.current = `clerk_${ids.userB}`

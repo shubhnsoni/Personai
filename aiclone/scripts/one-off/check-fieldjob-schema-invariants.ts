@@ -463,11 +463,12 @@ async function main() {
         for (const t of ["FieldJobEvent_append_only", "FieldJobAssignment_tenant_guard"]) {
             checkInvertible(`trigger ${t} is attached`, triggers.includes(t))
         }
+        const exclusionConstraints = await prisma.$queryRawUnsafe<{ n: bigint }[]>(
+            "select count(*) as n from pg_constraint where contype = 'x'",
+        )
         checkInvertible(
             "the pre-existing appointment exclusion constraint is untouched",
-            (await prisma.$queryRawUnsafe<{ n: bigint }[]>("select count(*) as n from pg_constraint where contype = 'x'")).every(
-                (r) => Number(r.n) === 2,
-            ),
+            exclusionConstraints.length > 0 && exclusionConstraints.every((r) => Number(r.n) === 2),
         )
 
         // ---- 7. direct-write refusals --------------------------------------

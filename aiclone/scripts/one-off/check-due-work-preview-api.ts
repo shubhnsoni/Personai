@@ -282,12 +282,19 @@ async function main() {
         /**
          * Counts for the no-write proof.
          *
-         * Widened after review. The first version counted five tables, four of which were TENANCY
-         * tables rather than anything this domain reads, and none of which was an append-only event
-         * log. The write the contract most specifically forbids - "a surface that logged its own
-         * invocation would be a write path" - would land in an event table and be invisible to a
-         * fieldJob/workspace/profile/membership/user count. Every append-only log this schema has is
-         * now counted, so that write cannot hide.
+         * Widened twice. The first version counted five tables, four of which were TENANCY tables and
+         * none an append-only log - so the write the contract most specifically forbids, a surface
+         * logging its own invocation, would have been invisible. The second version added eight event
+         * logs and the commit claimed that was "every append-only log this schema has". A review counted
+         * the repository's own `<Table>_append_only` triggers and found THIRTEEN. The five that were
+         * missing are added here: BlueprintInstallationEvent, CaseRetainerDraw, CaseRetainerEvent,
+         * CommerceEvent, CourseAccessEvent.
+         *
+         * KNOWN LIMIT, stated because the assertion name should not be read as more than it is: this
+         * compares row COUNTS. An UPDATE to an existing counted row, or an insert-then-delete inside the
+         * window, would not change a count and would pass. Nothing on this read path performs either -
+         * every database call in it is a findMany or findUnique - but that is established by reading the
+         * code, not by this assertion.
          */
         const countAll = async () => ({
             fieldJob: await prisma.fieldJob.count(),
@@ -303,6 +310,11 @@ async function main() {
             caseEvent: await prisma.caseEvent.count(),
             cohortEvent: await prisma.cohortEvent.count(),
             inventoryMovement: await prisma.inventoryMovement.count(),
+            blueprintInstallationEvent: await prisma.blueprintInstallationEvent.count(),
+            caseRetainerDraw: await prisma.caseRetainerDraw.count(),
+            caseRetainerEvent: await prisma.caseRetainerEvent.count(),
+            commerceEvent: await prisma.commerceEvent.count(),
+            courseAccessEvent: await prisma.courseAccessEvent.count(),
         })
 
         try {
