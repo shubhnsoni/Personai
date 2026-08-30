@@ -155,16 +155,14 @@ node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\probe-rehearsa
 Read `INTEGRATION_QUEUE.md` -> the last "Next in queue" table. In priority order:
 
 - **Blueprint installation runtime.** The largest genuinely-missing package and the prerequisite for
-  everything vertical-facing. Measured, not assumed: `src/lib/business-os/**` is a static registry
-  (`blueprints.ts` 418, `engines.ts` 261, `types.ts` 90, `validation.ts` 86, `workflow.ts` 42) with
-  **zero API routes**, so installation does not exist even in part. It needs durable state - an
-  installed-blueprint record with workspace/profile association, version, terminology, surfaces,
-  modules, workflow templates and an audit trail - therefore a MIGRATION, therefore **90+ minutes
-  minimum** and the full rehearsal cycle in Step 2. Read rule 23 first.
-
-  Note that `check-onboarding-blueprint-coverage` currently asserts **no route installs a blueprint**.
-  That assertion is deliberately the thing that will force whoever builds this to revisit the wording
-  of `CORRESPONDING_BLUEPRINT` in `src/lib/onboarding-needs.ts`, which is a correspondence and says so.
+  everything vertical-facing. **Read `BLUEPRINT_INSTALLATION_DESIGN.md` first** — it is an executable
+  design written at the close of this run, with the starting position measured rather than assumed, the
+  migration sequence, the harness plan, the four traps that have each already cost this program time,
+  and the tripwire assertion your first route will turn red. It recommends landing read-only PREVIEW
+  before any schema, which is useful on its own and cannot leave the rehearsal database in a bad state.
+  Measured: `src/lib/business-os/**` is a static registry with **zero API routes**, so installation does
+  not exist even in part. Needs durable state, therefore a migration, therefore **a fresh 3+ hour
+  window** rather than the tail of one.
 
 - **Unified daily operations runtime.** A tenant-scoped read-only view over records that already
   exist: reservations needing action, upcoming appointments and waitlist openings, case milestones and
