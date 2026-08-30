@@ -35,6 +35,18 @@ and has no workspace context to resolve against.
 `src/lib/business-os/**`, `src/components/business-os/**`, `src/app/api/platform/**`,
 `src/lib/persistence/**`, and the workspace-scoped engine runtimes under `src/lib/**`.
 
+**PRECISION, added after independent review.** The sentence "no existing surface consumer has a workspace
+id" is imprecise as written, and the reviewer was right to say so. The exact position, verified
+independently at `8b4d8e3`: a broad import grep finds **27** source files; of those, **20 are production
+read consumers** and none contains `workspaceId`, `selectedWorkspaceId`, a membership lookup or a
+workspace-list lookup. The other seven are four type-only importers (`header.tsx`, `content-manager.tsx`,
+`mobile-sidebar.tsx`, `onboarding-needs.ts`), the QA page, the testing auth fake, and `onboarding.ts`.
+
+`onboarding.ts` **does** contain `workspaceId` — it is measurement 6 below — but it is not a
+counterexample: it WRITES profile extras and creates the workspace, and it never reads effective surfaces
+or calls the resolver. The compatibility claim holds for the twenty read consumers, which is the set that
+matters, and that is what the claim should have said.
+
 **5. `business-os-shell.tsx` holds `selectedWorkspaceId` in React state** and fetches per workspace. The
 Business OS console is the one surface that already knows which workspace it is looking at.
 
