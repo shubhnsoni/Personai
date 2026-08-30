@@ -1,7 +1,7 @@
 {
-    "milestone": "H1 fieldJobs:inspection is complete end to end and BOTH gaps it left are closed (5822aa8 checklist authoring, 086c835 field service selectable during onboarding with enforced blueprint reachability). The UNIFIED DAILY OPERATIONS VIEW is now complete end to end as well: dac6a23 runtime and API, 0387d86 panel mounted first in the shell, d06e122 case milestones plus per-domain tenant scope, ff50658 HTTP-boundary harness. Sweep is 60. Registry still has ZERO planned capabilities. Repo-wide lint deliberately unchanged at 43 (14 errors, 29 warnings) across every commit tonight. STILL MISSING and owner-gated: appointments:reminders and appointments:deposits. STILL MISSING and NOT owner-gated: the blueprint INSTALLATION runtime does not exist even in part (business-os is a static registry with zero API routes); it needs durable state and therefore a migration, and it needs a fresh 3+ hour window rather than the tail of one - the comparable inspection package took most of a night with three workers. Operations does not cover cohort tasks or the durable TaskJob queue, states so in its own response and in the UI, and covering cohort tasks should wait for the cohort engine to declare its own needs-action condition rather than having this view invent one.",
-    "updatedAt": "2026-08-30 06:20 +05:30",
-    "updatedBy": "root orchestrator (claude-opus-5), resumed after compaction",
+    "milestone": "READ-ONLY BLUEPRINT PREVIEW IS COMPLETE END TO END: c3f3f44 is the green point. fbefa17 resolver + HTTP boundary + GET /api/platform/blueprints and GET /api/platform/blueprints/[blueprintId]/preview; f1af3a4 the contract as a TYPE FILE (src/lib/business-os/preview-types.ts) rather than a markdown document, so a worker cannot drift from it; 5e29a4c the onboarding invariant refined from a route-PATH proxy into a behavioural detector (BP2, gpt-5.6-terra); 0798020 the owner-facing panel (BP1, claude-sonnet-5); 3ea6106 root mounted it in business-os-shell.tsx; c3f3f44 closed two holes the harnesses themselves left open. Sweep is now 61 (check-blueprint-preview.ts joined it), FAILED 0. CORRECTION TO THE PREVIOUS MILESTONE TEXT: it claimed 'business-os is a static registry with zero API routes'. That was false when written - src/app/api/business-os/blueprints/route.ts and .../[blueprintId]/route.ts have existed since 627b826. Both are GET-only. There are now TWO blueprint listing surfaces and that is deliberate, not duplication: the business-os one sits behind requireBusinessOsAccess (the owner-console surface, opt-in per profile), the platform one needs only workspace membership, because onboarding happens BEFORE anyone opts into the owner console. A harness pins that distinction so a future de-duplication has to argue with it. STILL MISSING and NOT owner-gated: durable INSTALLATION. There is no installed-blueprint model, no write route, and no install runtime. Preview says so in every response - `installed` is typed as the literal null, and a limitations list ships in the body rather than in a document. STILL MISSING and owner-gated: appointments:reminders and appointments:deposits remain partial, provider boundaries inert. Repo-wide lint still exactly 43 (14 errors, 29 warnings) at every commit in this package.",
+    "updatedAt": "2026-08-30 08:40 +05:30",
+    "updatedBy": "root orchestrator (claude-opus-5, max effort), sole integration owner",
     "baseline": "f8ee611",
     "maxParallelWorkers": 3,
     "baseCommitPolicy": "Lanes must branch from a commit where tsc --noEmit and next build both exit 0. Qualifying commits: e97edf4 and later. The consolidation branched from a4d9fba. See ADR-007.",
@@ -1558,6 +1558,53 @@
             "evidence": "check-fieldjob-inspection-runtime 100/100 (from 96); check-fieldjob-inspection-routes 59/59 (from 54); both still invert to exit 1, with 41 and 29 assertions flipped respectively. The load-bearing canRecord assertion is that a SUBMITTED inspection reports canRecord false while isTerminal false - the two flags must DISAGREE somewhere or the field would be redundant - and a companion assertion attempts a real recordItem on that inspection and requires the 409, so the flag is checked against behaviour rather than against the table it was derived from. The rewritten invoiced ban was proven able to fail by appending a violating line to the panel (exit 1, naming the assertion) and then reverting it with git checkout; the panel is byte-identical to a5906ab. Cross-vertical: the -3 ADJUSTMENT appears in the stock record's movements through /api/platform/inventory/{id}/movements, its reason names the inspection, /api/platform/inventory/{id} reports the same onHand the fieldJobs side computed, and the part recorded WITHOUT consumeStock produced no movement at all - exactly one ADJUSTMENT across the whole record. That last one is what gives the consumeStock:false default meaning from outside fieldJobs. Full sweep 57 of 57 exit 0, tsc 0, repo-wide ESLint 43 with a byte-identical diff, npm audit 0, production build exit 0, live personalink and the disposable DB both re-verified.",
             "schemaImpact": "None. No migration, no schema change.",
             "deliberatelyNotDone": "Safe lint reduction was REFUSED rather than omitted. All 14 remaining errors and 29 warnings need per-component judgement - 25 no-img-element each change layout and loading behaviour, 10 set-state-in-effect need effects redesigned, 3 preserve-manual-memoization need memoized-collection identity analysis, 3 exhaustive-deps need per-effect analysis, 1 no-explicit-any is a documented design call at src/app/[slug]/page.tsx:70, 1 no-unused-vars is a live DOM query in a puppeteer script. Clearing any of them to move a number would break the project's own standing rules. Two genuine gaps are recorded in INTEGRATION_QUEUE.md rather than closed: the five /inspection-templates endpoints have NO owner surface, so a checklist can currently only be authored through the API; and nothing walks an owner through selecting the new field-service-v1 blueprint."
+        },
+        {
+            "id": "P2-021",
+            "title": "Read-only blueprint preview: contract, resolver, HTTP boundary, routes, owner panel and invariant refinement",
+            "status": "done",
+            "owner": "root orchestrator (claude-opus-5) with two supervised workers",
+            "commits": [
+                "f1af3a4 contract as types, not a document",
+                "5e29a4c BP2 (gpt-5.6-terra, PID 47284): onboarding invariant becomes behavioural",
+                "fbefa17 resolver, HTTP boundary and the two GET routes",
+                "0798020 BP1 (claude-sonnet-5): owner-facing preview panel",
+                "3ea6106 root mounted the panel in business-os-shell.tsx",
+                "c3f3f44 closed two holes the harnesses left open"
+            ],
+            "whatItDoes": [
+                "GET /api/platform/blueprints lists every registered blueprint, including the 3 deprecated ones, labelled rather than hidden, so an owner on an older vertical learns a newer one supersedes it instead of finding nothing.",
+                "GET /api/platform/blueprints/[blueprintId]/preview resolves engines, capabilities with live maturity and evidence, workflows with their approval requirements and the reason the approver is shown, versioning and supersession, terminology and surfaces, installability and blockers.",
+                "The owner panel renders all of it with distinct loading/empty/401/403/404/400/503 states and a DISABLED control labelled 'Installation is not built yet' rather than an install button that posts nowhere."
+            ],
+            "measuredFacts": [
+                "BusinessBlueprint declares NO terminology, surfaces or modules. Asserted against the type itself, so if a blueprint ever gains a terminology field the check goes red and somebody has to decide whether preview should read it instead of deriving it.",
+                "Surfaces are per-PROFILE JSON on Profile.personalityConfig, not per workspace: a profile with several workspaces has ONE set of surfaces across all of them. Stated as a limitation in every response.",
+                "businessOs is excluded from every role kit, so choosing a blueprint can never grant the owner console. Asserted for all 9 blueprints.",
+                "installable/blockedBy are recomputed from live capability maturity at preview time, NOT read from blueprint.status, because a capability can regress after a blueprint is declared."
+            ],
+            "designDecisions": [
+                "The contract is a TYPE FILE, not a markdown doc. A document describing a shape can be ignored; a type cannot. The UI re-exports BlueprintPreviewView from it rather than redeclaring, so tsc exit 0 is itself proof the panel matches what the resolver returns - which closed the one thing BP1 reported it could not verify.",
+                "`installed` is typed as the literal null rather than an optional object. Stronger than a field documented as always null: fabricating installed state is now a compile error, not a review question.",
+                "404 for an unknown blueprint id, deliberately breaking this platform's non-enumeration rule, because a blueprint id is a PUBLIC STATIC REGISTRY KEY identical for every tenant. Authorization is evaluated BEFORE the registry lookup, so 404 can never act as an oracle: an unauthorised caller gets 403 even for an id that does not exist, and a foreign workspace is byte-identical to a nonexistent one. The reasoning is pinned in an assertion so a future reader does not 'fix' it into a 403.",
+                "Presentation is derived through the blueprint->role inverse of CORRESPONDING_BLUEPRINT and tagged source: 'role-derived' everywhere. Rejected fabricating a blueprint terminology pack, and rejected inventing a private engine->surface mapping when surfacesFor/calendarNoun/shopNavLabel/defaultFulfillment already exist."
+            ],
+            "lessons": [
+                "A PASSING ASSERTION CAN BE VACUOUS. 'An optional capability never blocks installability' passed - and still passed with the `required` guard deleted from resolveBlockers, because the only optional composition in the repository is commerce:[catalog,orders] and both are available. It asserted 'nothing optional is unavailable' while appearing to assert 'optional is excluded'. Fixed by driving resolveBlockers with a SYNTHETIC composition over the REAL engine registry, using appointments:reminders (genuinely partial - no messaging provider is wired), and asserting BOTH directions: required blocks, the same capability optional does not. This is the same synthetic-descriptor lesson the capability-contract negative test already taught, re-learned in a new file.",
+                "AN INVERSION SWITCH THAT DOES NOT EXIST IS WORSE THAN NO SWITCH. The preview harness header advertised INVERT_ASSERTION=1 and never implemented it. Removed and replaced with the real method: inversion by SOURCE MUTATION, recorded with what broke and what went red.",
+                "A REFINED INVARIANT CAN SHRINK ITS OWN SCOPE. BP2's behavioural detector was correct but scanned only src/app/api/platform - while src/app/api/business-os ALREADY serves blueprints, making that tree the likelier place an install POST would land. Widened to every API route (119 -> 150) and the reach itself is now asserted, so a future narrowing is visible."
+            ],
+            "inversionEvidence": [
+                "check-blueprint-preview.ts normal: 53/53 exit 0.",
+                "Inversion A - unknown id falls back to all[0]: 2 assertions red, exit 1 (fabrication + the 404).",
+                "Inversion B - `required` guard deleted from resolveBlockers: exit 0 BEFORE the rewrite (the vacuity), 1 red and exit 1 AFTER it.",
+                "Restored: 53/53 exit 0.",
+                "check-onboarding-blueprint-coverage.ts: 25/25 exit 0; INVERT_ASSERTION=1 -> 11 red, exit 1."
+            ],
+            "notDone": [
+                "No installation. No installed-blueprint model, no write route, no install runtime, no history ledger.",
+                "The panel's 404 copy path is proven by static assertion and by the routes' own harness, not by a browser round trip."
+            ]
         }
     ],
     "laneState": {
@@ -1784,5 +1831,23 @@
         "build": "exit 0",
         "liveDatabase": "untouched - 35 tables, no _prisma_migrations, 0 wave tables leaked, Profile=16",
         "disposableDatabase": "unchanged, fully applied at 18 migrations; nothing after 8b33a6a added a migration"
+    },
+    "gatesAtC3f3f44": {
+        "commit": "c3f3f44",
+        "prisma validate": "0",
+        "prisma generate": "0",
+        "tsc --noEmit -p tsconfig.json": "0",
+        "check sweep": "61 checks, FAILED 0 (was 60; check-blueprint-preview.ts joined it)",
+        "check-blueprint-preview.ts": "53/53; inversion by source mutation, restored 53/53",
+        "check-onboarding-blueprint-coverage.ts": "25/25 (was 20); inverted exit 1, 11 flipped",
+        "check-business-os-a11y.ts": "PASS, failures []",
+        "targeted ESLint (9 new/changed files)": "0 findings",
+        "repo-wide ESLint": "43 problems (14 errors, 29 warnings) - unchanged",
+        "npm audit --omit=dev": "0 vulnerabilities",
+        "npm run build": "0; both routes in app-path-routes-manifest.json and compiled under .next/server/app/api/platform/blueprints",
+        "live personalink": "untouched - 35 tables, no _prisma_migrations, 0 wave tables leaked, no btree_gist, Profile = 16",
+        "append-only and guard triggers": "21 total, 0 disabled",
+        "frozen worktrees": "all six kirocrew/* still at ea69595",
+        "origin": "unchanged; nothing pushed"
     }
 }

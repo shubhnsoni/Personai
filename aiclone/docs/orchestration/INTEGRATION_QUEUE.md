@@ -1210,3 +1210,55 @@ and in the UI, with the reason for each.
 | Repoint or delete the wave-c rehearsal runner | tooling, outside the repo | Has now misled two separate resumes. |
 | G2 | appointments providers | Still **owner-gated**: real messages and real money. |
 | P1-007 | live `personalink` cutover | Still **owner-gated**. |
+
+
+---
+
+## Accepted — read-only blueprint preview, `c3f3f44`
+
+Phase 1 of the blueprint installation runtime. Preview resolves; it does not install.
+
+| Commit | What landed | Author |
+|---|---|---|
+| `f1af3a4` | `preview-types.ts` — the contract, as **types** rather than a document | root |
+| `5e29a4c` | onboarding invariant becomes behavioural, plus a schema-model trigger | BP2 `gpt-5.6-terra`, PID 47284 |
+| `fbefa17` | resolver, HTTP boundary, `GET /api/platform/blueprints` and `.../[blueprintId]/preview` | root |
+| `0798020` | `blueprint-preview-panel.tsx` with distinct 401/403/404/400/503/empty/loading states | BP1 `claude-sonnet-5` |
+| `3ea6106` | panel mounted in `business-os-shell.tsx` | root |
+| `c3f3f44` | closed two holes the harnesses themselves left open | root |
+
+Sweep **60 → 61**. Repo lint unchanged at 43 (14 errors, 29 warnings) across all six commits.
+
+### Corrections to what this queue previously asserted
+
+The entry below claimed `business-os` has **zero API routes**. That was false when written:
+`src/app/api/business-os/blueprints/route.ts` and `.../[blueprintId]/route.ts` have existed since
+`627b826`, both GET-only, both behind `requireBusinessOsAccess`. The substantive claim — that
+*installation* does not exist even in part — was and remains true, and is now enforced rather than
+asserted in prose.
+
+There are deliberately **two** blueprint listing surfaces. `business-os` requires the `businessOs`
+owner-console surface (opt-in per profile); `platform` requires only workspace membership, because
+onboarding happens before anyone opts into the owner console. Merging them would either lock preview out
+of onboarding or silently widen what `businessOs` implies. A harness now pins that.
+
+### What is still genuinely missing, and what now enforces it
+
+No installed-blueprint model, no write route, no install runtime, no history ledger.
+`check-onboarding-blueprint-coverage` no longer tests route *names* — it fires when a route both concerns
+blueprints and exports `POST`/`PUT`/`PATCH`/`DELETE`, **or** when `prisma/schema.prisma` gains a model
+matching `/Install|Blueprint/`. So the first durable installation model added will turn it red, which is
+exactly the intended prompt to revisit the wording of `CORRESPONDING_BLUEPRINT`. Do not weaken it to get
+past that point; update the wording, because at that moment installation will genuinely exist.
+
+### Next in queue — revised after `c3f3f44`
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| **Blueprint installation — durable state** | `prisma/schema.prisma` + `src/lib/business-os/**` + write route + owner UI | Preview is done, so this is now unblocked and is the next package. Needs an additive migration and therefore the **full** rehearsal cycle: fresh external backup → pre snapshot → additive build → apply → post snapshot → rollback via a **space-free** `down.sql` path → compare rollback against **both** pre and post → reapply → normalized compare. Every command through `assertDisposableTarget`; exclude and count-assert the five known `profileId` `DropForeignKey` drift statements (`ActivityEvent`, `Contact`, `ContactSourceLink`, `WorkflowRun`, `Workspace`); never leave the database between rollback and reapply. Reuse existing surfaces, workflow, task, approval and audit mechanisms — do **not** add vertical-specific tables or a parallel engine. Required behaviour: idempotent install, atomic install proven by an **injected last-step failure leaving zero partial rows**, upgrade by supersession rather than duplicate reinstall, refusal when a required capability is unavailable, append-only history with `UPDATE`/`DELETE` refused, and no silent permission expansion — `businessOs` must not become grantable by installing. |
+| Extend operations coverage to cohort tasks | `src/lib/operations/engine.ts` | Unchanged: have the cohort engine declare its own needs-action condition first. |
+| Operations due-work processing | new | Unchanged: not built, and nothing on a timer may be described as existing without execution evidence. |
+| P1-009 slice 6 | repo-wide lint | Unchanged, and still a refusal: 43 problems, no safe mechanical slice remains. |
+| Repoint or delete the wave-c rehearsal runner | tooling | Unchanged. Has misled two resumes. Note the primary runner is the one that works: `run-on-rehearsal-primary.js`. |
+| G2 | appointments providers | Still **owner-gated**: real messages, real money. |
+| P1-007 | live `personalink` cutover | Still **owner-gated**. |

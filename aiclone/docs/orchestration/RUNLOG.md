@@ -3595,3 +3595,144 @@ unit and inverting its expected range are both refused on update.
 | `check-fieldjob-inspection-runtime` | **112/112** (was 100); inverted exit 1, 49 flipped |
 | repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged |
 | `npm run build` | exit 0; the new `items/[itemId]` route in the manifest |
+
+
+---
+
+## Read-only blueprint preview — `c3f3f44`
+
+The question this package answers is "what would choosing this blueprint actually mean for my
+business", and the discipline is that it must answer it **without ever implying it did something**.
+There is no installation runtime in this repository. Every response says so.
+
+### The contract is a type file, not a document
+
+Two workers were about to build against a shape only one of us could see. The obvious move was to write
+a contract document. That was rejected: a document describing a shape can be ignored, misread, or drift
+silently, and the drift only surfaces at runtime. `src/lib/business-os/preview-types.ts` was committed
+first (`f1af3a4`) and both workers were pointed at it.
+
+The payoff was concrete and immediate. BP1's report listed, honestly, one thing it could not verify:
+"if root's actual response shape diverges from `preview-types.ts`, that would only surface at runtime".
+But BP1 had **re-exported** `BlueprintPreviewView` from the contract rather than redeclaring it — so
+once the resolver landed, `tsc --noEmit` exit 0 *was* the proof that the panel matches what the resolver
+returns. The unverifiable item closed itself, at compile time, because the contract was a type.
+
+`installed` is typed as the literal `null` rather than as an optional object. This is deliberately
+stronger than a field documented as always null: fabricating installed state is now a **compile error**
+rather than something a reviewer has to notice.
+
+### 404 here, 403 everywhere else, and why that is not a leak
+
+This platform's rule is that a caller must not be able to tell "does not exist" from "not yours". A
+blueprint id breaks the premise of that rule: it is a public static registry key, identical for every
+tenant, so refusing to confirm `field-service-v1` exists protects nothing and hides the owner's typo.
+So an unknown blueprint id is **404**.
+
+The safety property that makes this sound is ordering, not the status code: **authorization is evaluated
+BEFORE the registry lookup.** An unauthorised caller gets 403 even for an id that does not exist, so 404
+can never be used as a registry oracle. Both facts are asserted, along with a byte-identical comparison
+of the foreign-workspace and nonexistent-workspace refusals — comparing *serialized bodies*, because
+that is the assertion that has repeatedly caught refusals which merely looked alike. The reasoning is
+pinned in an assertion so a future reader does not "fix" it into a 403.
+
+### Presentation is derived, and admits it in every field
+
+`BusinessBlueprint` declares no terminology, no surfaces and no modules. That was measured, not assumed,
+and it is asserted **against the type itself** — so if a blueprint ever gains a `terminology` field, the
+check goes red and somebody has to decide whether preview should read it instead of deriving it.
+
+Given that, there were three options: fabricate a terminology pack per blueprint, invent a private
+engine-to-surface mapping, or resolve through the onboarding role the blueprint corresponds to using the
+`surfacesFor` / `calendarNoun` / `shopNavLabel` / `defaultFulfillment` helpers that already exist. Only
+the third tells the truth, and every value it produces is tagged `source: "role-derived"` so a reader
+can always tell derived from declared. A blueprint with no corresponding role reports `role: null` and
+empty surfaces rather than guessing.
+
+Two limitations ship in the response body rather than in a document, because a caller reads the body:
+surfaces are stored per **profile** (JSON on `Profile.personalityConfig`), so a profile with several
+workspaces has one set of surfaces across all of them; and `businessOs` — the owner console — is never
+granted by a role kit and cannot be switched on by choosing a blueprint. That second one is asserted for
+all nine blueprints, because "choosing a vertical quietly granted the owner console" is exactly the kind
+of silent permission expansion nobody would notice until it mattered.
+
+### Lessons
+
+36. **A passing assertion can be vacuous, and looking at it will not tell you.** `check-blueprint-preview`
+    asserted "an optional capability never blocks installability, however immature it is". It passed. It
+    also passed with the `required` guard **deleted** from `resolveBlockers` — because the only optional
+    composition in the entire repository is `commerce:[catalog,orders]`, and both are `available`. The
+    assertion was reporting "nothing optional is currently unavailable" while reading as "optional is
+    excluded from blockers". It would have gone on passing until the day someone composed an immature
+    capability optionally, which is the day it was supposed to fire.
+
+    The only reason this was caught is that the inversion was performed as a **real source mutation**
+    rather than trusted. Deleting the guard and expecting red produced green, and green-when-you-expect-red
+    is information. The fix is the synthetic-descriptor discipline the capability-contract negative test
+    already established: `resolveBlockers` is now exported and driven directly with a synthetic
+    composition over the **real** engine registry, using `appointments:reminders` — genuinely `partial`,
+    because the reminder record and its state machine are persisted but no messaging provider is wired —
+    and both directions are asserted: required blocks, and the *same* capability composed optionally does
+    not. The registry-wide check is kept as a weaker companion. An assertion that only ever exercises the
+    safe direction has not tested the discriminator; it has tested that the discriminator was not needed.
+
+37. **An inversion switch that does not exist is worse than no switch at all.** The preview harness
+    header stated "Set INVERT_ASSERTION=1 to flip every load-bearing expectation and prove this can
+    fail." It was never implemented. Any reader — including a later session — would have run it, seen
+    exit 0 unchanged, and concluded the assertions were inverted and fine. Removed, and replaced with a
+    description of what was actually done: inversion by source mutation, naming the specific break and
+    what went red. A harness that lies about how to falsify it is worse than one that says nothing.
+
+38. **A refined invariant can quietly shrink its own scope.** BP2 correctly replaced a route-*path*
+    proxy (`/blueprint|install|onboard/` on the filename, which any new route would trip regardless of
+    behaviour) with a behavioural detector: a route is an installation candidate when it concerns
+    blueprints **and** exports a write verb. Genuinely better, and it added a second trigger — any Prisma
+    model matching `/Install|Blueprint/` — so the invariant now also fires the moment durable
+    installation state appears.
+
+    But it scanned only `src/app/api/platform`, and `src/app/api/business-os` **already serves
+    blueprints** — two GET routes since `627b826`. That tree, not `platform`, is where somebody would
+    most naturally add an install `POST`. The refinement was correct and the scope was wrong, which is a
+    harder failure to see than a wrong assertion because everything it does check, it checks properly.
+    Widened to every API route, 119 → 150, and **the reach itself is now asserted**, so a future
+    narrowing shows up as a failure rather than as a smaller number nobody reads.
+
+39. **Two endpoints serving the same nouns are not automatically duplication.** `/api/business-os/blueprints`
+    and `/api/platform/blueprints` both list blueprints, which looks like something to consolidate. They
+    authorize differently: the first requires the `businessOs` owner-console surface, which is opt-in per
+    profile; the second requires only workspace membership. Onboarding happens *before* anyone opts into
+    the owner console, so merging them would either lock preview out of onboarding or quietly widen what
+    the `businessOs` surface implies. The distinction is now asserted with both route sources read, so a
+    future de-duplication has to argue with a failing check rather than with a comment.
+
+### Measured gates at `c3f3f44`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` | 0 |
+| `prisma generate` | 0 |
+| `tsc --noEmit` | 0 |
+| check sweep | **61 of 61 exit 0** (was 60) |
+| `check-blueprint-preview` | 53/53; inversion A 2 red / exit 1; inversion B 1 red / exit 1; restored 53/53 |
+| `check-onboarding-blueprint-coverage` | 25/25 (was 20); inverted exit 1, 11 flipped |
+| `check-business-os-a11y` | PASS, `failures: []` |
+| targeted ESLint, 9 files | 0 findings |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run build` | exit 0; both routes in `app-path-routes-manifest.json` |
+| live `personalink` | untouched — 35 tables, no `_prisma_migrations`, 0 leaked, no `btree_gist`, `Profile` = 16 |
+| triggers | 21 total, 0 disabled |
+| frozen worktrees | all six `kirocrew/*` still at `ea69595` |
+
+### Workers, with evidence rather than elapsed time
+
+| Worker | Model | Evidence | Delivered |
+|---|---|---|---|
+| BP2 — onboarding invariant | `gpt-5.6-terra` | **PID 47284**, commit `8fb9077`, report file, clean worktree | accepted as `5e29a4c` |
+| BP1 — owner preview panel | `claude-sonnet-5` | commit `277114a`, report file, clean worktree; **declined to fabricate a PID**, stating the tool environment did not surface one | accepted as `0798020` |
+
+`spawn_run` was hollow again — three probes (`3b7c855e`, `e694ae04`, `c0874291`) produced no worker.
+The one-shot cron path with `approval_mode: auto` produced two real workers with real commits. That is
+now twice in a row; cron is the proven path and `spawn_run` should not be retried a fourth time without
+new information. BP1 reporting "no PID available to me" rather than inventing one is the behaviour worth
+keeping — an unverifiable field left blank is evidence, a plausible number is noise.

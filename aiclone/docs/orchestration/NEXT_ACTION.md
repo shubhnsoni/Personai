@@ -21,14 +21,25 @@ and described H1 as unstarted when it was complete.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`eb35b32`**
+- Primary HEAD: **`c3f3f44`**
 - Origin unchanged; nothing pushed.
 - Waves A–G4 complete, plus surfaces, plus **H1 `fieldJobs:inspection` complete end to end**, plus the
   two gaps H1 left (**`5822aa8`** checklist authoring, **`086c835`** field service selectable during
   onboarding), plus checklist line editing and removal with the snapshot-survival claim now proven
   (**`eb35b32`**), plus the **unified daily operations view, end to end** (`dac6a23` runtime and API,
   `0387d86` panel, `d06e122` case milestones and per-domain scope, `ff50658` route harness).
-- **The check sweep is now 60.**
+- **The check sweep is now 61.**
+- **The READ-ONLY BLUEPRINT PREVIEW is complete end to end** (`c3f3f44`): `GET /api/platform/blueprints`
+  and `GET /api/platform/blueprints/[blueprintId]/preview`, a tenant-authorized resolver, and an owner
+  panel mounted in `business-os-shell.tsx`. **There is still no installation.** `installed` is typed as
+  the literal `null`, so fabricating installed state is a compile error rather than a review question.
+- **Correction to a claim this document's predecessor made:** it said business-os was "a static registry
+  with zero API routes". False since `627b826` — `src/app/api/business-os/blueprints/route.ts` and
+  `.../[blueprintId]/route.ts` have existed all along, both GET-only. There are now **two** blueprint
+  listing surfaces and that is deliberate: the business-os one sits behind `requireBusinessOsAccess`
+  (the owner-console surface, opt-in per profile), the platform one needs only workspace membership,
+  because onboarding happens *before* anyone opts into the owner console. A harness pins the
+  distinction so a future de-duplication has to argue with it.
 - **The capability registry has ZERO `planned` capabilities.** Two `partial` remain, both
   owner-gated: `appointments:reminders` and `appointments:deposits`, whose provider boundaries are
   inert.
@@ -39,6 +50,39 @@ and described H1 as unstarted when it was complete.
 - Live `personalink`: verified untouched — 35 tables, no `_prisma_migrations`, 0 wave tables leaked,
   no `btree_gist`, `Profile` = 16.
 - Frozen worktrees intact: all six `kirocrew/*` still at `ea69595`.
+
+### Measured gates at `c3f3f44` — the blueprint preview package
+
+| Gate | Result |
+|---|---|
+| `prisma validate` | 0 |
+| `prisma generate` | 0 |
+| `tsc --noEmit` | 0 |
+| check sweep | **61 of 61 exit 0** |
+| `check-blueprint-preview` | 53/53; inversion by source mutation; restored 53/53 |
+| `check-onboarding-blueprint-coverage` | 25/25 (was 20); inverted exit 1, 11 flipped |
+| `check-business-os-a11y` | PASS, `failures: []` |
+| targeted ESLint, 9 new/changed files | 0 findings |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | exit 0; **both** new routes in the manifest |
+| live `personalink` | untouched — 35 tables, no `_prisma_migrations`, 0 leaked, `Profile` = 16 |
+| guard/append-only triggers | 21 total, 0 disabled |
+
+**Two harness lessons from this package, both worth more than the feature.**
+
+*A passing assertion can be vacuous.* "An optional capability never blocks installability" passed — and
+kept passing with the `required` guard **deleted** from `resolveBlockers`, because the only optional
+composition in the repository is `commerce:[catalog,orders]` and both are `available`. It was asserting
+"nothing optional is unavailable" while appearing to assert "optional is excluded". The fix is the
+synthetic-descriptor discipline the capability-contract test already taught: drive `resolveBlockers`
+directly with a synthetic composition over the **real** engine registry, using `appointments:reminders`
+(genuinely `partial` — no messaging provider is wired), and assert **both** directions. If you only ever
+assert the safe direction, you have not tested the discriminator.
+
+*An inversion switch that does not exist is worse than none.* The preview harness header advertised
+`INVERT_ASSERTION=1` and never implemented it. A reader would have trusted it. Removed, and replaced
+with what was actually done: inversion by source mutation, with the specific break recorded.
 
 ### Measured gates at `eb35b32`
 
