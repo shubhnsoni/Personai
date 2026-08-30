@@ -29,6 +29,12 @@
  * checking. Domains deliberately NOT covered yet are listed in `UNCOVERED_DOMAINS` with the reason.
  */
 import { PersistenceError } from "../persistence/errors"
+import {
+    COHORT_NEEDS_ACTION_DOMAIN,
+    COHORT_NEEDS_ACTION_NOT_COVERED,
+    COHORT_NEEDS_ACTION_SCOPE,
+    resolveCohortNeedsAction,
+} from "../cohorts/needs-action"
 import type { OperationsContext } from "./shared"
 
 /** Exactly the domains read below. Asserted against the implementation by a harness. */
@@ -41,6 +47,7 @@ export const OPERATIONS_DOMAINS = [
     "fulfilments",
     "returns",
     "caseMilestones",
+    "cohortTasks",
 ] as const
 export type OperationsDomain = (typeof OPERATIONS_DOMAINS)[number]
 
@@ -66,6 +73,9 @@ export const OPERATIONS_DOMAIN_SCOPE: Readonly<Record<OperationsDomain, "profile
     returns: "profile",
     // CaseProject carries workspaceId, not profileId.
     caseMilestones: "workspace",
+    // Cohort carries profileId. The scope is declared by the cohort engine itself as
+    // COHORT_NEEDS_ACTION_SCOPE, and asserted equal to this entry, so the two cannot drift.
+    cohortTasks: "profile",
 })
 
 /**
@@ -74,13 +84,10 @@ export const OPERATIONS_DOMAIN_SCOPE: Readonly<Record<OperationsDomain, "profile
  * badly by the next person.
  */
 export const UNCOVERED_DOMAINS: Readonly<Record<string, string>> = Object.freeze({
-    cohortTasks:
-        "Cohort task and renewal state is spread across several models whose 'needs action' condition " +
-        "is not a single field. Including it would mean encoding a judgement here that the cohort " +
-        "engine has not itself declared.",
     durableTasks:
         "The shared TaskJob queue has its own surface and its own notion of overdue. Restating it here " +
         "would create a second answer to the same question.",
+    ...COHORT_NEEDS_ACTION_NOT_COVERED,
 })
 
 /** One thing waiting, in a shape that does not pretend to be the underlying record. */
@@ -181,6 +188,7 @@ export class OperationsService {
             this.returns(profileId),
             // Workspace-scoped, not profile-scoped. See OPERATIONS_DOMAIN_SCOPE.
             this.caseMilestones(scope.workspaceId, asOf, until),
+            this.cohortTasks(profileId, asOf),
         ])
 
         const items = groups.flat()
@@ -428,4 +436,54 @@ export class OperationsService {
             }),
         )
     }
+
+    /**
+     * Cohort work, CONSUMED from the cohort engine rather than decided here.
+     *
+     * This method deliberately contains no cohort business rule. It does not know that a SUBMITTED
+     * submission is owner work, that LATE attendance is credited, that an absence on a SCHEDULED session
+     * is not yet an exception, or that ELIGIBLE-not-ISSUED is outstanding issuance. Every one of those is
+     * a judgement the cohort engine makes in `resolveCohortNeedsAction`, grounded in its own transition
+     * tables - `submissionFlow`, `ATTENDANCE_CREDITED`, `renewalFlow`, `certificateFlow`.
+     *
+     * That division is the whole point, and it is why this domain was UNCOVERED until now. The previous
+     * entry in `UNCOVERED_DOMAINS` said covering cohorts here "would mean encoding a judgement here that
+     * the cohort engine has not itself declared". It has now declared it, so the refusal is discharged by
+     * the engine speaking rather than by this view guessing. If cohort rules ever need to change, they
+     * change in one place and this method keeps working.
+     *
+     * Only two things happen here, and both are this view's own concerns rather than the cohort engine's:
+     * the per-domain cap that every other domain applies, and the shape assertion below.
+     */
+    private async cohortTasks(profileId: string, asOf: Date): Promise<AttentionItem[]> {
+        const declared = await resolveCohortNeedsAction(this.ctx.db, profileId, asOf)
+        return declared.slice(0, MAX_ITEMS_PER_DOMAIN).map((entry) =>
+            Object.freeze({
+                // Taken from the engine's own constant, not restated, so a rename cannot silently
+                // produce items filed under a domain this view does not declare.
+                domain: COHORT_NEEDS_ACTION_DOMAIN,
+                id: entry.id,
+                reason: entry.reason,
+                label: entry.label,
+                at: entry.at,
+                // Read, never recomputed. The cohort engine decides what overdue means for a renewal,
+                // and a second opinion here would be a second answer to one question.
+                overdue: entry.overdue,
+            }),
+        )
+    }
+}
+
+/**
+ * The two engines must agree on which tenant boundary cohort work is read on.
+ *
+ * Asserted at module load rather than in a harness, because a mismatch would make every cohort count in
+ * this view silently wrong for any owner with more than one workspace - and it would look like a data
+ * problem rather than a contract problem. Failing here makes it a contract problem.
+ */
+if (OPERATIONS_DOMAIN_SCOPE[COHORT_NEEDS_ACTION_DOMAIN] !== COHORT_NEEDS_ACTION_SCOPE) {
+    throw new Error(
+        `operations declares cohortTasks scope as ${OPERATIONS_DOMAIN_SCOPE[COHORT_NEEDS_ACTION_DOMAIN]} ` +
+            `but the cohort engine declares ${COHORT_NEEDS_ACTION_SCOPE}`,
+    )
 }

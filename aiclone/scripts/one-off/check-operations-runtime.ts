@@ -40,6 +40,7 @@ import { join } from "node:path"
 
 import { PrismaClient } from "@prisma/client"
 
+import { COHORT_NEEDS_ACTION_DOMAIN, COHORT_NEEDS_ACTION_SCOPE } from "../../src/lib/cohorts/needs-action"
 import { OPERATIONS_DOMAINS, OPERATIONS_DOMAIN_SCOPE, OperationsService, UNCOVERED_DOMAINS } from "../../src/lib/operations/engine"
 import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
@@ -148,18 +149,77 @@ check(
 // 3. Structural: declared coverage matches the implementation
 // ---------------------------------------------------------------------------
 // Each reader is a private method named after its domain and returns items tagged with it.
-const taggedDomains = [...engineCode.matchAll(/domain: "([a-zA-Z]+)" as const/g)].map((m) => m[1])
-const uniqueTagged = [...new Set(taggedDomains)].sort()
+//
+// Two tagging forms are recognised, and the second is not a loophole. Most readers own their domain
+// name and tag it as a literal. `cohortTasks` does NOT own its name: the cohort engine declares it as
+// COHORT_NEEDS_ACTION_DOMAIN, and the operations reader imports that constant precisely so a rename in
+// the owning engine cannot leave this view filing items under a domain it no longer declares. A scan
+// that only accepted literals would therefore have punished the safer construction - so it accepts a
+// tag by imported constant, but ONLY for a constant it can resolve to a declared domain name, which
+// keeps the assertion honest rather than merely permissive.
+const literalTagged = [...engineCode.matchAll(/domain: "([a-zA-Z]+)" as const/g)].map((m) => m[1])
+const constantTagged: string[] = [...engineCode.matchAll(/domain: ([A-Z][A-Z0-9_]+),/g)]
+    .map((m) => m[1])
+    .filter((identifier) => identifier === "COHORT_NEEDS_ACTION_DOMAIN")
+    .map(() => String(COHORT_NEEDS_ACTION_DOMAIN))
+const uniqueTagged = [...new Set([...literalTagged, ...constantTagged])].sort()
 const declared = [...OPERATIONS_DOMAINS].sort()
 checkInvertible(
     "every declared operations domain has a reader, and every reader is declared",
     uniqueTagged.length === declared.length && uniqueTagged.every((d, i) => d === declared[i]),
     `declared=[${declared.join(",")}] implemented=[${uniqueTagged.join(",")}]`,
 )
+// The cohort domain must be consumed, not re-decided. Scanned over the cohortTasks METHOD BODY only,
+// not the whole engine: a file-wide token scan flagged `SUBMITTED` and would have kept flagging it,
+// because SUBMITTED is also a legitimate INSPECTION status in INSPECTION_OPEN_STATUSES. That scan was
+// testing whether a word appears, not whether cohort rules are restated - the same over-broad shape the
+// vacuity audit exists to catch, in the assertion rather than in the code.
+const cohortMethod = /private async cohortTasks\([\s\S]*?\n {4}\}/.exec(engineCode)?.[0] ?? ""
+const cohortStateTokens = [
+    "SUBMITTED",
+    "RETURNED",
+    "ACCEPTED",
+    "ABSENT",
+    "LATE",
+    "ELIGIBLE",
+    "ISSUED",
+    "LAPSED",
+    "REMINDED",
+    "RENEWED",
+    "submissionFlow",
+    "renewalFlow",
+    "certificateFlow",
+    "ATTENDANCE_CREDITED",
+]
+const restated = cohortStateTokens.filter((token) =>
+    new RegExp(token).test(cohortMethod.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")),
+)
+checkInvertible(
+    "operations CONSUMES the cohort engine's declaration and its own reader names no cohort state at all",
+    cohortMethod.length > 0 && /resolveCohortNeedsAction\(/.test(cohortMethod) && restated.length === 0,
+    cohortMethod.length === 0
+        ? "cohortTasks method not found - the scan is broken, not the code"
+        : restated.length > 0
+          ? `RESTATED cohort state: ${restated.join(",")}`
+          : `calls the declaration; names none of ${cohortStateTokens.length} cohort state tokens`,
+)
+// The two engines must agree on the tenant boundary. engine.ts asserts this at module load; asserting
+// it here too means the harness fails with a readable message rather than an import-time throw.
+checkInvertible(
+    "the cohort engine and the operations view agree on cohortTasks' tenant scope",
+    OPERATIONS_DOMAIN_SCOPE[COHORT_NEEDS_ACTION_DOMAIN] === COHORT_NEEDS_ACTION_SCOPE,
+    `operations=${OPERATIONS_DOMAIN_SCOPE[COHORT_NEEDS_ACTION_DOMAIN]} cohorts=${COHORT_NEEDS_ACTION_SCOPE}`,
+)
+// cohortTasks must no longer be listed as an absence now that it is covered.
+checkInvertible(
+    "cohortTasks is no longer in UNCOVERED_DOMAINS, because it is now covered",
+    !Object.prototype.hasOwnProperty.call(UNCOVERED_DOMAINS, "cohortTasks"),
+    `doesNotCover=[${Object.keys(UNCOVERED_DOMAINS).join(",")}]`,
+)
 check(
     "each declared domain is queried exactly once, so no domain is silently counted twice",
-    taggedDomains.length === uniqueTagged.length,
-    `${taggedDomains.length} tags for ${uniqueTagged.length} domains`,
+    literalTagged.length + constantTagged.length === uniqueTagged.length,
+    `${literalTagged.length + constantTagged.length} tags for ${uniqueTagged.length} domains`,
 )
 // An unexplained absence reads as an oversight and gets "fixed" badly by the next person.
 check(
