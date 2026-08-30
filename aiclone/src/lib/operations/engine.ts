@@ -342,7 +342,29 @@ export class OperationsService {
                 id: row.id,
                 // A committed job with no visit window is its own kind of exception: nobody has been
                 // told when to turn up, and it will never appear in a "today" list by date.
-                reason: row.scheduledStartAt === null ? "committed but unscheduled" : `${row.status.toLowerCase()} visit`,
+                //
+                // THE DATED CASE REPORTS THE JOB'S OWN STATUS, AND NOW SAYS WHOSE STATUS IT IS.
+                //
+                // This read `${row.status.toLowerCase()} visit`, which for a job holding status SCHEDULED
+                // emitted "scheduled visit". The due-work preview and its owner panel copy this string
+                // verbatim, so it is owner-facing copy authored here.
+                //
+                // The WORD is not the defect. The status really is SCHEDULED - a human booked the window
+                // and scheduledStartAt is set - so reporting it is true and it is the most useful thing
+                // this item can say; suppressing it would make the surface less informative and no more
+                // honest. What was missing is WHOSE claim it is. Bare "scheduled visit", in a list a
+                // platform rendered, reads as the PLATFORM having scheduled something, and that is the
+                // one claim nothing on this path can support: there is no timer, no queue and no
+                // provider here. Naming the record as the holder of the state - "visit marked scheduled"
+                // - keeps the fact and removes the reading. See THE NARROWING in
+                // ./due-work-preview-types.ts, which is where that rule is written down and enforced.
+                //
+                // The status token is also de-underscored, because IN_PROGRESS reached an owner as
+                // "in_progress visit". A raw enum in owner copy is a leak rather than a wording choice.
+                reason:
+                    row.scheduledStartAt === null
+                        ? "committed but unscheduled"
+                        : `visit marked ${row.status.toLowerCase().split("_").join(" ")}`,
                 label: `${row.reference} ${row.title}`,
                 at: row.scheduledStartAt,
                 overdue: row.scheduledStartAt !== null && row.scheduledStartAt.getTime() < asOf.getTime(),

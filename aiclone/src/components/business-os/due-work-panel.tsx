@@ -46,8 +46,17 @@ import type { DueWorkPreview } from "@/lib/operations/due-work-preview-types"
  * five times. Two further consequences the harness has to respect, both inherited from the contract:
  * `limitations` are DENIALS ("nothing has been sent, charged, dispatched...") and are pinned by exact
  * equality with the contract's own sentences rather than by word absence, and engine-owned item text
- * (`label`, `attentionReason`) may legitimately contain a banned word, which this panel copies verbatim
- * rather than editing somebody else's judgement.
+ * (`label`, `attentionReason`) is held to the NARROWED rule rather than to the flat ban.
+ *
+ * THE NARROWED RULE, and why this panel does not edit item text to satisfy it. The contract distinguishes
+ * a report of a RECORD'S own state ("visit marked scheduled" - a human booked that window, and the job
+ * says so) from a claim that this PLATFORM scheduled, sent or ran something. The first is true and useful;
+ * the second is the claim that makes an owner stop checking. `classifyPreviewProse` in the contract is the
+ * enforceable form of that distinction, and this panel's harness runs it over the rendered text of a mount
+ * driven by the REAL engine rather than over a fixture string somebody typed. So a banned word may
+ * legitimately appear in an item here, and this panel still copies that text verbatim: re-wording another
+ * module's judgement is how two screens start disagreeing, and the honesty requirement is met by the
+ * engine attributing the state at source, not by this component paraphrasing it.
  *
  * THE STALE-RESPONSE PROBLEM, and the three defences the house pattern already settled
  *
@@ -392,8 +401,9 @@ export function DueWorkPanel({ workspaceId }: { workspaceId: string }) {
                                     </li>
                                 ))}
                             </ul>
-                            {/* The server's own scope sentence, whether or not the scopes are mixed. When
-                                they are, positions across domains compare two different populations. */}
+                            {/* The server's own scope sentence. It reports the boundaries THIS plan's
+                                items were read on, so when they differ, positions across domains
+                                compare more than one population. Rendered, never paraphrased. */}
                             <p className="mt-2 text-xs text-muted-foreground">{plan.scopeNotice}</p>
                         </section>
 

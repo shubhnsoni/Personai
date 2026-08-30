@@ -22,7 +22,12 @@ export type DueWorkPlan = Readonly<{
     workspaceId: string
     covers: readonly OperationsDomain[]
     doesNotCover: Readonly<Record<string, string>>
+    /**
+     * Carried through from the summary. True when the DECLARED COVERAGE LIST spans more than one tenant
+     * boundary - a static property of that list, not a measurement of the supplied rows.
+     */
     mixedScope: boolean
+    /** What the boundaries of THIS proposal's own items are, in a sentence. Varies with the items. */
     scopeNotice: string
     empty: boolean
     explanation: string
@@ -68,6 +73,41 @@ export function planDueWork(summary: OperationsSummary): DueWorkPlan {
     )
 
     const empty = items.length === 0
+
+    // WHICH TENANT BOUNDARIES THIS PROPOSAL'S OWN ITEMS SPAN.
+    //
+    // The scope per domain is the SUMMARY'S declaration, read back from `summary.domains` rather than
+    // re-derived here, so this function still adds no judgement of its own. What it does add is the
+    // restriction to the domains that actually contributed an item.
+    //
+    // WHY THAT RESTRICTION IS THE WHOLE POINT. `summary.mixedScope` is computed in engine.ts as
+    // `scopes.size > 1` over the frozen OPERATIONS_DOMAIN_SCOPE map, which always holds both "profile"
+    // and "workspace" - caseMilestones is the workspace-scoped one - so it is true for every workspace,
+    // every profile and every dataset including an empty one. `summary.domains` is no better on its own:
+    // it lists all nine declared domains with their declared scope whether or not any of them returned a
+    // row. Both are therefore facts about the DECLARED COVERAGE LIST, and neither can say anything about
+    // the records in front of the owner.
+    //
+    // The notice below used to branch on `summary.mixedScope`, which had two consequences. The
+    // non-mixed arm was UNREACHABLE - constant-true input, so no workspace and no dataset could take it,
+    // and check-operations-runtime.ts carries a live counterexample proving the field cannot describe a
+    // dataset. And the arm that DID run asserted "this proposal combines attention from different tenant
+    // boundaries" to every owner, including one whose items all came from profile-scoped domains, for
+    // whom it was simply false. A constant dressed as an observation is the same defect class as copy
+    // that claims work was arranged when nothing acted: the reader cannot tell it is not a measurement.
+    //
+    // Deriving it from the items makes both arms reachable from real data and makes each sentence true
+    // when it appears. `mixedScope` itself is NOT redefined - it is carried through untouched, because
+    // two harnesses this package does not own pin it true end to end, and its declared-coverage meaning
+    // is now stated on the field in ./due-work-preview-types.ts rather than left to be guessed.
+    //
+    // A domain the summary declared no boundary for lands in the set as `undefined`. It is kept as its
+    // own member rather than dropped, so an unrecognised domain can only push this toward the cautious
+    // sentence and never toward a claim that one boundary covers everything.
+    const declaredScope = new Map(summary.domains.map((entry) => [entry.domain, entry.scope] as const))
+    const itemBoundaries = new Set(items.map((entry) => declaredScope.get(entry.domain)))
+    const oneBoundary = itemBoundaries.size === 1 && !itemBoundaries.has(undefined)
+
     return Object.freeze({
         asOf: summary.asOf,
         horizonHours: summary.horizonHours,
@@ -75,26 +115,14 @@ export function planDueWork(summary: OperationsSummary): DueWorkPlan {
         workspaceId: summary.workspaceId,
         covers: Object.freeze([...summary.covers]),
         doesNotCover: Object.freeze({ ...summary.doesNotCover }),
+        // Carried through unchanged. It reports that the DECLARED COVERAGE spans two tenant boundaries,
+        // which is a static property of that list; `scopeNotice` is what reports this proposal's items.
         mixedScope: summary.mixedScope,
-        // THE NON-MIXED BRANCH BELOW IS CURRENTLY UNREACHABLE, AND IS KEPT DELIBERATELY.
-        //
-        // `summary.mixedScope` is computed in engine.ts over the frozen OPERATIONS_DOMAIN_SCOPE map, which
-        // always contains both "profile" and "workspace" - caseMilestones is the workspace-scoped one - so
-        // `scopes.size > 1` is true for every workspace and every dataset. The only producer of a real
-        // OperationsSummary therefore never sets it false, and nothing in the running application can take
-        // the second arm. Do not read a passing test of the first arm as evidence that this ternary was
-        // exercised both ways; only a hand-built summary does that.
-        //
-        // Kept, rather than collapsed to the single mixed sentence, for two reasons. This function's input
-        // is the OperationsSummary TYPE, not the one engine that happens to build it today, and that type
-        // permits mixedScope false: a coverage list that lost its last workspace-scoped domain, or a second
-        // producer, takes this arm immediately, and it should say something accurate when it does rather
-        // than assert a mixture that is not there. And collapsing it would turn the first sentence into
-        // unconditional prose, which would then read as a measured fact about the caller's data instead of
-        // what it actually is - a branch on a static property of the declared coverage list.
-        scopeNotice: summary.mixedScope
-            ? "This proposal combines attention from different tenant boundaries; cross-domain positions do not imply a shared population."
-            : "The supplied summary reports one tenant boundary across its covered domains.",
+        scopeNotice: empty
+            ? "This proposal has no items, so there are no positions to compare across tenant boundaries."
+            : oneBoundary
+              ? "Every item in this proposal was read on one tenant boundary, so comparing their positions compares one population."
+              : "This proposal does not show its items all coming from one tenant boundary: positions that span different tenant boundaries compare more than one population.",
         empty,
         explanation: empty
             ? "No attention items were present in the supplied operations summary, so this proposal is empty."

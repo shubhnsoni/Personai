@@ -40,6 +40,47 @@
  *
  * The distinction is not pedantry. An owner who reads "3 reminders scheduled" will stop checking, and
  * nothing is scheduled.
+ *
+ * ---------------------------------------------------------------------------------------------------
+ * THE NARROWING, AND WHY A FLAT WORD BAN WAS THE WRONG SHAPE FOR ITEM TEXT
+ *
+ * An audit found this surface emitting "scheduled" after all, from engine-authored item text that the
+ * API and the panel copy verbatim: a FieldJob whose status is SCHEDULED produced the attention reason
+ * "scheduled visit", and the cohort classifier labelled a membership "Renewal is scheduled for ...".
+ *
+ * Banning the word outright would have been the wrong repair, because two different claims were being
+ * lumped together and only one of them is false:
+ *
+ *   (a) A REPORT OF A RECORD'S OWN PERSISTED STATE. A FieldJob really does hold status SCHEDULED,
+ *       because a human booked a visit window and `scheduledStartAt` is set. A CohortMembership really
+ *       does hold renewalState SCHEDULED, because somebody called `scheduleRenewal` with a due date.
+ *       Reporting that is TRUE, and it is the most useful thing the item can say. Refusing to say it
+ *       would make this surface LESS informative and no more honest - it would hide a fact an owner
+ *       needs in order to decide what to do.
+ *
+ *   (b) THIS PLATFORM CLAIMING IT SCHEDULED, SENT OR RAN SOMETHING. That is the false claim the
+ *       contract exists to prevent. Nothing on this path acts: no timer, no queue, no provider, no
+ *       delivery. "3 reminders scheduled" is (b), and it is what makes an owner stop checking.
+ *
+ * The two are told apart by ATTRIBUTION, not by vocabulary. A state word carried by a phrase that names
+ * the RECORD as the holder of the state - "visit marked scheduled", "renewal recorded as scheduled" - is
+ * (a): it says a record says so. The same word standing on its own, with no holder named, reads as this
+ * surface's own claim and is (b). `STATE_ATTRIBUTION_MARKERS` and `classifyPreviewProse` below are the
+ * enforceable form of this paragraph, so the rule and its enforcement are one artefact rather than two
+ * that can drift.
+ *
+ * WHERE EACH RULE APPLIES, because they are deliberately not the same strength:
+ *
+ *   THIS SURFACE'S OWN PROSE - `explanation`, `scopeNotice`, `doesNotCover` - keeps the FLAT ban. Not
+ *   one occurrence of a forbidden word, attributed or not. This prose reports no record's state; it
+ *   describes what the preview IS, so it has nothing legitimate to attribute and no reason to reach for
+ *   any of these words. Narrowing it would open a hole for exactly the copy the contract was written
+ *   against.
+ *
+ *   ENGINE-OWNED ITEM TEXT - `label` and `attentionReason` - is held to the NARROWED rule: no
+ *   PLATFORM CLAIM, and attributed state reports are permitted. This is the channel the audit found,
+ *   and it was previously unchecked in both directions - reported on stdout by the API harness and
+ *   subtracted from the panel harness's scan, so nothing failed when it said "scheduled visit".
  */
 import type { DueWorkPlan, DueWorkPlanBand, DueWorkPlanItem } from "./due-work-plan"
 import type { OperationsDomain } from "./engine"
@@ -78,8 +119,19 @@ export type DueWorkPreview = Readonly<{
     covers: readonly OperationsDomain[]
     /** Stated absences with reasons, so silence is not read as "nothing there". */
     doesNotCover: Readonly<Record<string, string>>
-    /** True when covered domains do not share one tenant boundary. Surfaced, never smoothed. */
+    /**
+     * True when the DECLARED COVERAGE LIST spans more than one tenant boundary.
+     *
+     * A property of that list, not a measurement of your records: it is derived from the frozen
+     * OPERATIONS_DOMAIN_SCOPE map in engine.ts, which always holds both "profile" and "workspace", so it
+     * is true for every workspace and every dataset including an empty one. Read `scopeNotice` for what
+     * the items in THIS plan actually span.
+     */
     mixedScope: boolean
+    /**
+     * What the items in THIS plan span, in a sentence. Derived from the boundaries the plan's own items
+     * were read on, so unlike `mixedScope` it varies with the data.
+     */
     scopeNotice: string
     empty: boolean
     /** What this plan is and is not, in the response body rather than in a document. */
@@ -134,6 +186,12 @@ export type DueWorkPreviewPort = {
  *
  * It also does not apply to field NAMES. `executed` is a required field of this contract, so any scan
  * that reads raw JSON rather than the prose values will report the contract as breaking itself.
+ *
+ * THREE, and this one is the audit's finding rather than the harness's: it does not apply UNCHANGED to
+ * engine-owned ITEM TEXT either. `label` and `attentionReason` report a record's own state, and a record
+ * whose status is SCHEDULED has to be reportable as such. Item text is therefore held to
+ * `classifyPreviewProse` below, which forbids the platform-claim reading and permits the attributed
+ * state report. See THE NARROWING at the top of this file for why those are different claims.
  */
 export const FORBIDDEN_PREVIEW_WORDS: readonly string[] = Object.freeze([
     "scheduled",
@@ -146,6 +204,80 @@ export const FORBIDDEN_PREVIEW_WORDS: readonly string[] = Object.freeze([
     "automatic",
     "will",
 ])
+
+/**
+ * Phrases that attribute a state to the RECORD holding it, rather than to this platform.
+ *
+ * Each one names a record as the source of what follows it: something was MARKED, or is RECORDED AS, or
+ * is the record's STATUS. A forbidden word carried by one of these is a report about a row; the same
+ * word with no holder named is this surface claiming to have done something. That is the whole of the
+ * (a)/(b) distinction, in a form a scan can apply.
+ *
+ * Hyphens and underscores count as separators as well as spaces, because a kebab reason token
+ * ("renewal-marked-scheduled") is a real emitted form here and attributes state exactly as the prose
+ * form does.
+ */
+export const STATE_ATTRIBUTION_MARKERS: readonly string[] = Object.freeze([
+    "marked",
+    "marked as",
+    "recorded",
+    "recorded as",
+    "status",
+])
+
+/** How much text before a forbidden word is examined for an attribution marker. */
+const ATTRIBUTION_WINDOW = 28
+
+export type PreviewProseClaim = Readonly<{
+    /** The forbidden word this occurrence used. */
+    word: string
+    /**
+     * `attributed-state` is case (a): a record's own state, with the record named as its holder.
+     * `platform-claim` is case (b): the same word with nothing named, which reads as this surface
+     * asserting it acted. Only (b) is a contract breach.
+     */
+    kind: "attributed-state" | "platform-claim"
+    /** The window that was judged, so a failure names the sentence rather than only the word. */
+    excerpt: string
+}>
+
+/**
+ * Classifies every forbidden-word OCCURRENCE in one string as (a) or (b).
+ *
+ * Per occurrence rather than per word, deliberately: one label can legitimately report a record's state
+ * and illegitimately claim delivery in the same sentence, and a per-word answer would let the honest
+ * half excuse the dishonest half.
+ *
+ * This function is the contract. A harness that re-implemented the judgement would be a second opinion
+ * about what the rule means, and the two would drift the first time the rule was refined - the same
+ * reason this whole file is a type file rather than a design document.
+ */
+export function classifyPreviewProse(text: string): readonly PreviewProseClaim[] {
+    const claims: PreviewProseClaim[] = []
+    for (const word of FORBIDDEN_PREVIEW_WORDS) {
+        const occurrences = new RegExp(`\\b${word}\\b`, "giu")
+        for (let hit = occurrences.exec(text); hit !== null; hit = occurrences.exec(text)) {
+            const before = text.slice(Math.max(0, hit.index - ATTRIBUTION_WINDOW), hit.index)
+            const attributed = STATE_ATTRIBUTION_MARKERS.some((marker) =>
+                new RegExp(`\\b${marker}\\b[\\s:_-]*$`, "iu").test(before),
+            )
+            claims.push({
+                word: hit[0].toLowerCase(),
+                kind: attributed ? "attributed-state" : "platform-claim",
+                excerpt: `${before}${hit[0]}`.trim(),
+            })
+        }
+    }
+    return Object.freeze(claims)
+}
+
+/**
+ * The (b) occurrences only - the ones this surface may never emit anywhere, in its own prose or in text
+ * it copies from an engine. Empty is the only acceptable answer for owner-facing item text.
+ */
+export function platformClaimsIn(text: string): readonly PreviewProseClaim[] {
+    return Object.freeze(classifyPreviewProse(text).filter((claim) => claim.kind === "platform-claim"))
+}
 
 /** Words this surface is expected to use, so honest wording is a positive requirement too. */
 export const REQUIRED_PREVIEW_WORDS: readonly string[] = Object.freeze(["plan", "preview"])
@@ -161,7 +293,7 @@ export const DUE_WORK_PREVIEW_LIMITATIONS: readonly string[] = Object.freeze([
     "Nothing runs on its own. There is no timer, interval, cron or background worker behind this surface - it produced this plan because somebody asked for it, and it produces another only when somebody asks again.",
     "The ordering is a proposal. Overdue work precedes dated work precedes undated work, and every item carries the reason for its position, but nothing here knows your priorities.",
     "Coverage is inherited from the operations view and is not everything. Read covers and doesNotCover before treating the total as a total.",
-    "Where covered domains do not share one tenant boundary, comparing positions across them compares two different populations. mixedScope says when that is the case.",
+    "Where covered domains do not share one tenant boundary, comparing positions across them compares two different populations. scopeNotice reports what the items in this plan span; mixedScope is a property of the declared coverage list rather than of your records.",
 ])
 
 /** Serialises a pure plan into the boundary shape. Dates become ISO strings; nothing is recomputed. */

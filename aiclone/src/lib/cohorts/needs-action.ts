@@ -33,7 +33,7 @@ export const COHORT_NEEDS_ACTION_DOMAIN = "cohortTasks" as const
 export type CohortNeedsActionReason =
     | "assignment-submitted"
     | "attendance-absent"
-    | "renewal-scheduled"
+    | "renewal-marked-scheduled"
     | "renewal-reminded"
     | "renewal-lapsed"
     | "certificate-eligible"
@@ -181,11 +181,36 @@ export async function resolveCohortNeedsAction(
         const cohort = cohortById.get(membership.cohortId)
         if (!cohort) continue
         if (membership.renewalState === "SCHEDULED") {
+            /*
+             * REPORTING A RECORD'S OWN STATE, AND SAYING WHOSE STATE IT IS.
+             *
+             * The reason was "renewal-scheduled" and the label "Renewal is scheduled for a member of X".
+             * Both are copied verbatim by the operations due-work preview and rendered to an owner, so
+             * they are owner-facing copy authored here rather than internal tokens.
+             *
+             * WHICH CLAIM IS THIS? It is a report of persisted state. renewalState is SCHEDULED because
+             * somebody called `scheduleRenewal` with a due date - see workflow.ts - and renewalDueAt is
+             * that date. Saying so is TRUE and it is what the owner needs. It is NOT this platform
+             * claiming it arranged a delivery: reaching REMINDED is what asserts a real reminder exists,
+             * and TASK_REQUIRED_RENEWAL_STATES in lifecycle.ts makes that state unreachable without a
+             * linked TaskJob. At SCHEDULED there may be no reminder row at all, and delivery is declared
+             * out of scope by COHORT_NEEDS_ACTION_NOT_COVERED.renewalDelivery above.
+             *
+             * So the fix is attribution, not suppression. "Renewal is scheduled" is passive with no
+             * holder named, and in a list a platform rendered that reads as the platform having
+             * scheduled it - the reading that makes an owner stop checking something nothing is going to
+             * act on. "Renewal is marked scheduled" names the record as the holder of the state, so the
+             * same fact survives and the misreading does not. The reason token carries the same marker
+             * because the operations panel renders it verbatim as an item's attention reason.
+             *
+             * The rule this follows, and the harness that enforces it, are in
+             * src/lib/operations/due-work-preview-types.ts under THE NARROWING.
+             */
             items.push(
                 item(
                     membership.id,
-                    "renewal-scheduled",
-                    `Renewal is scheduled for a member of ${cohort.title}`,
+                    "renewal-marked-scheduled",
+                    `Renewal is marked scheduled for a member of ${cohort.title}`,
                     membership.renewalDueAt,
                     asOf,
                 ),

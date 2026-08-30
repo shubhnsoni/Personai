@@ -5,12 +5,19 @@ import { collectElements, countTextOccurrences, hasAttribute, installDom } from 
 import type { HostElement, HostNode } from "../lib/dom-host"
 import type { FunctionComponent } from "react"
 import { domainLabel, readableKey } from "../../src/components/business-os/operations-shared"
+import { planDueWork } from "../../src/lib/operations/due-work-plan"
 import {
     DUE_WORK_PREVIEW_LIMITATIONS,
     FORBIDDEN_PREVIEW_WORDS,
     REQUIRED_PREVIEW_WORDS,
+    STATE_ATTRIBUTION_MARKERS,
+    classifyPreviewProse,
+    platformClaimsIn,
+    toDueWorkPreview,
 } from "../../src/lib/operations/due-work-preview-types"
 import type { DueWorkPreview } from "../../src/lib/operations/due-work-preview-types"
+import { OPERATIONS_DOMAIN_SCOPE, OperationsService } from "../../src/lib/operations/engine"
+import type { OperationsContext } from "../../src/lib/operations/shared"
 
 /**
  * Live component harness for the owner-facing DUE-WORK PLAN panel.
@@ -246,6 +253,78 @@ function planFixture(workspaceId: string, items: DueWorkPreview["items"]): DueWo
 }
 
 // ---------------------------------------------------------------------------------------------------
+// THE REAL ENGINE, driven by seeded rows.
+//
+// Everything above this line is a fixture: strings this harness typed, which can prove that the PANEL
+// adds no forbidden word of its own but can prove nothing about what an owner actually reads, because
+// the item text an owner reads is authored by the engine and copied verbatim through two layers.
+//
+// So section 8 below asserts the narrowed wording rule against text NOTHING HERE WROTE. The rows are
+// seeded; every owner-facing string asserted is computed by src/lib/operations/engine.ts and
+// src/lib/cohorts/needs-action.ts from those rows, then ordered by the real `planDueWork` and serialised
+// by the real `toDueWorkPreview`. A rule proven against a literal typed in this file would prove nothing
+// about the sentence that reaches a panel.
+//
+// The database is deliberately NOT used. Only the Prisma DELEGATES the engine calls are stubbed, and
+// they return the seeded rows unfiltered; every judgement that produces a string - which statuses are
+// open, what an unscheduled job means, which renewal states are owner work, how a reason reads - stays
+// with the engine under test. Two consequences that matter: this harness needs no DATABASE_URL and can
+// leave no residue, and it cannot perturb the global row counts that check-due-work-preview-api.ts takes
+// before and after a request while another stage runs it.
+// ---------------------------------------------------------------------------------------------------
+const ENGINE_WORKSPACE = "engine-workspace"
+const ENGINE_PROFILE = "engine-profile"
+
+type EngineSeed = Readonly<{
+    fieldJobs: readonly unknown[]
+    caseMilestones: readonly unknown[]
+    cohorts: readonly unknown[]
+    memberships: readonly unknown[]
+}>
+
+const NO_ROWS = { findMany: async (): Promise<readonly unknown[]> => [] }
+
+function engineDb(seed: EngineSeed) {
+    return {
+        reservation: NO_ROWS,
+        booking: NO_ROWS,
+        fieldJob: { findMany: async () => seed.fieldJobs },
+        fieldJobInspection: NO_ROWS,
+        // `fields` is present because the inventory reader compares two columns by field reference.
+        inventoryItem: { findMany: async (): Promise<readonly unknown[]> => [], fields: { reorderPoint: {} } },
+        fulfilment: NO_ROWS,
+        returnRequest: NO_ROWS,
+        caseMilestone: { findMany: async () => seed.caseMilestones },
+        cohort: { findMany: async () => seed.cohorts },
+        cohortMembership: { findMany: async () => seed.memberships },
+        cohortSession: NO_ROWS,
+        cohortAttendance: NO_ROWS,
+        cohortAssignment: NO_ROWS,
+        cohortSubmission: NO_ROWS,
+        cohortCertificate: NO_ROWS,
+    }
+}
+
+/** Runs the real engine, the real planner and the real serialiser over seeded rows. */
+async function enginePreview(seed: EngineSeed): Promise<DueWorkPreview> {
+    const service = new OperationsService({
+        db: engineDb(seed),
+        requireScope: async () => ({ profileId: ENGINE_PROFILE, workspaceId: ENGINE_WORKSPACE }),
+    } as unknown as OperationsContext)
+    return toDueWorkPreview(planDueWork(await service.summary(ENGINE_WORKSPACE)))
+}
+
+/** Every owner-facing string an ITEM carries. All of it engine-authored. */
+function engineItemText(preview: DueWorkPreview): string {
+    return preview.items.map((entry) => `${entry.label} ${entry.attentionReason}`).join(" ")
+}
+
+/** This surface's OWN affirmative prose, which is held to the flat ban rather than the narrowed rule. */
+function surfaceProse(preview: DueWorkPreview): readonly string[] {
+    return [preview.explanation, preview.scopeNotice, ...Object.values(preview.doesNotCover)]
+}
+
+// ---------------------------------------------------------------------------------------------------
 // Text tools
 // ---------------------------------------------------------------------------------------------------
 
@@ -261,6 +340,107 @@ function withoutPhrases(text: string, phrases: readonly string[]): string {
     for (const phrase of phrases) remaining = remaining.split(phrase).join(" ")
     return remaining
 }
+
+/**
+ * The rendered text with a SEPARATOR between text nodes, and the reason this exists is a measured hole.
+ *
+ * `HostNode.textContent` concatenates children with no separator at all (scripts/lib/dom-host.ts line 45),
+ * so a word at the end of one element abuts the first character of the next: an attention reason ending
+ * "...visit marked scheduled" followed by a badge reading "Field jobs" becomes "scheduledField jobs", and
+ * `\bscheduled\b` does not match that. Every word scan over raw `textContent` is therefore weaker than it
+ * looks - it can MISS a banned word that is genuinely on screen, purely because of which element it landed
+ * in. Measured while building section 8: three attributed occurrences were on screen and a raw
+ * `textContent` scan found one of them.
+ *
+ * Joining text nodes with a single space is also the closer model of what an owner reads: those nodes are
+ * separate paragraphs and badges on screen, not one run of prose. Used for every WORD SCAN below. The
+ * state markers and ordering checks keep using raw `textContent`, because they match whole phrases that
+ * live inside a single text node and are unaffected either way.
+ */
+function readableTextOf(root: HostNode): string {
+    const parts: string[] = []
+    const walk = (node: HostNode) => {
+        // `directText` is where this host keeps a node's own text, for TEXT nodes and for elements alike
+        // (React sets `element.textContent` directly for a single string child). Pushing it before
+        // recursing reproduces `textContent`'s own order - directText, then children - with a separator.
+        if (node.directText !== "") parts.push(node.directText)
+        for (const child of node.childNodes) walk(child)
+    }
+    walk(root)
+    return parts.join(" ")
+}
+
+/**
+ * Source with block and line comments removed. Nothing else - the import specifiers below have to
+ * survive, and they live inside quotes.
+ */
+function withoutComments(source: string): string {
+    return source
+        .replace(/\/\*[\s\S]*?\*\//g, " ")
+        .split("\n")
+        .map((line) => line.replace(/(^|[^:])\/\/.*$/, "$1"))
+        .join("\n")
+}
+
+/**
+ * Comment-free source with the CONTENTS of quoted strings emptied, so a needle scan sees code only.
+ *
+ * BOTH STEPS ARE LOAD-BEARING, AND SKIPPING EITHER HAS ALREADY PRODUCED A FALSE POSITIVE HERE. These
+ * files name every dependency they forbid, in prose, precisely in order to forbid it - and the contract's
+ * `limitations` go further and name them inside STRING LITERALS on executable lines, because the denial
+ * is shipped to the caller in the response body. A comment-stripping scan alone would therefore read the
+ * sentence "there is no timer, interval, cron or background worker behind this surface" as three
+ * violations. That is the trap this repository has walked into five times, and the string-literal form of
+ * it is the version a comment-only strip does not catch.
+ *
+ * Template literals are left intact on purpose: their `${...}` parts are real code, and emptying them
+ * would hide a call rather than a word.
+ */
+function codeOnly(source: string): string {
+    return withoutComments(source)
+        .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+        .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+}
+
+function importSpecifiersOf(source: string): readonly string[] {
+    const code = withoutComments(source)
+    const found = [
+        ...[...code.matchAll(/\bfrom\s+"([^"]+)"/g)].map((match) => match[1]),
+        ...[...code.matchAll(/\brequire\(\s*"([^"]+)"\s*\)/g)].map((match) => match[1]),
+        ...[...code.matchAll(/\bimport\(\s*"([^"]+)"\s*\)/g)].map((match) => match[1]),
+    ]
+    return [...new Set(found)].sort()
+}
+
+/**
+ * The only BARE package specifiers this path may import. A timer, queue, mailer, payment client or
+ * carrier arrives as a dependency, so an allowlist over specifiers refuses the whole category rather
+ * than the handful of names somebody thought to enumerate - and unlike a name list, it cannot be defeated
+ * by choosing a different vendor. Relative and `@/` specifiers are internal and are allowed by shape.
+ */
+const ALLOWED_BARE_IMPORTS: readonly string[] = Object.freeze(["react", "lucide-react", "@prisma/client"])
+
+/**
+ * Call shapes that would BE a timer, a background hand-off or an outbound request. Shapes rather than
+ * words, so the prohibition written in prose two paragraphs above cannot be mistaken for a violation of
+ * itself, and applied to `codeOnly` output as well.
+ */
+const EXECUTION_CALL_NEEDLES: readonly string[] = Object.freeze([
+    "setTimeout(",
+    "setInterval(",
+    "setImmediate(",
+    "queueMicrotask(",
+    "process.nextTick(",
+    "requestAnimationFrame(",
+    "fetch(",
+    "XMLHttpRequest",
+    "new Worker",
+    ".enqueue(",
+    ".publish(",
+    ".send(",
+    ".charge(",
+    ".dispatch(",
+])
 
 function forbiddenWordsIn(text: string): string[] {
     return FORBIDDEN_PREVIEW_WORDS.filter((word) => new RegExp(`\\b${word}\\b`, "iu").test(text))
@@ -471,7 +651,7 @@ async function main() {
         // ---- 1. the wording rule, over RENDERED TEXT ------------------------------------------------
         // The limitation sentences are removed first: they are DENIALS that necessarily contain banned
         // words, and they are pinned by exact equality immediately below instead.
-        const populatedProse = withoutPhrases(populatedText, DUE_WORK_PREVIEW_LIMITATIONS)
+        const populatedProse = withoutPhrases(readableTextOf(populated.container), DUE_WORK_PREVIEW_LIMITATIONS)
         const populatedHits = forbiddenWordsIn(populatedProse)
         checkInvertible(
             "MEASURED: the panel's rendered copy contains no forbidden word, with clean engine text supplied",
@@ -566,7 +746,7 @@ async function main() {
 
         const suppliedStrings = DIRTY_ITEMS.flatMap((entry) => [entry.label, entry.attentionReason, entry.orderingReason])
         const suppliedHits = forbiddenWordsIn(suppliedStrings.join(" "))
-        const dirtyRenderedHits = forbiddenWordsIn(withoutPhrases(dirtyText, DUE_WORK_PREVIEW_LIMITATIONS))
+        const dirtyRenderedHits = forbiddenWordsIn(withoutPhrases(readableTextOf(dirty.container), DUE_WORK_PREVIEW_LIMITATIONS))
         const contributed = dirtyRenderedHits.filter((word) => !suppliedHits.includes(word))
         checkInvertible(
             "the fixture really does supply banned words, so the subset assertion below is not vacuous",
@@ -584,6 +764,315 @@ async function main() {
             `REPORT  banned words present in engine-owned item text and copied verbatim by the panel: ${suppliedHits.join(",") || "none"}`,
         )
         await unmount(dirty)
+
+        // =============================================================================================
+        // 8. THE NARROWED WORDING RULE, ASSERTED AGAINST TEXT THE REAL ENGINE WROTE.
+        //
+        // Sections 1 and 1b prove things about the PANEL: with clean text it adds no forbidden word, and
+        // with dirty text it adds none of its own. Neither can say anything about the sentence an owner
+        // actually reads, because that sentence is authored by the engine - and an audit found the engine
+        // authoring "scheduled visit" for a FieldJob whose status is SCHEDULED, and "Renewal is scheduled
+        // for a member of ..." for a membership whose renewalState is SCHEDULED. Both were copied, in
+        // full, through the API and this panel, and nothing failed.
+        //
+        // THE FIX IS NOT A WORD BAN, because the two claims are not the same claim:
+        //
+        //   (a) the record's own state. The job's status really is SCHEDULED, because a human booked the
+        //       window. Saying so is true and it is what an owner needs.
+        //   (b) this platform claiming it scheduled or delivered something. Nothing on this path acts.
+        //
+        // The contract now tells them apart by ATTRIBUTION - `classifyPreviewProse` - and the engine now
+        // names the record as the holder of the state. This section asserts that against strings NOTHING
+        // IN THIS FILE TYPED: seeded rows in, real engine, real planner, real serialiser, real panel
+        // mount, assertions over what came out. The mutation control below strips the attribution from
+        // the ENGINE'S OWN sentences and shows the rule then reports them, so the rule is discriminating
+        // rather than merely permissive.
+        // =============================================================================================
+        const engineNow = Date.now()
+        const jobScheduled = {
+            id: "engine-job-scheduled",
+            status: "SCHEDULED",
+            scheduledStartAt: new Date(engineNow - 2 * 3_600_000),
+            reference: "FJ-4001",
+            title: "Boiler service at 4 Example Street",
+        }
+        const jobDispatched = {
+            id: "engine-job-dispatched",
+            status: "DISPATCHED",
+            scheduledStartAt: new Date(engineNow + 2 * 3_600_000),
+            reference: "FJ-4002",
+            title: "Meter exchange at 5 Example Street",
+        }
+        const jobInProgress = {
+            id: "engine-job-in-progress",
+            status: "IN_PROGRESS",
+            scheduledStartAt: new Date(engineNow + 3 * 3_600_000),
+            reference: "FJ-4003",
+            title: "Roof survey at 6 Example Street",
+        }
+        const jobUndated = {
+            id: "engine-job-undated",
+            status: "SCHEDULED",
+            scheduledStartAt: null,
+            reference: "FJ-4004",
+            title: "Follow-up at 7 Example Street",
+        }
+        const renewalCohort = { id: "engine-cohort", title: "Autumn intake" }
+        const renewalMembership = {
+            id: "engine-membership",
+            cohortId: renewalCohort.id,
+            status: "ACTIVE",
+            renewalState: "SCHEDULED",
+            renewalDueAt: new Date(engineNow + 4 * 3_600_000),
+        }
+        const blockedMilestone = {
+            id: "engine-milestone",
+            title: "Countersign the survey",
+            status: "BLOCKED",
+            dueAt: null,
+            case: { reference: "CASE-7" },
+        }
+
+        const profileOnlySeed: EngineSeed = {
+            fieldJobs: [jobScheduled, jobDispatched, jobInProgress, jobUndated],
+            caseMilestones: [],
+            cohorts: [renewalCohort],
+            memberships: [renewalMembership],
+        }
+        const bothBoundariesSeed: EngineSeed = { ...profileOnlySeed, caseMilestones: [blockedMilestone] }
+        const noRowsSeed: EngineSeed = { fieldJobs: [], caseMilestones: [], cohorts: [], memberships: [] }
+
+        const enginePlan = await enginePreview(profileOnlySeed)
+        const engineMixedPlan = await enginePreview(bothBoundariesSeed)
+        const engineEmptyPlan = await enginePreview(noRowsSeed)
+
+        const engineIds = enginePlan.items.map((entry) => entry.id)
+        checkInvertible(
+            "the seeded SCHEDULED field job and the seeded scheduled renewal both reach the plan, so the wording assertions below have real engine text to judge",
+            engineIds.includes(jobScheduled.id) && engineIds.includes(renewalMembership.id),
+            `${enginePlan.items.length} item(s): ${engineIds.join(",")}`,
+        )
+        const engineText = engineItemText(enginePlan)
+        const engineOccurrences = classifyPreviewProse(engineText)
+        report(
+            `REPORT  engine-authored item text under test: ${enginePlan.items.map((entry) => `[${entry.domain}] ${entry.label} :: ${entry.attentionReason}`).join("  |  ")}`,
+        )
+        report(
+            `REPORT  classified occurrences in that text: ${engineOccurrences.map((claim) => `${claim.word}=${claim.kind} in "${claim.excerpt}"`).join("  |  ") || "none"}`,
+        )
+        checkInvertible(
+            "MEASURED: the real engine's item text really does contain forbidden state words - the audit's finding, reproduced from the engine rather than restated",
+            engineOccurrences.length >= 3 && /\bscheduled\b/iu.test(engineText),
+            `${engineOccurrences.length} occurrence(s): ${engineOccurrences.map((claim) => `${claim.word}=${claim.kind}`).join(", ")}`,
+        )
+        const enginePlatformClaims = platformClaimsIn(engineText)
+        checkInvertible(
+            "MEASURED: every forbidden word the engine emitted is an ATTRIBUTED report of a record's own state - case (a) - and none is a claim that this platform acted - case (b)",
+            enginePlatformClaims.length === 0,
+            enginePlatformClaims.length === 0
+                ? `all ${engineOccurrences.length} attributed: ${engineOccurrences.map((claim) => `"${claim.excerpt}"`).join(" | ")}`
+                : `PLATFORM CLAIMS: ${enginePlatformClaims.map((claim) => `"${claim.excerpt}"`).join(" | ")}`,
+        )
+        checkInvertible(
+            "MEASURED: the engine no longer leaks a raw enum token into owner copy, so IN_PROGRESS does not reach a reader as in_progress",
+            engineText.length > 0 && !/\b\w+_\w+\b/u.test(engineText),
+            engineText,
+        )
+
+        // The surface's OWN prose keeps the FLAT ban: it reports no record's state, so it has nothing to
+        // attribute and no reason to reach for any of these words. Pinned non-empty first, field by
+        // field, because a scan over empty strings passes by scanning nothing.
+        const engineSurface = surfaceProse(enginePlan)
+        checkInvertible(
+            "the surface prose scanned next is non-empty field by field, so the flat-ban assertion cannot pass by scanning nothing",
+            engineSurface.length >= 2 && engineSurface.every((text) => text.trim().length > 0),
+            `${engineSurface.length} field(s), ${engineSurface.reduce((n, text) => n + text.trim().length, 0)} chars`,
+        )
+        const engineSurfaceHits = engineSurface.flatMap((text) => classifyPreviewProse(text))
+        checkInvertible(
+            "MEASURED: this surface's OWN prose contains no forbidden word at all, attributed or not - the flat ban is unchanged where nothing legitimate is being reported",
+            engineSurfaceHits.length === 0,
+            engineSurfaceHits.map((claim) => `${claim.word} in "${claim.excerpt}"`).join(" | ") || "none",
+        )
+
+        // ---- THE MUTATION: the rule, applied to the engine's own sentences with attribution removed ---
+        const attributionPattern = new RegExp(`\\b(?:${STATE_ATTRIBUTION_MARKERS.join("|")})\\b[\\s:_-]*`, "giu")
+        const unattributed = engineText.replace(attributionPattern, "")
+        const mutantClaims = platformClaimsIn(unattributed)
+        checkInvertible(
+            "MUTATION: strip the attribution out of the ENGINE'S OWN sentences and the rule reports every occurrence as a platform claim - so the narrowing discriminates rather than permitting the word everywhere",
+            mutantClaims.length > 0 && mutantClaims.length === engineOccurrences.length,
+            `${mutantClaims.length}/${engineOccurrences.length} now platform claims, e.g. "${mutantClaims[0]?.excerpt ?? ""}"`,
+        )
+
+        // ---- executed / sideEffects in the EMITTED body of a real engine-driven preview ---------------
+        const emittedBody = JSON.stringify(enginePlan)
+        checkInvertible(
+            "MEASURED: executed is the literal false in the EMITTED body, not merely in the type",
+            enginePlan.executed === false && /"executed":\s*false/u.test(emittedBody),
+            `executed=${JSON.stringify(enginePlan.executed)} present in body=${/"executed":\s*false/u.test(emittedBody)}`,
+        )
+        checkInvertible(
+            "MEASURED: sideEffects is an empty list in the EMITTED body, and there is no shape in which it could report otherwise",
+            enginePlan.sideEffects.length === 0 && /"sideEffects":\s*\[\]/u.test(emittedBody),
+            `sideEffects=${JSON.stringify(enginePlan.sideEffects)}`,
+        )
+
+        // ---- the scope notice: the arm that could not be reached, reached by DATA ---------------------
+        const boundariesOf = (preview: DueWorkPreview) =>
+            [...new Set(preview.items.map((entry) => OPERATIONS_DOMAIN_SCOPE[entry.domain]))].sort().join(",")
+        const noticeArms = [engineEmptyPlan.scopeNotice, enginePlan.scopeNotice, engineMixedPlan.scopeNotice]
+        checkInvertible(
+            "MEASURED: three real engine-produced plans take THREE different scope notices, so the arm that was unreachable under the old constant-true condition is now reached by data",
+            new Set(noticeArms).size === 3,
+            noticeArms.join("  ||  "),
+        )
+        checkInvertible(
+            "MEASURED: the single-boundary notice is reached because this plan's items really were all read on one boundary - recomputed from the items and the frozen scope map rather than read off the response",
+            enginePlan.items.length > 0 && boundariesOf(enginePlan) === "profile",
+            `items span [${boundariesOf(enginePlan)}]`,
+        )
+        checkInvertible(
+            "MEASURED: the mixed notice is reached because that plan's items really do span two boundaries - workspace via caseMilestones, profile via fieldJobs",
+            engineMixedPlan.items.length > 0 && boundariesOf(engineMixedPlan) === "profile,workspace",
+            `items span [${boundariesOf(engineMixedPlan)}]`,
+        )
+        checkInvertible(
+            "COUNTEREXAMPLE: mixedScope is true for BOTH plans, including the one whose items span a single boundary - so the notice now carries a fact the field cannot, and the field was left alone",
+            enginePlan.mixedScope === true &&
+                engineMixedPlan.mixedScope === true &&
+                enginePlan.scopeNotice !== engineMixedPlan.scopeNotice,
+            `mixedScope=${String(enginePlan.mixedScope)}/${String(engineMixedPlan.mixedScope)} while notices differ=${String(enginePlan.scopeNotice !== engineMixedPlan.scopeNotice)}`,
+        )
+        checkInvertible(
+            "the empty plan claims no boundary at all, because it has no positions to compare",
+            engineEmptyPlan.items.length === 0 && engineEmptyPlan.scopeNotice !== enginePlan.scopeNotice,
+            engineEmptyPlan.scopeNotice,
+        )
+        const noticeHits = noticeArms.flatMap((text) => classifyPreviewProse(text))
+        checkInvertible(
+            "MEASURED: all three scope notices are free of forbidden words, so making this branch live did not smuggle one in",
+            noticeHits.length === 0 && noticeArms.every((text) => text.trim().length > 0),
+            noticeHits.map((claim) => claim.word).join(",") || "none",
+        )
+
+        // ---- the same text, on screen, in a real mount of the real panel -----------------------------
+        const engineMount = mount()
+        await render(engineMount, ENGINE_WORKSPACE)
+        const engineCall = controlled.calls[controlled.calls.length - 1]
+        await settle(() => succeed(engineCall, enginePlan))
+        const engineRendered = engineMount.container.textContent
+        snapshots.set("populated-real-engine-text", engineRendered)
+
+        checkInvertible(
+            "the panel rendered the engine's own item sentences verbatim, so the rendered-text scan below is scanning them rather than nothing",
+            enginePlan.items.length > 0 &&
+                enginePlan.items.every(
+                    (entry) => engineRendered.includes(entry.label) && engineRendered.includes(entry.attentionReason),
+                ),
+            `${enginePlan.items.length} item(s) rendered`,
+        )
+        const engineRenderedProse = withoutPhrases(readableTextOf(engineMount.container), DUE_WORK_PREVIEW_LIMITATIONS)
+        const renderedOccurrences = classifyPreviewProse(engineRenderedProse)
+        const renderedPlatformClaims = platformClaimsIn(engineRenderedProse)
+        report(
+            `REPORT  rendered prose is ${engineRenderedProse.length} chars and carries ${renderedOccurrences.length} classified occurrence(s): ${renderedOccurrences.map((claim) => `${claim.word}=${claim.kind}`).join(",") || "none"}`,
+        )
+        checkInvertible(
+            "MEASURED: with the REAL engine's text on screen, nothing an owner reads is a claim that this platform scheduled, sent or ran anything",
+            renderedPlatformClaims.length === 0,
+            renderedPlatformClaims.map((claim) => `"${claim.excerpt}"`).join(" | ") || "none",
+        )
+        checkInvertible(
+            "and that scan is not passing by finding nothing - the rendered text really does carry attributed state words an owner can read",
+            renderedOccurrences.length >= 3 &&
+                renderedOccurrences.every((claim) => claim.kind === "attributed-state"),
+            `${renderedOccurrences.length} attributed occurrence(s) on screen`,
+        )
+        checkInvertible(
+            "MEASURED: the server's own scope notice for this plan is what the panel rendered, rather than a paraphrase",
+            engineRendered.includes(enginePlan.scopeNotice),
+            enginePlan.scopeNotice,
+        )
+        const engineButtons = collectElements(engineMount.container, (element) => element.tagName === "BUTTON")
+        checkInvertible(
+            "MEASURED: on the real engine's plan the panel still offers exactly ONE control, and it re-requests a plan rather than acting on the work",
+            engineButtons.length === 1 &&
+                engineButtons[0].textContent.trim() === "Request this plan again" &&
+                engineButtons[0].getAttribute("type") === "button",
+            `${engineButtons.length} button(s): ${engineButtons.map((button) => `${button.textContent.trim()}[${String(button.getAttribute("type"))}]`).join(" | ")}`,
+        )
+        await unmount(engineMount)
+
+        // =============================================================================================
+        // 9. NO TIMER, QUEUE, MESSAGE, PAYMENT OR PROVIDER ON THIS PATH - EXECUTABLE LINES ONLY.
+        //
+        // Two scans, and the reason there are two is that a name list is defeated by choosing a different
+        // vendor. A dependency of that kind has to arrive either as an IMPORT or as a global CALL, so an
+        // allowlist over import specifiers refuses the whole category, and a set of call SHAPES catches
+        // the globals that need no import.
+        //
+        // Both run over `codeOnly`, which strips comments AND the contents of quoted strings. The second
+        // step is the one this repository keeps forgetting: these files name every forbidden dependency
+        // in prose in order to forbid it, and the contract ships that prose to the caller INSIDE STRING
+        // LITERALS on executable lines. A comment-only strip therefore still reads the sentence "there is
+        // no timer, interval, cron or background worker behind this surface" as three violations.
+        // =============================================================================================
+        const sourceOf = (relative: string) => readFileSync(join(__dirname, "../..", relative), "utf8")
+        const pathFiles: readonly string[] = Object.freeze([
+            "src/lib/operations/engine.ts",
+            "src/lib/cohorts/needs-action.ts",
+            "src/lib/operations/due-work-plan.ts",
+            "src/lib/operations/due-work-preview-types.ts",
+        ])
+        const allPathFiles: readonly string[] = Object.freeze([
+            ...pathFiles,
+            "src/components/business-os/due-work-panel.tsx",
+        ])
+
+        const scannedSpecifiers = allPathFiles.flatMap((relative) => importSpecifiersOf(sourceOf(relative)))
+        checkInvertible(
+            "the import scan really found specifiers to judge, so the allowlist assertion below is not passing over an empty list",
+            scannedSpecifiers.length >= 10,
+            `${scannedSpecifiers.length} specifier(s) across ${allPathFiles.length} files`,
+        )
+        const outsideAllowlist = allPathFiles.flatMap((relative) =>
+            importSpecifiersOf(sourceOf(relative))
+                .filter(
+                    (specifier) =>
+                        !specifier.startsWith(".") &&
+                        !specifier.startsWith("@/") &&
+                        !ALLOWED_BARE_IMPORTS.includes(specifier),
+                )
+                .map((specifier) => `${relative}: ${specifier}`),
+        )
+        checkInvertible(
+            "MEASURED: no file on this path imports a package outside the allowlist, so no timer, queue, mailer, payment client or carrier is a dependency of it",
+            outsideAllowlist.length === 0,
+            outsideAllowlist.join(" | ") || `allowed bare imports only: ${ALLOWED_BARE_IMPORTS.join(",")}`,
+        )
+        const executionCalls = pathFiles.flatMap((relative) => {
+            const code = codeOnly(sourceOf(relative))
+            return EXECUTION_CALL_NEEDLES.filter((needle) => code.includes(needle)).map(
+                (needle) => `${relative}: ${needle}`,
+            )
+        })
+        checkInvertible(
+            "MEASURED: no executable line on this path is a timer, a background hand-off or an outbound request",
+            executionCalls.length === 0,
+            executionCalls.join(" | ") ||
+                `checked ${EXECUTION_CALL_NEEDLES.length} call shapes over ${pathFiles.length} files, comments and string literals removed`,
+        )
+        const trapWords = ["timer", "cron", "queue", "mailer", "payment", "provider", "scheduler"]
+        const trapHits = pathFiles.flatMap((relative) => {
+            const raw = sourceOf(relative)
+            return trapWords
+                .filter((word) => new RegExp(`\\b${word}`, "iu").test(raw))
+                .map((word) => `${relative.split("/").pop() ?? relative}:${word}`)
+        })
+        report(
+            `REPORT  a whole-file word scan of the same four files would report ${trapHits.length} "violation(s)" (${trapHits.join(", ") || "none"}). Every one is a prohibition written down in order to be forbidden, and several sit inside the limitation strings the response ships to the caller - which is why the scan above strips comments AND string literals.`,
+        )
 
         // =============================================================================================
         // 5b. EMPTY plan: visibly different from "not requested", and STILL states its coverage.
@@ -614,7 +1103,7 @@ async function main() {
             "an empty plan still names the clock reading it was computed against",
             emptyText.includes(new Date(AS_OF).toLocaleString()),
         )
-        const emptyHits = forbiddenWordsIn(withoutPhrases(emptyText, DUE_WORK_PREVIEW_LIMITATIONS))
+        const emptyHits = forbiddenWordsIn(withoutPhrases(readableTextOf(empty.container), DUE_WORK_PREVIEW_LIMITATIONS))
         checkInvertible(
             "the empty state's copy contains no forbidden word either",
             emptyHits.length === 0,
@@ -651,7 +1140,7 @@ async function main() {
             "the 403 copy never says the workspace was not found, because a refusal cannot tell the two apart",
             !/not found/iu.test(errorText),
         )
-        const errorHits = forbiddenWordsIn(withoutPhrases(errorText, DUE_WORK_PREVIEW_LIMITATIONS))
+        const errorHits = forbiddenWordsIn(withoutPhrases(readableTextOf(errored.container), DUE_WORK_PREVIEW_LIMITATIONS))
         checkInvertible(
             "the error state's copy contains no forbidden word either",
             errorHits.length === 0,
