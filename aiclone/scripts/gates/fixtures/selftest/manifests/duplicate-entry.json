@@ -1,0 +1,50 @@
+{
+  "manifestVersion": 1,
+  "description": "Self-test defect: check-alpha.js is listed twice. The driver must reject the manifest (exit 2) rather than run the harness twice and report an inflated executed count.",
+  "harnessDir": "scripts/gates/fixtures/selftest/harnesses",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [
+    { "file": "check-alpha.js", "package": "fixture", "run": true },
+    { "file": "check-alpha.js", "package": "fixture", "run": true },
+    { "file": "check-beta.js", "package": "fixture-b", "run": true },
+    {
+      "file": "check-red.js",
+      "package": "fixture",
+      "run": false,
+      "skip": {
+        "reason": "Not under test in this case.",
+        "requires": "nothing",
+        "howToRunManually": "see manifests/red.json",
+        "declaredBy": "Q1-A driver self-test"
+      }
+    },
+    {
+      "file": "check-silent.js",
+      "package": "fixture",
+      "run": false,
+      "skip": {
+        "reason": "Not under test in this case.",
+        "requires": "nothing",
+        "howToRunManually": "see manifests/zero-byte.json",
+        "declaredBy": "Q1-A driver self-test"
+      }
+    },
+    {
+      "file": "check-leaky.js",
+      "package": "fixture",
+      "run": false,
+      "skip": {
+        "reason": "Not under test in this case.",
+        "requires": "nothing",
+        "howToRunManually": "see manifests/redaction.json",
+        "declaredBy": "Q1-A driver self-test"
+      }
+    }
+  ]
+}

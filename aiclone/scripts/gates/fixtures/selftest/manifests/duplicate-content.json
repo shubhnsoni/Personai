@@ -1,0 +1,16 @@
+{
+  "manifestVersion": 1,
+  "description": "Self-test defect: dup-tree holds two byte-identical harnesses. A copied harness inflates the executed count without adding coverage, so the driver must exit 2 with DUPLICATE_HARNESS_CONTENT rather than counting it twice and reporting a bigger green number.",
+  "harnessDir": "scripts/gates/fixtures/selftest/dup-tree",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [
+    { "file": "check-alpha.js", "package": "fixture", "run": true },
+    { "file": "check-alpha-copy.js", "package": "fixture", "run": true }
+  ]
+}

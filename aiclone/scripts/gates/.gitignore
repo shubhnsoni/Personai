@@ -1,0 +1,7 @@
+# Gate-run output: per-harness logs and the JSON/Markdown summaries, regenerated
+# on every sweep. These are build artefacts, not source.
+#
+# Same convention as docs/orchestration/.gitignore: a directory-scoped ignore
+# file with the reason written next to it, rather than a rule bolted onto the
+# app-level .gitignore where it would be far from the thing it describes.
+artifacts/

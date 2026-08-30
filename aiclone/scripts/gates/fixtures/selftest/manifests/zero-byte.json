@@ -1,0 +1,49 @@
+{
+  "manifestVersion": 1,
+  "description": "Self-test defect: check-silent.js is enabled. It exits 0 with no output, so its log is zero bytes. The driver must refuse to count a silent success and exit 2.",
+  "harnessDir": "scripts/gates/fixtures/selftest/harnesses",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [
+    { "file": "check-alpha.js", "package": "fixture", "run": true },
+    { "file": "check-silent.js", "package": "fixture", "run": true },
+    {
+      "file": "check-beta.js",
+      "package": "fixture-b",
+      "run": false,
+      "skip": {
+        "reason": "Not under test in this case.",
+        "requires": "nothing",
+        "howToRunManually": "see manifests/baseline.json",
+        "declaredBy": "Q1-A driver self-test"
+      }
+    },
+    {
+      "file": "check-red.js",
+      "package": "fixture",
+      "run": false,
+      "skip": {
+        "reason": "Not under test in this case.",
+        "requires": "nothing",
+        "howToRunManually": "see manifests/red.json",
+        "declaredBy": "Q1-A driver self-test"
+      }
+    },
+    {
+      "file": "check-leaky.js",
+      "package": "fixture",
+      "run": false,
+      "skip": {
+        "reason": "Not under test in this case.",
+        "requires": "nothing",
+        "howToRunManually": "see manifests/redaction.json",
+        "declaredBy": "Q1-A driver self-test"
+      }
+    }
+  ]
+}
