@@ -1,3 +1,4 @@
+import { hasAttribute, installDom } from "../lib/dom-host"
 import type { WorkspaceSurfaceResolution } from "../../src/components/business-os/workspace-surfaces-shared"
 
 /**
@@ -8,6 +9,10 @@ import type { WorkspaceSurfaceResolution } from "../../src/components/business-o
  * react-dom/client a deliberately tiny in-memory DOM host. React really mounts the
  * component, runs useEffect/cleanup, and commits host mutations; this is not static
  * rendering and does not scan component source for the behaviour under test.
+ *
+ * The host itself was introduced here and has since been extracted to scripts/lib/dom-host.ts,
+ * because a second harness (check-commerce-panel-empty-state.ts) needed the same one. The
+ * behaviour asserted below is unchanged; only the host's location moved.
  */
 
 const INVERT = process.env.INVERT_ASSERTION === "1"
@@ -19,177 +24,6 @@ function checkInvertible(name: string, observed: unknown, detail?: string) {
     const passesNormally = Boolean(observed)
     const passesThisRun = INVERT ? !passesNormally : passesNormally
     if (!passesThisRun) failures.push(detail ? `${name}: ${detail}` : name)
-}
-
-class HostNode {
-    readonly childNodes: HostNode[] = []
-    parentNode: HostNode | null = null
-    directText = ""
-
-    constructor(
-        readonly nodeType: number,
-        readonly nodeName: string,
-        readonly ownerDocument: HostDocument | null,
-    ) {}
-
-    get firstChild(): HostNode | null {
-        return this.childNodes[0] ?? null
-    }
-
-    get lastChild(): HostNode | null {
-        return this.childNodes[this.childNodes.length - 1] ?? null
-    }
-
-    get textContent(): string {
-        if (this.nodeType === 3) return this.directText
-        return this.directText + this.childNodes.map((child) => child.textContent).join("")
-    }
-
-    set textContent(value: string) {
-        for (const child of this.childNodes) child.parentNode = null
-        this.childNodes.length = 0
-        this.directText = String(value)
-        this.changed()
-    }
-
-    get nodeValue(): string | null {
-        return this.nodeType === 3 ? this.directText : null
-    }
-
-    set nodeValue(value: string | null) {
-        this.directText = value ?? ""
-        this.changed()
-    }
-
-    appendChild<T extends HostNode>(child: T): T {
-        if (child.parentNode) child.parentNode.removeChild(child)
-        this.childNodes.push(child)
-        child.parentNode = this
-        this.changed()
-        return child
-    }
-
-    insertBefore<T extends HostNode>(child: T, before: HostNode | null): T {
-        if (before === null) return this.appendChild(child)
-        const index = this.childNodes.indexOf(before)
-        if (index < 0) throw new Error("insertBefore target is not a child")
-        if (child.parentNode) child.parentNode.removeChild(child)
-        this.childNodes.splice(index, 0, child)
-        child.parentNode = this
-        this.changed()
-        return child
-    }
-
-    removeChild<T extends HostNode>(child: T): T {
-        const index = this.childNodes.indexOf(child)
-        if (index < 0) throw new Error("removeChild target is not a child")
-        this.childNodes.splice(index, 1)
-        child.parentNode = null
-        this.changed()
-        return child
-    }
-
-    contains(candidate: HostNode | null): boolean {
-        if (candidate === this) return true
-        return this.childNodes.some((child) => child.contains(candidate))
-    }
-
-    addEventListener() {}
-    removeEventListener() {}
-
-    protected changed() {
-        if (this.ownerDocument) this.ownerDocument.mutations += 1
-    }
-}
-
-class HostElement extends HostNode {
-    readonly attributes = new Map<string, string>()
-    readonly style = {
-        setProperty: (_name: string, _value: string) => undefined,
-        removeProperty: (_name: string) => undefined,
-    }
-    readonly tagName: string
-
-    constructor(
-        tagName: string,
-        ownerDocument: HostDocument,
-        readonly namespaceURI = "http://www.w3.org/1999/xhtml",
-    ) {
-        super(1, tagName.toUpperCase(), ownerDocument)
-        this.tagName = tagName.toUpperCase()
-    }
-
-    setAttribute(name: string, value: unknown) {
-        this.attributes.set(name, String(value))
-        this.changed()
-    }
-
-    setAttributeNS(_namespace: string | null, name: string, value: unknown) {
-        this.setAttribute(name, value)
-    }
-
-    removeAttribute(name: string) {
-        if (this.attributes.delete(name)) this.changed()
-    }
-
-    removeAttributeNS(_namespace: string | null, name: string) {
-        this.removeAttribute(name)
-    }
-
-    getAttribute(name: string): string | null {
-        return this.attributes.get(name) ?? null
-    }
-
-    hasAttribute(name: string): boolean {
-        return this.attributes.has(name)
-    }
-
-    focus() {
-        if (this.ownerDocument) this.ownerDocument.activeElement = this
-    }
-}
-
-class HostIFrameElement extends HostElement {}
-class HostSvgElement extends HostElement {}
-
-class HostText extends HostNode {
-    constructor(value: string, ownerDocument: HostDocument) {
-        super(3, "#text", ownerDocument)
-        this.directText = value
-    }
-}
-
-class HostDocument extends HostNode {
-    readonly documentElement: HostElement
-    readonly body: HostElement
-    activeElement: HostElement | null = null
-    defaultView: Record<string, unknown> = {}
-    mutations = 0
-
-    constructor() {
-        super(9, "#document", null)
-        this.documentElement = new HostElement("html", this)
-        this.body = new HostElement("body", this)
-        this.documentElement.appendChild(this.body)
-        this.activeElement = this.body
-        this.mutations = 0
-    }
-
-    createElement(tagName: string): HostElement {
-        return tagName.toLowerCase() === "iframe"
-            ? new HostIFrameElement(tagName, this)
-            : new HostElement(tagName, this)
-    }
-
-    createElementNS(namespace: string, tagName: string): HostElement {
-        return namespace === "http://www.w3.org/2000/svg"
-            ? new HostSvgElement(tagName, this, namespace)
-            : new HostElement(tagName, this, namespace)
-    }
-
-    createTextNode(value: string): HostText {
-        return new HostText(value, this)
-    }
 }
 
 type Deferred<T> = Readonly<{
@@ -255,38 +89,6 @@ function emptyResolution(workspaceId: string): WorkspaceSurfaceResolution {
         notInstallableSurfaces: [],
     }
 }
-
-function hasAttribute(root: HostNode, name: string, value: string): boolean {
-    if (root instanceof HostElement && root.getAttribute(name) === value) return true
-    return root.childNodes.some((child) => hasAttribute(child, name, value))
-}
-
-function installDom() {
-    const document = new HostDocument()
-    const window = {
-        document,
-        Node: HostNode,
-        Element: HostElement,
-        HTMLElement: HostElement,
-        HTMLIFrameElement: HostIFrameElement,
-        SVGElement: HostSvgElement,
-        Event: class Event {},
-        getSelection: () => null,
-    }
-    document.defaultView = window
-    Object.assign(globalThis, {
-        document,
-        window,
-        Node: HostNode,
-        Element: HostElement,
-        HTMLElement: HostElement,
-        HTMLIFrameElement: HostIFrameElement,
-        SVGElement: HostSvgElement,
-        IS_REACT_ACT_ENVIRONMENT: true,
-    })
-    return document
-}
-
 async function main() {
     const document = installDom()
     const React = await import("react")
