@@ -34,7 +34,11 @@ const ALL_SURFACES: Surface[] = [
 // here would therefore switch an unfinished owner console on for those profiles by
 // default. It is granted only by explicit per-profile opt-in through extras.
 
-const ALL_PACKS: FieldPack[] = [
+/**
+ * Exported so the blueprint preview resolver can enumerate packs without restating the union. A second
+ * copy of this list would drift the first time a pack is added.
+ */
+export const ALL_PACKS: FieldPack[] = [
     "shopPhysical", "shopDigital", "menuDish", "tableBook", "ar", "portfolio", "whatsappUpi",
 ]
 
