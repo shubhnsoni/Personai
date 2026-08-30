@@ -91,7 +91,7 @@ const engineCode = engineSrc
  * THE GET-ONLY GATE, widened after audit. Shares its reasoning with check-due-work-preview-api.ts.
  *
  * The previous form was `!/export async function (POST|PATCH|PUT|DELETE)\(/`. That misses two declaration
- * styles this repository already uses for handler exports. Measured over its 154 route.ts files:
+ * styles this repository already uses for handler exports. Measured over its 156 route.ts files:
  * `export async function VERB` 95 times, `export function VERB` 17 times, `export const VERB` 4 times, for
  * POST/PUT/PATCH/DELETE. So a write verb added in either of the two latter styles passed the gate
  * untouched, and it covered neither HEAD nor OPTIONS. Both styles are house style here, so this was not a

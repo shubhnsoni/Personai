@@ -32,7 +32,7 @@ and described H1 as unstarted when it was complete.
   **`INVERT_ASSERTION=1` DOES NOT PROVE AN ASSERTION CAN FAIL.** It inverts the EXPECTED VALUE, so a
   tautology flips to FAIL exactly like a genuine assertion. A clean "N of N flipped" line proves the
   inversion plumbing works and nothing more. Eight assertions incapable of failing were found this wave
-  - two of them `checkInvertible`, all surviving inversion cleanly, all previously counted as evidence.
+  - THREE of them `checkInvertible`, all surviving inversion cleanly, all previously counted as evidence.
   Only a MUTATION of the code under test discriminates. Do not quote a pre-`1ca0505` harness PASS as
   evidence about the five gating vacuity classes.
 

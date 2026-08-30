@@ -396,7 +396,7 @@ non-vacuous harness improvement.
 
 ### Scope and method
 
-Audited all 69 pre-existing `check-*.ts` harnesses with the new AST-backed
+Audited all 70 pre-existing `check-*.ts` harnesses with the new AST-backed
 `check-harness-exit-integrity.ts`. The scanner inspects executable TypeScript AST
 nodes, not comments or strings, and excludes its own source because the detection
 logic and its controlled fixture necessarily contain the prohibited shape. It
@@ -415,7 +415,7 @@ when the same field is recomputed after the later assertions before output.
 | `check-business-os-surface.ts:174-175` | 2 | SAFE PRELIMINARY SUMMARY | `report.result` and `report.failures` are both recomputed at lines 280-281 after all later assertions and before the final `process.exitCode` decision at line 284. |
 | All remaining final exit/exit-code decisions | 111 | FINAL VERDICT | No later assertion occurs in their execution scope. |
 
-No REAL DEFECT was found in the 69 audited existing harnesses. The corrected
+No REAL DEFECT was found in the 70 audited existing harnesses. (Recorded as 69 originally; an integrity audit recomputed 71 check-*.ts files at that commit, minus the scanner itself, so 70 were in scope. check-workspace-surfaces-race.ts, added earlier in the same run, was among them.) The corrected
 `check-business-os-a11y.ts` has its only exit decision at the final tail, after
 all assertions and report serialization.
 

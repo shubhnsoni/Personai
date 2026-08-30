@@ -100,7 +100,7 @@ function refusal(called: Called): string {
  *
  * The first version of this gate asserted `!/export async function (POST|PATCH|PUT|DELETE)\(/`, which is
  * evadable without any cleverness at all: this repository's own src/app/api already declares handler
- * exports three different ways. Measured over its 154 route.ts files: `export async function VERB` 95
+ * exports three different ways. Measured over its 156 route.ts files: `export async function VERB` 95
  * times, `export function VERB` 17 times and `export const VERB` 4 times, for POST/PUT/PATCH/DELETE. A
  * write verb added to the due-work route in either of the two latter styles - both of them already house
  * style here - would have passed the old gate untouched. HEAD and OPTIONS were not covered at all.
