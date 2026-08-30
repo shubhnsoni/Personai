@@ -317,6 +317,24 @@ check(
   "appointments reminders is still only partial, so the partial negative test is not vacuous",
   businessEngineDescriptors.appointments.capabilities.find((c) => c.id === "reminders")?.maturity === "partial",
 )
+
+// The same real partial capability must be allowed when it is optional. This is paired
+// with the required refusal above: without this direction, deleting `composition.required`
+// from the validator would keep every existing maturity assertion green.
+const activeWithPartialOptionalCapability: BusinessBlueprint = {
+  ...activeWithPartialRequiredCapability,
+  id: "valid-active-optional-partial-capability",
+  engines: [{ engineId: "appointments", capabilities: ["reminders"], required: false }],
+}
+checkInvertible(
+  "active blueprint may include the same partial capability when the composition is optional",
+  validateBusinessBlueprint(activeWithPartialOptionalCapability).ok,
+)
+check(
+  "optional partial composition reaches the maturity gate rather than omitting the capability",
+  activeWithPartialOptionalCapability.engines[0]?.capabilities[0] === "reminders" &&
+    activeWithPartialOptionalCapability.engines[0]?.required === false,
+)
 check(
   "commerce returns is now available, so it can no longer serve as the planned example",
   businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "returns")?.maturity === "available",
