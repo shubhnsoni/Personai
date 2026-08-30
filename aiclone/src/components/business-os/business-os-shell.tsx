@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input"
 import { ReservationsPanel } from "@/components/business-os/reservations-panel"
 import { AccessLevelsPanel } from "@/components/business-os/access-levels-panel"
 import { AppointmentsPanel } from "@/components/business-os/appointments-panel"
+import { BlueprintPreviewPanel } from "@/components/business-os/blueprint-preview-panel"
 import { CasesPanel } from "@/components/business-os/cases-panel"
 import { CohortsPanel } from "@/components/business-os/cohorts-panel"
 import { CommercePanel } from "@/components/business-os/commerce-panel"
@@ -624,6 +625,10 @@ export function BusinessOsShell({
                             </Card>
 
                             <OperationsPanel workspaceId={selectedWorkspaceId} />
+
+                            {/* Read-only. Preview says what choosing a blueprint would mean; it cannot
+                                install, and the panel states that rather than implying a missing feature. */}
+                            <BlueprintPreviewPanel workspaceId={selectedWorkspaceId} />
 
                             <ReservationsPanel workspaceId={selectedWorkspaceId} />
 
