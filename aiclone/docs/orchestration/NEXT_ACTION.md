@@ -21,10 +21,28 @@ and described H1 as unstarted when it was complete.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`1ca0505`** - measure, do not trust this line
+- Primary HEAD: **`a38b56e`** - measure, do not trust this line
 - Origin unchanged at `4b386d1d`; nothing pushed.
 - **The check sweep is now 74 checks, FAILED 0** (68 at the start of the N-wave; only increased). Repo lint held at **43 problems (14 errors, 29 warnings)** at every commit.
+- **THE GATE IS NOW REPRODUCIBLE FROM THE REPOSITORY, AND THAT IS THE FIRST THING TO RUN:**
+
+  ```powershell
+  cd aiclone
+  node scripts/gates/run-gates.js      # 75 on disk, 74 executed, FAILED 0, 1 declared skip
+  node scripts/gates/selftest.js       # 21/21 - proves the driver fails when it should
+  ```
+
+  Read `aiclone/scripts/gates/README.md`. The old `run-h0-gates.ps1` in a temp directory is
+  SUPERSEDED and must not be quoted again: it hardcoded one user's absolute paths, and its
+  live-database guard was unreachable dead code that compared the rehearsal name it had just
+  assigned against `personalink`. Verified at `a38b56e` from primary AND from an isolated clean
+  worktree - same inventory list, same count, selftest 21/21 in both, no working-tree mutation.
+
+- **THE SWEEP FIGURE IS NO LONGER OPERATOR-OBSERVED.** The previous entry recorded, correctly, that
+  nobody could check "68 -> 74, FAILED 0" because the driver was not committed. That is closed.
+
 - **THE N-WAVE ANSWERED THE GREP IN THE LINE BELOW, AND THEN FOUND SOMETHING WORSE.**
+
   `check-harness-exit-integrity.ts` audited all 69 harnesses for that frozen-verdict shape and found
   **0 real defects** - the a11y case was the only instance, so the class was not systemic. But auditing
   it exposed the deeper question, and the answer is the most important thing this run learned:

@@ -4386,3 +4386,121 @@ fourth produced a permanent control.
     that missed the two export styles this repository uses 21 times. Root had reproduced, mutated and
     gated all of it and still missed every one. Budget a reviewer whose job is to attack the work, not to
     confirm it, and give it the specific instruction that agreement is worth little.
+
+
+---
+
+# Q-wave - the gate became reproducible, and then it started finding things
+
+Root `claude-opus-5`, sole integration owner. Baseline `478d13a` -> HEAD `a38b56e`. Ten commits across
+four waves, three parallel `orchestrate_subagent` stages per wave.
+
+| Gate at `a38b56e` | Result |
+|---|---|
+| `node scripts/gates/run-gates.js` from primary | **74 checks, FAILED 0**, 1 declared skip, credential scan clean |
+| same, from an isolated clean worktree | **74 checks, FAILED 0**, identical inventory, selftest 21/21, no mutation |
+| `npx prisma validate` | 0 |
+| `npx tsc --noEmit` | 0 |
+| repo-wide `npx eslint .` | 43 problems (14 errors, 29 warnings) - unchanged at all ten commits |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npx next build` | 0 |
+| live `personalink` | untouched - 35 tables, `Profile` = 16, no `_prisma_migrations` |
+| triggers | 24 total, 0 disabled |
+| origin | unchanged at `4b386d1d` |
+| frozen worktrees | all six at `ea69595` |
+
+69. **A GATE WHOSE DRIVER IS NOT IN THE REPOSITORY IS NOT A GATE.** This program quoted "the sweep is
+    74 checks, FAILED 0" as its primary evidence for days. The driver was a script in a TEMP directory
+    calling a second temp script that hardcoded one user's absolute paths: nobody else could reproduce
+    the number, and deleting a temp file would have destroyed the project's main control. Building the
+    repository-owned replacement immediately paid for itself twice. The old runner's live-database guard
+    turned out to be UNREACHABLE DEAD CODE - it assigned the rehearsal name into the URL and then
+    compared that freshly-assigned value against `personalink`, which can never be true - so the
+    safety everyone relied on came from the constant being correct rather than from the check. And the
+    replacement is five times faster, 200 seconds against eighteen minutes, because roughly fourteen
+    minutes per sweep was `npx` process startup and nothing about the checks changed.
+
+70. **A NEW CONTROL CATCHES ITS AUTHOR FIRST, AND THAT IS THE SIGN IT WORKS.** Three times in one
+    wave. The gate driver's first sweep flagged a `process.exit(1)` with fourteen assertions after it in
+    a stage's harness - the frozen-verdict shape - on the day the driver landed. The driver's own
+    self-test caught root's regression in the driver: a first version of the new manifest expectations
+    used `manifest.entries` where the field is `manifest.harnesses`, and six guards went from 19/19 to
+    13/19. And a stage's own mutation exposed a false negative in a brand-new assertion it had just
+    written - a case-sensitive `/Infinity/` against code that writes `POSITIVE_INFINITY`. A control that
+    has never embarrassed its author has not yet been tested.
+
+71. **THE LAST LINE OF DEFENCE FAILED INTO AN INFINITE LOOP, IN EXACTLY THE CASE IT EXISTED TO DETECT.**
+    The credential scanner iterated module-level `/g` regexes with `exec`, and on a hit called a helper
+    that ran `.replace()` on the SAME regex. `String.prototype.replace` resets `lastIndex` to 0 when it
+    finishes, so control returned to the loop, matched the identical occurrence again, and never
+    advanced; findings grew without bound until the process died on memory. It was reachable only where
+    the redactor and the scanner disagreed - harness logs are redacted first, so their values are
+    placeholders and the loop advanced by luck, while the driver's own console text is scanned raw. Two
+    functions sharing mutable regex state is the whole bug, and a shared `/g` regex is mutable state.
+
+72. **A WORD BAN WAS THE WRONG SHAPE FOR THE PROBLEM; ATTRIBUTION WAS THE RIGHT ONE.** The contract
+    forbade the surface from saying "scheduled", and the surface said it anyway, from engine-authored
+    item text. The naive repair - ban the word - would have made the surface LESS informative and no
+    more honest, because two different claims were being lumped together. A FieldJob really does hold
+    status SCHEDULED because a human booked a window; reporting that is true and useful. What is false
+    is the platform claiming IT scheduled something, when nothing on the path acts. The two are told
+    apart by whether the phrase names the record as the holder of the state, so "scheduled visit"
+    becomes "visit marked scheduled" and the fact survives while the misreading does not. A bonus defect
+    fell out of reading the same line: the status was interpolated raw, so `IN_PROGRESS` reached owners
+    as "in_progress visit".
+
+73. **MEASURING A DETECTOR'S POSITIVES IS NOT MEASURING ITS BOUNDARY.** The write detector caught 14 of
+    14 injected mutation classes, which read as complete coverage and was not: all fourteen were drawn
+    from shapes the detector already recognised. Two injections are now asserted as KNOWN GAPS - a write
+    on a third connection to a table absent from the fingerprint spec, and a session-state mutation on a
+    bypass connection - each proven to actually happen, each observed as `signals=[none]`, and each
+    written so the assertion FAILS if the gap ever closes. A suite that only ever confirms catches tells
+    you where the detector works; one that pins its misses tells you where it stops.
+
+74. **AN EXPECTATION THAT NOTHING READS IS WORSE THAN NO EXPECTATION.** The gate manifest declared three
+    numbers and the driver read one. Flipping a harness from run:true to run:false WAS caught; ADDING a
+    harness file with a run:false entry and a plausible reason was not - on-disk became 76, executed
+    stayed 74, and the run reported success. A harness could enter this repository and never run. The
+    manifest's own note said the block was derived from the declared inventory, so a reader took all
+    three as enforced. Partial enforcement of a stated invariant is a trap, not a partial win.
+
+75. **A FILTER IS NOT A CUT, AND THE DIFFERENCE DECIDES WHETHER BOUNDING A QUERY IS SAFE.** The
+    inventory reader fetched every tracked row and sliced twenty in TypeScript. Adding a bare `take`
+    would have been a real regression, because the twenty lowest-stock rows are not the same set as the
+    twenty lowest-stock rows that are ALSO below their own reorder point - so the comparison had to move
+    into SQL as a field reference before the bound was correct. The same discipline settled the ninth
+    domain the other way: there, `take` is REFUSED with measured reasons (a COALESCE across a related
+    table, an enum order that disagrees with the reason tokens on every pair), and the cost is
+    discharged by moving row-state predicates into SQL as filters - 505 rows fetched becomes 44 - which
+    cannot drop a row the comparator would have kept. A documented refusal is a complete result.
+
+76. **A GUARD PROVEN ONLY AGAINST A FIXTURE THAT DOES NOT EXERCISE IT IS UNPROVEN.** Root's new manifest
+    expectation threw a `ReferenceError` on the real manifest while the self-test stayed green at 19/19,
+    because no fixture manifest declared the field the new branch reads, so the branch was never
+    reached. The self-test was not weak in general - it caught the previous bug in the same edit - it
+    simply had no fixture for this path. Two fixtures and two cases now cover both guards.
+
+77. **THE PER-STAGE MODEL PINNING NEVER HAPPENED, AND ONLY THE STAGES' OWN HONESTY REVEALED IT.**
+    Every wave requested `gpt-5.6-sol` or `gpt-5.6-terra` per stage. `orchestrate_subagent` routes by
+    named agent ROLE and accepts no model override, so all twelve stages ran on the same Claude-family
+    model, and each one said so at the top of its report because it was asked to state its observed
+    model as a fact. Nothing else in the pipeline would have surfaced it: the dispatch returns success,
+    the work arrives, and the wave plan's model column would have been recorded as fact. If a run's
+    conclusions depend on which model produced what, the dispatch must be able to prove it - and here it
+    cannot, so no per-model comparison from this run means anything.
+
+78. **TWO STAGES DIED MID-EDIT AND THE WORK WAS STILL WORTH ADJUDICATING - ONCE IT WAS MEASURED.** Both
+    left the tree BROKEN rather than merely unfinished: one had renamed a union member while the emitting
+    site still wrote the old token behind an `as never` cast, silencing tsc instead of satisfying it; the
+    other's harness was red on its own committed fixture. Neither produced a report. Discarding 2,600
+    lines would have been wasteful and integrating them unverified would have been reckless, so root read
+    the diffs, finished the rename, fixed the assertion that could not pass, and proved each package by
+    mutation before committing. A stage's silence says nothing about the value of its diff; only
+    measurement does.
+
+79. **`_` IS A WILDCARD IN SQL `LIKE`, AND IT MANUFACTURED SIX TABLES OF PHANTOM RESIDUE.** A residue
+    sweep for `'%dwp\_%'` written without an escape matches "dwp" followed by ANY character, so it
+    reported ordinary cuids containing `dwp` or `wd` as leftover fixture rows. Root chased it, a stage
+    reproduced it independently, and the detector's own token sweep had the same bug - harmlessly, since
+    a looser pattern finding nothing is a stronger result, but it was not what the sweep claimed to do
+    and a shorter token would have made the collisions real.

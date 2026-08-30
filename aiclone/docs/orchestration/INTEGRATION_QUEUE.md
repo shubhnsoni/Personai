@@ -1533,3 +1533,93 @@ inventory, and the opposite of what the old assertion name implied.
 | 503 log may contain a DSN | `due-work-http.ts` | **Known tradeoff, recorded.** Server-side detail, client-side silence. The client body is still asserted leak-free on seven fragments. |
 | P1-009 slice 6 | repo-wide lint | Still a refusal. |
 | G2 / P1-007 | providers / live cutover | Still **owner-gated**. |
+
+
+---
+
+## Accepted - Q-wave: the gate became reproducible, then the gate found the defects
+
+Root: `claude-opus-5`, sole integration owner. Baseline `478d13a` (sweep 74, lint 43) ->
+HEAD `a38b56e`. Ten commits, four waves, three parallel stages per wave.
+
+| Commit | What landed | Stage |
+|---|---|---|
+| `b0233e1` | repository-owned gate driver + manifest; the headline number is reproducible | Q1-A |
+| `5bf48f7` | 405 with `Allow`; a server log structurally incapable of carrying a DSN | Q1-B |
+| `92d6005` | all eight engine domain readers deterministic; `mixedScope` assertion stops mirroring | Q1-C |
+| `66b0dec` | both meta-scanners derive assertion helpers from source | Q2-A |
+| `3f696b2` | a real write detector: interception + content fingerprints on a separate connection | Q2-C |
+| `5c265d1` | a record's own state told apart from a claim that this platform acted | Q2-B |
+| `eeab18f` | the credential scanner could hang; the panel claimed a measurement it never made | Q3-C findings |
+| `d93a5c1` | log `error.cause`; keep frame evidence; measure the detector's boundary | Q4-A |
+| `055280c` | vacuity scanner iterates to fixed point; real blind spot named | Q4-B |
+| `a38b56e` | the ninth domain reader was outside every claim made about the other eight | Q4-C |
+
+### The reproducible gate is the load-bearing change
+
+    cd aiclone && node scripts/gates/run-gates.js
+
+75 harnesses on disk, 75 manifest entries, 74 executed, FAILED 0, one declared skip.
+Verified at `a38b56e` from primary AND from an isolated clean worktree: identical
+inventory compared list-to-list, identical count, selftest 21/21 in both, no working-tree
+mutation, no leaked process, no database residue. It resolves the app directory from its
+own location, which was tested by invoking it by absolute path from `C:\Windows`.
+
+Two findings from building it. The old temp runner's live-database guard was UNREACHABLE
+DEAD CODE - it compared the rehearsal name it had just assigned against the string
+`personalink`, a condition that could never be true - so the safety everyone relied on
+came from the constant being right, not from the check. And it is ~5x faster, 200s against
+18-20 minutes, because roughly fourteen minutes per sweep was `npx` process startup.
+
+### What the new controls then caught, in their own author's work
+
+The gate driver's first sweep flagged a `process.exit(1)` with 14 assertions after it in
+Q1-B's harness - the frozen-verdict shape, correctly identified by the exit-integrity
+scanner. On the same day the driver landed.
+
+The vacuity scanner caught its own author's regression: root's first version of the new
+manifest expectations used `manifest.entries` where the field is `manifest.harnesses`,
+breaking six selftest guards, 19/19 to 13/19. The second version threw a ReferenceError
+on the real manifest while the selftest stayed green, because no fixture declared
+`harnessesOnDisk`. Two fixtures and two cases now cover both guards: 21/21.
+
+The adversarial review found a HANG in the credential scanner - the last line of defence
+inside the driver everything is now measured through. `push` calls `redact`, `redact`
+does `.replace()` on the same module-level `/g` regex, and `replace` resets `lastIndex`
+to 0, so the `exec` loop matched the identical occurrence forever. Proven both ways: the
+pre-fix file dies with heap exhaustion, exit 134; the fixed version terminates on six
+shapes in 6ms.
+
+### Claims corrected rather than defended
+
+- **The operations panel** rendered "This total spans two boundaries" to every owner from
+  a constant-true `mixedScope`. False for an owner with no case milestones and for one
+  whose profile owns a single workspace. The same defect class the wave fixed one file
+  over, left live in the surface an owner looks at.
+- **"never a stockout"** was false in two places, on a fixture with 24 rows at onHand 0
+  and a cap of 20. Four stockouts are dropped and the assertion body already pinned it.
+- **"all nine domain readers"** covered eight. The ninth issues SEVEN unbounded reads in
+  `needs-action.ts`, and the boundedness assertion counts `.findMany(` in `engine.ts`
+  alone. `take` is refused there with measured reasons; the cost is discharged by moving
+  row-state predicates into SQL as FILTERS, 505 rows fetched becomes 44.
+- **"all 14 injection classes caught"** measured the detector's positives only. Two
+  injections are now asserted as KNOWN GAPS that fail if the gap closes.
+- **Retainer locks** are jointly necessary and individually redundant, and only two of the
+  four are on the path the proof exercises - so two of the original four mutations were
+  vacuous by construction.
+
+### Next in queue - this table supersedes every earlier one
+
+| Pkg | Scope | State |
+|---|---|---|
+| HEAD on the due-work surface | `due-work-http.ts`, its harness, the shared write-verb regex | **Owed, and a decision rather than a fix.** RFC 9110 makes HEAD implied by GET; Next.js derives it from the GET export, so the framework would serve a HEAD the service refuses. The current justification is circular - the header is justified from the guard and the guard from the header - and a harness assertion now pins it. The write-verb regex also classifies HEAD as a write verb, which is a category error. Either add HEAD or record the departure knowingly. |
+| Four concurrency-unsafe residue proofs | `check-inventory-routes`, `check-inventory-runtime`, `check-retainer-schema-invariants`, `check-fieldjob-schema-invariants` | **Owed.** They prove residue by GLOBAL before/after row counts. Every transient failure in this wave was one of them, always with counts going DOWN - another stage's teardown between snapshots - and every one passed in isolation. The driver runs serially so the gate is not flaky in normal use. Fix is the pattern `check-operations-runtime` already uses: scope to the run's own prefix. |
+| Assertion-evidence gate | `scripts/gates/run-gates.js` | **Owed.** A harness that exits 0 without asserting anything still counts toward "74 checks". Zero bytes is the only content gate. Needs a per-harness output contract first. |
+| Credential scan breadth | `scripts/gates/lib/redact.js` | **Owed.** `critical` is reachable only from five env-derived DSN literals. A `CLERK_SECRET_KEY=sk_live_...` in a harness log matches nothing, and a passwordless DSN survives redaction with no finding. |
+| `check-harness-exit-integrity` wrapper limit | that file | **Owed.** It still carries the bounded-not-converged wrapper loop that `055280c` removed from its sibling. |
+| `mixedScope` itself | `engine.ts` + four consumers | **Owed.** Still constant-true and deliberately not redefined. Correcting the field must move it, `due-work-plan`, the panel and the preview harness in one commit. |
+| Sequence snapshot scope | `write-detector.ts` | **Owed.** The sequence component of the fingerprint is unconditionally global, so it reintroduces the concurrency problem the module was built to remove. Shielded today only because the driver runs serially. |
+| 11 `UNGUARDED_EVERY`, 19 `UNRESOLVED` | harness suite | **Owed, counted, non-gating.** Two of the eleven are new assertions from this wave. |
+| `check-order-stream` leg 1 | that harness + the manifest | **Owed, recommended.** Leg 1 makes no HTTP and no DB call and could run today at sub-second cost; the HTTP legs need a dev server and should stay skipped. |
+| P1-009 lint | repo-wide | Still a refusal. 43 findings remain a documented product-judgement backlog. |
+| G2 / P1-007 | providers / live cutover | Still **owner-gated**. Unchanged. |

@@ -1,7 +1,7 @@
 {
     "milestone": "WORKSPACE-SCOPED SURFACES AND COHORT OPERATIONS COVERAGE ARE COMPLETE. Sweep 64 -> 68, FAILED 0. Installation already froze the surfaces a blueprint implies into BlueprintInstallation.configJson but nothing applied them, because surface resolution had no notion of a workspace at all. That is now closed WITHOUT a migration and WITHOUT a second table: S1-A proved configJson sufficient, and the keystone measurement is that NOT ONE FILE under src/app/dashboard/** mentions workspaceId, so a workspace-aware resolver cannot change any existing behaviour - there was no code path where a workspace id was available and being ignored. OPERATIONS NOW COVERS COHORT WORK as its ninth domain, by CONSUMING the cohort engine's own declaration rather than restating cohort rules - discharging the refusal that had been recorded in UNCOVERED_DOMAINS. THE HARNESS AUDIT RAN FOUR PASSES: 14 assertions examined by real source mutation, 14 proven real, 1 vacuity found and fixed. The suite is substantially honest and three of four auditors correctly returned NO_CHANGE. TWO NEW DEFECT CLASSES WERE NAMED AND ONE TECHNIQUE BUILT. An OVER-CLAIMING assertion tests something real while its NAME claims a mechanism it never exercises - mutation cannot distinguish it from vacuity because both come back green. The retainer FOR UPDATE claim was exactly that, and S4-B built the DETERMINISTIC READ INTERLEAVING technique the repository lacked and PROVED it: with both locks removed, T2 commits 5 while T1 is held and T1 then overwrites with a stale 3, a forced lost update. The second class is a PROOF-MECHANISM weakness: INVERT_ASSERTION=1 flipped exactly ONE assertion in nine large harnesses, so the documented control exited non-zero while proving almost nothing. Now widened across nine files. STILL OPEN and recorded with its closing package: the SHELL selects a workspace on the user's behalf, falling back to an alphabetically-first membership. Not a leak - the user is a member - but they may believe they are seeing a different workspace. Repo-wide lint still exactly 43 (14 errors, 29 warnings) at every commit in this run. Live personalink untouched, origin unchanged, six frozen worktrees at ea69595.",
-    "updatedAt": "2026-08-30T20:15:00+05:30",
-    "updatedBy": "root claude-opus-5 (N-wave close, after integrity audit)",
+    "updatedAt": "2026-08-31T02:00:00+05:30",
+    "updatedBy": "root claude-opus-5 (Q-wave close)",
     "baseline": "f8ee611",
     "maxParallelWorkers": 3,
     "baseCommitPolicy": "Lanes must branch from a commit where tsc --noEmit and next build both exit 0. Qualifying commits: e97edf4 and later. The consolidation branched from a4d9fba. See ADR-007.",
@@ -2131,5 +2131,61 @@
         "vacuityDebtCleared": "UNGUARDED_EVERY 47 -> 3 at commit ee7e66e. 44 assertions gained a non-empty precondition on their own condition; all 28 affected harnesses re-run individually at exit 0. NOTE the earlier claim that all 47 were pre-existing was WRONG: check-due-work-panel.ts:549 and :858 and check-commerce-panel-empty-state.ts:144 are the same shape in harnesses THIS RUN created. The 3 survivors are deliberate: a11y:867 and capability-contract:407 are legitimate empty-collection cases (an empty collection IS the claim), and order-stream:334 could not be verified because that harness needs a dev server and is the one check the sweep skips - root would not ship an unverifiable edit to silence a counter.",
         "rootIntroducedItsOwnVacuousAssertion": "Found by the integrity audit, in the commit that removed one. check-inventory-runtime.ts and check-retainer-runtime.ts both asserted `backends >= 2 && idleInTransaction >= 1`. The observer client running the probe always counts itself in pg_stat_activity, and the second conjunct already requires a distinct backend for parked T1, so `backends >= 2` was entailed by its own sibling and could never fail - the same conjunct-forced-true-by-a-neighbour defect 558d877 exists to remove. Both are now `>= 3` (observer, parked T1, blocked T2). The lock-wait assertion also now requires locktype `transactionid`, which was collected and printed but never checked. Fixed at ee7e66e.",
         "noWriteProofScope": "The claim 'all eight append-only logs are now counted' was WRONG: the repository's own <Table>_append_only triggers name THIRTEEN. BlueprintInstallationEvent, CaseRetainerDraw, CaseRetainerEvent, CommerceEvent and CourseAccessEvent were uncounted and are added at ee7e66e. Known limit now stated in the code: the measurement compares row COUNTS, so an UPDATE to an existing row or an insert-then-delete inside the window would pass. Nothing on the read path does either - every call is findMany or findUnique - but that is established by reading the code, not by the assertion."
+    },
+    "gatesAtQWave": {
+        "startSha": "478d13a5dd9d38d37a355d68e3ad4dab5d5cc230",
+        "endSha": "a38b56e",
+        "commits": 10,
+        "waves": "Q1, Q2, Q3, Q4 - three parallel orchestrate_subagent stages per wave, twelve stages total",
+        "reproducibleGateCommand": "cd aiclone && node scripts/gates/run-gates.js",
+        "reproducibleGateSelftest": "cd aiclone && node scripts/gates/selftest.js",
+        "gateOutputLocation": "aiclone/scripts/gates/artifacts/run-<timestamp>/{summary.json,summary.md,logs/<harness>.log} plus stable artifacts/latest.{json,md}; gitignored via a directory-scoped scripts/gates/.gitignore",
+        "prisma validate": "0",
+        "tsc --noEmit": "0",
+        "gate driver from PRIMARY": "74 checks, FAILED 0; 75 on disk, 75 manifest, 1 declared skip; credential scan clean; verdict PASS",
+        "gate driver from an ISOLATED CLEAN WORKTREE": "74 checks, FAILED 0; identical inventory compared list-to-list; selftest 21/21; no working-tree mutation; no leaked process; no DB residue. Limitations stated: node_modules is a junction to primary so this is not a from-scratch npm ci, and .env was copied in as environment configuration.",
+        "gate driver selftest": "21/21 guards, including two new cases root added for the two previously-unread manifest expectations",
+        "repo-wide ESLint": "43 problems (14 errors, 29 warnings) - unchanged at all ten commits",
+        "npm audit --omit=dev": "0 vulnerabilities",
+        "npx next build": "0",
+        "vacuity scanner": "exit 0; all five gating classes 0; 11 non-gating UNGUARDED_EVERY and 19 UNRESOLVED, both counted and declared",
+        "exit-integrity scanner": "exit 0; 0 real defects",
+        "live personalink": "untouched - 35 tables, no _prisma_migrations, 0 wave tables leaked, Profile = 16",
+        "guard and append-only triggers": "24 total, 0 disabled",
+        "origin": "unchanged at 4b386d1d; nothing pushed",
+        "frozen worktrees": "all six kirocrew/* still at ea69595",
+        "preserved untracked paths": ".codex-remote-attachments/ and aiclone/docs/orchestration/P1_014_ACTION_INVENTORY.md both present and untracked. Root deleted one stray zero-byte file named '{const' created by a concurrent stage's shell-quoting accident, so the untracked set is exactly the two preserved paths.",
+        "prisma/**": "untouched; no migration added; none was needed",
+        "DB residue": "zero across all 115 base tables with the LIKE underscore ESCAPED, and zero leftover sequences",
+        "headlineChange": "The gate is reproducible from the repository. It was a script in a temp directory hardcoding one user's absolute paths, so the '74 checks FAILED 0' figure this program had quoted for days could not be checked by anyone. Building the replacement found that the old runner's live-database guard was unreachable dead code - it compared the rehearsal name it had just assigned against 'personalink' - and the replacement is ~5x faster because ~14 minutes per sweep was npx startup.",
+        "whatTheNewControlsCaught": [
+            "The gate driver's first sweep flagged a process.exit(1) with 14 assertions after it in a stage's harness - the frozen-verdict shape - on the day the driver landed.",
+            "The driver's self-test caught root's own regression in the driver: manifest.entries where the field is manifest.harnesses, 19/19 down to 13/19.",
+            "An adversarial review found a HANG in the credential scanner: push -> redact -> .replace() on the same module-level /g regex resets lastIndex to 0, so the exec loop matched forever. Pre-fix file dies with heap exhaustion exit 134; fixed version terminates on six shapes in 6ms.",
+            "The operations panel rendered 'This total spans two boundaries' to every owner from a constant-true mixedScope - the same defect class the wave fixed one file over, left live in the surface an owner looks at."
+        ],
+        "claimsCorrectedRatherThanDefended": [
+            "'never a stockout' was false in two places, on a fixture with 24 rows at onHand 0 and a cap of 20.",
+            "'all nine domain readers' covered eight; the ninth issues SEVEN unbounded reads in needs-action.ts and the boundedness assertion counts .findMany( in engine.ts alone.",
+            "'all 14 injection classes caught' measured the detector's positives only; two injections are now asserted as KNOWN GAPS that fail if the gap closes.",
+            "Retainer locks are jointly necessary and individually redundant, and only two of the four are on the path the proof exercises - so two of the original four mutations were vacuous by construction.",
+            "The 405 refusal replaced a documented 400 compromise; METHOD_NOT_ALLOWED now exists in the shared union with an exhaustive status map that makes omitting a status a compile error."
+        ],
+        "modelPinningFailure": "NO STAGE RAN ON ITS REQUESTED MODEL. Every wave requested gpt-5.6-sol or gpt-5.6-terra per stage; orchestrate_subagent routes by named agent ROLE and accepts no model override, so all twelve stages ran on the same Claude-family model. Each stage reported its observed model at the top because it was asked to state it as a fact, which is the only reason this is known - the dispatch returns success and the work arrives either way. No per-model comparison from this run means anything.",
+        "stagesThatFailedToReport": "Q2-B and Q2-C sessions died mid-edit with no report, both leaving the tree BROKEN rather than unfinished: Q2-B had renamed a union member while the emitting site still wrote the old token behind an `as never` cast silencing tsc, and Q2-C's harness was red on its own committed fixture. Root read the diffs, finished the rename, fixed the assertion that could not pass, proved each by mutation, and committed both. Q3-A returned a correct NO_CHANGE. One Q2 stage and one Q3 stage produced no output at all.",
+        "owedWork": [
+            "HEAD on the due-work surface: RFC 9110 makes HEAD implied by GET and Next.js derives it from the GET export, so the framework would serve a HEAD the service refuses. The justification is circular, a harness assertion now pins it, and the shared write-verb regex classifies HEAD as a write verb. Decide deliberately either way.",
+            "Four harnesses still prove residue by GLOBAL before/after row counts and are not concurrency-safe: check-inventory-routes, check-inventory-runtime, check-retainer-schema-invariants, check-fieldjob-schema-invariants. Every transient failure in this wave was one of them, always with counts going DOWN. The driver runs serially so the gate is not flaky in normal use.",
+            "The gate driver has no assertion-evidence gate: a harness that exits 0 without asserting anything still counts toward 74. Zero bytes is the only content gate. Needs a per-harness output contract first.",
+            "The credential scan's `critical` severity is reachable only from five env-derived DSN literals; a CLERK_SECRET_KEY=sk_live_... in a harness log matches nothing and a passwordless DSN survives with no finding.",
+            "check-harness-exit-integrity.ts still carries the bounded-not-converged wrapper loop that 055280c removed from its sibling.",
+            "mixedScope itself is still constant-true and deliberately not redefined; correcting the field must move it, due-work-plan, the panel and the preview harness in one commit.",
+            "The write detector's sequence snapshot is unconditionally global, reintroducing the concurrency problem the module was built to remove. Shielded today only because the driver runs serially.",
+            "11 UNGUARDED_EVERY and 19 UNRESOLVED vacuity findings remain, counted and non-gating. Two of the eleven are new assertions from this wave.",
+            "check-order-stream leg 1 makes no HTTP and no DB call and could run today at sub-second cost; the HTTP legs need a dev server and should stay skipped. Recommended split, root's call.",
+            "The frame redactor still does not cover every keyword-style DSN form; the `=` and `@tcp(...)` forms are matched and a general `\\S+:\\S+@` rule is deliberately refused because it eats node_modules/@scope paths.",
+            "needs-action.ts reads remain unbounded by `take` - refused with measured reasons (a COALESCE across a related table, an enum order disagreeing with the reason tokens on every pair, an ICU tie-break, and the cap living in engine.ts). Cost discharged by SQL filters instead: 505 rows fetched becomes 44."
+        ],
+        "maxMeasuredConcurrency": "3 orchestrate_subagent stages + root, sustained across four waves, evidenced by three independent deliverables returning per call and by three stages holding disjoint uncommitted file sets simultaneously."
     }
 }
