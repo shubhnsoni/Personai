@@ -8,6 +8,8 @@ import {
     COHORT_NEEDS_ACTION_DOMAIN,
     COHORT_NEEDS_ACTION_NOT_COVERED,
     COHORT_NEEDS_ACTION_SCOPE,
+    COHORT_NEEDS_ACTION_SORT_KEYS,
+    COHORT_NEEDS_ACTION_UNBOUNDED_READS,
     resolveCohortNeedsAction,
 } from "../../src/lib/cohorts/needs-action"
 import {
@@ -24,6 +26,10 @@ const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
 const RUN = `s3b_${process.pid}_${Date.now()}_${Math.floor(Math.random() * 1e9)}`
 const AS_OF = new Date("2035-06-15T12:00:00.000Z")
+/** One timestamp shared by nine items across two reasons. See THE TIE-HEAVY AND UNDATED FIXTURE. */
+const TIE_AT = new Date("2035-06-05T09:00:00.000Z")
+/** The order this harness expects the declaration to publish. Restated so a reorder fails loudly. */
+const PINNED_SORT_CHAIN = "at>reason>id"
 const APP_ROOT = join(__dirname, "../..")
 
 const results: Array<{ name: string; pass: boolean; detail: string }> = []
@@ -40,6 +46,15 @@ type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]
 type Ids = Readonly<{
     profileA: string
     profileB: string
+    /** Five absences on ONE held session, so all five carry that session's heldAt and tie on `at`. */
+    tieAbsences: readonly string[]
+    /** Four submissions on that same timestamp, so the reason key has to separate two blocks. */
+    tieSubmissions: readonly string[]
+    /** Renewals with no due date: `at` is null, and two of them make the null-null comparison live. */
+    undatedRenewalsScheduled: readonly string[]
+    undatedRenewalReminded: string
+    /** A SUBMITTED submission with no submittedAt - a second undated reason, not just a second row. */
+    undatedSubmission: string
     submitted: string
     returned: string
     accepted: string
@@ -67,6 +82,104 @@ function executableSource(source: string): string {
         .map((line) => line.replace(/\/\/.*$/, "").trim())
         .filter(Boolean)
         .join("\n")
+}
+
+/**
+ * THE COMPARATOR, DERIVED FROM THE PUBLISHED KEY LIST AND WRITTEN INDEPENDENTLY.
+ *
+ * `COHORT_NEEDS_ACTION_SORT_KEYS` states the chain the declaration sorts on; this is that chain
+ * implemented from scratch, deliberately NOT imported from the module under test. Importing the real
+ * comparator would make every ordering assertion below agree with the implementation by construction -
+ * it would compare the code to itself and pass for any ordering at all, including a wrong one.
+ *
+ * It is written in a different shape on purpose too: an explicit `<` rather than a subtraction, so it
+ * cannot reproduce an arithmetic mistake in the original by making the same one. The assertion that the
+ * published chain is still `at>reason>id` is what keeps the two in step, and it is checked before any
+ * expectation computed here is trusted.
+ */
+type Ordered = Readonly<{ id: string; reason: string; at: Date | null }>
+
+function independentCompare(a: Ordered, b: Ordered): number {
+    if (a.at === null || b.at === null) {
+        // Undated work sorts LAST. Stated as a branch because this is the case the declaration used to
+        // reach through Infinity - Infinity, and get right only because NaN happens to be falsy.
+        if (a.at !== null) return -1
+        if (b.at !== null) return 1
+    } else if (a.at.getTime() !== b.at.getTime()) {
+        return a.at.getTime() < b.at.getTime() ? -1 : 1
+    }
+    return a.reason.localeCompare(b.reason) || a.id.localeCompare(b.id)
+}
+
+/**
+ * THE ANSWER, RECOMPUTED FROM READS THAT FILTER NOTHING.
+ *
+ * `resolveCohortNeedsAction` now asks the database for each read's own row-state predicate - state
+ * SUBMITTED, status ABSENT, state ELIGIBLE - and narrows two `in` lists to active memberships and held
+ * sessions. Every one of those is a predicate the classification applied in TypeScript anyway, so the
+ * answer must not have moved. "Must not have moved" is a claim, so it is measured: the seven reads are
+ * performed here in their ORIGINAL form, with no state filter and with the full membership and session
+ * sets in the `in` lists, the classification is applied in TypeScript exactly as it was, and the
+ * resulting sequence must equal the declaration's own - id for id, reason for reason, timestamp for
+ * timestamp, in order.
+ *
+ * That is the equivalence check rather than a count. Two sequences of the same length can be different
+ * sequences, and the failure this guards against - a filter that quietly excludes a row the comparator
+ * would have kept - changes which rows come back, not how many.
+ */
+async function recomputeFromUnfilteredReads(tx: Tx, profileId: string): Promise<Ordered[]> {
+    const cohorts = await tx.cohort.findMany({
+        where: { profileId, status: { not: "CANCELLED" } },
+        select: { id: true, title: true },
+    })
+    const cohortById = new Map(cohorts.map((row) => [row.id, row] as const))
+    const cohortIds = [...cohortById.keys()]
+    const memberships = await tx.cohortMembership.findMany({ where: { cohortId: { in: cohortIds } } })
+    const sessions = await tx.cohortSession.findMany({ where: { cohortId: { in: cohortIds } } })
+    const assignments = await tx.cohortAssignment.findMany({ where: { cohortId: { in: cohortIds } } })
+    const membershipById = new Map(memberships.map((row) => [row.id, row] as const))
+    const sessionById = new Map(sessions.map((row) => [row.id, row] as const))
+    const assignmentById = new Map(assignments.map((row) => [row.id, row] as const))
+    const membershipIds = [...membershipById.keys()]
+    // Unfiltered on purpose: every row of each table for this profile's live cohorts, which is what the
+    // reads used to fetch and what the predicates below then had to sift in memory.
+    const attendance = await tx.cohortAttendance.findMany({
+        where: { membershipId: { in: membershipIds }, sessionId: { in: [...sessionById.keys()] } },
+    })
+    const submissions = await tx.cohortSubmission.findMany({
+        where: { membershipId: { in: membershipIds }, assignmentId: { in: [...assignmentById.keys()] } },
+    })
+    const certificates = await tx.cohortCertificate.findMany({ where: { membershipId: { in: membershipIds } } })
+    const active = (id: string): boolean => {
+        const status = membershipById.get(id)?.status
+        return status !== undefined && status !== "COMPLETED" && status !== "WITHDRAWN"
+    }
+    const out: Ordered[] = []
+    for (const row of submissions) {
+        const assignment = assignmentById.get(row.assignmentId)
+        if (!assignment || row.state !== "SUBMITTED" || !active(row.membershipId)) continue
+        if (!cohortById.has(assignment.cohortId)) continue
+        out.push({ id: row.id, reason: "assignment-submitted", at: row.submittedAt })
+    }
+    for (const row of attendance) {
+        const session = sessionById.get(row.sessionId)
+        if (!session || session.status !== "HELD" || row.status !== "ABSENT" || !active(row.membershipId)) continue
+        if (!cohortById.has(session.cohortId)) continue
+        out.push({ id: row.id, reason: "attendance-absent", at: session.heldAt ?? session.endsAt })
+    }
+    for (const row of memberships) {
+        if (!active(row.id) || !cohortById.has(row.cohortId)) continue
+        if (row.renewalState === "SCHEDULED") out.push({ id: row.id, reason: "renewal-marked-scheduled", at: row.renewalDueAt })
+        else if (row.renewalState === "REMINDED") out.push({ id: row.id, reason: "renewal-reminded", at: row.renewalDueAt })
+        else if (row.renewalState === "LAPSED") out.push({ id: row.id, reason: "renewal-lapsed", at: row.renewalDueAt })
+    }
+    for (const row of certificates) {
+        if (row.state !== "ELIGIBLE") continue
+        const membership = membershipById.get(row.membershipId)
+        if (!membership || !cohortById.has(membership.cohortId)) continue
+        out.push({ id: row.id, reason: "certificate-eligible", at: row.updatedAt })
+    }
+    return out.sort(independentCompare)
 }
 
 async function seed(tx: Tx): Promise<Ids> {
@@ -169,6 +282,7 @@ async function seed(tx: Tx): Promise<Ids> {
         memberId: string,
         state: "SUBMITTED" | "RETURNED" | "ACCEPTED",
         cohortId = q("cohort_a"),
+        submittedAt: Date | null = new Date("2035-06-11T12:00:00.000Z"),
     ) {
         const assignmentId = await assignment(suffix, cohortId)
         const id = q(`submission_${suffix}`)
@@ -179,7 +293,7 @@ async function seed(tx: Tx): Promise<Ids> {
                 membershipId: memberId,
                 state,
                 notes: "Fixture",
-                submittedAt: new Date("2035-06-11T12:00:00.000Z"),
+                submittedAt,
                 ...(state === "SUBMITTED" ? {} : { reviewedAt: new Date("2035-06-12T12:00:00.000Z") }),
             },
         })
@@ -193,7 +307,7 @@ async function seed(tx: Tx): Promise<Ids> {
     const cancelledCohortSubmission = await submission("cancelled_cohort", cancelledMember, "SUBMITTED", q("cohort_cancelled"))
     const tenantBSubmission = await submission("tenant_b", tenantBMember, "SUBMITTED", q("cohort_b"))
 
-    async function session(suffix: string, status: "HELD" | "SCHEDULED") {
+    async function session(suffix: string, status: "HELD" | "SCHEDULED", heldAt?: Date) {
         const id = q(`session_${suffix}`)
         await tx.cohortSession.create({
             data: {
@@ -204,14 +318,14 @@ async function seed(tx: Tx): Promise<Ids> {
                 startsAt: new Date("2035-06-10T10:00:00.000Z"),
                 endsAt: new Date("2035-06-10T11:00:00.000Z"),
                 status,
-                heldAt: status === "HELD" ? new Date("2035-06-10T11:00:00.000Z") : null,
+                heldAt: status === "HELD" ? (heldAt ?? new Date("2035-06-10T11:00:00.000Z")) : null,
             },
         })
         return id
     }
-    async function attendance(suffix: string, sessionId: string, status: "ABSENT" | "LATE") {
+    async function attendance(suffix: string, sessionId: string, status: "ABSENT" | "LATE", membershipId = mainMember) {
         const id = q(`attendance_${suffix}`)
-        await tx.cohortAttendance.create({ data: { id, sessionId, membershipId: mainMember, status } })
+        await tx.cohortAttendance.create({ data: { id, sessionId, membershipId, status } })
         return id
     }
     const heldAbsent = await attendance("held_absent", await session("held_absent", "HELD"), "ABSENT")
@@ -225,9 +339,63 @@ async function seed(tx: Tx): Promise<Ids> {
         data: { id: issuedCertificate, membershipId: issuedCertificateMember, state: "ISSUED", serial: q("serial"), issuedAt: new Date("2035-06-12T12:00:00.000Z") },
     })
 
+    /*
+     * THE TIE-HEAVY AND UNDATED FIXTURE.
+     *
+     * The ordering assertions further down are only worth making over rows that actually tie. A fixture
+     * where every item carries a distinct timestamp returns the same sequence whether the comparator is
+     * a total order or stops at `at`, so it would pass either way and prove nothing. So this seeds the
+     * two collisions the comparator exists to settle, and one that used to be settled by accident.
+     *
+     * NINE ITEMS ON ONE TIMESTAMP, ACROSS TWO REASONS. Five absences hang off ONE held session, so all
+     * five carry that session's heldAt; four submissions carry the same instant in submittedAt. `reason`
+     * must therefore separate the two blocks - assignment-submitted before attendance-absent - and `id`
+     * must order within each. Removing either key changes the answer rather than merely its arrangement.
+     *
+     * FOUR UNDATED ITEMS, WHICH IS THE CASE THAT USED TO WORK BY LUCK. renewalDueAt and submittedAt are
+     * both nullable, so `at: null` is ordinary state rather than a corner case. The old comparator mapped
+     * null to POSITIVE_INFINITY and subtracted, which for two undated items computed Infinity - Infinity
+     * = NaN and fell through to `reason` only because NaN is falsy. Four undated items make six null-null
+     * comparisons, so that path is now exercised on every run instead of being reasoned about.
+     *
+     * ROWS ARE INSERTED IN DESCENDING ID ORDER, so ascending-by-id is never the order they were written
+     * in. A comparator that dropped its id tie-break would tend to return insertion order, which here is
+     * the exact reverse of the right answer - so the mutation is caught by the data and not only by a
+     * regex over the source.
+     */
+    const tieSession = await session("tie", "HELD", TIE_AT)
+    const tieAbsences: string[] = []
+    for (let i = 5; i >= 1; i -= 1) {
+        const ordinal = String(i).padStart(3, "0")
+        const member = await membership(`tie_${ordinal}`)
+        tieAbsences.push(await attendance(`tie_${ordinal}`, tieSession, "ABSENT", member))
+    }
+    const tieSubmissions: string[] = []
+    for (let i = 4; i >= 1; i -= 1) {
+        tieSubmissions.push(
+            await submission(`tie_${String(i).padStart(3, "0")}`, mainMember, "SUBMITTED", q("cohort_a"), TIE_AT),
+        )
+    }
+    const undatedSubmission = await submission("undated", mainMember, "SUBMITTED", q("cohort_a"), null)
+    const undatedRenewalsScheduled: string[] = []
+    for (let i = 2; i >= 1; i -= 1) {
+        undatedRenewalsScheduled.push(
+            await membership(`undated_renewal_${String(i).padStart(3, "0")}`, { renewalState: "SCHEDULED", renewalDueAt: null }),
+        )
+    }
+    const undatedRenewalReminded = await membership("undated_renewal_reminded", {
+        renewalState: "REMINDED",
+        renewalDueAt: null,
+    })
+
     return {
         profileA: q("profile_a"),
         profileB: q("profile_b"),
+        tieAbsences,
+        tieSubmissions,
+        undatedRenewalsScheduled,
+        undatedRenewalReminded,
+        undatedSubmission,
         submitted,
         returned,
         accepted,
@@ -269,6 +437,65 @@ async function main() {
         queriedDelegates.join(",") === declaredDelegates.join(",") && new Set(queriedDelegates).size === queriedDelegates.length,
         `declared=${declaredDelegates.join(",")} queried=${queriedDelegates.join(",")}`,
     )
+    /*
+     * THE NINTH DOMAIN'S BOUNDEDNESS, ASSERTED HERE BECAUSE NOTHING ELSE CAN ASSERT IT.
+     *
+     * check-operations-runtime.ts asserts that every reader is bounded in the database by `take`. It
+     * computes that over `engine.ts` alone - `(engineCode.match(/\.findMany\(/g) ?? []).length` - so it is
+     * structurally incapable of covering this file, and this file is where the ninth of the nine domains
+     * that view reports does its reading. The claim there has been narrowed to the eight readers it
+     * measures; this is the other half, and it is a MEASUREMENT rather than a note.
+     *
+     * It is deliberately two-sided. `take` must be absent AND the declared count must equal the number of
+     * reads present, so adding an eighth read fails until it is declared, and adding a `take` to any read
+     * fails until the declaration stops claiming that read is unbounded. A gap that can only be described
+     * in prose drifts; this one cannot move in either direction without a red assertion.
+     */
+    const findManyTotal = (code.match(/\.findMany\(/g) ?? []).length
+    const takeTotal = (code.match(/\btake:/g) ?? []).length
+    checkInvertible(
+        "the declared count of unbounded reads is exactly what this file contains, so the ninth domain's gap can be neither widened nor closed unnoticed",
+        findManyTotal === COHORT_NEEDS_ACTION_UNBOUNDED_READS.count && takeTotal === 0,
+        `findMany=${findManyTotal} take=${takeTotal} declared unbounded=${COHORT_NEEDS_ACTION_UNBOUNDED_READS.count}`,
+    )
+    checkInvertible(
+        "the gap is declared with a reason that says why a take would return the WRONG rows, not merely that there is no take",
+        COHORT_NEEDS_ACTION_UNBOUNDED_READS.reason.length > 200 &&
+            /orderBy/.test(COHORT_NEEDS_ACTION_UNBOUNDED_READS.reason) &&
+            /COALESCE/i.test(COHORT_NEEDS_ACTION_UNBOUNDED_READS.reason),
+        `${COHORT_NEEDS_ACTION_UNBOUNDED_READS.reason.length} characters, naming orderBy and the COALESCE`,
+    )
+
+    /*
+     * THE TOTAL ORDER, MADE AN ASSERTION INSTEAD OF AN INHERITED ASSUMPTION.
+     *
+     * operations/engine.ts caps this declaration with `declared.slice(0, MAX_ITEMS_PER_DOMAIN)` and does
+     * not re-sort, on the stated grounds that what it receives is already totally ordered. That is a
+     * dependency in one direction only: this file can lose its tie-break and the consumer would keep
+     * slicing, quietly, an order that no longer decides which rows survive the cut. So the chain is
+     * published as data and pinned here, and the behavioural section proves the published chain is the
+     * one the returned sequence actually obeys.
+     */
+    checkInvertible(
+        "the published sort chain is the audited one - business keys first, the unique id last and only last",
+        COHORT_NEEDS_ACTION_SORT_KEYS.join(">") === PINNED_SORT_CHAIN &&
+            COHORT_NEEDS_ACTION_SORT_KEYS[COHORT_NEEDS_ACTION_SORT_KEYS.length - 1] === "id",
+        `published=[${COHORT_NEEDS_ACTION_SORT_KEYS.join(">")}] expected=[${PINNED_SORT_CHAIN}]`,
+    )
+    checkInvertible(
+        "the chain the source APPLIES is the chain it publishes, in that order and applied by the sort",
+        /compareAt\(a\.at, b\.at\) \|\| a\.reason\.localeCompare\(b\.reason\) \|\| a\.id\.localeCompare\(b\.id\)/.test(code) &&
+            /items\.sort\(byAtThenReasonThenId\)/.test(code),
+        "compareAt(at) then reason then id, applied by items.sort",
+    )
+    checkInvertible(
+        "an undated item is ordered by an explicit null branch rather than by infinity arithmetic, which produced NaN for two of them and was correct only because NaN is falsy",
+        !/infinity/i.test(code) &&
+            /if \(a === null\) return b === null \? 0 : 1/.test(code) &&
+            /if \(b === null\) return -1/.test(code),
+        /infinity/i.test(code) ? "INFINITY ARITHMETIC STILL PRESENT" : "compareAt names both null cases and no Infinity survives",
+    )
+
     checkInvertible("cohort attention declares profile scope", COHORT_NEEDS_ACTION_SCOPE === "profile")
     checkInvertible("cohort attention emits the consumer-ready domain", COHORT_NEEDS_ACTION_DOMAIN === "cohortTasks")
     checkInvertible(
@@ -354,6 +581,92 @@ async function main() {
                 [ids.submitted, ids.renewalScheduled, ids.eligibleCertificate].every((id) => itemIds.has(id)),
             )
             checkInvertible("second tenant work never appears in tenant A", !itemIds.has(ids.tenantBSubmission))
+            // Seeded since this harness was written and never asserted. It is the predicate the submission
+            // read now applies in the database, so it needs a live negative control rather than an
+            // assumption that the in-memory check still catches it.
+            checkInvertible(
+                "a SUBMITTED assignment on a COMPLETED membership is negative, which is exactly the predicate the narrowed submission read applies",
+                !itemIds.has(ids.completedMemberSubmission),
+                itemIds.has(ids.completedMemberSubmission) ? "PRESENT" : "excluded",
+            )
+
+            // ---- the total order, measured on rows that genuinely tie ---------------------------
+            const tieFixtureIds = [
+                ...ids.tieAbsences,
+                ...ids.tieSubmissions,
+                ...ids.undatedRenewalsScheduled,
+                ids.undatedRenewalReminded,
+                ids.undatedSubmission,
+            ]
+            checkInvertible(
+                "every tie-heavy and undated fixture row is present, so the ordering assertions below are made over the rows seeded to force the collisions",
+                tieFixtureIds.every((id) => itemIds.has(id)),
+                tieFixtureIds.filter((id) => !itemIds.has(id)).join(",") || `all ${tieFixtureIds.length} tie fixture rows classified`,
+            )
+            const undated = items.filter((entry) => entry.at === null)
+            const tiedGroups = new Map<number, number>()
+            for (const entry of items) {
+                if (entry.at !== null) tiedGroups.set(entry.at.getTime(), (tiedGroups.get(entry.at.getTime()) ?? 0) + 1)
+            }
+            const largestTiedGroup = Math.max(0, ...[...tiedGroups.values()])
+            // A vacuity guard, and the reason it is here: every assertion below would pass on a fixture
+            // where nothing ties, while proving nothing about the keys that break ties.
+            checkInvertible(
+                "the fixture materially exercises both collisions, so the ordering assertions are not vacuous",
+                undated.length >= 4 && largestTiedGroup >= 9,
+                `${undated.length} undated items = ${(undated.length * (undated.length - 1)) / 2} null-null comparisons; largest group sharing one timestamp = ${largestTiedGroup}`,
+            )
+            const notStrict: string[] = []
+            for (let i = 0; i < items.length; i += 1) {
+                for (let j = i + 1; j < items.length; j += 1) {
+                    if (independentCompare(items[i], items[j]) >= 0 || independentCompare(items[j], items[i]) <= 0) {
+                        notStrict.push(`${items[i].id.replace(`${RUN}_`, "")}<->${items[j].id.replace(`${RUN}_`, "")}`)
+                    }
+                }
+            }
+            checkInvertible(
+                "every pair of returned items is STRICTLY ordered in both directions, which is what makes the sequence a total order rather than a sorted one with ties left undefined",
+                items.length > 1 && notStrict.length === 0,
+                notStrict.length === 0
+                    ? `${(items.length * (items.length - 1)) / 2} pairs over ${items.length} items, all strict and antisymmetric`
+                    : `NOT TOTAL: ${notStrict.slice(0, 5).join(" ")}`,
+            )
+            checkInvertible(
+                "no id appears twice, so the last key in the chain cannot itself tie - each item is one row of one table, and the membership branch is if/else-if",
+                new Set(items.map((entry) => entry.id)).size === items.length,
+                `${new Set(items.map((entry) => entry.id)).size} distinct ids over ${items.length} items`,
+            )
+            checkInvertible(
+                "undated work sorts after every dated item - the case the old infinity arithmetic reached through NaN",
+                undated.length > 0 && items.slice(items.length - undated.length).every((entry) => entry.at === null),
+                `the last ${undated.length} of ${items.length} items are exactly the undated ones`,
+            )
+            const atTie = items.filter((entry) => entry.at !== null && entry.at.getTime() === TIE_AT.getTime()).map((entry) => entry.id)
+            const expectedAtTie = [
+                ...[...ids.tieSubmissions].sort((x, y) => x.localeCompare(y)),
+                ...[...ids.tieAbsences].sort((x, y) => x.localeCompare(y)),
+            ]
+            checkInvertible(
+                "items sharing one timestamp come back ordered by reason and then by id - four submissions before five absences, each block ascending - against an insertion order that was descending",
+                atTie.length === expectedAtTie.length && atTie.join(",") === expectedAtTie.join(","),
+                atTie.join(",") === expectedAtTie.join(",")
+                    ? `${atTie.length} items on one timestamp, in the one order the chain permits`
+                    : `expected [${expectedAtTie.map((id) => id.replace(`${RUN}_`, "")).join(",")}] got [${atTie.map((id) => id.replace(`${RUN}_`, "")).join(",")}]`,
+            )
+
+            // ---- the narrowed reads are EQUIVALENT, not merely cheaper --------------------------
+            const recomputed = await recomputeFromUnfilteredReads(tx, ids.profileA)
+            const shape = (entry: Ordered) =>
+                `${entry.reason}:${entry.id.replace(`${RUN}_`, "")}@${entry.at === null ? "null" : entry.at.toISOString()}`
+            const fromDeclaration = items.map(shape).join("|")
+            const fromUnfiltered = recomputed.map(shape).join("|")
+            checkInvertible(
+                "the answer is IDENTICAL to the one unfiltered whole-table reads produce - same items, same reasons, same timestamps, same order - so moving those predicates into the database changed the cost and not the behaviour",
+                items.length > 0 && fromDeclaration === fromUnfiltered,
+                fromDeclaration === fromUnfiltered
+                    ? `${items.length} items identical to the unfiltered read and in-memory filter`
+                    : `declaration=[${fromDeclaration}] unfiltered=[${fromUnfiltered}]`,
+            )
 
             const tenantBItems = await resolveCohortNeedsAction(tx, ids.profileB, AS_OF)
             checkInvertible("second tenant fixture is independently visible in tenant B", tenantBItems.some((entry) => entry.id === ids.tenantBSubmission))

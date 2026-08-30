@@ -20,6 +20,13 @@
  *   every reader must be a declared domain. Adding a query without declaring it, or declaring a domain
  *   without querying it, both fail.
  *
+ *   BOUNDED IN THE DATABASE - FOR THE EIGHT READERS THAT LIVE HERE, WHICH IS NOT ALL NINE DOMAINS. Every
+ *   findMany in engine.ts is asserted to carry `take`. That scan reads engine.ts and nothing else, so it
+ *   covers eight of the nine declared domains. The ninth, cohortTasks, does all of its reading in
+ *   src/lib/cohorts/needs-action.ts, and its reads are NOT bounded by take. The assertion below says so
+ *   in its own words rather than claiming all nine, and the excluded domain is asserted as a declared,
+ *   counted gap - see THE NINTH DOMAIN, BROUGHT INSIDE THE NET.
+ *
  *   NO SCHEDULER AND NO PROVIDER. Asserted absent in the runtime and the engine, because "operations"
  *   is exactly the word under which a queue or a mailer tends to arrive unannounced.
  *
@@ -61,7 +68,12 @@ import { join } from "node:path"
 
 import { PrismaClient } from "@prisma/client"
 
-import { COHORT_NEEDS_ACTION_DOMAIN, COHORT_NEEDS_ACTION_SCOPE } from "../../src/lib/cohorts/needs-action"
+import {
+    COHORT_NEEDS_ACTION_DOMAIN,
+    COHORT_NEEDS_ACTION_SCOPE,
+    COHORT_NEEDS_ACTION_SORT_KEYS,
+    COHORT_NEEDS_ACTION_UNBOUNDED_READS,
+} from "../../src/lib/cohorts/needs-action"
 import {
     OPERATIONS_DOMAINS,
     OPERATIONS_DOMAIN_SCOPE,
@@ -273,7 +285,7 @@ checkInvertible(
     wrongKeys.length === 0,
     wrongKeys.length > 0
         ? wrongKeys.map((r) => `${r.delegate}: expected [${(EXPECTED_ORDER_KEYS[r.delegate] ?? []).join(">")}] got [${r.orderKeys.join(">")}]`).join(" | ")
-        : "all 8 readers match their pinned key sequence",
+        : `all ${readerQueries.length} readers in engine.ts match their pinned key sequence`,
 )
 checkInvertible(
     "no reader silently reverses a business ordering, so overdue and low-stock work still sorts first",
@@ -282,10 +294,28 @@ checkInvertible(
 )
 // The unbounded reader is the one that could return a different SET on two identical requests.
 const unbounded = readerQueries.filter((r) => !/take: MAX_ITEMS_PER_DOMAIN/.test(r.body))
+/**
+ * WHAT THIS ASSERTION COVERS, WHICH IS NARROWER THAN IT USED TO SAY.
+ *
+ * It read "every reader is bounded IN THE DATABASE by take, so none fetches a whole table to show twenty
+ * rows". Both halves of that are measured over ONE file: `readerQueries` is scanned out of `engineCode`,
+ * and `findManyCount` is `(engineCode.match(/\.findMany\(/g) ?? []).length`. Nine domains are declared.
+ * Eight of them read in this file. The ninth, cohortTasks, does all of its reading in
+ * src/lib/cohorts/needs-action.ts, which this scan cannot see - and it is the one domain whose reads
+ * carry no `take` at all. So the sentence made a nine-reader claim on eight readers' evidence, and the
+ * reader it silently excluded is the only one for which the claim is false.
+ *
+ * The wording is narrowed to the file it measures, and the excluded domain is asserted immediately below
+ * rather than left outside the net. An overstated assertion is worse than a declared gap: a declared gap
+ * gets closed, an overstatement gets believed - including by the next person deciding whether this whole
+ * area still needs looking at.
+ */
 checkInvertible(
-    "every reader is bounded IN THE DATABASE by take, so none fetches a whole table to show twenty rows",
-    unbounded.length === 0,
-    unbounded.length > 0 ? `UNBOUNDED: ${unbounded.map((r) => r.delegate).join(",")}` : `all ${readerQueries.length} readers carry take: MAX_ITEMS_PER_DOMAIN`,
+    "every reader IN ENGINE.TS is bounded IN THE DATABASE by take, so no reader in this file fetches a whole table to show twenty rows",
+    unbounded.length === 0 && readerQueries.length === findManyCount,
+    unbounded.length > 0
+        ? `UNBOUNDED: ${unbounded.map((r) => r.delegate).join(",")}`
+        : `all ${readerQueries.length} of ${findManyCount} engine.ts readers carry take: MAX_ITEMS_PER_DOMAIN - cohortTasks reads elsewhere and is asserted separately below`,
 )
 // The inventory reader is the one that used to cut in TypeScript. Scanned over ITS body only: cohortTasks
 // slices legitimately, because it caps an in-memory declaration rather than a query result.
@@ -308,10 +338,66 @@ checkInvertible(
  * showing up as an operations view that reshuffles cohort work between two refreshes.
  */
 const cohortSrc = readFileSync(join(APP_ROOT, "src/lib/cohorts/needs-action.ts"), "utf8")
+// Comment-stripped the same way routeCode is, and for the same reason: that file's comments discuss the
+// `take` it does not have, and a prohibition has been mistaken for a violation here before.
+const cohortCode = cohortSrc
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split("\n")
+    .map((line) => line.replace(/(^|[^:])\/\/.*$/, "$1"))
+    .join("\n")
 checkInvertible(
     "the cohort declaration this view consumes is itself totally ordered, ending its sort chain on the unique id",
     /a\.id\.localeCompare\(b\.id\)/.test(cohortSrc) && /items\.sort\(/.test(cohortSrc),
     "resolveCohortNeedsAction sorts at, then reason, then id",
+)
+/**
+ * THE INHERITANCE PINNED AGAINST A PUBLISHED CONTRACT, NOT ONLY AGAINST THE FILE'S TEXT.
+ *
+ * The regex above catches the id tie-break disappearing, which is the failure that would make the slice
+ * above cut an undefined sequence. It does not catch the chain being SHORTENED in the middle, and that
+ * matters for the same reason EXPECTED_ORDER_KEYS is pinned in full here: the cheap way to make a sort
+ * reproducible is to simplify what is being sorted, and a chain reduced to `at` then `id` would still
+ * end on the unique id and still read as "deterministic" while having silently dropped the key that
+ * separates a whole cohort's absences on one session from the submissions sharing that timestamp.
+ *
+ * So the owning module publishes its chain as COHORT_NEEDS_ACTION_SORT_KEYS and it is pinned in full
+ * here, exactly as the eight local readers are. Its own harness asserts that the published chain is the
+ * chain the code applies and that the returned sequence obeys it pairwise.
+ */
+checkInvertible(
+    "the cohort declaration PUBLISHES its sort chain, and it is the audited one in full - so the order this reader inherits is a contract rather than something re-derived from another file's text",
+    COHORT_NEEDS_ACTION_SORT_KEYS.join(">") === "at>reason>id" &&
+        COHORT_NEEDS_ACTION_SORT_KEYS[COHORT_NEEDS_ACTION_SORT_KEYS.length - 1] === "id",
+    `cohortTasks inherits [${COHORT_NEEDS_ACTION_SORT_KEYS.join(">")}]`,
+)
+/**
+ * THE NINTH DOMAIN, BROUGHT INSIDE THE NET.
+ *
+ * The boundedness assertion above is scoped to engine.ts, and the arithmetic of why that is not the whole
+ * story is asserted rather than described: nine domains are declared, eight readers were found in this
+ * file, and the one left over is cohortTasks, which delegates its reading to needs-action.ts.
+ *
+ * That file's reads are unbounded, and the gap is DECLARED at its source with the reason a `take` there
+ * would return the wrong rows rather than fewer of the right ones. Counting it from here is what makes
+ * the ninth domain visible to this harness at all: the count is two-sided, so a `take` appearing in that
+ * file, or an eighth read being added to it, fails here as well as there. Neither this view nor that
+ * declaration can drift into a quieter state without a red assertion.
+ */
+const cohortFindMany = (cohortCode.match(/\.findMany\(/g) ?? []).length
+const cohortTakes = (cohortCode.match(/\btake:/g) ?? []).length
+checkInvertible(
+    "exactly one declared domain does no reading in engine.ts and it is cohortTasks - the arithmetic that makes an engine-only boundedness claim cover eight of nine domains",
+    OPERATIONS_DOMAINS.length === findManyCount + 1 &&
+        (OPERATIONS_DOMAINS as readonly string[]).includes(COHORT_NEEDS_ACTION_DOMAIN) &&
+        !readerQueries.some((r) => r.delegate.startsWith("cohort")),
+    `${OPERATIONS_DOMAINS.length} declared domains, ${findManyCount} readers in engine.ts, remainder=${COHORT_NEEDS_ACTION_DOMAIN}`,
+)
+checkInvertible(
+    "the ninth domain's reads are unbounded, that gap is declared at its source with a reason, and the declared count is exactly what that file contains",
+    cohortFindMany === COHORT_NEEDS_ACTION_UNBOUNDED_READS.count &&
+        cohortTakes === 0 &&
+        COHORT_NEEDS_ACTION_UNBOUNDED_READS.reason.length > 200,
+    `needs-action.ts: findMany=${cohortFindMany} take=${cohortTakes}; declared unbounded=${COHORT_NEEDS_ACTION_UNBOUNDED_READS.count}, reason ${COHORT_NEEDS_ACTION_UNBOUNDED_READS.reason.length} chars`,
 )
 
 // ---------------------------------------------------------------------------
