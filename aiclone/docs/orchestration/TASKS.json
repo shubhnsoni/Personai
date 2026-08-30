@@ -1,6 +1,6 @@
 {
-    "milestone": "READ-ONLY BLUEPRINT PREVIEW IS COMPLETE END TO END: c3f3f44 is the green point. fbefa17 resolver + HTTP boundary + GET /api/platform/blueprints and GET /api/platform/blueprints/[blueprintId]/preview; f1af3a4 the contract as a TYPE FILE (src/lib/business-os/preview-types.ts) rather than a markdown document, so a worker cannot drift from it; 5e29a4c the onboarding invariant refined from a route-PATH proxy into a behavioural detector (BP2, gpt-5.6-terra); 0798020 the owner-facing panel (BP1, claude-sonnet-5); 3ea6106 root mounted it in business-os-shell.tsx; c3f3f44 closed two holes the harnesses themselves left open. Sweep is now 61 (check-blueprint-preview.ts joined it), FAILED 0. CORRECTION TO THE PREVIOUS MILESTONE TEXT: it claimed 'business-os is a static registry with zero API routes'. That was false when written - src/app/api/business-os/blueprints/route.ts and .../[blueprintId]/route.ts have existed since 627b826. Both are GET-only. There are now TWO blueprint listing surfaces and that is deliberate, not duplication: the business-os one sits behind requireBusinessOsAccess (the owner-console surface, opt-in per profile), the platform one needs only workspace membership, because onboarding happens BEFORE anyone opts into the owner console. A harness pins that distinction so a future de-duplication has to argue with it. STILL MISSING and NOT owner-gated: durable INSTALLATION. There is no installed-blueprint model, no write route, and no install runtime. Preview says so in every response - `installed` is typed as the literal null, and a limitations list ships in the body rather than in a document. STILL MISSING and owner-gated: appointments:reminders and appointments:deposits remain partial, provider boundaries inert. Repo-wide lint still exactly 43 (14 errors, 29 warnings) at every commit in this package.",
-    "updatedAt": "2026-08-30 08:40 +05:30",
+    "milestone": "BLUEPRINT INSTALLATION IS COMPLETE END TO END: 9548440 is the green point. Phase 1 preview (c3f3f44) and Phase 2 durable installation both landed in this run. 2d83e46 the installation contract as a TYPE FILE; 94f946c the additive migration, fully rehearsed; cdd0127 the runtime, routes and the reshaped onboarding invariant; d1eeae9 BP4 (gpt-5.6-terra) fixed the same vacuity class in check-capability-contract.ts; f71a3af BP3 (claude-sonnet-5) the owner install UI, mounted by root; 9548440 the harness residue fix. Sweep is now 64 (three new install harnesses), FAILED 0. TWO NEW TABLES ONLY: BlueprintInstallation and BlueprintInstallationEvent. NOTHING was forked - no workflow-template table, no surface table, no terminology table, no vertical-specific config table, and WorkflowRun/WorkflowStep/Approval/TaskJob are untouched and asserted still present. ONE ACTIVE INSTALLATION PER WORKSPACE is a partial unique index, so upgrade-through-supersession is unrepresentable-otherwise rather than merely preferred. INSTALLING GRANTS NOTHING: Profile.personalityConfig is compared BYTE FOR BYTE across an install. PERMISSION_KEYS is still 18 and none mentions blueprints, so no role gained anything. Writes ask workspace.update (OWNER/ADMIN); reads ask profile.read, so onboarding can show a plan before anyone is elevated. A MANAGER can read and is refused when installing - asserted both ways. STILL MISSING and owner-gated: appointments:reminders and appointments:deposits remain partial, provider boundaries inert. coaching-studio-v1 is therefore genuinely uninstallable, which is what makes the install-time capability refusal a real test rather than a vacuous one. Repo-wide lint still exactly 43 (14 errors, 29 warnings) at every commit in this run.",
+    "updatedAt": "2026-08-30 09:40 +05:30",
     "updatedBy": "root orchestrator (claude-opus-5, max effort), sole integration owner",
     "baseline": "f8ee611",
     "maxParallelWorkers": 3,
@@ -1605,6 +1605,78 @@
                 "No installation. No installed-blueprint model, no write route, no install runtime, no history ledger.",
                 "The panel's 404 copy path is proven by static assertion and by the routes' own harness, not by a browser round trip."
             ]
+        },
+        {
+            "id": "P2-022",
+            "title": "Durable blueprint installation: schema, migration, runtime, routes, owner UI and the invariant it had to change",
+            "status": "done",
+            "owner": "root orchestrator (claude-opus-5); schema and migration exclusively root",
+            "commits": [
+                "2d83e46 the installation contract, as types rather than a document",
+                "94f946c additive migration + schema invariant harness, full rehearsal cycle",
+                "d1eeae9 BP4 (gpt-5.6-terra): check-capability-contract.ts optional-direction gap",
+                "f71a3af BP3 (claude-sonnet-5): owner installation UI",
+                "cdd0127 runtime, HTTP boundary, routes, panel mount, onboarding invariant reshaped",
+                "9548440 harness residue fix, back to zero"
+            ],
+            "schema": {
+                "tables": [
+                    "BlueprintInstallation",
+                    "BlueprintInstallationEvent"
+                ],
+                "enums": [
+                    "BlueprintInstallationState (ACTIVE/SUPERSEDED/REMOVED)",
+                    "BlueprintInstallationEventKind (INSTALLED/UPGRADED/SUPERSEDED/REMOVED)"
+                ],
+                "checkConstraints": 10,
+                "partialUniqueIndexes": [
+                    "BlueprintInstallation_one_active_per_workspace ON (workspaceId) WHERE state = 'ACTIVE'"
+                ],
+                "triggers": [
+                    "BlueprintInstallationEvent_tenant_guard - the denormalised workspaceId must equal its installation's",
+                    "BlueprintInstallation_supersession_guard - supersession may not cross a workspace",
+                    "BlueprintInstallationEvent_append_only - REUSES reject_append_only_mutation(), never redefines it"
+                ],
+                "notCreated": "no FAILED state, no REFUSED event kind, no Blueprint registry table, no FK on blueprintId, and none of the 13 forbidden tables"
+            },
+            "designDecisions": [
+                "NO WORKFLOW TEMPLATE TABLE. blueprint.id encodes the version and the registry RETAINS deprecated entries, so pinning an id is already immutable. Copying the declarations would create a second source of truth able to disagree with the first, and reconciling them would become somebody's permanent job.",
+                "NO SURFACE OR TERMINOLOGY TABLE. Surfaces already live per profile as JSON on Profile.personalityConfig. An unscoped Terminology table is on the design's forbidden list; the resolved pack is frozen into configJson on a workspace-scoped row, so it is scoped by construction.",
+                "INSTALL DOES NOT WRITE Profile.personalityConfig, so it grants nothing. The reason is structural, not cautious: surfaces are per PROFILE, an installation is per WORKSPACE, and a user reaches many workspaces through Membership (keyed by userId). Applying workspace-scoped intent to a profile-scoped store would change what that user sees in workspaces the install said nothing about.",
+                "NO FAILED STATE AND NO REFUSED EVENT. A refusal row is a partial write, and the zero-partial-rows proof would need an exception carved out of it. An assertion with an exception is the kind that stops noticing.",
+                "NO METHOD TO EDIT A CONFIG. Editing a frozen record of what was agreed to is how an audit trail stops being one. A configuration change is an upgrade, and upgrades supersede.",
+                "config is FROZEN at install time and drift is REPORTED rather than silently corrected, because the useful question is 'what did this workspace agree to', not 'what would we resolve today'.",
+                "Install asks for workspace.update rather than profile.update. MANAGER holds profile.update, and a manager being able to change what the business IS would be a silent permission expansion achieved by picking the permission that happened to be there. No new permission KEY was added, because adding one to PERMISSION_KEYS extends the OWNER and ADMIN closures automatically and forces a decision about every other role."
+            ],
+            "lessons": [
+                "A BEFORE DELETE TRIGGER OUTRANKS A CASCADE. onDelete: Cascade plus an append-only ledger means a workspace with installation history can never be deleted - the cascaded DELETE still fires the trigger. This is consistent with ActivityEvent and CopilotAuditEvent, which have made Contact and workspace deletion conditional the same way for far longer, but it is a real consequence of choosing append-only and the schema harness now asserts BOTH directions: cascade works with no history, and is refused once there is history. The first version asserted only the no-history case and so advertised a deletion path that does not exist in practice.",
+                "TRIGGER ORDER CAN MAKE A CHECK CONSTRAINT UNREACHABLE. On INSERT the supersession trigger fires before the no_self_supersession CHECK and refuses first, because the row being pointed at does not exist yet. An assertion that only tried INSERT would have claimed to test a constraint it never reached. Both statements are now asserted and the CHECK is proven reachable by UPDATE, which is the one that can reach it.",
+                "IN POSTGRES ANY SQL ERROR ABORTS THE ENCLOSING TRANSACTION. A harness that shares one outer transaction across its assertions cannot contain a trigger refusal and then continue - every later assertion fails with 25P02 while appearing to be about whatever it was named after. Database-level refusals belong in a harness that gives each one its own transaction.",
+                "RESIDUE IN A SHARED DATABASE IS A DEFECT, NOT AN INCONVENIENCE. The atomicity proof needs the real transaction, and proving the idempotency key survived by performing a real retry wrote a PERMANENT ledger line. One surviving profile-with-workspace made check-schema-invariants.ts fail three files away, because it projects every Profile into a Workspace and Workspace.profileId is UNIQUE. 'It is only the rehearsal database' is exactly how residue becomes somebody else's failing check.",
+                "A DOC COMMENT EXPLAINING A SEAM WILL TRIP A SCAN LOOKING FOR THE SEAM. The assertion that the composition root passes no test hooks failed because the file names both hooks in the comment explaining why it must not pass them - the same trap the migration builder and the preview resolver were already written around. Scan executable lines, and add the complementary assertion that the explanation is present so the seams cannot become undocumented."
+            ],
+            "provenBehaviour": {
+                "atomicity": "a failure injected at the LAST statement of the install transaction left ZERO rows in BOTH tables, asserted globally AND scoped to the workspace, with the idempotency key proven unconsumed afterwards",
+                "idempotency": "a replay returns the ORIGINAL installation with outcome replayed and writes no second row in either table",
+                "upgrade": "restaurant-venue-v2 -> v3 supersedes: exactly one ACTIVE row, both versions retained, one row and TWO ledger lines written, and the old row's own history names its successor",
+                "capabilityRefusal": "coaching-studio-v1 genuinely requires appointments:reminders, which is genuinely partial, so the install-time refusal is exercised against real registry state",
+                "noGrant": "Profile.personalityConfig compared BYTE FOR BYTE across an install",
+                "roleSafety": "MANAGER reads successfully and is FORBIDDEN when installing or removing",
+                "nonEnumeration": "foreign and nonexistent workspaces are byte-identical 403s at both the service and the HTTP boundary; an unauthorised caller gets 403 even for a nonexistent blueprint, so 404 is not a registry oracle",
+                "appendOnly": "the ledger refuses UPDATE and DELETE by trigger, each proven in its own transaction",
+                "noLeak": "the 503 is driven by a failure carrying a real-shaped DSN with a password; eight separate fragments are each asserted absent from the body"
+            },
+            "harnesses": {
+                "check-blueprint-install-schema.ts": "51/51; inverted exit 1, 41 flipped",
+                "check-blueprint-install-runtime.ts": "57/57; inverted exit 1, 44 flipped; restored 57/57; zero residue",
+                "check-blueprint-install-routes.ts": "46/46; inverted exit 1, 20 flipped",
+                "check-onboarding-blueprint-coverage.ts": "29/29 (was 25); inverted exit 1, 15 flipped"
+            },
+            "notDone": [
+                "No UI end-to-end run against a live server; the panel is verified by tsc, eslint and the static a11y harness.",
+                "The install does not apply surfaces anywhere, by design. A workspace-scoped surface mechanism does not exist and was not invented here."
+            ],
+            "followUp": "check-schema-invariants.ts assumes no Profile owns a Workspace: its backfill projection uses `on conflict (\"id\") do nothing`, which cannot absorb a collision on the UNIQUE profileId. It will break on the first real profile that owns a workspace. Noted, not fixed - out of this package's scope."
         }
     ],
     "laneState": {
@@ -1849,5 +1921,33 @@
         "append-only and guard triggers": "21 total, 0 disabled",
         "frozen worktrees": "all six kirocrew/* still at ea69595",
         "origin": "unchanged; nothing pushed"
+    },
+    "gatesAt9548440": {
+        "commit": "9548440",
+        "prisma validate": "0",
+        "prisma generate": "0",
+        "tsc --noEmit -p tsconfig.json": "0",
+        "check sweep": "64 checks, FAILED 0 (was 61; three install harnesses joined)",
+        "targeted ESLint (all new/changed files)": "0 findings",
+        "repo-wide ESLint": "43 problems (14 errors, 29 warnings) - unchanged across the entire run",
+        "npm audit --omit=dev": "0 vulnerabilities",
+        "npm run build": "0; /api/platform/workspaces/[workspaceId]/blueprint and .../blueprint/plan both in the manifest",
+        "migration": {
+            "name": "20260830010000_blueprint_installation",
+            "backup": "462288 bytes, sha256 9f8e4041d87f4b99cc9a22cfec3a0dff1f6cdd1261642209c2acbcf07c35bb5b",
+            "pre-install": "113 tables, raw 9d0a19a7, normalized eea92c9a",
+            "post-apply": "115 tables, raw e98fc561, normalized a7090c51",
+            "post-rollback": "113 tables, raw 9d0a19a7 - IDENTICAL to pre, raw AND normalized",
+            "apply vs rollback": "DIFFERS (exit 2), enumerating all ten constraints, so the rollback provably ran",
+            "post-reapply": "normalized a7090c51 - IDENTICAL to post-apply",
+            "raw diff": "create_table=2 create_type=2 alter_type_add_value=0 add_column=0 alter_column=0 drop_table=0 drop_column=0 drop_constraint=5",
+            "profileId drift": "exactly 5 DropForeignKey statements excluded, count asserted",
+            "down.sql path": "space-free; database never left between rollback and reapply"
+        },
+        "live personalink": "untouched - 35 tables, no _prisma_migrations, 0 wave tables leaked, no btree_gist, Profile = 16",
+        "guard and append-only triggers": "24 total, 0 disabled (was 21; +3 from this migration)",
+        "disposable DB": "19 migrations, up to date; BlueprintInstallation = 0 rows, BlueprintInstallationEvent = 0 rows",
+        "frozen worktrees": "all six kirocrew/* still at ea69595",
+        "origin": "unchanged at 4b386d1d; nothing pushed"
     }
 }

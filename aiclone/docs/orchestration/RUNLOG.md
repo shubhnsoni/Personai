@@ -3736,3 +3736,188 @@ The one-shot cron path with `approval_mode: auto` produced two real workers with
 now twice in a row; cron is the proven path and `spawn_run` should not be retried a fourth time without
 new information. BP1 reporting "no PID available to me" rather than inventing one is the behaviour worth
 keeping — an unverifiable field left blank is evidence, a plausible number is noise.
+
+
+---
+
+## Durable blueprint installation — `9548440`
+
+Preview said what choosing a blueprint would mean. This is the half that writes it down, and the whole
+discipline is that it writes down **only** that.
+
+### Two tables, and the list of things that were not built
+
+`BlueprintInstallation` and `BlueprintInstallationEvent`. That is the entire footprint. Every other
+candidate table was rejected for a specific reason rather than for tidiness:
+
+**No workflow template table.** The design suggested instantiating the blueprint's declared workflows as
+durable templates. `blueprint.id` already encodes the version — `restaurant-venue-v2` against `-v3` — and
+the registry **retains deprecated entries** rather than deleting them, which is precisely what makes
+pinning an id sufficient for immutability. Copying the declarations into the database would create a
+second source of truth able to disagree with the first, and reconciling them would become somebody's
+permanent job. `WorkflowRun`, `WorkflowStep`, `Approval` and `TaskJob` are untouched, and the schema
+harness asserts they still exist so "reuse" is a checked claim rather than an intention.
+
+**No surface or terminology table.** Surfaces already live per profile as JSON on
+`Profile.personalityConfig`. An unscoped `Terminology` table was explicitly on the design's forbidden
+list, and it deserves to be: terminology means nothing except relative to an installation, so a global
+table would invite exactly the cross-tenant leak this schema spends three triggers preventing elsewhere.
+The resolved pack is frozen into `configJson` on a workspace-scoped row, so it is scoped by construction.
+
+**No permission write, therefore no grant at all.** This is the one worth stating carefully, because it
+looks like a gap and is not. Installing does not touch `Profile.personalityConfig`. Surfaces are stored
+per **profile**; an installation is per **workspace**; and a user reaches many workspaces through
+`Membership`, which is keyed by `userId`. Writing workspace-scoped intent into a profile-scoped store
+would change what that user sees in workspaces the install said nothing about. So `configJson` **records**
+the surfaces the corresponding role implies and nothing applies them — and the runtime harness proves it
+by comparing that column **byte for byte** across an install. Not "no grant was intended": the column
+where grants live is unchanged.
+
+**No FAILED state and no REFUSED event kind.** A failed install leaves nothing at all. A refusal row
+would be a partial write, and the zero-partial-rows proof would need an exception carved out for it — and
+an assertion with an exception carved out of it is the kind that stops noticing.
+
+**No method to edit a config.** Editing a frozen record of what was agreed to is how an audit trail stops
+being one. A configuration change is an upgrade, and upgrades supersede.
+
+### One active installation per workspace, in the database
+
+A blueprint carries terminology for an entire vertical: the calendar noun is "job" or "booking" or
+"reservation", not all three. Two simultaneously active blueprints would leave the product with two
+answers to "what is this thing called" and no way to choose. So it is a partial unique index on
+`("workspaceId") WHERE state = 'ACTIVE'` — the mechanism that already enforces one default variant per
+product, and for the same reason: Postgres can express it and Prisma cannot.
+
+The consequence is the requested behaviour obtained structurally rather than by convention. **Upgrade
+through supersession is not preferred over re-installation; re-installation is unrepresentable.**
+
+### Role safety is a choice between two permissions that already exist
+
+Reads ask for `profile.read` — the same permission preview asks for — so an onboarding surface can show
+an owner what installing would do before they hold any elevated role. Writes ask for `workspace.update`,
+which `ROLE_PERMISSION_MATRIX` grants only to OWNER and ADMIN.
+
+Deliberately **not** `profile.update`, which MANAGER also holds. A manager being able to change what the
+business *is* would be a silent permission expansion achieved by picking the permission that happened to
+already be there. And no permission **key** was invented: adding one to `PERMISSION_KEYS` extends the
+OWNER and ADMIN closures automatically, since both derive from `ALL_PERMISSIONS`, and forces a decision
+about every other role. `PERMISSION_KEYS` is still 18 and none of them mentions blueprints. A MANAGER
+reading successfully and being refused when installing are both asserted, because only asserting the
+refusal would leave "MANAGER can see nothing either" indistinguishable from success.
+
+### The invariant that had to change, and was not weakened
+
+`check-onboarding-blueprint-coverage.ts` asserted that nothing in the repository could install a
+blueprint, and it was deliberately built to go red the moment that stopped being true. This commit makes
+it happen: the schema-model trigger fires on `BlueprintInstallation`, and the behavioural detector fires
+on the new `POST`.
+
+Deleting it or loosening it would have thrown away the reason it existed. So it was **replaced** by the
+claim that matters once installation is real, and which is strictly harder to satisfy:
+
+> **Onboarding has no path to the install runtime.**
+
+The old risk was that the map overclaimed what it did. The new risk is concrete and much worse —
+*signing up quietly reconfigures a workspace* — and one import in `onboarding-needs.ts` would do it. The
+check now asserts installation genuinely exists, that nothing on the onboarding path reaches the install
+runtime, and that the write path asks for `workspace.update`. 25 → 29 assertions.
+`CORRESPONDING_BLUEPRINT`'s comment was rewritten in the same commit, because it said installation did
+not exist and that sentence had just become false.
+
+### Lessons
+
+40. **A `BEFORE DELETE` trigger outranks a cascade.** `onDelete: Cascade` plus an append-only ledger
+    means a workspace with installation history can never be deleted: the cascaded `DELETE` still fires
+    the trigger. Consistent with `ActivityEvent` and `CopilotAuditEvent`, which have made `Contact` and
+    workspace deletion conditional the same way for far longer — but it is a real consequence of choosing
+    append-only, and the first version of the assertion tested only the no-history case, which
+    *advertised a deletion path that does not exist in practice*. Both directions are now asserted.
+
+41. **Trigger order can make a `CHECK` constraint unreachable.** On `INSERT` the supersession trigger
+    fires before `no_self_supersession` and refuses first, because the row being pointed at does not exist
+    yet. Found by writing the assertion and watching it fail *for the wrong reason* — the error code was
+    `P0001` (a plpgsql raise) where `23514` (a check violation) was expected. An assertion that only
+    tried `INSERT` would have claimed to test a constraint it never reached. Both statements are now
+    asserted, and the CHECK is proven reachable by `UPDATE`, which is the statement that can reach it.
+
+42. **In Postgres any SQL error aborts the enclosing transaction, so a shared-transaction harness cannot
+    contain a database-level refusal.** The first runtime harness attempted a real append-only `UPDATE`
+    inside the one outer transaction its other assertions shared. Everything after it failed with `25P02`
+    — "current transaction is aborted" — while still being *named* after the envelopes and permissions it
+    was no longer testing. Database-level refusals belong in a harness that gives each one its own
+    transaction, which is what the schema harness does.
+
+43. **Residue in a shared database is a defect, not an inconvenience.** The atomicity proof needs the
+    real transaction — a rollback the harness performed itself would prove nothing about whether the
+    service's transaction is atomic — and proving the idempotency key survived by performing a real retry
+    wrote a **permanent** ledger line, since neither it nor its installation, workspace or profile can be
+    deleted. One surviving profile-with-workspace made `check-schema-invariants.ts` fail **three files
+    away**: it projects every `Profile` into a `Workspace`, `Workspace.profileId` is `UNIQUE`, and its
+    `on conflict ("id") do nothing` cannot absorb a collision on a different column. The sweep read
+    64 checks / 1 FAILED and named a leftover row. *"It is only the rehearsal database"* is exactly how
+    residue becomes somebody else's failing check. The retry is now proven inside a rolled-back
+    transaction and the key's absence asserted directly, keeping both proofs at zero residue.
+
+44. **A doc comment explaining a seam will trip a scan looking for the seam.** The assertion that the
+    composition root passes no test hooks failed because that file names both hooks in the comment
+    explaining why it must never pass them — the third time this trap has appeared here, after the
+    migration builder and the preview resolver. Scan executable lines only, and add the *complementary*
+    assertion that the explanation is present, so the seams cannot quietly become undocumented.
+
+### Migration evidence
+
+| Step | Result |
+|---|---|
+| raw diff | `create_table=2 create_type=2 alter_type_add_value=0 add_column=0 alter_column=0 drop_table=0 drop_column=0` |
+| `profileId` drift | exactly **5** `DropForeignKey` statements excluded, count asserted |
+| backup | 462288 bytes, sha256 `9f8e4041d87f4b99cc9a22cfec3a0dff1f6cdd1261642209c2acbcf07c35bb5b` |
+| pre-install | 113 tables, raw `9d0a19a7`, normalized `eea92c9a` |
+| post-apply | 115 tables, raw `e98fc561`, normalized `a7090c51` |
+| post-rollback | 113 tables, raw `9d0a19a7` — **IDENTICAL to pre, raw AND normalized** |
+| apply vs rollback | **DIFFERS** (exit 2), enumerating all ten constraints, so the rollback provably ran |
+| post-reapply | normalized `a7090c51` — **IDENTICAL to post-apply** |
+| `down.sql` | applied from a **space-free** path; database never left between rollback and reapply |
+
+Counts reconcile exactly: +2 tables, +23 columns, +9 indexes, +10 checks, +7 enum values, and +5
+`information_schema.triggers` rows for three triggers, two of which cover two events each.
+
+### Measured gates at `9548440`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` | 0 |
+| `prisma generate` | 0 |
+| `tsc --noEmit` | 0 |
+| check sweep | **64 of 64 exit 0** (was 61) |
+| `check-blueprint-install-schema` | 51/51; inverted exit 1, 41 flipped |
+| `check-blueprint-install-runtime` | 57/57; inverted exit 1, 44 flipped; restored 57/57; **zero residue** |
+| `check-blueprint-install-routes` | 46/46; inverted exit 1, 20 flipped |
+| `check-onboarding-blueprint-coverage` | 29/29 (was 25); inverted exit 1, 15 flipped |
+| targeted ESLint | 0 findings |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged all run |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run build` | 0; both new routes in the manifest |
+| live `personalink` | untouched — 35 tables, no `_prisma_migrations`, 0 leaked, `Profile` = 16 |
+| triggers | 24 total, 0 disabled |
+| frozen worktrees | all six `kirocrew/*` still at `ea69595` |
+| origin | unchanged at `4b386d1d` |
+
+### Workers
+
+| Worker | Model | Evidence | Delivered |
+|---|---|---|---|
+| BP3 — install UI | `claude-sonnet-5` | commit `4af22ad`, clean worktree, 1030 insertions | accepted as `f71a3af` |
+| BP4 — harness vacuity audit | `gpt-5.6-terra` | commit `6077961`, audit doc with a break/restore evidence table | accepted as `d1eeae9` |
+
+Neither wrote its report file, though both committed real work — so both were judged on the diff instead.
+BP4's result is the one worth keeping: asked to hunt the vacuity class found in lesson 36, it found the
+**same defect in `check-capability-contract.ts`** — deleting `composition.required &&` from the validator
+left that harness green, because no active blueprint composed an immature capability *optionally*. It
+fixed it with the paired direction using the real partial capability, then reported that it had audited
+one file of ten and why: *"The time budget was spent proving and repairing the first demonstrated
+discriminator gap rather than manufacturing coverage."* It also declined to claim source-break evidence
+for other files because the supplied runner executes against the primary worktree, which its brief
+forbade it to touch. A worker that reports one proven finding and refuses to pad it is worth more than
+one that reports ten unproven ones.
+
+`spawn_run` was not retried; the one-shot cron path produced both workers, as it did in Phase 1.

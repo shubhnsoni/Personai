@@ -21,14 +21,30 @@ and described H1 as unstarted when it was complete.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`c3f3f44`**
-- Origin unchanged; nothing pushed.
+- Primary HEAD: **`9548440`**
+- Origin unchanged at `4b386d1d`; nothing pushed.
 - Waves A–G4 complete, plus surfaces, plus **H1 `fieldJobs:inspection` complete end to end**, plus the
   two gaps H1 left (**`5822aa8`** checklist authoring, **`086c835`** field service selectable during
   onboarding), plus checklist line editing and removal with the snapshot-survival claim now proven
   (**`eb35b32`**), plus the **unified daily operations view, end to end** (`dac6a23` runtime and API,
   `0387d86` panel, `d06e122` case milestones and per-domain scope, `ff50658` route harness).
-- **The check sweep is now 61.**
+- **The check sweep is now 64.**
+- **THE BLUEPRINT INSTALLATION RUNTIME IS COMPLETE END TO END** (`9548440`). Preview (`c3f3f44`) and
+  durable installation (`9548440`) both landed in this run. Two new tables only —
+  `BlueprintInstallation` and `BlueprintInstallationEvent` — and **nothing was forked**: no
+  workflow-template table, no surface table, no terminology table, no vertical-specific config table, and
+  `WorkflowRun` / `WorkflowStep` / `Approval` / `TaskJob` are untouched and asserted still present.
+- **Installing grants nothing, and that is proven rather than intended:** `Profile.personalityConfig` is
+  compared **byte for byte** across an install. `PERMISSION_KEYS` is still 18 and none of them mentions
+  blueprints, so no role gained anything. Writes ask `workspace.update` (OWNER/ADMIN); reads ask
+  `profile.read`. A MANAGER can read and is refused when installing — both asserted.
+- **One ACTIVE installation per workspace** is a partial unique index, so upgrade-through-supersession is
+  *unrepresentable otherwise* rather than merely preferred.
+- **The honest gap installation did NOT close:** `configJson` **records** the surfaces a blueprint implies;
+  nothing applies them. Surfaces are per PROFILE, an installation is per WORKSPACE, and a user reaches
+  many workspaces through `Membership`. Making install effectful needs workspace-scoped surface
+  resolution first — a change to how the whole product reads surfaces, not an installation feature. It is
+  top of the queue. **Do not bolt it onto the install row.**
 - **The READ-ONLY BLUEPRINT PREVIEW is complete end to end** (`c3f3f44`): `GET /api/platform/blueprints`
   and `GET /api/platform/blueprints/[blueprintId]/preview`, a tenant-authorized resolver, and an owner
   panel mounted in `business-os-shell.tsx`. **There is still no installation.** `installed` is typed as
@@ -50,6 +66,46 @@ and described H1 as unstarted when it was complete.
 - Live `personalink`: verified untouched — 35 tables, no `_prisma_migrations`, 0 wave tables leaked,
   no `btree_gist`, `Profile` = 16.
 - Frozen worktrees intact: all six `kirocrew/*` still at `ea69595`.
+
+### Measured gates at `9548440` — durable blueprint installation
+
+| Gate | Result |
+|---|---|
+| `prisma validate` / `prisma generate` | 0 / 0 |
+| `tsc --noEmit` | 0 |
+| check sweep | **64 of 64 exit 0** |
+| `check-blueprint-install-schema` | 51/51; inverted exit 1, 41 flipped |
+| `check-blueprint-install-runtime` | 57/57; inverted exit 1, 44 flipped; restored 57/57; zero residue |
+| `check-blueprint-install-routes` | 46/46; inverted exit 1, 20 flipped |
+| `check-onboarding-blueprint-coverage` | 29/29 (was 25); inverted exit 1, 15 flipped |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | 0; both install routes in the manifest |
+| live `personalink` | untouched — 35 tables, `Profile` = 16 |
+| triggers | 24 total, 0 disabled |
+
+Migration `20260830010000_blueprint_installation`: pre `9d0a19a7` → apply `e98fc561` → rollback
+**`9d0a19a7`, byte-identical to pre** → apply-vs-rollback **DIFFERS (exit 2)** → reapply normalized
+`a7090c51`, **identical to apply**. Five `profileId` drift statements excluded with the count asserted.
+`down.sql` from a space-free path. Database never left between rollback and reapply.
+
+**Four lessons from this package, all found by measurement rather than by reading.**
+
+*A `BEFORE DELETE` trigger outranks a cascade.* `onDelete: Cascade` plus an append-only ledger means a
+workspace with installation history **cannot be deleted**. The first version of the assertion tested only
+the no-history case and so advertised a deletion path that does not exist.
+
+*Trigger order can make a `CHECK` constraint unreachable.* On `INSERT` the supersession trigger refuses
+before `no_self_supersession` is evaluated. Found because the assertion failed with `P0001` where `23514`
+was expected. Only `UPDATE` reaches that CHECK, and both are now asserted.
+
+*Any SQL error aborts the enclosing transaction.* A harness sharing one outer transaction cannot contain a
+trigger refusal and continue — everything after it fails with `25P02` while still being named after what
+it is no longer testing.
+
+*Residue in a shared database is a defect.* The atomicity proof's real retry wrote a **permanent** ledger
+line, and one surviving profile-with-workspace broke `check-schema-invariants.ts` three files away. Read
+lesson 43 in `RUNLOG.md` before writing a harness that touches an append-only table.
 
 ### Measured gates at `c3f3f44` — the blueprint preview package
 

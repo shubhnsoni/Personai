@@ -1262,3 +1262,50 @@ past that point; update the wording, because at that moment installation will ge
 | Repoint or delete the wave-c rehearsal runner | tooling | Unchanged. Has misled two resumes. Note the primary runner is the one that works: `run-on-rehearsal-primary.js`. |
 | G2 | appointments providers | Still **owner-gated**: real messages, real money. |
 | P1-007 | live `personalink` cutover | Still **owner-gated**. |
+
+
+---
+
+## Accepted — durable blueprint installation, `9548440`
+
+Phase 2. The blueprint installation runtime is complete: schema, migration, runtime, routes and owner UI.
+
+| Commit | What landed | Author |
+|---|---|---|
+| `2d83e46` | `install-types.ts` — the contract, as **types** rather than a document | root |
+| `94f946c` | additive migration + `check-blueprint-install-schema.ts`, full rehearsal cycle | root |
+| `d1eeae9` | `check-capability-contract.ts` optional-direction gap closed | BP4 `gpt-5.6-terra` |
+| `f71a3af` | `blueprint-install-panel.tsx` + shared module + 156 a11y assertions | BP3 `claude-sonnet-5` |
+| `cdd0127` | runtime, HTTP boundary, both routes, panel mount, onboarding invariant reshaped | root |
+| `9548440` | harness residue fix — back to zero | root |
+
+Sweep **61 → 64**. Repo lint unchanged at 43 (14 errors, 29 warnings) across all six commits.
+
+### Visible product behaviour
+
+An owner in the Business OS console now sees, under the read-only preview panel, what their workspace has
+installed, its frozen configuration, whether that configuration has drifted from what the registry would
+resolve today, and the full append-only history including superseded and removed installations. They can
+plan an install (which writes nothing), install, upgrade — which supersedes rather than duplicating — and
+remove, which retains the row and its history rather than deleting.
+
+### What it deliberately does not do
+
+Installing grants nothing. It does not write `Profile.personalityConfig`, does not switch on the owner
+console, does not copy workflow declarations into the database, and does not notify, charge or schedule
+anything. `coaching-studio-v1` cannot be installed at all, because it requires `appointments:reminders`
+and that capability is genuinely `partial` — which is also what makes the install-time refusal a real
+test rather than a vacuous one.
+
+### Next in queue — revised after `9548440`
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| **Workspace-scoped surfaces** | `src/lib/surfaces.ts` + a scope mechanism | The honest gap installation exposed rather than closed. `configJson` RECORDS the surfaces a blueprint implies and nothing applies them, because surfaces are per PROFILE while an installation is per WORKSPACE and a user reaches many workspaces through `Membership`. Applying them today would change what that user sees in workspaces the install said nothing about. Making install actually *effectful* needs a workspace-scoped surface resolution first — and that is a change to how the whole product reads surfaces, not an installation feature. Do not bolt it onto the install row. |
+| **`check-schema-invariants.ts` fragility** | `scripts/one-off/check-schema-invariants.ts` | Found by breaking it accidentally. Its backfill projection inserts a `Workspace` for every `Profile` using `on conflict ("id") do nothing`, which cannot absorb a collision on the UNIQUE `profileId`. It passes today only because no `Profile` in the disposable database owns a `Workspace`. The first one that does breaks it. Small fix, real trap. |
+| Extend operations coverage to cohort tasks | `src/lib/operations/engine.ts` | Unchanged: have the cohort engine declare its own needs-action condition first. |
+| Operations due-work processing | new | Unchanged: not built, and nothing on a timer may be described as existing without execution evidence. |
+| Continue the harness vacuity audit | `scripts/one-off/check-*.ts` | BP4 audited **one** of ten assigned files and proved a real finding in it. Nine remain: `check-fieldjob-inspection-runtime`, `check-fieldjob-runtime`, `check-operations-runtime`, `check-commerce-runtime`, `check-inventory-runtime`, `check-cohort-runtime`, `check-course-access-runtime`, `check-retainer-runtime`, `check-reservation-authz`. The method is in `scripts/one-off/HARNESS_VACUITY_AUDIT.md`. Note the constraint BP4 hit: the rehearsal runner targets the PRIMARY worktree, so a worker in a linked worktree cannot use it for source-break evidence — give the next one a runner that respects its own cwd, or run it as root. |
+| P1-009 slice 6 | repo-wide lint | Unchanged, and still a refusal: 43 problems, no safe mechanical slice remains. |
+| G2 | appointments providers | Still **owner-gated**: real messages, real money. Also the reason `coaching-studio-v1` is uninstallable. |
+| P1-007 | live `personalink` cutover | Still **owner-gated**. |
