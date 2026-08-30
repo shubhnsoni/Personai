@@ -115,10 +115,25 @@ export type DueWorkPreviewPort = {
 /**
  * Words this surface must never emit, in a response body or in owner-facing copy.
  *
- * Enforced rather than remembered. Note for whoever writes the assertion: scan the EMITTED STRINGS, not
- * the source file — this very comment contains every one of these words in order to forbid them, and a
- * whole-file scan would flag the prohibition as the violation. That trap has now caught this repository
- * five times, and the fifth cost three attempts to fix.
+ * Enforced rather than remembered. Two traps for whoever writes the assertion, both of which have
+ * already been walked into:
+ *
+ * ONE: scan the EMITTED STRINGS, not the source file. This very comment contains every one of these
+ * words in order to forbid them, and a whole-file scan would flag the prohibition as the violation. That
+ * trap has now caught this repository five times, and the fifth cost three attempts to fix.
+ *
+ * TWO, found by the harness on its first real run against this contract: a word ban cannot tell an
+ * ASSERTION from a DENIAL. `DUE_WORK_PREVIEW_LIMITATIONS[0]` says that nothing has been *sent* or
+ * *dispatched* - it is the very sentence that makes the promise - and a scan over the whole body
+ * reported it as a violation of the rule it exists to state. So this list applies to prose that
+ * AFFIRMS something about the work: `explanation`, `scopeNotice`, `doesNotCover`. It does NOT apply to
+ * `limitations`, which are denials by construction and are instead pinned by exact equality with the
+ * constant below - a strictly stronger check, because it fixes every sentence rather than merely the
+ * absence of seven words. This is RUNLOG lesson 52 recurring: when a property is about prose, assert the
+ * presence of the right sentence, not the absence of a wrong word.
+ *
+ * It also does not apply to field NAMES. `executed` is a required field of this contract, so any scan
+ * that reads raw JSON rather than the prose values will report the contract as breaking itself.
  */
 export const FORBIDDEN_PREVIEW_WORDS: readonly string[] = Object.freeze([
     "scheduled",
@@ -140,7 +155,7 @@ export const REQUIRED_PREVIEW_WORDS: readonly string[] = Object.freeze(["plan", 
  * caller reads the body, and a limitation nobody reads is a limitation nobody honours.
  */
 export const DUE_WORK_PREVIEW_LIMITATIONS: readonly string[] = Object.freeze([
-    "This is a plan, not an action. Nothing here has been sent, charged, dispatched or handed to any provider, and requesting it changed no data.",
+    "This preview is a plan, not an action. Nothing here has been sent, charged, dispatched or handed to any provider, and requesting it changed no data.",
     "Nothing runs on its own. There is no timer, interval, cron or background worker behind this surface - it produced this plan because somebody asked for it, and it will not produce another until somebody asks again.",
     "The ordering is a proposal. Overdue work precedes dated work precedes undated work, and every item carries the reason for its position, but nothing here knows your priorities.",
     "Coverage is inherited from the operations view and is not everything. Read covers and doesNotCover before treating the total as a total.",
