@@ -62,7 +62,15 @@ import { Skeleton } from "@/components/ui/skeleton"
  */
 type Keyed<T> = Readonly<{ key: string; value: T }>
 
-export function WorkspaceSurfacesPanel({ workspaceId }: { workspaceId: string }) {
+type WorkspaceSurfacesPanelProps = Readonly<{
+    workspaceId: string
+    request?: typeof workspaceSurfacesRequest
+}>
+
+export function WorkspaceSurfacesPanel({
+    workspaceId,
+    request = workspaceSurfacesRequest,
+}: WorkspaceSurfacesPanelProps) {
     const [loaded, setLoaded] = useState<Keyed<WorkspaceSurfaceResolution> | null>(null)
     const [failed, setFailed] = useState<Keyed<unknown> | null>(null)
 
@@ -72,8 +80,9 @@ export function WorkspaceSurfacesPanel({ workspaceId }: { workspaceId: string })
      * - reachable from elsewhere - which also sets state. A self-contained async closure is accepted
      * because the compiler can see the whole path in one place. No eslint-disable is used.
      *
-     * The effect depends on `workspaceId` alone, so switching workspaces re-runs it: the cleanup
-     * aborts the in-flight request for the OLD workspace before the new fetch starts.
+     * In production the effect re-runs when `workspaceId` changes; the default request function is stable.
+     * The optional request dependency is the zero-runtime-change seam used by the live race harness, so
+     * replacing that function in a mounted test also performs the same cleanup before the next fetch.
      */
     useEffect(() => {
         const controller = new AbortController()
@@ -87,7 +96,7 @@ export function WorkspaceSurfacesPanel({ workspaceId }: { workspaceId: string })
         let superseded = false
         const run = async () => {
             try {
-                const data = await workspaceSurfacesRequest<WorkspaceSurfaceResolution>(
+                const data = await request<WorkspaceSurfaceResolution>(
                     `/api/platform/workspaces/${encodeURIComponent(workspaceId)}/surfaces`,
                     { signal: controller.signal },
                 )
@@ -104,7 +113,7 @@ export function WorkspaceSurfacesPanel({ workspaceId }: { workspaceId: string })
             superseded = true
             controller.abort()
         }
-    }, [workspaceId])
+    }, [workspaceId, request])
 
     // Only this workspace's result counts. A value left over from a previous workspace is not this
     // one's answer, so the panel reads as loading rather than briefly showing the wrong workspace's
