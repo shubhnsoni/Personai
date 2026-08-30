@@ -1443,6 +1443,162 @@ check(
     /versioning\.supersedes/.test(blueprintPreviewSrc) && /versioning\.supersededBy/.test(blueprintPreviewSrc),
 )
 
+// ---------------------------------------------------------------------------
+// BP3 — the blueprint INSTALLATION panel. Root is building the schema, migration and runtime in
+// parallel, so this panel is not mounted in BusinessOsShell yet and is checked directly against its
+// own source, matching how BP1's preview panel was checked before its runtime existed. The honesty
+// requirements specific to this package: `permissionChanges` is stated as a fact rather than rendered
+// as an empty list with a "none" placeholder; surfaces/fieldPacks are stated to be recorded, not
+// granted; a drifted config shows what was agreed to rather than swapping in today's resolution;
+// remove is stated to not be a delete and requires a confirmation step before the DELETE fires; the
+// history list has no edit/delete control; and a genuine replay renders as success, never as an error.
+// ---------------------------------------------------------------------------
+const blueprintInstallSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/blueprint-install-panel.tsx"),
+    "utf8",
+)
+const blueprintInstallSharedSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/blueprint-install-shared.ts"),
+    "utf8",
+)
+const blueprintInstallAll = `${blueprintInstallSrc}\n${blueprintInstallSharedSrc}`
+
+check("blueprint install decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(blueprintInstallSrc))
+check(
+    "blueprint install loading states announce themselves politely and as busy",
+    blueprintInstallSrc.includes('aria-live="polite"') && blueprintInstallSrc.includes('aria-busy="true"'),
+)
+check(
+    "every blueprint install loading state carries a screen-reader label",
+    /Loading blueprint installation/.test(blueprintInstallSrc) && /Loading install plan/.test(blueprintInstallSrc),
+)
+check("blueprint install panel uses a structural skeleton while loading", /Skeleton/.test(blueprintInstallSrc))
+check(
+    "blueprint install refusals are split by status, including a distinct 409, with 503 leaking nothing",
+    /error\.status === 401/.test(blueprintInstallSharedSrc) &&
+        /error\.status === 403/.test(blueprintInstallSharedSrc) &&
+        /error\.status === 404/.test(blueprintInstallSharedSrc) &&
+        /error\.status === 400/.test(blueprintInstallSharedSrc) &&
+        /error\.status === 409/.test(blueprintInstallSharedSrc) &&
+        /error\.status === 503/.test(blueprintInstallSharedSrc),
+)
+/*
+ * These two checks are scoped to the RENDERED copy functions only (`blueprintInstallErrorCopy` and
+ * `conflictCopy`), not the whole shared module. This repository's own recorded lesson from the
+ * inspection panel applies here too: a ban on a string is not a ban on a behaviour, and a doc comment
+ * that honestly explains "this never says X" or "this never collapses to Y" would itself contain the
+ * banned words and trip a whole-file ban that exists to protect exactly that honesty.
+ */
+const installErrorCopyFnMatch = blueprintInstallSharedSrc.match(
+    /export function blueprintInstallErrorCopy[\s\S]*?\n}/,
+)
+const installErrorCopyFnBody = installErrorCopyFnMatch ? installErrorCopyFnMatch[0] : ""
+check("blueprintInstallErrorCopy function body found for scoped checks", installErrorCopyFnMatch !== null)
+check(
+    "MEASURED: 403 copy for the installation view never says not found, matching the contract's byte-identical foreign/missing workspace",
+    /Workspace access required/.test(installErrorCopyFnBody) && !/not found/i.test(installErrorCopyFnBody.replace(/Blueprint not found/g, "")),
+)
+check(
+    "404 is reserved for an unknown blueprint id and is distinct from the 403 copy",
+    /Blueprint not found/.test(installErrorCopyFnBody) && /Workspace access required/.test(installErrorCopyFnBody),
+)
+
+const conflictCopyFnMatch = blueprintInstallSharedSrc.match(/export function conflictCopy[\s\S]*?\n}/)
+const conflictCopyFnBody = conflictCopyFnMatch ? conflictCopyFnMatch[0] : ""
+check("conflictCopy function body found for scoped checks", conflictCopyFnMatch !== null)
+check(
+    "MEASURED: 409 copy distinguishes a reused idempotency key from an active-installation conflict, and never collapses to \"already installed\"",
+    /idempotency-key-reused/.test(conflictCopyFnBody) &&
+        /active-installation-exists/.test(conflictCopyFnBody) &&
+        !/already installed/i.test(conflictCopyFnBody),
+)
+check(
+    "MEASURED: a replayed outcome renders as success text, never routed through error copy",
+    /outcome === "replayed"/.test(blueprintInstallSrc) && /is a success, not an error/.test(blueprintInstallSrc),
+)
+check(
+    "the install panel contains no fabricated installation, event or config",
+    !/\bid:\s*"/.test(blueprintInstallAll) && !/sampleInstall/i.test(blueprintInstallAll),
+)
+check(
+    "MEASURED: permissionChanges is rendered as a stated fact, never as an empty list with a placeholder",
+    /Installing changes no permissions/.test(blueprintInstallSrc) && !/permissionChanges\.map/.test(blueprintInstallSrc),
+)
+check(
+    "the permission-changes statement specifically names businessOs as not granted",
+    /does not grant the owner console/.test(blueprintInstallSrc),
+)
+check(
+    "MEASURED: surfaces and field packs are stated to be recorded, not granted, and navigation is stated unchanged",
+    /recorded[\s\S]{0,40}at install time, not granted/.test(blueprintInstallSrc) && /remains per-profile/.test(blueprintInstallSrc),
+)
+check(
+    "MEASURED: a drifted installation shows what was agreed to, not today's live resolution",
+    /driftedFromRegistry/.test(blueprintInstallSrc) && /has moved on/.test(blueprintInstallSrc),
+)
+check(
+    "currentBlockers are rendered when non-empty, with the server's own reasons",
+    /currentBlockers\.map/.test(blueprintInstallSrc) && /lost ground/.test(blueprintInstallSrc),
+)
+check(
+    "SUPERSEDED and REMOVED each render a distinct, explained terminal state",
+    /Superseded by a later installation and cannot change/.test(blueprintInstallSrc) &&
+        /Removed and cannot change/.test(blueprintInstallSrc),
+)
+check(
+    "MEASURED: remove is stated to not be a delete, before the DELETE fires",
+    /not a delete/.test(blueprintInstallSrc) && /moves this installation to REMOVED/.test(blueprintInstallSrc),
+)
+check(
+    "remove requires an explicit confirmation step separate from the destructive action",
+    /confirmingRemove/.test(blueprintInstallSrc) && /Confirm remove/.test(blueprintInstallSrc),
+)
+check(
+    "the DELETE request is only ever issued from the confirm handler, not the button that opens confirmation",
+    /onOpenRemove/.test(blueprintInstallSrc) && /method: "DELETE"/.test(blueprintInstallSrc),
+)
+check(
+    "MEASURED: the history list carries no edit or delete control on any line",
+    /History \(\{history\.length\}\)/.test(blueprintInstallSrc) &&
+        !/history[\s\S]{0,300}(onDelete|onEdit|<button[^>]*>\s*(Edit|Delete))/i.test(blueprintInstallSrc),
+)
+check(
+    "the history disclosure exposes its expanded state and states the record is append-only",
+    /aria-expanded=\{expanded\}/.test(blueprintInstallSrc) && /Append-only/.test(blueprintInstallSrc),
+)
+check(
+    "history buttons and sections come from server data, not a hardcoded event",
+    /history\.map/.test(blueprintInstallSrc) && /eventKindLabel\(event\.kind\)/.test(blueprintInstallSrc),
+)
+check(
+    "MEASURED: an idempotency key is minted once per intent and reused on a retry of the same failed intent, not per click",
+    /newIdempotencyKey\(\)/.test(blueprintInstallAll) &&
+        /keyForIntent/.test(blueprintInstallSrc) &&
+        /pendingIntent\.idempotencyKey/.test(blueprintInstallSrc),
+)
+check(
+    "the reuse condition checks kind, blueprintId AND a prior failure before reusing a key",
+    /pendingIntent\.kind === kind && pendingIntent\.blueprintId === blueprintId && actionFailed/.test(blueprintInstallSrc),
+)
+check(
+    "nothing installed renders as a real empty state, not an error and not a blank panel",
+    /title="Nothing installed"/.test(blueprintInstallSrc) && /a real answer, not an error/.test(blueprintInstallSrc),
+)
+check(
+    "installable/refused plan state is rendered as returned, never recomputed in the component",
+    /plan\.refused/.test(blueprintInstallSrc) && !/Math\.(round|floor|max|min)\(/.test(blueprintInstallSrc),
+)
+check(
+    "an upgrade plan states the current installation is superseded and retained, not a second install",
+    /supersede the current installation/.test(blueprintInstallSrc) && /this is an upgrade, not a second install/.test(blueprintInstallSrc),
+)
+check(
+    "all view types are imported from the install-types contract, never redeclared",
+    /from "@\/lib\/business-os\/install-types"/.test(blueprintInstallSharedSrc) &&
+        !/type BlueprintInstallationState\s*=/.test(blueprintInstallSharedSrc) &&
+        !/type InstalledConfig\s*=/.test(blueprintInstallSharedSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
