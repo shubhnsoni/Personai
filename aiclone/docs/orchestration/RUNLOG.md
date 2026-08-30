@@ -4281,3 +4281,108 @@ Integrated: `f7008f8` (root, due-work contract as types), `be36ea7` (N1-A), `ed5
     workspace's stored value - the payload never renders, but the correct data is erased and the panel sits
     on its skeleton forever. The key gates stop the wrong data being shown; the write guard stops the right
     data being destroyed. One mutation removing all three would have proven only that the group matters.
+
+
+---
+
+# Waves N2-N4 - the run turned on its own evidence
+
+Root `claude-opus-5`, sole integration owner. Integrated: `b237cc1`, `424c85c`, `6d38f8a`, `558d877`,
+`fd3d8fc`, `792e0ee`, `7397919`, `1ca0505`. Thirteen commits total on the run, 29 files, +5900/-33.
+
+The features shipped - a due-work preview API and an owner panel for it - are not the important part of
+this wave. The important part is that four separate proofs, three of them already accepted and committed
+by root, turned out to assert less than they read. Each discovery made the next one findable, and the
+fourth produced a permanent control.
+
+59. **AN ASSERTION CAN BE INCAPABLE OF FAILING, AND `INVERT_ASSERTION=1` CANNOT TELL YOU.** This is the
+    most load-bearing lesson of the run, and it invalidates a reassurance this program has leaned on
+    fourteen times. `checkInvertible` inverts the EXPECTED VALUE, not the behaviour. A tautological
+    assertion flips to FAIL under inversion exactly like a genuine one, so a clean "N of N flipped" line
+    proves the inversion plumbing works and says NOTHING about whether the assertions can fail for real
+    reasons. Every one of the eight vacuous assertions found this wave survived inversion cleanly, and
+    two of the five worst were `checkInvertible` and therefore counted as falsifiable evidence in earlier
+    reports. Inversion is necessary and it is not sufficient; a MUTATION of the code under test is what
+    discriminates.
+
+60. **A PROOF CAN REST ON AN ABSENCE OF SIGNAL. ASK THE SYSTEM WHAT IT IS WAITING ON.** Both lock-necessity
+    harnesses concluded "the lock serialises them" from the observation that T2 *did not get anywhere*
+    within 300ms - while T1 was allowed 1500ms for the same work. That single observation is produced
+    identically by a row-lock wait, a connection-pool wait, a slow pre-transaction preamble, or event-loop
+    starvation, and nothing anywhere pinned `connection_limit`, so the effective pool was Prisma's
+    machine-dependent default: the same harness could have proved different things on different hardware.
+    Both now open a separate observer connection and read `pg_locks` / `pg_stat_activity` while T1 is
+    parked, requiring a POSITIVE reading - `lockWaiters=1`, `ungranted=1 (transactionid)`, `backends=3` -
+    and pin the pool so starvation is excluded by construction. With the lock removed: `lockWaiters=0` and
+    `after-values=3,3`, which is the lost update itself rather than an inference about one.
+
+61. **A HARNESS CAN GUARANTEE ITS OWN ASSERTION PASSES.** The due-work surface's strongest claim - that
+    requesting a preview does not even record that it was requested - counted rows before opening a
+    `$transaction`, ran every request inside it, and compared counts after the transaction was ROLLED
+    BACK. A write would have been erased before the comparison. The assertion could not have failed. It
+    now uses a committed fixture with explicit cleanup, and inserting one row inside the measured window
+    turns it red and names the table. Ask of any before/after assertion: what would have had to happen for
+    this to fail, and could the test setup itself have prevented it?
+
+62. **A MOCK THAT DIES BEFORE THE INJECTED FAILURE TESTS NOTHING.** The 503 leak test injected an error
+    carrying a fake DSN through `workspace.findUnique` and asserted seven fragments were absent from the
+    response. But the authorization chain calls `user.findUnique` then `membership.findUnique` first, and
+    those were undefined on the mock, so the call died as a TypeError three steps before the DSN-bearing
+    throw. Seven green assertions were checking that a TypeError contained no connection string. The mock
+    now satisfies the whole chain AND asserts its own precondition - `workspace lookups=1` - so a future
+    refactor of the tenancy chain cannot quietly return the test to vacuity. An injected-failure test needs
+    to prove the failure was injected.
+
+63. **THE SUBTLEST VACUITY IS AN EXPECTATION DERIVED FROM THE OBSERVATION.** Five harnesses contained
+    `const expected = called.status < 400 ? "data,ok" : "error,ok"` followed by an assertion on that
+    expectation. If a 403 regressed to a 200, the expectation flipped with it and the assertion still
+    passed. It looks like a table-driven test and it is a mirror. The expected value now comes from the
+    LABEL, which is a literal, and the status itself is asserted. Two sibling classes found alongside it:
+    `x === x` where the two sides were different names for the same expression, and a variable read as an
+    assertion operand whose only assignment sat behind a condition that is false on every passing run.
+
+64. **NECESSITY IS A PROPERTY OF THE DESIGN, NOT OF THE INVARIANT - AND IT DIFFERS BETWEEN TWO DOMAINS
+    THAT LOOK IDENTICAL.** Inventory's single `for update` in `lockItem()` IS individually necessary,
+    because `reserved` is written as an absolute value computed in JS; remove it and two transactions both
+    write 3 while `CHECK (reserved <= onHand)` accepts both. Change that write to a relative increment and
+    Postgres takes the row lock itself and the same CHECK rejects the second write - so the lock is
+    necessary given the design, not in principle. Retainers look like the same pattern and are not:
+    removing each of the four `for update` clauses ONE AT A TIME left the harness green at 90/90 every
+    time, and only removing all four turned it red. Retainer locks are JOINTLY necessary and INDIVIDUALLY
+    redundant. Both old assertion names implied per-lock necessity. Neither had tested it, because both
+    only ever mutated one lock or all of them.
+
+65. **`git checkout` IS NOT A BACKUP, AND ROOT LOST WORK PROVING IT.** During a mutation proof root ran
+    `git checkout -- <path>` on three files to restore them. On the two UNTRACKED new files it was a no-op
+    that printed `did not match any file(s) known to git`, so those mutations were never reverted and the
+    next mutation ran on top of them. On the TRACKED file it silently discarded root's uncommitted edits,
+    which had to be reconstructed from memory. Use a FILE COPY to back up before a mutation, restore from
+    the copy, and verify with a hash or an empty `git diff`. Commit before mutating, not after.
+
+66. **A NEW CONTROL MUST NOT BE RED ON ARRIVAL, OR IT BECOMES A DISABLED ONE.** The vacuity scanner found
+    47 `UNGUARDED_EVERY` instances alongside the 8 serious ones. Gating on all 55 would have made the
+    scanner fail from its first run, which - given this repository already shipped "a control wired to
+    nothing" once - would have ended as a skip entry or a deleted file within a week. It gates on the five
+    serious classes, which are now at zero, and PRINTS the 47 with a count so the debt is visible and
+    cannot quietly grow. The count is recorded in INTEGRATION_QUEUE as owed work rather than carried
+    silently.
+
+67. **`spawn_run` RAN NOTHING FOR AN HOUR AND `orchestrate_subagent` WORKED FIRST TIME.** Three N2 workers
+    were dispatched under a `parent_session UNRESOLVED` warning, showed `[running]` for 57 minutes, wrote
+    zero bytes, could not be steered (`session has not registered`), and the two that were abandoned later
+    resolved to `error: spawn rejected`. The one that eventually got a real slot also produced nothing.
+    Root stopped waiting, rebuilt both packages itself, and then tried a DIFFERENT mechanism:
+    `orchestrate_subagent`, whose stages run in parallel, delivered a working component, a working scanner
+    and two substantial adversarial audits. When a delegation mechanism produces nothing twice, the
+    mechanism is the suspect - change it rather than the prompt. And root's own lesson 55 held: silence is
+    not evidence of death, but forty minutes of zero bytes is evidence of no progress, and the work still
+    has to get done.
+
+68. **THE MOST VALUABLE SUBAGENT OUTPUT WAS AN ATTACK, NOT A BUILD.** Two of the three deliverables that
+    changed root's mind this wave were read-only adversarial reviews of code root had already written,
+    tested and committed. They found the rollback-guaranteed assertion, the mock that never reached its
+    throw, the contract file whose own forbidden-word list drifted from its own prose paragraph (missing
+    "running" and "will", while one of its own limitation sentences used "will"), and the GET-only regex
+    that missed the two export styles this repository uses 21 times. Root had reproduced, mutated and
+    gated all of it and still missed every one. Budget a reviewer whose job is to attack the work, not to
+    confirm it, and give it the specific instruction that agreement is worth little.

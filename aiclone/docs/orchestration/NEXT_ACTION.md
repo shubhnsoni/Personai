@@ -21,9 +21,25 @@ and described H1 as unstarted when it was complete.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`4c9cf31`** — measure, do not trust this line
+- Primary HEAD: **`1ca0505`** - measure, do not trust this line
 - Origin unchanged at `4b386d1d`; nothing pushed.
-- **The check sweep is now 68.**
+- **The check sweep is now 74 checks, FAILED 0** (68 at the start of the N-wave; only increased). Repo lint held at **43 problems (14 errors, 29 warnings)** at every commit.
+- **THE N-WAVE ANSWERED THE GREP IN THE LINE BELOW, AND THEN FOUND SOMETHING WORSE.**
+  `check-harness-exit-integrity.ts` audited all 69 harnesses for that frozen-verdict shape and found
+  **0 real defects** - the a11y case was the only instance, so the class was not systemic. But auditing
+  it exposed the deeper question, and the answer is the most important thing this run learned:
+
+  **`INVERT_ASSERTION=1` DOES NOT PROVE AN ASSERTION CAN FAIL.** It inverts the EXPECTED VALUE, so a
+  tautology flips to FAIL exactly like a genuine assertion. A clean "N of N flipped" line proves the
+  inversion plumbing works and nothing more. Eight assertions incapable of failing were found this wave
+  - two of them `checkInvertible`, all surviving inversion cleanly, all previously counted as evidence.
+  Only a MUTATION of the code under test discriminates. Do not quote a pre-`1ca0505` harness PASS as
+  evidence about the five gating vacuity classes.
+
+  Two controls now exist and both are in the sweep: `check-harness-exit-integrity.ts` (does a verdict
+  reach the exit code - 0 defects across 74) and `check-assertion-vacuity.ts` (can the assertion fail at
+  all - 0 in all five gating classes, plus **47 non-gating `UNGUARDED_EVERY` findings that are owed work,
+  not noise**). Read the comment at the vacuity scanner's exit decision before changing what gates.
 - **A HARNESS GATE DEFECT WAS FIXED AND IT INVALIDATES EARLIER EVIDENCE.** `check-business-os-a11y.ts`
   decided `process.exitCode` about 100 lines before the end of the file, so two appended sections were
   invisible in its output *and* non-fatal. Any "a11y PASS" recorded before `c614001` covered only the

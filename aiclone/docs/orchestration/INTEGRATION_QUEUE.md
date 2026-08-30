@@ -1461,3 +1461,75 @@ Live `personalink` untouched: 35 tables, `_prisma_migrations` absent, 0 wave tab
 rows. 24 guard and append-only triggers, 0 disabled. `origin/recovered/aug20-wt-pr-32` still
 `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. All six frozen `kirocrew/*` worktrees still at `ea69595`. The
 two preserved untracked paths still present and still untracked.
+
+
+---
+
+## Accepted - N2 to N4: the run turned on its own evidence
+
+Root: `claude-opus-5`, sole integration owner. This is the wave where the interesting
+finding was not a feature but the discovery that several of this repository's proofs - including three
+root had already accepted and committed - asserted less than they read.
+
+| Commit | What landed | Author |
+|---|---|---|
+| `b237cc1` | a11y pinned an effect's dependency array by exact text; narrowed to the property, not the text | root |
+| `424c85c` | the manually invoked due-work preview API, GET only by construction | root |
+| `6d38f8a` | one no-workspace message for commerce, COUNTED; DOM host extracted to `scripts/lib/` | root |
+| `558d877` | the inventory lock proof measured an absence, and one conjunct measured nothing | root |
+| `fd3d8fc` | the due-work harness proved less than it claimed, in three places | root |
+| `792e0ee` | the owner-facing Due Work panel, wired into the shell | N3-A subagent + root |
+| `7397919` | five audit findings closed on the due-work surface | N4B subagent + root |
+| `1ca0505` | AST scanner for assertions that cannot fail, and the eight it found | N4A subagent + root |
+
+### The through-line: four proofs that could not fail
+
+Found in this order, each one making the next one findable.
+
+1. **A vacuous conjunct in an accepted commit.** `be36ea7`'s inventory lock proof ended in
+   `... && !t2SettledBeforeRelease`, where that variable was assigned only inside
+   `if (secondPrewriteBeforeRelease)` - false on every passing run. It held its initialiser and asserted
+   nothing, on every green run it ever had. Root had integrated that commit after independently
+   reproducing its numbers, and the numbers were right; the proof was weaker than it read.
+2. **The same proof rested on an absence of signal.** Its evidence was "T2 did not get to its prewrite
+   point in 300ms", with T1 allowed 1500ms for the same work, and nothing anywhere pinned
+   `connection_limit` - so the effective pool was Prisma's machine-dependent default and the same
+   harness could prove different things on different hardware. Both harnesses now ask Postgres what T2
+   is waiting ON, through a separate observer connection: `lockWaiters=1`, `ungranted=1 (transactionid)`,
+   `backends=3`. Removing the lock gives `lockWaiters=0` and `after-values=3,3` - the lost update itself.
+3. **The due-work no-write claim was guaranteed to pass by its own harness.** Counts were taken before a
+   `$transaction` that ended in a rollback, so a write would have been erased before the comparison. It
+   now uses a committed fixture; inserting one row inside the measured window turns it red and names the
+   table. The DSN-leak test never produced a DSN either - the mock died as a TypeError three calls before
+   the throw - and now asserts `workspace lookups=1` as its own precondition.
+4. **So root built the scanner.** `check-assertion-vacuity.ts` over 3092 assertion calls in 74 harnesses
+   found eight more of the serious kind, including the identical conjunct defect in
+   `check-retainer-runtime.ts:478` - the harness proving retainer lock necessity - two `x === x` JSON
+   comparisons, and five envelope loops that derived their expected value from the observed status, so a
+   403 regressing to a 200 flipped the expectation with it and still passed. Two of those five were
+   `checkInvertible` and therefore counted as falsifiable evidence.
+
+### A claim narrowed, and a claim corrected
+
+**Inventory:** the lock is load-bearing GIVEN THE ABSOLUTE WRITE. `reserved` is computed in JS as
+`locked.reserved + qty`, so two unserialised transactions both write 3 and `CHECK (reserved <= onHand)`
+accepts both. A relative write would let Postgres take the row lock itself and that same CHECK would
+reject the second write. Necessary given this design, not in principle.
+
+**Retainers:** removing each of the four `for update` clauses in `retainers.ts` ONE AT A TIME left the
+harness green at 90/90 every time. Removing all four turns it red, `used` going 0->3 instead of 0->8. The
+retainer locks are **jointly necessary and individually redundant** - a different situation from
+inventory, and the opposite of what the old assertion name implied.
+
+### Next in queue - this table supersedes every earlier one
+
+| Pkg | Scope | State |
+|---|---|---|
+| 47 `UNGUARDED_EVERY` assertions | across the harness suite | **Owed, and now counted.** An `arr.every(...)` with nothing pinning the array's length passes on an empty array. 9 are mitigated by a sibling assertion; 38 are not. Deliberately non-gating so the new scanner is not red on arrival - see the comment at its exit decision. Clearing them is mechanical and should be one package. |
+| 22 `UNRESOLVED` vacuity findings | same | **Owed.** Each carries per-item reasoning. 15 are `every()` over imported constants where emptiness is decided in another module; 5 bracket a call whose purity only the runtime settles. |
+| 405 instead of 400 on the due-work method guard | `PersistenceErrorCode`, shared | **Owed and deliberate.** `preview` refuses a non-GET with 400 because the shared error union has no 405 and hand-building a Response would break the envelope property. A real 405 needs `METHOD_NOT_ALLOWED` in that shared union plus an `Allow` header - a platform-wide change, and root did not take it unilaterally at this hour. |
+| Determinism of item ORDER | `operations/engine.ts` | **Owed.** Seven of nine domain queries have no unique tiebreak, and the inventory query is an unbounded `findMany` sliced in TypeScript. Two requests can legitimately return a different item order, or a different SET of items where many tie. The harness's determinism assertion is honest for its fixture and should not be quoted more broadly. |
+| Engine-owned text says "scheduled" | `engine.ts:294`, `needs-action.ts:187-188` | **Owed, and the honest gap in the due-work work.** `"scheduled visit"` and `"Renewal is scheduled for..."` are engine-authored templates, copied verbatim by the API and the panel. The contract's own worked example warns about exactly this sentence. The panel's wording claim is a subset relation - it adds no forbidden word of its own - not an absence. |
+| 503 log may contain a DSN | `due-work-http.ts` | **Known tradeoff, recorded.** Server-side detail, client-side silence. The client body is still asserted leak-free on seven fragments. |
+| P1-009 slice 6 | repo-wide lint | Still a refusal. |
+| G2 / P1-007 | providers / live cutover | Still **owner-gated**. |
