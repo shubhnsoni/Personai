@@ -45,17 +45,22 @@ export function json(data: unknown, status = 200): Response {
 export function success(data: unknown, status = 200): Response {
     return json({ ok: true, data }, status)
 }
-export function failure(error: unknown): Response {
+/**
+ * The 503 message names a SURFACE, so it is a parameter with the fieldJobs default rather than a
+ * hardcoded string. The operations view reuses this helper for its envelope and status map - which is
+ * the right reuse - and without this parameter its dependency failure told the caller that FIELD JOBS
+ * were unavailable. An accurate envelope carrying an inaccurate sentence is still wrong.
+ *
+ * Defaulted rather than required, so every existing call site keeps its exact current behaviour.
+ */
+export function failure(error: unknown, unavailableMessage = "Field jobs are temporarily unavailable"): Response {
     if (error instanceof PersistenceError) {
         return json(
             { ok: false, error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) } },
             error.status,
         )
     }
-    return json(
-        { ok: false, error: { code: "DEPENDENCY_UNAVAILABLE", message: "Field jobs are temporarily unavailable" } },
-        503,
-    )
+    return json({ ok: false, error: { code: "DEPENDENCY_UNAVAILABLE", message: unavailableMessage } }, 503)
 }
 
 export async function body(request: Request): Promise<JsonObject> {

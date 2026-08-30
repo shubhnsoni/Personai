@@ -53,6 +53,6 @@ export class OperationsApiService {
                     mixedScope: summary.mixedScope,
                 })
             })
-            .catch(failure)
+            .catch((error: unknown) => failure(error, "Operations are temporarily unavailable"))
     }
 }
