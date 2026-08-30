@@ -22,7 +22,15 @@
  *   refuse BYTE-IDENTICALLY, and the 503 leaks no DSN and names THIS surface rather than the one whose
  *   envelope helper it reuses;
  *   NEITHER THE CLIENT NOR THE SERVER LOG leaks the injected secret - the log assertions are new, and they
- *   are the ones that were failing: the body was always clean while the log printed the whole DSN.
+ *   are the ones that were failing: the body was always clean while the log printed the whole DSN. A
+ *   SECOND log probe covers the two defects the first one structurally cannot reach: a wrapped error whose
+ *   real failure is in `cause` (logged as kind and code only, never a message, at any depth), and a frame
+ *   redactor that used to destroy the file, line and column it exists to preserve.
+ *
+ * THE DETECTOR'S BOUNDARY IS MEASURED HERE TOO, not assumed. All fourteen original injection classes were
+ * shapes the detector already recognises, so catching all fourteen was evidence about its positives only.
+ * Two classes are now declared KNOWN GAPS and asserted as MISSES - each proving the mutation really
+ * happened before accepting "not caught", and each failing the day the gap closes.
  *
  * TWO SHARED FILES ARE NOW EXERCISED FROM HERE ON PURPOSE. Reaching a correct 405 required widening
  * `PersistenceErrorCode` in src/lib/persistence/errors.ts and giving `json`/`failure` in
@@ -1001,6 +1009,228 @@ async function main() {
             `keys=${Object.keys(broken.body).sort().join(",")}`,
         )
 
+        // ---- THE SECOND LOG PROBE: THE CAUSE CHAIN, AND THE FRAME REDACTOR ------
+        //
+        // The probe above throws a plain Error whose own message carries the secret, which is the shape
+        // the log was originally fixed for. It cannot exercise either of the two defects an adversarial
+        // review then found, so this second probe exists for exactly those, and it is a separate capture so
+        // that nothing here can move an assertion above.
+        //
+        // DEFECT ONE: THE LOG READ ONLY THE TOP-LEVEL ERROR. `undici` - the fetch implementation Node
+        // ships - raises `TypeError: fetch failed` and puts the real failure in `cause`. So a refused
+        // connection was logged as `kind: "TypeError", code: null`, next to prose telling the reader that a
+        // TypeError is a defect and that retrying cannot help. The log inverted its own purpose: it
+        // presented an outage as a bug, and it did so confidently. `AggregateError` failed the same way by
+        // a different route - its `code` is unset and every real error sits in `.errors`, which nothing
+        // read. The chain is now walked, and each link contributes KIND AND CODE ONLY, through the same two
+        // allowlist functions as the top-level error.
+        //
+        // DEFECT TWO: THE REDACTOR DESTROYED THE EVIDENCE. It replaced any `scheme://` span up to the next
+        // whitespace with one marker, and an ESM frame IS such a span - `at f (file:///C:/app/x.js:10:5)` -
+        // so file, line and column, the three things a stack frame is logged for, went together. A `?`
+        // anywhere on the line cost the position too. It is now narrowed to the AUTHORITY.
+        //
+        // The error below is built to be hostile on every axis at once: a wrapped cause carrying a real
+        // driver code, an AggregateError branch, a BARE STRING cause holding a whole DSN, a cause whose
+        // `code` is itself a DSN, a cycle back to the root, a MULTI-LINE message whose continuation line
+        // begins with "at " so it would be mistaken for a frame, and a stack whose frames are the four
+        // shapes the redactor has to tell apart. Each marker is unique, so any leak is attributable.
+        const probeAuthority = `${["svcuser", "hunter2"].join(":")}@${["dbhost.internal", "5432"].join(":")}`
+        // Assembled from parts on purpose: no line of this file is itself a complete connection string,
+        // and the run's own logs therefore cannot be made to contain one by quoting this source.
+        const probeDsn = `postgres://${probeAuthority}/appdb?sslmode=require`
+        const CAUSE_MESSAGE_MARKER = "CAUSEMESSAGE_MUST_NOT_APPEAR"
+        const STRING_CAUSE_MARKER = "STRINGCAUSE_MUST_NOT_APPEAR"
+        const CONTINUATION_MARKER = "MESSAGECONTINUATION_MUST_NOT_APPEAR"
+        const HOSTILE_CODE = `postgres://${probeAuthority}/appdb`
+
+        const deepest = Object.assign(new Error(`${CAUSE_MESSAGE_MARKER} inner ${probeDsn}`), { code: "ENOTFOUND" })
+        const hostileCoded = Object.assign(new Error("nothing useful here"), { code: HOSTILE_CODE })
+        const aggregate = new AggregateError(
+            [deepest, hostileCoded, `${STRING_CAUSE_MARKER} ${probeDsn}`],
+            "every attempt failed",
+        )
+        const driverCause = Object.assign(new Error(`${CAUSE_MESSAGE_MARKER} outer ${probeDsn}`), {
+            code: "ECONNREFUSED",
+            cause: aggregate,
+        })
+        // A multi-line message with an "at "-prefixed continuation. V8's stack header is `Name: message`,
+        // so lines 2..k of this message sit in `error.stack` and face the same frame test as a real frame.
+        const wrappedMessage = `fetch failed\n    at ${CONTINUATION_MARKER} (/tmp/pretend.js:1:1)`
+        const wrapped = Object.assign(new TypeError(wrappedMessage), { cause: driverCause })
+        // The cycle: the deepest link points back at the root. Legal, and it makes an unguarded walk
+        // recurse until the stack dies while answering a 503.
+        Object.assign(deepest, { cause: wrapped })
+        // The stack is set explicitly because a real ts-node stack contains no URI at all, and the
+        // redactor's whole job is what it does to one. Four frames, four different answers required:
+        // an ESM file URI, a bundler query string, a DSN, and a plain Windows path.
+        wrapped.stack =
+            `TypeError: ${wrappedMessage}\n` +
+            `    at composePreview (file:///C:/probe/app/src/lib/x.js:10:5)\n` +
+            `    at bundled (file:///C:/probe/app/y.js?v=abc123:20:7)\n` +
+            `    at driverConnect (${probeDsn})\n` +
+            `    at last (C:\\probe\\app\\z.ts:33:11)`
+
+        const causeProbe = { workspaceLookups: 0 }
+        const causePrisma = {
+            user: { findUnique: async () => ({ id: `${RUN}_cause_user` }) },
+            membership: {
+                findUnique: async () => ({
+                    id: `${RUN}_cause_member`,
+                    role: "OWNER",
+                    membershipLocations: [] as Array<{ locationId: string }>,
+                }),
+            },
+            workspace: {
+                findUnique: async () => {
+                    causeProbe.workspaceLookups += 1
+                    throw wrapped
+                },
+            },
+        } as unknown as PrismaClient
+        const causeIdentity = new ControlledIdentity()
+        causeIdentity.current = "clerk_whoever"
+        const causeApi = new DueWorkApiService(
+            new OperationsService(new OperationsContext(causePrisma, new PersistedTenancy(causePrisma, causeIdentity))),
+        )
+        const causeLines: string[] = []
+        const realErrorForCauseProbe = console.error
+        console.error = (...args: unknown[]): void => {
+            causeLines.push(args.map((a) => (typeof a === "string" ? a : inspect(a, { depth: 8 }))).join(" "))
+        }
+        let causeCaptured: Called | null = null
+        try {
+            causeCaptured = await call(causeApi.preview(get(`${BASE}?workspaceId=whatever`)))
+        } finally {
+            console.error = realErrorForCauseProbe
+        }
+        if (causeCaptured === null) {
+            throw new Error("ABORT: the cause-chain probe produced no response at all")
+        }
+        const causeLog = causeLines.join("\n")
+        const causeSurfaceLogs = causeLines.filter((line) => line.includes("[operations/due-work]"))
+
+        /** The JSON half of the log line, parsed so the assertions are about FIELDS rather than substrings. */
+        type LoggedCauseLine = Readonly<{ via?: unknown; kind?: unknown; code?: unknown }>
+        const loggedPayload = (): Record<string, unknown> | null => {
+            const line = causeSurfaceLogs[0] ?? ""
+            const at = line.indexOf('{"kind"')
+            if (at < 0) return null
+            try {
+                const parsed: unknown = JSON.parse(line.slice(at))
+                return parsed !== null && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null
+            } catch {
+                return null
+            }
+        }
+        const payload = loggedPayload()
+        const loggedCauses: readonly LoggedCauseLine[] = Array.isArray(payload?.causes)
+            ? (payload?.causes as LoggedCauseLine[])
+            : []
+        const causeAt = (via: string): LoggedCauseLine | undefined => loggedCauses.find((c) => c.via === via)
+        const loggedFrames: readonly string[] = Array.isArray(payload?.frames)
+            ? (payload?.frames as unknown[]).map((f) => String(f))
+            : []
+        const framesText = loggedFrames.join(" | ")
+
+        // The precondition, in the same shape as the first probe's: the throw has to have been reached and
+        // the log has to have run, or every "leaks no X" assertion below is satisfied by an empty string.
+        checkInvertible(
+            "MEASURED: the cause-chain probe reached the throw, logged exactly once, and the log line parsed - so the field assertions below are reading a real payload rather than nothing",
+            causeProbe.workspaceLookups === 1 &&
+                causeSurfaceLogs.length === 1 &&
+                payload !== null &&
+                loggedFrames.length === 4,
+            `lookups=${causeProbe.workspaceLookups} surface lines=${causeSurfaceLogs.length} payload=${payload === null ? "unparsed" : "parsed"} frames=${loggedFrames.length}`,
+        )
+        // ---- TASK: the cause's KIND and CODE reach the log ---------------------
+        checkInvertible(
+            "MEASURED: the log reads through `cause`, so a wrapped driver failure is no longer reported as a bare TypeError - the top level is TypeError with no code, and the cause carries the real ECONNREFUSED",
+            payload?.kind === "TypeError" &&
+                payload?.code === null &&
+                causeAt("cause")?.kind === "Error" &&
+                causeAt("cause")?.code === "ECONNREFUSED",
+            `top kind=${String(payload?.kind)} code=${JSON.stringify(payload?.code)}; cause kind=${String(causeAt("cause")?.kind)} code=${JSON.stringify(causeAt("cause")?.code)}`,
+        )
+        checkInvertible(
+            "MEASURED: an AggregateError's `.errors` are read too - its own code is unset, so its branches ARE the diagnosis, and the ENOTFOUND inside one of them reaches the operator",
+            causeAt("cause.cause")?.kind === "AggregateError" &&
+                causeAt("cause.cause.errors[0]")?.code === "ENOTFOUND",
+            `aggregate kind=${String(causeAt("cause.cause")?.kind)}; branch codes=[${loggedCauses.map((c) => JSON.stringify(c.code)).join(",")}]`,
+        )
+        checkInvertible(
+            "MEASURED: the walk is BOUNDED and survives a cycle - the deepest link points back at the root error and the chain still terminates, at exactly the five links this error has and no sixth",
+            loggedCauses.length === 5 &&
+                loggedCauses.map((c) => String(c.via)).join(",") ===
+                    "cause,cause.cause,cause.cause.errors[0],cause.cause.errors[1],cause.cause.errors[2]",
+            `${loggedCauses.length} links: [${loggedCauses.map((c) => String(c.via)).join(",")}]`,
+        )
+        // ---- and the allowlist is NOT weakened to get them ---------------------
+        checkInvertible(
+            "MEASURED: a cause's MESSAGE cannot reach the log at any depth - neither the wrapped cause's, nor the one inside the AggregateError, nor the DSN either of them carries",
+            !causeLog.includes(CAUSE_MESSAGE_MARKER) && !causeLog.includes(STRING_CAUSE_MARKER),
+            `outer cause marker present=${causeLog.includes(CAUSE_MESSAGE_MARKER)}, string-cause marker present=${causeLog.includes(STRING_CAUSE_MARKER)}`,
+        )
+        checkInvertible(
+            "MEASURED: a cause that IS a bare string - what `new Error(m, { cause: connectionString })` produces - is logged as its TYPE and nothing else, so its content has no path into the log",
+            causeAt("cause.cause.errors[2]")?.kind === "string" && causeAt("cause.cause.errors[2]")?.code === null,
+            `string cause logged as kind=${String(causeAt("cause.cause.errors[2]")?.kind)} code=${JSON.stringify(causeAt("cause.cause.errors[2]")?.code)}`,
+        )
+        checkInvertible(
+            "MEASURED: a cause whose `code` is itself a connection string is REFUSED by the same allowlist as the top-level code - reading the chain did not buy the chain an exemption",
+            causeAt("cause.cause.errors[1]")?.code === null &&
+                !causeLog.includes("dbhost.internal") &&
+                loggedCauses.every(
+                    (c) => c.code === null || /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(String(c.code)),
+                ),
+            `hostile code logged as ${JSON.stringify(causeAt("cause.cause.errors[1]")?.code)}; every logged code matches the bare-token pattern`,
+        )
+        checkInvertible(
+            "MEASURED: the multi-line message's `at `-prefixed continuation line does NOT become a frame - the stack header is cut by the message's own extent, not by dropping line one",
+            !causeLog.includes(CONTINUATION_MARKER) && payload?.messageHeaderCut === true,
+            `continuation marker present=${causeLog.includes(CONTINUATION_MARKER)} headerCut=${String(payload?.messageHeaderCut)}`,
+        )
+        // ---- TASK: the redactor keeps the evidence and drops the authority -----
+        checkInvertible(
+            "MEASURED: an ESM `file://` frame keeps its PATH, LINE and COLUMN - the three things this log exists to carry, and the three the old blunt rule replaced with a single marker",
+            framesText.includes("/C:/probe/app/src/lib/x.js:10:5"),
+            framesText.slice(0, 150),
+        )
+        checkInvertible(
+            "MEASURED: a bundler query string is dropped WITHOUT taking the line and column with it - the old rule ate to the next whitespace, so a cache-buster cost the position",
+            framesText.includes("y.js<redacted-query>:20:7"),
+            framesText.slice(0, 200),
+        )
+        checkInvertible(
+            "MEASURED: a DSN in a frame loses its whole AUTHORITY - userinfo, host and port - while the path tail survives, which is the narrowing: credentials live in the authority, evidence lives in the path",
+            framesText.includes("<redacted-authority>") &&
+                framesText.includes("/appdb") &&
+                !causeLog.includes("svcuser") &&
+                !causeLog.includes("hunter2") &&
+                !causeLog.includes("dbhost.internal") &&
+                !causeLog.includes("5432") &&
+                !causeLog.includes("sslmode"),
+            `authority marker present=${framesText.includes("<redacted-authority>")}, path tail kept=${framesText.includes("/appdb")}`,
+        )
+        checkInvertible(
+            "MEASURED: a plain filesystem frame with no URI in it is passed through untouched, so the redactor costs nothing on the frames that make up a real stack",
+            framesText.includes("z.ts:33:11"),
+            framesText.slice(-90),
+        )
+        checkInvertible(
+            "MEASURED: no complete URI survives in the log even in redacted form - the authority marker replaces the `//` as well, so this log cannot carry a connection string of any shape",
+            !/[a-z][a-z0-9+.-]*:\/\//i.test(causeLog) && !/(password|passwd|secret|token|apikey|api_key)\s*[:=]/i.test(causeLog),
+            "no scheme:// and no credential-shaped assignment in the cause-probe log",
+        )
+        checkInvertible(
+            "MEASURED: the cause-chain probe still answered a leak-free 503 to the client, so none of the above was bought at the boundary's expense",
+            causeCaptured.status === 503 &&
+                errCode(causeCaptured) === "DEPENDENCY_UNAVAILABLE" &&
+                !causeCaptured.raw.includes(CAUSE_MESSAGE_MARKER) &&
+                !causeCaptured.raw.includes("dbhost.internal"),
+            `status=${causeCaptured.status} code=${errCode(causeCaptured)}`,
+        )
+
         // ---- THE NO-WRITE CLAIM, PROVEN BY TWO INDEPENDENT MECHANISMS ----------
         //
         // THE COUNT VERSION OF THIS PROVED LESS THAN ITS NAME. Two defects, one fixed before and one
@@ -1040,10 +1270,23 @@ async function main() {
         //
         // Set WRITE_DETECTOR_INJECT=<class> to inject one mutation class into the measured window and
         // observe the detector go red naming it. Recognised classes are listed in INJECTABLE below.
+        //
+        // "14 OF 14 CAUGHT" WAS EVIDENCE ABOUT THE POSITIVES AND NOTHING ELSE, which is the finding that
+        // changed this block. Every one of the original fourteen was drawn from a shape the detector
+        // already recognises, so a green sweep of all fourteen measured how well it does the thing it was
+        // built to do and said nothing about WHERE IT STOPS. A detector's boundary is a property of the
+        // detector, and an unmeasured boundary gets quoted as if it were zero.
+        //
+        // So two of the classes below are declared KNOWN GAPS: shapes this detector is expected to MISS,
+        // asserted as misses. Each one is asserted twice over - that the mutation genuinely happened, and
+        // that no mechanism reported it - so it cannot pass by failing to inject. And each is written to
+        // FAIL THE DAY THE GAP CLOSES: if a future widening catches one, the assertion goes red and the
+        // harness says the detector got better, instead of carrying a stale claim about its limits.
         const INJECT = process.env.WRITE_DETECTOR_INJECT ?? ""
         const INJECTABLE = Object.freeze([
             "create",
             "createMany",
+            "createManyAndReturn",
             "update",
             "updateMany",
             "delete",
@@ -1056,7 +1299,23 @@ async function main() {
             "insertThenDelete",
             "bypassUpdate",
             "sequenceAdvance",
+            "gapBypassUnlistedTable",
+            "gapBypassSessionState",
         ])
+        /** The two classes above that are asserted as MISSES rather than as catches. */
+        const KNOWN_GAP_CLASSES: readonly string[] = Object.freeze(["gapBypassUnlistedTable", "gapBypassSessionState"])
+        /**
+         * The unlisted table for the first known gap: absent from every fingerprint spec, and chosen by
+         * measurement rather than by guess - `AdminSettings` is `id`/`key`/`value`, carries no foreign key
+         * and no trigger of any kind, so a probe row goes in and comes out cleanly. Its id deliberately
+         * does NOT contain the run token, because a row the token sweep could find would not be the shape
+         * under test.
+         */
+        const GAP_TABLE = "AdminSettings"
+        const GAP_ROW_ID = "wd-gap-probe-unlisted-row"
+        /** Two-int advisory lock key for the second known gap, so `pg_locks` can be queried unambiguously. */
+        const GAP_LOCK_CLASS = 4820
+        const GAP_LOCK_OBJECT = 26831
         if (INJECT !== "" && !INJECTABLE.includes(INJECT)) {
             throw new Error(`WRITE_DETECTOR_INJECT=${INJECT} is not a recognised class: ${INJECTABLE.join(", ")}`)
         }
@@ -1067,13 +1326,42 @@ async function main() {
         // variable, so on a normal run nothing would exercise the classification table at all. These
         // assertions run every time and are the reason a normal green run is evidence that the
         // detector can still tell a write from a read.
-        for (const verb of ["create", "createMany", "update", "updateMany", "delete", "deleteMany", "upsert"] as const) {
+        for (const verb of [
+            "create",
+            "createMany",
+            "createManyAndReturn",
+            "update",
+            "updateMany",
+            "updateManyAndReturn",
+            "delete",
+            "deleteMany",
+            "upsert",
+        ] as const) {
             checkInvertible(
                 `MEASURED: the write detector classifies the model action "${verb}" as a write`,
                 classifyModelCall(verb) === verb,
                 `${verb} -> ${String(classifyModelCall(verb))}`,
             )
         }
+        // THE TWO `AndReturn` VERBS WERE IN THE CLASSIFICATION TABLE AND IN NOTHING ELSE, and that is the
+        // gap this probe closes. `MODEL_WRITE_OPERATIONS` has held both since it was written, but neither
+        // appeared in INJECTABLE, so "14 of 14 injection classes caught" said nothing about them: two
+        // recognised write classes had never been driven through the interceptor at all.
+        //
+        // Only ONE of them can be. `createManyAndReturn` exists on this client and now has a real
+        // injection. `updateManyAndReturn` arrived in Prisma 6.2 and this project is on 5.22, so no call
+        // through the client can produce that operation name and an injection for it would be a TypeError
+        // rather than evidence. That is a measured fact rather than an assumption, so it is measured here
+        // - and phrased so it goes RED on the Prisma upgrade that makes the injection possible, which is
+        // the moment someone needs to be told to add it.
+        const userDelegate = prisma.user as unknown as Record<string, unknown>
+        const hasCreateManyAndReturn = typeof userDelegate.createManyAndReturn === "function"
+        const hasUpdateManyAndReturn = typeof userDelegate.updateManyAndReturn === "function"
+        checkInvertible(
+            "MEASURED: this client exposes createManyAndReturn - so that class is injected for real below - and exposes NO updateManyAndReturn, which is the only reason that class is proven by classification alone. FAILS on the Prisma upgrade that adds it, and the injection must be written then",
+            hasCreateManyAndReturn && !hasUpdateManyAndReturn,
+            `createManyAndReturn on the client=${hasCreateManyAndReturn}, updateManyAndReturn on the client=${hasUpdateManyAndReturn} (@prisma/client 5.x; updateManyAndReturn is 6.2+)`,
+        )
         for (const verb of ["findMany", "findUnique", "findFirst", "count", "aggregate", "groupBy"] as const) {
             checkInvertible(
                 `MEASURED: the write detector classifies the read action "${verb}" as a read, so it is not simply calling everything a write`,
@@ -1184,6 +1472,12 @@ async function main() {
                 case "createMany":
                     await w.user.createMany({ data: [newUser(injUser), newUser(injUser2)] })
                     break
+                case "createManyAndReturn":
+                    // In MODEL_WRITE_OPERATIONS since that map was written and never once driven through
+                    // the interceptor until now. Same table and same rows as `createMany`; the only thing
+                    // under test is whether the operation NAME is classified.
+                    await w.user.createManyAndReturn({ data: [newUser(injUser), newUser(injUser2)] })
+                    break
                 case "update":
                     await w.fieldJob.update({ where: { id: COMMITTED.job }, data: { title: "INJECTED UPDATE" } })
                     break
@@ -1238,6 +1532,36 @@ async function main() {
                 case "sequenceAdvance":
                     // No row anywhere changes. A row count cannot see this by construction.
                     await bypass.$queryRawUnsafe(`select nextval('"${injectedSequence ?? ""}"') as v`)
+                    break
+                // ---- the two KNOWN GAPS, injected so the boundary is measured -----
+                case "gapBypassUnlistedTable":
+                    // EXPECTED TO BE MISSED, and the three reasons are independent. It is issued on a
+                    // third connection, so call interception cannot see it. Its table is in none of the
+                    // fingerprint specs, so no digest covers it. And its row contains no run token, so the
+                    // sweep that asks the global question cannot match it. `bypassUpdate` above is caught
+                    // because it lands in a FINGERPRINTED table; the only thing changed here is the table,
+                    // which is precisely the axis nobody had measured.
+                    await bypass.$executeRawUnsafe(
+                        `insert into "${GAP_TABLE}" ("id","key","value") values ('${GAP_ROW_ID}','${GAP_ROW_ID}','{}')`,
+                    )
+                    break
+                case "gapBypassSessionState":
+                    // ALSO EXPECTED TO BE MISSED, and deliberately NOT the shape that HEAD's widening of
+                    // RAW_WRITE_PATTERN now catches. That widening made `set role`, `set session`,
+                    // `pg_advisory_lock` and `lock table` classify as writes - but classification only runs
+                    // on statements issued THROUGH the instrumented client. Issued on a third connection
+                    // the same statements are seen by nothing, and neither a content digest nor a sequence
+                    // read can see a lock or a session GUC, because neither is row state. So the widening
+                    // closed the classification half and left this half open, and this is the half.
+                    // `pg_try_advisory_lock` rather than `pg_advisory_lock`, and the reason is mechanical:
+                    // the blocking form returns `void`, which this Prisma refuses to deserialize (P2010),
+                    // so the probe died before it proved anything. The try form returns a boolean, which
+                    // makes the acquisition itself observable - and it is matched by the same
+                    // RAW_WRITE_PATTERN alternative, so nothing about the classification claim changes.
+                    await bypass.$queryRawUnsafe(
+                        `select pg_try_advisory_lock(${GAP_LOCK_CLASS}, ${GAP_LOCK_OBJECT}) as locked`,
+                    )
+                    await bypass.$executeRawUnsafe(`set statement_timeout = '9s'`)
                     break
                 default:
                     break
@@ -1337,6 +1661,58 @@ async function main() {
                     : attributable.map((d) => `${d.name} ${d.before}->${d.after}`).join(" ; "),
             )
 
+            // ---- WHERE THE DETECTOR STOPS, asserted as gaps -------------------
+            //
+            // Everything above says what the detector CAUGHT. These say what it does not, and they are
+            // written as assertions rather than as prose for one reason: prose about a limitation rots
+            // silently, and an assertion about a limitation goes RED when the limitation is fixed.
+            //
+            // `caughtSignals` is the union of every signal this harness actually asserts on, so a gap
+            // claim is made against the whole detector rather than against one mechanism. A gap assertion
+            // needs BOTH halves to be true: nothing was caught, AND the mutation demonstrably happened. The
+            // second half is not a formality - without it, an injection that silently failed to run would
+            // satisfy "nothing was caught" perfectly, which is the same vacuity this repository audits for
+            // wearing the opposite sign.
+            const caughtSignals: string[] = []
+            if (verdict.writes.length > 0) caughtSignals.push(`interception[${verdict.classes.join(",")}]`)
+            if (tableDiffs.length > 0) caughtSignals.push(`fingerprint[${tableDiffs.map((d) => `${d.name}.${d.component}`).join(",")}]`)
+            if (unexpectedTokenTables.length > 0) caughtSignals.push(`token[${unexpectedTokenTables.map((h) => h.table).join(",")}]`)
+            if (attributable.length > 0) caughtSignals.push(`sequence[${attributable.map((d) => d.name).join(",")}]`)
+
+            if (INJECT === "gapBypassUnlistedTable") {
+                const landed = (await bypass.$queryRawUnsafe(
+                    `select count(*)::text as n from "${GAP_TABLE}" where "id" = '${GAP_ROW_ID}'`,
+                )) as Array<{ n: string }>
+                const rowsWritten = Number(landed[0].n)
+                checkInvertible(
+                    "KNOWN GAP, ASSERTED AS A GAP: a row inserted on a THIRD connection into a table absent from the fingerprint spec, carrying no run token, is caught by NEITHER mechanism - interception sees only our client, no digest covers that table, and the token sweep has nothing to match. This assertion FAILS the day the detector catches it, which is the only way this harness can tell anyone the boundary moved",
+                    rowsWritten === 1 && caughtSignals.length === 0,
+                    `probe rows written to ${GAP_TABLE} outside the spec=${rowsWritten} (1 expected, and the write must be real or "not caught" would be vacuous); detector signals raised=[${caughtSignals.join(" ; ") || "none"}]`,
+                )
+            }
+            if (INJECT === "gapBypassSessionState") {
+                // Read from `prisma`, a DIFFERENT session, because a session can always see its own lock;
+                // observing it from elsewhere is what proves the lock is really held on the cluster.
+                const held = (await prisma.$queryRawUnsafe(
+                    `select count(*)::text as n from pg_locks
+                     where locktype = 'advisory' and classid = ${GAP_LOCK_CLASS} and objid = ${GAP_LOCK_OBJECT} and granted`,
+                )) as Array<{ n: string }>
+                const locksHeld = Number(held[0].n)
+                checkInvertible(
+                    "KNOWN GAP, ASSERTED AS A GAP: an advisory lock and a session GUC issued on a THIRD connection are caught by NEITHER mechanism. HEAD's widening of RAW_WRITE_PATTERN classifies both as writes, but classification only ever runs on statements issued through the INSTRUMENTED client; a lock and a session setting are not row state, so no digest and no sequence read can see them either. This assertion FAILS the day that changes",
+                    locksHeld === 1 && caughtSignals.length === 0,
+                    `advisory locks held on (${GAP_LOCK_CLASS},${GAP_LOCK_OBJECT}), observed from a different session=${locksHeld} (1 expected, or the "not caught" claim would be vacuous); detector signals raised=[${caughtSignals.join(" ; ") || "none"}]`,
+                )
+            }
+            // The gap classes are not exercised on a normal run, so the fact that they EXIST and are
+            // reachable is asserted every run - a boundary measurement that can be deleted by accident is
+            // not a boundary measurement.
+            checkInvertible(
+                "MEASURED: the injection table still declares both KNOWN-GAP classes, so the detector's boundary remains measurable rather than becoming a claim in a comment",
+                KNOWN_GAP_CLASSES.every((gap) => INJECTABLE.includes(gap)) && KNOWN_GAP_CLASSES.length === 2,
+                `known-gap classes declared=[${KNOWN_GAP_CLASSES.join(",")}] of ${INJECTABLE.length} injectable`,
+            )
+
             // ---- REPORTS: the concurrent traffic, made visible ---------------
             //
             // Printed rather than asserted, on purpose. This is the old mechanism's signal, and the
@@ -1373,6 +1749,17 @@ async function main() {
             if (injectedSequence !== null) {
                 await prisma.$executeRawUnsafe(`drop sequence if exists "${injectedSequence}"`)
             }
+            // THE KNOWN-GAP PROBES ARE THE ONE THING THE TOKEN SWEEP CANNOT CLEAN UP AFTER, because the
+            // whole point of them is that they carry no run token. So they are removed by exact id and by
+            // exact lock key - unconditionally, so a crashed earlier run's probe is cleared too - and both
+            // are then proven gone by query below rather than assumed gone here.
+            //
+            // `=` and not `like`: a LIKE pattern would need `_` escaped, and the residue proof this
+            // repository already got wrong once was exactly that. An equality test cannot have the bug.
+            await prisma.$executeRawUnsafe(`delete from "${GAP_TABLE}" where "id" = '${GAP_ROW_ID}'`)
+            if (INJECT === "gapBypassSessionState") {
+                await bypass.$queryRawUnsafe(`select pg_advisory_unlock(${GAP_LOCK_CLASS}, ${GAP_LOCK_OBJECT}) as released`)
+            }
             residueHits = await detector.sweep()
             sweptTableCount = detector.sweptTables.length
             await detector.close()
@@ -1402,6 +1789,28 @@ async function main() {
                 `pg_sequences rows for the injected sequence: ${left[0].n}`,
             )
         }
+        // THE KNOWN-GAP PROBES, PROVEN GONE BY QUERY. These two are the only fixtures in this harness the
+        // run-token sweep is structurally unable to see - carrying no token is what makes them the shape
+        // under test - so "the sweep found nothing" is not evidence about either of them and they are asked
+        // about directly. Asked on EVERY run, not only the injecting one: an orphan left by a crashed run
+        // would otherwise sit in this database indefinitely with nothing looking for it.
+        const gapRowLeft = (await prisma.$queryRawUnsafe(
+            `select count(*)::text as n from "${GAP_TABLE}" where "id" = '${GAP_ROW_ID}'`,
+        )) as Array<{ n: string }>
+        checkInvertible(
+            `MEASURED: the known-gap probe row is gone from ${GAP_TABLE} - the one fixture whose absence the token sweep CANNOT prove, since carrying no token is exactly what made it the shape under test`,
+            Number(gapRowLeft[0].n) === 0,
+            `rows in ${GAP_TABLE} with the probe id, asked by equality rather than by a LIKE pattern needing an escaped underscore: ${gapRowLeft[0].n}`,
+        )
+        const gapLockLeft = (await prisma.$queryRawUnsafe(
+            `select count(*)::text as n from pg_locks
+             where locktype = 'advisory' and classid = ${GAP_LOCK_CLASS} and objid = ${GAP_LOCK_OBJECT}`,
+        )) as Array<{ n: string }>
+        checkInvertible(
+            "MEASURED: the known-gap advisory lock is released, so that probe left no lock on the cluster - a residue no table sweep would ever have found",
+            Number(gapLockLeft[0].n) === 0,
+            `pg_locks rows on (${GAP_LOCK_CLASS},${GAP_LOCK_OBJECT}): ${gapLockLeft[0].n}`,
+        )
     } finally {
         await prisma.$disconnect()
     }

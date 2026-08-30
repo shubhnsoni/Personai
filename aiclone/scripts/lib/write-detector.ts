@@ -51,6 +51,31 @@
  * the fixture must be torn down explicitly. `sweepRunToken` exists to prove that teardown worked,
  * including for append-only tables whose rows cannot be deleted by the path that created them.
  *
+ * THE BLIND SPOTS ABOVE ARE NOW MEASURED, NOT MERELY DECLARED
+ * ----------------------------------------------------------
+ * Every "blind spot" line in this file used to be a claim in a comment, and the fourteen injection
+ * classes that exercised this module were all drawn from shapes it already recognises - so the
+ * evidence covered its POSITIVES and said nothing about where it stops. A boundary that is only
+ * asserted in prose gets quoted as if it were zero.
+ *
+ * Two classes in check-due-work-preview-api.ts now inject shapes this module is EXPECTED TO MISS, and
+ * assert the miss:
+ *
+ *   gapBypassUnlistedTable   a row written on a third connection into a table absent from the
+ *                            fingerprint spec, with no run token in it. Mechanism 1 cannot see the
+ *                            connection, mechanism 2 does not cover the table, and the token sweep has
+ *                            nothing to match. This is the third leg of blind spot 1 above.
+ *   gapBypassSessionState    an advisory lock and a session GUC on a third connection. HEAD widened
+ *                            RAW_WRITE_PATTERN so both CLASSIFY as writes - but classification only
+ *                            runs on statements issued through the instrumented client, and neither a
+ *                            content digest nor a sequence read can see a lock or a session setting,
+ *                            because neither is row state.
+ *
+ * Both assertions require the mutation to have demonstrably happened before they will accept "not
+ * caught", and both FAIL if this module ever catches them. So a widening that closes one of these gaps
+ * is reported as a red assertion naming the gap, rather than leaving a stale limitation in this comment.
+ * If you close one, that harness is where it is written down.
+ *
  * CONCURRENCY
  * -----------
  * Three kinds of observation are available, and they are not equally trustworthy when other
@@ -93,6 +118,11 @@ export type MutationClass =
     | "raw-write"
 
 /** Every model action Prisma exposes that changes data. Reads are everything else. */
+// BOTH `AndReturn` VERBS ARE PROVEN AS FAR AS THIS PROJECT'S PRISMA ALLOWS. They were in this map from
+// the day it was written and in no injection, so nothing had ever driven either through the interceptor.
+// `createManyAndReturn` now has a real injection. `updateManyAndReturn` is Prisma 6.2 and this project is
+// on 5.22, so no call through the client can produce that operation name; the harness measures the
+// client's capability and goes RED on the upgrade that makes the injection possible.
 const MODEL_WRITE_OPERATIONS: ReadonlyMap<string, MutationClass> = new Map([
     ["create", "create"],
     ["createMany", "createMany"],
