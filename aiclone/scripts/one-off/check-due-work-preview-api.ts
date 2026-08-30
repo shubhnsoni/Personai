@@ -6,7 +6,11 @@
  * are about what must NOT happen:
  *
  *   nothing is written - not a row, not a status, and not a record that a preview was requested, which
- *   is asserted by counting every table this domain can reach before and after a real request;
+ *   is asserted by TWO INDEPENDENT MECHANISMS over a committed request: a client extension that
+ *   observes every model action and raw call the client issues, and content digests taken on a
+ *   separate connection over this run's own rows. Row counting was retired here - it could not see an
+ *   UPDATE, an insert-then-delete, a sequence advance, or any of the 97 base tables its list omitted,
+ *   and being global it went red when a concurrent harness seeded the same database;
  *   nothing runs on its own - no timer, interval, cron, queue or background execution exists in the
  *   three source files, asserted over EXECUTABLE LINES ONLY;
  *   nothing is handed to a provider - no mailer, payment client, carrier or transport, and the
@@ -34,6 +38,8 @@
  * wording scan runs over the RESPONSE BODY rather than over any source file at all.
  *
  * Set INVERT_ASSERTION=1 to flip every load-bearing expectation and prove this can fail.
+ * Set WRITE_DETECTOR_INJECT=<class> to inject one write class into the measured no-write window and
+ * watch the detector name it. See INJECTABLE in the no-write block for the recognised classes.
  *
  *   ts-node -r tsconfig-paths/register scripts/one-off/check-due-work-preview-api.ts
  */
@@ -57,6 +63,14 @@ import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistenceError, type PersistenceErrorCode } from "../../src/lib/persistence/errors"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
+import {
+    createWriteDetector,
+    classifyModelCall,
+    classifyRawCall,
+    isWriteSql,
+    type TableFingerprintSpec,
+    type WriteDetectorVerdict,
+} from "../lib/write-detector"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
@@ -419,42 +433,61 @@ async function main() {
         }
 
         /**
-         * Counts for the no-write proof.
+         * THE TABLES THIS DOMAIN CAN REACH, and what they are now used for.
          *
-         * Widened twice. The first version counted five tables, four of which were TENANCY tables and
-         * none an append-only log - so the write the contract most specifically forbids, a surface
-         * logging its own invocation, would have been invisible. The second version added eight event
-         * logs and the commit claimed that was "every append-only log this schema has". A review counted
-         * the repository's own `<Table>_append_only` triggers and found THIRTEEN. The five that were
-         * missing are added here: BlueprintInstallationEvent, CaseRetainerDraw, CaseRetainerEvent,
-         * CommerceEvent, CourseAccessEvent.
+         * This list used to BE the no-write proof: `count()` on each of these before and after a
+         * request, compared as a total. It was widened twice - five tables, then thirteen append-only
+         * logs added after a review counted the schema's own `<Table>_append_only` triggers - and it
+         * was still unable to see five whole classes of write. Its own comment admitted two of them.
          *
-         * KNOWN LIMIT, stated because the assertion name should not be read as more than it is: this
-         * compares row COUNTS. An UPDATE to an existing counted row, or an insert-then-delete inside the
-         * window, would not change a count and would pass. Nothing on this read path performs either -
-         * every database call in it is a findMany or findUnique - but that is established by reading the
-         * code, not by this assertion.
+         *   an UPDATE to an existing row            the count does not move
+         *   an insert followed by a delete          the count returns to where it started
+         *   a sequence / identity advance           no row is left to count
+         *   a write to a table not on this list     this schema has 115 base tables; this list has 18
+         *   a write that is later rolled back       erased before the comparison is taken
+         *
+         * And it was not concurrency-safe. `count()` with no predicate is a GLOBAL count, so another
+         * harness seeding this same database inside the window moved it, and the assertion went red
+         * for a reason that had nothing to do with the code under test. Two other stages are on this
+         * database right now.
+         *
+         * So the list is no longer the proof. It is now (a) the fingerprint scope, taken with a
+         * content digest rather than a count and scoped to THIS RUN's rows, and (b) a REPORTED global
+         * count, printed and never asserted, whose only job is to make the concurrent traffic visible
+         * so that a reader can see why the assertions below are not built on it.
          */
-        const countAll = async () => ({
-            fieldJob: await prisma.fieldJob.count(),
-            workspace: await prisma.workspace.count(),
-            profile: await prisma.profile.count(),
-            membership: await prisma.membership.count(),
-            user: await prisma.user.count(),
-            activityEvent: await prisma.activityEvent.count(),
-            copilotAuditEvent: await prisma.copilotAuditEvent.count(),
-            fieldJobEvent: await prisma.fieldJobEvent.count(),
-            reservationEvent: await prisma.reservationEvent.count(),
-            appointmentEvent: await prisma.appointmentEvent.count(),
-            caseEvent: await prisma.caseEvent.count(),
-            cohortEvent: await prisma.cohortEvent.count(),
-            inventoryMovement: await prisma.inventoryMovement.count(),
-            blueprintInstallationEvent: await prisma.blueprintInstallationEvent.count(),
-            caseRetainerDraw: await prisma.caseRetainerDraw.count(),
-            caseRetainerEvent: await prisma.caseRetainerEvent.count(),
-            commerceEvent: await prisma.commerceEvent.count(),
-            courseAccessEvent: await prisma.courseAccessEvent.count(),
-        })
+        const DOMAIN_TABLES = Object.freeze([
+            "FieldJob",
+            "Workspace",
+            "Profile",
+            "Membership",
+            "User",
+            "ActivityEvent",
+            "CopilotAuditEvent",
+            "FieldJobEvent",
+            "ReservationEvent",
+            "AppointmentEvent",
+            "CaseEvent",
+            "CohortEvent",
+            "InventoryMovement",
+            "BlueprintInstallationEvent",
+            "CaseRetainerDraw",
+            "CaseRetainerEvent",
+            "CommerceEvent",
+            "CourseAccessEvent",
+        ])
+
+        /** The old mechanism, kept only as a printed observation. Never asserted on. */
+        const globalCounts = async (): Promise<Record<string, number>> => {
+            const out: Record<string, number> = {}
+            for (const table of DOMAIN_TABLES) {
+                const rows = (await prisma.$queryRawUnsafe(
+                    `select count(*)::text as n from "${table}"`,
+                )) as Array<{ n: string }>
+                out[table] = Number(rows[0].n)
+            }
+            return out
+        }
 
         try {
             await prisma.$transaction(async (tx) => {
@@ -968,45 +1001,406 @@ async function main() {
             `keys=${Object.keys(broken.body).sort().join(",")}`,
         )
 
-        // ---- the strongest no-write claim, measured on COMMITTED data ----------
+        // ---- THE NO-WRITE CLAIM, PROVEN BY TWO INDEPENDENT MECHANISMS ----------
         //
-        // THIS USED TO PROVE NOTHING. `before` was taken before prisma.$transaction opened, every real
-        // request ran inside that transaction, and the transaction ended in `throw new Rollback()`. So
-        // if `preview` had written a row, the rollback would have erased it and the counts would still
-        // have matched. The assertion was guaranteed to pass by its own test harness.
+        // THE COUNT VERSION OF THIS PROVED LESS THAN ITS NAME. Two defects, one fixed before and one
+        // fixed here.
         //
-        // The envelope and authorization work above still uses the rollback, which is correct - it
-        // needs seeded tenants and must leave none behind. But the no-write claim has to be measured
-        // against data the request can actually persist against, so it gets its own committed fixture
-        // and its own explicit cleanup.
+        // The first was that the measurement happened inside a transaction that ended in
+        // `throw new Rollback()`, so a write would have been erased before the comparison was taken.
+        // That is why this block has its own COMMITTED fixture and its own explicit teardown, and why
+        // it must never be moved back inside the rollback.
+        //
+        // The second is that comparing GLOBAL ROW COUNTS across a hand-written list of 18 tables cannot
+        // see an UPDATE (the count does not move), an insert-then-delete (the count returns), a
+        // sequence advance (no row is left), or a write to any of the other 97 base tables in this
+        // schema. Its own comment admitted the first two and asserted the rest by reading the code.
+        //
+        // So the claim is now carried by two mechanisms with complementary blind spots, and the
+        // assertions below say which one is speaking. See scripts/lib/write-detector.ts.
+        //
+        //   1. CALL INTERCEPTION observes every model action and raw call the client under test
+        //      issues, at the moment it is issued. Table-agnostic, so a write to an unlisted table is
+        //      caught like any other; indifferent to the write's later fate, so insert-then-delete and
+        //      transaction-contained writes are caught; and blind to anything that does not go through
+        //      this client.
+        //   2. CONTENT FINGERPRINTS on a SEPARATE CONNECTION digest the rows themselves
+        //      (`md5(string_agg((row)::text))`), plus `max(updatedAt)` and every sequence's
+        //      `last_value`. Catches an UPDATE that leaves the count identical, and catches a write
+        //      that bypassed the observed client entirely; blind to a write that is perfectly undone
+        //      inside the window.
+        //
+        // CONCURRENCY. Two other stages are on this database now, so every asserted signal here is
+        // scoped to something only THIS run can produce: the interceptor watches only our own client,
+        // the fingerprints are scoped by this run's unique token, and the global question ("did a row
+        // anywhere appear?") is asked as "does any row in any of the 115 tables mention THIS RUN's
+        // token?" - which no concurrent harness can answer yes to. The one genuinely shared signal is
+        // the sequence list; it is reported raw and asserted only where an advance is ATTRIBUTABLE to
+        // this run. That reasoning is written out at the assertion.
+        //
+        // Set WRITE_DETECTOR_INJECT=<class> to inject one mutation class into the measured window and
+        // observe the detector go red naming it. Recognised classes are listed in INJECTABLE below.
+        const INJECT = process.env.WRITE_DETECTOR_INJECT ?? ""
+        const INJECTABLE = Object.freeze([
+            "create",
+            "createMany",
+            "update",
+            "updateMany",
+            "delete",
+            "deleteMany",
+            "upsert",
+            "executeRaw",
+            "executeRawUnsafe",
+            "queryRawWrite",
+            "txWrite",
+            "insertThenDelete",
+            "bypassUpdate",
+            "sequenceAdvance",
+        ])
+        if (INJECT !== "" && !INJECTABLE.includes(INJECT)) {
+            throw new Error(`WRITE_DETECTOR_INJECT=${INJECT} is not a recognised class: ${INJECTABLE.join(", ")}`)
+        }
+
+        // ---- the classifier, asserted directly ---------------------------------
+        //
+        // The injections below prove the detector end to end, but they are driven by an environment
+        // variable, so on a normal run nothing would exercise the classification table at all. These
+        // assertions run every time and are the reason a normal green run is evidence that the
+        // detector can still tell a write from a read.
+        for (const verb of ["create", "createMany", "update", "updateMany", "delete", "deleteMany", "upsert"] as const) {
+            checkInvertible(
+                `MEASURED: the write detector classifies the model action "${verb}" as a write`,
+                classifyModelCall(verb) === verb,
+                `${verb} -> ${String(classifyModelCall(verb))}`,
+            )
+        }
+        for (const verb of ["findMany", "findUnique", "findFirst", "count", "aggregate", "groupBy"] as const) {
+            checkInvertible(
+                `MEASURED: the write detector classifies the read action "${verb}" as a read, so it is not simply calling everything a write`,
+                classifyModelCall(verb) === null,
+                `${verb} -> ${String(classifyModelCall(verb))}`,
+            )
+        }
+        // A verb-anchored regex would miss a CTE-led write, and this repository writes CTEs.
+        checkInvertible(
+            "MEASURED: raw write detection sees through a leading CTE and a leading comment, and still calls a bare select a read",
+            isWriteSql(`with recent as (select 1) insert into "User" ("id") values ('x')`) &&
+                isWriteSql(`-- harmless looking\n update "FieldJob" set "title" = 'x'`) &&
+                isWriteSql(`/* block */ delete from "User" where "id" = 'x'`) &&
+                !isWriteSql(`select "id" from "FieldJob" where "status" = 'SCHEDULED'`) &&
+                !isWriteSql(`  select count(*) from "User"`),
+            "CTE, line comment and block comment all classified as writes; selects as reads",
+        )
+        // A sequence advance writes no row, which is exactly why the count version could not see it.
+        checkInvertible(
+            "MEASURED: raw write detection treats a sequence advance and a row lock as writes, though neither changes a row's content",
+            isWriteSql(`select nextval('"FieldJobEvent_seq_seq"')`) &&
+                isWriteSql(`select setval('s', 1)`) &&
+                isWriteSql(`select "id" from "FieldJob" for update`),
+            "nextval, setval and FOR UPDATE all classified as writes",
+        )
+        // The args shapes are Prisma's, not ours, so they are asserted against the real ones.
+        checkInvertible(
+            "MEASURED: the raw classifier reads BOTH args shapes Prisma uses - the array form of the Unsafe calls and the Sql object form of the tagged calls",
+            classifyRawCall("$queryRawUnsafe", [`insert into "User" ("id") values ('x')`]) === "raw-write" &&
+                classifyRawCall("$queryRaw", { strings: [`update "User" set "name" = `, ``], values: ["x"] }) ===
+                    "raw-write" &&
+                classifyRawCall("$queryRawUnsafe", [`select 1`]) === null,
+            "array form and Sql form both classified; a raw select stays a read",
+        )
+        // FAIL-SAFE DIRECTION. If a future Prisma changes the args shape, the detector must go loud
+        // rather than quietly stop seeing raw writes - a silent blind spot is the defect being fixed.
+        checkInvertible(
+            "MEASURED: an args shape the classifier cannot read is treated as a WRITE, so a future Prisma change fails loud instead of going blind",
+            classifyRawCall("$queryRaw", { somethingNew: true }) === "raw-write" &&
+                classifyRawCall("$queryRaw", null) === "raw-write",
+            "unreadable args -> raw-write",
+        )
+
         const committed = await seedCommitted(prisma)
+        const detector = await createWriteDetector({ client: prisma, runToken: RUN })
+        // A THIRD connection, used only by the bypassUpdate and sequenceAdvance injections. It exists
+        // to write BEHIND the instrumented client's back, which is how the fingerprint mechanism is
+        // shown to catch something call interception structurally cannot.
+        const bypass = new PrismaClient()
+        const injectedSequence = INJECT === "sequenceAdvance" ? `wd_${RUN}_seq` : null
+        // Created BEFORE the window opens, so what the window observes is a pure ADVANCE of an
+        // existing sequence rather than the appearance of a new one.
+        if (injectedSequence !== null) {
+            await prisma.$executeRawUnsafe(`create sequence "${injectedSequence}" start 1`)
+        }
+
+        let verdict: WriteDetectorVerdict | null = null
+        let residueHits: readonly { table: string; rows: number }[] = []
+        let sweptTableCount = 0
         try {
-            const beforeCommitted = await countAll()
+            // SCOPE. Every spec is scoped to this run, so a concurrent harness's rows are not in any
+            // digest. The 18 domain tables are scoped by whole-row text match on the run token, which
+            // needs no per-table column knowledge and covers append-only logs the same way as any
+            // other table. The five tenancy tables get a second, id-anchored digest as well, so an
+            // UPDATE that removed the token would show up as a content change rather than as a row
+            // leaving the scope.
+            const specs: TableFingerprintSpec[] = [
+                ...DOMAIN_TABLES.map((table) => ({ table, where: `(q.*)::text like '%${RUN}%'` })),
+                ...["User", "Profile", "Workspace", "Membership", "FieldJob"].map((table) => ({
+                    table,
+                    where: `"id" like '${RUN}%'`,
+                })),
+            ]
+
+            const countsBefore = await globalCounts()
+            await detector.begin(specs)
+
             const identity = new ControlledIdentity()
             identity.current = committed.user
-            const committedApi = new DueWorkApiService(
-                new OperationsService(new OperationsContext(prisma, new PersistedTenancy(prisma, identity))),
+            // The service is given the INSTRUMENTED client, so every call it makes is observed.
+            const detectedApi = new DueWorkApiService(
+                new OperationsService(
+                    new OperationsContext(detector.client, new PersistedTenancy(detector.client, identity)),
+                ),
             )
-            const persisted = await call(committedApi.preview(get(`${BASE}?workspaceId=${committed.workspace}`)))
+            const persisted = await call(detectedApi.preview(get(`${BASE}?workspaceId=${committed.workspace}`)))
             checkInvertible(
                 "the committed-fixture request really succeeded, so the no-write claim is measured on a 200",
                 persisted.status === 200,
                 `status=${persisted.status} ${String((persisted.body.error as { message?: string } | undefined)?.message ?? "")}`,
             )
-            const afterCommitted = await countAll()
-            checkInvertible(
-                "MEASURED: a committed, non-rolled-back preview request wrote nothing to any counted table",
-                JSON.stringify(beforeCommitted) === JSON.stringify(afterCommitted),
-                Object.keys(beforeCommitted)
-                    .filter(
-                        (k) =>
-                            (beforeCommitted as Record<string, number>)[k] !==
-                            (afterCommitted as Record<string, number>)[k],
+
+            // ---- the injection, inside the measured window ---------------------
+            const w = detector.client
+            const injUser = `${RUN}_inj`
+            const injUser2 = `${RUN}_inj2`
+            const newUser = (id: string) => ({
+                id,
+                clerkId: `clerk_${id}`,
+                email: `${id}@example.test`,
+            })
+            const insertUserSql = (id: string) =>
+                `insert into "User" ("id","clerkId","email","updatedAt") values ('${id}','clerk_${id}','${id}@example.test',CURRENT_TIMESTAMP)`
+            switch (INJECT) {
+                case "create":
+                    await w.user.create({ data: newUser(injUser) })
+                    break
+                case "createMany":
+                    await w.user.createMany({ data: [newUser(injUser), newUser(injUser2)] })
+                    break
+                case "update":
+                    await w.fieldJob.update({ where: { id: COMMITTED.job }, data: { title: "INJECTED UPDATE" } })
+                    break
+                case "updateMany":
+                    await w.fieldJob.updateMany({ where: { id: COMMITTED.job }, data: { title: "INJECTED UPDATEMANY" } })
+                    break
+                case "delete":
+                    await w.fieldJob.delete({ where: { id: COMMITTED.job } })
+                    break
+                case "deleteMany":
+                    await w.fieldJob.deleteMany({ where: { id: COMMITTED.job } })
+                    break
+                case "upsert":
+                    await w.user.upsert({
+                        where: { id: injUser },
+                        create: newUser(injUser),
+                        update: { name: "INJECTED UPSERT" },
+                    })
+                    break
+                case "executeRawUnsafe":
+                    await w.$executeRawUnsafe(insertUserSql(injUser))
+                    break
+                case "executeRaw":
+                    // Tagged-template form, so the Sql-object args shape is exercised too.
+                    await w.$executeRaw`update "FieldJob" set "title" = ${"INJECTED EXECUTERAW"} where "id" = ${COMMITTED.job}`
+                    break
+                case "queryRawWrite":
+                    // $queryRaw is a READ entry point carrying a WRITE. Nothing about the method name
+                    // says "write", which is why classification is done on the statement.
+                    await w.$queryRaw`insert into "User" ("id","clerkId","email","updatedAt") values (${injUser}, ${`clerk_${injUser}`}, ${`${injUser}@example.test`}, CURRENT_TIMESTAMP) returning "id"`
+                    break
+                case "txWrite":
+                    // Contained in an interactive transaction that COMMITS. The interceptor records it
+                    // as it is issued, so the containment buys nothing.
+                    await w.$transaction(async (tx) => {
+                        await tx.user.create({ data: newUser(injUser) })
+                    })
+                    break
+                case "insertThenDelete":
+                    // Net zero by the time the window closes: the fingerprint is identical afterwards,
+                    // and ONLY call interception can see this.
+                    await w.$executeRawUnsafe(insertUserSql(injUser))
+                    await w.$executeRawUnsafe(`delete from "User" where "id" = '${injUser}'`)
+                    break
+                case "bypassUpdate":
+                    // Behind the instrumented client's back, and row-count-neutral: ONLY the
+                    // fingerprint can see this.
+                    await bypass.$executeRawUnsafe(
+                        `update "FieldJob" set "title" = 'INJECTED BYPASS' where "id" = '${COMMITTED.job}'`,
                     )
-                    .join(",") || "all counts identical",
+                    break
+                case "sequenceAdvance":
+                    // No row anywhere changes. A row count cannot see this by construction.
+                    await bypass.$queryRawUnsafe(`select nextval('"${injectedSequence ?? ""}"') as v`)
+                    break
+                default:
+                    break
+            }
+
+            verdict = await detector.end()
+            const countsAfter = await globalCounts()
+
+            // ---- ANTI-VACUITY: the detector must have been in the path ---------
+            //
+            // Every assertion below is of the form "nothing was seen". All of them pass perfectly if
+            // the instrumented client was never actually used - a refactor that handed the service the
+            // raw client would do it silently. So the FIRST thing asserted is that the interceptor
+            // observed the request's own reads.
+            const reads = verdict.observedCalls.filter((c) => c.mutationClass === null)
+            const readModels = [...new Set(reads.map((c) => c.model ?? "<raw>"))].sort()
+            checkInvertible(
+                "MEASURED: the interceptor was genuinely in the request's path - it observed the preview's own reads, so the no-write assertions below cannot pass by observing nothing",
+                verdict.observedCalls.length > 0 && reads.length > 0,
+                `${verdict.observedCalls.length} calls observed, ${reads.length} reads, models=[${readModels.join(",")}]`,
             )
+
+            // ---- MECHANISM 1: call interception -------------------------------
+            checkInvertible(
+                "MEASURED: mechanism 1 (call interception) saw the request issue NO create, createMany, update, updateMany, delete, deleteMany, upsert or raw write - on ANY table, listed or not",
+                verdict.writes.length === 0,
+                verdict.writes.length === 0
+                    ? `${verdict.observedCalls.length} calls, all reads`
+                    : `classes=[${verdict.classes.join(",")}] :: ${verdict.summary}`,
+            )
+            checkInvertible(
+                "MEASURED: no write was hidden inside an interactive $transaction either - the interceptor records a call when it is issued, so containment and rollback do not conceal it",
+                verdict.writes.filter((c) => c.insideTransaction).length === 0,
+                `${verdict.observedCalls.filter((c) => c.insideTransaction).length} in-transaction calls observed, ${verdict.writes.filter((c) => c.insideTransaction).length} of them writes`,
+            )
+
+            // ---- MECHANISM 2: independent content fingerprints ----------------
+            const tableDiffs = verdict.fingerprintDiffs.filter((d) => d.kind === "table")
+            checkInvertible(
+                "MEASURED: mechanism 2 (content digest on a separate connection) saw no row's CONTENT change - this is what a row count cannot see, and it is scoped to this run so a concurrent harness cannot move it",
+                tableDiffs.length === 0,
+                tableDiffs.length === 0
+                    ? `${specs.length} scoped digests identical (md5 over whole-row text, plus max(updatedAt))`
+                    : tableDiffs.map((d) => `${d.name}.${d.component} ${d.before}->${d.after}`).join(" ; "),
+            )
+
+            // ---- the global question, asked where it is actually true ---------
+            //
+            // THIS ASSERTION USED TO REQUIRE ZERO HITS HERE AND THAT WAS WRONG, not subtly: the
+            // committed fixture is DELIBERATELY still alive at this point - there is no rollback to
+            // lean on, which is the whole design - so this run's own seeded rows legitimately carry
+            // this run's token. Requiring zero made the harness red against its own fixture, and the
+            // gate driver caught it on its first sweep.
+            //
+            // The zero-residue claim is real and is asserted AFTER teardown, on `residueHits` below.
+            // What is worth asserting HERE is different and was not being asserted at all: that the
+            // preview did not spread the token ANYWHERE NEW. The fixture seeded five tables; if the
+            // token turns up in a sixth, something wrote on a read path.
+            const fixtureTables = new Set(["FieldJob", "Membership", "Workspace", "Profile", "User"])
+            const unexpectedTokenTables = verdict.runTokenHits.filter((h) => !fixtureTables.has(h.table))
+            checkInvertible(
+                "MEASURED: during the window this run's token appears ONLY in the five tables its own fixture seeded - the preview spread it to no other table",
+                unexpectedTokenTables.length === 0,
+                unexpectedTokenTables.length === 0
+                    ? `${detector.sweptTables.length} tables swept; hits confined to the fixture's own ${verdict.runTokenHits.length} table(s)`
+                    : unexpectedTokenTables.map((h) => `${h.table}=${h.rows}`).join(","),
+            )
+            // Not passing by finding nothing: the fixture must actually be present and carrying the
+            // token, or the assertion above would be satisfied by an empty database.
+            checkInvertible(
+                "the in-window sweep really did find this run's fixture, so the confinement check is not passing over an empty result",
+                verdict.runTokenHits.length > 0,
+                `${verdict.runTokenHits.length} fixture table(s) carried the token in-window`,
+            )
+
+            // ---- sequences: shared state, so attribution is explicit ----------
+            //
+            // `pg_sequences.last_value` is the one signal here that is genuinely global and cannot be
+            // scoped to this run: a concurrent harness inserting an event row advances the same
+            // counter. Asserting raw equality would therefore be asserting that no other stage is
+            // working, which is not a property of the code under test. So the raw movement is REPORTED
+            // and the assertion is on the movement ATTRIBUTABLE to this run: a sequence this run
+            // created, or one belonging to a table where this run's token or a write of ours appeared.
+            const sequenceDiffs = verdict.fingerprintDiffs.filter((d) => d.kind === "sequence")
+            const tokenTables = new Set(verdict.runTokenHits.map((h) => h.table))
+            const writtenModels = new Set(verdict.writes.map((c) => (c.model ?? "").toLowerCase()))
+            const attributable = sequenceDiffs.filter((d) => {
+                if (d.name.includes(RUN)) return true
+                const table = d.name.replace(/_seq_seq$/, "")
+                return tokenTables.has(table) || writtenModels.has(table.toLowerCase())
+            })
+            checkInvertible(
+                "MEASURED: no sequence or identity advance is attributable to this run - a write that leaves no row behind, which a row count cannot see at all",
+                attributable.length === 0,
+                attributable.length === 0
+                    ? `${Object.keys(verdict.before?.sequences ?? {}).length} sequences read; ${sequenceDiffs.length} moved, none attributable to this run`
+                    : attributable.map((d) => `${d.name} ${d.before}->${d.after}`).join(" ; "),
+            )
+
+            // ---- REPORTS: the concurrent traffic, made visible ---------------
+            //
+            // Printed rather than asserted, on purpose. This is the old mechanism's signal, and the
+            // point of showing it is that it moves for reasons that have nothing to do with this
+            // surface - which is precisely why the assertions above are not built on it.
+            const movedCounts = DOMAIN_TABLES.filter((t) => countsBefore[t] !== countsAfter[t]).map(
+                (t) => `${t} ${countsBefore[t]}->${countsAfter[t]}`,
+            )
+            console.log(
+                `REPORT  GLOBAL row counts across the 18 domain tables, the old mechanism's signal, NOT asserted on: ${
+                    movedCounts.length === 0 ? "unchanged during this window" : `MOVED (concurrent traffic): ${movedCounts.join(", ")}`
+                }`,
+            )
+            console.log(
+                `REPORT  GLOBAL sequence movement during the window, shared with every other harness, asserted only where attributable: ${
+                    sequenceDiffs.length === 0
+                        ? "none"
+                        : sequenceDiffs.map((d) => `${d.name} ${d.before}->${d.after}`).join(", ")
+                }`,
+            )
+            console.log(
+                `REPORT  detector coverage: ${verdict.observedCalls.length} intercepted calls, ${specs.length} run-scoped content digests, ${detector.sweptTables.length} tables token-swept, ${Object.keys(verdict.before?.sequences ?? {}).length} sequences read on a separate connection`,
+            )
+            if (INJECT !== "") {
+                console.log(`REPORT  WRITE_DETECTOR_INJECT=${INJECT} was active. Detector verdict: ${verdict.summary}`)
+            }
         } finally {
+            // TEARDOWN, then the residue proof. Explicit and ordered by foreign key, because the
+            // fixture is COMMITTED - there is no rollback to lean on, which is the whole point.
             await cleanupCommitted(prisma)
+            for (const table of ["FieldJob", "Membership", "Workspace", "Profile", "User"]) {
+                await prisma.$executeRawUnsafe(`delete from "${table}" where "id" like '${RUN}%'`)
+            }
+            if (injectedSequence !== null) {
+                await prisma.$executeRawUnsafe(`drop sequence if exists "${injectedSequence}"`)
+            }
+            residueHits = await detector.sweep()
+            sweptTableCount = detector.sweptTables.length
+            await detector.close()
+            await bypass.$disconnect()
+        }
+
+        // ---- ZERO RESIDUE, proven by query rather than by assuming a cascade ----
+        //
+        // Thirteen of this schema's tables carry an `<Table>_append_only` trigger that REFUSES delete,
+        // so if a fixture - or an injected proof - ever put a row in one, no teardown could remove it.
+        // The only honest way to claim none is there is to ask, which is what this does, across every
+        // base table in the schema rather than a list of the ones that seemed likely.
+        checkInvertible(
+            "MEASURED: this run left ZERO residue - no row in any base table in the schema mentions its token, including the 13 append-only tables whose rows no teardown could have removed",
+            residueHits.length === 0,
+            residueHits.length === 0
+                ? `${sweptTableCount} tables swept after teardown, 0 rows mention this run`
+                : residueHits.map((h) => `${h.table}=${h.rows}`).join(","),
+        )
+        if (injectedSequence !== null) {
+            const left = (await prisma.$queryRawUnsafe(
+                `select count(*)::text as n from pg_sequences where schemaname = 'public' and sequencename = '${injectedSequence}'`,
+            )) as Array<{ n: string }>
+            checkInvertible(
+                "MEASURED: the sequence created for the sequence-advance injection was dropped, so that proof left no schema residue either",
+                Number(left[0].n) === 0,
+                `pg_sequences rows for the injected sequence: ${left[0].n}`,
+            )
         }
     } finally {
         await prisma.$disconnect()
