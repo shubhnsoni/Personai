@@ -1332,6 +1332,117 @@ check(
     /<OperationsPanel workspaceId=\{selectedWorkspaceId\} \/>/.test(shellSrc) && /operations-panel/.test(shellSrc),
 )
 
+// ---------------------------------------------------------------------------
+// BP1 — the blueprint preview / onboarding panel. Root is implementing the resolver and the two
+// routes in parallel, so this panel is not mounted in BusinessOsShell yet and is checked directly
+// against its own source rather than through a render of the shell. The honesty requirements
+// specific to this package: everything in `presentation` is stated to be role-derived rather than
+// declared by the blueprint, `businessOsRequiresOptIn` is stated as NOT granting the owner console,
+// `limitations` always renders and says installation does not exist yet, `installed` never gets a
+// badge or a live install control, and a missing blueprint id is a genuine 404 rather than an
+// access-denial (a blueprint id is a public registry key, unlike a tenant-scoped record).
+// ---------------------------------------------------------------------------
+const blueprintPreviewSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/blueprint-preview-panel.tsx"),
+    "utf8",
+)
+const blueprintPreviewSharedSrc = readFileSync(
+    join(__dirname, "../../src/components/business-os/blueprint-preview-shared.ts"),
+    "utf8",
+)
+const blueprintPreviewAll = `${blueprintPreviewSrc}\n${blueprintPreviewSharedSrc}`
+
+check("blueprint preview decorative icons are hidden from assistive tech", /aria-hidden="true"/.test(blueprintPreviewSrc))
+check(
+    "blueprint preview loading states announce themselves politely and as busy",
+    blueprintPreviewSrc.includes('aria-live="polite"') && blueprintPreviewSrc.includes('aria-busy="true"'),
+)
+check(
+    "every blueprint preview loading state carries a screen-reader label",
+    /Loading blueprints/.test(blueprintPreviewSrc) && /Loading blueprint preview/.test(blueprintPreviewSrc),
+)
+check("blueprint preview panel uses a structural skeleton while loading", /Skeleton/.test(blueprintPreviewSrc))
+check(
+    "blueprint preview refusals are split by status, including a distinct 404, with 503 leaking nothing",
+    /error\.status === 401/.test(blueprintPreviewSharedSrc) &&
+        /error\.status === 403/.test(blueprintPreviewSharedSrc) &&
+        /error\.status === 404/.test(blueprintPreviewSharedSrc) &&
+        /error\.status === 400/.test(blueprintPreviewSharedSrc) &&
+        /error\.status === 503/.test(blueprintPreviewSharedSrc) &&
+        /Nothing was changed/.test(blueprintPreviewSharedSrc),
+)
+check(
+    "MEASURED: a missing blueprint id is copy'd as a genuine 404, never as an access-denial",
+    (() => {
+        const fnMatch = blueprintPreviewSharedSrc.match(
+            /export function blueprintPreviewErrorCopy[\s\S]*?\n}/,
+        )
+        if (!fnMatch) return false
+        const body = fnMatch[0]
+        return /Blueprint not found/.test(body) && !/you do not have access/i.test(body)
+    })(),
+)
+check(
+    "the blueprint preview 403 copy is distinct from its 404 copy",
+    /Workspace access required/.test(blueprintPreviewSharedSrc) && /Blueprint not found/.test(blueprintPreviewSharedSrc),
+)
+check(
+    "blueprint preview empty state states that no sample data is shown",
+    /No blueprints available/.test(blueprintPreviewSrc) && /Nothing here is sample data/.test(blueprintPreviewSrc),
+)
+check(
+    "the blueprint preview panel contains no fabricated blueprint, engine or workflow",
+    !/\bid:\s*"/.test(blueprintPreviewAll) && !/sampleBlueprint/i.test(blueprintPreviewAll),
+)
+check(
+    "engines, capabilities and workflows are only ever rendered from a mapped server array, never hardcoded",
+    /preview\.engines\.map/.test(blueprintPreviewSrc) &&
+        /preview\.workflows\.map/.test(blueprintPreviewSrc) &&
+        /engine\.capabilities\.map/.test(blueprintPreviewSrc),
+)
+check(
+    "installable and blockedBy are rendered as returned, never recomputed in the component",
+    /blueprint\.installable/.test(blueprintPreviewSrc) &&
+        /preview\.installable/.test(blueprintPreviewSrc) &&
+        !/Math\.(round|floor|max|min)\(/.test(blueprintPreviewSrc),
+)
+check(
+    "MEASURED: presentation values are stated to be role-derived, not the blueprint's own, wherever they render",
+    /Not declared by this blueprint/.test(blueprintPreviewSrc) && /it corresponds to/.test(blueprintPreviewSrc),
+)
+check(
+    "MEASURED: businessOsRequiresOptIn is stated as NOT granting the owner console, never as an included feature",
+    /granted by/.test(blueprintPreviewSrc) && /requires a separate, explicit opt-in/.test(blueprintPreviewSrc),
+)
+check(
+    "MEASURED: limitations always render, with copy anchoring the screen as a preview rather than a settings page",
+    /What this preview does not tell you/.test(blueprintPreviewSrc) &&
+        /preview\.limitations\.map/.test(blueprintPreviewSrc) &&
+        /not a report of/.test(blueprintPreviewSrc),
+)
+check(
+    "MEASURED: installed is never rendered as a badge, and the install control is disabled with copy explaining why",
+    !/installed[\s\S]{0,60}variant="(outline|secondary|destructive)"/i.test(blueprintPreviewSrc) &&
+        /Installation is not built yet/.test(blueprintPreviewSrc) &&
+        /<Button size="sm" variant="outline" disabled aria-disabled="true">/.test(blueprintPreviewSrc),
+)
+check(
+    "the install control does not post anywhere",
+    !/fetch\([^)]*install/i.test(blueprintPreviewSrc),
+)
+check(
+    "owner copilot prompts render as plain list text and are explicitly labelled non-interactive",
+    /Not interactive/.test(blueprintPreviewSrc) && /ownerCopilotPrompts\.map/.test(blueprintPreviewSrc),
+)
+check(
+    "approval requirements render the reason an approver is shown, not just the role",
+    /approval\.approverRole/.test(blueprintPreviewSrc) && /approval\.reason/.test(blueprintPreviewSrc),
+)
+check(
+    "the versioning block renders supersedes and supersededBy so an upgrade is distinguishable from a new blueprint",
+    /versioning\.supersedes/.test(blueprintPreviewSrc) && /versioning\.supersededBy/.test(blueprintPreviewSrc),
+)
+
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
