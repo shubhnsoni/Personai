@@ -390,3 +390,75 @@ non-vacuous harness improvement.
 - `npx eslint scripts/one-off/check-inventory-runtime.ts`: exit `0`.
 - `git diff --stat -- src`: exit `0`, no output; no `src/**` changes survive.
 - Every run reported all five tracked fixture-table counts returned to baseline and the append-only trigger re-armed.
+
+
+## Group G — N1-C harness exit-integrity audit
+
+### Scope and method
+
+Audited all 69 pre-existing `check-*.ts` harnesses with the new AST-backed
+`check-harness-exit-integrity.ts`. The scanner inspects executable TypeScript AST
+nodes, not comments or strings, and excludes its own source because the detection
+logic and its controlled fixture necessarily contain the prohibited shape. It
+checks `process.exitCode` assignments, `process.exit()` calls, and report
+`result`/`failures` writes against later assertion calls in the same execution
+scope. A decision before later assertions is a defect unless it is a
+precondition/disposable-database guard; a preliminary report write is safe only
+when the same field is recomputed after the later assertions before output.
+
+### Classification
+
+| Candidate group | Count | Classification | Evidence |
+| --- | ---: | --- | --- |
+| Disposable-target checks in appointment, blueprint-install, case, cohort, commerce, course-access, fieldjob, inventory, operations, reservation, retainer, and schema harnesses | 76 | INTENTIONAL GUARD | Each condition compares the configured or live database to `AUTHORIZED_TARGET`; a non-zero exit prevents unsafe database work, rather than deciding a completed assertion result. |
+| `check-blueprint-install-schema.ts:252` | 1 | INTENTIONAL GUARD | A conditional precondition aborts before the first assertion in its execution scope. |
+| `check-business-os-surface.ts:174-175` | 2 | SAFE PRELIMINARY SUMMARY | `report.result` and `report.failures` are both recomputed at lines 280-281 after all later assertions and before the final `process.exitCode` decision at line 284. |
+| All remaining final exit/exit-code decisions | 111 | FINAL VERDICT | No later assertion occurs in their execution scope. |
+
+No REAL DEFECT was found in the 69 audited existing harnesses. The corrected
+`check-business-os-a11y.ts` has its only exit decision at the final tail, after
+all assertions and report serialization.
+
+### Control proof
+
+`check-harness-exit-integrity.ts --prove-failure` adds an in-memory controlled
+fixture with one assertion before and one assertion after a `process.exitCode`
+decision. The meta-harness reported `REAL_DEFECT ... assertions-after=1` and
+exited `1`; normal and `--self-test` runs then returned `0`. This proves the
+control rejects the shape it is meant to prevent without adding a persistent
+fixture or scanning its own detection logic.
+
+### Validation
+
+- Normal CWD-aware rehearsal-runner meta audit: `0`; 69 existing harnesses scanned, 77 intentional guards, 2 recomputed summaries, 0 real defects.
+- Meta-harness self-test: `0`; controlled fixture rejected as expected.
+- Meta-harness controlled-failure proof: `1` (expected), verified by wrapper; normal run restored to `0`.
+- Targeted TypeScript check: `0`.
+
+
+### Root verification — stronger proof than the in-memory fixture
+
+The worker proved falsifiability with a five-line synthetic fixture. That shows the
+classifier rejects the bad shape, but not that it survives a real harness: 1866
+lines, 337 assertions, nested helpers, and a report object. Root therefore re-ran
+the proof against the real file the historical defect actually occurred in.
+
+`check-business-os-a11y.ts` was mutated in the disposable audit checkout by moving
+its verdict-and-exit block ahead of the final `checkInvertible` call — the exact
+RUNLOG lesson 51/52 shape, in the exact file. The meta-harness went red, exit `1`,
+and reported all three facets rather than only the obvious one:
+
+- `check-business-os-a11y.ts:1861` frozen `process.exitCode`; `assertions-after=1`; 336 assertions before.
+- `check-business-os-a11y.ts:1857` frozen `report.result` summary, never recomputed.
+- `check-business-os-a11y.ts:1858` frozen `report.failures` summary, never recomputed.
+
+The file was restored and the audit returned to `0` with 190 candidates, 77
+intentional guards, 2 recomputed summaries and 0 real defects. So the control
+detects the real regression in the real file, not merely a toy resembling it.
+
+Root also independently reproduced the three declared modes at the same numbers:
+normal `0`, `--self-test` `0`, `--prove-failure` `1`.
+
+Lettering note: there is no Group E. N1-A labelled its section Group F and the
+gap is preserved here rather than renumbered, because the worker reports already
+cite these letters. No section was removed.
