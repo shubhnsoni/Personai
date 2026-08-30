@@ -188,7 +188,20 @@ authorization error into a silent downgrade that still shows product areas.
 
 ## OPEN DEFECT — the shell selects a workspace on the user's behalf (found by independent review)
 
-**Severity: MAJOR. Not a cross-tenant disclosure. Not fixed in this run.**
+**CLOSED at `c614001`.** Kept below because the reasoning about *why it was not local* is the useful part,
+and because the panel-audit result it forced is worth preserving.
+
+What was done: the `workspaces[0]` alphabetical fallback is deleted, and so is the profile-match preference
+that preceded it — auto-selecting only for a single authorized workspace rules out a profile-based guess too.
+More than one workspace yields a deliberate "Choose a workspace" state, with the choice persisted under a
+shared storage key and an explicit clear path.
+
+The panel audit the fix required, and its result: **15 panels take `workspaceId`** (17 counting one panel's
+two children), not the twelve root's brief claimed. **All safe.** Every one gates the network call itself
+rather than only the render, so a blank id can never reach a URL. One cosmetic issue remains, outside that
+package's scope: `CommercePanel`'s two children each render their own "Select a workspace" card.
+
+**Severity when found: MAJOR. Not a cross-tenant disclosure.**
 
 The resolver honours precedence rule 4 exactly: `forWorkspace` takes an explicit id and
 `withoutWorkspace` takes the profile as an argument, so neither can query memberships and neither can

@@ -1361,3 +1361,35 @@ renewals, and certificates eligible but not issued.
 | P1-009 slice 6 | repo-wide lint | Unchanged, still a refusal: 43 problems, no safe mechanical slice remains. |
 | G2 | appointments providers | Still **owner-gated**: real messages, real money. |
 | P1-007 | live `personalink` cutover | Still **owner-gated**. |
+
+
+---
+
+## Accepted — S6: explicit workspace selection, and the a11y harness gate
+
+| Commit | What landed | Author |
+|---|---|---|
+| `c614001` | explicit workspace selection; a11y exit decision moved to the end of the file; the word-ban assertion replaced with a positive check | S6-A `claude-sonnet-5` + root |
+| `4c9cf31` | inversion widened on retainer runtime/routes/schema and cohort schema | S6-B `gpt-5.6-terra` |
+
+Sweep stays **68**, FAILED 0. Repo lint unchanged at 43.
+
+**The MAJOR review finding is closed.** The shell auto-selects only when there is exactly one authorized
+workspace; the `workspaces[0]` alphabetical fallback and the profile-match preference are both deleted; more
+than one workspace yields a deliberate "Choose a workspace" state with a persisted, clearable choice.
+
+**A harness gate defect was fixed and it invalidates earlier evidence.** `check-business-os-a11y.ts` decided
+its exit code ~100 lines before the end of the file, so two appended sections were invisible and non-fatal.
+Any "a11y PASS" recorded before `c614001` covered only the assertions above that point.
+
+### Next in queue
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| **Inventory lock necessity — NOT DONE, worker produced nothing** | `check-inventory-runtime.ts` | S6-C was dispatched on this and returned **NO_OUTPUT**: no commit, no modified file, no report, worktree byte-identical to how it was prepared. The package is untouched and still worth doing. The technique exists and is proven — see `RUNLOG.md` lesson 46 and the deterministic assertion in `check-retainer-runtime.ts`. The open question: can two concurrent inventory reservations interleave to oversell? `reserved <= onHand` is guarded in the engine AND by a database CHECK, and an opportunistic `Promise.all` cannot decide it. Re-dispatch with the same brief (`night-run/brief-S6-wave.md`, section S6-C). |
+| **Observe the panel stale-response race** | a component-level test | Unchanged and still open. The panel's defence against a slow response for workspace A landing in B is a source-level argument; no harness mounts the panel or reorders real responses. `renderToStaticMarkup` never runs effects, so the existing harness cannot reach it. |
+| **Audit the OTHER mid-file exit decisions** | `scripts/one-off/check-*.ts` | New, and directly implied by the `c614001` finding. If one harness decided its exit code before the end of the file, others may too. Grep for `process.exitCode` and check how many lines of assertions follow it in each file. Cheap to check, and the failure mode is silent. |
+| **`CommercePanel` double empty state** | `commerce-panel.tsx` | Cosmetic, reported by S6-A from outside its paths: the panel's two children each render their own "Select a workspace" card, so a user sees two stacked identical messages. Not a crash. |
+| Wire the due-work plan to a surface | new route + UI | Unchanged. `planDueWork` is pure and invoked by nobody. It must stay explicitly invoked: no timer, no scheduler, no background execution without measured execution evidence. |
+| P1-009 slice 6 | repo-wide lint | Unchanged, still a refusal. |
+| G2 / P1-007 | providers / live cutover | Still **owner-gated**. |

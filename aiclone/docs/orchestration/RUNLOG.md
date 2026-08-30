@@ -4108,3 +4108,102 @@ it was testing.**
 Two workers reported honestly that their environment surfaces no agent PID and declined to substitute a
 shell PID; two others reported a shell PID and labelled it as such. Three returned NO_CHANGE. None of that
 needed correcting, and all of it is worth more than a uniform set of confident numbers.
+
+
+---
+
+## S6 — the last wave, and a harness whose exit code ignored a third of itself
+
+### The finding that invalidated earlier evidence
+
+`check-business-os-a11y.ts` decided `report.result` and `process.exitCode` roughly a hundred lines before
+the end of the file. Everything below — two appended sections, including an entire fourteen-assertion set —
+ran **afterwards**, appending to `failures` after `failures` had already been serialised into the report and
+after the exit code had already been set.
+
+So those assertions were invisible in the output *and* non-fatal to the process. Every earlier
+"a11y PASS, exit 0" in this run was weaker evidence than it appeared, including root's own.
+
+Found by a worker while appending to the file. Proven by observation rather than argument: moving the
+decision to the bottom made the harness immediately report `FAIL` and exit `1` on a real failure that had
+been sitting there unseen for as long as the section had existed.
+
+51. **A CONTROL CAN BE WIRED TO NOTHING.** This is the third distinct shape of the same family. A *vacuous*
+    assertion tests nothing. An *over-claiming* assertion tests something weaker than its name. This one
+    tests the right thing and its **result is discarded** — because a mid-file exit decision cannot see
+    sections appended below it, and a harness that grows by appending will always eventually grow past it.
+    An exit decision belongs at the bottom of the file, where nothing can outrun it.
+
+### The failure it had been hiding, and three attempts to fix it
+
+The hidden failure was the assertion *"the empty-installation copy does not imply the workspace is broken or
+misconfigured"*, implemented as a ban on the words `misconfigured` and `broken`. It failed because the
+panel's **reassuring** copy says "it is not an error or a sign anything is misconfigured" — precisely the
+sentence the assertion wanted to exist.
+
+Root needed three attempts, and the failures are the lesson:
+
+1. Ban the words → fails on the desired copy.
+2. Require the negation and forbid a bare claim → still fails, because the panel's *doc comment* says the
+   copy is "never phrased so a reader could conclude the workspace is broken or misconfigured". A comment
+   explaining the rule tripped the rule. Fixed by stripping comments — the technique this repository has
+   now needed four times.
+3. Still fails, because `"not an error or a sign anything is misconfigured"` contains the substring
+   `"is misconfigured"` whose negation sits eight words earlier. **A regex cannot see that**, and detecting
+   an unnegated English claim will produce false positives forever.
+
+52. **WHEN A PROPERTY IS ABOUT PROSE, ASSERT THE PRESENCE OF THE RIGHT SENTENCE, NOT THE ABSENCE OF A WRONG
+    WORD.** The check is now positive — require the reassurance to be present — which is tractable, goes red
+    if that sentence is deleted, and cannot be defeated by phrasing. It was also renamed, because the old
+    name promised more than any regex over prose can deliver, and a name that overpromises is how an
+    over-claiming assertion is born.
+
+### Explicit workspace selection — the last review finding closed
+
+The shell no longer guesses. The `workspaces[0]` alphabetical fallback is deleted, and so is the
+profile-match preference that preceded it: auto-selecting **only** when there is exactly one authorized
+workspace rules out a profile-based guess as well. More than one now yields a deliberate "Choose a
+workspace" state, and the choice persists with an explicit clear path.
+
+The worker corrected root's brief on the way: **15** panels take `workspaceId`, not twelve — 17 counting
+one panel's two children — and it audited every one *before* changing anything, because getting that wrong
+would have emptied the console for every multi-workspace user. All safe: every panel gates the network call
+itself rather than only the render, so a blank id can never reach a URL. It reported one cosmetic issue
+outside its own paths and left it alone.
+
+### Orchestration: 16 workers, 15 with evidence, 1 with none
+
+**S6-C produced nothing.** Dispatched on gpt-5.6-sol to generalize the deterministic-interleaving technique
+to the inventory reservation path. Its cron fired and completed; its worktree is byte-identical to how root
+prepared it, with no commit, no modified file, and no report. Recorded as **NO_OUTPUT** rather than glossed:
+a worker that leaves no trace did no work, and its package is still open.
+
+The other fifteen all produced verifiable output. Four returned NO_CHANGE with break evidence and were
+right to. One did the work, gated it, and forgot to commit — root applied its working tree with
+attribution. Two declined to report a PID their environment does not surface; three reported a shell PID and
+labelled it as such.
+
+`spawn_run`: **FAILED_NO_START**, again. Probe `02da4673` registered `[running]` and produced no artifact in
+its five-minute window, and never wrote its report. Registry elapsed time is not progress and was not
+counted as such.
+
+### Measured gates at `4c9cf31`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` / `tsc --noEmit` | 0 / 0 |
+| check sweep | **68 of 68 exit 0** (baseline 64) |
+| `check-business-os-a11y` | PASS, exit 0, gate now covers all assertions; inverted exit 1 |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | 0 |
+| live `personalink` | untouched — `Profile` = 16 |
+| triggers | 24 total, 0 disabled |
+| origin | unchanged at `4b386d1d` |
+| frozen worktrees | all six at `ea69595` |
+
+Inversion widening, final tally across this run: **fourteen harnesses**. commerce 1→99, inventory 1→76,
+cohort-runtime 1→99, course-access 1→78, reservation-authz 1→33, fieldjob-evidence-audit 1→55,
+fieldjob-schema-invariants 12→78, capability-contract 20→230, fieldjob-routes 7→49, retainer-runtime 1→79,
+retainer-routes 1→55, retainer-schema-invariants 1→76, cohort-schema-invariants 1→59,
+cohort-needs-action 1→29. Normal assertion counts identical in every single case.

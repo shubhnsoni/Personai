@@ -21,9 +21,14 @@ and described H1 as unstarted when it was complete.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`9862439`** (S-wave green point; later commits may follow — measure, do not trust this line)
+- Primary HEAD: **`4c9cf31`** — measure, do not trust this line
 - Origin unchanged at `4b386d1d`; nothing pushed.
 - **The check sweep is now 68.**
+- **A HARNESS GATE DEFECT WAS FIXED AND IT INVALIDATES EARLIER EVIDENCE.** `check-business-os-a11y.ts`
+  decided `process.exitCode` about 100 lines before the end of the file, so two appended sections were
+  invisible in its output *and* non-fatal. Any "a11y PASS" recorded before `c614001` covered only the
+  assertions above that point. **If one harness did this, others may: grep `process.exitCode` and count the
+  assertion lines that follow it.** That check is in the queue.
 - **WORKSPACE-SCOPED SURFACES ARE COMPLETE, WITH NO MIGRATION.** Installation froze the surfaces a
   blueprint implies into `configJson` and nothing applied them; a workspace-aware resolver now reads that
   frozen config. `BlueprintInstallation.configJson` was proven sufficient, so there is no second surface
@@ -33,9 +38,13 @@ and described H1 as unstarted when it was complete.
   could not change existing behaviour — there was no path where a workspace id was available and ignored.
 - **Operations covers cohort work** as its ninth domain, by CONSUMING the cohort engine's own declaration.
   Its reader names no cohort state at all, and a harness enforces that.
-- **STILL OPEN, MAJOR:** the shell selects a workspace on the user's behalf. See
-  `WORKSPACE_SURFACES_DECISION.md` → "OPEN DEFECT". Not a leak; a user may believe they are looking at a
-  different workspace. Fixing it needs every panel's empty state audited first.
+- **STILL OPEN, MAJOR:** ~~the shell selects a workspace on the user's behalf~~ — **CLOSED at `c614001`.**
+  The `workspaces[0]` alphabetical fallback and the profile-match preference are both deleted; auto-select
+  happens only for a single authorized workspace, and more than one yields a deliberate "Choose a workspace"
+  state with a persisted, clearable choice.
+- **STILL OPEN:** the inventory lock-necessity question. A worker was dispatched and returned **NO_OUTPUT** —
+  no commit, no file, no report. The package is untouched. The technique to answer it exists and is proven
+  (`RUNLOG.md` lesson 46); the brief is `night-run/brief-S6-wave.md` section S6-C.
 - Waves A–G4 complete, plus surfaces, plus **H1 `fieldJobs:inspection` complete end to end**, plus the
   two gaps H1 left (**`5822aa8`** checklist authoring, **`086c835`** field service selectable during
   onboarding), plus checklist line editing and removal with the snapshot-survival claim now proven
