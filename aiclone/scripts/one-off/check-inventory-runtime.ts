@@ -39,6 +39,34 @@ function checkInvertible(name: string, pass: boolean, detail = "") {
     check(name, INVERT ? !pass : pass, detail)
 }
 
+function deferred<T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void
+    let reject!: (reason?: unknown) => void
+    const promise = new Promise<T>((res, rej) => {
+        resolve = res
+        reject = rej
+    })
+    return { promise, resolve, reject }
+}
+
+async function settlesWithin(promise: Promise<unknown>, milliseconds: number): Promise<boolean> {
+    return Promise.race([
+        promise.then(
+            () => true,
+            () => true,
+        ),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), milliseconds)),
+    ])
+}
+
+type ReservationInterleaving = {
+    itemId: string
+    prewrites: number
+    firstPrewrite: ReturnType<typeof deferred<void>>
+    secondPrewrite: ReturnType<typeof deferred<void>>
+    releaseFirst: ReturnType<typeof deferred<void>>
+}
+
 class ControlledIdentity implements PlatformIdentity {
     current: string | null = null
     async userId(): Promise<string | null> {
@@ -80,6 +108,23 @@ async function main() {
     }
 
     const prisma = new PrismaClient()
+    let interleaving: ReservationInterleaving | null = null
+    prisma.$use(async (params, next) => {
+        const gate = interleaving
+        const args = params.args as { where?: { id?: unknown } } | undefined
+        if (gate && params.model === "InventoryItem" && params.action === "update" && args?.where?.id === gate.itemId) {
+            gate.prewrites += 1
+            if (gate.prewrites === 1) {
+                gate.firstPrewrite.resolve()
+                // reserve() has completed its balance read and engine guard before issuing this update.
+                // Hold T1 before the write, with its source-level FOR UPDATE lock still open.
+                await gate.releaseFirst.promise
+            } else if (gate.prewrites === 2) {
+                gate.secondPrewrite.resolve()
+            }
+        }
+        return next(params)
+    })
     const identity = new ControlledIdentity()
     const ctx = new InventoryContext(prisma, new PersistedTenancy(prisma, identity))
     const inventory = new InventoryService(ctx)
@@ -95,7 +140,7 @@ async function main() {
         profileA: `${RUN}_pa`, profileB: `${RUN}_pb`,
         wsA: `${RUN}_wa`, wsB: `${RUN}_wb`,
         locA: `${RUN}_la`, locA2: `${RUN}_la2`, locB: `${RUN}_lb`,
-        prodA: `${RUN}_pra`, prodA2: `${RUN}_pra2`, prodB: `${RUN}_prb`,
+        prodA: `${RUN}_pra`, prodA2: `${RUN}_pra2`, prodA3: `${RUN}_pra3`, prodB: `${RUN}_prb`,
         orderA: `${RUN}_oa`, orderB: `${RUN}_ob`,
     }
     const profileList = `'${ids.profileA}','${ids.profileB}'`
@@ -151,6 +196,7 @@ async function main() {
         }
         await prisma.location.create({ data: { id: ids.locA2, workspaceId: ids.wsA, name: "Second shop" } })
         await prisma.digitalProduct.create({ data: { id: ids.prodA2, profileId: ids.profileA, title: "Other widget" } })
+        await prisma.digitalProduct.create({ data: { id: ids.prodA3, profileId: ids.profileA, title: "Interleaving widget" } })
         await prisma.user.create({ data: { id: ids.userC, clerkId: `clerk_${ids.userC}`, email: `${ids.userC}@example.test` } })
         for (let n = 1; n <= 8; n += 1) {
             await prisma.orderLine.create({
@@ -329,7 +375,101 @@ async function main() {
         const raceHolds = await prisma.inventoryReservation.count({ where: { itemId: raceItem.record.id, state: "HELD" } })
         checkInvertible("only one hold row exists for the contested unit", raceHolds === 1, `holds=${raceHolds}`)
 
-        // ---- 9. the ledger replays to the stored balances ----------
+        // ---- 9. deterministic read interleaving measures lock necessity
+        // Promise.all alone does not prove contention. This barrier pauses T1 after reserve()
+        // has read the balance and passed its engine guard, but before its absolute balance
+        // write. T2 then calls the same real service method while T1 is still open.
+        const interleavedItem = await inventory.ensureItem(ids.wsA, { productId: ids.prodA3, locationId: ids.locA }, actor)
+        await inventory.applyMovement(ids.wsA, interleavedItem.record.id, { kind: "RECEIPT", qty: 5 }, actor)
+        for (const n of [203, 204]) {
+            await prisma.orderLine.create({
+                data: {
+                    id: line(n), orderId: ids.orderA, titleSnapshot: `Interleaving ${n}`, qty: 3,
+                    unitPriceCents: 500, lineTotalCents: 1500, productId: ids.prodA3,
+                },
+            })
+        }
+        const gate: ReservationInterleaving = {
+            itemId: interleavedItem.record.id,
+            prewrites: 0,
+            firstPrewrite: deferred<void>(),
+            secondPrewrite: deferred<void>(),
+            releaseFirst: deferred<void>(),
+        }
+        interleaving = gate
+        const t1 = inventory.reserve(ids.wsA, interleavedItem.record.id, { orderLineId: line(203), qty: 3 }, actor)
+        const firstPrewriteReached = await settlesWithin(gate.firstPrewrite.promise, 1_500)
+        let t2: Promise<unknown> | null = null
+        let secondPrewriteBeforeRelease = false
+        let t2SettledBeforeRelease = false
+        try {
+            if (firstPrewriteReached) {
+                t2 = inventory.reserve(ids.wsA, interleavedItem.record.id, { orderLineId: line(204), qty: 3 }, actor)
+                secondPrewriteBeforeRelease = await settlesWithin(gate.secondPrewrite.promise, 300)
+                if (secondPrewriteBeforeRelease) t2SettledBeforeRelease = await settlesWithin(t2, 1_500)
+            }
+        } finally {
+            // This is an application barrier, never a database timeout or deadlock.
+            gate.releaseFirst.resolve()
+        }
+        const interleavedOutcomes = await Promise.allSettled(t2 ? [t1, t2] : [t1])
+        interleaving = null
+        const interleavedAfter = await inventory.get(ids.wsA, interleavedItem.record.id)
+        const heldAfter = await prisma.inventoryReservation.findMany({
+            where: { itemId: interleavedItem.record.id, state: "HELD" },
+            select: { qty: true },
+        })
+        const reserveMovements = await prisma.inventoryMovement.findMany({
+            where: { itemId: interleavedItem.record.id, kind: "RESERVE" },
+            orderBy: { seq: "asc" },
+            select: { reservedDelta: true, reservedAfter: true },
+        })
+        const outcomeLabels = interleavedOutcomes.map((outcome) =>
+            outcome.status === "fulfilled"
+                ? "fulfilled"
+                : outcome.reason instanceof PersistenceError
+                  ? `${outcome.reason.code}:${outcome.reason.message}`
+                  : `SQL_OR_UNKNOWN:${outcome.reason instanceof Error ? outcome.reason.message.split("\n")[0] : String(outcome.reason)}`,
+        )
+        const heldQty = heldAfter.reduce((sum, row) => sum + Number(row.qty), 0)
+        const movementDelta = reserveMovements.reduce((sum, row) => sum + Number(row.reservedDelta), 0)
+        console.log(
+            `[inventory-interleaving] first prewrite=${firstPrewriteReached}; T2 prewrite before release=${secondPrewriteBeforeRelease}; ` +
+                `T2 settled before release=${t2SettledBeforeRelease}; outcomes=${outcomeLabels.join(" | ")}; ` +
+                `item=${interleavedAfter.onHand}/${interleavedAfter.reserved}; held=${heldAfter.length}/${heldQty}; ` +
+                `reserve movements=${reserveMovements.length}/${movementDelta}; after-values=${reserveMovements.map((row) => row.reservedAfter).join(",")}`,
+        )
+        const fulfilled = interleavedOutcomes.filter((outcome) => outcome.status === "fulfilled").length
+        const engineRefusals = interleavedOutcomes.filter(
+            (outcome) =>
+                outcome.status === "rejected" &&
+                outcome.reason instanceof PersistenceError &&
+                outcome.reason.code === "CONFLICT" &&
+                /Only 2 units are available/.test(outcome.reason.message),
+        ).length
+        checkInvertible(
+            "MEASURED: the row lock prevents T2 from reaching its post-read prewrite point until T1 is released",
+            firstPrewriteReached && !secondPrewriteBeforeRelease && !t2SettledBeforeRelease,
+            `first=${firstPrewriteReached} secondBeforeRelease=${secondPrewriteBeforeRelease} settledBeforeRelease=${t2SettledBeforeRelease}`,
+        )
+        checkInvertible(
+            "MEASURED: after serialization exactly one three-unit hold lands and the engine refuses the other against the updated balance",
+            interleavedOutcomes.length === 2 && fulfilled === 1 && engineRefusals === 1,
+            outcomeLabels.join(" | "),
+        )
+        checkInvertible(
+            "the item aggregate, hold rows, and movement ledger agree after the forced interleaving",
+            interleavedAfter.onHand === 5 &&
+                interleavedAfter.reserved === 3 &&
+                heldAfter.length === 1 &&
+                heldQty === 3 &&
+                reserveMovements.length === 1 &&
+                movementDelta === 3 &&
+                Number(reserveMovements[0]?.reservedAfter) === 3,
+            `item=${interleavedAfter.onHand}/${interleavedAfter.reserved} held=${heldAfter.length}/${heldQty} movements=${reserveMovements.length}/${movementDelta}`,
+        )
+
+        // ---- 10. the ledger replays to the stored balances ----------
         const movements = await inventory.movements(ids.wsA, itemId)
         let onHand = 0
         let reserved = 0

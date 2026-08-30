@@ -340,3 +340,53 @@ observable additive outcome; the new assertion carries the mechanism claim.
 - Fieldjob: normal `0` (`77/77`); visit-window source mutation `1` (`76/77`); source restored.
 - Retainer: normal with deterministic interleaving `0` (`88/88`); both target locks removed `1` (`87/88`); source restored.
 - `git diff --stat -- src`: no output; no `src/**` changes survive.
+
+
+## Group F — N1-A deterministic inventory lock necessity
+
+### Scope and method
+
+Audited the inventory reservation lock claim through the CWD-aware rehearsal runner from the assigned
+`n1a/inventory-lock-necessity` checkout. The new inert-by-default Prisma middleware barrier pauses T1 at
+its `InventoryItem.update`, after the real `InventoryService.reserve()` balance read and engine guard but
+before the absolute `reserved` write. T2 then calls the same service method while T1 remains open. The
+barrier always releases T1 in `finally`; no deadlock, lock timeout, or SQL error is accepted as evidence.
+
+All inventory mutations use the single centralized `InventoryContext.lockItem()` query. The controlled
+mutation removed its sole `FOR UPDATE` clause, reran the identical interleaving, and restored the source
+exactly.
+
+### Evidence
+
+| Claim | Locks present | Central `FOR UPDATE` removed | Conclusion |
+| --- | --- | --- | --- |
+| T2 reaches the post-read/prewrite point while T1 is held | No; T1 reached the barrier, T2 did not reach it or settle before release | Yes; T2 reached it and committed before T1 was released | The row lock creates the serialization; scheduling and the Prisma pool do not |
+| Reservation outcomes | T1 fulfilled; T2 received engine `CONFLICT: Only 2 units are available; 3 were requested` | Both fulfilled | The lock makes the second engine guard observe the committed first hold |
+| Item aggregate | `onHand=5`, `reserved=3` | `onHand=5`, `reserved=3` | Without the lock, T1 overwrote T2 with the same stale absolute value `3` |
+| Active hold rows | 1 row, quantity sum 3 | 2 rows, quantity sum 6 | Both promises persisted without the lock |
+| RESERVE movements | 1 row, delta sum 3, after-value 3 | 2 rows, delta sum 6, after-values `3,3` | The unlocked aggregate silently diverged from both ledgers |
+| Database CHECK | Satisfied | Satisfied; no refusal | `reserved <= onHand` sees only stale `3 <= 5` and cannot compare active-hold or movement sums |
+
+### Conclusion
+
+The measured unlocked outcome is a **lost update** that also leaves six units promised against five on
+hand. It is not a row-level `reserved > onHand` oversell and not a database CHECK refusal: both absolute
+writes store `reserved=3`, so the CHECK remains green while two active holds total 6. The engine guard alone
+cannot prevent this because both transactions read the same pre-update `reserved=0` and both pass. The row
+lock preserves serialization, making the second guard see `reserved=3` and refuse the second request; the
+CHECK preserves only the narrower single-row arithmetic invariant as a backstop.
+
+### Vacuity and validation
+
+All three new load-bearing assertions use `checkInvertible`. Normal execution passed 88/88; the controlled
+lock-removal mutation failed exactly those three assertions at 85/88; restored sequential inversion passed
+9/88 and exited non-zero, so 79 assertions flipped, including all three new assertions. This is a real,
+non-vacuous harness improvement.
+
+- Production-lock run: exit `0`, 88/88.
+- Lock-removal mutation: exit `1`, 85/88.
+- Restored production run, sequential: exit `0`, 88/88.
+- `INVERT_ASSERTION=1`, sequential: exit `1`, 9/88 (79 flipped).
+- `npx eslint scripts/one-off/check-inventory-runtime.ts`: exit `0`.
+- `git diff --stat -- src`: exit `0`, no output; no `src/**` changes survive.
+- Every run reported all five tracked fixture-table counts returned to baseline and the append-only trigger re-armed.
