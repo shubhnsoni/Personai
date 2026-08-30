@@ -62,6 +62,36 @@ const APPROVAL_OPTIONS: ReadonlyArray<{ value: ApprovalReason; label: string }> 
 
 const EXECUTABLE_STATES = new Set(["queued", "planning", "awaiting_approval", "interrupted"])
 
+const SELECTED_WORKSPACE_STORAGE_KEY = "business-os:selected-workspace-id"
+
+/**
+ * Reads the persisted workspace choice so it survives a remount. Uses localStorage -- a
+ * browser-native API the shell already runs in, adding no new dependency. Never throws:
+ * a disabled/unavailable storage (private browsing, SSR, a hardened browser policy) is
+ * treated as "no persisted choice" rather than a crash.
+ */
+function readPersistedWorkspaceId(): string {
+    if (typeof window === "undefined") return ""
+    try {
+        return window.localStorage.getItem(SELECTED_WORKSPACE_STORAGE_KEY) ?? ""
+    } catch {
+        return ""
+    }
+}
+
+function writePersistedWorkspaceId(workspaceId: string): void {
+    if (typeof window === "undefined") return
+    try {
+        if (workspaceId) {
+            window.localStorage.setItem(SELECTED_WORKSPACE_STORAGE_KEY, workspaceId)
+        } else {
+            window.localStorage.removeItem(SELECTED_WORKSPACE_STORAGE_KEY)
+        }
+    } catch {
+        // Storage unavailable -- the choice simply will not survive a remount this time.
+    }
+}
+
 type WorkspaceSummary = Readonly<{
     id: string
     profileId: string | null
@@ -216,7 +246,11 @@ function LoadingRows({ label }: { label: string }) {
 export function BusinessOsShell({
     blueprints,
     engines,
-    activeProfileId = null,
+    // Accepted for backward compatibility with the caller (src/app/dashboard/business-os/page.tsx,
+    // out of scope for this change) but no longer read: workspace selection is now explicit only --
+    // see the workspace-loading effect below. The old "prefer the workspace whose profileId matches
+    // the active profile" auto-selection has been deleted.
+    activeProfileId: _activeProfileId = null,
 }: {
     blueprints: BusinessBlueprint[]
     engines: EngineDescriptor[]
@@ -273,9 +307,21 @@ export function BusinessOsShell({
             setRuns(runResponse.runs)
             setSelectedWorkspaceId((current) => {
                 if (current && workspaceResponse.workspaces.some((workspace) => workspace.id === current)) return current
-                return workspaceResponse.workspaces.find((workspace) => workspace.profileId === activeProfileId)?.id
-                    ?? workspaceResponse.workspaces[0]?.id
-                    ?? ""
+                // Restore a persisted choice from a prior session/remount, but only if it is
+                // still an authorized membership -- a revoked/renamed workspace must not be
+                // silently re-selected.
+                const persisted = readPersistedWorkspaceId()
+                if (persisted && workspaceResponse.workspaces.some((workspace) => workspace.id === persisted)) {
+                    return persisted
+                }
+                // Auto-select only when there is exactly one authorized workspace -- there is no
+                // ambiguity and no choice to get wrong. With more than one, and no persisted
+                // choice restored above, leave the selection empty: that is the deliberate
+                // choose-a-workspace state, not a guess. The previous "prefer the workspace whose
+                // profileId matches, else workspaces[0]" fallback is deleted entirely: a profile
+                // match is not a user decision, and workspaces[0] is an alphabetical accident
+                // (PersistedTenancy orders memberships by workspace name).
+                return workspaceResponse.workspaces.length === 1 ? workspaceResponse.workspaces[0].id : ""
             })
             setSelectedRunId((current) => {
                 if (current && runResponse.runs.some((run) => run.id === current)) return current
@@ -285,7 +331,7 @@ export function BusinessOsShell({
             if (!isAbortError(error)) setFatalError(error)
         })
         return () => controller.abort()
-    }, [activeProfileId, revision])
+    }, [revision])
 
     useEffect(() => {
         if (!selectedWorkspaceId) {
@@ -315,6 +361,14 @@ export function BusinessOsShell({
         })
         return () => controller.abort()
     }, [revision, selectedWorkspaceId])
+
+    // Persist the choice so it survives a remount (see readPersistedWorkspaceId above). Runs for
+    // every path that changes selectedWorkspaceId -- explicit pick, single-workspace auto-select,
+    // and restoring a still-valid persisted choice -- and clears storage when the choice is empty
+    // (multi-workspace choose-a-workspace state, or no authorized workspace at all).
+    useEffect(() => {
+        writePersistedWorkspaceId(selectedWorkspaceId)
+    }, [selectedWorkspaceId])
 
     useEffect(() => {
         if (!selectedRunId) {
@@ -535,6 +589,16 @@ export function BusinessOsShell({
 
                     {workspaceCopy ? (
                         <Card><CardContent><ErrorState title={workspaceCopy.title} description={workspaceCopy.description} /></CardContent></Card>
+                    ) : !selectedWorkspaceId && workspaces && workspaces.length > 1 ? (
+                        <Card>
+                            <CardContent>
+                                <EmptyState
+                                    icon={<Database aria-hidden="true" />}
+                                    title="Choose a workspace"
+                                    description="You have more than one authorized workspace and none is guessed for you. Pick one above to see its contacts, tasks, and product configuration."
+                                />
+                            </CardContent>
+                        </Card>
                     ) : selectedWorkspace ? (
                         <div className="grid gap-4 lg:grid-cols-2">
                             <Card>

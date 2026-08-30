@@ -1601,11 +1601,19 @@ check(
 
 report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
 report.headingSequence = headingSequence
-report.result = failures.length === 0 ? "PASS" : "FAIL"
-report.failures = failures
 
-console.log(JSON.stringify(report, null, 2))
-if (failures.length > 0) process.exitCode = 1
+// The report and the exit code are decided at the END of this file, not here.
+//
+// They used to be decided at this point, and everything below - roughly a hundred lines of real
+// assertions across two appended sections - ran AFTERWARDS. So those assertions appended to `failures`
+// after `failures` had already been serialised into the report and after `process.exitCode` had already
+// been set. Any failure among them was invisible in the output AND non-fatal to the process, which is
+// how a genuinely failing assertion sat here unnoticed: it was never printed and never gated.
+//
+// Found by worker S6-A while adding to this file. It is the vacuity class one level up again - not an
+// assertion that tests nothing, but a real assertion whose RESULT was wired to nothing. A harness that
+// appends sections over time will keep growing past a mid-file exit decision, so the decision belongs
+// at the bottom where new sections cannot outrun it.
 
 // ---------------------------------------------------------------------------
 // S2-A — the workspace-aware surfaces panel. Root is building the
@@ -1672,8 +1680,30 @@ check(
         !/no-active-blueprint-installation[\s\S]{0,120}ErrorState/.test(workspaceSurfacesSrc),
 )
 check(
-    "the empty-installation copy does not imply the workspace is broken or misconfigured",
-    !/not (configured|set up) correctly|misconfigured|broken/i.test(workspaceSurfacesSrc),
+    "the empty-installation copy explicitly tells the reader this is not an error",
+    (() => {
+        // Three attempts, and the lesson is in the failures rather than the fix.
+        //
+        // 1. The original banned the words "misconfigured" and "broken" anywhere in the file. It FAILED,
+        //    because the panel's reassuring copy says "it is not an error or a sign anything is
+        //    misconfigured" - exactly the sentence the assertion wanted to exist.
+        //
+        // 2. Rewritten to require the negation AND forbid a bare claim, it still failed: the DOC COMMENT
+        //    says the copy is "never phrased so a reader could conclude the workspace is broken or
+        //    misconfigured". A comment explaining the rule tripped the rule. Fixed by stripping comments.
+        //
+        // 3. It STILL failed, because "not an error or a sign anything is misconfigured" contains the
+        //    substring "is misconfigured" whose negation lives eight words earlier. A regex cannot see
+        //    that, and trying to detect "an unnegated claim" in English will keep producing false
+        //    positives forever.
+        //
+        // So the check is now POSITIVE, which is both tractable and stronger: require the reassurance to
+        // be present. Delete the "not an error" sentence and this goes red, which is the property that
+        // actually matters. Renamed to say what it checks, because the old name promised more than any
+        // regex over prose can deliver.
+        const executable = workspaceSurfacesSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+        return /not an error/i.test(executable)
+    })(),
 )
 check(
     "MEASURED: unknownSurfaces is disclosed by name and framed as an outlived config, never as an error",
@@ -1709,3 +1739,128 @@ check(
     "the mount effect depends only on workspaceId, so a workspace change re-runs it",
     /\}, \[workspaceId\]\)/.test(workspaceSurfacesSrc),
 )
+
+// ---------------------------------------------------------------------------
+// S6-A — explicit workspace selection (closes the OPEN DEFECT MAJOR finding in
+// docs/orchestration/WORKSPACE_SURFACES_DECISION.md: "the shell selects a
+// workspace on the user's behalf"). BusinessOsShell fetches via useEffect,
+// which renderToStaticMarkup never runs (SSR-only, no effects, no
+// interactivity, no DOM/testing-library available in this shared worktree --
+// see the file header). So the auto-selection resolver and the choose-a-
+// workspace render path cannot be exercised through a live render here; they
+// are asserted against the component's own source, the same technique this
+// file already uses for behaviour it cannot render-check (e.g. the
+// "mount effect depends only on workspaceId" and "aborts the in-flight
+// request" assertions for workspace-surfaces-panel above).
+//
+// INVERT_ASSERTION=1 support is added here, additively and only for this new
+// section: this file had no INVERT/checkInvertible infrastructure before.
+// checkInvertible flips the boolean under the flag, exactly like every other
+// harness's convention, so this section's ability to fail is itself provable
+// without touching the plain `check()` calls above (which stay exactly as
+// they were -- never modified).
+// ---------------------------------------------------------------------------
+const INVERT = process.env.INVERT_ASSERTION === "1"
+function checkInvertible(name: string, pass: boolean, detail?: string) {
+    check(name, INVERT ? !pass : pass, detail)
+}
+
+// Snapshot so this section's own exit code reflects only ITS assertions. The pre-existing
+// `report.result`/`process.exitCode` computation above (line ~1608) already runs before the
+// S2-A/S6-A sections below it execute, so any of THEIR failures were never gating the process --
+// a latent bug in this shared file that predates this package and is not on this package's path
+// to fix (workspace-surfaces-panel.tsx, where the one currently-failing pre-existing assertion
+// lives, is not one of this package's two owned files). This section does not silently repeat
+// that masking, but it also must not newly fail the S6-A gate on a defect it did not introduce:
+// it reports every failure (nothing is hidden from `report.failures` below) while gating its own
+// exit code strictly on assertions added in this section.
+const failuresBeforeS6A = failures.length
+
+const workspaceResolverMatch = shellSrc.match(
+    /setSelectedWorkspaceId\(\(current\) => \{[\s\S]*?\n {12}\}\)/,
+)
+const workspaceResolverBody = workspaceResolverMatch ? workspaceResolverMatch[0] : ""
+check("workspace-selection resolver body found in the shell for scoped checks", workspaceResolverMatch !== null)
+
+checkInvertible(
+    "no unconditional workspaces[0] fallback remains -- the banned construction is `?? workspaces[0]` used to guess a selection",
+    !/\?\?\s*workspaceResponse\.workspaces\[0\]/.test(shellSrc) && !/\?\?\s*workspaces\[0\]/.test(shellSrc),
+    "found a `?? workspaces[0]` (or `?? workspaceResponse.workspaces[0]`) fallback -- the deleted guess-fallback has returned",
+)
+checkInvertible(
+    "the profileId-match auto-selection is deleted, not just the [0] fallback",
+    !/find\(\(workspace\) => workspace\.profileId === activeProfileId\)/.test(shellSrc),
+    "found a workspace lookup keyed on profileId matching the active profile -- auto-selection by profile match has returned",
+)
+checkInvertible(
+    "the resolver auto-selects only when there is exactly one authorized workspace",
+    /workspaceResponse\.workspaces\.length === 1 \? workspaceResponse\.workspaces\[0\]\.id : ""/.test(workspaceResolverBody),
+    "expected the single-workspace auto-select ternary keyed on workspaces.length === 1",
+)
+checkInvertible(
+    "the multi-workspace path resolves to an empty selection, not a guess",
+    /workspaceResponse\.workspaces\.length === 1 \? workspaceResponse\.workspaces\[0\]\.id : ""\s*\n\s*\}\)/.test(
+        workspaceResolverBody,
+    ),
+    "the resolver's ternary for more than one workspace does not resolve to the empty string as its final statement",
+)
+checkInvertible(
+    "a persisted choice is restored only when it is still an authorized membership",
+    /readPersistedWorkspaceId\(\)/.test(workspaceResolverBody) &&
+        /workspaceResponse\.workspaces\.some\(\(workspace\) => workspace\.id === persisted\)/.test(workspaceResolverBody),
+    "expected the resolver to validate a restored persisted id against the current workspace list",
+)
+checkInvertible(
+    "the choose-a-workspace state is reachable: rendered when nothing is selected and more than one workspace exists",
+    /!selectedWorkspaceId && workspaces && workspaces\.length > 1/.test(shellSrc) &&
+        /title="Choose a workspace"/.test(shellSrc),
+    "expected an explicit choose-a-workspace branch gated on !selectedWorkspaceId && workspaces.length > 1",
+)
+checkInvertible(
+    "the choose-a-workspace state is distinct from the panels grid and from the error state",
+    (() => {
+        const branchMatch = shellSrc.match(
+            /\{workspaceCopy \? \([\s\S]*?\) : !selectedWorkspaceId && workspaces && workspaces\.length > 1 \? \([\s\S]*?\) : selectedWorkspace \? \(/,
+        )
+        return branchMatch !== null
+    })(),
+    "expected the choose-a-workspace branch to sit between the workspaceCopy (error) branch and the selectedWorkspace (panels) branch",
+)
+checkInvertible(
+    "the selected workspace is persisted through a mechanism the shell already has (localStorage), adding no new dependency",
+    /window\.localStorage\.setItem\(SELECTED_WORKSPACE_STORAGE_KEY/.test(shellSrc) &&
+        /window\.localStorage\.getItem\(SELECTED_WORKSPACE_STORAGE_KEY\)/.test(shellSrc),
+    "expected the persisted-choice helpers to use window.localStorage with the shared storage key",
+)
+checkInvertible(
+    "persistence is cleared (not left stale) when the selection becomes empty",
+    /window\.localStorage\.removeItem\(SELECTED_WORKSPACE_STORAGE_KEY\)/.test(shellSrc),
+    "expected an explicit removeItem path for the empty-selection case",
+)
+checkInvertible(
+    "package.json gained no new dependency for persistence",
+    !/localforage|zustand|jotai|recoil|redux/i.test(readFileSync(join(__dirname, "../../package.json"), "utf8")),
+    "found a state/storage library in package.json that was not there before -- persistence must reuse a browser-native mechanism",
+)
+
+if (INVERT) console.log("INVERT_ASSERTION=1 was set -- failures in the S6-A section above are the expected proof")
+
+const s6aFailureCount = failures.length - failuresBeforeS6A
+report.rendered = { populatedBytes: populated.length, blueprintsRendered: blueprints.length, enginesRendered: engines.length }
+report.headingSequence = headingSequence
+// Gates on EVERY failure in the file, not just this section's.
+//
+// S6-A gated only on `s6aFailureCount` deliberately, and that was the right call at the time: a real
+// pre-existing assertion was failing (the "misconfigured" word-ban), it was outside S6-A's two owned
+// files, and refusing to let it block a new section was better than either ignoring it or silently
+// widening scope. It named the gap in the output instead.
+//
+// Root has now fixed that assertion, so the reason for the narrow gate is gone. Narrowing an exit code to
+// a subsection is a temporary measure by nature: leave it in place and the next appended section inherits
+// a harness that reports PASS while something below is red. `s6aFailureCount` is kept in the report
+// because knowing which section a failure came from is useful; it just no longer decides anything.
+report.result = failures.length === 0 ? "PASS" : "FAIL"
+report.failures = failures
+report.s6aSectionFailures = s6aFailureCount
+console.log(JSON.stringify(report, null, 2))
+if (failures.length > 0) process.exitCode = 1
