@@ -198,18 +198,63 @@ const blueprintWriteRoutes = platformRoutes.filter((filePath) =>
 )
 const schemaSrc = readFileSync(join(APP_ROOT, "prisma/schema.prisma"), "utf8")
 const installedBlueprintModels = [...schemaSrc.matchAll(/^\s*model\s+(\w*(?:Install|Blueprint)\w*)\b/gim)].map((match) => match[1])
-check(
-    "no blueprint write route or durable installed-blueprint model exists, so the map is honest in calling itself a correspondence",
-    blueprintWriteRoutes.length === 0 && installedBlueprintModels.length === 0,
-    [
-        ...blueprintWriteRoutes.map((filePath) => `write route ${filePath.replace(APP_ROOT, "")}`),
-        ...installedBlueprintModels.map((model) => `schema model ${model}`),
-    ].join(", ") || `${platformRoutes.length} api routes; no blueprint writes or installed-blueprint models`,
+
+// ---- INSTALLATION NOW EXISTS, so this invariant changed shape ------------
+// It used to assert that nothing could install a blueprint, and it was written to go red the moment
+// that stopped being true - which it now has: there is a BlueprintInstallation model and a POST route.
+// Leaving the old assertion would have meant either deleting it or weakening it, and both would have
+// thrown away the reason it existed. So it is REPLACED by the claim that actually matters once
+// installation is real, and which is strictly harder to satisfy:
+//
+//   ONBOARDING MUST HAVE NO PATH TO THE INSTALL RUNTIME.
+//
+// The old risk was "the map overclaims what it does". The new risk is far worse and entirely concrete:
+// "signing up quietly reconfigures a workspace". A single import in onboarding-needs.ts would do it.
+checkInvertible(
+    "MEASURED: installation now genuinely exists - there is a durable model and a blueprint write route",
+    installedBlueprintModels.length > 0 && blueprintWriteRoutes.length > 0,
+    `${installedBlueprintModels.join(", ")}; ${blueprintWriteRoutes.map((f) => f.replace(APP_ROOT, "")).join(", ")}`,
 )
 const needsSrc = readFileSync(join(APP_ROOT, "src/lib/onboarding-needs.ts"), "utf8")
+checkInvertible(
+    "MEASURED: the onboarding module has NO import of and no reference to the install runtime, so choosing a role cannot install anything",
+    !/business-os\/install/.test(needsSrc) &&
+        !/BlueprintInstallService|blueprintInstallApi|\.install\s*\(/.test(needsSrc),
+    "no install import, no install call",
+)
+// The whole onboarding tree, not just the map: an install call one file away would be just as bad.
+const onboardingFiles = [
+    "src/lib/onboarding-needs.ts",
+    "src/lib/surfaces.ts",
+    "src/app/onboarding/page.tsx",
+]
+    .map((rel) => join(APP_ROOT, rel))
+    .filter((abs) => existsSync(abs))
+const onboardingInstallers = onboardingFiles.filter((abs) => {
+    const src = readFileSync(abs, "utf8")
+    return /business-os\/install|blueprintInstallApi|BlueprintInstallService/.test(src)
+})
+checkInvertible(
+    "MEASURED: nothing on the onboarding path reaches the install runtime",
+    onboardingInstallers.length === 0,
+    onboardingInstallers.map((f) => f.replace(APP_ROOT, "")).join(", ") ||
+        `${onboardingFiles.length} onboarding files checked, none installs`,
+)
+// And installing must require the STRONGER permission. profile.update is held by MANAGER; installing
+// re-terms a whole workspace, so it asks for workspace.update, which only OWNER and ADMIN hold.
+const installSharedSrc = readFileSync(join(APP_ROOT, "src/lib/business-os/install-shared.ts"), "utf8")
+checkInvertible(
+    "MEASURED: the install write path asks for workspace.update, not the profile.update a MANAGER already holds",
+    /requireWritableWorkspace[\s\S]*?"workspace\.update"/.test(installSharedSrc),
+    "workspace.update on the write path",
+)
 check(
-    "the map states in the source that it does not install anything",
+    "the map still states in the source that it is not an installer",
     /WHAT THIS IS NOT: an installer/.test(needsSrc) && /CORRESPONDING_BLUEPRINT/.test(needsSrc),
+)
+check(
+    "the map's own comment acknowledges that installation now exists, rather than still claiming nothing can install",
+    /no longer true/.test(needsSrc) && /workspace\.update/.test(needsSrc),
 )
 check(
     "the map is not named as though it installs",

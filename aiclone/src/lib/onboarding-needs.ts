@@ -124,12 +124,21 @@ export function extrasFromAddons(role: string, selected: AddonId[]) {
 /**
  * Which built-in blueprint an onboarding role corresponds to.
  *
- * WHAT THIS IS NOT: an installer. Nothing in this repository installs a blueprint into a workspace -
- * there is no installation runtime, no durable record of an installed blueprint, and no route that
- * would create one. This map records a CORRESPONDENCE so the product can say "the business type you
- * chose is described by this blueprint", and that is the whole of its meaning. A reader who assumes
- * choosing a role configures a workspace would be wrong, so the name says `CORRESPONDING`, not
- * `INSTALLS`.
+ * WHAT THIS IS NOT: an installer. This distinction USED to be easy, because nothing in this repository
+ * could install a blueprint at all. That is no longer true - there is now a durable installation record
+ * (`BlueprintInstallation`), a runtime, and a `POST` route that creates one - which makes the
+ * distinction more important rather than less.
+ *
+ * So, precisely: choosing a role during onboarding installs NOTHING. This map records a CORRESPONDENCE
+ * so the product can say "the business type you chose is described by this blueprint". Installing is a
+ * separate, explicitly-invoked act that requires `workspace.update` - OWNER or ADMIN - and it must be
+ * performed deliberately against `POST /api/platform/workspaces/{id}/blueprint`. This module has no
+ * import of, and no path to, the install runtime, and `check-onboarding-blueprint-coverage.ts` asserts
+ * that absence: the risk it now guards is no longer "the map overclaims", it is "signing up quietly
+ * reconfigures a workspace".
+ *
+ * The name still says `CORRESPONDING`, not `INSTALLS`, and now it says it against a codebase where
+ * installing is a real thing that something else does.
  *
  * WHY IT LIVES HERE rather than in src/lib/business-os. The blueprint registry is deliberately
  * self-contained: it describes engines and capabilities and knows nothing about onboarding. Pointing

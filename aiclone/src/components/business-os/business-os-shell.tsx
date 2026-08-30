@@ -26,6 +26,7 @@ import { ReservationsPanel } from "@/components/business-os/reservations-panel"
 import { AccessLevelsPanel } from "@/components/business-os/access-levels-panel"
 import { AppointmentsPanel } from "@/components/business-os/appointments-panel"
 import { BlueprintPreviewPanel } from "@/components/business-os/blueprint-preview-panel"
+import { BlueprintInstallPanel } from "@/components/business-os/blueprint-install-panel"
 import { CasesPanel } from "@/components/business-os/cases-panel"
 import { CohortsPanel } from "@/components/business-os/cohorts-panel"
 import { CommercePanel } from "@/components/business-os/commerce-panel"
@@ -629,6 +630,11 @@ export function BusinessOsShell({
                             {/* Read-only. Preview says what choosing a blueprint would mean; it cannot
                                 install, and the panel states that rather than implying a missing feature. */}
                             <BlueprintPreviewPanel workspaceId={selectedWorkspaceId} />
+
+                            {/* Installation. Preview above says what a blueprint would mean; this records
+                                the choice durably. It grants nothing: surfaces stay per-profile, and the
+                                owner console still needs its own explicit opt-in. */}
+                            <BlueprintInstallPanel workspaceId={selectedWorkspaceId} />
 
                             <ReservationsPanel workspaceId={selectedWorkspaceId} />
 

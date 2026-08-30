@@ -696,15 +696,35 @@ async function main() {
             },
         )
 
-        // ---- 13. tenancy cascade ---------------------------------------------
-        await accepts("deleting a workspace cascades its installations away rather than orphaning them", "t22", async (tx, s) => {
-            await insertInstall(tx, s, `${RUN}_t22_a`)
-            await tx.$executeRawUnsafe(`delete from "Workspace" where "id" = '${s.workspaceA}'`)
-            const left = await tx.$queryRawUnsafe<{ n: bigint }[]>(
-                `select count(*)::bigint as n from "BlueprintInstallation" where "id" = '${RUN}_t22_a'`,
-            )
-            if (Number(left[0].n) !== 0) throw new Error(`installation survived its workspace: ${Number(left[0].n)} row(s)`)
-        })
+        // ---- 13. tenancy cascade, and the limit the ledger imposes on it ------
+        await accepts(
+            "deleting a workspace cascades an installation with NO history away rather than orphaning it",
+            "t22",
+            async (tx, s) => {
+                await insertInstall(tx, s, `${RUN}_t22_a`)
+                await tx.$executeRawUnsafe(`delete from "Workspace" where "id" = '${s.workspaceA}'`)
+                const left = await tx.$queryRawUnsafe<{ n: bigint }[]>(
+                    `select count(*)::bigint as n from "BlueprintInstallation" where "id" = '${RUN}_t22_a'`,
+                )
+                if (Number(left[0].n) !== 0) throw new Error(`installation survived its workspace: ${Number(left[0].n)} row(s)`)
+            },
+        )
+        // And the half that the assertion above would otherwise hide. Once a ledger line exists the
+        // workspace can no longer be deleted at all: a CASCADE still fires the BEFORE DELETE trigger, so
+        // append-only wins over the cascade. That is consistent with ActivityEvent and CopilotAuditEvent,
+        // which have made Contact and workspace deletion conditional in the same way since long before
+        // this package - but it is a real consequence of choosing append-only, and asserting only the
+        // no-history case would have advertised a deletion path that does not exist in practice.
+        await refusesBy(
+            "MEASURED: once the ledger has a line, deleting the workspace is REFUSED - append-only outranks the cascade",
+            "t23",
+            /append-only/i,
+            async (tx, s) => {
+                await insertInstall(tx, s, `${RUN}_t23_a`)
+                await insertEvent(tx, `${RUN}_t23_e`, `${RUN}_t23_a`, s.workspaceA)
+                await tx.$executeRawUnsafe(`delete from "Workspace" where "id" = '${s.workspaceA}'`)
+            },
+        )
 
         // ---- 14. residue ------------------------------------------------------
         const after = await counts(prisma)
