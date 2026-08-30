@@ -403,8 +403,122 @@ async function main() {
             `lines=${afterEdit.items.length} first="${afterEdit.items[0].label}" required=${afterEdit.items[0].required}`,
         )
 
-        const replay = await inspections.create(
-            ids.wsA,
+        // ---- 4b. the same claim, through the ENGINE's own edit and remove paths --------------
+        //
+        // The block above edits the template row directly with Prisma. That proves the SCHEMA's
+        // snapshot design, but it does not exercise updateItem and removeItem, and removeItem is where
+        // the real risk lives: it DELETES the line and relies on onDelete: SetNull to leave the
+        // snapshot standing. A cascade there would silently destroy recorded answers, and no assertion
+        // above would have noticed.
+        const editedThroughEngine = await templates.updateItem(ids.wsA, tpl.template.id, li1.id, {
+            label: "Reworded through the engine",
+            guidance: "added later",
+        })
+        check(
+            "updateItem changes the template line itself",
+            editedThroughEngine.label === "Reworded through the engine" && editedThroughEngine.guidance === "added later",
+            `label="${editedThroughEngine.label}"`,
+        )
+        const afterEngineEdit = await inspections.get(ids.wsA, created.inspection.id)
+        checkInvertible(
+            "MEASURED: editing a line through the engine does not change what the inspection asked",
+            afterEngineEdit.items.length === 4 &&
+                afterEngineEdit.items[1].label === afterEdit.items[1].label &&
+                afterEngineEdit.items[1].guidance === afterEdit.items[1].guidance,
+            `snapshot label="${afterEngineEdit.items[1].label}" guidance="${String(afterEngineEdit.items[1].guidance)}"`,
+        )
+
+        // Record an answer first, so the deletion is against a line whose answer exists. No transition
+        // is needed - DRAFT is already recordable - and deliberately none is made, because a later
+        // section of this harness owns the DRAFT -> IN_PROGRESS move and would conflict with a second.
+        await inspections.recordItem(ids.wsA, created.inspection.id, afterEngineEdit.items[0].id, { result: "PASS" }, actor)
+        const beforeRemoval = await inspections.get(ids.wsA, created.inspection.id)
+        const answeredId = beforeRemoval.items[0].id
+        const answeredLabel = beforeRemoval.items[0].label
+        const answeredResult = beforeRemoval.items[0].result
+
+        const removal = await templates.removeItem(ids.wsA, tpl.template.id, li0.id)
+        checkInvertible(
+            "removeItem reports how many snapshots keep the question, measured rather than implied",
+            removal.snapshotsRetained >= 1,
+            `snapshotsRetained=${removal.snapshotsRetained}`,
+        )
+        const afterRemoval = await inspections.get(ids.wsA, created.inspection.id)
+        const survivor = afterRemoval.items.find((item) => item.id === answeredId)
+        checkInvertible(
+            "MEASURED: removing a template line does NOT delete the snapshotted question or its answer",
+            afterRemoval.items.length === beforeRemoval.items.length &&
+                survivor !== undefined &&
+                survivor.label === answeredLabel &&
+                survivor.result === answeredResult,
+            `lines=${afterRemoval.items.length} survivor="${String(survivor?.label)}" result=${String(survivor?.result)}`,
+        )
+        checkInvertible(
+            "the snapshot loses only its provenance pointer, which is what SetNull is for",
+            survivor?.templateItemId === null,
+            `templateItemId=${String(survivor?.templateItemId)}`,
+        )
+        check(
+            "the template itself lost the line",
+            (await templates.get(ids.wsA, tpl.template.id)).items.every((item) => item.id !== li0.id),
+        )
+
+        // Refusals on the new paths. The workspace-level refusal and the LINE-level refusal are
+        // different refusals, so they are asserted separately - comparing them would have been the
+        // same mistake the routes audit found earlier in this program, where a "foreign row" test
+        // actually failed at workspace authorization and never reached row ownership.
+        const foreignWorkspaceEdit = await attempt(() =>
+            templates.updateItem(ids.wsB, tpl.template.id, li1.id, { label: "theirs" }),
+        )
+        check(
+            "editing a checklist line from another tenant's workspace is refused",
+            !foreignWorkspaceEdit.ok && foreignWorkspaceEdit.code === "FORBIDDEN",
+            why(foreignWorkspaceEdit),
+        )
+
+        // Non-enumeration for LINE ids: a real line that belongs to a different checklist of the SAME
+        // tenant must refuse identically to a line that does not exist at all. Both reach
+        // ownedTemplateItem, which is the only place that can distinguish them.
+        const otherTpl = await templates.create(ids.wsA, { name: "Unrelated checklist" })
+        const otherLine = await templates.addItem(ids.wsA, otherTpl.template.id, { label: "Unrelated line" })
+        const wrongTemplateLine = await attempt(() =>
+            templates.updateItem(ids.wsA, tpl.template.id, otherLine.id, { label: "x" }),
+        )
+        const ghostEdit = await attempt(() => templates.updateItem(ids.wsA, tpl.template.id, `${RUN}_ghost_line`, { label: "x" }))
+        checkInvertible(
+            "MEASURED: a line from another checklist and a nonexistent line are BYTE-IDENTICAL refusals",
+            !wrongTemplateLine.ok && !ghostEdit.ok && envelope(ghostEdit) === envelope(wrongTemplateLine),
+            `wrongTemplate=${envelope(wrongTemplateLine)} ghost=${envelope(ghostEdit)}`,
+        )
+        const foreignRemove = await attempt(() => templates.removeItem(ids.wsB, tpl.template.id, li1.id))
+        check(
+            "removing a checklist line from another tenant's workspace is refused",
+            !foreignRemove.ok && foreignRemove.code === "FORBIDDEN",
+            why(foreignRemove),
+        )
+        const ghostRemove = await attempt(() => templates.removeItem(ids.wsA, tpl.template.id, otherLine.id))
+        checkInvertible(
+            "removing a line that belongs to another checklist is refused, so remove cannot reach across",
+            !ghostRemove.ok && ghostRemove.code === "FORBIDDEN",
+            why(ghostRemove),
+        )
+        // The engine's own validation must survive an edit, not only an insert.
+        const unitCleared = await attempt(() => templates.updateItem(ids.wsA, tpl.template.id, li1.id, { unit: null }))
+        checkInvertible(
+            "clearing a measurement line's unit through an edit is refused, exactly as on insert",
+            !unitCleared.ok && unitCleared.code === "CONFLICT",
+            why(unitCleared),
+        )
+        const invertedRange = await attempt(() =>
+            templates.updateItem(ids.wsA, tpl.template.id, li1.id, { expectedMin: 9, expectedMax: 1 }),
+        )
+        checkInvertible(
+            "an inverted expected range is refused on edit too",
+            !invertedRange.ok && invertedRange.code === "CONFLICT",
+            why(invertedRange),
+        )
+
+        const replay = await inspections.create(            ids.wsA,
             { jobId: ids.jobA, reference: "ignored", templateId: tpl.template.id, idempotencyKey: "i1" },
             actor,
         )

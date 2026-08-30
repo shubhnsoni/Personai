@@ -457,6 +457,36 @@ export class FieldJobApiService {
         })
     }
 
+    /**
+     * Editing a line takes only the fields present in the body, so correcting a label cannot clear a
+     * range by omission. `kind` is deliberately not editable - see the engine for why.
+     */
+    updateTemplateItem(templateId: string, itemId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const input = await body(request)
+            const row = await this.templates.updateItem(str(input.workspaceId, "workspaceId"), templateId, itemId, {
+                ...(input.label !== undefined ? { label: nullableStr(input.label, "label") } : {}),
+                ...(input.guidance !== undefined ? { guidance: nullableStr(input.guidance, "guidance") } : {}),
+                ...(input.required !== undefined ? { required: optBool(input.required, "required") } : {}),
+                ...(input.unit !== undefined ? { unit: nullableStr(input.unit, "unit") } : {}),
+                ...(input.expectedMin !== undefined ? { expectedMin: optDecimal(input.expectedMin, "expectedMin") } : {}),
+                ...(input.expectedMax !== undefined ? { expectedMax: optDecimal(input.expectedMax, "expectedMax") } : {}),
+            })
+            return success({ item: serialise({ ...row }) })
+        })
+    }
+
+    /**
+     * Removes a line. `snapshotsRetained` is returned so a caller can say how many past inspections
+     * keep the question rather than implying the record was erased with it.
+     */
+    removeTemplateItem(templateId: string, itemId: string, request: Request): Promise<Response> {
+        return this.run(async () => {
+            const result = await this.templates.removeItem(param(request, "workspaceId"), templateId, itemId)
+            return success({ removedId: result.removedId, snapshotsRetained: result.snapshotsRetained })
+        })
+    }
+
     updateTemplate(templateId: string, request: Request): Promise<Response> {
         return this.run(async () => {
             const input = await body(request)

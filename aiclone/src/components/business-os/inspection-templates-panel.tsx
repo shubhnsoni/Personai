@@ -97,6 +97,10 @@ export function InspectionTemplatesPanel({ workspaceId }: { workspaceId: string 
     const [lineMin, setLineMin] = useState("")
     const [lineMax, setLineMax] = useState("")
 
+    // per-line edit form, keyed by line id. An owner fixing a typo should not have to retype the line.
+    const [editLabel, setEditLabel] = useState<Record<string, string>>({})
+    const [removedNote, setRemovedNote] = useState<string | null>(null)
+
     const loadTemplates = useCallback(
         async (signal?: AbortSignal) => {
             if (!workspaceId) return
@@ -221,8 +225,7 @@ export function InspectionTemplatesPanel({ workspaceId }: { workspaceId: string 
         [renameTo, send, workspaceId],
     )
 
-    const addLine = useCallback(
-        (templateId: string) => {
+    const addLine = useCallback(        (templateId: string) => {
             const label = lineLabel.trim()
             if (!label) return
             void send(async () => {
@@ -250,6 +253,59 @@ export function InspectionTemplatesPanel({ workspaceId }: { workspaceId: string 
         [lineLabel, lineKind, lineRequired, lineGuidance, lineUnit, lineMin, lineMax, send, workspaceId],
     )
 
+    const renameLine = useCallback(
+        (templateId: string, itemId: string, currentLabel: string) => {
+            const next = (editLabel[itemId] ?? currentLabel).trim()
+            if (!next || next === currentLabel) return
+            void send(async () => {
+                await inspectionRequest(
+                    `/api/platform/inspection-templates/${encodeURIComponent(templateId)}/items/${encodeURIComponent(itemId)}`,
+                    {
+                        method: "PATCH",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ workspaceId, label: next }),
+                    },
+                )
+                setRemovedNote(null)
+            })
+        },
+        [editLabel, send, workspaceId],
+    )
+
+    const setLineRequiredFlag = useCallback(
+        (templateId: string, itemId: string, required: boolean) => {
+            void send(() =>
+                inspectionRequest(
+                    `/api/platform/inspection-templates/${encodeURIComponent(templateId)}/items/${encodeURIComponent(itemId)}`,
+                    {
+                        method: "PATCH",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ workspaceId, required }),
+                    },
+                ),
+            )
+        },
+        [send, workspaceId],
+    )
+
+    const removeLine = useCallback(
+        (templateId: string, itemId: string) => {
+            void send(async () => {
+                const result = await inspectionRequest<{ snapshotsRetained: number }>(
+                    `/api/platform/inspection-templates/${encodeURIComponent(templateId)}/items/${encodeURIComponent(itemId)}?workspaceId=${encodeURIComponent(workspaceId)}`,
+                    { method: "DELETE" },
+                )
+                // The server counts them, so the number is measured rather than implied.
+                setRemovedNote(
+                    result.snapshotsRetained === 0
+                        ? "Line removed. No past inspection had been created from it."
+                        : `Line removed. ${result.snapshotsRetained} past inspection${result.snapshotsRetained === 1 ? "" : "s"} keep the question and the answer that was recorded.`,
+                )
+            })
+        },
+        [send, workspaceId],
+    )
+
     if (!workspaceId) {
         return (
             <EmptyState
@@ -259,7 +315,6 @@ export function InspectionTemplatesPanel({ workspaceId }: { workspaceId: string 
             />
         )
     }
-
     return (
         <Card>
             <CardHeader>
@@ -391,6 +446,11 @@ export function InspectionTemplatesPanel({ workspaceId }: { workspaceId: string 
                                                 <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                                     Lines
                                                 </h5>
+                                                {removedNote ? (
+                                                    <p className="mt-1 rounded-md border border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                                                        {removedNote}
+                                                    </p>
+                                                ) : null}
                                                 {bundle.items.length === 0 ? (
                                                     <Nothing label="This checklist has no lines yet, so an inspection created from it would ask nothing." />
                                                 ) : (
@@ -422,6 +482,51 @@ export function InspectionTemplatesPanel({ workspaceId }: { workspaceId: string 
                                                                 {item.guidance ? (
                                                                     <p className="mt-1 text-muted-foreground">{item.guidance}</p>
                                                                 ) : null}
+                                                                <div className="mt-2 flex flex-wrap items-end gap-2">
+                                                                    <div className="min-w-[12rem] flex-1">
+                                                                        <Label htmlFor={`line-edit-${item.id}`}>Wording</Label>
+                                                                        <Input
+                                                                            id={`line-edit-${item.id}`}
+                                                                            value={editLabel[item.id] ?? item.label}
+                                                                            onChange={(event) =>
+                                                                                setEditLabel((prev) => ({
+                                                                                    ...prev,
+                                                                                    [item.id]: event.target.value,
+                                                                                }))
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        disabled={
+                                                                            busy ||
+                                                                            !(editLabel[item.id] ?? item.label).trim() ||
+                                                                            (editLabel[item.id] ?? item.label) === item.label
+                                                                        }
+                                                                        onClick={() => renameLine(template.id, item.id, item.label)}
+                                                                    >
+                                                                        Save wording
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        disabled={busy}
+                                                                        onClick={() =>
+                                                                            setLineRequiredFlag(template.id, item.id, !item.required)
+                                                                        }
+                                                                    >
+                                                                        {item.required ? "Make optional" : "Make required"}
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        disabled={busy}
+                                                                        onClick={() => removeLine(template.id, item.id)}
+                                                                    >
+                                                                        Remove line
+                                                                    </Button>
+                                                                </div>
                                                             </li>
                                                         ))}
                                                     </ol>

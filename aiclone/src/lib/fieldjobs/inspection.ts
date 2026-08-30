@@ -444,6 +444,98 @@ export class FieldJobInspectionTemplateService {
     }
 
     /**
+     * Edits a checklist line: fix a typo, add guidance, change whether it is required, adjust a
+     * range. Only fields present in the input are touched, so a caller correcting a label cannot
+     * accidentally clear a range by omitting it.
+     *
+     * SNAPSHOTTED ANSWERS ARE UNAFFECTED, and that is the whole reason this is safe to offer. An
+     * inspection copies its lines at creation; `templateItemId` is provenance only. So editing a line
+     * here cannot change what a past inspection asked or what a technician answered - which is
+     * asserted behaviourally, not merely stated.
+     */
+    async updateItem(
+        workspaceId: string,
+        templateId: string,
+        itemId: string,
+        input: Readonly<{
+            label?: string | null
+            guidance?: string | null
+            required?: boolean | null
+            unit?: string | null
+            expectedMin?: DecimalInput
+            expectedMax?: DecimalInput
+        }>,
+    ): Promise<TemplateItemRecord> {
+        const profileId = await this.ctx.requireProfile(workspaceId, "profile.update")
+        const template = await this.ownedTemplate(profileId, templateId)
+        const current = await this.ownedTemplateItem(template.id, itemId)
+
+        const label = input.label === undefined || input.label === null ? current.label : this.ctx.required(input.label, "label")
+        const unit = input.unit === undefined ? current.unit : input.unit?.trim() || null
+
+        // The kind is deliberately NOT editable. Changing a CHECK into a MEASUREMENT would leave every
+        // inspection snapshotted from it describing a different question than the one now on record,
+        // and a unit or range that the old snapshots never had. Delete the line and add the new one.
+        if (current.kind === "MEASUREMENT" && !unit) {
+            this.ctx.conflict("A measurement line needs a unit; a number with no unit is not a reading")
+        }
+
+        const min = input.expectedMin === undefined ? current.expectedMin : normaliseDecimal(input.expectedMin, "expectedMin")
+        const max = input.expectedMax === undefined ? current.expectedMax : normaliseDecimal(input.expectedMax, "expectedMax")
+        if (min !== null && max !== null && Number(max) < Number(min)) {
+            this.ctx.conflict("expectedMax cannot be below expectedMin")
+        }
+        if (current.kind !== "MEASUREMENT" && (min !== null || max !== null)) {
+            this.ctx.conflict("Only a measurement line can carry an expected range")
+        }
+
+        const row = await this.ctx.db.fieldJobInspectionTemplateItem.update({
+            where: { id: current.id },
+            data: {
+                label,
+                unit,
+                expectedMin: min,
+                expectedMax: max,
+                ...(input.guidance !== undefined ? { guidance: input.guidance?.trim() || null } : {}),
+                ...(typeof input.required === "boolean" ? { required: input.required } : {}),
+            },
+        })
+        return toTemplateItemRecord(row as RawTemplateItem)
+    }
+
+    /**
+     * Removes a checklist line so it is not asked again.
+     *
+     * Safe for the same reason editing is: inspections hold their own copy. The foreign key from a
+     * snapshotted item back to the template line is SetNull, so a past inspection keeps its question
+     * and its answer and simply loses the provenance pointer. Returns how many snapshots that applied
+     * to, so a caller can say "this stops being asked; N past inspections keep it" instead of guessing.
+     */
+    async removeItem(
+        workspaceId: string,
+        templateId: string,
+        itemId: string,
+    ): Promise<{ removedId: string; snapshotsRetained: number }> {
+        const profileId = await this.ctx.requireProfile(workspaceId, "profile.update")
+        const template = await this.ownedTemplate(profileId, templateId)
+        const current = await this.ownedTemplateItem(template.id, itemId)
+
+        const snapshotsRetained = await this.ctx.db.fieldJobInspectionItem.count({
+            where: { templateItemId: current.id },
+        })
+        await this.ctx.db.fieldJobInspectionTemplateItem.delete({ where: { id: current.id } })
+        return { removedId: current.id, snapshotsRetained }
+    }
+
+    /** Foreign and nonexistent refuse identically, so this cannot be used to discover line ids. */
+    private async ownedTemplateItem(templateId: string, itemId: string) {
+        const id = this.ctx.required(itemId, "itemId")
+        const row = await this.ctx.db.fieldJobInspectionTemplateItem.findUnique({ where: { id } })
+        if (!row || row.templateId !== templateId) this.ctx.denied()
+        return row
+    }
+
+    /**
      * Renames a checklist or retires it. `revision` is bumped on every edit as owner-visible
      * bookkeeping — it is NOT a version anybody can check out, because history is preserved by
      * snapshotting lines onto the inspection instead.
