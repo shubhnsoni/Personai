@@ -177,3 +177,109 @@ package, and doing it carelessly would produce a lot of green with no more meani
 - `check-operations-runtime.ts` — retained by root for the operations/cohort integration.
 - Group C (`check-course-access-runtime.ts`, `check-retainer-runtime.ts`, `check-reservation-authz.ts`) —
   not yet audited.
+
+
+## Group C — S3-A course access, retainers, and reservations
+
+### Scope and method
+
+Audited only the three assigned Group C runtime harnesses through the CWD-aware
+rehearsal runner from the assigned `s3a/vacuity-group-c` worktree. Every runner
+invocation identified that worktree and the authorized rehearsal database. Fixture
+IDs use each harness's timestamp-plus-random run prefix; every run reported its
+baseline counts restored and its append-only triggers re-armed.
+
+### Evidence table
+
+| Assertion / coverage claim | Harness location | Protected code | Break performed | Result |
+| --- | --- | --- | --- | --- |
+| Shared per-lesson rule agrees with the list's five representative cases | `check-course-access-runtime.ts:571` | `cohorts/access.ts:1105` unrestricted-rule branch | Changed `if (!rule) return true` to `return false` | Red: 85/87; this and the per-lesson/list agreement assertion failed. Restored run green 87/87. |
+| Shared rule and list agree for every lesson | `check-course-access-runtime.ts:588` | Same branch | Same mutation | Red with the named disagreement details; real, no fix needed. |
+| An owned but unlinked case cannot draw against a retainer | `check-retainer-runtime.ts:294` | `cases/retainers.ts:744` case-link guard | Changed `if (!link)` to `if (false)` | Red: 86/87. The fixture uses owner A, A's workspace, and A's unlinked case, so it reaches the per-row link guard. Restored run green 87/87. |
+| Foreign reservation get is forbidden | `check-reservation-authz.ts:190` | `reservations/engine.ts:217` `row.profileId !== profileId` ownership guard | Removed only the profile comparison | Red: 33/36; foreign get leaked. The caller is user B in B's valid workspace, proving the outer workspace guard was passed before the ownership check. |
+| Foreign and nonexistent reservation responses are identical | `check-reservation-authz.ts:195` | Same ownership guard | Same mutation | Red: foreign accepted while nonexistent remained forbidden. |
+| Foreign reservation history is forbidden | `check-reservation-authz.ts:436` | Same guard, reached by `history` | Same mutation | Red: foreign history leaked. Restored run green 36/36. |
+
+### Conclusion
+
+No proven assertion vacuity was found. Six assertions were source-mutated and all
+turned red against the named behavior; no harness changes or commit are warranted.
+
+One **suspected but unfixed proof gap** is recorded, not promoted to a finding:
+removing both `FOR UPDATE` clauses at `cases/retainers.ts:713` and `:928` left the
+existing two-draw concurrency run green (87/87). That does not prove the assertion
+vacuous: it names the observable additive outcome, which PostgreSQL scheduling may
+still preserve without those specific locks. Making the test claim lock necessity
+would require a deterministic read-interleaving harness, not source-text inspection;
+no careless widening was made.
+
+### Validation
+
+- Course access: normal `0` (87/87); inversion `1` (86/87), **1** assertion flipped; source mutation `1` (85/87); restored normal `0` (87/87).
+- Retainer: normal `0` (87/87); inversion `1` (86/87), **1** assertion flipped; owned-but-unlinked guard mutation `1` (86/87); restored normal `0` (87/87). Lock-removal probe remained `0` (87/87), recorded above.
+- Reservation authorization: normal `0` (36/36); inversion `1` (35/36), **1** assertion flipped; ownership mutation `1` (33/36); restored normal `0` (36/36).
+- `npx eslint scripts/one-off/check-course-access-runtime.ts scripts/one-off/check-retainer-runtime.ts scripts/one-off/check-reservation-authz.ts`: `0`.
+- `git diff --stat -- src`: no output; no `src/**` change survives.
+
+### Group C file status
+
+- `check-course-access-runtime.ts`: audited; two directly mutated assertions real.
+- `check-retainer-runtime.ts`: audited; owned-unlinked case refusal real; concurrency-lock necessity is an explicitly unfixed proof gap, not a certified vacuity.
+- `check-reservation-authz.ts`: audited; the Shape 3 ownership concern is disproven by a caller that passes workspace authorization and reaches row ownership.
+- `check-operations-runtime.ts`: not reached; explicitly retained by root.
+- `check-fieldjob-runtime.ts`: not reached; outside this assignment.
+
+
+---
+
+## Root note 2 — after Group C: the audit's most useful result is a proof gap, not a vacuity
+
+Final cross-pass tally: **14 assertions examined by real source mutation, 14 proven real, 1 vacuity
+found and fixed** (BP4's, in `check-capability-contract.ts`). Four workers, four passes, one defect.
+
+That is the headline and it should be read the right way round: **the assertion suite is substantially
+honest.** The vacuity class is real, it has cost this repository twice, and it is worth hunting — but it is
+not endemic, and three of four auditors correctly returned NO_CHANGE rather than manufacturing a finding.
+An auditor who reports something in every file should be disbelieved.
+
+### The finding that matters more than a vacuity
+
+Group C surfaced something the brief did not ask for and which no vacuity check would have caught.
+`check-retainer-runtime.ts:350` runs two parallel draws and claims they prove the `FOR UPDATE`
+serialization locks at `src/lib/cases/retainers.ts:713` and `:928`. **Removing BOTH `FOR UPDATE` clauses
+left the harness green, 87/87.**
+
+The auditor then did the harder and more valuable thing: it declined to call that vacuity. Its reasoning is
+correct and worth preserving — the assertion's named property is the *observable additive outcome*, and
+Postgres scheduling can preserve that outcome without those particular locks. So the assertion is not
+lying about what it checks; it is checking something weaker than a reader would assume from its name. The
+locks may well be necessary under contention the test never creates.
+
+**This is a distinct defect class from vacuity, and it needs a distinct name.** A vacuous assertion tests
+nothing. This assertion tests something real, but its NAME claims a mechanism it does not exercise. Call it
+an over-claiming assertion. It cannot be found by mutation alone — mutation says "green", which for a
+vacuity means "broken" and here means "insufficiently constrained" — and the two are only distinguishable
+by reasoning about what the property logically requires.
+
+Proving lock necessity needs deterministic read interleaving: two transactions held open at chosen points,
+not two promises raced. That is a real technique this repository does not currently use anywhere. Recorded
+as READY work with a known method, not as a bug.
+
+### The proof-mechanism weakness is now confirmed across six harnesses
+
+`INVERT_ASSERTION=1` flips exactly **one** assertion in each of `check-commerce-runtime` (110),
+`check-inventory-runtime` (85), `check-cohort-runtime` (114), `check-course-access-runtime` (87),
+`check-retainer-runtime` (87) and `check-reservation-authz` (36).
+
+Six for six. This is not legacy drift, it is the house habit — and `check-cohort-needs-action.ts` shipped
+with the same 1-of-32 shape in this very run before root widened it to 29-of-32. So it must be caught at
+review, on new files, rather than audited later.
+
+### What is left
+
+- `check-fieldjob-runtime.ts` — still not reached by any pass.
+- `check-operations-runtime.ts` — retained by root.
+- Widening `checkInvertible` coverage across the six harnesses above — its own package. Doing it carelessly
+  produces a lot of green with no more meaning than before.
+- A deterministic-interleaving technique for lock-necessity claims, then re-examining
+  `check-retainer-runtime.ts:350`.

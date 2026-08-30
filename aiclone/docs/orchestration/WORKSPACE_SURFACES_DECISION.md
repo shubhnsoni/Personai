@@ -126,6 +126,20 @@ wrong conclusion is a weaker guarantee than two functions that cannot be confuse
 The four-outcome table below still describes the system, but `profile-fallback` is now the *caller's*
 composition of the two methods rather than a mode of one.
 
+**The `source` VALUES in the table below are superseded too, and the table is left in place only because
+this correction refers to it.** S2-A flagged that two vocabularies coexisting in one document is a
+confusion hazard, and it was right. The authoritative strings are in
+`src/lib/business-os/workspace-surface-types.ts` and are:
+
+| Context | Authoritative `source` |
+|---|---|
+| workspace, ACTIVE installation | `active-blueprint-installation` |
+| workspace, no ACTIVE installation | `no-active-blueprint-installation` |
+| no workspace id | `legacy-profile` (from the separate `withoutWorkspace` method) |
+
+`workspace-installation` and `profile-fallback` below are **not real values** and never shipped. Build
+against the type file, never against this prose.
+
 So the resolver has four outcomes, and they must be distinguishable rather than collapsed:
 
 | Context | Source of surfaces | `source` |
