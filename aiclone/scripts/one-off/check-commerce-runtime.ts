@@ -46,6 +46,10 @@ function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
 
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    check(name, INVERT ? !pass : pass, detail)
+}
+
 class ControlledIdentity implements PlatformIdentity {
     current: string | null = null
     async userId(): Promise<string | null> {
@@ -137,12 +141,12 @@ async function main() {
                     else illegal += 1
                 }
             }
-            check(`${label} transition table is total over ${all.length}x${all.length} pairs`, legal + illegal === all.length ** 2, `legal=${legal} illegal=${illegal}`)
+            checkInvertible(`${label} transition table is total over ${all.length}x${all.length} pairs`, legal + illegal === all.length ** 2, `legal=${legal} illegal=${illegal}`)
         }
-        check("a shipped shipment cannot be cancelled, only delivered", !fulfilmentFlow.can("SHIPPED", "CANCELLED") && fulfilmentFlow.can("SHIPPED", "DELIVERED"))
-        check("delivered and cancelled shipments are terminal", fulfilmentFlow.isTerminal("DELIVERED") && fulfilmentFlow.isTerminal("CANCELLED"))
-        check("every return outcome is terminal", returnFlow.isTerminal("REJECTED") && returnFlow.isTerminal("RECEIVED") && returnFlow.isTerminal("CANCELLED"))
-        check("both restock outcomes are terminal", restockFlow.isTerminal("RESTOCKED") && restockFlow.isTerminal("DISCARDED"))
+        checkInvertible("a shipped shipment cannot be cancelled, only delivered", !fulfilmentFlow.can("SHIPPED", "CANCELLED") && fulfilmentFlow.can("SHIPPED", "DELIVERED"))
+        checkInvertible("delivered and cancelled shipments are terminal", fulfilmentFlow.isTerminal("DELIVERED") && fulfilmentFlow.isTerminal("CANCELLED"))
+        checkInvertible("every return outcome is terminal", returnFlow.isTerminal("REJECTED") && returnFlow.isTerminal("RECEIVED") && returnFlow.isTerminal("CANCELLED"))
+        checkInvertible("both restock outcomes are terminal", restockFlow.isTerminal("RESTOCKED") && restockFlow.isTerminal("DISCARDED"))
 
         // ---- seed two tenants with catalogues and orders ----------------
         for (const [u, p, w, l, pr, o] of [
@@ -188,39 +192,39 @@ async function main() {
         const anonVariant = await attempt(() => variants.create(ids.wsA, ids.prodA, { title: "X" }, actor))
         const anonFulfil = await attempt(() => fulfilments.create(ids.wsA, { orderId: ids.orderA, reference: "F" }, actor))
         const anonReturn = await attempt(() => returns.request(ids.wsA, { orderId: ids.orderA, reference: "R" }, actor))
-        check("anonymous variant create refused UNAUTHORIZED", !anonVariant.ok && anonVariant.code === "UNAUTHORIZED", why(anonVariant))
-        check("anonymous shipment create refused UNAUTHORIZED", !anonFulfil.ok && anonFulfil.code === "UNAUTHORIZED", why(anonFulfil))
-        check("anonymous return request refused UNAUTHORIZED", !anonReturn.ok && anonReturn.code === "UNAUTHORIZED", why(anonReturn))
-        check("anonymous wrote zero variants", beforeVariants === (await prisma.productVariant.count()), `before=${beforeVariants}`)
-        check("anonymous appended zero commerce events", beforeEvents === (await prisma.commerceEvent.count()), `before=${beforeEvents}`)
-        check("anonymous made zero external calls", fetchCalls === anonFetch, `calls=${fetchCalls - anonFetch}`)
+        checkInvertible("anonymous variant create refused UNAUTHORIZED", !anonVariant.ok && anonVariant.code === "UNAUTHORIZED", why(anonVariant))
+        checkInvertible("anonymous shipment create refused UNAUTHORIZED", !anonFulfil.ok && anonFulfil.code === "UNAUTHORIZED", why(anonFulfil))
+        checkInvertible("anonymous return request refused UNAUTHORIZED", !anonReturn.ok && anonReturn.code === "UNAUTHORIZED", why(anonReturn))
+        checkInvertible("anonymous wrote zero variants", beforeVariants === (await prisma.productVariant.count()), `before=${beforeVariants}`)
+        checkInvertible("anonymous appended zero commerce events", beforeEvents === (await prisma.commerceEvent.count()), `before=${beforeEvents}`)
+        checkInvertible("anonymous made zero external calls", fetchCalls === anonFetch, `calls=${fetchCalls - anonFetch}`)
 
         identity.current = `clerk_${ids.userC}`
         const outsider = await attempt(() => variants.list(ids.wsA, ids.prodA))
-        check("authenticated non-member refused FORBIDDEN", !outsider.ok && outsider.code === "FORBIDDEN", why(outsider))
+        checkInvertible("authenticated non-member refused FORBIDDEN", !outsider.ok && outsider.code === "FORBIDDEN", why(outsider))
 
         // ---- 2. the default variant is created on demand, once ----------
         identity.current = `clerk_${ids.userA}`
         const firstDefault = await inventory.ensureDefaultVariant(ids.profileA, ids.prodA)
-        check("the default variant id follows the migration's convention", firstDefault === `var_${ids.prodA}`, firstDefault)
+        checkInvertible("the default variant id follows the migration's convention", firstDefault === `var_${ids.prodA}`, firstDefault)
         const secondDefault = await inventory.ensureDefaultVariant(ids.profileA, ids.prodA)
-        check("resolving the default variant twice returns the same row", secondDefault === firstDefault, secondDefault)
+        checkInvertible("resolving the default variant twice returns the same row", secondDefault === firstDefault, secondDefault)
         const defaultRow = await prisma.productVariant.findUnique({ where: { id: firstDefault } })
-        check("the default variant inherits the product price rather than copying it", defaultRow?.priceCents === null, `${defaultRow?.priceCents}`)
-        check("the default variant carries the product sku", defaultRow?.sku === `${ids.prodA}-SKU`, `${defaultRow?.sku}`)
+        checkInvertible("the default variant inherits the product price rather than copying it", defaultRow?.priceCents === null, `${defaultRow?.priceCents}`)
+        checkInvertible("the default variant carries the product sku", defaultRow?.sku === `${ids.prodA}-SKU`, `${defaultRow?.sku}`)
         const defaultCount = await prisma.productVariant.count({ where: { productId: ids.prodA, isDefault: true } })
-        check("exactly one default variant exists for the product", defaultCount === 1, `n=${defaultCount}`)
+        checkInvertible("exactly one default variant exists for the product", defaultCount === 1, `n=${defaultCount}`)
 
         // ---- 3. options, values and variants ---------------------------
         const option = await variants.addOption(ids.wsA, ids.prodA, { name: "Size", values: ["S", "M", "L"] }, actor)
         const optionRows = await variants.listOptions(ids.wsA, ids.prodA)
-        check("the option was created with its three values", optionRows.length === 1 && optionRows[0].values.length === 3, `values=${optionRows[0]?.values.length}`)
+        checkInvertible("the option was created with its three values", optionRows.length === 1 && optionRows[0].values.length === 3, `values=${optionRows[0]?.values.length}`)
         const dupOption = await attempt(() => variants.addOption(ids.wsA, ids.prodA, { name: "Size" }, actor))
-        check("a duplicate option name on one product is refused", !dupOption.ok && dupOption.code === "CONFLICT", why(dupOption))
+        checkInvertible("a duplicate option name on one product is refused", !dupOption.ok && dupOption.code === "CONFLICT", why(dupOption))
         const dupValues = await attempt(() => variants.addOption(ids.wsA, ids.prodA, { name: "Colour", values: ["Red", "Red"] }, actor))
-        check("repeated option values are refused before anything is written", !dupValues.ok && dupValues.code === "CONFLICT", why(dupValues))
+        checkInvertible("repeated option values are refused before anything is written", !dupValues.ok && dupValues.code === "CONFLICT", why(dupValues))
         const dupValue = await attempt(() => variants.addOptionValue(ids.wsA, option.id, { value: "M" }, actor))
-        check("a duplicate value on one option is refused", !dupValue.ok && dupValue.code === "CONFLICT", why(dupValue))
+        checkInvertible("a duplicate value on one option is refused", !dupValue.ok && dupValue.code === "CONFLICT", why(dupValue))
 
         const sizeS = optionRows[0].values.find((v) => v.value === "S")!
         const sizeM = optionRows[0].values.find((v) => v.value === "M")!
@@ -229,49 +233,49 @@ async function main() {
             { title: "Small", sku: `${RUN}-S`, priceCents: 1800, optionValueIds: [sizeS.id], idempotencyKey: `${RUN}-v1` },
             actor,
         )
-        check("a variant was created with its own price", small.record.priceCents === 1800 && small.record.effectivePriceCents === 1800, `${small.record.priceCents}`)
-        check("a created variant is never the default", small.record.isDefault === false)
+        checkInvertible("a variant was created with its own price", small.record.priceCents === 1800 && small.record.effectivePriceCents === 1800, `${small.record.priceCents}`)
+        checkInvertible("a created variant is never the default", small.record.isDefault === false)
         const replay = await variants.create(ids.wsA, ids.prodA, { title: "Different", idempotencyKey: `${RUN}-v1` }, actor)
-        check("variant replay returns the original", replay.replayed && replay.record.id === small.record.id, `replayed=${replay.replayed}`)
+        checkInvertible("variant replay returns the original", replay.replayed && replay.record.id === small.record.id, `replayed=${replay.replayed}`)
         const dupSku = await attempt(() => variants.create(ids.wsA, ids.prodA, { title: "Clash", sku: `${RUN}-S` }, actor))
-        check("a duplicate sku within a profile is refused", !dupSku.ok && dupSku.code === "CONFLICT", why(dupSku))
+        checkInvertible("a duplicate sku within a profile is refused", !dupSku.ok && dupSku.code === "CONFLICT", why(dupSku))
         const otherProfileSku = await attempt(async () => {
             identity.current = `clerk_${ids.userB}`
             const r = await variants.create(ids.wsB, ids.prodB, { title: "Same sku other tenant", sku: `${RUN}-S` }, actor)
             identity.current = `clerk_${ids.userA}`
             return r
         })
-        check("the SAME sku is allowed in a different profile", otherProfileSku.ok, why(otherProfileSku))
+        checkInvertible("the SAME sku is allowed in a different profile", otherProfileSku.ok, why(otherProfileSku))
         identity.current = `clerk_${ids.userA}`
 
         const twoValuesOneOption = await attempt(() =>
             variants.create(ids.wsA, ids.prodA, { title: "Ambiguous", optionValueIds: [sizeS.id, sizeM.id] }, actor),
         )
-        check("a variant selecting two values of one option is refused", !twoValuesOneOption.ok && twoValuesOneOption.code === "CONFLICT", why(twoValuesOneOption))
+        checkInvertible("a variant selecting two values of one option is refused", !twoValuesOneOption.ok && twoValuesOneOption.code === "CONFLICT", why(twoValuesOneOption))
         const inheriting = await variants.create(ids.wsA, ids.prodA, { title: "Medium", optionValueIds: [sizeM.id] }, actor)
-        check("a variant with no price inherits the product's", inheriting.record.priceCents === null && inheriting.record.effectivePriceCents === 2500, `${inheriting.record.effectivePriceCents}`)
+        checkInvertible("a variant with no price inherits the product's", inheriting.record.priceCents === null && inheriting.record.effectivePriceCents === 2500, `${inheriting.record.effectivePriceCents}`)
         const negativePrice = await attempt(() => variants.create(ids.wsA, ids.prodA, { title: "Bad", priceCents: -5 }, actor))
-        check("a negative variant price is BAD_REQUEST", !negativePrice.ok && negativePrice.code === "BAD_REQUEST", why(negativePrice))
+        checkInvertible("a negative variant price is BAD_REQUEST", !negativePrice.ok && negativePrice.code === "BAD_REQUEST", why(negativePrice))
         const foreignProduct = await attempt(() => variants.create(ids.wsA, ids.prodB, { title: "Nope" }, actor))
-        check("creating a variant on another tenant's product is refused", !foreignProduct.ok && foreignProduct.code === "FORBIDDEN", why(foreignProduct))
+        checkInvertible("creating a variant on another tenant's product is refused", !foreignProduct.ok && foreignProduct.code === "FORBIDDEN", why(foreignProduct))
 
         const renamed = await variants.update(ids.wsA, small.record.id, { title: "Small (UK)" }, actor)
-        check("a variant can be renamed", renamed.title === "Small (UK)", renamed.title)
+        checkInvertible("a variant can be renamed", renamed.title === "Small (UK)", renamed.title)
         const cleared = await variants.update(ids.wsA, small.record.id, { clearPrice: true }, actor)
-        check("clearing a variant price makes it inherit again", cleared.priceCents === null && cleared.effectivePriceCents === 2500, `${cleared.effectivePriceCents}`)
+        checkInvertible("clearing a variant price makes it inherit again", cleared.priceCents === null && cleared.effectivePriceCents === 2500, `${cleared.effectivePriceCents}`)
         const noop = await attempt(() => variants.update(ids.wsA, small.record.id, {}, actor))
-        check("an update with no fields is BAD_REQUEST", !noop.ok && noop.code === "BAD_REQUEST", why(noop))
+        checkInvertible("an update with no fields is BAD_REQUEST", !noop.ok && noop.code === "BAD_REQUEST", why(noop))
 
         // ---- 4. variant-aware stock and concurrency -------------------
         const stockSmall = await inventory.ensureItem(ids.wsA, { productId: ids.prodA, variantId: small.record.id, locationId: ids.locA }, invActor)
         const stockMedium = await inventory.ensureItem(ids.wsA, { productId: ids.prodA, variantId: inheriting.record.id, locationId: ids.locA }, invActor)
-        check("two variants of one product hold separate stock at one location", stockSmall.record.id !== stockMedium.record.id, `${stockSmall.record.id} vs ${stockMedium.record.id}`)
+        checkInvertible("two variants of one product hold separate stock at one location", stockSmall.record.id !== stockMedium.record.id, `${stockSmall.record.id} vs ${stockMedium.record.id}`)
         const stockDefault = await inventory.ensureItem(ids.wsA, { productId: ids.prodA, locationId: ids.locA }, invActor)
-        check("omitting variantId resolves the default variant, so Wave F callers still work", stockDefault.record.variantId === firstDefault, stockDefault.record.variantId)
+        checkInvertible("omitting variantId resolves the default variant, so Wave F callers still work", stockDefault.record.variantId === firstDefault, stockDefault.record.variantId)
         const foreignVariantStock = await attempt(() =>
             inventory.ensureItem(ids.wsA, { productId: ids.prodA2, variantId: small.record.id, locationId: ids.locA }, invActor),
         )
-        check("a variant of a different product cannot be given that product's stock", !foreignVariantStock.ok && foreignVariantStock.code === "FORBIDDEN", why(foreignVariantStock))
+        checkInvertible("a variant of a different product cannot be given that product's stock", !foreignVariantStock.ok && foreignVariantStock.code === "FORBIDDEN", why(foreignVariantStock))
 
         await inventory.applyMovement(ids.wsA, stockSmall.record.id, { kind: "RECEIPT", qty: 1 }, invActor)
         const race = await Promise.allSettled([
@@ -279,43 +283,41 @@ async function main() {
             inventory.reserve(ids.wsA, stockSmall.record.id, { orderLineId: line(3), qty: 1 }, invActor),
         ])
         const won = race.filter((r) => r.status === "fulfilled").length
-        // This is the single inverted assertion: variant-level stock must still be sellable
-        // exactly once, measured with genuinely parallel transactions.
-        const exactlyOne = INVERT ? won !== 1 : won === 1 && race.length - won === 1
-        check("two concurrent holds on the last unit of a VARIANT produce exactly one winner", exactlyOne, `fulfilled=${won} rejected=${race.length - won}`)
+        const exactlyOne = won === 1 && race.length - won === 1
+        checkInvertible("two concurrent holds on the last unit of a VARIANT produce exactly one winner", exactlyOne, `fulfilled=${won} rejected=${race.length - won}`)
         const afterRace = await inventory.get(ids.wsA, stockSmall.record.id)
-        check("the contested variant ends with one unit reserved and none available", afterRace.reserved === 1 && afterRace.available === 0, `${afterRace.reserved}/${afterRace.available}`)
+        checkInvertible("the contested variant ends with one unit reserved and none available", afterRace.reserved === 1 && afterRace.available === 0, `${afterRace.reserved}/${afterRace.available}`)
 
         const deactivateHeld = await attempt(() => variants.update(ids.wsA, small.record.id, { isActive: false }, actor))
-        check("a variant with stock promised to orders cannot be deactivated", !deactivateHeld.ok && deactivateHeld.code === "CONFLICT" && /1 units promised/.test(deactivateHeld.message), why(deactivateHeld))
+        checkInvertible("a variant with stock promised to orders cannot be deactivated", !deactivateHeld.ok && deactivateHeld.code === "CONFLICT" && /1 units promised/.test(deactivateHeld.message), why(deactivateHeld))
 
         // ---- 5. fulfilment, partial and guarded ----------------------
         const shipment = await fulfilments.create(ids.wsA, { orderId: ids.orderA, reference: `${RUN}-F1`, locationId: ids.locA, idempotencyKey: `${RUN}-f1` }, actor)
-        check("a shipment starts DRAFT", shipment.fulfilment.state === "DRAFT", shipment.fulfilment.state)
+        checkInvertible("a shipment starts DRAFT", shipment.fulfilment.state === "DRAFT", shipment.fulfilment.state)
         const shipReplay = await fulfilments.create(ids.wsA, { orderId: ids.orderA, reference: `${RUN}-OTHER`, idempotencyKey: `${RUN}-f1` }, actor)
-        check("shipment replay returns the original", shipReplay.replayed && shipReplay.fulfilment.id === shipment.fulfilment.id, `replayed=${shipReplay.replayed}`)
+        checkInvertible("shipment replay returns the original", shipReplay.replayed && shipReplay.fulfilment.id === shipment.fulfilment.id, `replayed=${shipReplay.replayed}`)
         const dupRef = await attempt(() => fulfilments.create(ids.wsA, { orderId: ids.orderA, reference: `${RUN}-F1` }, actor))
-        check("a duplicate shipment reference within a profile is refused", !dupRef.ok && dupRef.code === "CONFLICT", why(dupRef))
+        checkInvertible("a duplicate shipment reference within a profile is refused", !dupRef.ok && dupRef.code === "CONFLICT", why(dupRef))
         const foreignOrder = await attempt(() => fulfilments.create(ids.wsA, { orderId: ids.orderB, reference: `${RUN}-X` }, actor))
-        check("a shipment against another tenant's order is refused", !foreignOrder.ok && foreignOrder.code === "FORBIDDEN", why(foreignOrder))
+        checkInvertible("a shipment against another tenant's order is refused", !foreignOrder.ok && foreignOrder.code === "FORBIDDEN", why(foreignOrder))
 
         const packEmpty = await attempt(() => fulfilments.transition(ids.wsA, shipment.fulfilment.id, "PACKED", actor))
-        check("a shipment with no lines cannot be packed", !packEmpty.ok && packEmpty.code === "CONFLICT", why(packEmpty))
+        checkInvertible("a shipment with no lines cannot be packed", !packEmpty.ok && packEmpty.code === "CONFLICT", why(packEmpty))
 
         // Line 1 was ordered 5. Ship 2, then 3, then refuse a 6th.
         await fulfilments.addItem(ids.wsA, shipment.fulfilment.id, { orderLineId: line(1), variantId: small.record.id, qty: 2 }, actor)
         const allocPartial = await fulfilments.allocations(ids.wsA, ids.orderA)
         const l1 = allocPartial.find((a) => a.orderLineId === line(1))!
-        check("partial allocation is reported, not rounded up", l1.ordered === 5 && l1.allocated === 2 && l1.remaining === 3, `${l1.allocated}/${l1.ordered} remaining=${l1.remaining}`)
-        check("nothing counts as fulfilled until it ships", l1.fulfilled === 0, `fulfilled=${l1.fulfilled}`)
+        checkInvertible("partial allocation is reported, not rounded up", l1.ordered === 5 && l1.allocated === 2 && l1.remaining === 3, `${l1.allocated}/${l1.ordered} remaining=${l1.remaining}`)
+        checkInvertible("nothing counts as fulfilled until it ships", l1.fulfilled === 0, `fulfilled=${l1.fulfilled}`)
         const overAllocate = await attempt(() =>
             fulfilments.addItem(ids.wsA, shipment.fulfilment.id, { orderLineId: line(4), qty: 99 }, actor),
         )
-        check("shipping more than a line ordered is refused with the remaining quantity named", !overAllocate.ok && /Only 1 units of that line are still unshipped/.test(overAllocate.message), why(overAllocate))
+        checkInvertible("shipping more than a line ordered is refused with the remaining quantity named", !overAllocate.ok && /Only 1 units of that line are still unshipped/.test(overAllocate.message), why(overAllocate))
         const dupLine = await attempt(() =>
             fulfilments.addItem(ids.wsA, shipment.fulfilment.id, { orderLineId: line(1), qty: 1 }, actor),
         )
-        check("one order line cannot appear twice on one shipment", !dupLine.ok && dupLine.code === "CONFLICT", why(dupLine))
+        checkInvertible("one order line cannot appear twice on one shipment", !dupLine.ok && dupLine.code === "CONFLICT", why(dupLine))
 
         // Whichever line won the race holds the last unit. Put THAT line on the shipment
         // while it is still a draft, rather than guessing, so consumption is deterministic.
@@ -323,7 +325,7 @@ async function main() {
             where: { itemId: stockSmall.record.id, state: "HELD" },
             select: { id: true, orderLineId: true },
         })
-        check("the race left exactly one hold to consume", heldReservation !== null, `${heldReservation?.orderLineId}`)
+        checkInvertible("the race left exactly one hold to consume", heldReservation !== null, `${heldReservation?.orderLineId}`)
         if (heldReservation) {
             await fulfilments.addItem(
                 ids.wsA,
@@ -333,21 +335,21 @@ async function main() {
             )
         }
         const atDraft = await inventory.get(ids.wsA, stockSmall.record.id)
-        check("adding lines to a draft shipment does not move stock", atDraft.onHand === 1 && atDraft.reserved === 1, `${atDraft.onHand}/${atDraft.reserved}`)
+        checkInvertible("adding lines to a draft shipment does not move stock", atDraft.onHand === 1 && atDraft.reserved === 1, `${atDraft.onHand}/${atDraft.reserved}`)
         const foreignLine = await attempt(() =>
             fulfilments.addItem(ids.wsA, shipment.fulfilment.id, { orderLineId: line(90), qty: 1 }, actor),
         )
-        check("another tenant's order line cannot be shipped", !foreignLine.ok && foreignLine.code === "FORBIDDEN", why(foreignLine))
+        checkInvertible("another tenant's order line cannot be shipped", !foreignLine.ok && foreignLine.code === "FORBIDDEN", why(foreignLine))
 
         await fulfilments.transition(ids.wsA, shipment.fulfilment.id, "PACKED", actor)
         const addAfterPack = await attempt(() =>
             fulfilments.addItem(ids.wsA, shipment.fulfilment.id, { orderLineId: line(5), qty: 1 }, actor),
         )
-        check("a packed shipment cannot gain new lines", !addAfterPack.ok && addAfterPack.code === "CONFLICT", why(addAfterPack))
+        checkInvertible("a packed shipment cannot gain new lines", !addAfterPack.ok && addAfterPack.code === "CONFLICT", why(addAfterPack))
 
         // Stock must NOT have moved at pack time.
         const atPack = await inventory.get(ids.wsA, stockSmall.record.id)
-        check("packing does not move stock, because the goods are still on the shelf", atPack.onHand === 1 && atPack.reserved === 1, `${atPack.onHand}/${atPack.reserved}`)
+        checkInvertible("packing does not move stock, because the goods are still on the shelf", atPack.onHand === 1 && atPack.reserved === 1, `${atPack.onHand}/${atPack.reserved}`)
 
         // Line 2 holds one unit of the small variant. Ship it and the hold is consumed.
         await fulfilments.transition(ids.wsA, shipment.fulfilment.id, "SHIPPED", actor, { carrier: "Owner entered", trackingNumber: "TYPED-BY-HAND" })
@@ -355,76 +357,76 @@ async function main() {
         const holdAfter = heldReservation
             ? await prisma.inventoryReservation.findUnique({ where: { id: heldReservation.id } })
             : null
-        check("shipping consumes the hold, so stock leaves at SHIPPED", atShip.onHand === 0 && atShip.reserved === 0, `${atShip.onHand}/${atShip.reserved}`)
-        check("the consumed hold is recorded as CONSUMED, not deleted", holdAfter?.state === "CONSUMED", `${holdAfter?.state}`)
+        checkInvertible("shipping consumes the hold, so stock leaves at SHIPPED", atShip.onHand === 0 && atShip.reserved === 0, `${atShip.onHand}/${atShip.reserved}`)
+        checkInvertible("the consumed hold is recorded as CONSUMED, not deleted", holdAfter?.state === "CONSUMED", `${holdAfter?.state}`)
         const cancelShipped = await attempt(() => fulfilments.transition(ids.wsA, shipment.fulfilment.id, "CANCELLED", actor))
-        check("a shipped shipment cannot be cancelled", !cancelShipped.ok && cancelShipped.code === "CONFLICT", why(cancelShipped))
+        checkInvertible("a shipped shipment cannot be cancelled", !cancelShipped.ok && cancelShipped.code === "CONFLICT", why(cancelShipped))
         await fulfilments.transition(ids.wsA, shipment.fulfilment.id, "DELIVERED", actor)
         const afterDelivered = await attempt(() => fulfilments.transition(ids.wsA, shipment.fulfilment.id, "PACKED", actor))
-        check("a delivered shipment is terminal", !afterDelivered.ok && afterDelivered.code === "CONFLICT", why(afterDelivered))
+        checkInvertible("a delivered shipment is terminal", !afterDelivered.ok && afterDelivered.code === "CONFLICT", why(afterDelivered))
 
         const allocFinal = await fulfilments.allocations(ids.wsA, ids.orderA)
         const l1f = allocFinal.find((a) => a.orderLineId === line(1))!
-        check("a delivered shipment counts as fulfilled", l1f.fulfilled === 2, `fulfilled=${l1f.fulfilled}`)
+        checkInvertible("a delivered shipment counts as fulfilled", l1f.fulfilled === 2, `fulfilled=${l1f.fulfilled}`)
 
         // ---- 6. return eligibility is derived -----------------------
         const elig = await returns.eligibility(ids.wsA, ids.orderA)
         const e1 = elig.find((e) => e.orderLineId === line(1))!
-        check("only shipped units are returnable", e1.fulfilled === 2 && e1.returnable === 2, `fulfilled=${e1.fulfilled} returnable=${e1.returnable}`)
+        checkInvertible("only shipped units are returnable", e1.fulfilled === 2 && e1.returnable === 2, `fulfilled=${e1.fulfilled} returnable=${e1.returnable}`)
         const e5 = elig.find((e) => e.orderLineId === line(5))!
-        check("a line that never shipped is not returnable", e5.fulfilled === 0 && e5.returnable === 0, `returnable=${e5.returnable}`)
+        checkInvertible("a line that never shipped is not returnable", e5.fulfilled === 0 && e5.returnable === 0, `returnable=${e5.returnable}`)
 
         const ret = await returns.request(ids.wsA, { orderId: ids.orderA, reference: `${RUN}-R1`, reason: "Wrong size", idempotencyKey: `${RUN}-r1` }, actor)
-        check("a return starts REQUESTED", ret.returnRequest.state === "REQUESTED", ret.returnRequest.state)
+        checkInvertible("a return starts REQUESTED", ret.returnRequest.state === "REQUESTED", ret.returnRequest.state)
         const retReplay = await returns.request(ids.wsA, { orderId: ids.orderA, reference: `${RUN}-OTHER`, idempotencyKey: `${RUN}-r1` }, actor)
-        check("return replay returns the original", retReplay.replayed && retReplay.returnRequest.id === ret.returnRequest.id, `replayed=${retReplay.replayed}`)
+        checkInvertible("return replay returns the original", retReplay.replayed && retReplay.returnRequest.id === ret.returnRequest.id, `replayed=${retReplay.replayed}`)
 
         const approveEmpty = await attempt(() => returns.transition(ids.wsA, ret.returnRequest.id, "APPROVED", actor, { decidedBy: ids.userA }))
-        check("a return with no lines cannot be approved", !approveEmpty.ok && approveEmpty.code === "CONFLICT", why(approveEmpty))
+        checkInvertible("a return with no lines cannot be approved", !approveEmpty.ok && approveEmpty.code === "CONFLICT", why(approveEmpty))
         const overReturn = await attempt(() => returns.addItem(ids.wsA, ret.returnRequest.id, { orderLineId: line(1), qty: 99 }, actor))
-        check("returning more than shipped is refused with the returnable quantity named", !overReturn.ok && /Only 2 units of that line can still be returned/.test(overReturn.message), why(overReturn))
+        checkInvertible("returning more than shipped is refused with the returnable quantity named", !overReturn.ok && /Only 2 units of that line can still be returned/.test(overReturn.message), why(overReturn))
         const unshippedReturn = await attempt(() => returns.addItem(ids.wsA, ret.returnRequest.id, { orderLineId: line(5), qty: 1 }, actor))
-        check("a line that never shipped cannot be returned", !unshippedReturn.ok && unshippedReturn.code === "CONFLICT", why(unshippedReturn))
+        checkInvertible("a line that never shipped cannot be returned", !unshippedReturn.ok && unshippedReturn.code === "CONFLICT", why(unshippedReturn))
         const retItem = await returns.addItem(ids.wsA, ret.returnRequest.id, { orderLineId: line(1), variantId: small.record.id, qty: 2 }, actor)
-        check("a return line was recorded against the shipped variant", retItem.variantId === small.record.id, retItem.variantId)
+        checkInvertible("a return line was recorded against the shipped variant", retItem.variantId === small.record.id, retItem.variantId)
         const dupRetLine = await attempt(() => returns.addItem(ids.wsA, ret.returnRequest.id, { orderLineId: line(1), qty: 1 }, actor))
-        check("one order line cannot appear twice on one return", !dupRetLine.ok && dupRetLine.code === "CONFLICT", why(dupRetLine))
+        checkInvertible("one order line cannot appear twice on one return", !dupRetLine.ok && dupRetLine.code === "CONFLICT", why(dupRetLine))
 
         const eligAfterClaim = await returns.eligibility(ids.wsA, ids.orderA)
         const e1c = eligAfterClaim.find((e) => e.orderLineId === line(1))!
-        check("a live claim reduces what is still returnable", e1c.claimed === 2 && e1c.returnable === 0, `claimed=${e1c.claimed} returnable=${e1c.returnable}`)
+        checkInvertible("a live claim reduces what is still returnable", e1c.claimed === 2 && e1c.returnable === 0, `claimed=${e1c.claimed} returnable=${e1c.returnable}`)
 
         const noDecider = await attempt(() => returns.transition(ids.wsA, ret.returnRequest.id, "APPROVED", actor))
-        check("approving without naming the decider is refused", !noDecider.ok && noDecider.code === "CONFLICT", why(noDecider))
+        checkInvertible("approving without naming the decider is refused", !noDecider.ok && noDecider.code === "CONFLICT", why(noDecider))
         const earlyRestock = await attempt(() => returns.settleItem(ids.wsA, ret.returnRequest.id, retItem.id, "RESTOCKED", actor, { locationId: ids.locA }))
-        check("goods cannot be restocked before the return is received", !earlyRestock.ok && earlyRestock.code === "CONFLICT", why(earlyRestock))
+        checkInvertible("goods cannot be restocked before the return is received", !earlyRestock.ok && earlyRestock.code === "CONFLICT", why(earlyRestock))
 
         await returns.transition(ids.wsA, ret.returnRequest.id, "APPROVED", actor, { decidedBy: ids.userA, decisionNote: "Approved" })
         const received = await returns.transition(ids.wsA, ret.returnRequest.id, "RECEIVED", actor)
-        check("an approved return can be received", received.state === "RECEIVED" && received.receivedAt !== null, received.state)
+        checkInvertible("an approved return can be received", received.state === "RECEIVED" && received.receivedAt !== null, received.state)
         const reDecide = await attempt(() => returns.transition(ids.wsA, ret.returnRequest.id, "REJECTED", actor, { decidedBy: ids.userA }))
-        check("a received return is terminal", !reDecide.ok && reDecide.code === "CONFLICT", why(reDecide))
+        checkInvertible("a received return is terminal", !reDecide.ok && reDecide.code === "CONFLICT", why(reDecide))
 
         // ---- 7. restocking is idempotent ---------------------------
         const beforeRestock = await inventory.get(ids.wsA, stockSmall.record.id)
         const noLocation = await attempt(() => returns.settleItem(ids.wsA, ret.returnRequest.id, retItem.id, "RESTOCKED", actor))
-        check("restocking without a location is BAD_REQUEST", !noLocation.ok && noLocation.code === "BAD_REQUEST", why(noLocation))
+        checkInvertible("restocking without a location is BAD_REQUEST", !noLocation.ok && noLocation.code === "BAD_REQUEST", why(noLocation))
         const restocked = await returns.settleItem(ids.wsA, ret.returnRequest.id, retItem.id, "RESTOCKED", actor, { locationId: ids.locA })
-        check("restocking is not reported as a replay the first time", restocked.replayed === false)
+        checkInvertible("restocking is not reported as a replay the first time", restocked.replayed === false)
         const afterRestock = await inventory.get(ids.wsA, stockSmall.record.id)
-        check("restocking credited the returned units once", afterRestock.onHand === beforeRestock.onHand + 2, `${beforeRestock.onHand} -> ${afterRestock.onHand}`)
+        checkInvertible("restocking credited the returned units once", afterRestock.onHand === beforeRestock.onHand + 2, `${beforeRestock.onHand} -> ${afterRestock.onHand}`)
         const replayRestock = await returns.settleItem(ids.wsA, ret.returnRequest.id, retItem.id, "RESTOCKED", actor, { locationId: ids.locA })
-        check("restocking the same line again is an idempotent replay", replayRestock.replayed === true)
+        checkInvertible("restocking the same line again is an idempotent replay", replayRestock.replayed === true)
         const afterReplay = await inventory.get(ids.wsA, stockSmall.record.id)
-        check("the replay credited NOTHING further", afterReplay.onHand === afterRestock.onHand, `${afterRestock.onHand} -> ${afterReplay.onHand}`)
+        checkInvertible("the replay credited NOTHING further", afterReplay.onHand === afterRestock.onHand, `${afterRestock.onHand} -> ${afterReplay.onHand}`)
         const movements = await prisma.inventoryMovement.count({
             where: { itemId: stockSmall.record.id, idempotencyKey: `return:${retItem.id}` },
         })
-        check("exactly one RETURN movement exists for the return line", movements === 1, `movements=${movements}`)
+        checkInvertible("exactly one RETURN movement exists for the return line", movements === 1, `movements=${movements}`)
         const itemRow = await prisma.returnItem.findUnique({ where: { id: retItem.id } })
-        check("the return line records which movement credited it", itemRow?.restockMovementId !== null, `${itemRow?.restockMovementId}`)
+        checkInvertible("the return line records which movement credited it", itemRow?.restockMovementId !== null, `${itemRow?.restockMovementId}`)
         const discardAfter = await attempt(() => returns.settleItem(ids.wsA, ret.returnRequest.id, retItem.id, "DISCARDED", actor))
-        check("a restocked line cannot then be discarded", !discardAfter.ok && discardAfter.code === "CONFLICT", why(discardAfter))
+        checkInvertible("a restocked line cannot then be discarded", !discardAfter.ok && discardAfter.code === "CONFLICT", why(discardAfter))
 
         // ---- 8. tenant isolation and non-enumeration --------------
         identity.current = `clerk_${ids.userB}`
@@ -432,38 +434,38 @@ async function main() {
         const crossFetch = fetchCalls
         const foreignVariantGet = await attempt(() => variants.get(ids.wsB, small.record.id))
         const missingVariantGet = await attempt(() => variants.get(ids.wsB, `${RUN}_absent`))
-        check("wrong-tenant variant read refused FORBIDDEN", !foreignVariantGet.ok && foreignVariantGet.code === "FORBIDDEN", why(foreignVariantGet))
-        check("a foreign variant and a missing variant refuse identically", why(foreignVariantGet) === why(missingVariantGet), `${why(foreignVariantGet)}`)
+        checkInvertible("wrong-tenant variant read refused FORBIDDEN", !foreignVariantGet.ok && foreignVariantGet.code === "FORBIDDEN", why(foreignVariantGet))
+        checkInvertible("a foreign variant and a missing variant refuse identically", why(foreignVariantGet) === why(missingVariantGet), `${why(foreignVariantGet)}`)
         const foreignShip = await attempt(() => fulfilments.get(ids.wsB, shipment.fulfilment.id))
         const missingShip = await attempt(() => fulfilments.get(ids.wsB, `${RUN}_absent`))
-        check("a foreign shipment and a missing shipment refuse identically", why(foreignShip) === why(missingShip), `${why(foreignShip)}`)
+        checkInvertible("a foreign shipment and a missing shipment refuse identically", why(foreignShip) === why(missingShip), `${why(foreignShip)}`)
         const foreignRet = await attempt(() => returns.get(ids.wsB, ret.returnRequest.id))
         const missingRet = await attempt(() => returns.get(ids.wsB, `${RUN}_absent`))
-        check("a foreign return and a missing return refuse identically", why(foreignRet) === why(missingRet), `${why(foreignRet)}`)
+        checkInvertible("a foreign return and a missing return refuse identically", why(foreignRet) === why(missingRet), `${why(foreignRet)}`)
         const foreignElig = await attempt(() => returns.eligibility(ids.wsB, ids.orderA))
-        check("wrong-tenant eligibility is refused, leaking no quantities", !foreignElig.ok && foreignElig.code === "FORBIDDEN", why(foreignElig))
-        check("cross-tenant refusals appended zero commerce events", beforeCross === (await prisma.commerceEvent.count()), `before=${beforeCross}`)
-        check("cross-tenant refusals made zero external calls", fetchCalls === crossFetch, `calls=${fetchCalls - crossFetch}`)
+        checkInvertible("wrong-tenant eligibility is refused, leaking no quantities", !foreignElig.ok && foreignElig.code === "FORBIDDEN", why(foreignElig))
+        checkInvertible("cross-tenant refusals appended zero commerce events", beforeCross === (await prisma.commerceEvent.count()), `before=${beforeCross}`)
+        checkInvertible("cross-tenant refusals made zero external calls", fetchCalls === crossFetch, `calls=${fetchCalls - crossFetch}`)
         const listB = await fulfilments.list(ids.wsB)
-        check("tenant B's shipment list never contains tenant A's shipment", !listB.some((f) => f.id === shipment.fulfilment.id), `n=${listB.length}`)
+        checkInvertible("tenant B's shipment list never contains tenant A's shipment", !listB.some((f) => f.id === shipment.fulfilment.id), `n=${listB.length}`)
 
         identity.current = `clerk_${ids.userA}`
         const orphanWs = `${RUN}_orphan`
         await prisma.workspace.create({ data: { id: orphanWs, name: "Orphan", slug: `ws-${orphanWs}` } })
         await prisma.membership.create({ data: { workspaceId: orphanWs, userId: ids.userA, role: "OWNER" } })
         const orphan = await attempt(() => fulfilments.list(orphanWs))
-        check("a workspace with no profile is refused, not shown an empty list", !orphan.ok && orphan.code === "FORBIDDEN", why(orphan))
+        checkInvertible("a workspace with no profile is refused, not shown an empty list", !orphan.ok && orphan.code === "FORBIDDEN", why(orphan))
 
         // ---- 9. append-only commerce timeline ---------------------
         const timeline = await variants.events(ids.wsA, "FULFILMENT", shipment.fulfilment.id)
         const seqs = timeline.map((e) => Number(e.seq))
-        check("the shipment timeline recorded every accepted change", timeline.length >= 5, `events=${timeline.length}`)
-        check("timeline seq is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
+        checkInvertible("the shipment timeline recorded every accepted change", timeline.length >= 5, `events=${timeline.length}`)
+        checkInvertible("timeline seq is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
         const kinds = new Set<string>(
             (await prisma.commerceEvent.findMany({ where: { profileId: ids.profileA }, select: { kind: true } })).map((e) => String(e.kind)),
         )
         for (const kind of ["VARIANT", "FULFILMENT", "RETURN", "RESTOCK"]) {
-            check(`the commerce ledger contains a ${kind} event`, kinds.has(kind), [...kinds].join(","))
+            checkInvertible(`the commerce ledger contains a ${kind} event`, kinds.has(kind), [...kinds].join(","))
         }
         let appendOnly = false
         let appendDetail = ""
@@ -473,7 +475,7 @@ async function main() {
             appendOnly = true
             appendDetail = String((e as Error).message).split("\n").find((l) => /append-only/.test(l))?.trim() ?? "refused"
         }
-        check("the database refuses to rewrite the commerce ledger", appendOnly, appendDetail || "NO ERROR")
+        checkInvertible("the database refuses to rewrite the commerce ledger", appendOnly, appendDetail || "NO ERROR")
 
         // ---- 10. a failed transaction leaves no residue -----------
         {
@@ -496,7 +498,7 @@ async function main() {
         }
 
         // ---- 11. whole-run external call tally -------------------
-        check("no external call was EVER made in this run", fetchCalls === 0, `calls=${fetchCalls}`)
+        checkInvertible("no external call was EVER made in this run", fetchCalls === 0, `calls=${fetchCalls}`)
     } finally {
         for (const [table, trigger] of [["CommerceEvent", "CommerceEvent_append_only"], ["InventoryMovement", "InventoryMovement_append_only"]]) {
             try {

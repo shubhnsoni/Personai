@@ -47,6 +47,10 @@ function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
 
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    check(name, INVERT ? !pass : pass, detail)
+}
+
 /** Identity that can be switched between users and anonymous at will. */
 class ControlledIdentity implements PlatformIdentity {
     current: string | null = null
@@ -155,15 +159,15 @@ async function main() {
             engine.create(ids.wsA, { tableId: ids.tableA, partySize: 2, ...slot, guestName: "Anon" }, actor),
         )
         const after1 = await prisma.reservation.count()
-        check(
+        checkInvertible(
             "anonymous create is refused UNAUTHORIZED",
             !anon.ok && anon.code === "UNAUTHORIZED",
             !anon.ok ? `${anon.code}: ${anon.message}` : "ACCEPTED",
         )
-        check("anonymous create wrote zero rows", before1 === after1, `before=${before1} after=${after1}`)
+        checkInvertible("anonymous create wrote zero rows", before1 === after1, `before=${before1} after=${after1}`)
 
         const anonList = await attempt(() => engine.list(ids.wsA))
-        check(
+        checkInvertible(
             "anonymous list is refused UNAUTHORIZED",
             !anonList.ok && anonList.code === "UNAUTHORIZED",
             !anonList.ok ? anonList.code : "ACCEPTED",
@@ -176,35 +180,35 @@ async function main() {
             { tableId: ids.tableA, partySize: 4, ...slot, guestName: "Owner Guest", idempotencyKey: "k1" },
             actor,
         )
-        check("valid owner create succeeds", created.reservation.status === "CONFIRMED", `status=${created.reservation.status}`)
-        check("valid owner create is not a replay", created.replayed === false, `replayed=${created.replayed}`)
+        checkInvertible("valid owner create succeeds", created.reservation.status === "CONFIRMED", `status=${created.reservation.status}`)
+        checkInvertible("valid owner create is not a replay", created.replayed === false, `replayed=${created.replayed}`)
 
         const listed = await engine.list(ids.wsA)
-        check("owner sees exactly their own reservation", listed.length === 1 && listed[0].id === created.reservation.id, `count=${listed.length}`)
+        checkInvertible("owner sees exactly their own reservation", listed.length === 1 && listed[0].id === created.reservation.id, `count=${listed.length}`)
 
         // ---- 3. wrong tenant refused, and indistinguishable from missing --
         identity.current = `clerk_${ids.userB}`
         const foreign = await attempt(() => engine.get(ids.wsB, created.reservation.id))
         const missing = await attempt(() => engine.get(ids.wsB, `${RUN}_does_not_exist`))
-        check(
+        checkInvertible(
             "wrong-tenant get is refused FORBIDDEN",
             !foreign.ok && foreign.code === "FORBIDDEN",
             !foreign.ok ? `${foreign.code}: ${foreign.message}` : "LEAKED",
         )
-        check(
+        checkInvertible(
             "foreign and nonexistent responses are byte-identical",
             JSON.stringify(foreign) === JSON.stringify(missing),
             `foreign=${JSON.stringify(foreign)} missing=${JSON.stringify(missing)}`,
         )
 
         const foreignList = await engine.list(ids.wsB)
-        check("wrong tenant sees zero of the other venue's rows", foreignList.length === 0, `count=${foreignList.length}`)
+        checkInvertible("wrong tenant sees zero of the other venue's rows", foreignList.length === 0, `count=${foreignList.length}`)
 
         // Cross-venue table use: B cannot book A's table.
         const crossTable = await attempt(() =>
             engineB_create(ids.wsB, ids.tableA),
         )
-        check(
+        checkInvertible(
             "cannot book a table belonging to another venue",
             !crossTable.ok && crossTable.code === "FORBIDDEN",
             !crossTable.ok ? `${crossTable.code}: ${crossTable.message}` : "LEAKED",
@@ -225,12 +229,12 @@ async function main() {
             engine.transition(ids.wsB, created.reservation.id, "CANCELLED", actor),
         )
         const afterStatus = (await prisma.reservation.findUnique({ where: { id: created.reservation.id } }))?.status
-        check(
+        checkInvertible(
             "wrong-tenant transition is refused FORBIDDEN",
             !foreignTransition.ok && foreignTransition.code === "FORBIDDEN",
             !foreignTransition.ok ? foreignTransition.code : "MUTATED",
         )
-        check("refused transition left status unchanged", beforeStatus === afterStatus, `${beforeStatus} -> ${afterStatus}`)
+        checkInvertible("refused transition left status unchanged", beforeStatus === afterStatus, `${beforeStatus} -> ${afterStatus}`)
 
         // ---- 5. capacity is fail-closed on NULL seats ---------------------
         identity.current = `clerk_${ids.userA}`
@@ -241,7 +245,7 @@ async function main() {
                 actor,
             ),
         )
-        check(
+        checkInvertible(
             "table with NULL seats refuses reservations (fail-closed)",
             !noSeats.ok && noSeats.code === "CONFLICT" && /seat count/i.test(noSeats.message),
             !noSeats.ok ? noSeats.message : "ACCEPTED",
@@ -254,7 +258,7 @@ async function main() {
                 actor,
             ),
         )
-        check(
+        checkInvertible(
             "party larger than the table is refused",
             !tooBig.ok && tooBig.code === "CONFLICT" && /exceeds/i.test(tooBig.message),
             !tooBig.ok ? tooBig.message : "ACCEPTED",
@@ -283,13 +287,12 @@ async function main() {
         const rejectionDetail = rejected
             .map((r) => String((r as PromiseRejectedResult).reason?.message ?? "").split("\n").filter(Boolean)[0])
             .join(" | ")
-        // This is the single inverted assertion.
-        check(
+        checkInvertible(
             "two concurrent overlapping bookings produce exactly one winner",
-            INVERT ? fulfilled !== 1 : fulfilled === 1,
+            fulfilled === 1,
             `fulfilled=${fulfilled} rejectedCodes=${rejectionCodes.join(",")}`,
         )
-        check(
+        checkInvertible(
             "the loser is refused with CONFLICT",
             rejectionCodes.length === 1 && rejectionCodes[0] === "CONFLICT",
             `codes=${rejectionCodes.join(",")} detail=${rejectionDetail.slice(0, 160)}`,
@@ -323,12 +326,12 @@ async function main() {
                 throw e
             }
         })
-        check(
+        checkInvertible(
             "a sequential overlapping reservation is refused",
             !sequentialOverlap.ok && sequentialOverlap.code === "CONFLICT",
             !sequentialOverlap.ok ? sequentialOverlap.message : "ACCEPTED",
         )
-        check(
+        checkInvertible(
             "the sequential overlap was detected by the APPLICATION, not only the database constraint",
             sequentialDetectedBy === "application",
             `detectedBy=${String(sequentialDetectedBy)}`,
@@ -336,7 +339,7 @@ async function main() {
         const raceRows = await prisma.reservation.count({
             where: { tableId: ids.tableA, startAt: { gte: at("2031-04-01T00:00:00Z"), lt: at("2031-04-02T00:00:00Z") } },
         })
-        check("only one row persisted for the contended slot", raceRows === 1, `rows=${raceRows}`)
+        checkInvertible("only one row persisted for the contended slot", raceRows === 1, `rows=${raceRows}`)
 
         // ---- 7. adjacent booking at the turnover boundary is allowed ------
         const adjacent = await attempt(() =>
@@ -348,7 +351,7 @@ async function main() {
         )
         // Whether this is accepted depends on which racer won; assert only that an
         // exactly-adjacent booking is never refused for OVERLAP reasons.
-        check(
+        checkInvertible(
             "exact turnover boundary is not treated as an overlap",
             adjacent.ok || (!adjacent.ok && !/overlapping/i.test(adjacent.message)),
             adjacent.ok ? "accepted" : adjacent.message,
@@ -362,10 +365,10 @@ async function main() {
             actor,
         )
         const eventsAfter = await prisma.reservationEvent.count({ where: { reservationId: created.reservation.id } })
-        check("replay is reported as replayed", replay.replayed === true, `replayed=${replay.replayed}`)
-        check("replay returns the ORIGINAL reservation id", replay.reservation.id === created.reservation.id, `${replay.reservation.id} vs ${created.reservation.id}`)
-        check("replay did not overwrite the original guest name", replay.reservation.guestName === "Owner Guest", `name=${replay.reservation.guestName}`)
-        check("replay wrote NO second event", eventsBefore === eventsAfter, `before=${eventsBefore} after=${eventsAfter}`)
+        checkInvertible("replay is reported as replayed", replay.replayed === true, `replayed=${replay.replayed}`)
+        checkInvertible("replay returns the ORIGINAL reservation id", replay.reservation.id === created.reservation.id, `${replay.reservation.id} vs ${created.reservation.id}`)
+        checkInvertible("replay did not overwrite the original guest name", replay.reservation.guestName === "Owner Guest", `name=${replay.reservation.guestName}`)
+        checkInvertible("replay wrote NO second event", eventsBefore === eventsAfter, `before=${eventsBefore} after=${eventsAfter}`)
 
         // ---- 9. exhaustive illegal-transition refusal --------------------
         // Walk a reservation CONFIRMED -> SEATED -> COMPLETED and, at each state,
@@ -384,7 +387,7 @@ async function main() {
             if (!r.ok && r.code === "CONFLICT" && afterRow!.status === before) illegalRefused += 1
             else illegalLeaked.push(`${from}->${target}:${r.ok ? "ACCEPTED" : r.code}`)
         }
-        check(
+        checkInvertible(
             "every illegal transition from the current state is refused",
             illegalTotal > 0 && illegalRefused === illegalTotal,
             `refused=${illegalRefused}/${illegalTotal}${illegalLeaked.length ? ` leaked=${illegalLeaked.join(",")}` : ""}`,
@@ -393,14 +396,14 @@ async function main() {
         // ---- 10. legal transition path works and is recorded -------------
         await engine.transition(ids.wsA, created.reservation.id, "SEATED", actor)
         const seated = await engine.get(ids.wsA, created.reservation.id)
-        check("CONFIRMED -> SEATED is allowed", seated.status === "SEATED", `status=${seated.status}`)
+        checkInvertible("CONFIRMED -> SEATED is allowed", seated.status === "SEATED", `status=${seated.status}`)
         await engine.transition(ids.wsA, created.reservation.id, "COMPLETED", actor)
         const completed = await engine.get(ids.wsA, created.reservation.id)
-        check("SEATED -> COMPLETED is allowed", completed.status === "COMPLETED", `status=${completed.status}`)
-        check("terminal reservation offers no further transitions", completed.allowedTransitions.length === 0, `allowed=${completed.allowedTransitions.join(",")}`)
+        checkInvertible("SEATED -> COMPLETED is allowed", completed.status === "COMPLETED", `status=${completed.status}`)
+        checkInvertible("terminal reservation offers no further transitions", completed.allowedTransitions.length === 0, `allowed=${completed.allowedTransitions.join(",")}`)
 
         const terminalMove = await attempt(() => engine.transition(ids.wsA, created.reservation.id, "CANCELLED", actor))
-        check(
+        checkInvertible(
             "terminal reservation refuses further change",
             !terminalMove.ok && terminalMove.code === "CONFLICT",
             !terminalMove.ok ? terminalMove.message : "MUTATED",
@@ -410,8 +413,8 @@ async function main() {
         const history = await engine.history(ids.wsA, created.reservation.id)
         const seqs = history.map((h) => Number(h.seq))
         const monotonic = seqs.every((v, i) => i === 0 || v > seqs[i - 1])
-        check("event ledger is monotonic", monotonic && seqs.length >= 3, `seqs=${seqs.join(",")}`)
-        check(
+        checkInvertible("event ledger is monotonic", monotonic && seqs.length >= 3, `seqs=${seqs.join(",")}`)
+        checkInvertible(
             "ledger records the CREATED event then STATUS events",
             history[0]?.kind === "CREATED" && history.slice(1).every((h) => h.kind === "STATUS"),
             history.map((h) => h.kind).join(","),
@@ -427,12 +430,12 @@ async function main() {
             ledgerImmutable = true
             ledgerDetail = (e as Error).message.split("\n").find((l) => l.includes("append-only")) ?? "refused"
         }
-        check("ledger refuses UPDATE at the database level", ledgerImmutable, ledgerDetail || "NOT REFUSED")
+        checkInvertible("ledger refuses UPDATE at the database level", ledgerImmutable, ledgerDetail || "NOT REFUSED")
 
         // ---- 12. history is tenant-checked ------------------------------
         identity.current = `clerk_${ids.userB}`
         const foreignHistory = await attempt(() => engine.history(ids.wsB, created.reservation.id))
-        check(
+        checkInvertible(
             "wrong-tenant history is refused FORBIDDEN",
             !foreignHistory.ok && foreignHistory.code === "FORBIDDEN",
             !foreignHistory.ok ? foreignHistory.code : "LEAKED",

@@ -51,6 +51,10 @@ function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
 
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    check(name, INVERT ? !pass : pass, detail)
+}
+
 class ControlledIdentity implements PlatformIdentity {
     current: string | null = null
     async userId(): Promise<string | null> {
@@ -158,16 +162,16 @@ async function main() {
                     else illegal += 1
                 }
             }
-            check(
+            checkInvertible(
                 `${label} transition table is total over ${all.length}x${all.length} pairs`,
                 legal + illegal === all.length ** 2,
                 `legal=${legal} illegal=${illegal}`,
             )
         }
-        check("terminal cohort statuses allow nothing", cohortFlow.isTerminal("COMPLETED") && cohortFlow.isTerminal("CANCELLED"))
-        check("a completed or withdrawn membership is terminal", membershipFlow.isTerminal("COMPLETED") && membershipFlow.isTerminal("WITHDRAWN"))
-        check("a revoked certificate is terminal", certificateFlow.isTerminal("REVOKED"))
-        check("attendance has exactly 4 statuses", ATTENDANCE_STATUSES.length === 4, `n=${ATTENDANCE_STATUSES.length}`)
+        checkInvertible("terminal cohort statuses allow nothing", cohortFlow.isTerminal("COMPLETED") && cohortFlow.isTerminal("CANCELLED"))
+        checkInvertible("a completed or withdrawn membership is terminal", membershipFlow.isTerminal("COMPLETED") && membershipFlow.isTerminal("WITHDRAWN"))
+        checkInvertible("a revoked certificate is terminal", certificateFlow.isTerminal("REVOKED"))
+        checkInvertible("attendance has exactly 4 statuses", ATTENDANCE_STATUSES.length === 4, `n=${ATTENDANCE_STATUSES.length}`)
 
         // ---- seed two tenants, each with a real program -------------------
         for (const [u, p, w, c, l, d] of [
@@ -196,11 +200,11 @@ async function main() {
         const anonCreate = await attempt(() => cohorts.create(ids.wsA, { courseId: ids.courseA, code: "X", title: "X" }, actor))
         const anonList = await attempt(() => cohorts.list(ids.wsA))
         const anonEnrol = await attempt(() => cohorts.enrol(ids.wsA, { courseId: ids.courseA, visitorEmail: "a@b.test" }))
-        check("anonymous cohort create refused UNAUTHORIZED", !anonCreate.ok && anonCreate.code === "UNAUTHORIZED", why(anonCreate))
-        check("anonymous list refused UNAUTHORIZED", !anonList.ok && anonList.code === "UNAUTHORIZED", why(anonList))
-        check("anonymous enrol refused UNAUTHORIZED", !anonEnrol.ok && anonEnrol.code === "UNAUTHORIZED", why(anonEnrol))
-        check("anonymous wrote zero cohorts", beforeCohorts === (await prisma.cohort.count()), `before=${beforeCohorts}`)
-        check("anonymous appended zero events", beforeEvents === (await prisma.cohortEvent.count()), `before=${beforeEvents}`)
+        checkInvertible("anonymous cohort create refused UNAUTHORIZED", !anonCreate.ok && anonCreate.code === "UNAUTHORIZED", why(anonCreate))
+        checkInvertible("anonymous list refused UNAUTHORIZED", !anonList.ok && anonList.code === "UNAUTHORIZED", why(anonList))
+        checkInvertible("anonymous enrol refused UNAUTHORIZED", !anonEnrol.ok && anonEnrol.code === "UNAUTHORIZED", why(anonEnrol))
+        checkInvertible("anonymous wrote zero cohorts", beforeCohorts === (await prisma.cohort.count()), `before=${beforeCohorts}`)
+        checkInvertible("anonymous appended zero events", beforeEvents === (await prisma.cohortEvent.count()), `before=${beforeEvents}`)
 
         // ---- 2. valid member creates a cohort on an owned course ---------
         identity.current = `clerk_${ids.userA}`
@@ -219,31 +223,31 @@ async function main() {
             actor,
         )
         const cohortId = created.record.id
-        check("cohort created PLANNED", created.record.status === "PLANNED", created.record.status)
-        check("cohort exposes server-computed allowedTransitions", created.record.allowedTransitions.slice().sort().join(",") === "CANCELLED,ENROLLING", created.record.allowedTransitions.join(","))
+        checkInvertible("cohort created PLANNED", created.record.status === "PLANNED", created.record.status)
+        checkInvertible("cohort exposes server-computed allowedTransitions", created.record.allowedTransitions.slice().sort().join(",") === "CANCELLED,ENROLLING", created.record.allowedTransitions.join(","))
         const replay = await cohorts.create(ids.wsA, { courseId: ids.courseA, code: "OTHER", title: "Other", idempotencyKey: `${RUN}-k1` }, actor)
-        check("cohort replay returns the original id and title", replay.replayed && replay.record.id === cohortId && replay.record.title === "Batch one", `replayed=${replay.replayed}`)
+        checkInvertible("cohort replay returns the original id and title", replay.replayed && replay.record.id === cohortId && replay.record.title === "Batch one", `replayed=${replay.replayed}`)
         const dupCode = await attempt(() => cohorts.create(ids.wsA, { courseId: ids.courseA, code: "B1", title: "Clash" }, actor))
-        check("duplicate cohort code on a program is refused", !dupCode.ok && dupCode.code === "CONFLICT", why(dupCode))
+        checkInvertible("duplicate cohort code on a program is refused", !dupCode.ok && dupCode.code === "CONFLICT", why(dupCode))
 
         // A cohort may only be built on a course the caller owns.
         const foreignCourse = await attempt(() => cohorts.create(ids.wsA, { courseId: ids.courseB, code: "B9", title: "Nope" }, actor))
-        check("creating a cohort on another tenant's course is refused", !foreignCourse.ok && foreignCourse.code === "FORBIDDEN", why(foreignCourse))
+        checkInvertible("creating a cohort on another tenant's course is refused", !foreignCourse.ok && foreignCourse.code === "FORBIDDEN", why(foreignCourse))
 
         const badThreshold = await attempt(() => cohorts.create(ids.wsA, { courseId: ids.courseA, code: "B8", title: "T", attendanceThresholdPct: 140 }, actor))
-        check("an attendance threshold above 100 is refused", !badThreshold.ok && badThreshold.code === "CONFLICT", why(badThreshold))
+        checkInvertible("an attendance threshold above 100 is refused", !badThreshold.ok && badThreshold.code === "CONFLICT", why(badThreshold))
         const badWindow = await attempt(() =>
             cohorts.create(ids.wsA, { courseId: ids.courseA, code: "B7", title: "T", startsOn: new Date("2035-02-01T00:00:00Z"), endsOn: new Date("2035-01-01T00:00:00Z") }, actor),
         )
-        check("a cohort that ends before it starts is refused", !badWindow.ok && badWindow.code === "CONFLICT", why(badWindow))
+        checkInvertible("a cohort that ends before it starts is refused", !badWindow.ok && badWindow.code === "CONFLICT", why(badWindow))
 
         // ---- 3. enrolment reuses the existing CourseEnrollment ----------
         const enrol1 = await cohorts.enrol(ids.wsA, { courseId: ids.courseA, visitorEmail: "one@example.test", idempotencyKey: `${RUN}-e1` })
         const enrolReplay = await cohorts.enrol(ids.wsA, { courseId: ids.courseA, visitorEmail: "changed@example.test", idempotencyKey: `${RUN}-e1` })
-        check("enrolment replay returns the original enrolment", enrolReplay.replayed && enrolReplay.enrollmentId === enrol1.enrollmentId, `replayed=${enrolReplay.replayed}`)
+        checkInvertible("enrolment replay returns the original enrolment", enrolReplay.replayed && enrolReplay.enrollmentId === enrol1.enrollmentId, `replayed=${enrolReplay.replayed}`)
         const enrolRow = await prisma.courseEnrollment.findUnique({ where: { id: enrol1.enrollmentId } })
-        check("the enrolment is a real CourseEnrollment row on the owned course", enrolRow?.courseId === ids.courseA, `courseId=${enrolRow?.courseId}`)
-        check("the replayed enrolment kept its original email", enrolRow?.visitorEmail === "one@example.test", `${enrolRow?.visitorEmail}`)
+        checkInvertible("the enrolment is a real CourseEnrollment row on the owned course", enrolRow?.courseId === ids.courseA, `courseId=${enrolRow?.courseId}`)
+        checkInvertible("the replayed enrolment kept its original email", enrolRow?.visitorEmail === "one@example.test", `${enrolRow?.visitorEmail}`)
 
         const enrol2 = await cohorts.enrol(ids.wsA, { courseId: ids.courseA, visitorEmail: "two@example.test" })
         const enrol3 = await cohorts.enrol(ids.wsA, { courseId: ids.courseA, visitorEmail: "three@example.test" })
@@ -251,15 +255,15 @@ async function main() {
         // ---- 4. joining, capacity and idempotency ----------------------
         const join1 = await cohorts.join(ids.wsA, cohortId, { enrollmentId: enrol1.enrollmentId, idempotencyKey: `${RUN}-j1` }, actor)
         const membershipId = join1.membership.id
-        check("membership starts INVITED", join1.membership.status === "INVITED", join1.membership.status)
+        checkInvertible("membership starts INVITED", join1.membership.status === "INVITED", join1.membership.status)
         const joinReplay = await cohorts.join(ids.wsA, cohortId, { enrollmentId: enrol2.enrollmentId, idempotencyKey: `${RUN}-j1` }, actor)
-        check("join replay returns the original membership", joinReplay.replayed && joinReplay.membership.id === membershipId, `replayed=${joinReplay.replayed}`)
+        checkInvertible("join replay returns the original membership", joinReplay.replayed && joinReplay.membership.id === membershipId, `replayed=${joinReplay.replayed}`)
         const rejoin = await attempt(() => cohorts.join(ids.wsA, cohortId, { enrollmentId: enrol1.enrollmentId }, actor))
-        check("the same enrolment cannot join twice", !rejoin.ok && rejoin.code === "CONFLICT", why(rejoin))
+        checkInvertible("the same enrolment cannot join twice", !rejoin.ok && rejoin.code === "CONFLICT", why(rejoin))
 
         const join2 = await cohorts.join(ids.wsA, cohortId, { enrollmentId: enrol2.enrollmentId }, actor)
         const overCapacity = await attempt(() => cohorts.join(ids.wsA, cohortId, { enrollmentId: enrol3.enrollmentId }, actor))
-        check("a full cohort refuses another member", !overCapacity.ok && overCapacity.code === "CONFLICT", why(overCapacity))
+        checkInvertible("a full cohort refuses another member", !overCapacity.ok && overCapacity.code === "CONFLICT", why(overCapacity))
 
         // Withdrawing frees a seat, because capacity counts live members.
         await cohorts.transitionMembership(ids.wsA, cohortId, join2.membership.id, "WITHDRAWN", actor, "changed mind")
@@ -272,14 +276,14 @@ async function main() {
         } catch {
             seatFreed = false
         }
-        check("withdrawing frees a seat", seatFreed, `membership=${renewalTarget || "none"}`)
+        checkInvertible("withdrawing frees a seat", seatFreed, `membership=${renewalTarget || "none"}`)
 
         // ---- 5. cohort lifecycle ---------------------------------------
         const skipToCompleted = await attempt(() => cohorts.transition(ids.wsA, cohortId, "COMPLETED", actor))
-        check("PLANNED to COMPLETED is refused", !skipToCompleted.ok && skipToCompleted.code === "CONFLICT", why(skipToCompleted))
+        checkInvertible("PLANNED to COMPLETED is refused", !skipToCompleted.ok && skipToCompleted.code === "CONFLICT", why(skipToCompleted))
         await cohorts.transition(ids.wsA, cohortId, "ENROLLING", actor)
         const running = await cohorts.transition(ids.wsA, cohortId, "RUNNING", actor)
-        check("ENROLLING to RUNNING is accepted", running.status === "RUNNING", running.status)
+        checkInvertible("ENROLLING to RUNNING is accepted", running.status === "RUNNING", running.status)
 
         // ---- 6. sessions and attendance --------------------------------
         const session1 = await flow.addSession(
@@ -288,36 +292,36 @@ async function main() {
             { ordinal: 1, title: "Kickoff", startsAt: new Date("2035-03-01T10:00:00Z"), endsAt: new Date("2035-03-01T11:00:00Z"), locationId: ids.locA },
             actor,
         )
-        check("session records the reused Location", session1.locationId === ids.locA, `${session1.locationId}`)
+        checkInvertible("session records the reused Location", session1.locationId === ids.locA, `${session1.locationId}`)
         const dupOrdinal = await attempt(() =>
             flow.addSession(ids.wsA, cohortId, { ordinal: 1, title: "Clash", startsAt: new Date("2035-03-02T10:00:00Z"), endsAt: new Date("2035-03-02T11:00:00Z") }, actor),
         )
-        check("session ordinal is unique within a cohort", !dupOrdinal.ok && dupOrdinal.code === "CONFLICT", why(dupOrdinal))
+        checkInvertible("session ordinal is unique within a cohort", !dupOrdinal.ok && dupOrdinal.code === "CONFLICT", why(dupOrdinal))
         const backwards = await attempt(() =>
             flow.addSession(ids.wsA, cohortId, { ordinal: 2, title: "Bad", startsAt: new Date("2035-03-02T11:00:00Z"), endsAt: new Date("2035-03-02T10:00:00Z") }, actor),
         )
-        check("a session that ends before it starts is refused", !backwards.ok && backwards.code === "CONFLICT", why(backwards))
+        checkInvertible("a session that ends before it starts is refused", !backwards.ok && backwards.code === "CONFLICT", why(backwards))
         const foreignLocation = await attempt(() =>
             flow.addSession(ids.wsA, cohortId, { ordinal: 3, title: "Bad venue", startsAt: new Date("2035-03-03T10:00:00Z"), endsAt: new Date("2035-03-03T11:00:00Z"), locationId: ids.locB }, actor),
         )
-        check("another tenant's Location cannot be used as a venue", !foreignLocation.ok && foreignLocation.code === "FORBIDDEN", why(foreignLocation))
+        checkInvertible("another tenant's Location cannot be used as a venue", !foreignLocation.ok && foreignLocation.code === "FORBIDDEN", why(foreignLocation))
 
         const earlyAttendance = await attempt(() =>
             flow.recordAttendance(ids.wsA, cohortId, session1.id, { membershipId, status: "PRESENT" }, actor),
         )
-        check("attendance for a SCHEDULED session is refused", !earlyAttendance.ok && earlyAttendance.code === "CONFLICT", why(earlyAttendance))
+        checkInvertible("attendance for a SCHEDULED session is refused", !earlyAttendance.ok && earlyAttendance.code === "CONFLICT", why(earlyAttendance))
 
         await flow.transitionSession(ids.wsA, cohortId, session1.id, "IN_PROGRESS", actor)
         const badStatus = await attempt(() =>
             flow.recordAttendance(ids.wsA, cohortId, session1.id, { membershipId, status: "MAYBE" }, actor),
         )
-        check("an unknown attendance status is BAD_REQUEST not CONFLICT", !badStatus.ok && badStatus.code === "BAD_REQUEST", why(badStatus))
+        checkInvertible("an unknown attendance status is BAD_REQUEST not CONFLICT", !badStatus.ok && badStatus.code === "BAD_REQUEST", why(badStatus))
         const att = await flow.recordAttendance(ids.wsA, cohortId, session1.id, { membershipId, status: "PRESENT" }, actor)
-        check("attendance recorded once the session has started", att.status === "PRESENT", att.status)
+        checkInvertible("attendance recorded once the session has started", att.status === "PRESENT", att.status)
         const corrected = await flow.recordAttendance(ids.wsA, cohortId, session1.id, { membershipId, status: "LATE" }, actor)
-        check("a correction updates the same attendance row", corrected.id === att.id && corrected.status === "LATE", `${corrected.id === att.id} ${corrected.status}`)
+        checkInvertible("a correction updates the same attendance row", corrected.id === att.id && corrected.status === "LATE", `${corrected.id === att.id} ${corrected.status}`)
         const attRows = await prisma.cohortAttendance.count({ where: { sessionId: session1.id, membershipId } })
-        check("a correction does not create a second attendance row", attRows === 1, `rows=${attRows}`)
+        checkInvertible("a correction does not create a second attendance row", attRows === 1, `rows=${attRows}`)
 
         const session2 = await flow.addSession(
             ids.wsA,
@@ -329,36 +333,36 @@ async function main() {
         const cancelledAttendance = await attempt(() =>
             flow.recordAttendance(ids.wsA, cohortId, session2.id, { membershipId, status: "PRESENT" }, actor),
         )
-        check("attendance for a CANCELLED session is refused", !cancelledAttendance.ok && cancelledAttendance.code === "CONFLICT", why(cancelledAttendance))
+        checkInvertible("attendance for a CANCELLED session is refused", !cancelledAttendance.ok && cancelledAttendance.code === "CONFLICT", why(cancelledAttendance))
 
         // ---- 7. assignments and submissions ---------------------------
         const assignment = await flow.addAssignment(ids.wsA, cohortId, { ordinal: 1, title: "Case study", maxPoints: 50 }, actor)
         const dupAssignment = await attempt(() => flow.addAssignment(ids.wsA, cohortId, { ordinal: 1, title: "Clash" }, actor))
-        check("assignment ordinal is unique within a cohort", !dupAssignment.ok && dupAssignment.code === "CONFLICT", why(dupAssignment))
+        checkInvertible("assignment ordinal is unique within a cohort", !dupAssignment.ok && dupAssignment.code === "CONFLICT", why(dupAssignment))
 
         const sub = await flow.openSubmission(ids.wsA, cohortId, assignment.id, { membershipId, idempotencyKey: `${RUN}-s1` }, actor)
-        check("a new submission starts DRAFT", sub.submission.state === "DRAFT", sub.submission.state)
+        checkInvertible("a new submission starts DRAFT", sub.submission.state === "DRAFT", sub.submission.state)
         const subReplay = await flow.openSubmission(ids.wsA, cohortId, assignment.id, { membershipId, idempotencyKey: `${RUN}-s1` }, actor)
-        check("submission replay returns the original", subReplay.replayed && subReplay.submission.id === sub.submission.id, `replayed=${subReplay.replayed}`)
+        checkInvertible("submission replay returns the original", subReplay.replayed && subReplay.submission.id === sub.submission.id, `replayed=${subReplay.replayed}`)
 
         const emptySubmit = await attempt(() =>
             flow.transitionSubmission(ids.wsA, cohortId, assignment.id, sub.submission.id, "SUBMITTED", actor),
         )
-        check("submitting with no document and no notes is refused", !emptySubmit.ok && emptySubmit.code === "CONFLICT", why(emptySubmit))
+        checkInvertible("submitting with no document and no notes is refused", !emptySubmit.ok && emptySubmit.code === "CONFLICT", why(emptySubmit))
         const foreignDoc = await attempt(() =>
             flow.transitionSubmission(ids.wsA, cohortId, assignment.id, sub.submission.id, "SUBMITTED", actor, { documentId: ids.docB }),
         )
-        check("another tenant's ProfileDocument cannot be attached", !foreignDoc.ok && foreignDoc.code === "FORBIDDEN", why(foreignDoc))
+        checkInvertible("another tenant's ProfileDocument cannot be attached", !foreignDoc.ok && foreignDoc.code === "FORBIDDEN", why(foreignDoc))
         const submitted = await flow.transitionSubmission(ids.wsA, cohortId, assignment.id, sub.submission.id, "SUBMITTED", actor, { documentId: ids.docA })
-        check("submitting with a real ProfileDocument is accepted and stamped", submitted.documentId === ids.docA && submitted.submittedAt !== null, `${submitted.documentId}`)
+        checkInvertible("submitting with a real ProfileDocument is accepted and stamped", submitted.documentId === ids.docA && submitted.submittedAt !== null, `${submitted.documentId}`)
         const skipState = await attempt(() =>
             flow.transitionSubmission(ids.wsA, cohortId, assignment.id, sub.submission.id, "DRAFT", actor),
         )
-        check("SUBMITTED cannot go back to DRAFT", !skipState.ok && skipState.code === "CONFLICT", why(skipState))
+        checkInvertible("SUBMITTED cannot go back to DRAFT", !skipState.ok && skipState.code === "CONFLICT", why(skipState))
         const tooManyPoints = await attempt(() =>
             flow.transitionSubmission(ids.wsA, cohortId, assignment.id, sub.submission.id, "ACCEPTED", actor, { points: 500 }),
         )
-        check("points above the assignment maximum are BAD_REQUEST", !tooManyPoints.ok && tooManyPoints.code === "BAD_REQUEST", why(tooManyPoints))
+        checkInvertible("points above the assignment maximum are BAD_REQUEST", !tooManyPoints.ok && tooManyPoints.code === "BAD_REQUEST", why(tooManyPoints))
 
         // ---- 8. progress is derived, not stored ------------------------
         for (let i = 0; i < 3; i += 1) {
@@ -367,22 +371,22 @@ async function main() {
             })
         }
         const partial = await cohorts.progressFor(ids.wsA, cohortId, membershipId)
-        check("lesson progress is 3 of 4 lessons at 75%", partial.lessons.totalLessons === 4 && partial.lessons.completedLessons === 3 && partial.lessons.percent === 75, `${partial.lessons.completedLessons}/${partial.lessons.totalLessons} = ${partial.lessons.percent}%`)
-        check("a cancelled session is excluded from attendance", partial.attendance.attendableSessions === 1, `attendable=${partial.attendance.attendableSessions}`)
-        check("LATE counts towards the attendance threshold", partial.attendance.percent === 100, `attendance=${partial.attendance.percent}%`)
-        check("an unaccepted assignment counts as outstanding", partial.assignments.outstandingAssignments === 1, `outstanding=${partial.assignments.outstandingAssignments}`)
-        check("the learner is not yet eligible, with reasons given", !partial.eligible && partial.reasons.length === 2, `reasons=${partial.reasons.join(" | ")}`)
+        checkInvertible("lesson progress is 3 of 4 lessons at 75%", partial.lessons.totalLessons === 4 && partial.lessons.completedLessons === 3 && partial.lessons.percent === 75, `${partial.lessons.completedLessons}/${partial.lessons.totalLessons} = ${partial.lessons.percent}%`)
+        checkInvertible("a cancelled session is excluded from attendance", partial.attendance.attendableSessions === 1, `attendable=${partial.attendance.attendableSessions}`)
+        checkInvertible("LATE counts towards the attendance threshold", partial.attendance.percent === 100, `attendance=${partial.attendance.percent}%`)
+        checkInvertible("an unaccepted assignment counts as outstanding", partial.assignments.outstandingAssignments === 1, `outstanding=${partial.assignments.outstandingAssignments}`)
+        checkInvertible("the learner is not yet eligible, with reasons given", !partial.eligible && partial.reasons.length === 2, `reasons=${partial.reasons.join(" | ")}`)
 
         // ---- 9. completion and certificates are policy-gated ----------
         await cohorts.transitionMembership(ids.wsA, cohortId, membershipId, "ACTIVE", actor)
         const earlyComplete = await attempt(() => cohorts.transitionMembership(ids.wsA, cohortId, membershipId, "COMPLETED", actor))
-        check("completing a learner who fails the policy is refused", !earlyComplete.ok && earlyComplete.code === "CONFLICT", why(earlyComplete))
-        check("the completion refusal names the unmet requirements", !earlyComplete.ok && /lessons are not complete/.test(earlyComplete.message) && /assignments have no accepted submission/.test(earlyComplete.message), why(earlyComplete))
+        checkInvertible("completing a learner who fails the policy is refused", !earlyComplete.ok && earlyComplete.code === "CONFLICT", why(earlyComplete))
+        checkInvertible("the completion refusal names the unmet requirements", !earlyComplete.ok && /lessons are not complete/.test(earlyComplete.message) && /assignments have no accepted submission/.test(earlyComplete.message), why(earlyComplete))
 
         const earlyEligible = await attempt(() => flow.transitionCertificate(ids.wsA, cohortId, membershipId, "ELIGIBLE", actor))
-        check("marking an unqualified learner ELIGIBLE is refused", !earlyEligible.ok && earlyEligible.code === "CONFLICT", why(earlyEligible))
+        checkInvertible("marking an unqualified learner ELIGIBLE is refused", !earlyEligible.ok && earlyEligible.code === "CONFLICT", why(earlyEligible))
         const certBefore = await prisma.cohortCertificate.count({ where: { membershipId } })
-        check("a refused eligibility claim created no certificate row", certBefore === 0, `rows=${certBefore}`)
+        checkInvertible("a refused eligibility claim created no certificate row", certBefore === 0, `rows=${certBefore}`)
 
         // Satisfy the policy for real, then the same calls succeed.
         await prisma.lessonCompletion.create({
@@ -390,35 +394,35 @@ async function main() {
         })
         await flow.transitionSubmission(ids.wsA, cohortId, assignment.id, sub.submission.id, "ACCEPTED", actor, { points: 45, reviewedBy: ids.userA })
         const full = await cohorts.progressFor(ids.wsA, cohortId, membershipId)
-        check("the learner is now eligible with no reasons", full.eligible && full.reasons.length === 0, `reasons=${full.reasons.join(" | ")}`)
+        checkInvertible("the learner is now eligible with no reasons", full.eligible && full.reasons.length === 0, `reasons=${full.reasons.join(" | ")}`)
 
         const jumpToIssued = await attempt(() => flow.transitionCertificate(ids.wsA, cohortId, membershipId, "ISSUED", actor))
-        check("issuing before eligibility is recorded is refused", !jumpToIssued.ok && jumpToIssued.code === "CONFLICT", why(jumpToIssued))
+        checkInvertible("issuing before eligibility is recorded is refused", !jumpToIssued.ok && jumpToIssued.code === "CONFLICT", why(jumpToIssued))
         const eligible = await flow.transitionCertificate(ids.wsA, cohortId, membershipId, "ELIGIBLE", actor)
-        check("eligibility is recorded with no serial and no issue date", eligible.state === "ELIGIBLE" && eligible.serial === null && eligible.issuedAt === null, `${eligible.state}/${eligible.serial}`)
+        checkInvertible("eligibility is recorded with no serial and no issue date", eligible.state === "ELIGIBLE" && eligible.serial === null && eligible.issuedAt === null, `${eligible.state}/${eligible.serial}`)
         const issued = await flow.transitionCertificate(ids.wsA, cohortId, membershipId, "ISSUED", actor, { documentId: ids.docA })
-        check("issuing mints a server-side serial and stamps issuedAt", issued.state === "ISSUED" && !!issued.serial && issued.issuedAt !== null, `${issued.state}/${issued.serial}`)
-        check("the serial is derived from the cohort code, not caller input", (issued.serial ?? "").startsWith("B1-"), `${issued.serial}`)
+        checkInvertible("issuing mints a server-side serial and stamps issuedAt", issued.state === "ISSUED" && !!issued.serial && issued.issuedAt !== null, `${issued.state}/${issued.serial}`)
+        checkInvertible("the serial is derived from the cohort code, not caller input", (issued.serial ?? "").startsWith("B1-"), `${issued.serial}`)
         const completed = await cohorts.transitionMembership(ids.wsA, cohortId, membershipId, "COMPLETED", actor)
-        check("completion is accepted once the policy is met and stamps completedAt", completed.status === "COMPLETED" && completed.completedAt !== null, `${completed.status}`)
+        checkInvertible("completion is accepted once the policy is met and stamps completedAt", completed.status === "COMPLETED" && completed.completedAt !== null, `${completed.status}`)
         const revoked = await flow.transitionCertificate(ids.wsA, cohortId, membershipId, "REVOKED", actor, { reason: "issued in error" })
-        check("a certificate can be revoked", revoked.state === "REVOKED" && revoked.revokedAt !== null, revoked.state)
+        checkInvertible("a certificate can be revoked", revoked.state === "REVOKED" && revoked.revokedAt !== null, revoked.state)
         const afterRevoke = await attempt(() => flow.transitionCertificate(ids.wsA, cohortId, membershipId, "ISSUED", actor))
-        check("a revoked certificate is terminal", !afterRevoke.ok && afterRevoke.code === "CONFLICT", why(afterRevoke))
+        checkInvertible("a revoked certificate is terminal", !afterRevoke.ok && afterRevoke.code === "CONFLICT", why(afterRevoke))
 
         // ---- 10. renewal reminders compose TaskJob --------------------
         const remindWithoutTask = await attempt(() => flow.transitionRenewal(ids.wsA, cohortId, renewalTarget, "REMINDED", actor))
-        check("renewal cannot start at REMINDED", !remindWithoutTask.ok && remindWithoutTask.code === "CONFLICT", why(remindWithoutTask))
+        checkInvertible("renewal cannot start at REMINDED", !remindWithoutTask.ok && remindWithoutTask.code === "CONFLICT", why(remindWithoutTask))
 
         const noTaskSchedule = await flow.scheduleRenewal(ids.wsA, cohortId, renewalTarget, { dueAt: new Date("2035-06-01T00:00:00Z") }, actor)
-        check("a renewal can be scheduled without a reminder", noTaskSchedule.renewalState === "SCHEDULED" && noTaskSchedule.renewalTaskJobId === null, `${noTaskSchedule.renewalState}`)
+        checkInvertible("a renewal can be scheduled without a reminder", noTaskSchedule.renewalState === "SCHEDULED" && noTaskSchedule.renewalTaskJobId === null, `${noTaskSchedule.renewalState}`)
         const remindNoTask = await attempt(() => flow.transitionRenewal(ids.wsA, cohortId, renewalTarget, "REMINDED", actor))
-        check("REMINDED is refused while no reminder task exists", !remindNoTask.ok && remindNoTask.code === "CONFLICT", why(remindNoTask))
+        checkInvertible("REMINDED is refused while no reminder task exists", !remindNoTask.ok && remindNoTask.code === "CONFLICT", why(remindNoTask))
 
         const backwardsReminder = await attempt(() =>
             flow.scheduleRenewal(ids.wsA, cohortId, renewalTarget, { dueAt: new Date("2035-06-01T00:00:00Z"), remindAt: new Date("2035-07-01T00:00:00Z") }, actor),
         )
-        check("a reminder after the due date is refused", !backwardsReminder.ok && backwardsReminder.code === "CONFLICT", why(backwardsReminder))
+        checkInvertible("a reminder after the due date is refused", !backwardsReminder.ok && backwardsReminder.code === "CONFLICT", why(backwardsReminder))
 
         await cohorts.transitionMembership(ids.wsA, cohortId, renewalTarget, "ACTIVE", actor)
         await flow.transitionRenewal(ids.wsA, cohortId, renewalTarget, "RENEWED", actor)
@@ -429,13 +433,13 @@ async function main() {
             { dueAt: new Date("2035-06-01T00:00:00Z"), remindAt: new Date("2035-05-25T00:00:00Z"), idempotencyKey: `${RUN}-r1` },
             actor,
         )
-        check("scheduling with a reminder links a TaskJob", withTask.renewalTaskJobId !== null, `${withTask.renewalTaskJobId}`)
+        checkInvertible("scheduling with a reminder links a TaskJob", withTask.renewalTaskJobId !== null, `${withTask.renewalTaskJobId}`)
         const task = await prisma.taskJob.findUnique({ where: { id: withTask.renewalTaskJobId ?? "" } })
-        check("the linked reminder is a real QUEUED TaskJob row", task?.state === "QUEUED", `state=${task?.state}`)
-        check("the reminder task fires at the requested time, not now", task?.nextAttemptAt.toISOString() === "2035-05-25T00:00:00.000Z", `${task?.nextAttemptAt.toISOString()}`)
-        check("the reminder task carries the cohort workflow key", /cohorts\.renewal\.reminder/.test(task?.payload ?? ""), (task?.payload ?? "").slice(0, 60))
+        checkInvertible("the linked reminder is a real QUEUED TaskJob row", task?.state === "QUEUED", `state=${task?.state}`)
+        checkInvertible("the reminder task fires at the requested time, not now", task?.nextAttemptAt.toISOString() === "2035-05-25T00:00:00.000Z", `${task?.nextAttemptAt.toISOString()}`)
+        checkInvertible("the reminder task carries the cohort workflow key", /cohorts\.renewal\.reminder/.test(task?.payload ?? ""), (task?.payload ?? "").slice(0, 60))
         const reminded = await flow.transitionRenewal(ids.wsA, cohortId, renewalTarget, "REMINDED", actor)
-        check("REMINDED is accepted once a reminder task exists", reminded.renewalState === "REMINDED", reminded.renewalState)
+        checkInvertible("REMINDED is accepted once a reminder task exists", reminded.renewalState === "REMINDED", reminded.renewalState)
 
         const tasksBefore = await prisma.taskJob.count()
         await flow.transitionRenewal(ids.wsA, cohortId, renewalTarget, "RENEWED", actor)
@@ -446,7 +450,7 @@ async function main() {
             { dueAt: new Date("2036-06-01T00:00:00Z"), remindAt: new Date("2036-05-25T00:00:00Z"), idempotencyKey: `${RUN}-r1` },
             actor,
         )
-        check("rescheduling with the same key reuses the existing TaskJob", (await prisma.taskJob.count()) === tasksBefore, `before=${tasksBefore} after=${await prisma.taskJob.count()}`)
+        checkInvertible("rescheduling with the same key reuses the existing TaskJob", (await prisma.taskJob.count()) === tasksBefore, `before=${tasksBefore} after=${await prisma.taskJob.count()}`)
 
         // ---- 11. wrong tenant: foreign is indistinguishable from missing
         identity.current = `clerk_${ids.userB}`
@@ -454,23 +458,20 @@ async function main() {
         const crossFetch = fetchCalls
         const foreignGet = await attempt(() => cohorts.get(ids.wsB, cohortId))
         const missingGet = await attempt(() => cohorts.get(ids.wsB, `${RUN}_absent`))
-        check("wrong-tenant get refused FORBIDDEN", !foreignGet.ok && foreignGet.code === "FORBIDDEN", why(foreignGet))
-        // This is the single inverted assertion.
-        const identical = INVERT
-            ? why(foreignGet) !== why(missingGet)
-            : !foreignGet.ok && !missingGet.ok && why(foreignGet) === why(missingGet)
-        check("a foreign cohort and a missing cohort refuse identically", identical, `${why(foreignGet)} vs ${why(missingGet)}`)
+        checkInvertible("wrong-tenant get refused FORBIDDEN", !foreignGet.ok && foreignGet.code === "FORBIDDEN", why(foreignGet))
+        const identical = !foreignGet.ok && !missingGet.ok && why(foreignGet) === why(missingGet)
+        checkInvertible("a foreign cohort and a missing cohort refuse identically", identical, `${why(foreignGet)} vs ${why(missingGet)}`)
         const foreignMutate = await attempt(() => cohorts.transition(ids.wsB, cohortId, "CANCELLED", actor))
         const missingMutate = await attempt(() => cohorts.transition(ids.wsB, `${RUN}_absent`, "CANCELLED", actor))
-        check("a foreign mutation and a missing mutation refuse identically", why(foreignMutate) === why(missingMutate), `${why(foreignMutate)}`)
+        checkInvertible("a foreign mutation and a missing mutation refuse identically", why(foreignMutate) === why(missingMutate), `${why(foreignMutate)}`)
         const foreignMembership = await attempt(() => cohorts.listMemberships(ids.wsB, cohortId))
-        check("wrong-tenant membership list refused", !foreignMembership.ok && foreignMembership.code === "FORBIDDEN", why(foreignMembership))
+        checkInvertible("wrong-tenant membership list refused", !foreignMembership.ok && foreignMembership.code === "FORBIDDEN", why(foreignMembership))
         const foreignEnrolJoin = await attempt(() => cohorts.join(ids.wsB, cohortId, { enrollmentId: enrol1.enrollmentId }, actor))
-        check("wrong-tenant join refused", !foreignEnrolJoin.ok && foreignEnrolJoin.code === "FORBIDDEN", why(foreignEnrolJoin))
-        check("cross-tenant refusals appended zero events", beforeCross === (await prisma.cohortEvent.count()), `before=${beforeCross}`)
-        check("cross-tenant refusals made zero external calls", fetchCalls === crossFetch, `calls=${fetchCalls - crossFetch}`)
+        checkInvertible("wrong-tenant join refused", !foreignEnrolJoin.ok && foreignEnrolJoin.code === "FORBIDDEN", why(foreignEnrolJoin))
+        checkInvertible("cross-tenant refusals appended zero events", beforeCross === (await prisma.cohortEvent.count()), `before=${beforeCross}`)
+        checkInvertible("cross-tenant refusals made zero external calls", fetchCalls === crossFetch, `calls=${fetchCalls - crossFetch}`)
         const listB = await cohorts.list(ids.wsB)
-        check("tenant B's list never contains tenant A's cohort", !listB.some((c) => c.id === cohortId), `n=${listB.length}`)
+        checkInvertible("tenant B's list never contains tenant A's cohort", !listB.some((c) => c.id === cohortId), `n=${listB.length}`)
 
         // A workspace with no linked profile owns no programs.
         identity.current = `clerk_${ids.userA}`
@@ -478,16 +479,16 @@ async function main() {
         await prisma.workspace.create({ data: { id: orphanWs, name: "Orphan", slug: `ws-${orphanWs}` } })
         await prisma.membership.create({ data: { workspaceId: orphanWs, userId: ids.userA, role: "OWNER" } })
         const orphan = await attempt(() => cohorts.list(orphanWs))
-        check("a workspace with no profile is refused, not silently empty", !orphan.ok && orphan.code === "FORBIDDEN", why(orphan))
+        checkInvertible("a workspace with no profile is refused, not silently empty", !orphan.ok && orphan.code === "FORBIDDEN", why(orphan))
 
         // ---- 12. append-only timeline ---------------------------------
         const timeline = await cohorts.timeline(ids.wsA, cohortId)
         const seqs = timeline.map((e) => Number(e.seq))
-        check("the cohort timeline recorded every accepted change", timeline.length >= 20, `events=${timeline.length}`)
-        check("timeline seq is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
+        checkInvertible("the cohort timeline recorded every accepted change", timeline.length >= 20, `events=${timeline.length}`)
+        checkInvertible("timeline seq is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
         const kinds = new Set<string>(timeline.map((e) => String(e.kind)))
         for (const kind of ["CREATED", "STATUS", "MEMBERSHIP", "SESSION", "ATTENDANCE", "ASSIGNMENT", "SUBMISSION", "CERTIFICATE", "RENEWAL"]) {
-            check(`timeline contains a ${kind} event`, kinds.has(kind), [...kinds].join(","))
+            checkInvertible(`timeline contains a ${kind} event`, kinds.has(kind), [...kinds].join(","))
         }
         let appendOnly = false
         let appendDetail = ""
@@ -497,7 +498,7 @@ async function main() {
             appendOnly = true
             appendDetail = String((e as Error).message).split("\n").find((l) => /append-only/.test(l))?.trim() ?? "refused"
         }
-        check("the database refuses to rewrite cohort history", appendOnly, appendDetail || "NO ERROR")
+        checkInvertible("the database refuses to rewrite cohort history", appendOnly, appendDetail || "NO ERROR")
 
         // ---- 13. a failed transaction leaves no residue ---------------
         {
@@ -518,7 +519,7 @@ async function main() {
         }
 
         // ---- 14. whole-run external call tally -----------------------
-        check("no external call was EVER made in this run", fetchCalls === 0, `calls=${fetchCalls}`)
+        checkInvertible("no external call was EVER made in this run", fetchCalls === 0, `calls=${fetchCalls}`)
     } finally {
         try {
             await prisma.$executeRawUnsafe(`alter table "CohortEvent" disable trigger "CohortEvent_append_only"`)

@@ -35,6 +35,10 @@ function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
 
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    check(name, INVERT ? !pass : pass, detail)
+}
+
 class ControlledIdentity implements PlatformIdentity {
     current: string | null = null
     async userId(): Promise<string | null> {
@@ -115,16 +119,16 @@ async function main() {
                 else illegal += 1
             }
         }
-        check(
+        checkInvertible(
             `reservation transition table is total over ${RESERVATION_STATES.length}x${RESERVATION_STATES.length} pairs`,
             legal + illegal === RESERVATION_STATES.length ** 2,
             `legal=${legal} illegal=${illegal}`,
         )
-        check(
+        checkInvertible(
             "every settled state is terminal, so stock cannot be double-credited",
             reservationFlow.isTerminal("RELEASED") && reservationFlow.isTerminal("CONSUMED") && reservationFlow.isTerminal("EXPIRED"),
         )
-        check("available units never go negative", availableUnits(3, 5) === 0, `availableUnits(3,5)=${availableUnits(3, 5)}`)
+        checkInvertible("available units never go negative", availableUnits(3, 5) === 0, `availableUnits(3,5)=${availableUnits(3, 5)}`)
 
         // ---- seed two tenants with real catalogues and orders -------------
         for (const [u, p, w, l, pr, o] of [
@@ -175,15 +179,15 @@ async function main() {
         const beforeMoves = await prisma.inventoryMovement.count()
         const anonEnsure = await attempt(() => inventory.ensureItem(ids.wsA, { productId: ids.prodA, locationId: ids.locA }, actor))
         const anonList = await attempt(() => inventory.list(ids.wsA))
-        check("anonymous stock-record create refused UNAUTHORIZED", !anonEnsure.ok && anonEnsure.code === "UNAUTHORIZED", why(anonEnsure))
-        check("anonymous list refused UNAUTHORIZED", !anonList.ok && anonList.code === "UNAUTHORIZED", why(anonList))
-        check("anonymous wrote zero stock records", beforeItems === (await prisma.inventoryItem.count()), `before=${beforeItems}`)
-        check("anonymous appended zero movements", beforeMoves === (await prisma.inventoryMovement.count()), `before=${beforeMoves}`)
+        checkInvertible("anonymous stock-record create refused UNAUTHORIZED", !anonEnsure.ok && anonEnsure.code === "UNAUTHORIZED", why(anonEnsure))
+        checkInvertible("anonymous list refused UNAUTHORIZED", !anonList.ok && anonList.code === "UNAUTHORIZED", why(anonList))
+        checkInvertible("anonymous wrote zero stock records", beforeItems === (await prisma.inventoryItem.count()), `before=${beforeItems}`)
+        checkInvertible("anonymous appended zero movements", beforeMoves === (await prisma.inventoryMovement.count()), `before=${beforeMoves}`)
 
         // ---- 2. authenticated non-member is refused ---------------------
         identity.current = `clerk_${ids.userC}`
         const outsider = await attempt(() => inventory.list(ids.wsA))
-        check("authenticated non-member refused FORBIDDEN", !outsider.ok && outsider.code === "FORBIDDEN", why(outsider))
+        checkInvertible("authenticated non-member refused FORBIDDEN", !outsider.ok && outsider.code === "FORBIDDEN", why(outsider))
 
         // ---- 3. stock records are idempotent by construction -----------
         identity.current = `clerk_${ids.userA}`
@@ -193,114 +197,114 @@ async function main() {
             actor,
         )
         const itemId = created.record.id
-        check("a new stock record starts empty", created.record.onHand === 0 && created.record.reserved === 0 && created.record.available === 0, `${created.record.onHand}/${created.record.reserved}`)
-        check("a new stock record is immediately below its reorder point", created.record.belowReorderPoint, `available=${created.record.available} reorder=${created.record.reorderPoint}`)
+        checkInvertible("a new stock record starts empty", created.record.onHand === 0 && created.record.reserved === 0 && created.record.available === 0, `${created.record.onHand}/${created.record.reserved}`)
+        checkInvertible("a new stock record is immediately below its reorder point", created.record.belowReorderPoint, `available=${created.record.available} reorder=${created.record.reorderPoint}`)
         const replay = await inventory.ensureItem(ids.wsA, { productId: ids.prodA, locationId: ids.locA }, actor)
-        check("re-creating the same product-location pair replays", replay.replayed && replay.record.id === itemId, `replayed=${replay.replayed}`)
-        check("the replay did not reset the reorder point", replay.record.reorderPoint === 2, `${replay.record.reorderPoint}`)
+        checkInvertible("re-creating the same product-location pair replays", replay.replayed && replay.record.id === itemId, `replayed=${replay.replayed}`)
+        checkInvertible("the replay did not reset the reorder point", replay.record.reorderPoint === 2, `${replay.record.reorderPoint}`)
 
         const foreignProduct = await attempt(() => inventory.ensureItem(ids.wsA, { productId: ids.prodB, locationId: ids.locA }, actor))
-        check("another tenant's product is refused", !foreignProduct.ok && foreignProduct.code === "FORBIDDEN", why(foreignProduct))
+        checkInvertible("another tenant's product is refused", !foreignProduct.ok && foreignProduct.code === "FORBIDDEN", why(foreignProduct))
         const foreignLocation = await attempt(() => inventory.ensureItem(ids.wsA, { productId: ids.prodA, locationId: ids.locB }, actor))
-        check("another tenant's location is refused", !foreignLocation.ok && foreignLocation.code === "FORBIDDEN", why(foreignLocation))
+        checkInvertible("another tenant's location is refused", !foreignLocation.ok && foreignLocation.code === "FORBIDDEN", why(foreignLocation))
 
         // ---- 4. direct movements and their arithmetic ------------------
         const received = await inventory.applyMovement(ids.wsA, itemId, { kind: "RECEIPT", qty: 10, idempotencyKey: `${RUN}-r1` }, actor)
-        check("a receipt of 10 leaves 10 on hand and 10 available", received.onHand === 10 && received.available === 10, `${received.onHand}/${received.available}`)
-        check("10 on hand is above a reorder point of 2", !received.belowReorderPoint, `available=${received.available}`)
+        checkInvertible("a receipt of 10 leaves 10 on hand and 10 available", received.onHand === 10 && received.available === 10, `${received.onHand}/${received.available}`)
+        checkInvertible("10 on hand is above a reorder point of 2", !received.belowReorderPoint, `available=${received.available}`)
         const receiptReplay = await inventory.applyMovement(ids.wsA, itemId, { kind: "RECEIPT", qty: 999, idempotencyKey: `${RUN}-r1` }, actor)
-        check("replaying a receipt key does not apply it twice", receiptReplay.onHand === 10, `onHand=${receiptReplay.onHand}`)
+        checkInvertible("replaying a receipt key does not apply it twice", receiptReplay.onHand === 10, `onHand=${receiptReplay.onHand}`)
 
         const adjusted = await inventory.applyMovement(ids.wsA, itemId, { kind: "ADJUSTMENT", qty: -3, reason: "damaged" }, actor)
-        check("an adjustment of -3 leaves 7 on hand", adjusted.onHand === 7, `${adjusted.onHand}`)
+        checkInvertible("an adjustment of -3 leaves 7 on hand", adjusted.onHand === 7, `${adjusted.onHand}`)
         const counted = await inventory.applyMovement(ids.wsA, itemId, { kind: "COUNT", qty: 5 }, actor)
-        check("a stock count is absolute, not relative", counted.onHand === 5, `${counted.onHand}`)
+        checkInvertible("a stock count is absolute, not relative", counted.onHand === 5, `${counted.onHand}`)
         const returned = await inventory.applyMovement(ids.wsA, itemId, { kind: "RETURN", qty: 1, orderId: ids.orderA }, actor)
-        check("a return adds the unit back", returned.onHand === 6, `${returned.onHand}`)
+        checkInvertible("a return adds the unit back", returned.onHand === 6, `${returned.onHand}`)
 
         const negative = await attempt(() => inventory.applyMovement(ids.wsA, itemId, { kind: "ADJUSTMENT", qty: -99 }, actor))
-        check("an adjustment below zero is refused with the real balance named", !negative.ok && negative.code === "CONFLICT" && /only 6 are present/.test(negative.message), why(negative))
+        checkInvertible("an adjustment below zero is refused with the real balance named", !negative.ok && negative.code === "CONFLICT" && /only 6 are present/.test(negative.message), why(negative))
         const zeroAdjust = await attempt(() => inventory.applyMovement(ids.wsA, itemId, { kind: "ADJUSTMENT", qty: 0 }, actor))
-        check("a zero adjustment is BAD_REQUEST, not a silent no-op", !zeroAdjust.ok && zeroAdjust.code === "BAD_REQUEST", why(zeroAdjust))
+        checkInvertible("a zero adjustment is BAD_REQUEST, not a silent no-op", !zeroAdjust.ok && zeroAdjust.code === "BAD_REQUEST", why(zeroAdjust))
         const negativeReceipt = await attempt(() => inventory.applyMovement(ids.wsA, itemId, { kind: "RECEIPT", qty: -1 }, actor))
-        check("a negative receipt is BAD_REQUEST", !negativeReceipt.ok && negativeReceipt.code === "BAD_REQUEST", why(negativeReceipt))
+        checkInvertible("a negative receipt is BAD_REQUEST", !negativeReceipt.ok && negativeReceipt.code === "BAD_REQUEST", why(negativeReceipt))
         const negativeCount = await attempt(() => inventory.applyMovement(ids.wsA, itemId, { kind: "COUNT", qty: -1 }, actor))
-        check("a negative stock count is BAD_REQUEST", !negativeCount.ok && negativeCount.code === "BAD_REQUEST", why(negativeCount))
+        checkInvertible("a negative stock count is BAD_REQUEST", !negativeCount.ok && negativeCount.code === "BAD_REQUEST", why(negativeCount))
         for (const kind of ["RESERVE", "RELEASE", "CONSUME"]) {
             const driven = await attempt(() => inventory.applyMovement(ids.wsA, itemId, { kind, qty: 1 }, actor))
-            check(`${kind} cannot be written as a direct movement`, !driven.ok && driven.code === "BAD_REQUEST", why(driven))
+            checkInvertible(`${kind} cannot be written as a direct movement`, !driven.ok && driven.code === "BAD_REQUEST", why(driven))
         }
         const madeUpKind = await attempt(() => inventory.applyMovement(ids.wsA, itemId, { kind: "TELEPORT", qty: 1 }, actor))
-        check("an unknown movement kind is BAD_REQUEST", !madeUpKind.ok && madeUpKind.code === "BAD_REQUEST", why(madeUpKind))
+        checkInvertible("an unknown movement kind is BAD_REQUEST", !madeUpKind.ok && madeUpKind.code === "BAD_REQUEST", why(madeUpKind))
         const foreignOrder = await attempt(() => inventory.applyMovement(ids.wsA, itemId, { kind: "RETURN", qty: 1, orderId: ids.orderB }, actor))
-        check("a return against another tenant's order is refused", !foreignOrder.ok && foreignOrder.code === "FORBIDDEN", why(foreignOrder))
+        checkInvertible("a return against another tenant's order is refused", !foreignOrder.ok && foreignOrder.code === "FORBIDDEN", why(foreignOrder))
 
         // ---- 5. reservations -----------------------------------------
         const held = await inventory.reserve(ids.wsA, itemId, { orderLineId: line(1), qty: 2, idempotencyKey: `${RUN}-h1` }, actor)
-        check("a hold starts HELD", held.reservation.state === "HELD", held.reservation.state)
+        checkInvertible("a hold starts HELD", held.reservation.state === "HELD", held.reservation.state)
         const afterHold = await inventory.get(ids.wsA, itemId)
-        check("a hold reduces available without moving on-hand", afterHold.onHand === 6 && afterHold.reserved === 2 && afterHold.available === 4, `${afterHold.onHand}/${afterHold.reserved}/${afterHold.available}`)
+        checkInvertible("a hold reduces available without moving on-hand", afterHold.onHand === 6 && afterHold.reserved === 2 && afterHold.available === 4, `${afterHold.onHand}/${afterHold.reserved}/${afterHold.available}`)
         const holdReplay = await inventory.reserve(ids.wsA, itemId, { orderLineId: line(2), qty: 5, idempotencyKey: `${RUN}-h1` }, actor)
-        check("replaying a hold key returns the original hold", holdReplay.replayed && holdReplay.reservation.id === held.reservation.id, `replayed=${holdReplay.replayed}`)
+        checkInvertible("replaying a hold key returns the original hold", holdReplay.replayed && holdReplay.reservation.id === held.reservation.id, `replayed=${holdReplay.replayed}`)
         const doubleHold = await attempt(() => inventory.reserve(ids.wsA, itemId, { orderLineId: line(1), qty: 1 }, actor))
-        check("one order line cannot hold stock twice", !doubleHold.ok && doubleHold.code === "CONFLICT", why(doubleHold))
+        checkInvertible("one order line cannot hold stock twice", !doubleHold.ok && doubleHold.code === "CONFLICT", why(doubleHold))
 
         const oversell = await attempt(() => inventory.reserve(ids.wsA, itemId, { orderLineId: line(3), qty: 99 }, actor))
-        check("an oversell is refused with the available quantity named", !oversell.ok && oversell.code === "CONFLICT" && /Only 4 units are available/.test(oversell.message), why(oversell))
-        check("the oversell refusal carries machine-readable detail", !oversell.ok && (oversell.details as { available?: number } | null)?.available === 4, oversell.ok ? "ACCEPTED" : JSON.stringify(oversell.details))
+        checkInvertible("an oversell is refused with the available quantity named", !oversell.ok && oversell.code === "CONFLICT" && /Only 4 units are available/.test(oversell.message), why(oversell))
+        checkInvertible("the oversell refusal carries machine-readable detail", !oversell.ok && (oversell.details as { available?: number } | null)?.available === 4, oversell.ok ? "ACCEPTED" : JSON.stringify(oversell.details))
         const beforeOversell = await prisma.inventoryMovement.count()
         await attempt(() => inventory.reserve(ids.wsA, itemId, { orderLineId: line(4), qty: 99 }, actor))
-        check("a refused hold appends no movement", beforeOversell === (await prisma.inventoryMovement.count()), `before=${beforeOversell}`)
+        checkInvertible("a refused hold appends no movement", beforeOversell === (await prisma.inventoryMovement.count()), `before=${beforeOversell}`)
 
         const crossProduct = await attempt(() => inventory.reserve(ids.wsA, itemId, { orderLineId: line(99), qty: 1 }, actor))
-        check("a line for a different product cannot reserve this stock", !crossProduct.ok && crossProduct.code === "CONFLICT", why(crossProduct))
+        checkInvertible("a line for a different product cannot reserve this stock", !crossProduct.ok && crossProduct.code === "CONFLICT", why(crossProduct))
         const foreignLine = await attempt(() => inventory.reserve(ids.wsA, itemId, { orderLineId: line(100), qty: 1 }, actor))
-        check("another tenant's order line is refused", !foreignLine.ok && foreignLine.code === "FORBIDDEN", why(foreignLine))
+        checkInvertible("another tenant's order line is refused", !foreignLine.ok && foreignLine.code === "FORBIDDEN", why(foreignLine))
 
         // An untracked record cannot promise anything.
         const untracked = await inventory.ensureItem(ids.wsA, { productId: ids.prodA, locationId: ids.locA2, trackingEnabled: false }, actor)
         await inventory.applyMovement(ids.wsA, untracked.record.id, { kind: "RECEIPT", qty: 5 }, actor)
         const untrackedHold = await attempt(() => inventory.reserve(ids.wsA, untracked.record.id, { orderLineId: line(5), qty: 1 }, actor))
-        check("an untracked stock record refuses to hold a reservation", !untrackedHold.ok && untrackedHold.code === "CONFLICT", why(untrackedHold))
+        checkInvertible("an untracked stock record refuses to hold a reservation", !untrackedHold.ok && untrackedHold.code === "CONFLICT", why(untrackedHold))
 
         // ---- 6. settling a hold -------------------------------------
         const consumed = await inventory.settleReservation(ids.wsA, held.reservation.id, "CONSUMED", actor)
-        check("consuming a hold marks it CONSUMED and stamps consumedAt", consumed.state === "CONSUMED" && consumed.consumedAt !== null, consumed.state)
+        checkInvertible("consuming a hold marks it CONSUMED and stamps consumedAt", consumed.state === "CONSUMED" && consumed.consumedAt !== null, consumed.state)
         const afterConsume = await inventory.get(ids.wsA, itemId)
-        check("consuming takes the units off the shelf", afterConsume.onHand === 4 && afterConsume.reserved === 0 && afterConsume.available === 4, `${afterConsume.onHand}/${afterConsume.reserved}`)
+        checkInvertible("consuming takes the units off the shelf", afterConsume.onHand === 4 && afterConsume.reserved === 0 && afterConsume.available === 4, `${afterConsume.onHand}/${afterConsume.reserved}`)
         const reConsume = await attempt(() => inventory.settleReservation(ids.wsA, held.reservation.id, "RELEASED", actor))
-        check("a consumed hold is terminal, so stock cannot be double-credited", !reConsume.ok && reConsume.code === "CONFLICT", why(reConsume))
+        checkInvertible("a consumed hold is terminal, so stock cannot be double-credited", !reConsume.ok && reConsume.code === "CONFLICT", why(reConsume))
 
         const toRelease = await inventory.reserve(ids.wsA, itemId, { orderLineId: line(6), qty: 3 }, actor)
         const midRelease = await inventory.get(ids.wsA, itemId)
-        check("a second hold reduces available again", midRelease.available === 1, `available=${midRelease.available}`)
+        checkInvertible("a second hold reduces available again", midRelease.available === 1, `available=${midRelease.available}`)
         const released = await inventory.settleReservation(ids.wsA, toRelease.reservation.id, "RELEASED", actor, "customer cancelled")
-        check("releasing marks it RELEASED and stamps releasedAt", released.state === "RELEASED" && released.releasedAt !== null, released.state)
+        checkInvertible("releasing marks it RELEASED and stamps releasedAt", released.state === "RELEASED" && released.releasedAt !== null, released.state)
         const afterRelease = await inventory.get(ids.wsA, itemId)
-        check("releasing returns the units to available stock", afterRelease.onHand === 4 && afterRelease.reserved === 0 && afterRelease.available === 4, `${afterRelease.onHand}/${afterRelease.reserved}`)
+        checkInvertible("releasing returns the units to available stock", afterRelease.onHand === 4 && afterRelease.reserved === 0 && afterRelease.available === 4, `${afterRelease.onHand}/${afterRelease.reserved}`)
 
         const noExpiry = await inventory.reserve(ids.wsA, itemId, { orderLineId: line(7), qty: 1 }, actor)
         const cannotExpire = await attempt(() => inventory.settleReservation(ids.wsA, noExpiry.reservation.id, "EXPIRED", actor))
-        check("a hold with no expiry cannot be expired", !cannotExpire.ok && cannotExpire.code === "CONFLICT", why(cannotExpire))
+        checkInvertible("a hold with no expiry cannot be expired", !cannotExpire.ok && cannotExpire.code === "CONFLICT", why(cannotExpire))
         await inventory.settleReservation(ids.wsA, noExpiry.reservation.id, "RELEASED", actor)
 
         const future = await inventory.reserve(ids.wsA, itemId, { orderLineId: line(8), qty: 1, expiresAt: new Date("2040-01-01T00:00:00Z") }, actor)
         const notYet = await attempt(() => inventory.settleReservation(ids.wsA, future.reservation.id, "EXPIRED", actor))
-        check("a live hold cannot be expired early", !notYet.ok && notYet.code === "CONFLICT", why(notYet))
+        checkInvertible("a live hold cannot be expired early", !notYet.ok && notYet.code === "CONFLICT", why(notYet))
         // Backdate the expiry directly, which is the only honest way to test the clock.
         await prisma.inventoryReservation.update({
             where: { id: future.reservation.id },
             data: { expiresAt: new Date("2020-01-01T00:00:00Z") },
         })
         const expired = await inventory.settleReservation(ids.wsA, future.reservation.id, "EXPIRED", actor)
-        check("a hold past its expiry can be expired", expired.state === "EXPIRED", expired.state)
+        checkInvertible("a hold past its expiry can be expired", expired.state === "EXPIRED", expired.state)
         const afterExpiry = await inventory.get(ids.wsA, itemId)
-        check("expiring returns the units to available stock", afterExpiry.reserved === 0 && afterExpiry.available === 4, `${afterExpiry.reserved}/${afterExpiry.available}`)
+        checkInvertible("expiring returns the units to available stock", afterExpiry.reserved === 0 && afterExpiry.available === 4, `${afterExpiry.reserved}/${afterExpiry.available}`)
 
         // ---- 7. an adjustment may not strand promised stock ---------
         const promised = await inventory.reserve(ids.wsA, itemId, { orderLineId: line(2), qty: 4 }, actor)
         const strand = await attempt(() => inventory.applyMovement(ids.wsA, itemId, { kind: "COUNT", qty: 1 }, actor))
-        check("a stock count below the promised quantity is refused", !strand.ok && strand.code === "CONFLICT" && /already promised to orders/.test(strand.message), why(strand))
+        checkInvertible("a stock count below the promised quantity is refused", !strand.ok && strand.code === "CONFLICT" && /already promised to orders/.test(strand.message), why(strand))
         await inventory.settleReservation(ids.wsA, promised.reservation.id, "RELEASED", actor)
 
         // ---- 8. CONCURRENCY: two holds, one unit -------------------
@@ -318,14 +322,12 @@ async function main() {
         ])
         const won = race.filter((r) => r.status === "fulfilled").length
         const lost = race.filter((r) => r.status === "rejected").length
-        // This is the single inverted assertion: the row lock is what makes the last unit
-        // sellable exactly once, and it is measured by running the two calls in parallel.
-        const exactlyOne = INVERT ? won !== 1 : won === 1 && lost === 1
-        check("two concurrent holds on the last unit produce exactly one winner", exactlyOne, `fulfilled=${won} rejected=${lost}`)
+        const exactlyOne = won === 1 && lost === 1
+        checkInvertible("two concurrent holds on the last unit produce exactly one winner", exactlyOne, `fulfilled=${won} rejected=${lost}`)
         const raceAfter = await inventory.get(ids.wsA, raceItem.record.id)
-        check("the contested record ends with exactly one unit reserved", raceAfter.reserved === 1 && raceAfter.available === 0, `${raceAfter.reserved}/${raceAfter.available}`)
+        checkInvertible("the contested record ends with exactly one unit reserved", raceAfter.reserved === 1 && raceAfter.available === 0, `${raceAfter.reserved}/${raceAfter.available}`)
         const raceHolds = await prisma.inventoryReservation.count({ where: { itemId: raceItem.record.id, state: "HELD" } })
-        check("only one hold row exists for the contested unit", raceHolds === 1, `holds=${raceHolds}`)
+        checkInvertible("only one hold row exists for the contested unit", raceHolds === 1, `holds=${raceHolds}`)
 
         // ---- 9. the ledger replays to the stored balances ----------
         const movements = await inventory.movements(ids.wsA, itemId)
@@ -338,20 +340,20 @@ async function main() {
             if (onHand !== Number(m.onHandAfter) || reserved !== Number(m.reservedAfter)) consistent = false
         }
         const finalRecord = await inventory.get(ids.wsA, itemId)
-        check("replaying the ledger reproduces every stored balance", consistent, `replayed=${onHand}/${reserved}`)
-        check("the replayed total matches the live record", onHand === finalRecord.onHand && reserved === finalRecord.reserved, `${onHand}/${reserved} vs ${finalRecord.onHand}/${finalRecord.reserved}`)
+        checkInvertible("replaying the ledger reproduces every stored balance", consistent, `replayed=${onHand}/${reserved}`)
+        checkInvertible("the replayed total matches the live record", onHand === finalRecord.onHand && reserved === finalRecord.reserved, `${onHand}/${reserved} vs ${finalRecord.onHand}/${finalRecord.reserved}`)
         const seqs = movements.map((m) => Number(m.seq))
-        check("movement seq is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
+        checkInvertible("movement seq is strictly increasing", seqs.every((v, i) => i === 0 || v > seqs[i - 1]), `n=${seqs.length}`)
         const kinds = new Set<string>(movements.map((m) => String(m.kind)))
         for (const kind of ["RECEIPT", "ADJUSTMENT", "COUNT", "RETURN", "RESERVE", "RELEASE", "CONSUME"]) {
-            check(`the ledger contains a ${kind} movement`, kinds.has(kind), [...kinds].join(","))
+            checkInvertible(`the ledger contains a ${kind} movement`, kinds.has(kind), [...kinds].join(","))
         }
 
         // ---- 10. availability across locations --------------------
         const availability = await inventory.availability(ids.wsA, ids.prodA)
-        check("availability reports both locations for the product", availability.locations.length === 2, `n=${availability.locations.length}`)
-        check("availability sums on-hand across locations", availability.totalOnHand === 9, `total=${availability.totalOnHand}`)
-        check("availability flags that not every location tracks units", availability.allLocationsTracked === false, `${availability.allLocationsTracked}`)
+        checkInvertible("availability reports both locations for the product", availability.locations.length === 2, `n=${availability.locations.length}`)
+        checkInvertible("availability sums on-hand across locations", availability.totalOnHand === 9, `total=${availability.totalOnHand}`)
+        checkInvertible("availability flags that not every location tracks units", availability.allLocationsTracked === false, `${availability.allLocationsTracked}`)
 
         // ---- 11. wrong tenant: foreign is indistinguishable from missing
         identity.current = `clerk_${ids.userB}`
@@ -359,24 +361,24 @@ async function main() {
         const crossFetch = fetchCalls
         const foreignGet = await attempt(() => inventory.get(ids.wsB, itemId))
         const missingGet = await attempt(() => inventory.get(ids.wsB, `${RUN}_absent`))
-        check("wrong-tenant read refused FORBIDDEN", !foreignGet.ok && foreignGet.code === "FORBIDDEN", why(foreignGet))
-        check("a foreign record and a missing record refuse identically", why(foreignGet) === why(missingGet), `${why(foreignGet)} vs ${why(missingGet)}`)
+        checkInvertible("wrong-tenant read refused FORBIDDEN", !foreignGet.ok && foreignGet.code === "FORBIDDEN", why(foreignGet))
+        checkInvertible("a foreign record and a missing record refuse identically", why(foreignGet) === why(missingGet), `${why(foreignGet)} vs ${why(missingGet)}`)
         const foreignMutate = await attempt(() => inventory.applyMovement(ids.wsB, itemId, { kind: "RECEIPT", qty: 1 }, actor))
         const missingMutate = await attempt(() => inventory.applyMovement(ids.wsB, `${RUN}_absent`, { kind: "RECEIPT", qty: 1 }, actor))
-        check("a foreign mutation and a missing mutation refuse identically", why(foreignMutate) === why(missingMutate), why(foreignMutate))
+        checkInvertible("a foreign mutation and a missing mutation refuse identically", why(foreignMutate) === why(missingMutate), why(foreignMutate))
         const foreignMovements = await attempt(() => inventory.movements(ids.wsB, itemId))
-        check("wrong-tenant ledger read refused", !foreignMovements.ok && foreignMovements.code === "FORBIDDEN", why(foreignMovements))
-        check("cross-tenant refusals appended zero movements", beforeCross === (await prisma.inventoryMovement.count()), `before=${beforeCross}`)
-        check("cross-tenant refusals made zero external calls", fetchCalls === crossFetch, `calls=${fetchCalls - crossFetch}`)
+        checkInvertible("wrong-tenant ledger read refused", !foreignMovements.ok && foreignMovements.code === "FORBIDDEN", why(foreignMovements))
+        checkInvertible("cross-tenant refusals appended zero movements", beforeCross === (await prisma.inventoryMovement.count()), `before=${beforeCross}`)
+        checkInvertible("cross-tenant refusals made zero external calls", fetchCalls === crossFetch, `calls=${fetchCalls - crossFetch}`)
         const listB = await inventory.list(ids.wsB)
-        check("tenant B's list never contains tenant A's stock", !listB.some((r) => r.id === itemId), `n=${listB.length}`)
+        checkInvertible("tenant B's list never contains tenant A's stock", !listB.some((r) => r.id === itemId), `n=${listB.length}`)
 
         identity.current = `clerk_${ids.userA}`
         const orphanWs = `${RUN}_orphan`
         await prisma.workspace.create({ data: { id: orphanWs, name: "Orphan", slug: `ws-${orphanWs}` } })
         await prisma.membership.create({ data: { workspaceId: orphanWs, userId: ids.userA, role: "OWNER" } })
         const orphan = await attempt(() => inventory.list(orphanWs))
-        check("a workspace with no profile is refused, not shown an empty shelf", !orphan.ok && orphan.code === "FORBIDDEN", why(orphan))
+        checkInvertible("a workspace with no profile is refused, not shown an empty shelf", !orphan.ok && orphan.code === "FORBIDDEN", why(orphan))
 
         // ---- 12. append-only ledger and rollback ------------------
         let appendOnly = false
@@ -387,7 +389,7 @@ async function main() {
             appendOnly = true
             appendDetail = String((e as Error).message).split("\n").find((l) => /append-only/.test(l))?.trim() ?? "refused"
         }
-        check("the database refuses to rewrite the movement ledger", appendOnly, appendDetail || "NO ERROR")
+        checkInvertible("the database refuses to rewrite the movement ledger", appendOnly, appendDetail || "NO ERROR")
 
         {
             const beforeM = await prisma.inventoryMovement.count()
@@ -406,7 +408,7 @@ async function main() {
         }
 
         // ---- 13. whole-run external call tally -------------------
-        check("no external call was EVER made in this run", fetchCalls === 0, `calls=${fetchCalls}`)
+        checkInvertible("no external call was EVER made in this run", fetchCalls === 0, `calls=${fetchCalls}`)
     } finally {
         try {
             await prisma.$executeRawUnsafe(`alter table "InventoryMovement" disable trigger "InventoryMovement_append_only"`)
