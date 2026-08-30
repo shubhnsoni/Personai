@@ -45,6 +45,34 @@ function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
 
+function deferred<T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void
+    let reject!: (reason?: unknown) => void
+    const promise = new Promise<T>((res, rej) => {
+        resolve = res
+        reject = rej
+    })
+    return { promise, resolve, reject }
+}
+
+async function settlesWithin(promise: Promise<unknown>, milliseconds: number): Promise<boolean> {
+    return Promise.race([
+        promise.then(
+            () => true,
+            () => true,
+        ),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), milliseconds)),
+    ])
+}
+
+type ReadInterleaving = {
+    periodId: string
+    reads: number
+    firstRead: ReturnType<typeof deferred<void>>
+    secondRead: ReturnType<typeof deferred<void>>
+    releaseFirst: ReturnType<typeof deferred<void>>
+}
+
 let fetchCalls = 0
 const realFetch = globalThis.fetch
 globalThis.fetch = (async (...args: unknown[]) => {
@@ -85,6 +113,29 @@ async function main() {
     }
 
     const prisma = new PrismaClient()
+    let interleaving: ReadInterleaving | null = null
+    prisma.$use(async (params, next) => {
+        const output = await next(params)
+        const gate = interleaving
+        const args = params.args as { where?: { id?: unknown } } | undefined
+        if (
+            gate &&
+            params.model === "CaseRetainerPeriod" &&
+            (params.action === "findUnique" || params.action === "findUniqueOrThrow") &&
+            args?.where?.id === gate.periodId
+        ) {
+            gate.reads += 1
+            if (gate.reads === 1) {
+                gate.firstRead.resolve()
+                // This runs after recordDraw has read the balance but before it calculates or writes.
+                // The transaction, and therefore its source-level FOR UPDATE locks, remain open here.
+                await gate.releaseFirst.promise
+            } else if (gate.reads === 2) {
+                gate.secondRead.resolve()
+            }
+        }
+        return output
+    })
     const identity = new ControlledIdentity()
     const ctx = new CaseContext(prisma, new PersistedTenancy(prisma, identity))
     const cases = new CaseProjectService(ctx)
@@ -375,6 +426,57 @@ async function main() {
             mismatch || `replay=${running} period=${afterParallel}`,
         )
         check("the ledger has a row per accepted draw and no more", ledger.length === 6, `rows=${ledger.length}`)
+
+        // ---- 10. deterministic read interleaving proves lock necessity -----
+        // Promise.all alone may serialize by scheduling. Here the middleware above pauses T1 only
+        // after recordDraw has read this period's balance. T2 then calls the same service method.
+        // With FOR UPDATE it cannot reach its own balance read until T1 commits; without both locks
+        // it reads the same stale balance, commits first, and T1 overwrites that balance after release.
+        const interleaved = await retainers.create(
+            ids.wsA,
+            { reference: "RET-INTERLEAVE", title: "Forced read interleaving", basis: "UNITS", includedUnits: 40 },
+            actor,
+        )
+        await retainers.transition(ids.wsA, interleaved.record.id, "ACTIVE", actor)
+        const interleavedPeriod = await retainers.openPeriod(ids.wsA, interleaved.record.id, {}, actor)
+        const interleaveBefore = interleavedPeriod.usedUnits
+        const gate: ReadInterleaving = {
+            periodId: interleavedPeriod.id,
+            reads: 0,
+            firstRead: deferred<void>(),
+            secondRead: deferred<void>(),
+            releaseFirst: deferred<void>(),
+        }
+        interleaving = gate
+        const t1 = retainers.recordDraw(ids.wsA, interleaved.record.id, { kind: "DRAW", units: 3 }, actor)
+        const firstReadReached = await settlesWithin(gate.firstRead.promise, 1_500)
+        let t2: Promise<unknown> | null = null
+        let secondReadBeforeRelease = false
+        let t2CommittedBeforeRelease = false
+        try {
+            if (firstReadReached) {
+                t2 = retainers.recordDraw(ids.wsA, interleaved.record.id, { kind: "DRAW", units: 5 }, actor)
+                secondReadBeforeRelease = await settlesWithin(gate.secondRead.promise, 300)
+                if (secondReadBeforeRelease) t2CommittedBeforeRelease = await settlesWithin(t2, 1_500)
+            }
+        } finally {
+            // This is an application-level barrier, not a database timeout: no SQL error is used
+            // as evidence, and releasing it always lets both transactions commit or report normally.
+            gate.releaseFirst.resolve()
+        }
+        const outcomes = await Promise.allSettled(t2 ? [t1, t2] : [t1])
+        interleaving = null
+        const interleaveAfter = (await prisma.caseRetainerPeriod.findUniqueOrThrow({ where: { id: interleavedPeriod.id } })).usedUnits
+        check(
+            "MEASURED: deterministic read interleaving proves recordDraw's FOR UPDATE locks serialize both draws instead of allowing a stale-balance overwrite",
+            firstReadReached &&
+                !secondReadBeforeRelease &&
+                !t2CommittedBeforeRelease &&
+                outcomes.length === 2 &&
+                outcomes.every((outcome) => outcome.status === "fulfilled") &&
+                interleaveAfter === interleaveBefore + 8,
+            `T1 balance read=${firstReadReached}; T2 balance read before release=${secondReadBeforeRelease}; T2 committed before release=${t2CommittedBeforeRelease}; used=${interleaveBefore}->${interleaveAfter}`,
+        )
 
         // ---- 11. unlinking is refused once history exists ------------------
         const unlink = await attempt(() => retainers.unlinkCase(ids.wsA, retainerId, caseA.record.id, actor))

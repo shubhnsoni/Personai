@@ -283,3 +283,60 @@ review, on new files, rather than audited later.
   produces a lot of green with no more meaning than before.
 - A deterministic-interleaving technique for lock-necessity claims, then re-examining
   `check-retainer-runtime.ts:350`.
+
+
+## Group D — S4-B fieldjob runtime and deterministic retainer lock necessity
+
+### Scope and method
+
+Audited only `check-fieldjob-runtime.ts` and `check-retainer-runtime.ts` through the
+CWD-aware rehearsal runner in the assigned `s4b/fieldjob-and-lock-necessity`
+worktree. The runner reported that exact checkout and the authorized rehearsal
+database. Every temporary `src/**` mutation was restored byte-for-byte; no source
+change survives.
+
+### Fieldjob evidence
+
+| Assertion / coverage claim | Harness location | Protected code | Break performed | Result |
+| --- | --- | --- | --- | --- |
+| A visit window with a start and no end is refused | `check-fieldjob-runtime.ts:~302` | `fieldjobs/engine.ts`, `schedule()` visit-window discriminator | Replaced `if (!both && !neither)` with `if (false)` temporarily | Red: `76/77`, exit `1`; exactly this assertion failed. Restored source has no diff. |
+
+The sole fieldjob source-broken assertion is real. No harness change was warranted.
+
+### Deterministic retainer read interleaving
+
+The old `Promise.all` draw pair proved the additive result but did not force a
+concurrent read. The new harness creates a separate active unit retainer and arms a
+Prisma query middleware barrier only for that period. T1 calls the real
+`CaseRetainerService.recordDraw(3)` and is held *after* its real
+`CaseRetainerPeriod.findUnique` returns the balance, while its interactive
+transaction and source-level locks stay open. T2 then calls the same real method
+with `5`. The barrier records whether T2 reaches its own balance read and whether
+it commits before T1 is released; it releases T1 in `finally`, so no SQL timeout,
+deadlock, or aborted transaction is used as evidence.
+
+The successful locks-present run empirically demonstrated that the available Prisma
+pool can hold both interactive transactions: T1 reached its balance read, T2 was
+started while T1 remained open, and T2 could not reach that read before release.
+After release both fulfilled and the period moved `0 -> 8` (`88/88`, exit `0`).
+
+For the red mutation, only the two `recordDraw` clauses named by the audit were
+removed temporarily: the open-period `FOR UPDATE` at `retainers.ts:713` and the
+retainer `FOR UPDATE` at `retainers.ts:928`. T2 then reached the same balance read
+and committed before release; T1 resumed with its stale `0` and overwrote the
+period, yielding `0 -> 3`. The new assertion failed exactly as intended (`87/88`,
+exit `1`). Source was restored exactly.
+
+### Conclusion
+
+This is **not** an over-claiming assertion anymore. Deterministic read interleaving
+proves the lock necessity claim against the real service method: the two `FOR UPDATE`
+reads serialize concurrent draws, and removing both permits the forced stale-read
+lost update. The old opportunistic parallel-draw assertion remains useful for its
+observable additive outcome; the new assertion carries the mechanism claim.
+
+### Validation
+
+- Fieldjob: normal `0` (`77/77`); visit-window source mutation `1` (`76/77`); source restored.
+- Retainer: normal with deterministic interleaving `0` (`88/88`); both target locks removed `1` (`87/88`); source restored.
+- `git diff --stat -- src`: no output; no `src/**` changes survive.
