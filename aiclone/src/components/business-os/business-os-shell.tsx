@@ -31,6 +31,7 @@ import { WorkspaceSurfacesPanel } from "@/components/business-os/workspace-surfa
 import { CasesPanel } from "@/components/business-os/cases-panel"
 import { CohortsPanel } from "@/components/business-os/cohorts-panel"
 import { CommercePanel } from "@/components/business-os/commerce-panel"
+import { DueWorkPanel } from "@/components/business-os/due-work-panel"
 import { FieldJobsPanel } from "@/components/business-os/fieldjobs-panel"
 import { InspectionPanel } from "@/components/business-os/inspection-panel"
 import { InspectionTemplatesPanel } from "@/components/business-os/inspection-templates-panel"
@@ -691,6 +692,11 @@ export function BusinessOsShell({
                             </Card>
 
                             <OperationsPanel workspaceId={selectedWorkspaceId} />
+
+                            {/* The same attention items, proposed in an order and explained. Sits next to
+                                the operations view because it is that view's summary re-read: it requests a
+                                plan when asked, and can neither act on the work nor change a record. */}
+                            <DueWorkPanel workspaceId={selectedWorkspaceId} />
 
                             {/* Read-only. Preview says what choosing a blueprint would mean; it cannot
                                 install, and the panel states that rather than implying a missing feature. */}
