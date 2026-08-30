@@ -245,6 +245,7 @@ model Profile {
 
   fieldJobInspectionTemplates FieldJobInspectionTemplate[]
   fieldJobInspections         FieldJobInspection[]
+  BlueprintInstallation       BlueprintInstallation[]
 }
 
 model ProfileEvent {
@@ -1215,6 +1216,8 @@ model Workspace {
   contacts     Contact[]
   workflowRuns WorkflowRun[]
   CaseRetainer CaseRetainer[]
+
+  blueprintInstallations BlueprintInstallation[]
 
   @@index([profileId])
 }
@@ -3529,4 +3532,129 @@ model FieldJobInspectionPart {
   @@unique([inspectionId, idempotencyKey])
   @@index([inspectionId])
   @@index([inventoryItemId])
+}
+
+/// Lifecycle of one blueprint installation.
+///
+/// There is deliberately no FAILED state. A failed install leaves NO ROW AT ALL - it is one
+/// transaction, and a failure row would be a partial write that the zero-partial-rows proof would
+/// then have to carve an exception for.
+enum BlueprintInstallationState {
+  ACTIVE
+  SUPERSEDED
+  REMOVED
+}
+
+/// What happened to an installation. Append-only.
+///
+/// No kind describes a refusal, for the same reason there is no FAILED state: a refused install
+/// writes nothing anywhere.
+enum BlueprintInstallationEventKind {
+  INSTALLED
+  UPGRADED
+  SUPERSEDED
+  REMOVED
+}
+
+/// A durable record that a workspace runs a specific blueprint VERSION.
+///
+/// AT MOST ONE ACTIVE ROW PER WORKSPACE, enforced by a partial unique index in the migration
+/// (`WHERE state = 'ACTIVE'`), the same mechanism that already enforces one default variant per
+/// product. A blueprint carries terminology for a whole vertical - the calendar noun is "job" or
+/// "booking" or "reservation", not all three - so two active blueprints would leave the product
+/// unable to say what a thing is called. That constraint is what makes changing blueprint an
+/// UPGRADE THROUGH SUPERSESSION rather than a second install.
+///
+/// WHAT THIS TABLE DOES NOT DO:
+///   - It does not copy the blueprint's workflow declarations. `blueprintId` is the registry key and
+///     encodes the version (`restaurant-venue-v2` vs `-v3`), and the registry RETAINS deprecated
+///     entries rather than deleting them, so pinning the id is already immutable. A template table
+///     would be a second source of truth able to disagree with the first.
+///   - It does not grant anything. Surfaces live per PROFILE as JSON on `Profile.personalityConfig`,
+///     while this row is per WORKSPACE, and a user reaches many workspaces through `Membership`
+///     (keyed by userId). `configJson` RECORDS the resolved surfaces; nothing applies them.
+model BlueprintInstallation {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  /// The profile this install was performed for, when there is one. SetNull rather than Cascade: the
+  /// history of what a workspace ran must survive a profile being removed.
+  profileId String?
+  profile   Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  /// Registry key, e.g. "field-service-v1". Not a foreign key - the registry is static code, and a
+  /// table of blueprints would be a copy of `blueprints.ts` that can drift from it.
+  blueprintId      String
+  /// Recorded separately from the id even though the id encodes it, because a reader answering
+  /// "which version is this workspace on" should not have to parse a string to find out.
+  blueprintVersion String
+
+  state BlueprintInstallationState
+
+  /// Required, not optional. Every engine here uses `(scope, idempotencyKey)` uniqueness; making it
+  /// optional would make the replay guarantee depend on caller diligence.
+  idempotencyKey String
+
+  /// The configuration resolved AT INSTALL TIME and frozen here: role, surfaces, field packs,
+  /// terminology, engine ids. Frozen rather than re-derived, because the point of recording it is to
+  /// answer "what did this workspace agree to" after the registry has moved on. Where it differs from
+  /// today's resolution, that difference is reported as drift rather than silently corrected.
+  configJson Json
+
+  /// The installation this one replaced, on an upgrade. Unique, so two installations cannot both
+  /// claim to have superseded the same one. Restrict, because the superseded row is the evidence
+  /// that the upgrade happened.
+  supersedesInstallationId String?                @unique
+  supersedes               BlueprintInstallation? @relation("BlueprintInstallationSupersession", fields: [supersedesInstallationId], references: [id], onDelete: Restrict)
+  supersededBy             BlueprintInstallation? @relation("BlueprintInstallationSupersession")
+
+  /// Identity that performed the install. A string, not a relation: the ledger must stay readable
+  /// after the actor's record is gone.
+  installedBy String
+
+  installedAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  /// Set when state becomes REMOVED. The row and its history are retained; remove is not a delete.
+  removedAt   DateTime?
+
+  events BlueprintInstallationEvent[]
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, state, installedAt])
+  @@index([blueprintId, state])
+}
+
+/// Append-only history of installs, upgrades, supersessions and removals.
+///
+/// Guarded by `reject_append_only_mutation()` in the migration, so UPDATE and DELETE are refused by
+/// the DATABASE rather than by runtime discipline.
+model BlueprintInstallationEvent {
+  id             String                @id @default(cuid())
+  installationId String
+  installation   BlueprintInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  /// Denormalised so the ledger can be read per tenant without joining through an installation whose
+  /// own row may have moved to SUPERSEDED or REMOVED.
+  workspaceId String
+
+  kind BlueprintInstallationEventKind
+
+  /// Recorded on the event as well as the installation, because an upgrade writes events against two
+  /// installations and each line must state which blueprint version it is about.
+  blueprintId      String
+  blueprintVersion String
+
+  /// Identity that caused the transition. A string for the same reason as `installedBy`.
+  actor String
+
+  /// Why, when `kind` alone does not say. An upgrade records what it superseded here.
+  detail String?
+
+  metadataJson Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([installationId, createdAt])
+  @@index([workspaceId, createdAt])
 }
