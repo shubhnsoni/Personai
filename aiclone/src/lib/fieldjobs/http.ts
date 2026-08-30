@@ -39,8 +39,28 @@ import type { FieldJobActor } from "./shared"
 
 export type JsonObject = Record<string, unknown>
 
-export function json(data: unknown, status = 200): Response {
-    return Response.json(data, { status })
+/**
+ * `headers` is OPTIONAL AND ADDITIVE, and the no-header path is deliberately the original statement
+ * rather than the original statement with an `undefined` threaded through it.
+ *
+ * A refusal sometimes has to carry a header to be correct rather than merely well-shaped: a 405 that
+ * does not say which methods it would have accepted is an incomplete answer. Before this, the only way
+ * to attach one was to bypass these helpers and hand-build a Response, which is how a surface ends up
+ * with an envelope that has quietly drifted from every other surface's.
+ *
+ * THE EARLY RETURN IS THE POINT. Every existing call site passes no headers and therefore executes
+ * `Response.json(data, { status })` - the same expression, with the same init-object shape, as before
+ * this parameter existed. Passing `{ status, headers: undefined }` would almost certainly behave
+ * identically, but "almost certainly" is not the standard for a helper shared by every surface on this
+ * platform, and this way the claim is settled by reading the branch rather than by trusting an
+ * implementation detail of Response.
+ *
+ * Headers can only be ADDED. There is no parameter for removing or overriding the content type, so no
+ * caller can use this to reshape a response into something the envelope contract does not describe.
+ */
+export function json(data: unknown, status = 200, headers?: Readonly<Record<string, string>>): Response {
+    if (!headers) return Response.json(data, { status })
+    return Response.json(data, { status, headers: { ...headers } })
 }
 export function success(data: unknown, status = 200): Response {
     return json({ ok: true, data }, status)
@@ -52,15 +72,30 @@ export function success(data: unknown, status = 200): Response {
  * were unavailable. An accurate envelope carrying an inaccurate sentence is still wrong.
  *
  * Defaulted rather than required, so every existing call site keeps its exact current behaviour.
+ *
+ * `headers` is the same kind of parameter for the same reason, and it does NOT touch the body. The
+ * envelope stays { ok: false, error: { code, message } } with its optional `details`, byte-identically,
+ * whether headers are supplied or not - the object literals below are not in the branch that changed.
+ *
+ * WHY THE CALLER SUPPLIES THE HEADER RATHER THAN THIS HELPER DERIVING IT. The obvious shortcut is for
+ * this function to notice a METHOD_NOT_ALLOWED error and add `Allow` itself. It must not: which methods
+ * a surface permits is a fact about that surface, and a shared helper that guessed it would be wrong for
+ * every surface whose permitted set differed from whichever one it guessed. This helper carries a
+ * header; it does not decide what the header says.
  */
-export function failure(error: unknown, unavailableMessage = "Field jobs are temporarily unavailable"): Response {
+export function failure(
+    error: unknown,
+    unavailableMessage = "Field jobs are temporarily unavailable",
+    headers?: Readonly<Record<string, string>>,
+): Response {
     if (error instanceof PersistenceError) {
         return json(
             { ok: false, error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) } },
             error.status,
+            headers,
         )
     }
-    return json({ ok: false, error: { code: "DEPENDENCY_UNAVAILABLE", message: unavailableMessage } }, 503)
+    return json({ ok: false, error: { code: "DEPENDENCY_UNAVAILABLE", message: unavailableMessage } }, 503, headers)
 }
 
 export async function body(request: Request): Promise<JsonObject> {

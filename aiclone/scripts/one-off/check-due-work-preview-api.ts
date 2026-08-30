@@ -14,9 +14,18 @@
  *   the wording is honest - the SERIALISED BODY may not contain "scheduled", "sent", "executed" and the
  *   rest of FORBIDDEN_PREVIEW_WORDS, and must contain the required ones;
  *   `executed` is the literal false and `sideEffects` is empty in the emitted JSON, not merely in the type;
- *   401 / 400 / 403 / 503 all use the shared envelope, a foreign workspace and a nonexistent one refuse
- *   BYTE-IDENTICALLY, and the 503 leaks no DSN and names THIS surface rather than the one whose envelope
- *   helper it reuses.
+ *   401 / 400 / 403 / 405 / 503 all use the shared envelope, a foreign workspace and a nonexistent one
+ *   refuse BYTE-IDENTICALLY, and the 503 leaks no DSN and names THIS surface rather than the one whose
+ *   envelope helper it reuses;
+ *   NEITHER THE CLIENT NOR THE SERVER LOG leaks the injected secret - the log assertions are new, and they
+ *   are the ones that were failing: the body was always clean while the log printed the whole DSN.
+ *
+ * TWO SHARED FILES ARE NOW EXERCISED FROM HERE ON PURPOSE. Reaching a correct 405 required widening
+ * `PersistenceErrorCode` in src/lib/persistence/errors.ts and giving `json`/`failure` in
+ * src/lib/fieldjobs/http.ts an optional headers parameter. Both are used by every surface on this platform,
+ * so this harness pins the PRE-EXISTING behaviour of those helpers - every old code's status against a
+ * literal, every old refusal body as a string, and every old response's header set against the platform
+ * primitive - because a tsc pass cannot tell anyone that a status or a byte stayed the same.
  *
  * THE COMMENT-SCANNING TRAP, which this repository has now walked into five times: the contract file and
  * both source files NAME every forbidden word and every forbidden dependency, in prose, precisely in
@@ -30,9 +39,11 @@
  */
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { inspect } from "node:util"
 
 import { PrismaClient } from "@prisma/client"
 
+import { failure, success } from "../../src/lib/fieldjobs/http"
 import { DueWorkApiService } from "../../src/lib/operations/due-work-http"
 import { planDueWork } from "../../src/lib/operations/due-work-plan"
 import {
@@ -43,6 +54,7 @@ import {
 } from "../../src/lib/operations/due-work-preview-types"
 import { OPERATIONS_DOMAIN_SCOPE, OperationsService } from "../../src/lib/operations/engine"
 import { OperationsContext } from "../../src/lib/operations/shared"
+import { PersistenceError, type PersistenceErrorCode } from "../../src/lib/persistence/errors"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
 
@@ -70,7 +82,12 @@ class ControlledIdentity implements PlatformIdentity {
     }
 }
 
-type Called = Readonly<{ status: number; body: Record<string, unknown>; raw: string }>
+type Called = Readonly<{
+    status: number
+    body: Record<string, unknown>
+    raw: string
+    headers: Readonly<Record<string, string>>
+}>
 
 async function call(promise: Promise<Response>): Promise<Called> {
     const response = await promise
@@ -81,7 +98,14 @@ async function call(promise: Promise<Response>): Promise<Called> {
     } catch {
         body = {}
     }
-    return Object.freeze({ status: response.status, body, raw })
+    // Header names are lowercased on the way in: HTTP header names are case-insensitive, so asserting
+    // against "allow" rather than whatever case the helper happened to write makes the assertion about
+    // the header rather than about its spelling.
+    const headers: Record<string, string> = {}
+    response.headers.forEach((value, key) => {
+        headers[key.toLowerCase()] = value
+    })
+    return Object.freeze({ status: response.status, body, raw, headers: Object.freeze(headers) })
 }
 
 function get(url: string): Request {
@@ -271,6 +295,121 @@ async function main() {
         "no requireScope in the boundary",
     )
 
+    // ---- THE SHARED FILES: what the 405 required, and what it must NOT have cost ----------
+    //
+    // Closing the 405 compromise needed changes to two files that are not this surface's. METHOD_NOT_ALLOWED
+    // was added to `PersistenceErrorCode` and its status map in src/lib/persistence/errors.ts, and `json`
+    // and `failure` in src/lib/fieldjobs/http.ts grew an optional trailing `headers` parameter. Both files
+    // are shared platform-wide: five modules import `failure` (business-os install, business-os preview,
+    // business-os workspace-surface, operations view, this surface) and FieldJobApiService.run adds a sixth
+    // call site with its own `.catch(failure)`. So the load-bearing question is not whether 405 works. It is
+    // whether every OTHER refusal on this platform still answers exactly as it did.
+    //
+    // A TSC PASS IS NOT EVIDENCE OF THAT, and this block exists because it is not. `Readonly<Record<
+    // PersistenceErrorCode, number>>` forces the new member to be given SOME status - which is why widening
+    // the union is safe to attempt - but it says nothing about whether an existing member's status changed,
+    // and an optional parameter type-checks identically whether or not the unchanged branch is the one
+    // taken. Both of those are runtime facts, so they are measured as runtime facts: statuses against
+    // LITERALS rather than read back out of the map that would have to be wrong for this to matter, and
+    // refusal bodies compared as STRINGS.
+    const PRE_EXISTING_CODES: ReadonlyArray<readonly [PersistenceErrorCode, number]> = Object.freeze([
+        Object.freeze(["BAD_REQUEST", 400] as const),
+        Object.freeze(["UNAUTHORIZED", 401] as const),
+        Object.freeze(["FORBIDDEN", 403] as const),
+        Object.freeze(["NOT_FOUND", 404] as const),
+        Object.freeze(["CONFLICT", 409] as const),
+        Object.freeze(["DEPENDENCY_UNAVAILABLE", 503] as const),
+    ])
+
+    function headerNames(response: Response): string {
+        const names: string[] = []
+        response.headers.forEach((_value, key) => names.push(key.toLowerCase()))
+        return names.sort().join(",")
+    }
+
+    // The baseline is the PLATFORM PRIMITIVE, not another one of these helpers. `Response.json(data,
+    // { status })` is the exact expression the old no-header `json` was, so comparing against it directly
+    // answers "did wrapping it in an optional-headers branch add anything?" without trusting either helper.
+    const PLATFORM_HEADERS = headerNames(Response.json({ probe: true }, { status: 400 }))
+    checkInvertible(
+        "MEASURED: the platform's own Response.json sets exactly one header, so the comparisons below have something to compare against",
+        PLATFORM_HEADERS === "content-type",
+        `Response.json headers=[${PLATFORM_HEADERS}]`,
+    )
+
+    for (const [code, status] of PRE_EXISTING_CODES) {
+        checkInvertible(
+            `MEASURED: pre-existing code ${code} still maps to ${status}, unchanged by widening the shared union`,
+            new PersistenceError(code, "m").status === status,
+            `${code} -> ${new PersistenceError(code, "m").status}`,
+        )
+        const plain = failure(new PersistenceError(code, "m"))
+        const detailed = failure(new PersistenceError(code, "m", { field: "f" }))
+        const plainRaw = await plain.text()
+        const detailedRaw = await detailed.text()
+        checkInvertible(
+            `MEASURED: the shared refusal body for ${code} is byte-identical to its pre-change form, with and without details`,
+            plainRaw === `{"ok":false,"error":{"code":"${code}","message":"m"}}` &&
+                detailedRaw === `{"ok":false,"error":{"code":"${code}","message":"m","details":{"field":"f"}}}` &&
+                plain.status === status &&
+                detailed.status === status,
+            `${plainRaw} | ${detailedRaw} | ${plain.status}/${detailed.status}`,
+        )
+        checkInvertible(
+            `MEASURED: a ${code} refusal from an existing call site gained NO header - its header set still equals the platform default`,
+            headerNames(plain) === PLATFORM_HEADERS && headerNames(detailed) === PLATFORM_HEADERS,
+            `[${headerNames(plain)}] [${headerNames(detailed)}] vs platform [${PLATFORM_HEADERS}]`,
+        )
+    }
+
+    // The non-PersistenceError branch, and its DEFAULT message - which is the fieldJobs surface's actual
+    // output, because FieldJobApiService.run passes `failure` straight to `.catch` with no second argument.
+    // Written out in full rather than interpolated: this string is what five other surfaces' 503 bodies are
+    // pinned against, and an expectation assembled from the same pieces as the code cannot hold it still.
+    const fallback = failure(new Error("boom"))
+    const fallbackRaw = await fallback.text()
+    checkInvertible(
+        "MEASURED: the shared 503 fallback body and its default fieldJobs message are byte-identical to their pre-change form",
+        fallbackRaw ===
+            '{"ok":false,"error":{"code":"DEPENDENCY_UNAVAILABLE","message":"Field jobs are temporarily unavailable"}}' &&
+            fallback.status === 503 &&
+            headerNames(fallback) === PLATFORM_HEADERS,
+        `${fallbackRaw} status=${fallback.status} headers=[${headerNames(fallback)}]`,
+    )
+    // The named-surface overload, which the operations view and this surface both rely on.
+    const named = failure(new Error("boom"), "The due-work plan is temporarily unavailable")
+    const namedRaw = await named.text()
+    checkInvertible(
+        "MEASURED: the surface-named 503 overload is byte-identical too, and still takes the no-header path",
+        namedRaw ===
+            '{"ok":false,"error":{"code":"DEPENDENCY_UNAVAILABLE","message":"The due-work plan is temporarily unavailable"}}' &&
+            named.status === 503 &&
+            headerNames(named) === PLATFORM_HEADERS,
+        `${namedRaw} headers=[${headerNames(named)}]`,
+    )
+    // `success` shares the same `json` and is used by every surface on every 200, so it is pinned too.
+    const okShape = success({ probe: 1 })
+    const okShapeRaw = await okShape.text()
+    checkInvertible(
+        "MEASURED: the shared success envelope is byte-identical and header-identical after the json change",
+        okShapeRaw === '{"ok":true,"data":{"probe":1}}' &&
+            okShape.status === 200 &&
+            headerNames(okShape) === PLATFORM_HEADERS,
+        `${okShapeRaw} status=${okShape.status} headers=[${headerNames(okShape)}]`,
+    )
+    // And the new capability, proven to actually work through the SHARED helper rather than around it.
+    const withHeader = failure(new PersistenceError("METHOD_NOT_ALLOWED", "m", { allow: "GET" }), undefined, {
+        Allow: "GET",
+    })
+    const withHeaderRaw = await withHeader.text()
+    checkInvertible(
+        "MEASURED: the shared helper can now carry a header WITHOUT changing the body shape - same envelope, plus one header",
+        withHeaderRaw === '{"ok":false,"error":{"code":"METHOD_NOT_ALLOWED","message":"m","details":{"allow":"GET"}}}' &&
+            withHeader.status === 405 &&
+            headerNames(withHeader) === [PLATFORM_HEADERS, "allow"].sort().join(","),
+        `${withHeaderRaw} status=${withHeader.status} headers=[${headerNames(withHeader)}]`,
+    )
+
     const prisma = new PrismaClient()
     try {
         const live = await prisma.$queryRawUnsafe<{ db: string }[]>("select current_database() as db")
@@ -348,7 +487,7 @@ async function main() {
                 )
                 checkInvertible(
                     "MEASURED: the SERVICE itself refuses a POST Request, so the GET guarantee does not depend on the route module's exports",
-                    posted.status !== 200 && posted.status === 400 && errCode(posted) === "BAD_REQUEST",
+                    posted.status !== 200 && posted.status === 405 && errCode(posted) === "METHOD_NOT_ALLOWED",
                     `GET on this URL=${ok.status}, POST=${posted.status} code=${errCode(posted)}`,
                 )
                 checkInvertible(
@@ -357,12 +496,51 @@ async function main() {
                         /GET/.test(String((posted.body.error as { message?: string } | undefined)?.message ?? "")),
                     `keys=${Object.keys(posted.body).sort().join(",")} message=${String((posted.body.error as { message?: string } | undefined)?.message ?? "").slice(0, 70)}`,
                 )
+                // THE 405 IS ONLY HALF AN ANSWER WITHOUT `Allow`. A caller told "not that method" and not
+                // told which method has to guess. This is the header that closes the documented compromise:
+                // it could not be sent before, because `failure` built its response through a `json` helper
+                // that accepted no headers, and the alternative was hand-building a Response that bypassed
+                // the shared envelope. So the header and the envelope are asserted TOGETHER - either one
+                // alone was already achievable, and neither alone was the fix.
+                checkInvertible(
+                    "MEASURED: the 405 carries an Allow header, so the refusal tells the caller what to use instead",
+                    posted.headers.allow === "GET",
+                    `allow=${JSON.stringify(posted.headers.allow ?? null)} headers=[${Object.keys(posted.headers).sort().join(",")}]`,
+                )
+                // The header must not be able to disagree with the check that produced the refusal. Both
+                // are derived from one frozen list in the source, and the body echoes it, so this pins
+                // header and body to each other rather than pinning each to a literal separately.
+                checkInvertible(
+                    "MEASURED: the Allow header and the refusal body name the SAME permitted method set, so the header cannot drift from the check",
+                    posted.headers.allow ===
+                        String(
+                            (posted.body.error as { details?: { allow?: unknown } } | undefined)?.details?.allow ?? "",
+                        ),
+                    `header=${JSON.stringify(posted.headers.allow ?? null)} body=${JSON.stringify((posted.body.error as { details?: { allow?: unknown } } | undefined)?.details?.allow ?? null)}`,
+                )
+                // Allow must name only methods the surface HONOURS. Listing HEAD would be the easy,
+                // plausible error - it is a read verb on a read-only surface - and it would be a lie,
+                // because requireReadMethod refuses it. So the claim is checked against behaviour.
+                const headed = await call(api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: "HEAD" })))
+                checkInvertible(
+                    "MEASURED: every method named in Allow is actually accepted, and HEAD - which is refused - is NOT named",
+                    headed.status === 405 && !/HEAD/i.test(posted.headers.allow ?? "") && ok.status === 200,
+                    `HEAD=${headed.status}, allow=${JSON.stringify(posted.headers.allow ?? null)}, GET=${ok.status}`,
+                )
+                // A 405 is the ONLY status that gets the header. If `failure` had been changed to attach it
+                // generally, or the surface had grown a habit of passing headers, every refusal would start
+                // advertising an unrelated method set - so the absence is asserted on a 200 and on a 400.
+                checkInvertible(
+                    "MEASURED: no Allow header leaks onto responses that are not method refusals",
+                    ok.headers.allow === undefined,
+                    `200 headers=[${Object.keys(ok.headers).sort().join(",")}]`,
+                )
                 // A write verb must be refused before any parameter is read, or a POST with no
                 // workspaceId is reported as a missing parameter and the method problem is never named.
                 const postedBare = await call(api.preview(new Request(BASE, { method: "POST" })))
                 checkInvertible(
                     "the method is checked BEFORE the parameters, so a POST is refused as a method and not reported as a missing workspaceId",
-                    postedBare.status === 400 &&
+                    postedBare.status === 405 &&
                         !/workspaceId/.test(String((postedBare.body.error as { message?: string } | undefined)?.message ?? "")),
                     String((postedBare.body.error as { message?: string } | undefined)?.message ?? "").slice(0, 70),
                 )
@@ -370,8 +548,8 @@ async function main() {
                     const other = await call(api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: verb })))
                     checkInvertible(
                         `MEASURED: the service refuses ${verb} too, so the guarantee is about "not GET" rather than about POST alone`,
-                        other.status === 400 && errCode(other) === "BAD_REQUEST",
-                        `status=${other.status} code=${errCode(other)}`,
+                        other.status === 405 && errCode(other) === "METHOD_NOT_ALLOWED" && other.headers.allow === "GET",
+                        `status=${other.status} code=${errCode(other)} allow=${JSON.stringify(other.headers.allow ?? null)}`,
                     )
                 }
                 const data = (ok.body.data ?? {}) as Record<string, unknown>
@@ -618,6 +796,7 @@ async function main() {
                     ["400", noWorkspace, 400],
                     ["401", anon, 401],
                     ["403", foreign, 403],
+                    ["405", posted, 405],
                 ] as Array<[string, Called, number]>) {
                     const keys = Object.keys(called.body).sort().join(",")
                     const expected = expectedStatus < 400 ? "data,ok" : "error,ok"
@@ -666,14 +845,50 @@ async function main() {
         const brokenApi = new DueWorkApiService(
             new OperationsService(new OperationsContext(brokenPrisma, new PersistedTenancy(brokenPrisma, brokenIdentity))),
         )
-        const broken = await call(brokenApi.preview(get(`${BASE}?workspaceId=whatever`)))
-        // The precondition for every leak assertion below. Without this the mock can silently stop
-        // reaching the throw again - a refactor of the tenancy chain would do it - and the leak
-        // assertions would go back to passing against an error containing no secret.
+        // ---- THE SERVER LOG, which is where the secret actually went -----------
+        //
+        // The fragment assertions here used to cover the RESPONSE only, and the response was clean. The LOG
+        // was not: `logUnexpectedFailure` passed the whole error object to console.error, so this injected
+        // DSN - credentials, host, port, database and query string - was printed in full to stderr on every
+        // unexpected failure. A harness that proves the client is safe and never looks at the server side
+        // proves half of the thing it is named after, and the half it skipped was the one that leaked.
+        //
+        // console.error is captured rather than the process's stderr, because that is the exact call the
+        // code under test makes. Non-string arguments go through util.inspect, which is what console.error
+        // does with them anyway - so if this code went back to passing an Error object, the capture sees its
+        // message and stack exactly as an operator would and the fragment assertions go red. A capture that
+        // only concatenated string arguments would miss precisely the defect being fixed.
+        const loggedLines: string[] = []
+        const realConsoleError = console.error
+        console.error = (...args: unknown[]): void => {
+            loggedLines.push(args.map((a) => (typeof a === "string" ? a : inspect(a, { depth: 6 }))).join(" "))
+        }
+        let captured: Called | null = null
+        try {
+            captured = await call(brokenApi.preview(get(`${BASE}?workspaceId=whatever`)))
+        } finally {
+            console.error = realConsoleError
+        }
+        if (captured === null) {
+            // THROW rather than `process.exit(1)`. Behaviour is identical - main().catch exits 1 - but a
+            // mid-file exit decision with 14 assertions after it is indistinguishable, to any static
+            // reader and to check-harness-exit-integrity.ts, from the frozen-verdict defect that scanner
+            // exists to catch. It flagged this line as a REAL_DEFECT and it was right to: the shape is the
+            // defect even when the intent is a precondition abort. An abort belongs in the exception path.
+            throw new Error("ABORT: the 503 probe produced no response at all")
+        }
+        const broken: Called = captured
+        const loggedAll = loggedLines.join("\n")
+        const surfaceLogs = loggedLines.filter((line) => line.includes("[operations/due-work]"))
+        // The precondition for every leak assertion below, now covering BOTH paths. Without the first half
+        // the mock can silently stop reaching the throw - a refactor of the tenancy chain would do it - and
+        // the response assertions go back to passing against an error containing no secret. Without the
+        // second half the LOG assertions pass because nothing was logged at all, which is the same vacuity
+        // one layer down: deleting the log call would satisfy every "leaks no X" assertion perfectly.
         checkInvertible(
-            "MEASURED: the injected secret was actually produced - the failure path reached the throw",
-            leakProbe.workspaceLookups === 1,
-            `workspace lookups=${leakProbe.workspaceLookups}`,
+            "MEASURED: the injected secret was produced AND the log path ran - the failure path reached the throw and logged exactly once",
+            leakProbe.workspaceLookups === 1 && surfaceLogs.length === 1,
+            `workspace lookups=${leakProbe.workspaceLookups} surface log lines=${surfaceLogs.length} total captured=${loggedLines.length}`,
         )
         checkInvertible(
             "a dependency failure is 503 rather than a 500 or a stack trace",
@@ -687,6 +902,59 @@ async function main() {
                 fragment,
             )
         }
+        // THE SAME SEVEN FRAGMENTS, AGAINST THE SERVER LOG. This is the set that was missing, and the one
+        // that was failing in reality: every assertion above already passed while the line below it printed
+        // the whole DSN to stderr.
+        for (const fragment of ["SECRET_DETAIL", "postgres://", "user:pw", "dbhost", "5432", "sslmode", "personalink"]) {
+            checkInvertible(
+                `MEASURED: the SERVER LOG leaks no "${fragment}"`,
+                !loggedAll.toLowerCase().includes(fragment.toLowerCase()),
+                fragment,
+            )
+        }
+        // Credential-shaped text in general, not only this fixture's fragments. The injected secret is one
+        // sample; a scan for the SHAPE catches a driver that formats its DSN some other way.
+        checkInvertible(
+            "MEASURED: the server log contains no URI with a scheme at all, so no connection string of any shape survives",
+            !/[a-z][a-z0-9+.-]*:\/\//i.test(loggedAll),
+            loggedAll.slice(0, 120),
+        )
+        checkInvertible(
+            "MEASURED: the server log contains no query string and no key=value pair, so no credential can ride in as a parameter",
+            !/\?[^\s]*=/.test(loggedAll) && !/(password|passwd|secret|token|apikey|api_key)\s*[:=]/i.test(loggedAll),
+            "no query string, no credential-shaped assignment",
+        )
+
+        // ---- AND THE LOG MUST STILL BE WORTH READING ---------------------------
+        //
+        // A sanitizer that logs nothing satisfies every "leaks no X" assertion above perfectly, and it is
+        // not a fix - it is the ORIGINAL defect, the one where a dependency outage left no trace on the
+        // server and a TypeError in the plan composition was indistinguishable from it. So usefulness is
+        // asserted rather than assumed. Deleting the console.error call would turn all nine assertions above
+        // green and these four red, which is the correct verdict on that change.
+        checkInvertible(
+            "MEASURED: the sanitized log still names WHAT failed - the error's kind reaches the operator",
+            /"kind":"Error"/.test(loggedAll),
+            surfaceLogs.join(" ").slice(-200),
+        )
+        checkInvertible(
+            "MEASURED: the sanitized log still says roughly WHERE it failed - real source locations survive",
+            /"frames":\[[^\]]/.test(loggedAll) && /\.ts:\d+:\d+/.test(loggedAll),
+            `${(loggedAll.match(/"framesKept":\d+/) ?? ["framesKept:?"])[0]}`,
+        )
+        checkInvertible(
+            "MEASURED: the log names the failing boundary and the status it answered, so an operator can find it by grep",
+            /\[operations\/due-work\]/.test(loggedAll) && /DEPENDENCY_UNAVAILABLE/.test(loggedAll),
+            "tagged with the surface and the status",
+        )
+        // The mechanism, asserted directly rather than inferred from the two facts above. V8 puts
+        // "Name: message" on the stack's FIRST line, which is exactly where the DSN was, so keeping frames
+        // while dropping that line is the whole technique - and both halves have to be true at once.
+        checkInvertible(
+            "MEASURED: the log keeps stack FRAMES while dropping the message line they were attached to",
+            /"framesKept":[1-9]/.test(loggedAll) && !/"message":/.test(loggedAll),
+            `${(loggedAll.match(/"framesKept":\d+/) ?? ["none"])[0]}, no message field emitted`,
+        )
         checkInvertible(
             "the 503 message names THIS surface rather than the one whose envelope helper it reuses",
             /due-work plan is temporarily unavailable/i.test(broken.raw) &&
