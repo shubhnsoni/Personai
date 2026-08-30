@@ -264,36 +264,36 @@ async function main() {
     const declaredDelegates = COHORT_NEEDS_ACTION_COVERAGE.map(
         (model) => `${model[0].toLowerCase()}${model.slice(1)}`,
     ).sort()
-    check(
+    checkInvertible(
         "declared coverage matches every queried Prisma model",
         queriedDelegates.join(",") === declaredDelegates.join(",") && new Set(queriedDelegates).size === queriedDelegates.length,
         `declared=${declaredDelegates.join(",")} queried=${queriedDelegates.join(",")}`,
     )
-    check("cohort attention declares profile scope", COHORT_NEEDS_ACTION_SCOPE === "profile")
-    check("cohort attention emits the consumer-ready domain", COHORT_NEEDS_ACTION_DOMAIN === "cohortTasks")
-    check(
+    checkInvertible("cohort attention declares profile scope", COHORT_NEEDS_ACTION_SCOPE === "profile")
+    checkInvertible("cohort attention emits the consumer-ready domain", COHORT_NEEDS_ACTION_DOMAIN === "cohortTasks")
+    checkInvertible(
         "not-covered concerns are explicit and reasoned",
         Object.keys(COHORT_NEEDS_ACTION_NOT_COVERED).length >= 4 && Object.values(COHORT_NEEDS_ACTION_NOT_COVERED).every((reason) => reason.length > 60),
     )
 
     const forbidden = ["fetch(", "nodemailer", "resend", "stripe", "twilio", "scheduler", "mailer", "setinterval", "settimeout", "enqueue", "publish("]
     const foundForbidden = forbidden.filter((needle) => code.toLowerCase().includes(needle))
-    check(
+    checkInvertible(
         "executable lines contain no provider, scheduler or mailer identifier",
         foundForbidden.length === 0,
         foundForbidden.join(",") || `checked ${forbidden.length} identifiers after stripping comments`,
     )
-    check(
+    checkInvertible(
         "resolver contains no write or transaction call",
         !/\.(create|createMany|update|updateMany|delete|deleteMany|upsert)\(|\$transaction|\$executeRaw|\$queryRaw/.test(code),
     )
 
-    check("RETURNED is learner-owned according to the real transition table", submissionFlow.can("RETURNED", "SUBMITTED"))
-    check("LATE is credited by the real progress policy", ATTENDANCE_CREDITED.includes("LATE"))
-    check("SCHEDULED is not attendable according to the real session policy", !ATTENDABLE_SESSION_STATUSES.includes("SCHEDULED"))
-    check("ELIGIBLE can become ISSUED according to the real certificate flow", certificateFlow.can("ELIGIBLE", "ISSUED"))
-    check("LAPSED is a real renewal state that can re-enter scheduling", renewalFlow.can("LAPSED", "SCHEDULED"))
-    check("COMPLETED membership is terminal according to the real flow", membershipFlow.isTerminal("COMPLETED"))
+    checkInvertible("RETURNED is learner-owned according to the real transition table", submissionFlow.can("RETURNED", "SUBMITTED"))
+    checkInvertible("LATE is credited by the real progress policy", ATTENDANCE_CREDITED.includes("LATE"))
+    checkInvertible("SCHEDULED is not attendable according to the real session policy", !ATTENDABLE_SESSION_STATUSES.includes("SCHEDULED"))
+    checkInvertible("ELIGIBLE can become ISSUED according to the real certificate flow", certificateFlow.can("ELIGIBLE", "ISSUED"))
+    checkInvertible("LAPSED is a real renewal state that can re-enter scheduling", renewalFlow.can("LAPSED", "SCHEDULED"))
+    checkInvertible("COMPLETED membership is terminal according to the real flow", membershipFlow.isTerminal("COMPLETED"))
 
     const prisma = new PrismaClient()
     const prefixLike = `${RUN}%`
@@ -314,7 +314,7 @@ async function main() {
                 scheduledAbsent: await tx.cohortAttendance.count({ where: { id: ids.scheduledAbsent, status: "ABSENT", session: { status: "SCHEDULED" } } }),
                 tenantB: await tx.cohortSubmission.count({ where: { id: ids.tenantBSubmission, assignment: { cohort: { profileId: ids.profileB } } } }),
             }
-            check(
+            checkInvertible(
                 "positive and negative fixtures materially exist before classification",
                 Object.values(fixtureCounts).every((count) => count === 1),
                 JSON.stringify(fixtureCounts),
@@ -325,16 +325,16 @@ async function main() {
             const reasons = new Map(items.map((entry) => [entry.id, entry.reason] as const))
 
             checkInvertible("SUBMITTED assignment is positive owner work", itemIds.has(ids.submitted), reasons.get(ids.submitted) ?? "missing")
-            check("RETURNED assignment is negative because it went back to the learner", !itemIds.has(ids.returned))
-            check("HELD ABSENT is a positive finalized attendance exception", itemIds.has(ids.heldAbsent), reasons.get(ids.heldAbsent) ?? "missing")
-            check("HELD LATE is negative because late attendance receives credit", !itemIds.has(ids.heldLate))
-            check("SCHEDULED ABSENT is negative because the session has not happened", !itemIds.has(ids.scheduledAbsent))
-            check("SCHEDULED renewal is positive upcoming work", itemIds.has(ids.renewalScheduled))
-            check("REMINDED renewal is positive outstanding work", itemIds.has(ids.renewalReminded))
-            check("LAPSED renewal is positive and overdue", itemIds.has(ids.renewalLapsed) && items.find((entry) => entry.id === ids.renewalLapsed)?.overdue === true)
-            check("NONE renewal is negative", !itemIds.has(ids.renewalNone))
-            check("ELIGIBLE certificate is positive issuance work", itemIds.has(ids.eligibleCertificate))
-            check("ISSUED certificate is negative completed work", !itemIds.has(ids.issuedCertificate))
+            checkInvertible("RETURNED assignment is negative because it went back to the learner", !itemIds.has(ids.returned))
+            checkInvertible("HELD ABSENT is a positive finalized attendance exception", itemIds.has(ids.heldAbsent), reasons.get(ids.heldAbsent) ?? "missing")
+            checkInvertible("HELD LATE is negative because late attendance receives credit", !itemIds.has(ids.heldLate))
+            checkInvertible("SCHEDULED ABSENT is negative because the session has not happened", !itemIds.has(ids.scheduledAbsent))
+            checkInvertible("SCHEDULED renewal is positive upcoming work", itemIds.has(ids.renewalScheduled))
+            checkInvertible("REMINDED renewal is positive outstanding work", itemIds.has(ids.renewalReminded))
+            checkInvertible("LAPSED renewal is positive and overdue", itemIds.has(ids.renewalLapsed) && items.find((entry) => entry.id === ids.renewalLapsed)?.overdue === true)
+            checkInvertible("NONE renewal is negative", !itemIds.has(ids.renewalNone))
+            checkInvertible("ELIGIBLE certificate is positive issuance work", itemIds.has(ids.eligibleCertificate))
+            checkInvertible("ISSUED certificate is negative completed work", !itemIds.has(ids.issuedCertificate))
 
             const completedIds = [
                 ids.accepted,
@@ -344,20 +344,20 @@ async function main() {
                 ids.cancelledCohortSubmission,
                 ids.issuedCertificate,
             ]
-            check(
+            checkInvertible(
                 "genuinely completed or cancelled work does not appear",
                 completedIds.every((id) => !itemIds.has(id)),
                 completedIds.filter((id) => itemIds.has(id)).join(",") || "all excluded",
             )
-            check(
+            checkInvertible(
                 "completed-work exclusion has open controls that do appear",
                 [ids.submitted, ids.renewalScheduled, ids.eligibleCertificate].every((id) => itemIds.has(id)),
             )
-            check("second tenant work never appears in tenant A", !itemIds.has(ids.tenantBSubmission))
+            checkInvertible("second tenant work never appears in tenant A", !itemIds.has(ids.tenantBSubmission))
 
             const tenantBItems = await resolveCohortNeedsAction(tx, ids.profileB, AS_OF)
-            check("second tenant fixture is independently visible in tenant B", tenantBItems.some((entry) => entry.id === ids.tenantBSubmission))
-            check("tenant B never sees tenant A's submitted assignment", !tenantBItems.some((entry) => entry.id === ids.submitted))
+            checkInvertible("second tenant fixture is independently visible in tenant B", tenantBItems.some((entry) => entry.id === ids.tenantBSubmission))
+            checkInvertible("tenant B never sees tenant A's submitted assignment", !tenantBItems.some((entry) => entry.id === ids.submitted))
 
             throw new Rollback("deliberate whole-harness rollback")
         })
