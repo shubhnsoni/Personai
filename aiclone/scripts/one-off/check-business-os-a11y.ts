@@ -1736,8 +1736,18 @@ check(
     /new AbortController\(\)/.test(workspaceSurfacesSrc) && /controller\.abort\(\)/.test(workspaceSurfacesSrc),
 )
 check(
-    "the mount effect depends only on workspaceId, so a workspace change re-runs it",
-    /\}, \[workspaceId\]\)/.test(workspaceSurfacesSrc),
+    "the mount effect depends on workspaceId, so a workspace change re-runs it, and on nothing unstable",
+    // Was /\}, \[workspaceId\]\)/ — an exact-text pin that broke when the injectable `request` seam was
+    // added for the live race harness. The property worth guarding is not the literal text: it is that
+    // `workspaceId` is a dependency (so a switch refetches) and that no UNSTABLE value joins it (which
+    // would refetch on every render). `request` is permitted because it defaults to a module-scope
+    // function and is therefore referentially stable in production.
+    //
+    // The behaviour itself is now proven by OBSERVATION rather than by this scan:
+    // check-workspace-surfaces-race.ts mounts the real component and asserts that changing the prop
+    // aborts the previous transport and starts a new request. This assertion is kept only as the cheap
+    // structural guard against an unstable dependency being added.
+    /\}, \[workspaceId(, request)?\]\)/.test(workspaceSurfacesSrc),
 )
 
 // ---------------------------------------------------------------------------
@@ -1752,6 +1762,17 @@ check(
 // file already uses for behaviour it cannot render-check (e.g. the
 // "mount effect depends only on workspaceId" and "aborts the in-flight
 // request" assertions for workspace-surfaces-panel above).
+//
+// SUPERSEDED IN PART, N1-B: the "no DOM available" premise above is no longer
+// true. check-workspace-surfaces-race.ts mounts real components through
+// react-dom/client into a small in-memory DOM host with act(), adding NO
+// dependency -- no jsdom, no Testing Library, no react-test-renderer. Effects,
+// cleanup and host mutations all run. So the two workspace-surfaces assertions
+// named above are no longer the best available evidence for their properties;
+// that harness proves them by observation. The source scans are retained here
+// as cheap structural guards, not as the primary proof. Anything in THIS file
+// still asserted only by source scan could now be upgraded the same way, and
+// the file header's claim that no DOM is available should be read as historical.
 //
 // INVERT_ASSERTION=1 support is added here, additively and only for this new
 // section: this file had no INVERT/checkInvertible infrastructure before.
