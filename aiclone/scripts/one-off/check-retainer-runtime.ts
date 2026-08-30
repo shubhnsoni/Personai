@@ -59,6 +59,61 @@ function deferred<T>() {
     return { promise, resolve, reject }
 }
 
+type RetainerLockObservation = Readonly<{
+    lockWaiters: number
+    ungranted: number
+    idleInTransaction: number
+    backends: number
+    lockTypes: string
+}>
+
+/**
+ * Positive evidence that T2 REACHED the database and is blocked on a LOCK.
+ *
+ * Added for the same reason as the equivalent probe in check-inventory-runtime.ts: the interleaving
+ * proof below rested on an ABSENCE of signal - "T2 did not reach its second read within 300ms" - and
+ * that one observation is produced identically by a row-lock wait, a connection-pool wait, a slow
+ * pre-transaction preamble, or event-loop starvation. Asking Postgres what T2 is waiting ON turns the
+ * absence into a measurement.
+ */
+async function observeRetainerLocks(observer: PrismaClient): Promise<RetainerLockObservation> {
+    const rows = await observer.$queryRawUnsafe<
+        Array<{ lockwaiters: bigint; ungranted: bigint; idleintx: bigint; backends: bigint; locktypes: string | null }>
+    >(`
+        select
+            (select count(*) from pg_stat_activity a
+              where a.datname = current_database() and a.wait_event_type = 'Lock') as lockwaiters,
+            (select count(*) from pg_locks l join pg_stat_activity a on a.pid = l.pid
+              where not l.granted and a.datname = current_database()) as ungranted,
+            (select count(*) from pg_stat_activity a
+              where a.datname = current_database() and a.state = 'idle in transaction') as idleintx,
+            (select count(*) from pg_stat_activity a
+              where a.datname = current_database()) as backends,
+            (select string_agg(distinct l.locktype, ',') from pg_locks l join pg_stat_activity a on a.pid = l.pid
+              where not l.granted and a.datname = current_database()) as locktypes
+    `)
+    const row = rows[0]
+    return Object.freeze({
+        lockWaiters: Number(row?.lockwaiters ?? 0),
+        ungranted: Number(row?.ungranted ?? 0),
+        idleInTransaction: Number(row?.idleintx ?? 0),
+        backends: Number(row?.backends ?? 0),
+        lockTypes: row?.locktypes ?? "",
+    })
+}
+
+async function awaitRetainerLockWaiter(observer: PrismaClient, milliseconds: number): Promise<RetainerLockObservation> {
+    const deadline = Date.now() + milliseconds
+    let best = await observeRetainerLocks(observer)
+    while (Date.now() < deadline) {
+        if (best.lockWaiters > 0) return best
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        const next = await observeRetainerLocks(observer)
+        if (next.lockWaiters > best.lockWaiters || next.ungranted > best.ungranted) best = next
+    }
+    return best
+}
+
 async function settlesWithin(promise: Promise<unknown>, milliseconds: number): Promise<boolean> {
     return Promise.race([
         promise.then(
@@ -116,7 +171,14 @@ async function main() {
         process.exit(1)
     }
 
-    const prisma = new PrismaClient()
+    // The pool is PINNED and a separate observer client added, for the reason documented on
+    // observeRetainerLocks: with Prisma's machine-dependent default pool, a parked T1 could starve T2
+    // of a CONNECTION and the proof below could not tell that apart from a row-lock wait.
+    const retainerPinnedUrl = `${url}${url!.includes("?") ? "&" : "?"}connection_limit=5`
+    const prisma = new PrismaClient({ datasources: { db: { url: retainerPinnedUrl } } })
+    const observer = new PrismaClient({
+        datasources: { db: { url: `${url}${url!.includes("?") ? "&" : "?"}connection_limit=2` } },
+    })
     let interleaving: ReadInterleaving | null = null
     prisma.$use(async (params, next) => {
         const output = await next(params)
@@ -452,16 +514,38 @@ async function main() {
             releaseFirst: deferred<void>(),
         }
         interleaving = gate
+        // WHAT THIS SECTION ESTABLISHES, measured rather than assumed.
+        //
+        // Root removed each of the four `for update` clauses in src/lib/cases/retainers.ts one at a
+        // time and this harness stayed GREEN every time, at 90/90 exit 0. Removing all four together
+        // turns it red: lockWaiters drops to 0 and `used` goes 0->3 instead of 0->8, which is the lost
+        // update - one draw's absolute write overwriting the other's.
+        //
+        // So the retainer locks are JOINTLY NECESSARY AND INDIVIDUALLY REDUNDANT: any one of them is
+        // sufficient to serialise these two draws, and therefore no single one is load-bearing on its
+        // own. That is a materially different situation from inventory, where the single `for update`
+        // in InventoryContext.lockItem() IS individually necessary and removing just that one flips
+        // the result. A reader of the old assertion name would have concluded each retainer lock was
+        // load-bearing; it is not, and the name now says what was actually measured.
         const t1 = retainers.recordDraw(ids.wsA, interleaved.record.id, { kind: "DRAW", units: 3 }, actor)
         const firstReadReached = await settlesWithin(gate.firstRead.promise, 1_500)
         let t2: Promise<unknown> | null = null
         let secondReadBeforeRelease = false
-        let t2CommittedBeforeRelease = false
+        let retainerLockEvidence: RetainerLockObservation = {
+            lockWaiters: 0,
+            ungranted: 0,
+            idleInTransaction: 0,
+            backends: 0,
+            lockTypes: "",
+        }
         try {
             if (firstReadReached) {
                 t2 = retainers.recordDraw(ids.wsA, interleaved.record.id, { kind: "DRAW", units: 5 }, actor)
+                // POSITIVE evidence first, and T2 gets the same budget T1 got. The removed conjunct
+                // `!t2CommittedBeforeRelease` was assigned only inside `if (secondReadBeforeRelease)`,
+                // which is false on every passing run, so it held its initialiser and asserted nothing.
+                retainerLockEvidence = await awaitRetainerLockWaiter(observer, 1_500)
                 secondReadBeforeRelease = await settlesWithin(gate.secondRead.promise, 300)
-                if (secondReadBeforeRelease) t2CommittedBeforeRelease = await settlesWithin(t2, 1_500)
             }
         } finally {
             // This is an application-level barrier, not a database timeout: no SQL error is used
@@ -472,14 +556,23 @@ async function main() {
         interleaving = null
         const interleaveAfter = (await prisma.caseRetainerPeriod.findUniqueOrThrow({ where: { id: interleavedPeriod.id } })).usedUnits
         checkInvertible(
-            "MEASURED: deterministic read interleaving proves recordDraw's FOR UPDATE locks serialize both draws instead of allowing a stale-balance overwrite",
+            "MEASURED: while T1 is parked, Postgres reports T2 blocked in a LOCK wait - not merely absent",
+            firstReadReached && retainerLockEvidence.lockWaiters >= 1,
+            `lockWaiters=${retainerLockEvidence.lockWaiters} ungranted=${retainerLockEvidence.ungranted} types=${retainerLockEvidence.lockTypes}`,
+        )
+        checkInvertible(
+            "MEASURED: T2 reached the database, so it was not starved of a pooled connection",
+            retainerLockEvidence.backends >= 2 && retainerLockEvidence.idleInTransaction >= 1,
+            `backends=${retainerLockEvidence.backends} idleInTx=${retainerLockEvidence.idleInTransaction} (pool pinned to 5)`,
+        )
+        checkInvertible(
+            "MEASURED: recordDraw's FOR UPDATE locks are JOINTLY necessary - with all of them removed the two draws stop serializing",
             firstReadReached &&
                 !secondReadBeforeRelease &&
-                !t2CommittedBeforeRelease &&
                 outcomes.length === 2 &&
                 outcomes.every((outcome) => outcome.status === "fulfilled") &&
                 interleaveAfter === interleaveBefore + 8,
-            `T1 balance read=${firstReadReached}; T2 balance read before release=${secondReadBeforeRelease}; T2 committed before release=${t2CommittedBeforeRelease}; used=${interleaveBefore}->${interleaveAfter}`,
+            `T1 balance read=${firstReadReached}; T2 balance read before release=${secondReadBeforeRelease}; lockWaiters=${retainerLockEvidence.lockWaiters}; used=${interleaveBefore}->${interleaveAfter}`,
         )
 
         // ---- 11. unlinking is refused once history exists ------------------
@@ -681,6 +774,7 @@ async function main() {
         // Three triggers, each firing on two events, so six information_schema rows.
         check("every append-only trigger was re-armed after teardown", Number(armed[0].n) === 6, `rows=${armed[0].n}`)
         await prisma.$disconnect()
+        await observer.$disconnect()
     }
 
     const failed = results.filter((r) => !r.pass)

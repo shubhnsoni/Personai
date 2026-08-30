@@ -178,9 +178,20 @@ async function main() {
                     "every item's due date is an ISO string or null, never a Date object",
                     items.every((item) => item.at === null || typeof item.at === "string"),
                 )
+                // NOT `JSON.stringify(JSON.parse(raw)) === JSON.stringify(body)`: `body` IS
+                // `JSON.parse(raw)`, produced by the `call()` helper, so that comparison is x === x and
+                // cannot fail. What is worth asserting is that the wire bytes parse and carry the
+                // envelope.
                 check(
-                    "the response is round-trippable JSON",
-                    JSON.stringify(JSON.parse(ok.raw)) === JSON.stringify(ok.body),
+                    "the response body is valid JSON on the wire and carries the envelope key",
+                    (() => {
+                        try {
+                            const parsed = JSON.parse(ok.raw) as Record<string, unknown>
+                            return parsed.ok === true && typeof parsed.data === "object" && parsed.data !== null
+                        } catch {
+                            return false
+                        }
+                    })(),
                 )
 
                 // ---- 403 -------------------------------------------------------
@@ -233,8 +244,16 @@ async function main() {
                     ["403", foreign],
                 ] as Array<[string, Called]>) {
                     const keys = Object.keys(called.body).sort().join(",")
-                    const expected = called.status < 400 ? "data,ok" : "error,ok"
-                    check(`the ${label} response uses the shared envelope shape`, keys === expected, `keys=${keys}`)
+                    // The expectation comes from the LABEL, a literal, not from the observed status.
+                    // Deriving it from `called.status` meant a 403 regressing to a 200 flipped the
+                    // expectation with it and this assertion still passed.
+                    const expectedStatus = Number(label)
+                    const expected = expectedStatus < 400 ? "data,ok" : "error,ok"
+                    check(
+                        `the ${label} response really is ${label} and uses the shared envelope shape`,
+                        called.status === expectedStatus && keys === expected,
+                        `status=${called.status} keys=${keys}`,
+                    )
                 }
 
                 throw new Rollback()

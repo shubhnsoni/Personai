@@ -406,8 +406,16 @@ async function main() {
             ["503", broken],
         ] as Array<[string, Called]>) {
             const keys = Object.keys(c.body).sort().join(",")
-            const expected = c.status < 400 ? "data,ok" : "error,ok"
-            checkInvertible(`the ${label} response uses the shared envelope shape`, keys === expected, `keys=${keys}`)
+            // The expectation comes from the LABEL, which is a literal, not from the observed
+            // status. Deriving it from $(System.Collections.Hashtable.v).status meant a 403 regressing to a 200 flipped the
+            // expectation with it and this assertion still passed.
+            const expectedStatus = Number(label)
+            const expected = expectedStatus < 400 ? "data,ok" : "error,ok"
+            checkInvertible(
+                `the ${label} response really is ${label} and uses the shared envelope shape`,
+                c.status === expectedStatus && keys === expected,
+                `status=${c.status} keys=${keys}`,
+            )
         }
     } finally {
         const profileList = `'${ids.profileA}','${ids.profileB}'`
