@@ -59,6 +59,67 @@ async function settlesWithin(promise: Promise<unknown>, milliseconds: number): P
     ])
 }
 
+type LockObservation = Readonly<{
+    /** Backends in this database blocked in a LOCK wait. The discriminating number. */
+    lockWaiters: number
+    /** Ungranted lock rows in this database. */
+    ungranted: number
+    /** Backends holding an open transaction without running a statement - the parked T1. */
+    idleInTransaction: number
+    /** Distinct backends in this database, so pool starvation is visible rather than inferred. */
+    backends: number
+    /** What the waiter is blocked on, e.g. transactionid or tuple. */
+    lockTypes: string
+}>
+
+/**
+ * Positive evidence that a second transaction REACHED the database and is blocked on a LOCK.
+ *
+ * This exists because the original form of the interleaving proof measured only an ABSENCE of signal:
+ * "T2 did not reach its prewrite point within 300ms". That single observation is produced identically by
+ * a row-lock wait, a connection-pool wait, a slow pre-transaction preamble, or event-loop starvation, so
+ * it cannot support a claim about row locking specifically. Asking Postgres what T2 is actually waiting
+ * ON turns an absence into a measurement.
+ */
+async function observeLocks(observer: PrismaClient): Promise<LockObservation> {
+    const rows = await observer.$queryRawUnsafe<
+        Array<{ lockwaiters: bigint; ungranted: bigint; idleintx: bigint; backends: bigint; locktypes: string | null }>
+    >(`
+        select
+            (select count(*) from pg_stat_activity a
+              where a.datname = current_database() and a.wait_event_type = 'Lock') as lockwaiters,
+            (select count(*) from pg_locks l join pg_stat_activity a on a.pid = l.pid
+              where not l.granted and a.datname = current_database()) as ungranted,
+            (select count(*) from pg_stat_activity a
+              where a.datname = current_database() and a.state = 'idle in transaction') as idleintx,
+            (select count(*) from pg_stat_activity a
+              where a.datname = current_database()) as backends,
+            (select string_agg(distinct l.locktype, ',') from pg_locks l join pg_stat_activity a on a.pid = l.pid
+              where not l.granted and a.datname = current_database()) as locktypes
+    `)
+    const row = rows[0]
+    return Object.freeze({
+        lockWaiters: Number(row?.lockwaiters ?? 0),
+        ungranted: Number(row?.ungranted ?? 0),
+        idleInTransaction: Number(row?.idleintx ?? 0),
+        backends: Number(row?.backends ?? 0),
+        lockTypes: row?.locktypes ?? "",
+    })
+}
+
+/** Polls until a lock waiter appears, or the budget expires. Returns the strongest observation seen. */
+async function awaitLockWaiter(observer: PrismaClient, milliseconds: number): Promise<LockObservation> {
+    const deadline = Date.now() + milliseconds
+    let best = await observeLocks(observer)
+    while (Date.now() < deadline) {
+        if (best.lockWaiters > 0) return best
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        const next = await observeLocks(observer)
+        if (next.lockWaiters > best.lockWaiters || next.ungranted > best.ungranted) best = next
+    }
+    return best
+}
+
 type ReservationInterleaving = {
     itemId: string
     prewrites: number
@@ -107,7 +168,27 @@ async function main() {
         process.exit(1)
     }
 
-    const prisma = new PrismaClient()
+    /**
+     * The pool is PINNED rather than left to Prisma's default.
+     *
+     * The interleaving proof below parks T1 inside middleware while T1 holds a pooled connection, then
+     * runs T2 through the same client. If the pool were small enough, T2 would block acquiring a
+     * CONNECTION rather than waiting on the row lock, and the two are observationally identical to any
+     * assertion that only measures "T2 did not get far". Prisma's default is
+     * `num_physical_cpus * 2 + 1`, which is machine-dependent and therefore not a property of this
+     * repository: the same harness could prove different things on different hardware.
+     *
+     * Pinning it to 5 excludes pool starvation BY CONSTRUCTION - T1 holds one, the observer client below
+     * has its own, and T2 cannot be starved. The lock-wait probe then supplies POSITIVE evidence.
+     */
+    const pinnedUrl = `${url}${url!.includes("?") ? "&" : "?"}connection_limit=5`
+    const prisma = new PrismaClient({ datasources: { db: { url: pinnedUrl } } })
+    /**
+     * A SEPARATE client on its own connection, used only to observe locks.
+     *
+     * It must not share the pool under test: an observer that queued behind T1 could not report on T1.
+     */
+    const observer = new PrismaClient({ datasources: { db: { url: `${url}${url!.includes("?") ? "&" : "?"}connection_limit=2` } } })
     let interleaving: ReservationInterleaving | null = null
     prisma.$use(async (params, next) => {
         const gate = interleaving
@@ -375,10 +456,35 @@ async function main() {
         const raceHolds = await prisma.inventoryReservation.count({ where: { itemId: raceItem.record.id, state: "HELD" } })
         checkInvertible("only one hold row exists for the contested unit", raceHolds === 1, `holds=${raceHolds}`)
 
-        // ---- 9. deterministic read interleaving measures lock necessity
+        // ---- 9. deterministic read interleaving: the lock is load-bearing GIVEN THE ABSOLUTE WRITE
+        //
         // Promise.all alone does not prove contention. This barrier pauses T1 after reserve()
         // has read the balance and passed its engine guard, but before its absolute balance
         // write. T2 then calls the same real service method while T1 is still open.
+        //
+        // WHAT THIS SECTION CLAIMS, narrowed after an adversarial review of its first version:
+        //
+        //   `reserved` is written as an ABSOLUTE value computed in JS from the locked read
+        //   (`locked.reserved + qty`). Two unserialised transactions would both read 0 and both write 3,
+        //   and `CHECK (reserved <= onHand)` is satisfied by 3 <= 5, so the database accepts both and the
+        //   oversell survives as two HELD rows totalling 6 against 5 on hand. For the code AS WRITTEN
+        //   the lock is therefore necessary, which is what the mutation below measures.
+        //
+        // WHAT IT DOES NOT CLAIM: that no alternative design preserves the invariant. A relative write
+        //   (`{ increment: qty }`) would make Postgres take the row lock itself at UPDATE time, and the
+        //   existing CHECK would then reject the second write. The lock is necessary given this design,
+        //   not necessary in principle. The tradeoff is the quality of the refusal - the engine's named
+        //   "Only N units are available" with machine-readable details, versus a constraint-derived
+        //   conflict - and that is a deliberate design choice recorded in engine.ts, not an oversight.
+        //
+        // The first version of this section also measured only an ABSENCE of signal: "T2 did not reach
+        // its prewrite point within 300ms", with T1 allowed 1500ms for the same work. That observation is
+        // produced identically by a row-lock wait, a connection-pool wait, a slow pre-transaction
+        // preamble, or event-loop starvation. It now asks Postgres what T2 is actually waiting ON, gives
+        // T2 the same budget as T1, and pins the pool so starvation is excluded by construction.
+        // A third conjunct, `!t2SettledBeforeRelease`, was removed outright: its assignment sat behind
+        // `if (secondPrewriteBeforeRelease)`, which is false on every passing run, so it was true by
+        // initialisation and asserted nothing at all.
         const interleavedItem = await inventory.ensureItem(ids.wsA, { productId: ids.prodA3, locationId: ids.locA }, actor)
         await inventory.applyMovement(ids.wsA, interleavedItem.record.id, { kind: "RECEIPT", qty: 5 }, actor)
         for (const n of [203, 204]) {
@@ -401,19 +507,28 @@ async function main() {
         const firstPrewriteReached = await settlesWithin(gate.firstPrewrite.promise, 1_500)
         let t2: Promise<unknown> | null = null
         let secondPrewriteBeforeRelease = false
-        let t2SettledBeforeRelease = false
+        let lockEvidence: LockObservation = { lockWaiters: 0, ungranted: 0, idleInTransaction: 0, backends: 0, lockTypes: "" }
         try {
             if (firstPrewriteReached) {
                 t2 = inventory.reserve(ids.wsA, interleavedItem.record.id, { orderLineId: line(204), qty: 3 }, actor)
+                // POSITIVE evidence first: ask Postgres what T2 is blocked on, rather than inferring
+                // from the fact that it got nowhere. T2 is given the same 1500ms T1 got, because an
+                // asymmetric budget measures impatience as well as blocking.
+                lockEvidence = await awaitLockWaiter(observer, 1_500)
                 secondPrewriteBeforeRelease = await settlesWithin(gate.secondPrewrite.promise, 300)
-                if (secondPrewriteBeforeRelease) t2SettledBeforeRelease = await settlesWithin(t2, 1_500)
             }
         } finally {
             // This is an application barrier, never a database timeout or deadlock.
             gate.releaseFirst.resolve()
         }
-        const interleavedOutcomes = await Promise.allSettled(t2 ? [t1, t2] : [t1])
-        interleaving = null
+        let interleavedOutcomes: PromiseSettledResult<unknown>[]
+        try {
+            interleavedOutcomes = await Promise.allSettled(t2 ? [t1, t2] : [t1])
+        } finally {
+            // In a finally: a throw here previously left the gate armed, so any later InventoryItem
+            // update in this harness would have been parked with nothing to release it.
+            interleaving = null
+        }
         const interleavedAfter = await inventory.get(ids.wsA, interleavedItem.record.id)
         const heldAfter = await prisma.inventoryReservation.findMany({
             where: { itemId: interleavedItem.record.id, state: "HELD" },
@@ -435,7 +550,8 @@ async function main() {
         const movementDelta = reserveMovements.reduce((sum, row) => sum + Number(row.reservedDelta), 0)
         console.log(
             `[inventory-interleaving] first prewrite=${firstPrewriteReached}; T2 prewrite before release=${secondPrewriteBeforeRelease}; ` +
-                `T2 settled before release=${t2SettledBeforeRelease}; outcomes=${outcomeLabels.join(" | ")}; ` +
+                `lock waiters=${lockEvidence.lockWaiters}; ungranted=${lockEvidence.ungranted} (${lockEvidence.lockTypes}); ` +
+                `idle-in-tx=${lockEvidence.idleInTransaction}; backends=${lockEvidence.backends}; outcomes=${outcomeLabels.join(" | ")}; ` +
                 `item=${interleavedAfter.onHand}/${interleavedAfter.reserved}; held=${heldAfter.length}/${heldQty}; ` +
                 `reserve movements=${reserveMovements.length}/${movementDelta}; after-values=${reserveMovements.map((row) => row.reservedAfter).join(",")}`,
         )
@@ -448,9 +564,19 @@ async function main() {
                 /Only 2 units are available/.test(outcome.reason.message),
         ).length
         checkInvertible(
-            "MEASURED: the row lock prevents T2 from reaching its post-read prewrite point until T1 is released",
-            firstPrewriteReached && !secondPrewriteBeforeRelease && !t2SettledBeforeRelease,
-            `first=${firstPrewriteReached} secondBeforeRelease=${secondPrewriteBeforeRelease} settledBeforeRelease=${t2SettledBeforeRelease}`,
+            "MEASURED: while T1 is parked, Postgres reports T2 blocked in a LOCK wait - not merely absent",
+            firstPrewriteReached && lockEvidence.lockWaiters >= 1,
+            `first=${firstPrewriteReached} lockWaiters=${lockEvidence.lockWaiters} ungranted=${lockEvidence.ungranted} types=${lockEvidence.lockTypes}`,
+        )
+        checkInvertible(
+            "MEASURED: T2 reached the database, so it was not starved of a pooled connection",
+            lockEvidence.backends >= 2 && lockEvidence.idleInTransaction >= 1,
+            `backends=${lockEvidence.backends} idleInTx=${lockEvidence.idleInTransaction} (pool pinned to 5)`,
+        )
+        checkInvertible(
+            "the row lock prevents T2 from reaching its post-read prewrite point until T1 is released",
+            firstPrewriteReached && !secondPrewriteBeforeRelease,
+            `first=${firstPrewriteReached} secondBeforeRelease=${secondPrewriteBeforeRelease}`,
         )
         checkInvertible(
             "MEASURED: after serialization exactly one three-unit hold lands and the engine refuses the other against the updated balance",
@@ -590,6 +716,7 @@ async function main() {
             check(`${label} returned to baseline`, actual === expected, `baseline=${expected} end=${actual}`)
         }
         await prisma.$disconnect()
+        await observer.$disconnect()
         globalThis.fetch = realFetch
     }
 
