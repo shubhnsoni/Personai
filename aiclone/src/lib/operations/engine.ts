@@ -439,7 +439,14 @@ export class OperationsService {
      * keeps that intent legible next to the tenant filter rather than resting on three-valued logic.
      *
      * Ordering is unchanged in substance: lowest stock first, so the cap drops the best-stocked
-     * candidates and never a stockout. `id` only separates rows at the same onHand.
+     * candidates FIRST. `id` only separates rows at the same onHand.
+ *
+ * It does NOT follow that a stockout is never dropped, and an earlier version of this comment said it
+ * did. When more rows tie at one stock level than the cap admits, the cap cuts INSIDE that level, so an
+ * owner with 25 items at onHand 0 sees twenty of them and a count of twenty. The harness's own fixture
+ * proves it: 24 rows at onHand 0 against a cap of 20, and the assertion pins the returned set to the
+ * first twenty of the twenty-four. What the ordering guarantees is that no BETTER-stocked candidate is
+ * kept ahead of a worse-stocked one - not that every stockout fits.
      */
     private async inventory(profileId: string): Promise<AttentionItem[]> {
         const rows = await this.ctx.db.inventoryItem.findMany({

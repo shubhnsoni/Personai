@@ -122,8 +122,29 @@ const RAW_OPERATIONS: ReadonlySet<string> = new Set([
  * (`for update` / `for share`) are included too - they mutate no content, but they take a lock on
  * committed data and no read-only path has any business doing so.
  */
+/*
+ * WHAT COUNTS AS A WRITE IN RAW SQL.
+ *
+ * Widened after an adversarial review found several state mutations classified as READS, each of them
+ * inconsistent with this module's own reason for including `for update`: if taking a lock on committed
+ * data has no place on a read path, then neither does changing session state, locking a table, or
+ * creating an object.
+ *
+ *   SET / SET ROLE / SET SESSION / SET LOCAL   had no alternative at all, so
+ *                                             `$queryRawUnsafe("SET ROLE admin")` was a read
+ *   pg_advisory_lock / pg_try_advisory_lock    a lock on shared state - exactly what `for update` is here for
+ *   LOCK TABLE                                same
+ *   create TEMP/TEMPORARY/UNLOGGED table      the alternation required `create` to be followed
+ *                                             immediately by the object keyword, so any modifier
+ *                                             between them defeated it
+ *   create OR REPLACE view/function           same cause. `refresh materialized` was matched while
+ *   create MATERIALIZED view                  creating one was not
+ *
+ * The direction of every one of these is fail-safe: an unrecognised shape is treated as a write, so a
+ * false positive costs a red run and a false negative costs the whole claim.
+ */
 const RAW_WRITE_PATTERN =
-    /\b(?:insert\s+into|update\s+(?:only\s+)?"?[a-z_]|delete\s+from|merge\s+into|truncate|copy\s+"?[a-z_][^\s]*\s+from|alter\s+|drop\s+|create\s+(?:table|index|sequence|schema|view|trigger|function|type|database|role|extension)|grant\s+|revoke\s+|reindex\b|vacuum\b|refresh\s+materialized|nextval\s*\(|setval\s*\(|\bfor\s+(?:update|no\s+key\s+update|share|key\s+share)\b)/i
+    /\b(?:insert\s+into|update\s+(?:only\s+)?"?[a-z_]|delete\s+from|merge\s+into|truncate|copy\s+"?[a-z_][^\s]*\s+from|alter\s+|drop\s+|create\s+(?:or\s+replace\s+)?(?:temp\s+|temporary\s+|unlogged\s+|materialized\s+|global\s+|local\s+)*(?:table|index|sequence|schema|view|trigger|function|procedure|type|database|role|extension)|grant\s+|revoke\s+|reindex\b|vacuum\b|refresh\s+materialized|nextval\s*\(|setval\s*\(|set\s+(?:role|session|local|constraints|search_path|transaction)\b|pg_(?:try_)?advisory(?:_xact)?_lock(?:_shared)?\s*\(|lock\s+(?:table\b|only\b|")|\bfor\s+(?:update|no\s+key\s+update|share|key\s+share)\b)/i
 
 /** Statement-leading comments and whitespace, stripped before classification. */
 function stripLeadingNoise(sql: string): string {

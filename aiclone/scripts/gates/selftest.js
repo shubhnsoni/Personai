@@ -127,6 +127,25 @@ const CASES = [
     assert: (r) => /DUPLICATE manifest entry/.test(r.stderr),
   },
   {
+    // Q3-C found that only expected.executedChecks was ever read, so a harness could be ADDED to the
+    // tree with a run:false entry and never run while the gate still reported success. Both remaining
+    // expectations are asserted now, and these two cases are why that is a guard rather than a claim:
+    // the fixture manifests did not declare harnessesOnDisk, so root's first version of the check threw
+    // a ReferenceError on the real manifest while the self-test stayed green at 19/19.
+    name: "expected-on-disk-drift",
+    why: "a harness added to the tree but declared run:false no longer passes silently",
+    args: [fixture("expected-on-disk-drift.json")],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "ON_DISK_COUNT_DRIFT"),
+  },
+  {
+    name: "expected-declared-skips-drift",
+    why: "a newly declared skip must be a reviewed decision, not an absorbed one",
+    args: [fixture("expected-declared-skips-drift.json")],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "DECLARED_SKIP_COUNT_DRIFT"),
+  },
+  {
     name: "undeclared-skip",
     why: "run:false without a reason is exactly the old buried $skip array and is rejected",
     args: [fixture("undeclared-skip.json")],

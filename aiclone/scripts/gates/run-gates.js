@@ -781,6 +781,38 @@ async function main() {
           "Investigate the difference — do not edit the expectation to match.",
       });
     }
+    /*
+     * THE OTHER TWO EXPECTATIONS WERE DECORATIVE, AND THAT LEFT A REAL HOLE.
+     *
+     * Only `executedChecks` was read. Flipping an existing run:true to run:false WAS caught, because
+     * executed drops below the expectation. But ADDING a new harness file together with a run:false
+     * entry and a plausible skip reason was NOT: on-disk becomes 76, runnable stays 74, executed stays
+     * 74, declaredSkips becomes 2 against an expectation of 1 that nothing read, and the run reported
+     * gateEstablished: true. A harness could be added to this repository and silently never run.
+     *
+     * Both are asserted now, with the same "investigate, do not edit the expectation" wording. One
+     * third of a block being enforced is worse than none, because the manifest says the block is
+     * derived from the declared inventory and a reader takes all of it as checked.
+     */
+    if (Number.isInteger(e.harnessesOnDisk) && onDisk.length !== e.harnessesOnDisk) {
+      integrityFindings.push({
+        kind: "ON_DISK_COUNT_DRIFT",
+        detail:
+          `Manifest expects ${e.harnessesOnDisk} harnesses on disk; found ${onDisk.length}. ` +
+          "Investigate the difference - do not edit the expectation to match.",
+      });
+    }
+    if (Number.isInteger(e.declaredSkips)) {
+      const declaredSkipCount = manifest.harnesses.filter((entry) => !entry.run).length;
+      if (declaredSkipCount !== e.declaredSkips) {
+        integrityFindings.push({
+          kind: "DECLARED_SKIP_COUNT_DRIFT",
+          detail:
+            `Manifest expects ${e.declaredSkips} declared skip(s); it now declares ${declaredSkipCount}. ` +
+            "A new skip must be a deliberate reviewed decision - do not edit the expectation to match.",
+        });
+      }
+    }
   }
 
   // Written once here so a summary exists on disk even if the scan below throws;

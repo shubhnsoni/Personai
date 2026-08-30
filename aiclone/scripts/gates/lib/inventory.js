@@ -253,16 +253,46 @@ function reconcile(manifest, harnessDirAbs) {
  * is true when the filter narrowed the set — the caller MUST mark such a run
  * partial, because a filtered run can never establish the gate.
  */
+/**
+ * Narrows the runnable set to the requested packages and/or filter pattern.
+ *
+ * AN UNRECOGNISED PACKAGE NAME IS AN ERROR, NOT AN EMPTY SELECTION. Before this it was neither
+ * validated nor detected: `--package=fieldjobs` (the real package is `fieldjob`) selected zero
+ * harnesses, `verifyResults` iterated an empty list and found nothing to complain about, the
+ * executed-count drift check is skipped whenever a filter is active, and the verdict was PARTIAL-PASS
+ * - which with `--accept-partial` is exit 0 printing "TOTAL 0 checks, FAILED 0". A green exit code
+ * having run nothing is the worst failure mode a gate driver has, because the exit code is the
+ * machine-readable signal and a typo produced it.
+ *
+ * The declared package set is right there in the manifest, so this is checkable rather than a matter
+ * of trust. An empty selection is likewise refused: whatever the caller meant, they did not mean
+ * "verify nothing and call it a pass".
+ */
 function applyFilter(entries, { packages, filterPattern }) {
   const runnable = entries.filter((e) => e.run);
   let selected = runnable;
 
   if (packages && packages.length > 0) {
+    const declared = new Set(entries.map((e) => String(e.package ?? "").toLowerCase()));
+    const unknown = packages.filter((p) => !declared.has(String(p).toLowerCase()));
+    if (unknown.length > 0) {
+      throw new ManifestError(
+        `Unknown --package value(s): ${unknown.join(", ")}. Declared packages: ` +
+          `${[...declared].filter(Boolean).sort().join(", ")}`,
+      );
+    }
     const wanted = new Set(packages.map((p) => p.toLowerCase()));
     selected = selected.filter((e) => wanted.has(e.package.toLowerCase()));
   }
   if (filterPattern) {
     selected = selected.filter((e) => filterPattern.test(e.file));
+  }
+
+  if (selected.length === 0) {
+    throw new ManifestError(
+      "The requested filter selected 0 runnable harnesses. Refusing to report a pass over an empty " +
+        "selection - narrow the filter deliberately or drop it.",
+    );
   }
 
   return {

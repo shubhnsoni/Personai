@@ -242,13 +242,38 @@ export function OperationsPanel({ workspaceId }: { workspaceId: string }) {
                           * Saying so turns a number that would not reconcile against another screen
                           * into a fact the owner can act on.
                           */}
-                        {summary.mixedScope ? (
-                            <p className="mt-2 text-xs text-muted-foreground">
-                                This total spans two boundaries: most domains cover your whole profile, while items
-                                marked <span className="font-medium">this workspace only</span> cover just the selected
-                                workspace.
-                            </p>
-                        ) : null}
+                        {/*
+                          * THIS SENTENCE IS ABOUT THE COVERAGE LIST, NOT ABOUT THIS OWNER'S DATA, AND IT
+                          * USED TO CLAIM OTHERWISE.
+                          *
+                          * It read `summary.mixedScope ? <p>This total spans two boundaries…</p> : null`.
+                          * `mixedScope` is `scopes.size > 1` over the FROZEN OPERATIONS_DOMAIN_SCOPE map,
+                          * which always holds both "profile" and "workspace", so it is true for every
+                          * owner, every workspace and every dataset including an empty one. The `: null`
+                          * arm was unreachable and the sentence was shown unconditionally.
+                          *
+                          * For an owner with no case milestones, nothing in the total is workspace-scoped.
+                          * For an owner whose profile owns one workspace, the two boundaries are the same
+                          * set. In both cases "This total spans two boundaries" is a measurement claim
+                          * about their data that is false, and the owner cannot tell it is not a
+                          * measurement - which is the same defect class this domain fixed one file over,
+                          * where copy implied work had been arranged when nothing acted.
+                          *
+                          * So the branch is gone and the sentence now says what is actually true and
+                          * always true: a fact about how the VIEW is assembled. The per-item "this
+                          * workspace only" marker is what tells an owner which of their own items are
+                          * workspace-scoped, and that marker is derived from real data.
+                          *
+                          * A notice derived from the domains that actually contributed items is the
+                          * better answer and exists already for the due-work plan, as `scopeNotice` in
+                          * due-work-plan.ts. Bringing that here needs a panel-harness assertion to go
+                          * with it and is recorded as owed work rather than guessed at now.
+                          */}
+                        <p className="mt-2 text-xs text-muted-foreground">
+                            This view is assembled from domains read on two different boundaries: most cover your whole
+                            profile, while items marked <span className="font-medium">this workspace only</span> cover
+                            just the selected workspace. The marker on each item says which it is.
+                        </p>
 
                         {summary.total === 0 ? (
                             <div className="mt-3">

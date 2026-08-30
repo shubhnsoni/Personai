@@ -151,20 +151,42 @@ function scanForLeaks(text, { secretLiterals = [], label = "input" } = {}) {
       }
     }
 
-    URI_USERINFO_WITH_PASSWORD.lastIndex = 0;
-    let match = URI_USERINFO_WITH_PASSWORD.exec(line);
+    /*
+     * THESE LOOPS USE LOCAL REGEX COPIES, AND THAT IS A BUG FIX, NOT A STYLE CHOICE.
+     *
+     * `push` calls `redact(line, ...)` to build its sample, and `redact` does
+     * `out.replace(PASSWORD_KV, ...)` on the MODULE-LEVEL regex. `String.prototype.replace` with a
+     * global regex sets `lastIndex` back to 0 when it finishes. So the sequence was: exec finds a
+     * match at index n -> push -> redact -> replace resets lastIndex to 0 -> control returns to this
+     * loop -> exec matches the SAME occurrence again -> forever. `findings` grew without bound and the
+     * driver hung, then died on memory.
+     *
+     * It was reachable. Harness logs are redacted before being written, so their values are
+     * `<redacted>` - a PLACEHOLDER, so `push` never fires and the loop advanced by luck. But the
+     * driver's own console text is scanned RAW, so any unredacted `password=<value>` written by the
+     * driver itself hung the scan. That is the credential check - the last line of defence - failing
+     * into an infinite loop in exactly the situation it exists to detect.
+     *
+     * Fresh instances per call means `redact`'s use of the shared regexes cannot rewind these.
+     */
+    const uriScan = new RegExp(URI_USERINFO_WITH_PASSWORD.source, URI_USERINFO_WITH_PASSWORD.flags);
+    let match = uriScan.exec(line);
     while (match) {
       const password = match[3];
       if (!PLACEHOLDERS.has(String(password).toLowerCase())) push("DSN_WITH_PASSWORD", "shape");
-      match = URI_USERINFO_WITH_PASSWORD.exec(line);
+      if (match.index === uriScan.lastIndex) uriScan.lastIndex += 1;
+      match = uriScan.exec(line);
     }
 
-    PASSWORD_KV.lastIndex = 0;
-    match = PASSWORD_KV.exec(line);
+    const kvScan = new RegExp(PASSWORD_KV.source, PASSWORD_KV.flags);
+    match = kvScan.exec(line);
     while (match) {
       const value = match[2];
       if (value !== "" && !PLACEHOLDERS.has(String(value).toLowerCase())) push("PASSWORD_KV", "shape");
-      match = PASSWORD_KV.exec(line);
+      // A zero-length match cannot advance lastIndex on its own: PASSWORD_KV's value group is `*`,
+      // so `password=` with nothing after it matches empty and would spin here too.
+      if (match.index === kvScan.lastIndex) kvScan.lastIndex += 1;
+      match = kvScan.exec(line);
     }
   });
 

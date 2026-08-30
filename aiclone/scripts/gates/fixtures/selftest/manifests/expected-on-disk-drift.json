@@ -1,0 +1,62 @@
+{
+  "manifestVersion": 1,
+  "description": "Baseline with expected.harnessesOnDisk deliberately wrong (99). Proves ON_DISK_COUNT_DRIFT fires. That guard exists because adding a harness file together with a run:false entry previously changed only the on-disk count, which nothing read - so a harness could enter the repository and never run while the gate still reported success.",
+  "harnessDir": "scripts/gates/fixtures/selftest/harnesses",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "expected": {
+    "executedChecks": 2,
+    "declaredSkips": 3,
+    "harnessesOnDisk": 99
+  },
+  "harnesses": [
+    {
+      "file": "check-alpha.js",
+      "package": "fixture",
+      "run": true
+    },
+    {
+      "file": "check-beta.js",
+      "package": "fixture-b",
+      "run": true
+    },
+    {
+      "file": "check-red.js",
+      "package": "fixture",
+      "run": false,
+      "skip": {
+        "reason": "Deliberately red. Only enabled by manifests/red.json, which proves the driver surfaces a real non-zero exit code.",
+        "requires": "nothing; it fails on purpose",
+        "howToRunManually": "node scripts/gates/run-gates.js --manifest=scripts/gates/fixtures/selftest/manifests/red.json",
+        "declaredBy": "Q1-A driver self-test"
+      }
+    },
+    {
+      "file": "check-silent.js",
+      "package": "fixture",
+      "run": false,
+      "skip": {
+        "reason": "Exits 0 while emitting nothing. Only enabled by manifests/zero-byte.json, which proves the driver rejects a zero-byte result.",
+        "requires": "nothing",
+        "howToRunManually": "node scripts/gates/run-gates.js --manifest=scripts/gates/fixtures/selftest/manifests/zero-byte.json",
+        "declaredBy": "Q1-A driver self-test"
+      }
+    },
+    {
+      "file": "check-leaky.js",
+      "package": "fixture",
+      "run": false,
+      "skip": {
+        "reason": "Prints a fabricated connection string. Only enabled by manifests/redaction.json, which proves harness output is redacted before it reaches a log file.",
+        "requires": "nothing",
+        "howToRunManually": "node scripts/gates/run-gates.js --manifest=scripts/gates/fixtures/selftest/manifests/redaction.json",
+        "declaredBy": "Q1-A driver self-test"
+      }
+    }
+  ]
+}

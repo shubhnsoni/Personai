@@ -962,7 +962,7 @@ async function main() {
                 )
                 const inventoryIds = idsIn(a, "inventory")
                 checkInvertible(
-                    "the inventory cap drops the BEST-STOCKED candidates first and never a stockout - 24 rows sit at onHand 0 and the cap is full of them",
+                    "the inventory cap drops the BEST-STOCKED candidates first; with 24 rows tied at onHand 0 and a cap of 20 the cut falls INSIDE that level, so four stockouts are dropped and the label must not claim otherwise",
                     inventoryIds.length === CAP && ids.tie.inventoryHigher.every((id) => !inventoryIds.includes(id)),
                     `returned ${inventoryIds.length}; the ${ids.tie.inventoryHigher.length} rows at onHand 4 are absent while stockouts fill the cap`,
                 )
