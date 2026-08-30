@@ -16,7 +16,8 @@ import { WORKSPACE_SURFACE_INVARIANTS } from "../../src/lib/business-os/workspac
 import { WorkspaceSurfaceResolver } from "../../src/lib/business-os/workspace-surfaces"
 import { PersistenceError } from "../../src/lib/persistence/errors"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
-import { PERMISSION_KEYS } from "../../src/lib/tenancy/types"
+import { hasPermission } from "../../src/lib/tenancy/permissions"
+import { KNOWN_ROLES, PERMISSION_KEYS } from "../../src/lib/tenancy/types"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
@@ -360,6 +361,32 @@ async function main() {
                         `update "BlueprintInstallation" set "configJson" = $1::jsonb where "id" = $2`,
                         JSON.stringify(baseConfig),
                         activeRow.id,
+                    )
+
+                    // ---- 12-13. what "every role can read surfaces" actually rests on ------
+                    // S2-B's boundary harness proved all five membership roles get 200, then reported
+                    // honestly that the COMPLEMENT is untestable: `ROLE_PERMISSION_MATRIX` grants
+                    // profile.read to every value of the MembershipRole enum, so there is no denied role
+                    // to exercise. It declined to seed a fake one, which was right.
+                    //
+                    // That leaves a real gap. "All roles can read" is currently TRUE BY ACCIDENT of the
+                    // matrix rather than by a checked decision, and the deny path is never exercised at
+                    // all. These two assertions close both halves: the openness becomes a MEASURED fact
+                    // that fails loudly if a future role lacks profile.read, and the deny branch is
+                    // proven reachable via the one input that can still reach it - an unrecognised role
+                    // string, which `resolveRolePermissions` treats as deniedByDefault.
+                    const rolesWithoutRead = KNOWN_ROLES.filter((role) => !hasPermission(role, "profile.read"))
+                    check(
+                        "12. MEASURED: every current MembershipRole holds profile.read, which is WHY the boundary lets all five read",
+                        rolesWithoutRead.length === 0,
+                        rolesWithoutRead.length === 0
+                            ? `all of ${KNOWN_ROLES.join(",")} hold profile.read`
+                            : `these roles do NOT: ${rolesWithoutRead.join(",")} - the boundary must now refuse them`,
+                    )
+                    check(
+                        "13. the deny path is real: an unrecognised role holds no permission, so it is denied by default",
+                        !hasPermission("NOT_A_ROLE", "profile.read") && !hasPermission("", "profile.read"),
+                        "unknown and blank roles both denied",
                     )
 
                     throw new Rollback("deliberate rollback")
