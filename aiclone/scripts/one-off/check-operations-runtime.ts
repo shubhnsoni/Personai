@@ -87,6 +87,31 @@ const engineCode = engineSrc
     })
     .join("\n")
 
+/**
+ * THE GET-ONLY GATE, widened after audit. Shares its reasoning with check-due-work-preview-api.ts.
+ *
+ * The previous form was `!/export async function (POST|PATCH|PUT|DELETE)\(/`. That misses two declaration
+ * styles this repository already uses for handler exports. Measured over its 154 route.ts files:
+ * `export async function VERB` 95 times, `export function VERB` 17 times, `export const VERB` 4 times, for
+ * POST/PUT/PATCH/DELETE. So a write verb added in either of the two latter styles passed the gate
+ * untouched, and it covered neither HEAD nor OPTIONS. Both styles are house style here, so this was not a
+ * theoretical hole.
+ *
+ * The GET side accepts the non-async form for the same reason, and 26 route files here already use it: a
+ * gate that fails on a legal refactor gets deleted rather than fixed. Applied to comment-stripped source,
+ * because a route file's own comments name the verbs they forbid and this repo has mistaken a prohibition
+ * for a violation five times.
+ *
+ * No `g` flag: a shared /g/ regex keeps `lastIndex` between `.test` calls and answers false on alternate uses.
+ */
+const WRITE_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/
+const GET_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+GET\b/
+const routeCode = routeSrc
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split("\n")
+    .map((line) => line.replace(/(^|[^:])\/\/.*$/, "$1"))
+    .join("\n")
+
 const WRITE_CALLS = [".create(", ".createMany(", ".update(", ".updateMany(", ".delete(", ".deleteMany(", ".upsert("]
 const foundWrites = WRITE_CALLS.filter((needle) => engineCode.includes(needle))
 checkInvertible(
@@ -104,9 +129,9 @@ check(
     /today\(request: Request\)/.test(httpSrc) && !/(create|update|delete|patch|post)\s*\(/i.test(httpSrc.replace(/\/\*[\s\S]*?\*\//g, "")),
 )
 check(
-    "the operations route exports GET and no write verb",
-    /export async function GET\(/.test(routeSrc) &&
-        !/export async function (POST|PATCH|PUT|DELETE)\(/.test(routeSrc),
+    "the operations route exports GET and no POST, PUT, PATCH, DELETE, HEAD or OPTIONS - in ANY of the three export styles this repo uses",
+    GET_EXPORT.test(routeCode) && !WRITE_VERB_EXPORT.test(routeCode),
+    "GET only, checked against `export [async] function|const VERB`",
 )
 
 // ---------------------------------------------------------------------------

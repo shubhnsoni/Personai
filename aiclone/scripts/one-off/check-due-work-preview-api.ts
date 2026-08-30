@@ -41,7 +41,7 @@ import {
     REQUIRED_PREVIEW_WORDS,
     toDueWorkPreview,
 } from "../../src/lib/operations/due-work-preview-types"
-import { OperationsService } from "../../src/lib/operations/engine"
+import { OPERATIONS_DOMAIN_SCOPE, OperationsService } from "../../src/lib/operations/engine"
 import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
@@ -94,6 +94,27 @@ function errCode(called: Called): string {
 function refusal(called: Called): string {
     return JSON.stringify(called.body)
 }
+
+/**
+ * THE GET-ONLY GATE, widened after audit.
+ *
+ * The first version of this gate asserted `!/export async function (POST|PATCH|PUT|DELETE)\(/`, which is
+ * evadable without any cleverness at all: this repository's own src/app/api already declares handler
+ * exports three different ways. Measured over its 154 route.ts files: `export async function VERB` 95
+ * times, `export function VERB` 17 times and `export const VERB` 4 times, for POST/PUT/PATCH/DELETE. A
+ * write verb added to the due-work route in either of the two latter styles - both of them already house
+ * style here - would have passed the old gate untouched. HEAD and OPTIONS were not covered at all.
+ *
+ * So the ban matches all three declaration styles across six verbs. The GET side accepts the non-async
+ * form too, and that is not hypothetical either: 26 route files in this repo write `export function GET`,
+ * so the old `export async function GET\(` pattern would have gone red on a legal refactor of this one -
+ * and a gate that fails spuriously gets deleted by the next person rather than fixed.
+ *
+ * Neither pattern carries the `g` flag - a shared /g/ regex keeps `lastIndex` between `.test` calls and
+ * would start answering false on alternate uses.
+ */
+const WRITE_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/
+const GET_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+GET\b/
 
 /**
  * Source with comments removed, so a prohibition written in prose is not mistaken for the thing it
@@ -210,10 +231,9 @@ async function main() {
     const allExec = `${httpExec}\n${runtimeExec}\n${routeExec}`
 
     checkInvertible(
-        "the due-work route exports GET and no write verb",
-        /export async function GET\(/.test(routeExec) &&
-            !/export async function (POST|PATCH|PUT|DELETE)\(/.test(routeExec),
-        "GET only",
+        "the due-work route exports GET and no POST, PUT, PATCH, DELETE, HEAD or OPTIONS - in ANY of the three export styles this repo uses",
+        GET_EXPORT.test(routeExec) && !WRITE_VERB_EXPORT.test(routeExec),
+        "GET only, checked against `export [async] function|const VERB`",
     )
     check("the due-work route is dynamic and runs on node", /force-dynamic/.test(routeExec) && /runtime = "nodejs"/.test(routeExec))
 
@@ -303,6 +323,45 @@ async function main() {
                 identity.current = ids.userA
                 const ok = await call(api.preview(get(`${BASE}?workspaceId=${ids.wsA}`)))
                 checkInvertible("a member's preview request is 200", ok.status === 200, `status=${ok.status}`)
+
+                // ---- the GET guarantee, asserted against the SERVICE ------------
+                // The route module exporting no write verb is asserted structurally above, and that
+                // assertion is about ONE file. `dueWorkApi` is an exported singleton, so a future module
+                // importing it and calling .preview from a POST handler would have had a working write-verb
+                // endpoint while the structural assertion above still passed. So the refusal is asserted
+                // where the work happens. Same URL and same authorized member as the 200 immediately
+                // above, so the only difference is the verb.
+                const posted = await call(
+                    api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: "POST" })),
+                )
+                checkInvertible(
+                    "MEASURED: the SERVICE itself refuses a POST Request, so the GET guarantee does not depend on the route module's exports",
+                    posted.status !== 200 && posted.status === 400 && errCode(posted) === "BAD_REQUEST",
+                    `GET on this URL=${ok.status}, POST=${posted.status} code=${errCode(posted)}`,
+                )
+                checkInvertible(
+                    "the method refusal uses the shared envelope rather than a bespoke Response",
+                    Object.keys(posted.body).sort().join(",") === "error,ok" &&
+                        /GET/.test(String((posted.body.error as { message?: string } | undefined)?.message ?? "")),
+                    `keys=${Object.keys(posted.body).sort().join(",")} message=${String((posted.body.error as { message?: string } | undefined)?.message ?? "").slice(0, 70)}`,
+                )
+                // A write verb must be refused before any parameter is read, or a POST with no
+                // workspaceId is reported as a missing parameter and the method problem is never named.
+                const postedBare = await call(api.preview(new Request(BASE, { method: "POST" })))
+                checkInvertible(
+                    "the method is checked BEFORE the parameters, so a POST is refused as a method and not reported as a missing workspaceId",
+                    postedBare.status === 400 &&
+                        !/workspaceId/.test(String((postedBare.body.error as { message?: string } | undefined)?.message ?? "")),
+                    String((postedBare.body.error as { message?: string } | undefined)?.message ?? "").slice(0, 70),
+                )
+                for (const verb of ["PUT", "PATCH", "DELETE"] as const) {
+                    const other = await call(api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: verb })))
+                    checkInvertible(
+                        `MEASURED: the service refuses ${verb} too, so the guarantee is about "not GET" rather than about POST alone`,
+                        other.status === 400 && errCode(other) === "BAD_REQUEST",
+                        `status=${other.status} code=${errCode(other)}`,
+                    )
+                }
                 const data = (ok.body.data ?? {}) as Record<string, unknown>
                 const items = (data.items ?? []) as Array<Record<string, unknown>>
 
@@ -347,6 +406,23 @@ async function main() {
                         text: String(v),
                     })),
                 ]
+                // PRECONDITION FOR THE WORD SCAN BELOW, and it is not decoration.
+                //
+                // Every entry above reads `String(data.<field> ?? "")`. On any response that lacks `data`
+                // at all - an empty plan shape, a refusal, a renamed field, a 503 - those become empty
+                // strings, `doesNotCover` contributes nothing, and every one of the nine forbidden-word
+                // assertions then passes by scanning nothing. That is the exact vacuity this repository
+                // audits for, sitting inside the assertion rather than the code. So the scanned prose is
+                // pinned as non-empty first, field by field rather than in total, because one populated
+                // field would otherwise cover for an empty one.
+                const scannedChars = affirmative.reduce((n, p) => n + p.text.trim().length, 0)
+                checkInvertible(
+                    "MEASURED: the prose the forbidden-word loop scans is actually non-empty, so the word assertions cannot pass by scanning nothing",
+                    affirmative.length >= 2 &&
+                        affirmative.every((p) => p.text.trim().length > 0) &&
+                        scannedChars > 0,
+                    `${affirmative.length} fields, ${scannedChars} chars, empty=[${affirmative.filter((p) => p.text.trim().length === 0).map((p) => p.where).join(",") || "none"}]`,
+                )
                 for (const word of FORBIDDEN_PREVIEW_WORDS) {
                     const hits = affirmative.filter((p) => new RegExp(`\\b${word}\\b`, "i").test(p.text))
                     checkInvertible(
@@ -479,6 +555,21 @@ async function main() {
                         (data.covers as string[]).length > 0 &&
                         Object.keys((data.doesNotCover ?? {}) as Record<string, string>).length > 0,
                     `covers=${(data.covers as string[] | undefined)?.length ?? 0} doesNotCover=${Object.keys((data.doesNotCover ?? {}) as Record<string, string>).length}`,
+                )
+                // mixedScope is CONSTANT-TRUE, and this assertion says only that, on purpose.
+                //
+                // engine.ts computes it over the frozen OPERATIONS_DOMAIN_SCOPE map, which always holds both
+                // "profile" and "workspace", so `scopes.size > 1` is true for every workspace and every
+                // dataset - including one with no rows in it. It is therefore a property of the declared
+                // coverage list, not a measurement of this fixture's data, and the name below says so. An
+                // assertion phrased as "the response reports that its total spans more than one tenant
+                // boundary" would claim to have observed something about the data that was never observed;
+                // that phrasing exists in check-operations-runtime.ts and is left alone here rather than
+                // copied. This pins the current truth and no more than the current truth.
+                checkInvertible(
+                    "mixedScope is true because the DECLARED COVERAGE LIST spans two tenant boundaries - a static property of that list, not a measurement of this fixture's data",
+                    data.mixedScope === true,
+                    `mixedScope=${String(data.mixedScope)}; boundaries in the frozen coverage map=[${[...new Set(Object.values(OPERATIONS_DOMAIN_SCOPE))].sort().join(",")}] so this is constant-true for every workspace and every dataset`,
                 )
 
                 // ---- 400 -------------------------------------------------------

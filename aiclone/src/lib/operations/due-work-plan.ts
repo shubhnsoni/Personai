@@ -76,6 +76,22 @@ export function planDueWork(summary: OperationsSummary): DueWorkPlan {
         covers: Object.freeze([...summary.covers]),
         doesNotCover: Object.freeze({ ...summary.doesNotCover }),
         mixedScope: summary.mixedScope,
+        // THE NON-MIXED BRANCH BELOW IS CURRENTLY UNREACHABLE, AND IS KEPT DELIBERATELY.
+        //
+        // `summary.mixedScope` is computed in engine.ts over the frozen OPERATIONS_DOMAIN_SCOPE map, which
+        // always contains both "profile" and "workspace" - caseMilestones is the workspace-scoped one - so
+        // `scopes.size > 1` is true for every workspace and every dataset. The only producer of a real
+        // OperationsSummary therefore never sets it false, and nothing in the running application can take
+        // the second arm. Do not read a passing test of the first arm as evidence that this ternary was
+        // exercised both ways; only a hand-built summary does that.
+        //
+        // Kept, rather than collapsed to the single mixed sentence, for two reasons. This function's input
+        // is the OperationsSummary TYPE, not the one engine that happens to build it today, and that type
+        // permits mixedScope false: a coverage list that lost its last workspace-scoped domain, or a second
+        // producer, takes this arm immediately, and it should say something accurate when it does rather
+        // than assert a mixture that is not there. And collapsing it would turn the first sentence into
+        // unconditional prose, which would then read as a measured fact about the caller's data instead of
+        // what it actually is - a branch on a static property of the declared coverage list.
         scopeNotice: summary.mixedScope
             ? "This proposal combines attention from different tenant boundaries; cross-domain positions do not imply a shared population."
             : "The supplied summary reports one tenant boundary across its covered domains.",

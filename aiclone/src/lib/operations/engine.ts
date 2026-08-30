@@ -134,6 +134,10 @@ export type OperationsSummary = Readonly<{
     /**
      * True when the covered domains do NOT all share one tenant boundary. A caller that renders a
      * single total should say so when this is true.
+     *
+     * CONSTANT-TRUE TODAY. It is derived from the frozen OPERATIONS_DOMAIN_SCOPE map rather than from the
+     * rows that were read, so it is a static property of this view's declared coverage and not an
+     * observation about any workspace's data. See the computation in `summary` below.
      */
     mixedScope: boolean
 }>
@@ -202,6 +206,20 @@ export class OperationsService {
             })
         })
 
+        // STATIC PROPERTY OF THE DECLARED COVERAGE LIST, NOT AN OBSERVATION ABOUT THE DATA.
+        //
+        // This reads OPERATIONS_DOMAIN_SCOPE, which is frozen at module load and always contains both
+        // "profile" and "workspace" - caseMilestones is the workspace-scoped one. So the `scopes.size > 1`
+        // below is true for every workspace, every profile and every dataset, including an empty one. It
+        // is a fact about the list of domains this file declares, computed from a constant, and it carries
+        // no information about the records that were actually read. Nothing derived from it should be
+        // presented to an owner as something observed in their data.
+        //
+        // It is computed rather than hardcoded true because it must follow the coverage list: the day a
+        // domain is added or removed the answer has to change with it, and a literal would not. A caller
+        // rendering one total across these domains still has to say that the total spans two boundaries,
+        // which is what this supports. Read it as "this view's declared coverage spans two tenant
+        // boundaries", never as "your data spans two tenant boundaries".
         const scopes = new Set(OPERATIONS_DOMAINS.map((domain) => OPERATIONS_DOMAIN_SCOPE[domain]))
 
         return Object.freeze({
