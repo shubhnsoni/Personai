@@ -39,7 +39,7 @@ function check(name: string, pass: boolean, detail = "") {
 /** Prisma error messages begin with a blank line, so take the first meaningful one. */
 function errLine(e: unknown): string {
   const lines = String((e as Error).message).split("\n").map((l) => l.trim()).filter(Boolean);
-  return (lines.find((l) => l.includes("append-only") || l.includes("ERROR")) ?? lines[0] ?? "unknown error").slice(0, 110);
+  return (lines.find((l) => l.includes("append-only") || l.includes("ERROR") || l.includes("Code:")) ?? lines[0] ?? "unknown error").slice(0, 110);
 }
 
 class Rollback extends Error {}
@@ -140,37 +140,81 @@ async function main() {
     }
 
     // ---- 6. deterministic backfill + second-run idempotency -------------------
-    // Projects Profile rows into Workspace/Contact with deterministic ids, twice,
-    // asserting the second run is a no-op. Always rolled back.
-    let firstRun = -1, secondRun = -1, profiles = -1;
+    // Seed both directions of the invariant: a profile that needs a workspace and
+    // a profile that already owns one. The transaction always rolls back.
+    const run = `s1b_bf_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const profileCountBefore = Number(
+      (await prisma.$queryRawUnsafe<{ n: number }[]>('select count(*)::int n from "Profile"'))[0].n,
+    );
+    const profileWithoutWorkspace = `${run}_profile_without_workspace`;
+    const profileWithWorkspace = `${run}_profile_with_workspace`;
+    const existingWorkspace = `${run}_existing_workspace`;
+    const projectedWorkspace = `bf_${profileWithoutWorkspace}`;
+    const conflictingProjection = `bf_${profileWithWorkspace}`;
+    let firstRun = -1, secondRun = -1, profiles = -1, uncovered = -1, duplicates = -1;
+    let projectedNewProfile = "", reusedWorkspace = "", projectedExisting = -1;
+    let projectionError = "";
     try {
       await prisma.$transaction(async (tx) => {
+        for (const suffix of ["without_workspace", "with_workspace"]) {
+          const user = `${run}_user_${suffix}`;
+          const profile = `${run}_profile_${suffix}`;
+          await tx.$executeRawUnsafe(
+            `insert into "User" ("id","clerkId","email","updatedAt") values ('${user}','clerk_${user}','${user}@example.test',CURRENT_TIMESTAMP)`,
+          );
+          await tx.$executeRawUnsafe(
+            `insert into "Profile" ("id","userId","slug","displayName","updatedAt") values ('${profile}','${user}','${profile}','Profile ${suffix}',CURRENT_TIMESTAMP)`,
+          );
+        }
+        await tx.$executeRawUnsafe(
+          `insert into "Workspace" ("id","profileId","name","slug","updatedAt") values ('${existingWorkspace}','${profileWithWorkspace}','existing','${existingWorkspace}',CURRENT_TIMESTAMP)`,
+        );
         profiles = Number((await tx.$queryRawUnsafe<{ n: number }[]>('select count(*)::int n from "Profile"'))[0].n);
         const proj = `insert into "Workspace" ("id","profileId","name","slug","updatedAt")
                       select 'bf_'||p."id", p."id", coalesce(p."displayName",'workspace'), 'bf-'||p."id", CURRENT_TIMESTAMP
                       from "Profile" p
-                      on conflict ("id") do nothing`;
-        await tx.$executeRawUnsafe(proj);
-        firstRun = Number((await tx.$queryRawUnsafe<{ n: number }[]>(`select count(*)::int n from "Workspace" where "id" like 'bf_%'`))[0].n);
-        await tx.$executeRawUnsafe(proj); // replay
-        secondRun = Number((await tx.$queryRawUnsafe<{ n: number }[]>(`select count(*)::int n from "Workspace" where "id" like 'bf_%'`))[0].n);
+                      where not exists (select 1 from "Workspace" w where w."profileId" = p."id")
+                      on conflict ("profileId") do nothing`;
+        firstRun = Number(await tx.$executeRawUnsafe(proj));
+        projectedNewProfile = (await tx.$queryRawUnsafe<{ id: string }[]>(
+          `select "id" from "Workspace" where "profileId"='${profileWithoutWorkspace}'`,
+        ))[0]?.id ?? "";
+        reusedWorkspace = (await tx.$queryRawUnsafe<{ id: string }[]>(
+          `select "id" from "Workspace" where "profileId"='${profileWithWorkspace}'`,
+        ))[0]?.id ?? "";
+        projectedExisting = Number((await tx.$queryRawUnsafe<{ n: number }[]>(
+          `select count(*)::int n from "Workspace" where "id"='${conflictingProjection}'`,
+        ))[0].n);
+        uncovered = Number((await tx.$queryRawUnsafe<{ n: number }[]>(
+          `select count(*)::int n from "Profile" p left join "Workspace" w on w."profileId"=p."id" where w."id" is null`,
+        ))[0].n);
+        duplicates = Number((await tx.$queryRawUnsafe<{ n: number }[]>(
+          `select count(*)::int n from (select "profileId" from "Workspace" where "profileId" is not null group by "profileId" having count(*) > 1) d`,
+        ))[0].n);
+        secondRun = Number(await tx.$executeRawUnsafe(proj)); // replay
         throw new Rollback();
       });
     } catch (e) {
-      if (!(e instanceof Rollback)) throw e;
+      if (!(e instanceof Rollback)) projectionError = errLine(e);
     }
-    check("backfill projects every Profile row", firstRun === profiles, `profiles=${profiles} projected=${firstRun}`);
-    check("backfill replay is idempotent", firstRun === secondRun, `first=${firstRun} second=${secondRun}`);
+    check("backfill completes without id or profileId unique violation", projectionError.length === 0, projectionError || `run=${run}`);
+    check("backfill projects a profile with no workspace", projectedNewProfile === projectedWorkspace, `expected=${projectedWorkspace} actual=${projectedNewProfile}`);
+    check("backfill reuses an existing workspace", reusedWorkspace === existingWorkspace && projectedExisting === 0, `reused=${reusedWorkspace} conflictingProjectionRows=${projectedExisting}`);
+    check("backfill covers every Profile row", uncovered === 0, `profiles=${profiles} uncovered=${uncovered} firstInserted=${firstRun}`);
+    check("backfill replay is idempotent", secondRun === 0, `firstInserted=${firstRun} secondInserted=${secondRun}`);
+    check("backfill creates no duplicate workspace for any profile", duplicates === 0, `duplicateProfileRows=${duplicates}`);
 
     // ---- 7. backfill left no residue -----------------------------------------
-    const residue = Number(
-      (await prisma.$queryRawUnsafe<{ n: number }[]>(`select count(*)::int n from "Workspace" where "id" like 'bf_%' or "id" like 'inv_%'`))[0].n,
-    );
-    check("harness left zero residue", residue === 0, `residue rows=${residue}`);
+    const residue = Number((await prisma.$queryRawUnsafe<{ n: number }[]>(
+      `select (select count(*) from "User" where starts_with("id",'${run}')) +
+              (select count(*) from "Profile" where starts_with("id",'${run}')) +
+              (select count(*) from "Workspace" where starts_with("id",'${run}')) n`,
+    ))[0].n);
+    check("harness left zero residue", residue === 0, `run=${run} residue rows=${residue}`);
 
     // ---- 8. pre-existing tables untouched by this harness ---------------------
     const profileCount = Number((await prisma.$queryRawUnsafe<{ n: number }[]>('select count(*)::int n from "Profile"'))[0].n);
-    check("Profile row count stable", profileCount === profiles, `before=${profiles} after=${profileCount}`);
+    check("Profile row count stable", profileCount === profileCountBefore, `before=${profileCountBefore} after=${profileCount}`);
   } finally {
     await prisma.$disconnect();
   }
