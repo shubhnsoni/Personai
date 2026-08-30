@@ -37,15 +37,15 @@ import type { FieldJobActor } from "./shared"
  * request, and actorId is never taken from the caller.
  */
 
-type JsonObject = Record<string, unknown>
+export type JsonObject = Record<string, unknown>
 
-function json(data: unknown, status = 200): Response {
+export function json(data: unknown, status = 200): Response {
     return Response.json(data, { status })
 }
-function success(data: unknown, status = 200): Response {
+export function success(data: unknown, status = 200): Response {
     return json({ ok: true, data }, status)
 }
-function failure(error: unknown): Response {
+export function failure(error: unknown): Response {
     if (error instanceof PersistenceError) {
         return json(
             { ok: false, error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) } },
@@ -58,7 +58,7 @@ function failure(error: unknown): Response {
     )
 }
 
-async function body(request: Request): Promise<JsonObject> {
+export async function body(request: Request): Promise<JsonObject> {
     let value: unknown
     try {
         value = await request.json()
@@ -71,27 +71,27 @@ async function body(request: Request): Promise<JsonObject> {
     return value as JsonObject
 }
 
-function str(value: unknown, field: string): string {
+export function str(value: unknown, field: string): string {
     if (typeof value !== "string" || !value.trim()) {
         throw new PersistenceError("BAD_REQUEST", `${field} is required`, { field })
     }
     return value.trim()
 }
-function nullableStr(value: unknown, field: string): string | null {
+export function nullableStr(value: unknown, field: string): string | null {
     if (value === null || value === undefined || value === "") return null
     if (typeof value !== "string") throw new PersistenceError("BAD_REQUEST", `${field} must be a string or null`, { field })
     return value.trim() || null
 }
-function optInt(value: unknown, field: string): number | null {
+export function optInt(value: unknown, field: string): number | null {
     if (value === null || value === undefined || value === "") return null
     if (!Number.isInteger(value)) throw new PersistenceError("BAD_REQUEST", `${field} must be an integer`, { field })
     return value as number
 }
-function int(value: unknown, field: string): number {
+export function int(value: unknown, field: string): number {
     if (!Number.isInteger(value)) throw new PersistenceError("BAD_REQUEST", `${field} must be an integer`, { field })
     return value as number
 }
-function optDate(value: unknown, field: string): Date | null {
+export function optDate(value: unknown, field: string): Date | null {
     if (value === null || value === undefined || value === "") return null
     if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
         throw new PersistenceError("BAD_REQUEST", `${field} must be an ISO-compatible timestamp`, { field })
@@ -100,7 +100,7 @@ function optDate(value: unknown, field: string): Date | null {
 }
 
 /** Validates a value against the owning flow, so an unknown value is 400 and not 409. */
-function vocab<T extends string>(value: unknown, guard: (v: unknown) => v is T, label: string, field: string): T {
+export function vocab<T extends string>(value: unknown, guard: (v: unknown) => v is T, label: string, field: string): T {
     const raw = str(value, field)
     if (!guard(raw)) {
         throw new PersistenceError("BAD_REQUEST", `${field} is not a recognised ${label} value`, { field })
@@ -138,7 +138,7 @@ function isDecimal(value: unknown): value is { toString(): string } {
  * are Decimal(14,4), and turning them into JSON numbers would silently lose precision on exactly
  * the readings an inspection exists to record. Consumers parse them for display.
  */
-function serialise(value: Record<string, unknown>): Record<string, unknown> {
+export function serialise(value: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(value)) {
         out[k] =
@@ -152,10 +152,10 @@ function serialise(value: Record<string, unknown>): Record<string, unknown> {
     }
     return out
 }
-function serialiseAll(rows: readonly unknown[]): Array<Record<string, unknown>> {
+export function serialiseAll(rows: readonly unknown[]): Array<Record<string, unknown>> {
     return rows.map((r) => serialise({ ...(r as Record<string, unknown>) }))
 }
-function param(request: Request, name: string): string {
+export function param(request: Request, name: string): string {
     return str(new URL(request.url).searchParams.get(name), name)
 }
 
