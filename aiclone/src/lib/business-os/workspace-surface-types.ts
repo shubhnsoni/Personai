@@ -19,6 +19,23 @@ export type WorkspaceSurfaceResolution = Readonly<{
     blueprintId: string | null
     source: "active-blueprint-installation" | "no-active-blueprint-installation"
     surfaces: readonly Surface[]
+    /**
+     * Strings present in the frozen config that THIS BUILD does not recognise as product surfaces.
+     * Dropped from `surfaces`, and reported here rather than discarded silently.
+     *
+     * This exists because a frozen config is designed to OUTLIVE the code that wrote it. The day a
+     * surface is retired from the `Surface` union, every workspace installed before that release holds a
+     * config naming it. Refusing the whole config then would take those workspaces down on deploy - a
+     * self-inflicted outage caused by data that was valid when it was written. Dropping is also the
+     * fail-SAFE direction: an unrecognised string cannot be granted, so a permission-shaped value in a
+     * surfaces array is ignored rather than honoured.
+     *
+     * STRUCTURAL corruption is different and still throws: a config that is not an object, whose
+     * `surfaces` is not an array, that does not assert `businessOsExcluded`, or that contains a
+     * non-string element, is not outdated - it is wrong, and guessing at its meaning would be worse
+     * than refusing it.
+     */
+    unknownSurfaces: readonly string[]
 }>
 
 /**

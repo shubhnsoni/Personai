@@ -31,12 +31,21 @@ const INSTALLABLE_SURFACE_SET: ReadonlySet<string> = new Set(INSTALLABLE_SURFACE
 
 type FrozenInstallationConfig = Readonly<{
     surfaces: readonly Surface[]
+    unknown: readonly string[]
 }>
 
 /**
- * Fail closed on malformed frozen data. Filtering unknown values would silently broaden the meaning of
- * a partially corrupt config, while accepting permission-shaped strings would collapse product and
- * authorization concerns.
+ * Splits a frozen config into surfaces this build knows and strings it does not.
+ *
+ * STRUCTURAL corruption throws: not an object, `surfaces` not an array, `businessOsExcluded` not
+ * asserted, or a non-string element. Those are not outdated configs, they are wrong ones, and guessing
+ * at their meaning would be worse than refusing them.
+ *
+ * An UNRECOGNISED SURFACE STRING does NOT throw. A frozen config is meant to outlive the code that
+ * wrote it, so the day a surface is retired from the `Surface` union every workspace installed before
+ * that release holds a config naming it. Throwing would take all of them down on deploy, over data that
+ * was valid when written. Dropping is also the fail-safe direction, because an unrecognised string
+ * cannot be granted - which is why a permission-shaped value here is ignored rather than honoured.
  */
 function frozenConfig(value: unknown, installationId: string): FrozenInstallationConfig {
     if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -49,14 +58,17 @@ function frozenConfig(value: unknown, installationId: string): FrozenInstallatio
     }
 
     const surfaces: Surface[] = []
+    const unknown: string[] = []
     for (const surface of candidate.surfaces) {
-        if (typeof surface !== "string" || !INSTALLABLE_SURFACE_SET.has(surface)) {
-            throw invalidConfig(installationId)
+        if (typeof surface !== "string") throw invalidConfig(installationId)
+        if (!INSTALLABLE_SURFACE_SET.has(surface)) {
+            if (!unknown.includes(surface)) unknown.push(surface)
+            continue
         }
         if (!surfaces.includes(surface as Surface)) surfaces.push(surface as Surface)
     }
 
-    return Object.freeze({ surfaces: Object.freeze(surfaces) })
+    return Object.freeze({ surfaces: Object.freeze(surfaces), unknown: Object.freeze(unknown) })
 }
 
 function invalidConfig(installationId: string): PersistenceError {
@@ -92,6 +104,7 @@ export class WorkspaceSurfaceResolver implements WorkspaceSurfaceResolverPort {
                 blueprintId: null,
                 source: "no-active-blueprint-installation" as const,
                 surfaces: Object.freeze([]) as readonly Surface[],
+                unknownSurfaces: Object.freeze([]) as readonly string[],
             })
         }
 
@@ -102,6 +115,7 @@ export class WorkspaceSurfaceResolver implements WorkspaceSurfaceResolverPort {
             blueprintId: installation.blueprintId,
             source: "active-blueprint-installation" as const,
             surfaces: config.surfaces,
+            unknownSurfaces: config.unknown,
         })
     }
 

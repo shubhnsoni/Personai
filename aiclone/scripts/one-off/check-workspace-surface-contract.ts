@@ -301,6 +301,67 @@ async function main() {
                         `${JSON.stringify(profilesBefore)} -> ${JSON.stringify(profilesAfter)}`,
                     )
 
+                    // ---- 9-11. a frozen config OUTLIVES the code that wrote it -------------
+                    // Root added these after S1-A. Its resolver threw CONFLICT on ANY unrecognised
+                    // surface string, which is the wrong failure mode for the case that will actually
+                    // happen: the day a surface is retired from the Surface union, every workspace
+                    // installed before that release holds a config naming it, and refusing the whole
+                    // config would take all of them down on deploy over data that was valid when
+                    // written. Unrecognised strings are now DROPPED and REPORTED; structural corruption
+                    // still throws.
+                    const activeRow = await tx.blueprintInstallation.findFirst({
+                        where: { workspaceId: ids.workspaceB, state: "ACTIVE" },
+                        select: { id: true, configJson: true },
+                    })
+                    if (!activeRow) throw new Error("fixture error: workspace B has no ACTIVE installation")
+                    const baseConfig = activeRow.configJson as Record<string, unknown>
+                    const knownSurfaces = [...(baseConfig.surfaces as string[])]
+
+                    // A retired surface plus a permission-shaped string. Neither may reach `surfaces`.
+                    await tx.$executeRawUnsafe(
+                        `update "BlueprintInstallation" set "configJson" = $1::jsonb where "id" = $2`,
+                        JSON.stringify({ ...baseConfig, surfaces: [...knownSurfaces, "retiredSurface", "workspace.update"] }),
+                        activeRow.id,
+                    )
+                    const withUnknown = await resolver.forWorkspace(ids.workspaceB)
+                    check(
+                        "9. an unrecognised surface in a frozen config is DROPPED, not honoured, and the workspace still resolves",
+                        withUnknown.surfaces.length === knownSurfaces.length &&
+                            !(withUnknown.surfaces as readonly string[]).includes("retiredSurface") &&
+                            !(withUnknown.surfaces as readonly string[]).includes("workspace.update"),
+                        `surfaces=[${withUnknown.surfaces.join(",")}]`,
+                    )
+                    check(
+                        "10. the dropped values are REPORTED rather than discarded silently",
+                        withUnknown.unknownSurfaces.length === 2 &&
+                            withUnknown.unknownSurfaces.includes("retiredSurface") &&
+                            withUnknown.unknownSurfaces.includes("workspace.update"),
+                        `unknownSurfaces=[${withUnknown.unknownSurfaces.join(",")}]`,
+                    )
+
+                    // Structural corruption is a different thing and must still refuse.
+                    await tx.$executeRawUnsafe(
+                        `update "BlueprintInstallation" set "configJson" = $1::jsonb where "id" = $2`,
+                        JSON.stringify({ ...baseConfig, businessOsExcluded: false }),
+                        activeRow.id,
+                    )
+                    let structuralCode = "NO_REFUSAL"
+                    try {
+                        await resolver.forWorkspace(ids.workspaceB)
+                    } catch (error) {
+                        structuralCode = error instanceof PersistenceError ? error.code : "OTHER"
+                    }
+                    check(
+                        "11. a config that does not assert businessOsExcluded is STRUCTURALLY corrupt and is refused",
+                        structuralCode === "CONFLICT",
+                        `code=${structuralCode}`,
+                    )
+                    await tx.$executeRawUnsafe(
+                        `update "BlueprintInstallation" set "configJson" = $1::jsonb where "id" = $2`,
+                        JSON.stringify(baseConfig),
+                        activeRow.id,
+                    )
+
                     throw new Rollback("deliberate rollback")
                 },
                 { timeout: 120_000 },
