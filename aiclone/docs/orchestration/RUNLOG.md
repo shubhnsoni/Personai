@@ -3921,3 +3921,190 @@ forbade it to touch. A worker that reports one proven finding and refuses to pad
 one that reports ten unproven ones.
 
 `spawn_run` was not retried; the one-shot cron path produced both workers, as it did in Phase 1.
+
+
+---
+
+## Workspace-scoped surfaces, cohort operations coverage, and what four audit passes actually found
+
+Eleven workers across five waves, three concurrent throughout, plus root. Sweep 64 → 68. No migration was
+added, because none turned out to be needed.
+
+### The measurement that decided the whole design
+
+Installation already froze the surfaces a blueprint implies into `BlueprintInstallation.configJson`, and
+nothing applied them. The obvious reading was "installation forgot to apply surfaces". The real position,
+measured before anything was written, is different and much better:
+
+**Not one file under `src/app/dashboard/**` mentions `workspaceId`.** The entire dashboard — layout,
+sidebar, all six pages, and the `requireSurface` redirect gate — is purely profile-scoped. Workspace
+context lives in 68 files and none of them is a dashboard page.
+
+So a workspace-aware resolver **cannot change any existing behaviour**, because there was no code path
+where a workspace id was available and being ignored. That is why there is no migration, why "compatibility
+layer" overstates it — the legacy path is simply the branch taken when there is no workspace — and why the
+right shape was one resolver around the existing installation record rather than a second mechanism beside
+it. A worker then proved `configJson` sufficient by installing genuinely different blueprints into two
+workspaces and showing each resolved to its own exact frozen set, with A-only surfaces provably absent
+from B for one user who belonged to both.
+
+### Two places root was wrong, both found by workers
+
+**The fallback design.** Root's decision document specified that a workspace with no active installation
+should fall back to profile surfaces and carry a `source` flag saying so. S1-A implemented the opposite —
+explicitly empty, no fallback — and was right. The regression root feared cannot occur, for the same reason
+the keystone measurement gives: nothing consumes the resolver yet, so "empty" is not a regression but a
+choice about what a *new* consumer sees, and the only new consumer is a panel looking at one specific
+workspace. Showing it the *profile's* surfaces would be exactly the conflation the document exists to
+prevent. The shipped design is two separate methods, and that is better than a flag for a reason worth
+keeping: **a flag that must be read to avoid a wrong conclusion is a weaker guarantee than two functions
+that cannot be confused.**
+
+**A brief that cited a document the worker could not see.** S2-B's brief pointed at a CORRECTION section
+that did not exist at the commit it was branched from, because root committed that document afterwards.
+S2-B read the executable contracts instead and flagged the discrepancy rather than proceeding on stale
+prose. That is the correct order of trust, and the brief was wrong, not the worker.
+
+### A frozen config must outlive the code that wrote it
+
+S1-A's resolver threw `CONFLICT` on any surface string outside the current `Surface` union, reasoning that
+filtering would silently broaden a corrupt config. Right about corruption; wrong about the case that will
+actually happen. The day a surface is retired from the union, **every workspace installed before that
+release holds a config naming it**, and refusing the whole config would take them all down on deploy over
+data that was valid when it was written.
+
+The two cases are now distinguished, because they are different kinds of thing: structural corruption
+throws; an unrecognised string is dropped and reported. Dropping is also the fail-safe direction, since an
+unrecognised value cannot be granted — which is why a permission-shaped string in a surfaces array is
+ignored rather than honoured.
+
+Independent review then caught a third case root had collapsed into the second: `businessOs` is a
+*recognised* `Surface` that installations may never contribute, so reporting it as "no longer recognised"
+told an owner that wrong-now data was merely an outdated config. It now has its own channel.
+
+### Operations covers cohort work by consuming, not by re-deciding
+
+`operations/engine.ts` had refused to cover cohort work, and its recorded reason was precise: doing so
+"would mean encoding a judgement here that the cohort engine has not itself declared". The refusal is now
+discharged by the owning engine **speaking**, not by the view guessing. The reader contains no cohort rule
+at all, and a harness asserts its method body names none of fourteen cohort state tokens.
+
+The classifications are grounded in the real transition tables rather than the enum names: `submissionFlow`
+makes `SUBMITTED` the staff-review branch point, so `RETURNED` is learner-owned; `ATTENDANCE_CREDITED`
+includes `LATE`, so late is not an exception; `recordAttendance` refuses `SCHEDULED`, so an absence there is
+not yet real; `certificateFlow` declares `ELIGIBLE → ISSUED`, so issuance is the outstanding owner action.
+
+### What four audit passes actually found, and why the number is the point
+
+**14 assertions examined by real source mutation. 14 proven real. 1 vacuity, found by the earliest pass.**
+
+Read that the right way round: **the assertion suite is substantially honest.** The vacuity class is real
+and has cost this program twice, but it is not endemic, and three of four auditors correctly returned
+NO_CHANGE with break evidence rather than manufacturing a finding. An auditor who reports something in
+every file should be disbelieved rather than thanked.
+
+The audit's value turned out to lie elsewhere — in two defect classes nobody had named.
+
+### Lessons
+
+45. **AN OVER-CLAIMING ASSERTION IS NOT A VACUOUS ONE, AND MUTATION CANNOT TELL THEM APART.**
+    `check-retainer-runtime.ts` raced two draws with `Promise.all` and claimed they proved the `FOR UPDATE`
+    serialization locks. Removing **both** locks left it green, 87/87. The auditor then did the harder
+    thing and declined to call it vacuity: the assertion's named property is the *observable additive
+    outcome*, which Postgres scheduling can preserve without those locks. So it tests something real while
+    its NAME claims a mechanism it never exercises.
+
+    Mutation says "green" in both cases — for a vacuity that means "tests nothing", here it means
+    "insufficiently constrained" — and only reasoning about what the property logically *requires* can
+    separate them. **Two promises raced do not create contention.** They are serialised by the connection
+    pool or by scheduling, so the interleaving the lock exists to prevent never occurs.
+
+46. **THE TECHNIQUE THAT SETTLES A LOCK CLAIM IS DETERMINISTIC READ INTERLEAVING, AND IT NOW EXISTS HERE.**
+    An inert-by-default Prisma query middleware barrier holds T1 open immediately after its balance read,
+    while its `FOR UPDATE` locks are still held. T2 then calls the same real service method. The harness
+    observes whether T2 reaches its own read and commits before T1 is released. `finally` always releases
+    T1, and a deadlock or lock timeout is never counted as a pass.
+
+    Result, reproduced independently by root: **locks present** — T2 does not reach its read before
+    release, balance 0 → 8. **Both `FOR UPDATE` clauses removed** — T2 reads and commits while T1 is held,
+    then T1 overwrites with its stale 3, balance 0 → **3**. A real forced lost update. The claim is now
+    proven rather than asserted, and the older opportunistic assertion is retained as what it always
+    was: an additive-outcome test.
+
+47. **A CONTROL CAN PASS FOR THE WRONG REASON TOO — CHECK THE PROOF MECHANISM, NOT JUST THE ASSERTIONS.**
+    `INVERT_ASSERTION=1` is documented as the control proving a suite can fail. In **nine** large harnesses
+    it flipped exactly **one** assertion. The gate was technically satisfied and evidentially near-worthless:
+    it proved one assertion could fail, not that the suite could, and a reader running the documented
+    control would see `exit 1` and conclude otherwise.
+
+    This is the vacuity shape one level up, in the mechanism rather than the assertion. Crucially, a
+    brand-new harness shipped with the same 1-of-32 shape **in this run**, which makes it a house habit
+    rather than legacy drift — so it has to be caught at review of new files, not audited later. Now
+    widened across nine files plus that new one, with normal assertion counts identical in every case.
+    Rollback, residue, teardown and fixture-precondition assertions were deliberately left plain, because
+    inverting them would assert that the harness *should* leave residue.
+
+48. **RESIDUE IS A DEFECT, AND THE ASSERTION THAT PROVED IT WAS ALSO THE ONE IT BROKE.**
+    `check-schema-invariants.ts` projects a `Workspace` for every `Profile` with
+    `on conflict ("id") do nothing`, but `Workspace.profileId` is `UNIQUE`, so the collision that actually
+    occurs is on `profileId` and cannot be absorbed. It had passed for as long as it existed only because
+    no `Profile` in the disposable database owned a `Workspace` — a fact discovered when leftover harness
+    residue from the previous run turned the sweep red and named a row that harness had never heard of.
+    Fixed with a `not exists` guard and the correct conflict target, and the
+    profile-that-already-owns-a-workspace case is now seeded, so the fix demonstrates something.
+
+49. **AN ASSERTION CAN PUNISH THE BETTER CODE.** The operations declared-coverage scan recognised only a
+    literal `domain: "x" as const` tag. The cohort reader deliberately tags with the imported
+    `COHORT_NEEDS_ACTION_DOMAIN` constant, so a rename in the owning engine cannot leave the view filing
+    items under a domain it no longer declares — and the scan failed it. The scan was wrong, not the code.
+    Widened to accept a constant it can resolve to a declared domain, which keeps it honest rather than
+    merely permissive.
+
+50. **AND ROOT WROTE AN OVER-BROAD ASSERTION WHILE DOCUMENTING THE CLASS.** Root's first attempt at
+    "operations restates no cohort rules" scanned the whole engine for cohort state tokens and failed on
+    `SUBMITTED` — which is a legitimate **inspection** status in `INSPECTION_OPEN_STATUSES`. It was testing
+    whether a word appears, not whether rules are restated: exactly the over-broad shape the audit exists
+    to catch, occurring in the assertion instead of the code, written by the person writing the lesson.
+
+### Measured gates at the S-wave green point
+
+| Gate | Result |
+|---|---|
+| `prisma validate` | 0 |
+| `tsc --noEmit` | 0 |
+| check sweep | **68 of 68 exit 0** (baseline 64; only increased) |
+| `check-workspace-surface-contract` | 16/16; inverted flips 16 |
+| `check-workspace-surface-boundary` | 18/18; inverted flips 18 |
+| `check-cohort-needs-action` | 32/32; inverted flips 29 (was 1) |
+| `check-due-work-plan` | 12/12; inverted flips 12 |
+| `check-schema-invariants` | 22/22 (was 18); mutation reproduced `23505` with 6 red |
+| `check-operations-runtime` | 31/31 (was 28); inverted flips 16 |
+| `check-retainer-runtime` | 88/88; lock proof red at 87/88 with both locks removed |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged at every commit |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run build` | 0; the new surfaces route in the manifest |
+| live `personalink` | untouched — 35 tables, `Profile` = 16 |
+| triggers | 24 total, 0 disabled |
+| frozen worktrees | all six `kirocrew/*` at `ea69595` |
+| origin | unchanged at `4b386d1d` |
+| **migration** | **none added — none was needed** |
+
+### Orchestration, with evidence
+
+`spawn_run` — **FAILED_NO_START.** Probe `02da4673` registered as `[running]` but produced no artifact
+inside its five-minute window and never wrote its report file. Registry elapsed time is not progress, and
+was not counted as such. Every one of the eleven workers ran through the one-shot cron path with an
+explicit model pin.
+
+Maximum measured concurrency: **three workers plus root**, sustained across five waves, evidenced by
+simultaneous dirty files in three separate worktrees alongside root's own commits — not by elapsed time.
+
+One tooling fix mattered more than it looks: the previous run's auditor could not produce source-mutation
+evidence because the supplied rehearsal runner hardcodes the primary worktree, and it correctly refused to
+claim evidence it could not stand behind. A cwd-respecting runner was written before this wave started, and
+every worker used it. **Four audit passes became possible because one tool stopped lying about which tree
+it was testing.**
+
+Two workers reported honestly that their environment surfaces no agent PID and declined to substitute a
+shell PID; two others reported a shell PID and labelled it as such. Three returned NO_CHANGE. None of that
+needed correcting, and all of it is worth more than a uniform set of confident numbers.

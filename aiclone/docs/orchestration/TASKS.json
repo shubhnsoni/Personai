@@ -1,6 +1,6 @@
 {
-    "milestone": "BLUEPRINT INSTALLATION IS COMPLETE END TO END: 9548440 is the green point. Phase 1 preview (c3f3f44) and Phase 2 durable installation both landed in this run. 2d83e46 the installation contract as a TYPE FILE; 94f946c the additive migration, fully rehearsed; cdd0127 the runtime, routes and the reshaped onboarding invariant; d1eeae9 BP4 (gpt-5.6-terra) fixed the same vacuity class in check-capability-contract.ts; f71a3af BP3 (claude-sonnet-5) the owner install UI, mounted by root; 9548440 the harness residue fix. Sweep is now 64 (three new install harnesses), FAILED 0. TWO NEW TABLES ONLY: BlueprintInstallation and BlueprintInstallationEvent. NOTHING was forked - no workflow-template table, no surface table, no terminology table, no vertical-specific config table, and WorkflowRun/WorkflowStep/Approval/TaskJob are untouched and asserted still present. ONE ACTIVE INSTALLATION PER WORKSPACE is a partial unique index, so upgrade-through-supersession is unrepresentable-otherwise rather than merely preferred. INSTALLING GRANTS NOTHING: Profile.personalityConfig is compared BYTE FOR BYTE across an install. PERMISSION_KEYS is still 18 and none mentions blueprints, so no role gained anything. Writes ask workspace.update (OWNER/ADMIN); reads ask profile.read, so onboarding can show a plan before anyone is elevated. A MANAGER can read and is refused when installing - asserted both ways. STILL MISSING and owner-gated: appointments:reminders and appointments:deposits remain partial, provider boundaries inert. coaching-studio-v1 is therefore genuinely uninstallable, which is what makes the install-time capability refusal a real test rather than a vacuous one. Repo-wide lint still exactly 43 (14 errors, 29 warnings) at every commit in this run.",
-    "updatedAt": "2026-08-30 09:40 +05:30",
+    "milestone": "WORKSPACE-SCOPED SURFACES AND COHORT OPERATIONS COVERAGE ARE COMPLETE. Sweep 64 -> 68, FAILED 0. Installation already froze the surfaces a blueprint implies into BlueprintInstallation.configJson but nothing applied them, because surface resolution had no notion of a workspace at all. That is now closed WITHOUT a migration and WITHOUT a second table: S1-A proved configJson sufficient, and the keystone measurement is that NOT ONE FILE under src/app/dashboard/** mentions workspaceId, so a workspace-aware resolver cannot change any existing behaviour - there was no code path where a workspace id was available and being ignored. OPERATIONS NOW COVERS COHORT WORK as its ninth domain, by CONSUMING the cohort engine's own declaration rather than restating cohort rules - discharging the refusal that had been recorded in UNCOVERED_DOMAINS. THE HARNESS AUDIT RAN FOUR PASSES: 14 assertions examined by real source mutation, 14 proven real, 1 vacuity found and fixed. The suite is substantially honest and three of four auditors correctly returned NO_CHANGE. TWO NEW DEFECT CLASSES WERE NAMED AND ONE TECHNIQUE BUILT. An OVER-CLAIMING assertion tests something real while its NAME claims a mechanism it never exercises - mutation cannot distinguish it from vacuity because both come back green. The retainer FOR UPDATE claim was exactly that, and S4-B built the DETERMINISTIC READ INTERLEAVING technique the repository lacked and PROVED it: with both locks removed, T2 commits 5 while T1 is held and T1 then overwrites with a stale 3, a forced lost update. The second class is a PROOF-MECHANISM weakness: INVERT_ASSERTION=1 flipped exactly ONE assertion in nine large harnesses, so the documented control exited non-zero while proving almost nothing. Now widened across nine files. STILL OPEN and recorded with its closing package: the SHELL selects a workspace on the user's behalf, falling back to an alphabetically-first membership. Not a leak - the user is a member - but they may believe they are seeing a different workspace. Repo-wide lint still exactly 43 (14 errors, 29 warnings) at every commit in this run. Live personalink untouched, origin unchanged, six frozen worktrees at ea69595.",
+    "updatedAt": "2026-08-30 12:15 +05:30",
     "updatedBy": "root orchestrator (claude-opus-5, max effort), sole integration owner",
     "baseline": "f8ee611",
     "maxParallelWorkers": 3,
@@ -1677,6 +1677,98 @@
                 "The install does not apply surfaces anywhere, by design. A workspace-scoped surface mechanism does not exist and was not invented here."
             ],
             "followUp": "check-schema-invariants.ts assumes no Profile owns a Workspace: its backfill projection uses `on conflict (\"id\") do nothing`, which cannot absorb a collision on the UNIQUE profileId. It will break on the first real profile that owns a workspace. Noted, not fixed - out of this package's scope."
+        },
+        {
+            "id": "P2-023",
+            "title": "Workspace-scoped surfaces: contract, resolver, boundary, owner UI, independent review and its fixes",
+            "status": "done",
+            "owner": "root orchestrator (claude-opus-5) with four supervised workers",
+            "commits": [
+                "11950b8 root: the canonical precedence decision, written from measurement before implementation",
+                "66ddbe8 S1-A (gpt-5.6-sol): contract, candidate resolver, 8-property security evaluation",
+                "34f5055 root: a frozen surface config must outlive the code that wrote it",
+                "043e7e0 S2-B (gpt-5.6-sol): the GET boundary, route and 18-assertion adversarial harness",
+                "1b8eb50 root: make the role-openness claim measured rather than accidental",
+                "76f8e92 S2-A (claude-sonnet-5): the owner panel; 817ed37 root mounted it",
+                "f2f7a30 root: acted on the independent review - two fixed, one recorded open",
+                "c1b45c0 root: tightened the compatibility claim to what was actually verified"
+            ],
+            "keystoneMeasurement": "NOT ONE FILE under src/app/dashboard/** mentions workspaceId. The whole dashboard - layout, sidebar, all six pages, the requireSurface redirect gate - is purely profile-scoped, and workspace context lives in 68 files none of which is a dashboard page. So a workspace-aware resolver could not change existing behaviour: there was no path where a workspace id was available and being ignored. That is why no migration was needed and why 'compatibility layer' overstates it - the legacy path is simply the branch taken when there is no workspace.",
+            "designDecisions": [
+                "NO second surface or install table. S1-A proved BlueprintInstallation.configJson sufficient by installing genuinely different blueprints into two workspaces and showing each resolved to its own exact frozen set.",
+                "TWO SEPARATE METHODS rather than one with a fallback flag. forWorkspace is explicitly EMPTY when nothing is installed; withoutWorkspace takes the profile as an ARGUMENT so it cannot query memberships and is therefore structurally incapable of guessing. This puts the fall-back decision in the caller where it is visible, instead of behind a source flag a caller could ignore while still receiving surfaces.",
+                "ROOT'S OWN DECISION DOCUMENT WAS WRONG ABOUT THIS and the correction is recorded: it specified a flagged profile fallback, fearing a regression that cannot occur because the resolver has no existing consumers.",
+                "A FROZEN CONFIG MUST OUTLIVE THE CODE THAT WROTE IT. S1-A threw CONFLICT on any unrecognised surface string; root split the cases, because the day a surface is retired from the Surface union every workspace installed before that release holds a config naming it, and refusing the whole config would take them all down on deploy over data that was valid when written. Structural corruption still throws; an unrecognised string is dropped and reported.",
+                "Reads ask profile.read so onboarding can show a plan before anyone is elevated; nothing here consults or produces a PermissionKey."
+            ],
+            "reviewFindings": {
+                "reviewer": "S3-C (gpt-5.6-sol), read-only, changed nothing, git status empty",
+                "CRITICAL": "none - could not obtain another workspace's surfaces by any path, could not make a SUPERSEDED or REMOVED row contribute, could not widen a permission or reach businessOs through installation",
+                "M1 OPEN": "the SHELL guesses workspace context: it prefers the workspace matching the active profile and otherwise falls back to workspaces[0], which tenancy orders alphabetically. Not a leak, but a user may believe they are seeing a different workspace. Not fixed because it is not local - twelve panels take workspaceId and blanking the selection empties them all on load. Recorded with its closing package; the panel now always NAMES the workspace it shows, which removes the ambiguity that made an implicit selection dangerous rather than merely convenient.",
+                "m1 FIXED": "a late stale success could not RENDER in the wrong workspace but could ERASE the right one: the key gate blocked the mismatched read while the write still overwrote the current workspace's value, leaving the panel loading forever. The abort alone does not prevent it, because a promise already resolved when abort fires still lands in the try. Now guarded by a superseded flag set in cleanup.",
+                "m2 FIXED": "businessOs was reported as an UNRECOGNISED surface. It is a valid Surface that installations may never contribute, so the copy told an owner that wrong-now data was merely a config that outlived a product change. Now a separate notInstallableSurfaces channel through resolver, contract, boundary and panel.",
+                "n1 FIXED": "the decision document claimed an obsolete table still described the system while one of its rows contradicted the shipped behaviour"
+            },
+            "harnesses": {
+                "check-workspace-surface-contract.ts": "16/16; inverted flips all 16",
+                "check-workspace-surface-boundary.ts": "18/18; inverted flips all 18"
+            },
+            "honestLimitation": "The panel's stale-response defence is a source-level argument, not an observed race: no harness mounts the panel or reorders real responses, so m1's fix is reasoned rather than executed. The a11y harness proves the mechanism is PRESENT, not that it works under reordering."
+        },
+        {
+            "id": "P2-024",
+            "title": "Cohort needs-action contract, and Operations covering cohort work by consuming it",
+            "status": "done",
+            "owner": "S3-B (gpt-5.6-sol) declared it; root integrated the consumer side",
+            "commits": [
+                "f4a86a7 S3-B: src/lib/cohorts/needs-action.ts + 32-assertion harness",
+                "fc99824 root: the inversion control must exercise the suite, not one assertion",
+                "0fff301 root: operations covers cohortTasks by CONSUMING the declaration"
+            ],
+            "whyItMatters": "operations/engine.ts had refused to cover cohort work on the explicit grounds that doing so 'would mean encoding a judgement here that the cohort engine has not itself declared'. The refusal is now discharged by the owning engine SPEAKING, not by the view guessing. The reader contains no cohort business rule at all, and a harness asserts its method body names none of 14 cohort state tokens.",
+            "decisionsGroundedInTheEngine": "S3-B justified every classification from the real transition tables rather than the enum names: submissionFlow makes SUBMITTED the staff-review branch point so RETURNED is learner-owned; ATTENDANCE_CREDITED includes LATE so late is not an exception; recordAttendance refuses SCHEDULED so an absence there is not yet real; certificateFlow declares ELIGIBLE -> ISSUED so issuance is the outstanding owner action. Scope is profile, determined from CohortContext.requireProfile bridging Workspace.profileId, and asserted equal to the operations declaration at module load.",
+            "rootFindings": [
+                "The harness shipped 32 assertions with ONE invertible. Widened to 29 of 32. Same weakness root had documented twenty minutes earlier for three older harnesses - reproduced in a brand-new file, which makes it a house habit rather than legacy debt.",
+                "The declared-coverage scan only recognised a literal domain tag and so FAILED on the safer constant-based construction - the assertion would have punished the better code. Widened to accept a constant it can resolve to a declared domain.",
+                "Root's own first 'operations restates no cohort rules' assertion scanned the whole engine and failed on SUBMITTED, which is a legitimate INSPECTION status. It was testing whether a word appears, not whether rules are restated: the over-broad shape the vacuity audit exists to catch, occurring in the assertion instead of the code."
+            ]
+        },
+        {
+            "id": "P2-025",
+            "title": "Harness audit: four passes, two new defect classes named, and the deterministic-interleaving technique built",
+            "status": "done",
+            "owner": "five supervised workers; root integrated and recorded",
+            "passes": {
+                "BP4 (earlier run)": "check-capability-contract.ts - the ONE vacuity found across all passes: deleting `composition.required &&` left it green because no active blueprint composed an immature capability optionally",
+                "S1-C (gpt-5.6-terra)": "NO_CHANGE, 1 assertion proven real, 2 of 3 files not reached - honest and low-yield",
+                "S2-C (gpt-5.6-terra)": "NO_CHANGE, 4 proven real across 3 files; its sharpest result is that breaking the inventory engine guard left ONLY the database constraint and the assertion still went red, because it asserts the ENGINE refusal specifically",
+                "S3-A (gpt-5.6-terra)": "NO_CHANGE, 6 proven real; DISPROVED the Shape 3 concern for reservation authz by showing the foreign-get assertion leaks when row ownership is removed; and found the over-claiming retainer lock assertion without overclaiming it as vacuity",
+                "S4-B (gpt-5.6-terra)": "fieldjob runtime audited, 1 proven real, NO_CHANGE; then BUILT the deterministic interleaving technique and PROVED lock necessity"
+            },
+            "tally": "14 assertions examined by real source mutation, 14 proven real, 1 vacuity found and fixed. The suite is substantially honest; an auditor who finds something in every file should be disbelieved rather than thanked.",
+            "newDefectClasses": {
+                "over-claiming assertion": "tests something real, but its NAME claims a mechanism it never exercises. Mutation alone cannot distinguish it from vacuity because both come back green; only reasoning about what the property logically requires can. check-retainer-runtime.ts:350 raced two draws with Promise.all and claimed to prove FOR UPDATE necessity - removing BOTH locks left it green 87/87.",
+                "proof-mechanism weakness": "INVERT_ASSERTION=1 flipped exactly ONE assertion in nine large harnesses, so the documented control exited non-zero while demonstrating almost nothing. A reader would reasonably conclude the whole suite was proven falsifiable. Same shape as vacuity, one level up."
+            },
+            "techniqueBuilt": {
+                "name": "deterministic read interleaving",
+                "how": "an inert-by-default Prisma query middleware barrier holds T1 open immediately after its balance read while its FOR UPDATE locks are still held; T2 then calls the same real service method; the harness observes whether T2 reaches its own read and commits before T1 is released. finally always releases T1, and a deadlock or lock timeout is never counted as a pass.",
+                "result": "PROVEN. Locks present: T2 does not reach its read before release, balance 0 -> 8. Both FOR UPDATE clauses removed: T2 reads and commits while T1 is held, T1 then overwrites with its stale 3, balance 0 -> 3. A real forced lost update, independently reproduced by root.",
+                "whyItMatters": "Two promises raced with Promise.all do not create contention - they are serialised by the pool or by scheduling, so the dangerous interleaving never occurs. This is the first technique in the repository that can substantiate a lock-necessity claim."
+            },
+            "inversionWidened": "nine files by S4-A and S5-B plus check-cohort-needs-action by root: commerce 1->99, inventory 1->76, cohort-runtime 1->99, course-access 1->78, reservation-authz 1->33, fieldjob-evidence-audit 1->55, fieldjob-schema-invariants 12->78, capability-contract 20->230, fieldjob-routes 7->49, cohort-needs-action 1->29. Normal assertion counts identical in every case. Rollback, residue, teardown and fixture-precondition assertions deliberately left plain, because inverting them would assert the harness SHOULD leave residue."
+        },
+        {
+            "id": "P2-026",
+            "title": "Supporting repairs: schema-invariants backfill fragility, and a manual due-work planning contract",
+            "status": "done",
+            "owner": "S1-B and S5-A, integrated by root",
+            "commits": [
+                "0b71ace S1-B (gpt-5.6-terra): the backfill projection collision",
+                "9862439 S5-A (gpt-5.6-sol): the due-work planning contract"
+            ],
+            "schemaInvariantsRepair": "check-schema-invariants.ts projected a Workspace for every Profile using `on conflict (\"id\") do nothing`, but Workspace.profileId is UNIQUE so the collision that actually occurs is on profileId and cannot be absorbed. It passed only because no Profile in the disposable database owned a Workspace - a fact root had proved by accident when leftover harness residue turned the sweep red. Fixed with a `not exists` guard plus the correct conflict target, and the profile-that-already-owns-a-workspace case is now SEEDED so the fix demonstrates something. 18 -> 22 assertions. Root independently reverted the conflict target and reproduced the original 23505 on profileId with 6 assertions red.",
+            "dueWorkPlanning": "A pure function from an OperationsSummary to an ordered, EXPLAINED plan. It plans and is incapable of doing: no external write, no message, no money, no provider call, and NO SCHEDULER - asserted over executable lines only against 14 background/external-action identifiers, because its own comments legitimately discuss the absence of schedulers and a whole-file scan would flag the explanation. It reads no clock, taking asOf from the summary, so two calls with the same input are byte-identical. Every planned item traces to an input AttentionItem by index. It never re-derives overdue, partitioning on the supplied boolean instead. mixedScope is surfaced with a notice, because ranking a workspace-scoped milestone against a profile-scoped reservation compares two different populations. 12 assertions, all invertible, inversion flips all 12."
         }
     ],
     "laneState": {
@@ -1949,5 +2041,32 @@
         "disposable DB": "19 migrations, up to date; BlueprintInstallation = 0 rows, BlueprintInstallationEvent = 0 rows",
         "frozen worktrees": "all six kirocrew/* still at ea69595",
         "origin": "unchanged at 4b386d1d; nothing pushed"
+    },
+    "gatesAtSWave": {
+        "commit": "9862439",
+        "prisma validate": "0",
+        "tsc --noEmit -p tsconfig.json": "0",
+        "check sweep": "68 checks, FAILED 0 (baseline 64; only increased, as required)",
+        "new harnesses": {
+            "check-workspace-surface-contract.ts": "16/16; inverted flips 16",
+            "check-workspace-surface-boundary.ts": "18/18; inverted flips 18",
+            "check-cohort-needs-action.ts": "32/32; inverted flips 29",
+            "check-due-work-plan.ts": "12/12; inverted flips 12"
+        },
+        "repaired harnesses": {
+            "check-schema-invariants.ts": "18 -> 22; mutation reproduced 23505 with 6 red; restored green",
+            "check-operations-runtime.ts": "28 -> 31; inverted flips 16",
+            "check-retainer-runtime.ts": "87 -> 88; the deterministic lock proof, root-reproduced red at 87/88 with both locks removed"
+        },
+        "repo-wide ESLint": "43 problems (14 errors, 29 warnings) - unchanged at every commit",
+        "npm audit --omit=dev": "0 vulnerabilities",
+        "npm run build": "0; /api/platform/workspaces/[workspaceId]/surfaces in the manifest",
+        "live personalink": "untouched - 35 tables, no _prisma_migrations, 0 wave tables leaked, Profile = 16",
+        "guard and append-only triggers": "24 total, 0 disabled",
+        "disposable DB": "19 migrations, up to date. NO MIGRATION WAS ADDED in this run - none was needed.",
+        "frozen worktrees": "all six kirocrew/* still at ea69595",
+        "origin": "unchanged at 4b386d1d; nothing pushed",
+        "maxMeasuredConcurrency": "3 workers + root, sustained across five waves, evidenced by simultaneous dirty files in three separate worktrees plus root's own commits",
+        "spawn_run": "FAILED_NO_START. Probe 02da4673 registered [running] but produced no artifact within its 5-minute window and never wrote its report file. Registry elapsed time is not progress. All 11 workers ran via the one-shot cron path with explicit model pins."
     }
 }

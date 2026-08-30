@@ -21,8 +21,21 @@ and described H1 as unstarted when it was complete.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`9548440`**
+- Primary HEAD: **`9862439`** (S-wave green point; later commits may follow — measure, do not trust this line)
 - Origin unchanged at `4b386d1d`; nothing pushed.
+- **The check sweep is now 68.**
+- **WORKSPACE-SCOPED SURFACES ARE COMPLETE, WITH NO MIGRATION.** Installation froze the surfaces a
+  blueprint implies into `configJson` and nothing applied them; a workspace-aware resolver now reads that
+  frozen config. `BlueprintInstallation.configJson` was proven sufficient, so there is no second surface
+  table and no second install table.
+- **The keystone measurement, and the reason no migration was needed:** not one file under
+  `src/app/dashboard/**` mentions `workspaceId`. The whole dashboard is profile-scoped, so the resolver
+  could not change existing behaviour — there was no path where a workspace id was available and ignored.
+- **Operations covers cohort work** as its ninth domain, by CONSUMING the cohort engine's own declaration.
+  Its reader names no cohort state at all, and a harness enforces that.
+- **STILL OPEN, MAJOR:** the shell selects a workspace on the user's behalf. See
+  `WORKSPACE_SURFACES_DECISION.md` → "OPEN DEFECT". Not a leak; a user may believe they are looking at a
+  different workspace. Fixing it needs every panel's empty state audited first.
 - Waves A–G4 complete, plus surfaces, plus **H1 `fieldJobs:inspection` complete end to end**, plus the
   two gaps H1 left (**`5822aa8`** checklist authoring, **`086c835`** field service selectable during
   onboarding), plus checklist line editing and removal with the snapshot-survival claim now proven
@@ -66,6 +79,37 @@ and described H1 as unstarted when it was complete.
 - Live `personalink`: verified untouched — 35 tables, no `_prisma_migrations`, 0 wave tables leaked,
   no `btree_gist`, `Profile` = 16.
 - Frozen worktrees intact: all six `kirocrew/*` still at `ea69595`.
+
+### Measured gates at the S-wave green point `9862439`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` / `tsc --noEmit` | 0 / 0 |
+| check sweep | **68 of 68 exit 0** (baseline 64; only increased) |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged at every commit |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | 0; the new surfaces route in the manifest |
+| live `personalink` | untouched — 35 tables, `Profile` = 16 |
+| triggers | 24 total, 0 disabled |
+| **migration** | **none added — none was needed** |
+
+**Four lessons from this run, and three of them are about the tests rather than the code.**
+
+*An over-claiming assertion is not a vacuous one, and mutation cannot tell them apart.* The retainer harness
+raced two draws and claimed to prove the `FOR UPDATE` locks; removing **both** locks left it green. Two
+promises raced do not create contention — the pool serialises them, so the interleaving the lock prevents
+never happens. Read `RUNLOG.md` lessons 45–46 before writing any concurrency assertion.
+
+*The technique that settles a lock claim now exists here.* Deterministic read interleaving: hold T1 open
+after its read via an inert-by-default Prisma middleware barrier, let T2 run, observe. With the locks
+removed it produced a real forced lost update — balance 3 instead of 8.
+
+*Check the proof mechanism, not just the assertions.* `INVERT_ASSERTION=1` flipped exactly ONE assertion in
+nine large harnesses. The gate passed and demonstrated almost nothing. A brand-new harness shipped with the
+same shape in this run, so catch it at review of new files.
+
+*An assertion can punish the better code.* The operations coverage scan required a literal domain tag and
+failed the safer constant-based one. The scan was wrong, not the code.
 
 ### Measured gates at `9548440` — durable blueprint installation
 

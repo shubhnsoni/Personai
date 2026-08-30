@@ -1309,3 +1309,55 @@ test rather than a vacuous one.
 | P1-009 slice 6 | repo-wide lint | Unchanged, and still a refusal: 43 problems, no safe mechanical slice remains. |
 | G2 | appointments providers | Still **owner-gated**: real messages, real money. Also the reason `coaching-studio-v1` is uninstallable. |
 | P1-007 | live `personalink` cutover | Still **owner-gated**. |
+
+
+---
+
+## Accepted — workspace-scoped surfaces, cohort operations coverage, and the harness audit
+
+Eleven workers, five waves, three concurrent throughout. Sweep **64 → 68**. **No migration was added,
+because none was needed.**
+
+| Commit | What landed | Author |
+|---|---|---|
+| `11950b8` | the canonical precedence decision, written from measurement before implementation | root |
+| `0b71ace` | `check-schema-invariants` backfill collision fixed and the reuse case seeded | S1-B `gpt-5.6-terra` |
+| `739fbdb` | Group A audit result recorded (1 proven real, 2 files not reached) | S1-C `gpt-5.6-terra` |
+| `ead6741` | Group B audit + root's cross-pass note on the proof mechanism | S2-C `gpt-5.6-terra` |
+| `66ddbe8` | contract, candidate resolver, 8-property security evaluation | S1-A `gpt-5.6-sol` |
+| `34f5055` | a frozen surface config must outlive the code that wrote it | root |
+| `043e7e0` | the GET boundary, route and 18-assertion adversarial harness | S2-B `gpt-5.6-sol` |
+| `1b8eb50` | the role-openness claim made measured rather than accidental | root |
+| `228c95e` | Group C audit; the over-claiming class named | S3-A `gpt-5.6-terra` |
+| `76f8e92` `817ed37` | the owner panel, and root mounting it | S2-A `claude-sonnet-5` / root |
+| `f4a86a7` `fc99824` | cohort needs-action declaration; inversion widened 1 → 29 | S3-B `gpt-5.6-sol` / root |
+| `0fff301` | Operations covers `cohortTasks` by CONSUMING the declaration | root |
+| `f2f7a30` `c1b45c0` | acted on the independent review: two fixed, one recorded open | root (from S3-C `gpt-5.6-sol`) |
+| `27b8b21` | deterministic read interleaving; retainer lock necessity PROVEN | S4-B `gpt-5.6-terra` |
+| `504799c` `0a0984b` | inversion widened across nine harnesses | S4-A / S5-B `gpt-5.6-terra` |
+| `9862439` | the manual due-work planning contract | S5-A `gpt-5.6-sol` |
+
+Repo lint unchanged at 43 (14 errors, 29 warnings) at every commit.
+
+### Visible product behaviour
+
+An owner in the Business OS console now sees, per workspace, which product surfaces the installed blueprint
+resolves to, which blueprint they came from, and — when nothing is installed, which is currently every
+workspace — a calm statement of that rather than an error. Configuration that names a surface this build no
+longer recognises is reported as dropped; configuration that names a surface no blueprint may ever grant is
+reported separately as worth investigating. The Operations Command Centre now counts cohort work as its
+ninth domain: submitted assignments awaiting review, absences on held sessions, scheduled/reminded/lapsed
+renewals, and certificates eligible but not issued.
+
+### Next in queue
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| **Explicit workspace selection** | `business-os-shell.tsx` | The one MAJOR review finding. The shell prefers the workspace matching the active profile and otherwise falls back to `workspaces[0]`, which tenancy orders alphabetically — so a user in A and B whose profile matches neither is shown A's configuration without choosing it. Not a leak; they are a member of A. **Not local:** twelve panels take `workspaceId` and blanking the selection empties them all on first load, so every panel's empty state must be audited first. Full specification is in `WORKSPACE_SURFACES_DECISION.md` under "OPEN DEFECT". A worker was dispatched on this at the end of the run; check `s6a/explicit-workspace-selection` and `reports/S6A-report.md` before starting. |
+| **Observe the panel stale-response race** | `check-business-os-a11y.ts` or a new harness | The panel's defence against a slow response for workspace A landing in B is a **source-level argument**, not an observed one. No harness mounts the panel or reorders real responses. The fix for the eviction bug is reasoned, and the assertion only proves the mechanism is present. Needs a component-level test that actually reorders two responses. |
+| **Generalize deterministic interleaving** | `check-inventory-runtime.ts` and other lock claims | The technique now exists (see `RUNLOG.md` lesson 46 and `check-retainer-runtime.ts`). The open question it can now answer: whether two concurrent inventory reservations can interleave to oversell, which `Promise.all` cannot decide. A worker was dispatched on this; check `s6c/inventory-lock-necessity` and `reports/S6C-report.md`. |
+| **Finish widening the inversion control** | remaining `check-*.ts` | Nine files done. `check-retainer-runtime` still flips 1 of 88; a worker was dispatched on it plus retainer routes/schema and cohort schema — check `s6b/widen-inversion-3`. Measure the real "before" count per file rather than assuming 1. |
+| Wire the due-work plan to a surface | new route + UI | `planDueWork` exists, is pure, and is invoked by nobody. It must stay explicitly invoked: **no timer, no scheduler, no background execution** without measured execution evidence. |
+| P1-009 slice 6 | repo-wide lint | Unchanged, still a refusal: 43 problems, no safe mechanical slice remains. |
+| G2 | appointments providers | Still **owner-gated**: real messages, real money. |
+| P1-007 | live `personalink` cutover | Still **owner-gated**. |
