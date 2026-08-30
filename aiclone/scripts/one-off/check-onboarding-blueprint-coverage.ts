@@ -154,7 +154,8 @@ checkInvertible(
 
 // ---- 7. the map does not claim something that does not exist -------------
 // There is no installation runtime. Asserted, not assumed: if one is ever added, this check should be
-// the thing that makes somebody revisit the wording here.
+// the thing that makes somebody revisit the wording here. Route paths identify the blueprint domain;
+// a write-method export is the behaviour that makes such a route an installation candidate.
 function routeFiles(dir: string): string[] {
     if (!existsSync(dir)) return []
     const out: string[] = []
@@ -165,12 +166,35 @@ function routeFiles(dir: string): string[] {
     }
     return out
 }
+function exportsBlueprintWriteRoute(filePath: string, source: string): boolean {
+    const concernsBlueprints = /(?:^|[\\/])blueprints?(?:[\\/]|$)/i.test(filePath) || /\bblueprint\b/i.test(source)
+    const exportsWriteMethod = /\bexport\s+(?:(?:async\s+)?function|const|let|var)\s+(?:POST|PUT|PATCH|DELETE)\b/.test(source)
+    return concernsBlueprints && exportsWriteMethod
+}
+
+const syntheticInstallRoute = "export async function POST() { return Response.json({ installed: true }) }"
+checkInvertible(
+    "detector self-test: a synthetic blueprint POST route is identified as an installation candidate",
+    exportsBlueprintWriteRoute("/synthetic/blueprints/install/route.ts", syntheticInstallRoute),
+)
+checkInvertible(
+    "detector self-test: a synthetic GET-only blueprint preview route is not an installation candidate",
+    !exportsBlueprintWriteRoute("/synthetic/blueprints/preview/route.ts", "export async function GET() { return Response.json({}) }"),
+)
+
 const platformRoutes = routeFiles(join(APP_ROOT, "src/app/api/platform"))
-const installRoutes = platformRoutes.filter((f) => /blueprint|install|onboard/i.test(f))
+const blueprintWriteRoutes = platformRoutes.filter((filePath) =>
+    exportsBlueprintWriteRoute(filePath, readFileSync(filePath, "utf8")),
+)
+const schemaSrc = readFileSync(join(APP_ROOT, "prisma/schema.prisma"), "utf8")
+const installedBlueprintModels = [...schemaSrc.matchAll(/^\s*model\s+(\w*(?:Install|Blueprint)\w*)\b/gim)].map((match) => match[1])
 check(
-    "no route installs a blueprint, so the map is honest in calling itself a correspondence",
-    installRoutes.length === 0,
-    installRoutes.map((f) => f.replace(APP_ROOT, "")).join(", ") || `${platformRoutes.length} platform routes, none installing`,
+    "no blueprint write route or durable installed-blueprint model exists, so the map is honest in calling itself a correspondence",
+    blueprintWriteRoutes.length === 0 && installedBlueprintModels.length === 0,
+    [
+        ...blueprintWriteRoutes.map((filePath) => `write route ${filePath.replace(APP_ROOT, "")}`),
+        ...installedBlueprintModels.map((model) => `schema model ${model}`),
+    ].join(", ") || `${platformRoutes.length} platform routes; no blueprint writes or installed-blueprint models`,
 )
 const needsSrc = readFileSync(join(APP_ROOT, "src/lib/onboarding-needs.ts"), "utf8")
 check(
@@ -180,6 +204,17 @@ check(
 check(
     "the map is not named as though it installs",
     !/INSTALLS_BLUEPRINT|installBlueprint\s*=/.test(needsSrc),
+)
+
+const previewTypesSrc = readFileSync(join(APP_ROOT, "src/lib/business-os/preview-types.ts"), "utf8")
+const previewView = /export type BlueprintPreviewView = Readonly<\{([\s\S]*?)\n\}>/.exec(previewTypesSrc)?.[1] ?? ""
+check(
+    "BlueprintPreviewView makes installed an explicit null rather than an optional installed-state object",
+    /(?:^|\n)\s*installed\s*:\s*null\s*(?:\n|$)/m.test(previewView),
+)
+check(
+    "BlueprintPreviewView carries a limitations list so callers cannot render a caveat-free preview",
+    /(?:^|\n)\s*limitations\s*:\s*readonly\s+string\[\]\s*(?:\n|$)/m.test(previewView),
 )
 
 // ---- 8. the blueprint the new role points at is genuinely satisfiable ----
