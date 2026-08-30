@@ -340,6 +340,30 @@ async function main() {
                         `unknownSurfaces=[${withUnknown.unknownSurfaces.join(",")}]`,
                     )
 
+                    // 10b/10c. `businessOs` is NOT an unknown surface. Independent review caught this: it
+                    // is a perfectly valid Surface that installations may never contribute, so classifying
+                    // it as "no longer recognised" told an owner that wrong-now data was merely an outdated
+                    // config. Both are dropped, so the security behaviour is unchanged - but the diagnosis
+                    // must be right, or reassuring copy hides a real problem.
+                    await tx.$executeRawUnsafe(
+                        `update "BlueprintInstallation" set "configJson" = $1::jsonb where "id" = $2`,
+                        JSON.stringify({ ...baseConfig, surfaces: [...knownSurfaces, "businessOs", "retiredSurface"] }),
+                        activeRow.id,
+                    )
+                    const withBusinessOs = await resolver.forWorkspace(ids.workspaceB)
+                    check(
+                        "10b. businessOs is reported as RECOGNISED-BUT-NOT-INSTALLABLE, never as an unknown surface",
+                        withBusinessOs.notInstallableSurfaces.includes("businessOs") &&
+                            !withBusinessOs.unknownSurfaces.includes("businessOs") &&
+                            withBusinessOs.unknownSurfaces.includes("retiredSurface"),
+                        `notInstallable=[${withBusinessOs.notInstallableSurfaces.join(",")}] unknown=[${withBusinessOs.unknownSurfaces.join(",")}]`,
+                    )
+                    check(
+                        "10c. and businessOs is still DROPPED, so the sharper diagnosis did not weaken the refusal",
+                        !(withBusinessOs.surfaces as readonly string[]).includes("businessOs"),
+                        `surfaces=[${withBusinessOs.surfaces.join(",")}]`,
+                    )
+
                     // Structural corruption is a different thing and must still refuse.
                     await tx.$executeRawUnsafe(
                         `update "BlueprintInstallation" set "configJson" = $1::jsonb where "id" = $2`,

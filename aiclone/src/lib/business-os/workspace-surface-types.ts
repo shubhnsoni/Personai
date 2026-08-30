@@ -36,6 +36,17 @@ export type WorkspaceSurfaceResolution = Readonly<{
      * than refusing it.
      */
     unknownSurfaces: readonly string[]
+    /**
+     * Strings this build DOES recognise as surfaces but which an installation may never contribute -
+     * `businessOs` today, because the owner console needs an explicit per-profile opt-in.
+     *
+     * Reported separately from `unknownSurfaces` because collapsing the two was a misdiagnosis, caught by
+     * independent review. A config naming `businessOs` is not an old config written before a product
+     * change; it is a config that is WRONG NOW. Both are dropped and neither is ever granted, so the
+     * security behaviour is the same - but telling an owner that bad installation data is merely
+     * "forward compatibility" hides a real problem behind reassuring copy.
+     */
+    notInstallableSurfaces: readonly string[]
 }>
 
 /**

@@ -28,5 +28,8 @@ function serialiseResolution(resolution: WorkspaceSurfaceResolution): Record<str
         source: resolution.source,
         surfaces: [...resolution.surfaces],
         unknownSurfaces: [...resolution.unknownSurfaces],
+        // Recognised but non-installable values, reported separately so a caller is never told that
+        // wrong-now configuration data is merely an outdated config. See workspace-surface-types.ts.
+        notInstallableSurfaces: [...resolution.notInstallableSurfaces],
     }
 }

@@ -29,9 +29,25 @@ const INSTALLABLE_SURFACES = Object.freeze([
 
 const INSTALLABLE_SURFACE_SET: ReadonlySet<string> = new Set(INSTALLABLE_SURFACES)
 
+/**
+ * Surfaces this build RECOGNISES but which an installation may never contribute.
+ *
+ * Exactly `businessOs` today. It is a perfectly valid `Surface` in `src/lib/surfaces.ts` - it is simply
+ * not installable, because the owner console requires an explicit per-profile opt-in and no blueprint may
+ * switch it on.
+ *
+ * This set exists because collapsing it into "unknown" was a misdiagnosis. A config naming `businessOs`
+ * is not an old config written before a product change; it is a config that is WRONG NOW, and reporting
+ * it as forward-compatibility drift would hide bad installation data behind reassuring copy. The
+ * behaviour is identical and fail-safe either way - the value is dropped and never granted - but the
+ * caller is now told which of the two things happened.
+ */
+const RECOGNISED_BUT_NOT_INSTALLABLE: ReadonlySet<string> = new Set<string>(["businessOs"])
+
 type FrozenInstallationConfig = Readonly<{
     surfaces: readonly Surface[]
     unknown: readonly string[]
+    notInstallable: readonly string[]
 }>
 
 /**
@@ -59,8 +75,15 @@ function frozenConfig(value: unknown, installationId: string): FrozenInstallatio
 
     const surfaces: Surface[] = []
     const unknown: string[] = []
+    const notInstallable: string[] = []
     for (const surface of candidate.surfaces) {
         if (typeof surface !== "string") throw invalidConfig(installationId)
+        if (RECOGNISED_BUT_NOT_INSTALLABLE.has(surface)) {
+            // Recognised, and refused. Reported separately from `unknown` so nobody is told a config is
+            // merely outdated when it is actually wrong.
+            if (!notInstallable.includes(surface)) notInstallable.push(surface)
+            continue
+        }
         if (!INSTALLABLE_SURFACE_SET.has(surface)) {
             if (!unknown.includes(surface)) unknown.push(surface)
             continue
@@ -68,7 +91,11 @@ function frozenConfig(value: unknown, installationId: string): FrozenInstallatio
         if (!surfaces.includes(surface as Surface)) surfaces.push(surface as Surface)
     }
 
-    return Object.freeze({ surfaces: Object.freeze(surfaces), unknown: Object.freeze(unknown) })
+    return Object.freeze({
+        surfaces: Object.freeze(surfaces),
+        unknown: Object.freeze(unknown),
+        notInstallable: Object.freeze(notInstallable),
+    })
 }
 
 function invalidConfig(installationId: string): PersistenceError {
@@ -105,6 +132,7 @@ export class WorkspaceSurfaceResolver implements WorkspaceSurfaceResolverPort {
                 source: "no-active-blueprint-installation" as const,
                 surfaces: Object.freeze([]) as readonly Surface[],
                 unknownSurfaces: Object.freeze([]) as readonly string[],
+                notInstallableSurfaces: Object.freeze([]) as readonly string[],
             })
         }
 
@@ -116,6 +144,7 @@ export class WorkspaceSurfaceResolver implements WorkspaceSurfaceResolverPort {
             source: "active-blueprint-installation" as const,
             surfaces: config.surfaces,
             unknownSurfaces: config.unknown,
+            notInstallableSurfaces: config.notInstallable,
         })
     }
 

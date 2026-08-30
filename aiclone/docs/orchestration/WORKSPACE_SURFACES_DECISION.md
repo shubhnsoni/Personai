@@ -123,8 +123,9 @@ fall-back decision **to the caller, where it is visible**, instead of hiding it 
 a `source` field a caller could ignore while still receiving surfaces. A flag that must be read to avoid a
 wrong conclusion is a weaker guarantee than two functions that cannot be confused.
 
-The four-outcome table below still describes the system, but `profile-fallback` is now the *caller's*
-composition of the two methods rather than a mode of one.
+The four-outcome table below is **obsolete in two of its four rows** and is retained only because this
+correction refers to it. Independent review pointed out that the sentence previously here — "still
+describes the system" — was simply false. Read the authoritative table a few lines down, not this one.
 
 **The `source` VALUES in the table below are superseded too, and the table is left in place only because
 this correction refers to it.** S2-A flagged that two vocabularies coexisting in one document is a
@@ -146,7 +147,7 @@ So the resolver has four outcomes, and they must be distinguishable rather than 
 |---|---|---|
 | no workspace id | profile role kit + extras | `profile-legacy` |
 | workspace, ACTIVE installation | `configJson.surfaces`, frozen | `workspace-installation` |
-| workspace, no ACTIVE installation | profile role kit + extras | `profile-fallback` |
+| workspace, no ACTIVE installation | **superseded — see the CORRECTION above; the shipped behaviour is an EXPLICITLY EMPTY set with `no-active-blueprint-installation`, never profile extras** | ~~`profile-fallback`~~ |
 | workspace not accessible | nothing; fails closed | refusal, not a source |
 
 ## Refusals
@@ -169,3 +170,47 @@ authorization error into a silent downgrade that still shows product areas.
   and installing must not become a way to obtain it. `configJson.businessOsExcluded` is asserted true.
 - **No mutation of `surfacesFor`'s signature.** Twenty consumers depend on it. The workspace-aware resolver
   is a new function that *uses* it, not a replacement that breaks them.
+
+
+---
+
+## OPEN DEFECT — the shell selects a workspace on the user's behalf (found by independent review)
+
+**Severity: MAJOR. Not a cross-tenant disclosure. Not fixed in this run.**
+
+The resolver honours precedence rule 4 exactly: `forWorkspace` takes an explicit id and
+`withoutWorkspace` takes the profile as an argument, so neither can query memberships and neither can
+guess. That part is structural and was attacked and held.
+
+The **shell** is where the rule leaks, and the chain is:
+
+- `src/lib/auth-sync.ts:113-117` picks the active profile from a cookie, then falls back to latest/first.
+- `src/app/dashboard/business-os/page.tsx:24,29-30` takes `user.profiles[0]`.
+- `src/components/business-os/business-os-shell.tsx:274-278` prefers the workspace whose `profileId`
+  matches, **then falls back to `workspaces[0]?.id`**.
+- `src/lib/persistence/tenancy.ts:53` orders memberships by workspace name and membership id — so `[0]`
+  is an alphabetical accident, not a user decision.
+
+A user with authorized memberships in A and B, whose active profile matches neither, is shown A's
+installation-derived product configuration because A sorts first. They are a member of A, so nothing
+leaks — but they may believe they are looking at B.
+
+### Why it was not fixed here
+
+Removing the auto-selection is not a local change. Twelve panels in the shell take `workspaceId`, and
+blanking the selection would empty all of them on load. Doing it properly means an explicit
+workspace-selection state with a deliberate "no workspace chosen" rendering across the whole console —
+its own package, with its own UI decisions.
+
+### What WAS done, and why it is not a fix
+
+`workspace-surfaces-panel.tsx` now always names the workspace it is showing. That removes the
+*ambiguity* which made an implicit selection dangerous rather than merely convenient: an owner can see
+which workspace answered. The implicit selection itself remains.
+
+### The package that closes it
+
+Make workspace selection explicit in `business-os-shell.tsx`: no auto-selection when the user has more
+than one authorized workspace, a deliberate empty state until they choose, and the choice persisted so
+it survives a reload. Then delete the `workspaces[0]` fallback. Check every panel's empty state before
+doing it, because they will all start seeing `workspaceId === ""` on first load.

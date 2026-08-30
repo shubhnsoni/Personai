@@ -77,21 +77,33 @@ export function WorkspaceSurfacesPanel({ workspaceId }: { workspaceId: string })
      */
     useEffect(() => {
         const controller = new AbortController()
+        // Set by cleanup. The abort alone is not enough: a fetch implementation that ignores its signal,
+        // or a promise already resolved when abort fires, still lands in the `try` and would write into
+        // the single state slot. Independent review found the consequence - a late success for the OLD
+        // workspace could not RENDER (the read gate blocks it) but it DID overwrite the current
+        // workspace's stored value, leaving the panel on its loading skeleton indefinitely. So this is
+        // not a duplicate of the key gate: the key gate stops the wrong data being shown, and this stops
+        // the right data being erased.
+        let superseded = false
         const run = async () => {
             try {
                 const data = await workspaceSurfacesRequest<WorkspaceSurfaceResolution>(
                     `/api/platform/workspaces/${encodeURIComponent(workspaceId)}/surfaces`,
                     { signal: controller.signal },
                 )
+                if (superseded) return
                 setFailed(null)
                 setLoaded({ key: workspaceId, value: data })
             } catch (cause) {
-                if (isAbortError(cause)) return
+                if (isAbortError(cause) || superseded) return
                 setFailed({ key: workspaceId, value: cause })
             }
         }
         if (workspaceId) void run()
-        return () => controller.abort()
+        return () => {
+            superseded = true
+            controller.abort()
+        }
     }, [workspaceId])
 
     // Only this workspace's result counts. A value left over from a previous workspace is not this
@@ -117,6 +129,18 @@ export function WorkspaceSurfacesPanel({ workspaceId }: { workspaceId: string })
                     <LayoutGrid className="h-4 w-4" aria-hidden="true" />
                     Workspace surfaces
                 </CardTitle>
+                {/* The workspace is named, always. Independent review found the shell can SELECT a
+                    workspace on the user's behalf - it prefers the one matching the active profile and
+                    otherwise falls back to the first in a name-ordered list - so without this line an
+                    owner could read one workspace's product configuration believing it was another's.
+                    Naming it does not fix the implicit selection, which is recorded as its own package,
+                    but it removes the ambiguity that made the selection dangerous rather than merely
+                    convenient. */}
+                {workspaceId ? (
+                    <p className="text-xs text-muted-foreground">
+                        Showing workspace <span className="font-medium">{workspaceId}</span>
+                    </p>
+                ) : null}
             </CardHeader>
             <CardContent>
                 <p className="text-xs text-muted-foreground">
@@ -204,6 +228,27 @@ export function WorkspaceSurfacesPanel({ workspaceId }: { workspaceId: string })
                                     recognise. They were dropped rather than shown or granted:{" "}
                                     <span className="font-medium">{resolution.unknownSurfaces.join(", ")}</span>. This
                                     means the configuration outlived a product change - it is not an error.
+                                </p>
+                            </section>
+                        ) : null}
+
+                        {resolution.notInstallableSurfaces.length > 0 ? (
+                            <section aria-labelledby="workspace-surfaces-not-installable-heading">
+                                <h4
+                                    id="workspace-surfaces-not-installable-heading"
+                                    className="flex items-center gap-1 text-xs font-medium text-destructive"
+                                >
+                                    <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                                    This installation records a surface it is not allowed to grant
+                                </h4>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    The frozen configuration names{" "}
+                                    <span className="font-medium">{resolution.notInstallableSurfaces.join(", ")}</span>,
+                                    which this build DOES recognise but which no blueprint may contribute - the owner
+                                    console requires a separate explicit opt-in. It was dropped and was never granted,
+                                    so nothing is exposed. Unlike an unrecognised surface above, this is not a
+                                    configuration that outlived a product change: it is wrong now, and worth
+                                    investigating.
                                 </p>
                             </section>
                         ) : null}

@@ -382,7 +382,7 @@ async function main() {
                         outerKeys(owner) === "data,ok" &&
                             owner.body.ok === true &&
                             Object.keys(ownerResolution).sort().join(",") ===
-                                "blueprintId,installationId,source,surfaces,unknownSurfaces,workspaceId",
+                                "blueprintId,installationId,notInstallableSurfaces,source,surfaces,unknownSurfaces,workspaceId",
                         `outer=${outerKeys(owner)} resolution=${Object.keys(ownerResolution).sort().join(",")}`,
                     )
                     for (const [label, refusal] of [
