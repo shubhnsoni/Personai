@@ -149,6 +149,24 @@ check(
     "the preview context asks only for profile.read, so no write permission path exists",
     /"profile\.read"/.test(sharedSrc) && !/profile\.update/.test(executableOnly(sharedSrc)),
 )
+// There are now TWO blueprint listing surfaces, and that is deliberate rather than duplication:
+// /api/business-os/blueprints sits behind requireBusinessOsAccess (the owner-console surface, which is
+// opt-in per profile and asserted below to never be granted by a blueprint choice), while
+// /api/platform/blueprints needs only workspace membership. Onboarding happens BEFORE anyone opts into
+// the owner console, so merging the two would either lock preview out of onboarding or quietly widen
+// what the businessOs surface implies. Pinned here so a future de-duplication has to argue with it.
+const businessOsListSrc = readFileSync(join(APP_ROOT, "src/app/api/business-os/blueprints/route.ts"), "utf8")
+const platformListSrc = readFileSync(join(APP_ROOT, "src/app/api/platform/blueprints/route.ts"), "utf8")
+checkInvertible(
+    "MEASURED: the two blueprint listing surfaces authorize differently, so neither is a duplicate of the other",
+    /requireBusinessOsAccess/.test(businessOsListSrc) && !/requireBusinessOsAccess/.test(platformListSrc),
+    "business-os route requires the businessOs surface; platform route requires only workspace membership",
+)
+check(
+    "both blueprint listing surfaces are GET-only, so neither is an install path",
+    !/\bexport\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/.test(businessOsListSrc)
+        && !/\bexport\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/.test(platformListSrc),
+)
 const PROVIDER_FORMS = ["nodemailer", "resend", "stripe", "twilio", "setInterval", "setTimeout", "cron", "enqueue"]
 const allPreviewCode = `${resolverCode}\n${httpSrc}\n${sharedSrc}\n${runtimeSrc}\n${listRouteSrc}\n${previewRouteSrc}`
 const foundProviders = PROVIDER_FORMS.filter((n) => allPreviewCode.toLowerCase().includes(n.toLowerCase()))

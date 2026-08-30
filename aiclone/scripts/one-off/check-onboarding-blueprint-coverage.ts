@@ -182,7 +182,17 @@ checkInvertible(
     !exportsBlueprintWriteRoute("/synthetic/blueprints/preview/route.ts", "export async function GET() { return Response.json({}) }"),
 )
 
-const platformRoutes = routeFiles(join(APP_ROOT, "src/app/api/platform"))
+// Scanning only src/app/api/platform would leave the likelier hole open: src/app/api/business-os
+// ALREADY serves blueprints (a GET list and a GET by id, both behind the businessOs surface), so that
+// tree - not platform - is where somebody would most naturally add an install POST. The scan therefore
+// covers every API route, and the assertion names the count so a shrinking scan is visible.
+const platformRoutes = routeFiles(join(APP_ROOT, "src/app/api"))
+checkInvertible(
+    "the write-route scan reaches the business-os blueprint tree, not just the platform one",
+    platformRoutes.some((f) => /[\\/]api[\\/]business-os[\\/]blueprints[\\/]/.test(f))
+        && platformRoutes.some((f) => /[\\/]api[\\/]platform[\\/]blueprints[\\/]/.test(f)),
+    `${platformRoutes.length} api routes scanned`,
+)
 const blueprintWriteRoutes = platformRoutes.filter((filePath) =>
     exportsBlueprintWriteRoute(filePath, readFileSync(filePath, "utf8")),
 )
@@ -194,7 +204,7 @@ check(
     [
         ...blueprintWriteRoutes.map((filePath) => `write route ${filePath.replace(APP_ROOT, "")}`),
         ...installedBlueprintModels.map((model) => `schema model ${model}`),
-    ].join(", ") || `${platformRoutes.length} platform routes; no blueprint writes or installed-blueprint models`,
+    ].join(", ") || `${platformRoutes.length} api routes; no blueprint writes or installed-blueprint models`,
 )
 const needsSrc = readFileSync(join(APP_ROOT, "src/lib/onboarding-needs.ts"), "utf8")
 check(
