@@ -44,6 +44,10 @@ const results: Array<{ name: string; pass: boolean; detail: string }> = []
 function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
+/** Flipped individually by INVERT_ASSERTION=1; identical to checkInvertible() otherwise. */
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    results.push({ name, pass: INVERT ? !pass : pass, detail })
+}
 
 function deferred<T>() {
     let resolve!: (value: T | PromiseLike<T>) => void
@@ -181,24 +185,24 @@ async function main() {
                     else illegal += 1
                 }
             }
-            check(
+            checkInvertible(
                 `${label} transition table is total over ${all.length}x${all.length} pairs`,
                 legal + illegal === all.length ** 2,
                 `legal=${legal} illegal=${illegal}`,
             )
         }
-        check(
+        checkInvertible(
             "EXPIRED and CANCELLED retainers are terminal, so a cancelled agreement cannot be revived",
             retainerFlow.isTerminal("EXPIRED") && retainerFlow.isTerminal("CANCELLED"),
         )
-        check(
+        checkInvertible(
             "every ended period state is terminal, so a closed window cannot silently reopen",
             retainerPeriodFlow.isTerminal("CLOSED") &&
                 retainerPeriodFlow.isTerminal("RENEWED") &&
                 retainerPeriodFlow.isTerminal("LAPSED"),
         )
-        check("PAUSED is reachable from ACTIVE and back", retainerFlow.can("ACTIVE", "PAUSED") && retainerFlow.can("PAUSED", "ACTIVE"))
-        check("CANCELLED is not reachable from EXPIRED", !retainerFlow.can("EXPIRED", "CANCELLED"))
+        checkInvertible("PAUSED is reachable from ACTIVE and back", retainerFlow.can("ACTIVE", "PAUSED") && retainerFlow.can("PAUSED", "ACTIVE"))
+        checkInvertible("CANCELLED is not reachable from EXPIRED", !retainerFlow.can("EXPIRED", "CANCELLED"))
 
         // ---- seed two tenants ----------------------------------------------
         for (const [u, p, w] of [
@@ -222,9 +226,9 @@ async function main() {
         )
         const anonList = await attempt(() => retainers.list(ids.wsA))
         const afterAnon = await prisma.caseRetainer.count()
-        check("anonymous create refused UNAUTHORIZED", !anonCreate.ok && anonCreate.code === "UNAUTHORIZED", why(anonCreate))
-        check("anonymous list refused UNAUTHORIZED", !anonList.ok && anonList.code === "UNAUTHORIZED", why(anonList))
-        check("anonymous wrote zero retainers", beforeAnon === afterAnon, `before=${beforeAnon} after=${afterAnon}`)
+        checkInvertible("anonymous create refused UNAUTHORIZED", !anonCreate.ok && anonCreate.code === "UNAUTHORIZED", why(anonCreate))
+        checkInvertible("anonymous list refused UNAUTHORIZED", !anonList.ok && anonList.code === "UNAUTHORIZED", why(anonList))
+        checkInvertible("anonymous wrote zero retainers", beforeAnon === afterAnon, `before=${beforeAnon} after=${afterAnon}`)
 
         // ---- 2. the agreement cannot be self-contradictory at the engine ----
         identity.current = `clerk_${ids.userA}`
@@ -235,7 +239,7 @@ async function main() {
                 actor,
             ),
         )
-        check(
+        checkInvertible(
             "a retainer denominated in both units and money is refused with a named conflict, not a constraint violation",
             !bothBases.ok && bothBases.code === "CONFLICT",
             why(bothBases),
@@ -247,13 +251,13 @@ async function main() {
                 actor,
             ),
         )
-        check("a MONTHLY retainer carrying periodDays is refused", !monthlyDays.ok && monthlyDays.code === "CONFLICT", why(monthlyDays))
+        checkInvertible("a MONTHLY retainer carrying periodDays is refused", !monthlyDays.ok && monthlyDays.code === "CONFLICT", why(monthlyDays))
         const customNoDays = await attempt(() =>
             retainers.create(ids.wsA, { reference: "BAD3", title: "T", basis: "UNITS", includedUnits: 10, periodKind: "CUSTOM" }, actor),
         )
-        check("a CUSTOM retainer with no periodDays is refused", !customNoDays.ok && customNoDays.code === "CONFLICT", why(customNoDays))
+        checkInvertible("a CUSTOM retainer with no periodDays is refused", !customNoDays.ok && customNoDays.code === "CONFLICT", why(customNoDays))
         const afterBad = await prisma.caseRetainer.count()
-        check("three refused agreements wrote zero rows", afterBad === afterAnon, `count=${afterBad}`)
+        checkInvertible("three refused agreements wrote zero rows", afterBad === afterAnon, `count=${afterBad}`)
 
         // ---- 3. create, idempotency, derived period length ------------------
         const created = await retainers.create(
@@ -268,14 +272,14 @@ async function main() {
             },
             actor,
         )
-        check("retainer created DRAFT", created.record.state === "DRAFT", `state=${created.record.state}`)
-        check("period length is derived from MONTHLY, not stored", created.record.periodLengthDays === 30, `days=${created.record.periodLengthDays}`)
+        checkInvertible("retainer created DRAFT", created.record.state === "DRAFT", `state=${created.record.state}`)
+        checkInvertible("period length is derived from MONTHLY, not stored", created.record.periodLengthDays === 30, `days=${created.record.periodLengthDays}`)
         const replay = await retainers.create(
             ids.wsA,
             { reference: "RET-DIFFERENT", title: "different", basis: "VALUE", includedValueCents: 999, idempotencyKey: "k1" },
             actor,
         )
-        check(
+        checkInvertible(
             "replaying the idempotency key returns the original agreement, not a second one",
             replay.replayed && replay.record.id === created.record.id && replay.record.reference === "RET-1",
             `replayed=${replay.replayed} reference=${replay.record.reference}`,
@@ -283,20 +287,20 @@ async function main() {
         const dupReference = await attempt(() =>
             retainers.create(ids.wsA, { reference: "RET-1", title: "clash", basis: "UNITS", includedUnits: 5 }, actor),
         )
-        check("a duplicate reference in the same workspace is a CONFLICT", !dupReference.ok && dupReference.code === "CONFLICT", why(dupReference))
+        checkInvertible("a duplicate reference in the same workspace is a CONFLICT", !dupReference.ok && dupReference.code === "CONFLICT", why(dupReference))
 
         const retainerId = created.record.id
 
         // ---- 4. a DRAFT agreement cannot be used ---------------------------
         const draftPeriod = await attempt(() => retainers.openPeriod(ids.wsA, retainerId, {}, actor))
-        check("a DRAFT retainer cannot open a period", !draftPeriod.ok && draftPeriod.code === "CONFLICT", why(draftPeriod))
+        checkInvertible("a DRAFT retainer cannot open a period", !draftPeriod.ok && draftPeriod.code === "CONFLICT", why(draftPeriod))
         const draftDraw = await attempt(() => retainers.recordDraw(ids.wsA, retainerId, { kind: "DRAW", units: 1 }, actor))
-        check("a DRAFT retainer cannot accept a draw", !draftDraw.ok && draftDraw.code === "CONFLICT", why(draftDraw))
+        checkInvertible("a DRAFT retainer cannot accept a draw", !draftDraw.ok && draftDraw.code === "CONFLICT", why(draftDraw))
 
         // ---- 5. activation, cases, and coverage ----------------------------
         const activated = await retainers.transition(ids.wsA, retainerId, "ACTIVE", actor)
-        check("activation stamps activatedAt", activated.activatedAt !== null, `activatedAt=${activated.activatedAt}`)
-        check(
+        checkInvertible("activation stamps activatedAt", activated.activatedAt !== null, `activatedAt=${activated.activatedAt}`)
+        checkInvertible(
             "an ACTIVE retainer exposes only its real next moves",
             [...activated.allowedTransitions].sort().join(",") === "CANCELLED,EXPIRED,PAUSED",
             activated.allowedTransitions.join(","),
@@ -309,17 +313,17 @@ async function main() {
         identity.current = `clerk_${ids.userA}`
 
         const linked = await retainers.linkCase(ids.wsA, retainerId, caseA.record.id, actor)
-        check("linking a case in the same workspace succeeds", linked.linked)
+        checkInvertible("linking a case in the same workspace succeeds", linked.linked)
         const relink = await retainers.linkCase(ids.wsA, retainerId, caseA.record.id, actor)
-        check("re-linking the same case is a no-op rather than a duplicate or an error", relink.linked === false)
+        checkInvertible("re-linking the same case is a no-op rather than a duplicate or an error", relink.linked === false)
         const foreignLink = await attempt(() => retainers.linkCase(ids.wsA, retainerId, caseB.record.id, actor))
-        check(
+        checkInvertible(
             "linking another tenant's case is FORBIDDEN, and indistinguishable from a case that does not exist",
             !foreignLink.ok && foreignLink.code === "FORBIDDEN",
             why(foreignLink),
         )
         const ghostLink = await attempt(() => retainers.linkCase(ids.wsA, retainerId, `${RUN}_nope`, actor))
-        check(
+        checkInvertible(
             "linking a nonexistent case produces the identical refusal",
             !ghostLink.ok && ghostLink.code === "FORBIDDEN" && ghostLink.message === (foreignLink as { message: string }).message,
             why(ghostLink),
@@ -327,54 +331,54 @@ async function main() {
 
         // ---- 6. periods ----------------------------------------------------
         const period1 = await retainers.openPeriod(ids.wsA, retainerId, {}, actor)
-        check("the first period is ordinal 1 and OPEN", period1.ordinal === 1 && period1.state === "OPEN", `ordinal=${period1.ordinal}`)
-        check("the allowance is snapshot onto the period", period1.includedUnits === 40, `included=${period1.includedUnits}`)
-        check("remaining is derived on read", period1.remaining === 40 && period1.overage === 0, `remaining=${period1.remaining}`)
-        check(
+        checkInvertible("the first period is ordinal 1 and OPEN", period1.ordinal === 1 && period1.state === "OPEN", `ordinal=${period1.ordinal}`)
+        checkInvertible("the allowance is snapshot onto the period", period1.includedUnits === 40, `included=${period1.includedUnits}`)
+        checkInvertible("remaining is derived on read", period1.remaining === 40 && period1.overage === 0, `remaining=${period1.remaining}`)
+        checkInvertible(
             "the period is dated 30 days long, from the derived MONTHLY length",
             Math.round((period1.endsOn.getTime() - period1.startsOn.getTime()) / 86_400_000) === 30,
         )
         const secondOpen = await attempt(() => retainers.openPeriod(ids.wsA, retainerId, {}, actor))
-        check("a second open period is refused while one is open", !secondOpen.ok && secondOpen.code === "CONFLICT", why(secondOpen))
+        checkInvertible("a second open period is refused while one is open", !secondOpen.ok && secondOpen.code === "CONFLICT", why(secondOpen))
 
         // ---- 7. draws ------------------------------------------------------
         const unlinkedDraw = await attempt(() =>
             retainers.recordDraw(ids.wsA, retainerId, { kind: "DRAW", units: 2, caseId: caseA2.record.id }, actor),
         )
-        check(
+        checkInvertible(
             "a draw naming a case the retainer does not cover is refused",
             !unlinkedDraw.ok && unlinkedDraw.code === "CONFLICT",
             why(unlinkedDraw),
         )
         const wrongBasis = await attempt(() => retainers.recordDraw(ids.wsA, retainerId, { kind: "DRAW", valueCents: 500 }, actor))
-        check("a money draw against a unit period is refused", !wrongBasis.ok && wrongBasis.code === "CONFLICT", why(wrongBasis))
+        checkInvertible("a money draw against a unit period is refused", !wrongBasis.ok && wrongBasis.code === "CONFLICT", why(wrongBasis))
         const negativeDraw = await attempt(() => retainers.recordDraw(ids.wsA, retainerId, { kind: "DRAW", units: -3 }, actor))
-        check("a negative DRAW is refused and pointed at CREDIT", !negativeDraw.ok && negativeDraw.code === "CONFLICT", why(negativeDraw))
+        checkInvertible("a negative DRAW is refused and pointed at CREDIT", !negativeDraw.ok && negativeDraw.code === "CONFLICT", why(negativeDraw))
         const zeroDraw = await attempt(() => retainers.recordDraw(ids.wsA, retainerId, { kind: "DRAW", units: 0 }, actor))
-        check("a zero draw is refused", !zeroDraw.ok && zeroDraw.code === "CONFLICT", why(zeroDraw))
+        checkInvertible("a zero draw is refused", !zeroDraw.ok && zeroDraw.code === "CONFLICT", why(zeroDraw))
 
         const drawsBeforeRefusals = await prisma.caseRetainerDraw.count()
         const usedBefore = (await prisma.caseRetainerPeriod.findUniqueOrThrow({ where: { id: period1.id } })).usedUnits
-        check("four refused draws wrote no ledger row", drawsBeforeRefusals === base.draws, `draws=${drawsBeforeRefusals}`)
-        check("four refused draws left the balance untouched", usedBefore === 0, `used=${usedBefore}`)
+        checkInvertible("four refused draws wrote no ledger row", drawsBeforeRefusals === base.draws, `draws=${drawsBeforeRefusals}`)
+        checkInvertible("four refused draws left the balance untouched", usedBefore === 0, `used=${usedBefore}`)
 
         const d1 = await retainers.recordDraw(ids.wsA, retainerId, { kind: "DRAW", units: 6, caseId: caseA.record.id, note: "review" }, actor)
-        check("a draw against a covered case is accepted", d1.draw.unitsDelta === 6, `delta=${d1.draw.unitsDelta}`)
-        check("the draw records the balance it produced", d1.draw.usedUnitsAfter === 6, `after=${d1.draw.usedUnitsAfter}`)
-        check("the period reflects the draw in the same transaction", d1.period.usedUnits === 6 && d1.period.remaining === 34, `used=${d1.period.usedUnits}`)
+        checkInvertible("a draw against a covered case is accepted", d1.draw.unitsDelta === 6, `delta=${d1.draw.unitsDelta}`)
+        checkInvertible("the draw records the balance it produced", d1.draw.usedUnitsAfter === 6, `after=${d1.draw.usedUnitsAfter}`)
+        checkInvertible("the period reflects the draw in the same transaction", d1.period.usedUnits === 6 && d1.period.remaining === 34, `used=${d1.period.usedUnits}`)
 
         const idem1 = await retainers.recordDraw(ids.wsA, retainerId, { kind: "DRAW", units: 5, idempotencyKey: "d-1" }, actor)
         const idem2 = await retainers.recordDraw(ids.wsA, retainerId, { kind: "DRAW", units: 5, idempotencyKey: "d-1" }, actor)
-        check(
+        checkInvertible(
             "replaying a draw idempotency key returns the original and consumes nothing further",
             idem2.replayed && idem2.draw.id === idem1.draw.id && idem2.period.usedUnits === 11,
             `replayed=${idem2.replayed} used=${idem2.period.usedUnits}`,
         )
 
         const credit = await retainers.recordDraw(ids.wsA, retainerId, { kind: "CREDIT", units: -4, note: "engagement cancelled" }, actor)
-        check("a CREDIT returns allowance and is recorded as its own kind", credit.period.usedUnits === 7 && credit.draw.kind === "CREDIT", `used=${credit.period.usedUnits}`)
+        checkInvertible("a CREDIT returns allowance and is recorded as its own kind", credit.period.usedUnits === 7 && credit.draw.kind === "CREDIT", `used=${credit.period.usedUnits}`)
         const overCredit = await attempt(() => retainers.recordDraw(ids.wsA, retainerId, { kind: "CREDIT", units: -100 }, actor))
-        check(
+        checkInvertible(
             "a credit larger than what was used is refused, so the balance cannot go negative",
             !overCredit.ok && overCredit.code === "CONFLICT",
             why(overCredit),
@@ -382,12 +386,12 @@ async function main() {
 
         // ---- 8. OVERAGE is accepted and reported ---------------------------
         const over = await retainers.recordDraw(ids.wsA, retainerId, { kind: "DRAW", units: 40, caseId: caseA.record.id }, actor)
-        check(
+        checkInvertible(
             "a draw past the allowance is ACCEPTED, because refusing work that was done would be a lie",
             over.period.usedUnits === 47,
             `used=${over.period.usedUnits}`,
         )
-        check("the overage is reported, not hidden", over.period.overage === 7 && over.period.remaining === 0, `overage=${over.period.overage}`)
+        checkInvertible("the overage is reported, not hidden", over.period.overage === 7 && over.period.remaining === 0, `overage=${over.period.overage}`)
 
         // ---- 9. CONCURRENCY: both parallel draws must land -----------------
         const beforeParallel = (await prisma.caseRetainerPeriod.findUniqueOrThrow({ where: { id: period1.id } })).usedUnits
@@ -397,12 +401,12 @@ async function main() {
         ])
         const landed = parallel.filter((p) => p.status === "fulfilled").length
         const afterParallel = (await prisma.caseRetainerPeriod.findUniqueOrThrow({ where: { id: period1.id } })).usedUnits
-        check(
+        checkInvertible(
             "MEASURED: two genuinely parallel draws BOTH land - consumption is additive, so a lost writer would forget real work",
             landed === 2,
             `landed=${landed}/2`,
         )
-        check(
+        checkInvertible(
             "the two parallel draws sum correctly, so neither overwrote the other's balance",
             afterParallel === beforeParallel + 8,
             `${beforeParallel} -> ${afterParallel}`,
@@ -420,12 +424,12 @@ async function main() {
             running += row.unitsDelta ?? 0
             if (running !== row.usedUnitsAfter) mismatch = `expected ${running}, stored ${row.usedUnitsAfter}`
         }
-        check(
+        checkInvertible(
             "replaying every delta reproduces every stored after-balance, and the final one matches the period",
             mismatch === "" && running === afterParallel,
             mismatch || `replay=${running} period=${afterParallel}`,
         )
-        check("the ledger has a row per accepted draw and no more", ledger.length === 6, `rows=${ledger.length}`)
+        checkInvertible("the ledger has a row per accepted draw and no more", ledger.length === 6, `rows=${ledger.length}`)
 
         // ---- 10. deterministic read interleaving proves lock necessity -----
         // Promise.all alone may serialize by scheduling. Here the middleware above pauses T1 only
@@ -467,7 +471,7 @@ async function main() {
         const outcomes = await Promise.allSettled(t2 ? [t1, t2] : [t1])
         interleaving = null
         const interleaveAfter = (await prisma.caseRetainerPeriod.findUniqueOrThrow({ where: { id: interleavedPeriod.id } })).usedUnits
-        check(
+        checkInvertible(
             "MEASURED: deterministic read interleaving proves recordDraw's FOR UPDATE locks serialize both draws instead of allowing a stale-balance overwrite",
             firstReadReached &&
                 !secondReadBeforeRelease &&
@@ -480,7 +484,7 @@ async function main() {
 
         // ---- 11. unlinking is refused once history exists ------------------
         const unlink = await attempt(() => retainers.unlinkCase(ids.wsA, retainerId, caseA.record.id, actor))
-        check(
+        checkInvertible(
             "a case that has drawn cannot be unlinked, because the ledger names it",
             !unlink.ok && unlink.code === "CONFLICT",
             why(unlink),
@@ -494,23 +498,23 @@ async function main() {
             data: { id: `${RUN}_inv2`, caseId: caseA2.record.id, reference: "INV-2", amountCents: 100, state: "DRAFT" },
         })
         const badBilling = await attempt(() => retainers.setBilling(ids.wsA, retainerId, period1.id, "ISSUED", actor))
-        check("moving billing straight to ISSUED from NONE is refused", !badBilling.ok && badBilling.code === "CONFLICT", why(badBilling))
+        checkInvertible("moving billing straight to ISSUED from NONE is refused", !badBilling.ok && badBilling.code === "CONFLICT", why(badBilling))
         const draftBilling = await retainers.setBilling(ids.wsA, retainerId, period1.id, "DRAFT", actor)
-        check("billing enters DRAFT first, using the existing invoice vocabulary", draftBilling.billingState === "DRAFT")
+        checkInvertible("billing enters DRAFT first, using the existing invoice vocabulary", draftBilling.billingState === "DRAFT")
         const uncoveredInvoice = await attempt(() =>
             retainers.setBilling(ids.wsA, retainerId, period1.id, "ISSUED", actor, { invoiceId: foreignInvoice.id }),
         )
-        check(
+        checkInvertible(
             "an invoice on a case the retainer does not cover is refused",
             !uncoveredInvoice.ok && uncoveredInvoice.code === "CONFLICT",
             why(uncoveredInvoice),
         )
         const issued = await retainers.setBilling(ids.wsA, retainerId, period1.id, "ISSUED", actor, { invoiceId: invoice.id })
-        check("a covered invoice is recorded against the period", issued.invoiceId === invoice.id && issued.billingState === "ISSUED")
+        checkInvertible("a covered invoice is recorded against the period", issued.invoiceId === invoice.id && issued.billingState === "ISSUED")
         const paid = await retainers.setBilling(ids.wsA, retainerId, period1.id, "PAID", actor)
-        check("billing can reach PAID and is then terminal", paid.billingState === "PAID" && paid.allowedBillingTransitions.length === 0)
+        checkInvertible("billing can reach PAID and is then terminal", paid.billingState === "PAID" && paid.allowedBillingTransitions.length === 0)
         const paymentsNow = await prisma.payment.count()
-        check(
+        checkInvertible(
             "the entire billing lifecycle created no Payment row",
             paymentsNow === base.payments,
             `payments ${base.payments} -> ${paymentsNow}`,
@@ -518,19 +522,19 @@ async function main() {
 
         // ---- 13. renewal creates the next period atomically ---------------
         const renewed = await retainers.transitionPeriod(ids.wsA, retainerId, period1.id, "RENEWED", actor)
-        check("the renewed period is terminal", renewed.period.state === "RENEWED" && renewed.period.allowedTransitions.length === 0)
-        check("renewal produced the next period in the same call", renewed.next !== null && renewed.next.ordinal === 2, `next=${renewed.next?.ordinal}`)
-        check(
+        checkInvertible("the renewed period is terminal", renewed.period.state === "RENEWED" && renewed.period.allowedTransitions.length === 0)
+        checkInvertible("renewal produced the next period in the same call", renewed.next !== null && renewed.next.ordinal === 2, `next=${renewed.next?.ordinal}`)
+        checkInvertible(
             "the next period starts where the last one ended, so there is no gap in coverage",
             renewed.next!.startsOn.getTime() === period1.endsOn.getTime(),
         )
-        check(
+        checkInvertible(
             "the new period starts with a fresh allowance and no rollover, because the agreement forbids it",
             renewed.next!.includedUnits === 40 && renewed.next!.usedUnits === 0,
             `included=${renewed.next!.includedUnits}`,
         )
         const reRenew = await attempt(() => retainers.transitionPeriod(ids.wsA, retainerId, period1.id, "CLOSED", actor))
-        check("a renewed period cannot then be closed", !reRenew.ok && reRenew.code === "CONFLICT", why(reRenew))
+        checkInvertible("a renewed period cannot then be closed", !reRenew.ok && reRenew.code === "CONFLICT", why(reRenew))
 
         // ---- 14. rollover, on a second agreement that allows it -----------
         const roll = await retainers.create(
@@ -542,70 +546,70 @@ async function main() {
         const rp1 = await retainers.openPeriod(ids.wsA, roll.record.id, {}, actor)
         await retainers.recordDraw(ids.wsA, roll.record.id, { kind: "DRAW", valueCents: 30000 }, actor)
         const rolled = await retainers.transitionPeriod(ids.wsA, roll.record.id, rp1.id, "RENEWED", actor)
-        check(
+        checkInvertible(
             "rollover carries the unused remainder forward, so 100000 + 70000 unused = 170000",
             rolled.next!.includedValueCents === 170000,
             `included=${rolled.next!.includedValueCents}`,
         )
         const rollBalance = await retainers.balance(ids.wsA, roll.record.id)
-        check(
+        checkInvertible(
             "lifetime totals span every period, so a closed period's consumption is not forgotten",
             rollBalance.lifetimeUsed === 30000 && rollBalance.periodCount === 2,
             `used=${rollBalance.lifetimeUsed} periods=${rollBalance.periodCount}`,
         )
-        check("balance names the open period", rollBalance.openPeriod?.id === rolled.next!.id)
+        checkInvertible("balance names the open period", rollBalance.openPeriod?.id === rolled.next!.id)
 
         // ---- 15. a paused agreement stops accepting work ------------------
         await retainers.transition(ids.wsA, roll.record.id, "PAUSED", actor)
         const pausedDraw = await attempt(() => retainers.recordDraw(ids.wsA, roll.record.id, { kind: "DRAW", valueCents: 100 }, actor))
-        check("a PAUSED retainer cannot accept a draw", !pausedDraw.ok && pausedDraw.code === "CONFLICT", why(pausedDraw))
+        checkInvertible("a PAUSED retainer cannot accept a draw", !pausedDraw.ok && pausedDraw.code === "CONFLICT", why(pausedDraw))
         const pausedRenew = await attempt(() => retainers.transitionPeriod(ids.wsA, roll.record.id, rolled.next!.id, "RENEWED", actor))
-        check("a PAUSED retainer cannot be renewed", !pausedRenew.ok && pausedRenew.code === "CONFLICT", why(pausedRenew))
+        checkInvertible("a PAUSED retainer cannot be renewed", !pausedRenew.ok && pausedRenew.code === "CONFLICT", why(pausedRenew))
         const lapsed = await retainers.transitionPeriod(ids.wsA, roll.record.id, rolled.next!.id, "LAPSED", actor)
-        check("a paused agreement's period can still be marked LAPSED, which is what actually happened", lapsed.period.state === "LAPSED")
-        check("lapsing does not create a next period", lapsed.next === null)
+        checkInvertible("a paused agreement's period can still be marked LAPSED, which is what actually happened", lapsed.period.state === "LAPSED")
+        checkInvertible("lapsing does not create a next period", lapsed.next === null)
 
         // ---- 16. tenant isolation and non-enumeration ---------------------
         identity.current = `clerk_${ids.userB}`
         const foreignGet = await attempt(() => retainers.get(ids.wsB, retainerId))
         const ghostGet = await attempt(() => retainers.get(ids.wsB, `${RUN}_ghost`))
-        check("another tenant reading the retainer is FORBIDDEN", !foreignGet.ok && foreignGet.code === "FORBIDDEN", why(foreignGet))
-        check(
+        checkInvertible("another tenant reading the retainer is FORBIDDEN", !foreignGet.ok && foreignGet.code === "FORBIDDEN", why(foreignGet))
+        checkInvertible(
             "a foreign retainer and a nonexistent one produce the identical refusal",
             !foreignGet.ok && !ghostGet.ok && foreignGet.code === ghostGet.code && foreignGet.message === ghostGet.message,
             `${why(foreignGet)} vs ${why(ghostGet)}`,
         )
         const crossWorkspace = await attempt(() => retainers.get(ids.wsA, retainerId))
-        check(
+        checkInvertible(
             "naming someone else's workspace is refused before the retainer is even read",
             !crossWorkspace.ok && crossWorkspace.code === "FORBIDDEN",
             why(crossWorkspace),
         )
         const bList = await retainers.list(ids.wsB)
-        check("the other tenant's list is empty rather than filtered from a shared page", bList.length === 0, `n=${bList.length}`)
+        checkInvertible("the other tenant's list is empty rather than filtered from a shared page", bList.length === 0, `n=${bList.length}`)
         identity.current = `clerk_${ids.userA}`
 
         // ---- 17. the agreement history is complete and append-only --------
         const timeline = await retainers.timeline(ids.wsA, retainerId)
         const subjects = new Set(timeline.map((e) => e.subjectType))
-        check(
+        checkInvertible(
             "the history covers the agreement, its periods, its case links, its billing and its draws",
             ["agreement", "period", "caseLink", "billing", "draw"].every((s) => subjects.has(s)),
             [...subjects].join(","),
         )
-        check("history is ordered by a monotonic sequence", timeline.every((e, i) => i === 0 || BigInt(e.seq) > BigInt(timeline[i - 1].seq)))
+        checkInvertible("history is ordered by a monotonic sequence", timeline.every((e, i) => i === 0 || BigInt(e.seq) > BigInt(timeline[i - 1].seq)))
         const rewrite = await attempt(() =>
             prisma.$executeRawUnsafe(`update "CaseRetainerEvent" set "to" = 'TAMPERED' where "retainerId" = '${retainerId}'`),
         )
-        check("the database refuses to rewrite the agreement history", !rewrite.ok, why(rewrite))
+        checkInvertible("the database refuses to rewrite the agreement history", !rewrite.ok, why(rewrite))
         const eraseDraw = await attempt(() =>
             prisma.$executeRawUnsafe(`delete from "CaseRetainerDraw" where "retainerId" = '${retainerId}'`),
         )
-        check("the database refuses to erase the draw ledger", !eraseDraw.ok, why(eraseDraw))
+        checkInvertible("the database refuses to erase the draw ledger", !eraseDraw.ok, why(eraseDraw))
 
         // ---- 18. a case event is written where the reader will look -------
         const caseEvents = await prisma.caseEvent.count({ where: { caseId: caseA.record.id, kind: "RETAINER" } })
-        check(
+        checkInvertible(
             "retainer activity involving a case also lands on that case's timeline",
             caseEvents >= 2,
             `retainer events on the case=${caseEvents}`,
@@ -614,10 +618,10 @@ async function main() {
         // ---- 19. cancellation is final -----------------------------------
         await retainers.transition(ids.wsA, retainerId, "CANCELLED", actor, "client ended the engagement")
         const revive = await attempt(() => retainers.transition(ids.wsA, retainerId, "ACTIVE", actor))
-        check("a cancelled retainer cannot be revived", !revive.ok && revive.code === "CONFLICT", why(revive))
+        checkInvertible("a cancelled retainer cannot be revived", !revive.ok && revive.code === "CONFLICT", why(revive))
 
         // ---- 20. zero external calls -------------------------------------
-        check("zero external calls were made by the retainer runtime", fetchCalls === 0, `fetchCalls=${fetchCalls}`)
+        checkInvertible("zero external calls were made by the retainer runtime", fetchCalls === 0, `fetchCalls=${fetchCalls}`)
     } finally {
         globalThis.fetch = realFetch
         const wsList = `'${ids.wsA}','${ids.wsB}'`
@@ -679,12 +683,7 @@ async function main() {
         await prisma.$disconnect()
     }
 
-    let failed = results.filter((r) => !r.pass)
-    if (INVERT) {
-        const target = results.find((r) => r.name.startsWith("MEASURED:"))
-        if (target) target.pass = !target.pass
-        failed = results.filter((r) => !r.pass)
-    }
+    const failed = results.filter((r) => !r.pass)
     for (const r of results) console.log(`${r.pass ? "PASS" : "FAIL"}  ${r.name}${r.detail ? `  (${r.detail})` : ""}`)
     console.log(`\n${results.length - failed.length}/${results.length} assertions passed`)
     if (INVERT) console.log("INVERT_ASSERTION=1 was set - a failure here is the expected proof")

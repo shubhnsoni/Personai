@@ -40,6 +40,10 @@ const results: Array<{ name: string; pass: boolean; detail: string }> = []
 function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
+/** Flipped individually by INVERT_ASSERTION=1; identical to checkInvertible() otherwise. */
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    results.push({ name, pass: INVERT ? !pass : pass, detail })
+}
 
 class ControlledIdentity implements PlatformIdentity {
     current: string | null = null
@@ -148,23 +152,23 @@ async function main() {
         const anonCreate = await call(
             api.createRetainer(send(RET, { workspaceId: ids.wsA, reference: "R", title: "T", basis: "UNITS", includedUnits: 10 })),
         )
-        check("anonymous list is 401", anonList.status === 401, `status=${anonList.status}`)
-        check("anonymous create is 401", anonCreate.status === 401, `status=${anonCreate.status}`)
-        check("the 401 body is the shared envelope", errCode(anonList) === "UNAUTHORIZED", errCode(anonList))
-        check("anonymous wrote nothing", (await prisma.caseRetainer.count()) === base.retainers)
+        checkInvertible("anonymous list is 401", anonList.status === 401, `status=${anonList.status}`)
+        checkInvertible("anonymous create is 401", anonCreate.status === 401, `status=${anonCreate.status}`)
+        checkInvertible("the 401 body is the shared envelope", errCode(anonList) === "UNAUTHORIZED", errCode(anonList))
+        checkInvertible("anonymous wrote nothing", (await prisma.caseRetainer.count()) === base.retainers)
 
         // ---- 2. shape errors are 400 at the boundary -----------------------
         identity.current = `clerk_${ids.userA}`
         const noBody = await call(api.createRetainer(malformed(RET)))
-        check("malformed JSON is 400", noBody.status === 400, `status=${noBody.status}`)
+        checkInvertible("malformed JSON is 400", noBody.status === 400, `status=${noBody.status}`)
         const noWorkspace = await call(api.createRetainer(send(RET, { reference: "R", title: "T", basis: "UNITS" })))
-        check("a missing workspaceId is 400 with the field named", noWorkspace.status === 400 && /workspaceId/.test(errMessage(noWorkspace)), errMessage(noWorkspace))
+        checkInvertible("a missing workspaceId is 400 with the field named", noWorkspace.status === 400 && /workspaceId/.test(errMessage(noWorkspace)), errMessage(noWorkspace))
         const noQueryParam = await call(api.listRetainers(get(RET)))
-        check("a read with no workspaceId query param is 400", noQueryParam.status === 400, `status=${noQueryParam.status}`)
+        checkInvertible("a read with no workspaceId query param is 400", noQueryParam.status === 400, `status=${noQueryParam.status}`)
         const badBasis = await call(
             api.createRetainer(send(RET, { workspaceId: ids.wsA, reference: "R", title: "T", basis: "HOURS", includedUnits: 5 })),
         )
-        check(
+        checkInvertible(
             "MEASURED: an unrecognised enum value is 400, not 409 - the vocabulary check happens before the state machine",
             badBasis.status === 400 && /basis/.test(errMessage(badBasis)),
             `${badBasis.status} ${errMessage(badBasis)}`,
@@ -172,13 +176,13 @@ async function main() {
         const badInt = await call(
             api.createRetainer(send(RET, { workspaceId: ids.wsA, reference: "R", title: "T", basis: "UNITS", includedUnits: 1.5 })),
         )
-        check("a non-integer allowance is 400", badInt.status === 400, `${badInt.status} ${errMessage(badInt)}`)
+        checkInvertible("a non-integer allowance is 400", badInt.status === 400, `${badInt.status} ${errMessage(badInt)}`)
         const badBool = await call(
             api.createRetainer(
                 send(RET, { workspaceId: ids.wsA, reference: "R", title: "T", basis: "UNITS", includedUnits: 5, rolloverAllowed: "yes" }),
             ),
         )
-        check("a non-boolean flag is 400", badBool.status === 400, `${badBool.status} ${errMessage(badBool)}`)
+        checkInvertible("a non-boolean flag is 400", badBool.status === 400, `${badBool.status} ${errMessage(badBool)}`)
 
         // ---- 3. create, replay, and semantic conflicts ---------------------
         const created = await call(
@@ -193,22 +197,22 @@ async function main() {
                 }),
             ),
         )
-        check("create is 201", created.status === 201, `status=${created.status}`)
+        checkInvertible("create is 201", created.status === 201, `status=${created.status}`)
         const retainerId = String((dataOf(created).retainer as { id: string }).id)
         const replay = await call(
             api.createRetainer(
                 send(RET, { workspaceId: ids.wsA, reference: "RET-OTHER", title: "x", basis: "VALUE", includedValueCents: 9, idempotencyKey: "k1" }),
             ),
         )
-        check("a replayed create is 200 with replayed true", replay.status === 200 && dataOf(replay).replayed === true, `status=${replay.status}`)
-        check("and it returns the original record", (dataOf(replay).retainer as { id: string }).id === retainerId)
+        checkInvertible("a replayed create is 200 with replayed true", replay.status === 200 && dataOf(replay).replayed === true, `status=${replay.status}`)
+        checkInvertible("and it returns the original record", (dataOf(replay).retainer as { id: string }).id === retainerId)
 
         const bothBases = await call(
             api.createRetainer(
                 send(RET, { workspaceId: ids.wsA, reference: "RET-BAD", title: "x", basis: "UNITS", includedUnits: 5, includedValueCents: 500 }),
             ),
         )
-        check(
+        checkInvertible(
             "MEASURED: a recognised but contradictory payload is 409, not 400 - the value was understood and refused",
             bothBases.status === 409,
             `${bothBases.status} ${errMessage(bothBases)}`,
@@ -217,8 +221,8 @@ async function main() {
         // ---- 4. NON-ENUMERATION, byte for byte ----------------------------
         const foreignRetainer = await call(api.getRetainer(retainerId, get(`${RET}/${retainerId}?workspaceId=${ids.wsB}`)))
         const ghostRetainer = await call(api.getRetainer(`${RUN}_ghost`, get(`${RET}/${RUN}_ghost?workspaceId=${ids.wsB}`)))
-        check("reading someone else's retainer is 403", foreignRetainer.status === 403, `status=${foreignRetainer.status}`)
-        check(
+        checkInvertible("reading someone else's retainer is 403", foreignRetainer.status === 403, `status=${foreignRetainer.status}`)
+        checkInvertible(
             "MEASURED: a foreign retainer and a nonexistent retainer are BYTE-IDENTICAL, status and body",
             refusal(foreignRetainer) === refusal(ghostRetainer),
             `${refusal(foreignRetainer)} vs ${refusal(ghostRetainer)}`,
@@ -226,13 +230,13 @@ async function main() {
         identity.current = `clerk_${ids.userB}`
         const otherTenantRead = await call(api.getRetainer(retainerId, get(`${RET}/${retainerId}?workspaceId=${ids.wsB}`)))
         const otherTenantGhost = await call(api.getRetainer(`${RUN}_ghost2`, get(`${RET}/${RUN}_ghost2?workspaceId=${ids.wsB}`)))
-        check(
+        checkInvertible(
             "the same holds for a genuinely different signed-in tenant",
             refusal(otherTenantRead) === refusal(otherTenantGhost) && otherTenantRead.status === 403,
             refusal(otherTenantRead),
         )
         const bList = await call(api.listRetainers(get(`${RET}?workspaceId=${ids.wsB}`)))
-        check(
+        checkInvertible(
             "the other tenant's list is 200 and empty, not a filtered page of somebody else's rows",
             bList.status === 200 && (dataOf(bList).retainers as unknown[]).length === 0,
         )
@@ -240,11 +244,11 @@ async function main() {
 
         // ---- 5. state machine over HTTP ----------------------------------
         const badState = await call(api.transitionRetainer(retainerId, send(`${RET}/${retainerId}`, { workspaceId: ids.wsA, state: "SLEEPING" }, "PATCH")))
-        check("an unknown state is 400", badState.status === 400, `${badState.status} ${errMessage(badState)}`)
+        checkInvertible("an unknown state is 400", badState.status === 400, `${badState.status} ${errMessage(badState)}`)
         const illegalState = await call(
             api.transitionRetainer(retainerId, send(`${RET}/${retainerId}`, { workspaceId: ids.wsA, state: "PAUSED" }, "PATCH")),
         )
-        check(
+        checkInvertible(
             "a known state in the wrong order is 409 - the same field produces 400 and 409 for different reasons",
             illegalState.status === 409,
             `${illegalState.status} ${errMessage(illegalState)}`,
@@ -252,8 +256,8 @@ async function main() {
         const activated = await call(
             api.transitionRetainer(retainerId, send(`${RET}/${retainerId}`, { workspaceId: ids.wsA, state: "ACTIVE" }, "PATCH")),
         )
-        check("activating is 200", activated.status === 200, `status=${activated.status}`)
-        check(
+        checkInvertible("activating is 200", activated.status === 200, `status=${activated.status}`)
+        checkInvertible(
             "the response exposes allowedTransitions, so a client never has to guess",
             Array.isArray((dataOf(activated).retainer as { allowedTransitions?: unknown[] }).allowedTransitions),
         )
@@ -261,9 +265,9 @@ async function main() {
         // ---- 6. cases ------------------------------------------------------
         const caseA = await cases.create(ids.wsA, { reference: "C-1", title: "Advisory" }, { actorType: "STAFF", actorId: null })
         const linked = await call(api.linkRetainerCase(retainerId, send(`${RET}/${retainerId}/cases`, { workspaceId: ids.wsA, caseId: caseA.record.id })))
-        check("linking a case is 201", linked.status === 201 && dataOf(linked).linked === true, `status=${linked.status}`)
+        checkInvertible("linking a case is 201", linked.status === 201 && dataOf(linked).linked === true, `status=${linked.status}`)
         const relinked = await call(api.linkRetainerCase(retainerId, send(`${RET}/${retainerId}/cases`, { workspaceId: ids.wsA, caseId: caseA.record.id })))
-        check(
+        checkInvertible(
             "re-linking is 200 with linked false, matching the replay convention rather than erroring",
             relinked.status === 200 && dataOf(relinked).linked === false,
             `status=${relinked.status}`,
@@ -271,21 +275,21 @@ async function main() {
         const foreignCaseLink = await call(
             api.linkRetainerCase(retainerId, send(`${RET}/${retainerId}/cases`, { workspaceId: ids.wsA, caseId: `${RUN}_ghostcase` })),
         )
-        check("linking a nonexistent case is 403, not 404", foreignCaseLink.status === 403, `status=${foreignCaseLink.status}`)
+        checkInvertible("linking a nonexistent case is 403, not 404", foreignCaseLink.status === 403, `status=${foreignCaseLink.status}`)
         const caseList = await call(api.listRetainerCases(retainerId, get(`${RET}/${retainerId}/cases?workspaceId=${ids.wsA}`)))
-        check("the case list carries the case reference and title", (dataOf(caseList).cases as Array<{ reference: string }>)[0].reference === "C-1")
+        checkInvertible("the case list carries the case reference and title", (dataOf(caseList).cases as Array<{ reference: string }>)[0].reference === "C-1")
 
         // ---- 7. periods and draws ----------------------------------------
         const period = await call(api.openRetainerPeriod(retainerId, send(`${RET}/${retainerId}/periods`, { workspaceId: ids.wsA })))
-        check("opening a period is 201", period.status === 201, `status=${period.status}`)
+        checkInvertible("opening a period is 201", period.status === 201, `status=${period.status}`)
         const periodId = String((dataOf(period).period as { id: string }).id)
-        check(
+        checkInvertible(
             "the period reports remaining and overage, derived rather than stored",
             (dataOf(period).period as { remaining: number; overage: number }).remaining === 20 &&
                 (dataOf(period).period as { overage: number }).overage === 0,
         )
         const secondPeriod = await call(api.openRetainerPeriod(retainerId, send(`${RET}/${retainerId}/periods`, { workspaceId: ids.wsA })))
-        check("a second open period is 409", secondPeriod.status === 409, `${secondPeriod.status} ${errMessage(secondPeriod)}`)
+        checkInvertible("a second open period is 409", secondPeriod.status === 409, `${secondPeriod.status} ${errMessage(secondPeriod)}`)
 
         const draw = await call(
             api.recordRetainerDraw(
@@ -293,19 +297,19 @@ async function main() {
                 send(`${RET}/${retainerId}/draws`, { workspaceId: ids.wsA, kind: "DRAW", units: 6, caseId: caseA.record.id, idempotencyKey: "d1" }),
             ),
         )
-        check("recording a draw is 201", draw.status === 201, `status=${draw.status}`)
-        check("the response carries both the draw and the period it moved", Boolean(dataOf(draw).draw) && Boolean(dataOf(draw).period))
+        checkInvertible("recording a draw is 201", draw.status === 201, `status=${draw.status}`)
+        checkInvertible("the response carries both the draw and the period it moved", Boolean(dataOf(draw).draw) && Boolean(dataOf(draw).period))
         const drawReplay = await call(
             api.recordRetainerDraw(
                 retainerId,
                 send(`${RET}/${retainerId}/draws`, { workspaceId: ids.wsA, kind: "DRAW", units: 6, idempotencyKey: "d1" }),
             ),
         )
-        check("a replayed draw is 200 and consumes nothing further", drawReplay.status === 200 && dataOf(drawReplay).replayed === true)
+        checkInvertible("a replayed draw is 200 and consumes nothing further", drawReplay.status === 200 && dataOf(drawReplay).replayed === true)
         const overCredit = await call(
             api.recordRetainerDraw(retainerId, send(`${RET}/${retainerId}/draws`, { workspaceId: ids.wsA, kind: "CREDIT", units: -99 })),
         )
-        check(
+        checkInvertible(
             "MEASURED: an over-credit 409 carries the figure the caller needs, not just a status",
             overCredit.status === 409 && /\b6\b/.test(errMessage(overCredit)),
             `${overCredit.status} ${errMessage(overCredit)}`,
@@ -313,32 +317,32 @@ async function main() {
         const overage = await call(
             api.recordRetainerDraw(retainerId, send(`${RET}/${retainerId}/draws`, { workspaceId: ids.wsA, kind: "DRAW", units: 30 })),
         )
-        check(
+        checkInvertible(
             "a draw past the allowance is ACCEPTED over HTTP and the overage is reported",
             overage.status === 201 && (dataOf(overage).period as { overage: number }).overage === 16,
             `${overage.status} overage=${(dataOf(overage).period as { overage?: number }).overage}`,
         )
 
         const balance = await call(api.retainerBalance(retainerId, get(`${RET}/${retainerId}/balance?workspaceId=${ids.wsA}`)))
-        check(
+        checkInvertible(
             "the balance route recomputes lifetime totals",
             balance.status === 200 && (dataOf(balance).balance as { lifetimeUsed: number }).lifetimeUsed === 36,
             `used=${(dataOf(balance).balance as { lifetimeUsed?: number }).lifetimeUsed}`,
         )
 
         const drawList = await call(api.listRetainerDraws(retainerId, get(`${RET}/${retainerId}/draws?workspaceId=${ids.wsA}&periodId=${periodId}`)))
-        check("the draw list filters by period and serialises the bigint sequence as a string", drawList.status === 200 && typeof (dataOf(drawList).draws as Array<{ seq: unknown }>)[0].seq === "string")
+        checkInvertible("the draw list filters by period and serialises the bigint sequence as a string", drawList.status === 200 && typeof (dataOf(drawList).draws as Array<{ seq: unknown }>)[0].seq === "string")
 
         // ---- 8. billing over HTTP creates no payment ---------------------
         const paymentsBefore = await prisma.payment.count()
         const badBilling = await call(
             api.setRetainerBilling(retainerId, periodId, send(`${RET}/${retainerId}/periods/${periodId}/billing`, { workspaceId: ids.wsA, billingState: "PAID" }, "PATCH")),
         )
-        check("jumping billing straight to PAID is 409", badBilling.status === 409, `${badBilling.status} ${errMessage(badBilling)}`)
+        checkInvertible("jumping billing straight to PAID is 409", badBilling.status === 409, `${badBilling.status} ${errMessage(badBilling)}`)
         const draftBilling = await call(
             api.setRetainerBilling(retainerId, periodId, send(`${RET}/${retainerId}/periods/${periodId}/billing`, { workspaceId: ids.wsA, billingState: "DRAFT" }, "PATCH")),
         )
-        check("billing enters DRAFT with 200", draftBilling.status === 200, `status=${draftBilling.status}`)
+        checkInvertible("billing enters DRAFT with 200", draftBilling.status === 200, `status=${draftBilling.status}`)
         const invoice = await prisma.caseInvoice.create({
             data: { id: `${RUN}_inv`, caseId: caseA.record.id, reference: "INV-1", amountCents: 500000, state: "DRAFT" },
         })
@@ -349,13 +353,13 @@ async function main() {
                 send(`${RET}/${retainerId}/periods/${periodId}/billing`, { workspaceId: ids.wsA, billingState: "ISSUED", invoiceId: invoice.id }, "PATCH"),
             ),
         )
-        check("issuing records the invoice id", issued.status === 200 && (dataOf(issued).period as { invoiceId: string }).invoiceId === invoice.id)
+        checkInvertible("issuing records the invoice id", issued.status === 200 && (dataOf(issued).period as { invoiceId: string }).invoiceId === invoice.id)
         const paid = await call(
             api.setRetainerBilling(retainerId, periodId, send(`${RET}/${retainerId}/periods/${periodId}/billing`, { workspaceId: ids.wsA, billingState: "PAID" }, "PATCH")),
         )
-        check("billing reaches PAID", paid.status === 200)
+        checkInvertible("billing reaches PAID", paid.status === 200)
         const paymentsAfter = await prisma.payment.count()
-        check(
+        checkInvertible(
             "MEASURED: the whole billing lifecycle driven over HTTP created no Payment row",
             paymentsAfter === paymentsBefore,
             `payments ${paymentsBefore} -> ${paymentsAfter}`,
@@ -365,9 +369,9 @@ async function main() {
         const renewed = await call(
             api.transitionRetainerPeriod(retainerId, periodId, send(`${RET}/${retainerId}/periods/${periodId}`, { workspaceId: ids.wsA, state: "RENEWED" }, "PATCH")),
         )
-        check("renewing returns both the closed period and the next one", renewed.status === 200 && Boolean(dataOf(renewed).next))
+        checkInvertible("renewing returns both the closed period and the next one", renewed.status === 200 && Boolean(dataOf(renewed).next))
         const unlink = await call(api.unlinkRetainerCase(retainerId, caseA.record.id, get(`${RET}/${retainerId}/cases/${caseA.record.id}?workspaceId=${ids.wsA}`)))
-        check(
+        checkInvertible(
             "unlinking a case that has drawn is 409, because the ledger names it",
             unlink.status === 409,
             `${unlink.status} ${errMessage(unlink)}`,
@@ -376,9 +380,9 @@ async function main() {
         // ---- 10. timeline -------------------------------------------------
         const timeline = await call(api.retainerTimeline(retainerId, get(`${RET}/${retainerId}/timeline?workspaceId=${ids.wsA}`)))
         const events = dataOf(timeline).events as Array<{ subjectType: string; seq: unknown }>
-        check("the timeline is 200 and non-empty", timeline.status === 200 && events.length > 0, `n=${events.length}`)
-        check("its sequence numbers are serialised as strings, not bigints", events.every((e) => typeof e.seq === "string"))
-        check(
+        checkInvertible("the timeline is 200 and non-empty", timeline.status === 200 && events.length > 0, `n=${events.length}`)
+        checkInvertible("its sequence numbers are serialised as strings, not bigints", events.every((e) => typeof e.seq === "string"))
+        checkInvertible(
             "it covers the agreement, its periods, its case links, its billing and its draws",
             ["agreement", "period", "caseLink", "billing", "draw"].every((s) => events.some((e) => e.subjectType === s)),
             [...new Set(events.map((e) => e.subjectType))].join(","),
@@ -399,8 +403,8 @@ async function main() {
             new CaseRetainerService(new CaseContext(brokenPrisma, tenancy)),
         )
         const broken = await call(brokenApi.listRetainers(get(`${RET}?workspaceId=${ids.wsA}`)))
-        check("a dependency failure is 503", broken.status === 503, `status=${broken.status}`)
-        check(
+        checkInvertible("a dependency failure is 503", broken.status === 503, `status=${broken.status}`)
+        checkInvertible(
             "MEASURED: the 503 body leaks no internal detail - no DSN, no host, no driver text",
             !/SECRET_DETAIL|postgres:\/\//.test(broken.raw) && errCode(broken) === "DEPENDENCY_UNAVAILABLE",
             broken.raw.slice(0, 120),
@@ -418,7 +422,7 @@ async function main() {
         ] as Array<[string, Called]>) {
             const keys = Object.keys(c.body).sort().join(",")
             const expected = c.status < 400 ? "data,ok" : "error,ok"
-            check(`the ${label} response uses the shared envelope shape`, keys === expected, `keys=${keys}`)
+            checkInvertible(`the ${label} response uses the shared envelope shape`, keys === expected, `keys=${keys}`)
         }
     } finally {
         const wsList = `'${ids.wsA}','${ids.wsB}'`
@@ -472,12 +476,7 @@ async function main() {
         await prisma.$disconnect()
     }
 
-    let failed = results.filter((r) => !r.pass)
-    if (INVERT) {
-        const target = results.find((r) => r.name.includes("BYTE-IDENTICAL"))
-        if (target) target.pass = !target.pass
-        failed = results.filter((r) => !r.pass)
-    }
+    const failed = results.filter((r) => !r.pass)
     for (const r of results) console.log(`${r.pass ? "PASS" : "FAIL"}  ${r.name}${r.detail ? `  (${r.detail})` : ""}`)
     console.log(`\n${results.length - failed.length}/${results.length} assertions passed`)
     if (INVERT) console.log("INVERT_ASSERTION=1 was set - a failure here is the expected proof")

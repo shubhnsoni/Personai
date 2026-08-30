@@ -115,6 +115,10 @@ const results: Array<{ name: string; pass: boolean; detail: string }> = []
 function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
 }
+/** Flipped individually by INVERT_ASSERTION=1; identical to checkInvertible() otherwise. */
+function checkInvertible(name: string, pass: boolean, detail = "") {
+    results.push({ name, pass: INVERT ? !pass : pass, detail })
+}
 
 function errLine(e: unknown): string {
     const lines = String((e as Error).message)
@@ -293,15 +297,15 @@ async function main() {
             )
         ).map((r) => r.table_name)
         const missing = NEW_TABLES.filter((t) => !tables.includes(t))
-        check("all 5 retainer tables present", missing.length === 0, missing.length ? `missing: ${missing}` : "5/5")
+        checkInvertible("all 5 retainer tables present", missing.length === 0, missing.length ? `missing: ${missing}` : "5/5")
         const forked = FORBIDDEN_TABLES.filter((t) => tables.includes(t))
-        check(
+        checkInvertible(
             "no parallel subscription, plan, credit, wallet, time-entry or retainer-invoice table was created",
             forked.length === 0,
             forked.join(",") || "none",
         )
         for (const t of ["CaseProject", "CaseInvoice", "CaseEvent", "Payment", "Contact", "Workspace"]) {
-            check(`pre-existing ${t} still exists`, tables.includes(t), tables.includes(t) ? "present" : "MISSING")
+            checkInvertible(`pre-existing ${t} still exists`, tables.includes(t), tables.includes(t) ? "present" : "MISSING")
         }
 
         // ---- 2. enums, and the one deliberate extension -----------------------
@@ -310,20 +314,20 @@ async function main() {
         )
         for (const [name, expected] of NEW_ENUMS) {
             const n = enums.filter((e) => e.typname === name).length
-            check(`enum ${name} has ${expected} labels`, n === expected, `count=${n}`)
+            checkInvertible(`enum ${name} has ${expected} labels`, n === expected, `count=${n}`)
         }
         const caseKinds = enums
             .filter((e) => e.typname === "CaseEventKind")
             .sort((a, b) => a.ord - b.ord)
             .map((e) => e.enumlabel)
-        check("CaseEventKind now has 10 labels", caseKinds.length === 10, caseKinds.join(","))
-        check("CaseEventKind gained RETAINER", caseKinds.includes("RETAINER"))
-        check(
+        checkInvertible("CaseEventKind now has 10 labels", caseKinds.length === 10, caseKinds.join(","))
+        checkInvertible("CaseEventKind gained RETAINER", caseKinds.includes("RETAINER"))
+        checkInvertible(
             "the original eight CaseEventKind labels are still in their original order",
             ORIGINAL_CASE_EVENT_KINDS.every((label, i) => caseKinds[i] === label),
             caseKinds.slice(0, 8).join(","),
         )
-        check(
+        checkInvertible(
             "RETAINER sits immediately before NOTE, matching schema.prisma rather than being appended at the end",
             caseKinds[8] === "RETAINER" && caseKinds[9] === "NOTE",
             caseKinds.slice(7).join(","),
@@ -339,7 +343,7 @@ async function main() {
         )
         for (const [tbl, col, ref] of REUSE_FKS) {
             const hit = fks.some((f) => f.tbl === tbl && f.col === col && f.ref === ref)
-            check(`${tbl}.${col} points at the pre-existing ${ref}`, hit)
+            checkInvertible(`${tbl}.${col} points at the pre-existing ${ref}`, hit)
         }
 
         // ---- 4. constraints and indexes exist --------------------------------
@@ -349,14 +353,14 @@ async function main() {
             )
         ).map((r) => r.conname)
         for (const name of CHECK_CONSTRAINTS) {
-            check(`CHECK ${name} exists`, constraints.includes(name))
+            checkInvertible(`CHECK ${name} exists`, constraints.includes(name))
         }
         const indexes = await prisma.$queryRawUnsafe<{ indexname: string; indexdef: string }[]>(
             "select indexname, indexdef from pg_indexes where schemaname='public'",
         )
         const openIdx = indexes.find((i) => i.indexname === "CaseRetainerPeriod_one_open_per_retainer")
-        check("partial unique index CaseRetainerPeriod_one_open_per_retainer exists", Boolean(openIdx))
-        check(
+        checkInvertible("partial unique index CaseRetainerPeriod_one_open_per_retainer exists", Boolean(openIdx))
+        checkInvertible(
             "it is genuinely partial - a WHERE clause on state OPEN, not a plain unique key",
             Boolean(openIdx && /WHERE/i.test(openIdx.indexdef) && /OPEN/.test(openIdx.indexdef)),
             openIdx?.indexdef.slice(0, 120) ?? "absent",
@@ -372,9 +376,9 @@ async function main() {
             "CaseRetainerDraw_mismatch_guard",
             "CaseRetainerCaseLink_tenant_guard",
         ]) {
-            check(`trigger ${t} is attached`, triggers.includes(t))
+            checkInvertible(`trigger ${t} is attached`, triggers.includes(t))
         }
-        check(
+        checkInvertible(
             "the pre-existing CaseEvent_append_only trigger survived the enum recreation path",
             triggers.includes("CaseEvent_append_only"),
         )
@@ -386,7 +390,7 @@ async function main() {
                  values ('${RUN}_bb_x','${s.workspaceA}','${RUN}_bb_x','X','UNITS',10,5000,CURRENT_TIMESTAMP)`,
             )
         })
-        check("a retainer denominated in BOTH units and money is refused", badBasis.refused, badBasis.detail)
+        checkInvertible("a retainer denominated in BOTH units and money is refused", badBasis.refused, badBasis.detail)
 
         const noBasis = await refuses("nb", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -394,7 +398,7 @@ async function main() {
                  values ('${RUN}_nb_x','${s.workspaceA}','${RUN}_nb_x','X','UNITS',CURRENT_TIMESTAMP)`,
             )
         })
-        check("a retainer with no allowance at all is refused", noBasis.refused, noBasis.detail)
+        checkInvertible("a retainer with no allowance at all is refused", noBasis.refused, noBasis.detail)
 
         const zeroUnits = await refuses("zu", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -402,7 +406,7 @@ async function main() {
                  values ('${RUN}_zu_x','${s.workspaceA}','${RUN}_zu_x','X','UNITS',0,CURRENT_TIMESTAMP)`,
             )
         })
-        check("a retainer including zero units is refused", zeroUnits.refused, zeroUnits.detail)
+        checkInvertible("a retainer including zero units is refused", zeroUnits.refused, zeroUnits.detail)
 
         const monthlyWithDays = await refuses("md", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -410,7 +414,7 @@ async function main() {
                  values ('${RUN}_md_x','${s.workspaceA}','${RUN}_md_x','X','UNITS',10,'MONTHLY',30,CURRENT_TIMESTAMP)`,
             )
         })
-        check(
+        checkInvertible(
             "a MONTHLY retainer carrying a day count is refused, because it would have two answers for its own length",
             monthlyWithDays.refused,
             monthlyWithDays.detail,
@@ -422,7 +426,7 @@ async function main() {
                  values ('${RUN}_cd_x','${s.workspaceA}','${RUN}_cd_x','X','UNITS',10,'CUSTOM',CURRENT_TIMESTAMP)`,
             )
         })
-        check("a CUSTOM retainer with no day count is refused", customNoDays.refused, customNoDays.detail)
+        checkInvertible("a CUSTOM retainer with no day count is refused", customNoDays.refused, customNoDays.detail)
 
         // ---- 6. periods -------------------------------------------------------
         const badDates = await refuses("bd", async (tx, s) => {
@@ -431,14 +435,14 @@ async function main() {
                  values ('${RUN}_bd_x','${s.retainerUnits}',2,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP - interval '1 day',40,'CLOSED',CURRENT_TIMESTAMP)`,
             )
         })
-        check("a period that ends before it starts is refused", badDates.refused, badDates.detail)
+        checkInvertible("a period that ends before it starts is refused", badDates.refused, badDates.detail)
 
         const negativeUsed = await refuses("nu", async (tx, s) => {
             await tx.$executeRawUnsafe(
                 `update "CaseRetainerPeriod" set "usedUnits" = -1 where "id" = '${s.periodUnits}'`,
             )
         })
-        check("a period with a negative used balance is refused", negativeUsed.refused, negativeUsed.detail)
+        checkInvertible("a period with a negative used balance is refused", negativeUsed.refused, negativeUsed.detail)
 
         const twoBases = await refuses("tb", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -446,7 +450,7 @@ async function main() {
                  values ('${RUN}_tb_x','${s.retainerUnits}',2,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP + interval '30 days',40,5000,'CLOSED',CURRENT_TIMESTAMP)`,
             )
         })
-        check("a period carrying both a unit allowance and a money allowance is refused", twoBases.refused, twoBases.detail)
+        checkInvertible("a period carrying both a unit allowance and a money allowance is refused", twoBases.refused, twoBases.detail)
 
         const twoOpen = await refuses("to", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -454,7 +458,7 @@ async function main() {
                  values ('${RUN}_to_x','${s.retainerUnits}',2,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP + interval '30 days',40,'OPEN',CURRENT_TIMESTAMP)`,
             )
         })
-        check(
+        checkInvertible(
             "a second OPEN period on the same retainer is refused, so there is exactly one current allowance",
             twoOpen.refused,
             twoOpen.detail,
@@ -467,7 +471,7 @@ async function main() {
             )
             throw new Error("ACCEPTED")
         })
-        check(
+        checkInvertible(
             "a CLOSED period alongside an OPEN one is accepted, because the index is partial and history must accumulate",
             secondClosed.detail === "ACCEPTED",
             secondClosed.detail,
@@ -480,7 +484,7 @@ async function main() {
                  values ('${RUN}_d1_x','${s.retainerUnits}','${s.periodUnits}','DRAW',2,500,2,500,'STAFF')`,
             )
         })
-        check("a draw denominated in both units and money is refused", drawBothDeltas.refused, drawBothDeltas.detail)
+        checkInvertible("a draw denominated in both units and money is refused", drawBothDeltas.refused, drawBothDeltas.detail)
 
         const drawNoDelta = await refuses("d2", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -488,7 +492,7 @@ async function main() {
                  values ('${RUN}_d2_x','${s.retainerUnits}','${s.periodUnits}','DRAW',0,0,'STAFF')`,
             )
         })
-        check("a draw with no delta at all is refused", drawNoDelta.refused, drawNoDelta.detail)
+        checkInvertible("a draw with no delta at all is refused", drawNoDelta.refused, drawNoDelta.detail)
 
         const drawZero = await refuses("d3", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -496,7 +500,7 @@ async function main() {
                  values ('${RUN}_d3_x','${s.retainerUnits}','${s.periodUnits}','DRAW',0,0,0,'STAFF')`,
             )
         })
-        check("a draw of zero is refused, because a ledger row that changes nothing is noise", drawZero.refused, drawZero.detail)
+        checkInvertible("a draw of zero is refused, because a ledger row that changes nothing is noise", drawZero.refused, drawZero.detail)
 
         const drawNegativeAfter = await refuses("d4", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -504,7 +508,7 @@ async function main() {
                  values ('${RUN}_d4_x','${s.retainerUnits}','${s.periodUnits}','CREDIT',-2,-2,0,'STAFF')`,
             )
         })
-        check("a draw whose resulting balance is negative is refused", drawNegativeAfter.refused, drawNegativeAfter.detail)
+        checkInvertible("a draw whose resulting balance is negative is refused", drawNegativeAfter.refused, drawNegativeAfter.detail)
 
         const drawForeignPeriod = await refuses("d5", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -512,7 +516,7 @@ async function main() {
                  values ('${RUN}_d5_x','${s.retainerUnits}','${s.periodOther}','DRAW',2,2,0,'STAFF')`,
             )
         })
-        check(
+        checkInvertible(
             "a draw against another retainer's period is refused by trigger",
             drawForeignPeriod.refused,
             drawForeignPeriod.detail,
@@ -524,7 +528,7 @@ async function main() {
                  values ('${RUN}_d6_x','${s.retainerUnits}','${s.periodUnits}','${s.caseA2}','DRAW',2,2,0,'STAFF')`,
             )
         })
-        check(
+        checkInvertible(
             "a draw naming a case the retainer does not cover is refused by trigger",
             drawUnlinkedCase.refused,
             drawUnlinkedCase.detail,
@@ -536,7 +540,7 @@ async function main() {
                  values ('${RUN}_d7_x','${s.retainerUnits}','${s.periodUnits}','DRAW',500,0,500,'STAFF')`,
             )
         })
-        check(
+        checkInvertible(
             "a money draw against a unit-denominated period is refused by trigger",
             drawWrongBasis.refused,
             drawWrongBasis.detail,
@@ -549,7 +553,7 @@ async function main() {
             )
             throw new Error("ACCEPTED")
         })
-        check("a draw naming a linked case is accepted", drawLinkedCase.detail === "ACCEPTED", drawLinkedCase.detail)
+        checkInvertible("a draw naming a linked case is accepted", drawLinkedCase.detail === "ACCEPTED", drawLinkedCase.detail)
 
         const overage = await refuses("d9", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -563,7 +567,7 @@ async function main() {
             if (rows[0].used <= rows[0].incl) throw new Error("overage was not recorded")
             throw new Error("ACCEPTED")
         })
-        check(
+        checkInvertible(
             "OVERAGE IS ACCEPTED - used may exceed included, because refusing work that was actually done would be a lie",
             overage.detail === "ACCEPTED",
             overage.detail,
@@ -591,7 +595,7 @@ async function main() {
             if (rows.length !== 4) throw new Error(`expected 4 ledger rows, found ${rows.length}`)
             throw new Error("ACCEPTED")
         })
-        check(
+        checkInvertible(
             "replaying the ledger deltas reproduces every stored after-balance, so the ledger checks itself",
             replay.detail === "ACCEPTED",
             replay.detail,
@@ -605,7 +609,7 @@ async function main() {
             )
             await tx.$executeRawUnsafe(`update "CaseRetainerDraw" set "unitsDelta" = 99 where "id" = '${RUN}_aw_x'`)
         })
-        check("the database refuses to rewrite a draw", rewrite.refused, rewrite.detail)
+        checkInvertible("the database refuses to rewrite a draw", rewrite.refused, rewrite.detail)
 
         const erase = await refuses("ae", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -614,7 +618,7 @@ async function main() {
             )
             await tx.$executeRawUnsafe(`delete from "CaseRetainerDraw" where "id" = '${RUN}_ae_x'`)
         })
-        check("the database refuses to erase a draw", erase.refused, erase.detail)
+        checkInvertible("the database refuses to erase a draw", erase.refused, erase.detail)
 
         const eventRewrite = await refuses("er", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -623,8 +627,8 @@ async function main() {
             )
             await tx.$executeRawUnsafe(`update "CaseRetainerEvent" set "to" = 'TAMPERED' where "id" = '${RUN}_er_x'`)
         })
-        check("the database refuses to rewrite the agreement history", eventRewrite.refused, eventRewrite.detail)
-        check(
+        checkInvertible("the database refuses to rewrite the agreement history", eventRewrite.refused, eventRewrite.detail)
+        checkInvertible(
             "CaseRetainerEvent reuses the pre-existing CaseEventKind enum, so the second migration added no vocabulary",
             enums.some((e) => e.typname === "CaseEventKind" && e.enumlabel === "RETAINER"),
         )
@@ -635,7 +639,7 @@ async function main() {
                 `insert into "CaseRetainerCaseLink" ("retainerId","caseId") values ('${s.retainerUnits}','${s.caseB}')`,
             )
         })
-        check(
+        checkInvertible(
             "linking a retainer to a case in another workspace is refused by trigger",
             crossTenantLink.refused,
             crossTenantLink.detail,
@@ -647,7 +651,7 @@ async function main() {
             )
             throw new Error("ACCEPTED")
         })
-        check("linking a retainer to a second case in the same workspace is accepted", sameTenantLink.detail === "ACCEPTED", sameTenantLink.detail)
+        checkInvertible("linking a retainer to a second case in the same workspace is accepted", sameTenantLink.detail === "ACCEPTED", sameTenantLink.detail)
 
         // ---- 11. billing state is a reference, never money -------------------
         const invoiceLink = await refuses("il", async (tx, s) => {
@@ -661,7 +665,7 @@ async function main() {
             }
             throw new Error("ACCEPTED")
         })
-        check(
+        checkInvertible(
             "recording an invoice against a period creates no Payment row",
             invoiceLink.detail === "ACCEPTED",
             invoiceLink.detail,
@@ -671,7 +675,7 @@ async function main() {
         )
         const names = periodCols.map((c) => c.column_name)
         for (const forbidden of ["paidCents", "amountPaidCents", "providerPaymentId", "stripeId", "chargeId"]) {
-            check(`CaseRetainerPeriod has no ${forbidden} column, so it cannot become a payment record`, !names.includes(forbidden))
+            checkInvertible(`CaseRetainerPeriod has no ${forbidden} column, so it cannot become a payment record`, !names.includes(forbidden))
         }
 
         // ---- 12. residue ------------------------------------------------------
@@ -684,14 +688,7 @@ async function main() {
         await prisma.$disconnect()
     }
 
-    let failed = results.filter((r) => !r.pass)
-    if (INVERT) {
-        // Flip the single most load-bearing claim: that a draw cannot reach into another
-        // agreement's period. If the harness cannot go red, it is not evidence.
-        const target = results.find((r) => r.name.includes("another retainer's period"))
-        if (target) target.pass = !target.pass
-        failed = results.filter((r) => !r.pass)
-    }
+    const failed = results.filter((r) => !r.pass)
     for (const r of results) {
         console.log(`${r.pass ? "PASS" : "FAIL"}  ${r.name}${r.detail ? `  (${r.detail})` : ""}`)
     }

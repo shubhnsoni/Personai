@@ -66,6 +66,10 @@ const results: Array<{ name: string; pass: boolean; detail: string }> = [];
 function check(name: string, pass: boolean, detail = "") {
   results.push({ name, pass, detail });
 }
+/** Flipped individually by INVERT_ASSERTION=1; identical to checkInvertible() otherwise. */
+function checkInvertible(name: string, pass: boolean, detail = "") {
+  results.push({ name, pass: INVERT ? !pass : pass, detail });
+}
 
 function errLine(e: unknown): string {
   const lines = String((e as Error).message).split("\n").map((l) => l.trim()).filter(Boolean);
@@ -165,17 +169,17 @@ async function main() {
       )
     ).map((r) => r.table_name);
     const missing = NEW_TABLES.filter((t) => !tables.includes(t));
-    check("all 8 cohort tables present", missing.length === 0, missing.length ? `missing: ${missing}` : "8/8");
+    checkInvertible("all 8 cohort tables present", missing.length === 0, missing.length ? `missing: ${missing}` : "8/8");
 
     const forked = FORBIDDEN_TABLES.filter((t) => tables.includes(t));
-    check(
+    checkInvertible(
       "no parallel course, lesson, learner, progress, file, payment or queue table was created",
       forked.length === 0,
       forked.join(",") || "none",
     );
 
     for (const t of ["Course", "CourseModule", "CourseLesson", "CourseEnrollment", "LessonCompletion", "Member"]) {
-      check(`pre-existing ${t} still exists`, tables.includes(t), tables.includes(t) ? "present" : "MISSING");
+      checkInvertible(`pre-existing ${t} still exists`, tables.includes(t), tables.includes(t) ? "present" : "MISSING");
     }
 
     // ---- 2. the nine enums with correct label counts ---------------------
@@ -184,9 +188,9 @@ async function main() {
     );
     for (const [name, expected] of NEW_ENUMS) {
       const n = enums.filter((e) => e.typname === name).length;
-      check(`enum ${name} has ${expected} labels`, n === expected, `count=${n}`);
+      checkInvertible(`enum ${name} has ${expected} labels`, n === expected, `count=${n}`);
     }
-    check(
+    checkInvertible(
       "CohortRenewalState carries NONE, so a membership that never renews is not mislabelled",
       enums.some((e) => e.typname === "CohortRenewalState" && e.enumlabel === "NONE"),
     );
@@ -203,7 +207,7 @@ async function main() {
           f.def.includes(`"${column}"`) &&
           new RegExp(`REFERENCES\\s+"?${target}"?`).test(f.def),
       );
-      check(`${table}.${column} references the existing ${target}`, !!found, found ? "ok" : "MISSING");
+      checkInvertible(`${table}.${column} references the existing ${target}`, !!found, found ? "ok" : "MISSING");
     }
 
     // A forked system would show up as a cohort table with its own learner-, lesson-,
@@ -217,7 +221,7 @@ async function main() {
         c.column_name,
       ),
     );
-    check(
+    checkInvertible(
       "no cohort table duplicates learner, lesson-content, payment or task-queue columns",
       smells.length === 0,
       smells.map((s) => `${s.table_name}.${s.column_name}`).join(",") || "none",
@@ -225,7 +229,7 @@ async function main() {
 
     // Progress must be DERIVED. A cached percentage column is the smell to catch.
     const progressCols = cohortCols.filter((c) => /progress|percent|completedLessons|lessonsDone/i.test(c.column_name));
-    check(
+    checkInvertible(
       "no cohort table caches progress; it is derived from LessonCompletion",
       progressCols.length === 0,
       progressCols.map((s) => `${s.table_name}.${s.column_name}`).join(",") || "none",
@@ -237,10 +241,10 @@ async function main() {
         where table_schema='public' and table_name='CourseEnrollment'`,
     );
     const idem = enrollCols.find((c) => c.column_name === "idempotencyKey");
-    check("CourseEnrollment gained idempotencyKey", !!idem, idem ? "present" : "MISSING");
-    check("that column is NULLABLE, so existing rows are unaffected", idem?.is_nullable === "YES", `is_nullable=${idem?.is_nullable}`);
+    checkInvertible("CourseEnrollment gained idempotencyKey", !!idem, idem ? "present" : "MISSING");
+    checkInvertible("that column is NULLABLE, so existing rows are unaffected", idem?.is_nullable === "YES", `is_nullable=${idem?.is_nullable}`);
     for (const c of ["visitorEmail", "status", "progress", "paymentId", "enrolledAt", "completedAt"]) {
-      check(`pre-existing CourseEnrollment.${c} survived`, enrollCols.some((r) => r.column_name === c));
+      checkInvertible(`pre-existing CourseEnrollment.${c} survived`, enrollCols.some((r) => r.column_name === c));
     }
 
     // Two NULL keys must coexist, or the migration would have broken existing rows.
@@ -266,7 +270,7 @@ async function main() {
       } catch (e) {
         if (!(e instanceof Rollback)) detail = errLine(e);
       }
-      check("many enrolments with a NULL idempotency key coexist", bothInserted, detail);
+      checkInvertible("many enrolments with a NULL idempotency key coexist", bothInserted, detail);
     }
 
     // ---- 5. append-only trigger registered and ENFORCED -----------------
@@ -276,11 +280,11 @@ async function main() {
       )
     ).map((r) => `${r.tbl}.${r.ev}`);
     for (const want of ["CohortEvent.UPDATE", "CohortEvent.DELETE"]) {
-      check(`trigger ${want}`, trg.includes(want), trg.includes(want) ? "registered" : `have: ${trg}`);
+      checkInvertible(`trigger ${want}`, trg.includes(want), trg.includes(want) ? "registered" : `have: ${trg}`);
     }
     // The four earlier ledgers must still be armed; this migration reused their function.
     for (const want of ["ActivityEvent.UPDATE", "ReservationEvent.UPDATE", "AppointmentEvent.UPDATE", "CaseEvent.UPDATE"]) {
-      check(`pre-existing trigger ${want} still armed`, trg.includes(want), trg.includes(want) ? "armed" : `have: ${trg}`);
+      checkInvertible(`pre-existing trigger ${want} still armed`, trg.includes(want), trg.includes(want) ? "armed" : `have: ${trg}`);
     }
 
     for (const op of ["UPDATE", "DELETE"] as const) {
@@ -297,8 +301,8 @@ async function main() {
         }
       });
       // This is the single inverted assertion.
-      const expected = op === "UPDATE" ? (INVERT ? !refused : refused && detail.length > 0) : refused && detail.length > 0;
-      check(`CohortEvent refuses ${op}`, expected, detail || "NO ERROR OBSERVED");
+      const expected = refused && detail.length > 0;
+      checkInvertible(`CohortEvent refuses ${op}`, expected, detail || "NO ERROR OBSERVED");
     }
 
     // ---- 6. uniqueness that makes idempotency and ordering real ---------
@@ -309,7 +313,7 @@ async function main() {
           `insert into "Cohort" ("id","profileId","courseId","code","title","updatedAt") values ('${RUN}_dup','${s.profileId}','${s.courseId}','B-dupcode','Clash',CURRENT_TIMESTAMP)`,
         );
       });
-      check("cohort code is unique within a course", refused && detail.length > 0, detail || "NO ERROR");
+      checkInvertible("cohort code is unique within a course", refused && detail.length > 0, detail || "NO ERROR");
     }
     {
       const { refused, detail } = await refuses(async (tx) => {
@@ -318,7 +322,7 @@ async function main() {
           `insert into "CohortMembership" ("id","cohortId","enrollmentId","updatedAt") values ('${RUN}_dm','${s.cohortId}','${s.enrollmentId}',CURRENT_TIMESTAMP)`,
         );
       });
-      check("one enrolment joins a cohort at most once", refused && detail.length > 0, detail || "NO ERROR");
+      checkInvertible("one enrolment joins a cohort at most once", refused && detail.length > 0, detail || "NO ERROR");
     }
     {
       const { refused, detail } = await refuses(async (tx) => {
@@ -328,7 +332,7 @@ async function main() {
         await tx.$executeRawUnsafe(ins(`${RUN}_s1`));
         await tx.$executeRawUnsafe(ins(`${RUN}_s2`));
       });
-      check("session ordinal is unique within a cohort", refused && detail.length > 0, detail || "NO ERROR");
+      checkInvertible("session ordinal is unique within a cohort", refused && detail.length > 0, detail || "NO ERROR");
     }
     {
       const { refused, detail } = await refuses(async (tx) => {
@@ -341,7 +345,7 @@ async function main() {
         await tx.$executeRawUnsafe(ins(`${RUN}_a1`));
         await tx.$executeRawUnsafe(ins(`${RUN}_a2`));
       });
-      check("attendance is recorded once per learner per session", refused && detail.length > 0, detail || "NO ERROR");
+      checkInvertible("attendance is recorded once per learner per session", refused && detail.length > 0, detail || "NO ERROR");
     }
     {
       const { refused, detail } = await refuses(async (tx) => {
@@ -354,7 +358,7 @@ async function main() {
         await tx.$executeRawUnsafe(ins(`${RUN}_sub1`));
         await tx.$executeRawUnsafe(ins(`${RUN}_sub2`));
       });
-      check("one submission per learner per assignment", refused && detail.length > 0, detail || "NO ERROR");
+      checkInvertible("one submission per learner per assignment", refused && detail.length > 0, detail || "NO ERROR");
     }
     {
       const { refused, detail } = await refuses(async (tx) => {
@@ -364,7 +368,7 @@ async function main() {
         await tx.$executeRawUnsafe(ins(`${RUN}_ct1`));
         await tx.$executeRawUnsafe(ins(`${RUN}_ct2`));
       });
-      check("a membership has at most one certificate", refused && detail.length > 0, detail || "NO ERROR");
+      checkInvertible("a membership has at most one certificate", refused && detail.length > 0, detail || "NO ERROR");
     }
     {
       const { refused, detail } = await refuses(async (tx) => {
@@ -377,7 +381,7 @@ async function main() {
           `insert into "CohortCertificate" ("id","membershipId","serial","state","updatedAt") values ('${RUN}_x2','${b.membershipId}','SER-DUP','ISSUED',CURRENT_TIMESTAMP)`,
         );
       });
-      check("a certificate serial is globally unique", refused && detail.length > 0, detail || "NO ERROR");
+      checkInvertible("a certificate serial is globally unique", refused && detail.length > 0, detail || "NO ERROR");
     }
 
     // ---- 7. defaults that keep an unissued record honest ----------------
@@ -397,15 +401,15 @@ async function main() {
             `select "status" st, "renewalState" rn from "CohortMembership" where "id"='${s.membershipId}'`,
           );
           states = `cert=${rows[0].st} serial=${rows[0].serial} issuedAt=${rows[0].issued} cohort=${coh[0].st} membership=${mem[0].st}/${mem[0].rn}`;
-          check("a new certificate defaults to INELIGIBLE with no serial and no issue date",
+          checkInvertible("a new certificate defaults to INELIGIBLE with no serial and no issue date",
             rows[0].st === "INELIGIBLE" && rows[0].serial === null && rows[0].issued === null, states);
-          check("a new cohort defaults to PLANNED", coh[0].st === "PLANNED", coh[0].st);
-          check("a new membership defaults to INVITED with renewal NONE",
+          checkInvertible("a new cohort defaults to PLANNED", coh[0].st === "PLANNED", coh[0].st);
+          checkInvertible("a new membership defaults to INVITED with renewal NONE",
             mem[0].st === "INVITED" && mem[0].rn === "NONE", `${mem[0].st}/${mem[0].rn}`);
           throw new Rollback();
         });
       } catch (e) {
-        if (!(e instanceof Rollback)) check("defaults probe completed", false, errLine(e));
+        if (!(e instanceof Rollback)) checkInvertible("defaults probe completed", false, errLine(e));
       }
     }
 
@@ -432,7 +436,7 @@ async function main() {
       } catch (e) {
         if (!(e instanceof Rollback)) detail = errLine(e);
       }
-      check("CohortEvent.seq is monotonic per cohort", ordered, detail);
+      checkInvertible("CohortEvent.seq is monotonic per cohort", ordered, detail);
     }
 
     // ---- 9. cascade reaches cohort rows but never shared records -------
@@ -471,9 +475,9 @@ async function main() {
       } catch (e) {
         if (!(e instanceof Rollback)) detail = errLine(e);
       }
-      check("deleting a course cascades its cohorts", cascaded, detail);
-      check("cascading a cohort does NOT delete the shared TaskJob it referenced", taskSurvived, detail);
-      check("cascading a cohort does NOT delete the shared ProfileDocument it referenced", documentSurvived, detail);
+      checkInvertible("deleting a course cascades its cohorts", cascaded, detail);
+      checkInvertible("cascading a cohort does NOT delete the shared TaskJob it referenced", taskSurvived, detail);
+      checkInvertible("cascading a cohort does NOT delete the shared ProfileDocument it referenced", documentSurvived, detail);
     }
 
     // ---- 10. progress is derivable from the pre-existing tables --------
@@ -508,7 +512,7 @@ async function main() {
       } catch (e) {
         if (!(e instanceof Rollback)) derived = errLine(e);
       }
-      check("progress is computable from CourseLesson and LessonCompletion alone", ok, derived);
+      checkInvertible("progress is computable from CourseLesson and LessonCompletion alone", ok, derived);
     }
 
     // ---- 11. zero residue ---------------------------------------------
