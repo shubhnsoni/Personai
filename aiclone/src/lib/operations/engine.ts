@@ -40,8 +40,33 @@ export const OPERATIONS_DOMAINS = [
     "inventory",
     "fulfilments",
     "returns",
+    "caseMilestones",
 ] as const
 export type OperationsDomain = (typeof OPERATIONS_DOMAINS)[number]
+
+/**
+ * WHICH TENANT BOUNDARY EACH DOMAIN IS READ ON, reported rather than implied.
+ *
+ * This is not bookkeeping. Most engines here are profile-scoped, but CaseProject is scoped by
+ * workspaceId, and a profile can own several workspaces. So for an owner with two workspaces, the
+ * field-job count is profile-wide while the case-milestone count is only this workspace's.
+ *
+ * Presenting one total over two different boundaries without saying so would be exactly the kind of
+ * quiet inconsistency that makes somebody stop trusting a dashboard - they would notice the numbers
+ * not adding up against another screen and have no way to find out why. Stating the scope per domain
+ * turns a trap into a fact.
+ */
+export const OPERATIONS_DOMAIN_SCOPE: Readonly<Record<OperationsDomain, "profile" | "workspace">> = Object.freeze({
+    reservations: "profile",
+    appointments: "profile",
+    fieldJobs: "profile",
+    inspections: "profile",
+    inventory: "profile",
+    fulfilments: "profile",
+    returns: "profile",
+    // CaseProject carries workspaceId, not profileId.
+    caseMilestones: "workspace",
+})
 
 /**
  * Domains an owner might reasonably expect here and which are deliberately absent, with the reason.
@@ -49,9 +74,6 @@ export type OperationsDomain = (typeof OPERATIONS_DOMAINS)[number]
  * badly by the next person.
  */
 export const UNCOVERED_DOMAINS: Readonly<Record<string, string>> = Object.freeze({
-    caseMilestones:
-        "CaseMilestone is scoped through CaseProject rather than carrying profileId, so including it " +
-        "means a join this read-only view has no other reason to make. Deferred rather than guessed at.",
     cohortTasks:
         "Cohort task and renewal state is spread across several models whose 'needs action' condition " +
         "is not a single field. Including it would mean encoding a judgement here that the cohort " +
@@ -82,6 +104,8 @@ export type DomainSummary = Readonly<{
     count: number
     /** How many of those are already overdue. */
     overdue: number
+    /** Which tenant boundary this count was read on. See OPERATIONS_DOMAIN_SCOPE. */
+    scope: "profile" | "workspace"
 }>
 
 export type OperationsSummary = Readonly<{
@@ -90,6 +114,8 @@ export type OperationsSummary = Readonly<{
     /** Horizon used for "upcoming", in hours. */
     horizonHours: number
     profileId: string
+    /** The workspace whose access was authorised, and the boundary workspace-scoped domains use. */
+    workspaceId: string
     domains: readonly DomainSummary[]
     items: readonly AttentionItem[]
     total: number
@@ -98,6 +124,11 @@ export type OperationsSummary = Readonly<{
     covers: readonly OperationsDomain[]
     /** Stated absences, so a caller does not read silence as "nothing there". */
     doesNotCover: Readonly<Record<string, string>>
+    /**
+     * True when the covered domains do NOT all share one tenant boundary. A caller that renders a
+     * single total should say so when this is true.
+     */
+    mixedScope: boolean
 }>
 
 const DEFAULT_HORIZON_HOURS = 24
@@ -125,7 +156,8 @@ export class OperationsService {
         workspaceId: string,
         options: Readonly<{ horizonHours?: number | null }> = {},
     ): Promise<OperationsSummary> {
-        const profileId = await this.ctx.requireProfile(workspaceId, "profile.read")
+        const scope = await this.ctx.requireScope(workspaceId, "profile.read")
+        const profileId = scope.profileId
 
         const horizonHours = options.horizonHours ?? DEFAULT_HORIZON_HOURS
         if (!Number.isInteger(horizonHours) || horizonHours <= 0 || horizonHours > MAX_HORIZON_HOURS) {
@@ -147,6 +179,8 @@ export class OperationsService {
             this.inventory(profileId),
             this.fulfilments(profileId),
             this.returns(profileId),
+            // Workspace-scoped, not profile-scoped. See OPERATIONS_DOMAIN_SCOPE.
+            this.caseMilestones(scope.workspaceId, asOf, until),
         ])
 
         const items = groups.flat()
@@ -156,19 +190,24 @@ export class OperationsService {
                 domain,
                 count: mine.length,
                 overdue: mine.filter((item) => item.overdue).length,
+                scope: OPERATIONS_DOMAIN_SCOPE[domain],
             })
         })
+
+        const scopes = new Set(OPERATIONS_DOMAINS.map((domain) => OPERATIONS_DOMAIN_SCOPE[domain]))
 
         return Object.freeze({
             asOf,
             horizonHours,
             profileId,
+            workspaceId: scope.workspaceId,
             domains: Object.freeze(domains),
             items: Object.freeze(items),
             total: items.length,
             totalOverdue: items.filter((item) => item.overdue).length,
             covers: OPERATIONS_DOMAINS,
             doesNotCover: UNCOVERED_DOMAINS,
+            mixedScope: scopes.size > 1,
         })
     }
 
@@ -348,6 +387,44 @@ export class OperationsService {
                 label: `Return ${row.reference}`,
                 at: null,
                 overdue: false,
+            }),
+        )
+    }
+
+    /**
+     * WORKSPACE-SCOPED, unlike every reader above.
+     *
+     * CaseProject carries workspaceId rather than profileId, so this filters through the relation on
+     * the workspace whose access was authorised. Scoping it by profileId instead would have been
+     * wrong in a way that is easy to miss: it would have returned cases from the profile's OTHER
+     * workspaces, which the caller may have no access to. The scope difference is reported in the
+     * response rather than hidden - see OPERATIONS_DOMAIN_SCOPE.
+     *
+     * BLOCKED is included alongside overdue and upcoming because a blocked milestone is the clearest
+     * "somebody must do something" state in the case domain, and it has no due date of its own to
+     * bring it into a date window.
+     */
+    private async caseMilestones(workspaceId: string, asOf: Date, until: Date): Promise<AttentionItem[]> {
+        const rows = await this.ctx.db.caseMilestone.findMany({
+            where: {
+                case: { workspaceId },
+                OR: [
+                    { status: "BLOCKED" },
+                    { status: { in: ["PENDING", "IN_PROGRESS"] }, dueAt: { lte: until } },
+                ],
+            },
+            orderBy: [{ dueAt: "asc" }, { ordinal: "asc" }],
+            take: MAX_ITEMS_PER_DOMAIN,
+            select: { id: true, title: true, status: true, dueAt: true, case: { select: { reference: true } } },
+        })
+        return rows.map((row) =>
+            Object.freeze({
+                domain: "caseMilestones" as const,
+                id: row.id,
+                reason: row.status === "BLOCKED" ? "blocked" : "due",
+                label: `${row.case.reference} ${row.title}`,
+                at: row.dueAt,
+                overdue: row.dueAt !== null && row.dueAt.getTime() < asOf.getTime(),
             }),
         )
     }

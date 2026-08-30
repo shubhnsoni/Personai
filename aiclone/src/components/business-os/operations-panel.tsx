@@ -229,9 +229,25 @@ export function OperationsPanel({ workspaceId }: { workspaceId: string }) {
                                     <Badge key={domain.domain} variant="secondary">
                                         {domainLabel(domain.domain)} {domain.count}
                                         {domain.overdue > 0 ? ` (${domain.overdue} overdue)` : ""}
+                                        {domain.scope === "workspace" ? " · this workspace only" : ""}
                                     </Badge>
                                 ))}
                             </div>
+                        ) : null}
+
+                        {/*
+                          * Most domains are profile-scoped; case milestones are workspace-scoped
+                          * because CaseProject carries workspaceId. For an owner with more than one
+                          * workspace those are different sets, so a single total spans two boundaries.
+                          * Saying so turns a number that would not reconcile against another screen
+                          * into a fact the owner can act on.
+                          */}
+                        {summary.mixedScope ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                                This total spans two boundaries: most domains cover your whole profile, while items
+                                marked <span className="font-medium">this workspace only</span> cover just the selected
+                                workspace.
+                            </p>
                         ) : null}
 
                         {summary.total === 0 ? (

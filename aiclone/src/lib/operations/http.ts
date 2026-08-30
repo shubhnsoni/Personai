@@ -50,6 +50,7 @@ export class OperationsApiService {
                     items: summary.items.map((item) => serialise({ ...item })),
                     covers: [...summary.covers],
                     doesNotCover: summary.doesNotCover,
+                    mixedScope: summary.mixedScope,
                 })
             })
             .catch(failure)

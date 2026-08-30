@@ -40,7 +40,7 @@ import { join } from "node:path"
 
 import { PrismaClient } from "@prisma/client"
 
-import { OPERATIONS_DOMAINS, OperationsService, UNCOVERED_DOMAINS } from "../../src/lib/operations/engine"
+import { OPERATIONS_DOMAINS, OPERATIONS_DOMAIN_SCOPE, OperationsService, UNCOVERED_DOMAINS } from "../../src/lib/operations/engine"
 import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
@@ -113,10 +113,31 @@ check(
 // ---------------------------------------------------------------------------
 const findManyCount = (engineCode.match(/\.findMany\(/g) ?? []).length
 const profileIdCount = (engineCode.match(/profileId,/g) ?? []).length
+// caseMilestones filters through the relation on workspaceId instead of carrying profileId, so it is
+// excluded from the profileId count and asserted separately below.
+const workspaceScopedReaders = Object.values(OPERATIONS_DOMAIN_SCOPE).filter((s) => s === "workspace").length
 checkInvertible(
-    "every findMany in the operations engine filters on profileId",
-    findManyCount > 0 && profileIdCount >= findManyCount,
-    `findMany=${findManyCount} profileId filters=${profileIdCount}`,
+    "every profile-scoped findMany in the operations engine filters on profileId",
+    findManyCount > 0 && profileIdCount >= findManyCount - workspaceScopedReaders,
+    `findMany=${findManyCount} profileId filters=${profileIdCount} workspace-scoped readers=${workspaceScopedReaders}`,
+)
+checkInvertible(
+    "the workspace-scoped reader filters through its relation on workspaceId, not on profileId",
+    /case: \{ workspaceId \}/.test(engineCode),
+    "caseMilestones filters case.workspaceId",
+)
+// The scope difference is the kind of thing that silently makes a total unreconcilable, so it must be
+// reported rather than merely known.
+checkInvertible(
+    "every domain declares which tenant boundary it was read on",
+    OPERATIONS_DOMAINS.every((domain) => OPERATIONS_DOMAIN_SCOPE[domain] === "profile" || OPERATIONS_DOMAIN_SCOPE[domain] === "workspace"),
+    Object.entries(OPERATIONS_DOMAIN_SCOPE)
+        .map(([d, s]) => `${d}:${s}`)
+        .join(" "),
+)
+check(
+    "the scope map covers exactly the declared domains, with no extra and none missing",
+    Object.keys(OPERATIONS_DOMAIN_SCOPE).sort().join(",") === [...OPERATIONS_DOMAINS].sort().join(","),
 )
 check(
     "the operations context asks only for profile.read, so there is no write permission path at all",
@@ -290,6 +311,17 @@ async function main() {
                 check(
                     "the response declares what it covers and what it does not",
                     a.covers.length === OPERATIONS_DOMAINS.length && Object.keys(a.doesNotCover).length > 0,
+                )
+                // The mixed-boundary fact must be reported, not merely true.
+                checkInvertible(
+                    "the response reports that its total spans more than one tenant boundary",
+                    a.mixedScope === true && a.domains.some((d) => d.scope === "workspace") && a.domains.some((d) => d.scope === "profile"),
+                    `mixedScope=${String(a.mixedScope)}`,
+                )
+                check(
+                    "the response reports the workspace it authorised, which workspace-scoped domains were read on",
+                    a.workspaceId === ids.wsA && b.workspaceId === ids.wsB,
+                    `${a.workspaceId === ids.wsA ? "correct" : "WRONG"}`,
                 )
                 check(
                     "every comparison in one response is made against a single clock reading",

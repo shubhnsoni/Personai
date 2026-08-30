@@ -25,20 +25,31 @@ export class OperationsContext {
     ) {}
 
     /**
-     * Resolves the caller's workspace to the profileId whose records the view aggregates.
+     * Resolves the caller's workspace to BOTH the workspace it authorised and the profileId whose
+     * records the view aggregates.
+     *
+     * Both are returned because this domain genuinely needs both, and that is a fact worth surfacing
+     * rather than smoothing over: most engines in this repository are profile-scoped
+     * (Reservation, FieldJob, InventoryItem all carry profileId), but CaseProject is scoped by
+     * workspaceId. A profile can own several workspaces, so those two scopes are not the same set.
+     * The operations view therefore reports a `scope` per domain instead of implying one uniform
+     * boundary - see OPERATIONS_DOMAIN_SCOPE in engine.ts.
      *
      * Only `profile.read` is accepted. Widening this to `profile.update` would be a signal that
      * something in this domain writes, and nothing does.
      */
-    async requireProfile(workspaceId: string, permission: "profile.read"): Promise<string> {
+    async requireScope(
+        workspaceId: string,
+        permission: "profile.read",
+    ): Promise<{ profileId: string; workspaceId: string }> {
         const access = await this.tenancy.requireAccess(workspaceId, permission)
         const workspace = await this.db.workspace.findUnique({
             where: { id: access.workspaceId },
-            select: { profileId: true },
+            select: { id: true, profileId: true },
         })
         if (!workspace?.profileId) {
             throw new PersistenceError("FORBIDDEN", "This workspace is not linked to a profile that owns operations")
         }
-        return workspace.profileId
+        return { profileId: workspace.profileId, workspaceId: workspace.id }
     }
 }

@@ -18,6 +18,7 @@ export type OperationsDomain =
     | "inventory"
     | "fulfilments"
     | "returns"
+    | "caseMilestones"
 
 export type AttentionItemView = Readonly<{
     domain: OperationsDomain
@@ -33,6 +34,12 @@ export type DomainSummaryView = Readonly<{
     domain: OperationsDomain
     count: number
     overdue: number
+    /**
+     * Which tenant boundary this count was read on. Most domains are profile-scoped; case milestones
+     * are workspace-scoped because CaseProject carries workspaceId. For an owner with more than one
+     * workspace those are different sets, which is why the server reports it instead of implying one.
+     */
+    scope: "profile" | "workspace"
 }>
 
 export type OperationsSummaryView = Readonly<{
@@ -46,6 +53,8 @@ export type OperationsSummaryView = Readonly<{
     covers: readonly string[]
     /** What it is not, with the reason. Rendered, never hidden. */
     doesNotCover: Readonly<Record<string, string>>
+    /** True when the covered domains do not all share one tenant boundary. */
+    mixedScope: boolean
 }>
 
 type ApiEnvelope<T> =
@@ -122,6 +131,7 @@ const DOMAIN_LABELS: Readonly<Record<OperationsDomain, string>> = Object.freeze(
     inventory: "Stock",
     fulfilments: "Shipments",
     returns: "Returns",
+    caseMilestones: "Case milestones",
 })
 
 export function domainLabel(domain: string): string {
