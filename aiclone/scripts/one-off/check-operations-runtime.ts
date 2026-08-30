@@ -31,6 +31,27 @@
  *   must never see one of tenant B's ids, in ANY domain - asserted id by id, not by count, because two
  *   tenants with one record each produce the same count either way.
  *
+ *   DETERMINISM ON A TIE-HEAVY FIXTURE. Every domain orders by a business key that is not unique, so the
+ *   fixture is built so that those keys TIE: reservations sharing one startAt, appointments sharing one
+ *   startTime, field jobs sharing both a null scheduledStartAt and one createdAt, milestones sharing both
+ *   a dueAt and an ordinal, and a whole catalogue sitting at onHand 0. A fixture where nothing ties would
+ *   pass whether or not the ordering is reproducible, and would therefore prove nothing.
+ *
+ *   Two of those groups are seeded LARGER THAN THE PER-DOMAIN CAP on purpose, because a cap over an
+ *   undefined order does not merely reshuffle the answer - it changes which rows are IN it. Each
+ *   tie-heavy group is also inserted in DESCENDING id order, so id-ascending is not the order the rows
+ *   physically sit in and a reader that fails to ask for one cannot pass by accident.
+ *
+ *   THE CAP MUST DROP THE LEAST IMPORTANT ROW, NEVER THE MOST IMPORTANT. This is the one way a
+ *   bounding change could do real damage - an owner is not told about a stockout because the query got
+ *   cheaper - so it is asserted directly, against an independently computed answer rather than against
+ *   the engine's own.
+ *
+ *   THE INVENTORY BOUND IS ASSERTED EQUIVALENT, NOT MERELY CHEAPER. The reorder comparison moved from
+ *   TypeScript into SQL as a field reference. The old computation - fetch every tracked row, filter
+ *   onHand <= reorderPoint in TypeScript, sort, cut - is performed here independently and the engine's
+ *   answer must equal it exactly.
+ *
  * Set INVERT_ASSERTION=1 to flip every load-bearing expectation and prove this can fail.
  *
  *   ts-node -r tsconfig-paths/register scripts/one-off/check-operations-runtime.ts
@@ -41,7 +62,14 @@ import { join } from "node:path"
 import { PrismaClient } from "@prisma/client"
 
 import { COHORT_NEEDS_ACTION_DOMAIN, COHORT_NEEDS_ACTION_SCOPE } from "../../src/lib/cohorts/needs-action"
-import { OPERATIONS_DOMAINS, OPERATIONS_DOMAIN_SCOPE, OperationsService, UNCOVERED_DOMAINS } from "../../src/lib/operations/engine"
+import {
+    OPERATIONS_DOMAINS,
+    OPERATIONS_DOMAIN_SCOPE,
+    type OperationsDomain,
+    OperationsService,
+    type OperationsSummary,
+    UNCOVERED_DOMAINS,
+} from "../../src/lib/operations/engine"
 import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
@@ -171,6 +199,122 @@ check(
 )
 
 // ---------------------------------------------------------------------------
+// 2b. Structural: every reader asks for a REPRODUCIBLE order, and asks the database to bound it
+// ---------------------------------------------------------------------------
+/**
+ * DETERMINISM PROVEN BY CONSTRUCTION, which is the only way it can be proven.
+ *
+ * A behavioural test can only show that two requests HAPPENED to agree. `ORDER BY` on a non-unique key
+ * leaves tied rows in an undefined order, and undefined does not mean different - the same plan over the
+ * same physical rows will usually return the same sequence, so a fixture can agree twice and still be
+ * riding on luck. What makes the answer reproducible is a total order in the query, and that is a
+ * property of the source. So it is asserted here, per reader, and the tie-heavy fixture further down
+ * demonstrates the consequence.
+ *
+ * The expected key sequences are PINNED IN FULL rather than merely checked for a trailing id. That is
+ * deliberate: the cheap way to make sorting deterministic is to simplify what is being sorted, and
+ * pinning every key ahead of the tie-break means a change to a domain's business ordering - dropping
+ * `scheduledStartAt` so nulls stop sorting last, or dropping `ordinal` from the milestone order - fails
+ * here instead of passing quietly as "still deterministic".
+ */
+const EXPECTED_ORDER_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+    // Business key first, exactly as audited; the unique id last, and only last.
+    reservation: ["startAt", "id"],
+    booking: ["startTime", "id"],
+    fieldJob: ["scheduledStartAt", "createdAt", "id"],
+    fieldJobInspection: ["createdAt", "id"],
+    inventoryItem: ["onHand", "id"],
+    fulfilment: ["createdAt", "id"],
+    returnRequest: ["createdAt", "id"],
+    caseMilestone: ["dueAt", "ordinal", "id"],
+})
+
+type ReaderQuery = Readonly<{ delegate: string; body: string; orderKeys: readonly string[]; directions: readonly string[] }>
+const readerQueries: ReaderQuery[] = []
+{
+    const starts = [...engineCode.matchAll(/this\.ctx\.db\.(\w+)\.findMany\(/g)]
+    for (let i = 0; i < starts.length; i += 1) {
+        const from = starts[i].index ?? 0
+        const to = i + 1 < starts.length ? (starts[i + 1].index ?? engineCode.length) : engineCode.length
+        const body = engineCode.slice(from, to)
+        const orderBy = /orderBy:\s*(\[[\s\S]*?\]|\{[\s\S]*?\})/.exec(body)?.[1] ?? ""
+        const pairs = [...orderBy.matchAll(/(\w+):\s*"(asc|desc)"/g)]
+        readerQueries.push({
+            delegate: starts[i][1],
+            body,
+            orderKeys: pairs.map((p) => p[1]),
+            directions: pairs.map((p) => p[2]),
+        })
+    }
+}
+
+checkInvertible(
+    "every database reader in the engine was found by the scan, so the assertions below cover all of them",
+    readerQueries.length === findManyCount && readerQueries.length === Object.keys(EXPECTED_ORDER_KEYS).length,
+    `readers=${readerQueries.length} findMany=${findManyCount} pinned=${Object.keys(EXPECTED_ORDER_KEYS).length}: ${readerQueries.map((r) => r.delegate).join(",")}`,
+)
+// The load-bearing one: a non-unique ORDER BY leaves tied rows undefined, and a cap over an undefined
+// order changes the SET, not just the sequence.
+const notUniquelyOrdered = readerQueries.filter((r) => r.orderKeys[r.orderKeys.length - 1] !== "id")
+checkInvertible(
+    "every reader's ordering ends on the UNIQUE id, so no reader can return tied rows in an undefined order",
+    readerQueries.length > 0 && notUniquelyOrdered.length === 0,
+    notUniquelyOrdered.length > 0
+        ? `NO UNIQUE TIE-BREAK: ${notUniquelyOrdered.map((r) => `${r.delegate}[${r.orderKeys.join(">")}]`).join(" ")}`
+        : readerQueries.map((r) => `${r.delegate}[${r.orderKeys.join(">")}]`).join(" "),
+)
+// Appended LAST is what makes it safe. A tie-break placed anywhere else would outrank a business key and
+// silently reorder work by an arbitrary cuid.
+const wrongKeys = readerQueries.filter(
+    (r) => (EXPECTED_ORDER_KEYS[r.delegate] ?? []).join(">") !== r.orderKeys.join(">"),
+)
+checkInvertible(
+    "each reader's BUSINESS ordering is exactly the audited one with the tie-break appended after it, not woven into it",
+    wrongKeys.length === 0,
+    wrongKeys.length > 0
+        ? wrongKeys.map((r) => `${r.delegate}: expected [${(EXPECTED_ORDER_KEYS[r.delegate] ?? []).join(">")}] got [${r.orderKeys.join(">")}]`).join(" | ")
+        : "all 8 readers match their pinned key sequence",
+)
+checkInvertible(
+    "no reader silently reverses a business ordering, so overdue and low-stock work still sorts first",
+    readerQueries.every((r) => r.directions.every((d) => d === "asc")),
+    readerQueries.map((r) => `${r.delegate}:${r.directions.join(",")}`).join(" "),
+)
+// The unbounded reader is the one that could return a different SET on two identical requests.
+const unbounded = readerQueries.filter((r) => !/take: MAX_ITEMS_PER_DOMAIN/.test(r.body))
+checkInvertible(
+    "every reader is bounded IN THE DATABASE by take, so none fetches a whole table to show twenty rows",
+    unbounded.length === 0,
+    unbounded.length > 0 ? `UNBOUNDED: ${unbounded.map((r) => r.delegate).join(",")}` : `all ${readerQueries.length} readers carry take: MAX_ITEMS_PER_DOMAIN`,
+)
+// The inventory reader is the one that used to cut in TypeScript. Scanned over ITS body only: cohortTasks
+// slices legitimately, because it caps an in-memory declaration rather than a query result.
+const inventoryReader = readerQueries.find((r) => r.delegate === "inventoryItem")
+checkInvertible(
+    "the inventory reorder comparison happens in SQL as a field reference, so its take is correct rather than lossy",
+    inventoryReader !== undefined &&
+        /onHand: \{ lte: this\.ctx\.db\.inventoryItem\.fields\.reorderPoint \}/.test(inventoryReader.body),
+    inventoryReader === undefined ? "inventory reader not found - the scan is broken, not the code" : "onHand <= reorderPoint compared in the database",
+)
+checkInvertible(
+    "the inventory reader no longer cuts its result in TypeScript, which is what made its SET undefined",
+    inventoryReader !== undefined && !/\.slice\(/.test(inventoryReader.body),
+    inventoryReader === undefined ? "inventory reader not found" : "no .slice() in the inventory reader",
+)
+/**
+ * cohortTasks has no orderBy of its own and must not acquire one: it consumes a declaration the cohort
+ * engine has already put in a total order. That inheritance is asserted at its source, so the day
+ * `resolveCohortNeedsAction` stops ending its sort chain on the unique id, this fails here rather than
+ * showing up as an operations view that reshuffles cohort work between two refreshes.
+ */
+const cohortSrc = readFileSync(join(APP_ROOT, "src/lib/cohorts/needs-action.ts"), "utf8")
+checkInvertible(
+    "the cohort declaration this view consumes is itself totally ordered, ending its sort chain on the unique id",
+    /a\.id\.localeCompare\(b\.id\)/.test(cohortSrc) && /items\.sort\(/.test(cohortSrc),
+    "resolveCohortNeedsAction sorts at, then reason, then id",
+)
+
+// ---------------------------------------------------------------------------
 // 3. Structural: declared coverage matches the implementation
 // ---------------------------------------------------------------------------
 // Each reader is a private method named after its domain and returns items tagged with it.
@@ -277,16 +421,315 @@ check(
 // ---------------------------------------------------------------------------
 // 5. Behavioural: two tenants, and neither sees the other
 // ---------------------------------------------------------------------------
+/**
+ * THE PER-DOMAIN CAP, read out of the engine rather than restated here.
+ *
+ * The expected sequences below have to cut where the engine cuts. Hardcoding 20 would make this harness
+ * agree with a stale number the day the cap moves, and exporting the constant would widen the engine's
+ * API for a test's convenience, so it is read from the source instead.
+ */
+const CAP = Number(/const MAX_ITEMS_PER_DOMAIN = (\d+)/.exec(engineSrc)?.[1] ?? "0")
+check("the per-domain cap was recovered from the engine source, so the expected cuts below are its cut", CAP > 0, `MAX_ITEMS_PER_DOMAIN=${CAP}`)
+
+/**
+ * THE TIE-HEAVY FIXTURE.
+ *
+ * Every group below shares its domain's business ordering key, because a fixture in which each row has a
+ * distinct timestamp cannot tell a total order from a partial one - both return the same sequence, so a
+ * passing assertion would say nothing about determinism.
+ *
+ * Two groups deliberately EXCEED the cap - reservations at 22 and stockouts at 24, against a cap of 20 -
+ * because that is where an undefined order stops being cosmetic: the cap has to cut somewhere, and
+ * cutting an undefined order makes the SET undefined rather than merely its arrangement.
+ *
+ * Both groups also carry rows that are genuinely LESS urgent by their domain's own rule - reservations
+ * dated three months later, stock sitting at 4 against a reorder point of 5 - which must be the rows the
+ * cap drops. A cap that dropped a stockout to make room for a well-stocked item would be the one way this
+ * change could do real damage, so the fixture contains the material to catch it.
+ *
+ * IDS ARE COLLATION-PROOF ON PURPOSE. Every id in a group has the same length and differs only in
+ * zero-padded digits, so "ascending id" means the same thing in TypeScript as in the database whatever
+ * collation the target uses. Without that, an expected sequence computed here could disagree with the
+ * database's ORDER BY over an underscore, and the failure would look like the bug this harness exists to
+ * catch instead of the fixture artefact it would actually be.
+ *
+ * ROWS ARE INSERTED IN DESCENDING ID ORDER, so ascending-by-id is never the order the rows physically sit
+ * in. A reader that asks for no tie-break tends to get physical order back, which here is the exact
+ * REVERSE of the right answer - so the mutation of removing a tie-break is caught behaviourally and not
+ * only structurally.
+ */
+const TIED_AT = "2020-03-01 10:00:00"
+const TIED_END = "2020-03-01 11:00:00"
+const LATER_AT = "2020-06-01 10:00:00"
+const LATER_END = "2020-06-01 11:00:00"
+const RES_TIED = 22
+const INV_TIED = 24
+const SMALL_GROUP = 3
+
+type TieHeavy = Readonly<{
+    reservationsTied: readonly string[]
+    /** Later-dated, therefore less urgent: the cap must drop these before any tied row. */
+    reservationsLater: readonly string[]
+    appointmentsTied: readonly string[]
+    fieldJobsTied: readonly string[]
+    inspectionsTied: readonly string[]
+    fulfilmentsTied: readonly string[]
+    returnsTied: readonly string[]
+    milestonesTied: readonly string[]
+    /** onHand 0 against a reorder point of 5: the most urgent rows, and more of them than the cap admits. */
+    inventoryTied: readonly string[]
+    /** onHand 4 against a reorder point of 5: still needs reordering, but less urgently. */
+    inventoryHigher: readonly string[]
+    /** Above its own reorder point, untracked, or with no reorder point: must never be reported at all. */
+    inventoryNotCandidates: readonly string[]
+}>
+
 type Seeded = Readonly<{
     wsA: string
     wsB: string
     userA: string
     userB: string
+    profileA: string
+    profileB: string
     jobA: string
     jobB: string
     inspectionA: string
     inspectionB: string
+    tie: TieHeavy
+    probeB: InventoryProbe
 }>
+
+/** Ascending by id, compared the way the database compares these ids. See the note on collation above. */
+function byId(x: string, y: string): number {
+    return x < y ? -1 : x > y ? 1 : 0
+}
+
+/**
+ * A SECOND INVENTORY SHAPE, on tenant B, that can tell a real column-to-column comparison from a
+ * cheap approximation of one.
+ *
+ * Tenant A's inventory is deliberately tie-heavy and larger than the cap, which is what proves the cut is
+ * reproducible - but it also makes A blind to one specific regression. With 24 stockouts filling a cap of
+ * 20, dropping the `onHand <= reorderPoint` comparison from the query changes nothing OBSERVABLE on A: the
+ * twenty lowest-stock rows are the same rows either way. A harness that only had tenant A would catch that
+ * mutation by reading the source and not by running it.
+ *
+ * So tenant B carries a shape where the comparison decides the ANSWER. Its candidate set is smaller than
+ * the cap, and it holds rows with LOWER absolute stock than a genuine candidate which are nevertheless
+ * above their OWN reorder point. Order by stock alone and those rows come first; compare each row against
+ * its own reorder point and they are not candidates at all.
+ */
+type InventoryProbe = Readonly<{
+    /** onHand 0 against a reorder point of 2: candidates, and the most urgent. */
+    candidatesUrgent: readonly string[]
+    /** onHand 5 against a reorder point of 9: candidates, less urgent, and OUTRANKED BY STOCK by the rows below. */
+    candidatesLessUrgent: readonly string[]
+    /** onHand 1 against a reorder point of 0: NOT candidates, despite holding less stock than the rows above. */
+    nonCandidatesLowerStock: readonly string[]
+}>
+
+async function seedInventoryProbe(tx: Tx, profileId: string, workspaceId: string, q: (s: string) => string): Promise<InventoryProbe> {
+    const mk = (sql: string) => tx.$executeRawUnsafe(sql)
+    const group = (kind: string, from: number, count: number) =>
+        Array.from({ length: count }, (_, i) => q(`${kind}_${String(from + i).padStart(3, "0")}`))
+    const rev = <T,>(xs: readonly T[]) => [...xs].reverse()
+
+    const location = q("bloc_001")
+    await mk(
+        `insert into "Location" ("id","workspaceId","name","updatedAt") values ('${location}','${workspaceId}','${location}',CURRENT_TIMESTAMP)`,
+    )
+    const product = q("bprod_001")
+    await mk(
+        `insert into "DigitalProduct" ("id","profileId","title","updatedAt") values ('${product}','${profileId}','Probe',CURRENT_TIMESTAMP)`,
+    )
+    const candidatesUrgent = group("binv", 1, 3)
+    const nonCandidatesLowerStock = group("binv", 101, 4)
+    const candidatesLessUrgent = group("binv", 201, 3)
+    const rows = [
+        ...candidatesUrgent.map((id) => ({ id, onHand: 0, point: 2 })),
+        ...nonCandidatesLowerStock.map((id) => ({ id, onHand: 1, point: 0 })),
+        ...candidatesLessUrgent.map((id) => ({ id, onHand: 5, point: 9 })),
+    ]
+    await mk(
+        `insert into "ProductVariant" ("id","profileId","productId","title","updatedAt") values ` +
+            rev(rows)
+                .map((r) => `('${r.id}_v','${profileId}','${product}','Probe',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+    await mk(
+        `insert into "InventoryItem" ("id","profileId","productId","locationId","variantId","onHand","reserved","reorderPoint","trackingEnabled","updatedAt") values ` +
+            rev(rows)
+                .map(
+                    (r) =>
+                        `('${r.id}','${profileId}','${product}','${location}','${r.id}_v',${r.onHand},0,${r.point},true,CURRENT_TIMESTAMP)`,
+                )
+                .join(","),
+    )
+    return { candidatesUrgent, candidatesLessUrgent, nonCandidatesLowerStock }
+}
+
+async function seedTieHeavy(tx: Tx, profileId: string, workspaceId: string, q: (s: string) => string): Promise<TieHeavy> {
+    const mk = (sql: string) => tx.$executeRawUnsafe(sql)
+    const group = (kind: string, from: number, count: number) =>
+        Array.from({ length: count }, (_, i) => q(`${kind}_${String(from + i).padStart(3, "0")}`))
+    /** Insert order is the REVERSE of the correct answer, so physical order cannot pass for sorted. */
+    const rev = <T,>(xs: readonly T[]) => [...xs].reverse()
+
+    // -- reservations: one startAt shared by 22 rows, plus 2 that are genuinely later ------------------
+    const reservationsTied = group("res", 1, RES_TIED)
+    const reservationsLater = group("res", 101, 2)
+    // The reservation exclusion constraint forbids two active reservations overlapping on ONE table, and
+    // these deliberately share a time window, so each gets its own table. That is fixture surface the
+    // constraint forces, not a choice.
+    const tables = group("tbl", 1, RES_TIED + reservationsLater.length)
+    await mk(
+        `insert into "RestaurantTable" ("id","profileId","label","code","updatedAt") values ` +
+            rev(tables)
+                .map((t) => `('${t}','${profileId}','${t}','${t}',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+    const reservationRows = [
+        ...reservationsTied.map((id, i) => ({ id, tableId: tables[i], at: TIED_AT, end: TIED_END })),
+        ...reservationsLater.map((id, i) => ({ id, tableId: tables[RES_TIED + i], at: LATER_AT, end: LATER_END })),
+    ]
+    await mk(
+        `insert into "Reservation" ("id","profileId","tableId","partySize","startAt","endAt","status","guestName","updatedAt") values ` +
+            rev(reservationRows)
+                .map((r) => `('${r.id}','${profileId}','${r.tableId}',2,'${r.at}','${r.end}','REQUESTED','Tie',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+
+    // -- appointments: three bookings on one startTime ------------------------------------------------
+    const offering = q("svc_001")
+    await mk(
+        `insert into "ServiceOffering" ("id","profileId","name","updatedAt") values ('${offering}','${profileId}','Tie',CURRENT_TIMESTAMP)`,
+    )
+    const appointmentsTied = group("apt", 1, SMALL_GROUP)
+    // resourceId is left null so the appointment exclusion constraint does not apply; these must share a
+    // startTime, and that constraint exists to stop two bookings sharing a RESOURCE at one time.
+    await mk(
+        `insert into "Booking" ("id","profileId","visitorName","visitorEmail","serviceOfferingId","startTime","endTime","status","updatedAt") values ` +
+            rev(appointmentsTied)
+                .map((id) => `('${id}','${profileId}','Tie','tie@example.test','${offering}','${TIED_AT}','${TIED_END}','CONFIRMED',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+
+    // -- field jobs: BOTH existing keys tie - no visit window, and one createdAt ----------------------
+    const fieldJobsTied = group("fj", 1, SMALL_GROUP)
+    await mk(
+        `insert into "FieldJob" ("id","profileId","reference","title","status","priority","siteAddress","createdAt","updatedAt") values ` +
+            rev(fieldJobsTied)
+                .map((id) => `('${id}','${profileId}','${id}','Tie','SCHEDULED','NORMAL','1 Example Street','${TIED_AT}',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+
+    // -- inspections: three sharing one createdAt --------------------------------------------------
+    // ONE PER JOB, because a partial unique index allows at most one OPEN inspection per job - a job may
+    // be inspected repeatedly over its life, but not twice at once. So each tie-heavy inspection hangs off
+    // its own tie-heavy job rather than three off one. The fixture obeys the domain rule; it does not
+    // reshape the rule to make the fixture convenient.
+    const inspectionsTied = group("insp", 1, SMALL_GROUP)
+    await mk(
+        `insert into "FieldJobInspection" ("id","jobId","profileId","reference","status","createdAt","updatedAt") values ` +
+            rev(inspectionsTied.map((id, i) => ({ id, jobId: fieldJobsTied[i] })))
+                .map((r) => `('${r.id}','${r.jobId}','${profileId}','${r.id}','IN_PROGRESS','${TIED_AT}',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+
+    // -- fulfilments and returns: one order, one createdAt each ---------------------------------------
+    const order = q("ord_001")
+    await mk(
+        `insert into "Order" ("id","profileId","publicToken","number","businessDate","subtotalCents","totalCents","currency","updatedAt")
+         values ('${order}','${profileId}','${order}',1,'2020-03-01',0,0,'USD',CURRENT_TIMESTAMP)`,
+    )
+    const fulfilmentsTied = group("ful", 1, SMALL_GROUP)
+    await mk(
+        `insert into "Fulfilment" ("id","profileId","orderId","reference","state","createdAt","updatedAt") values ` +
+            rev(fulfilmentsTied)
+                .map((id) => `('${id}','${profileId}','${order}','${id}','DRAFT','${TIED_AT}',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+    const returnsTied = group("ret", 1, SMALL_GROUP)
+    await mk(
+        `insert into "ReturnRequest" ("id","profileId","orderId","reference","state","createdAt","updatedAt") values ` +
+            rev(returnsTied)
+                .map((id) => `('${id}','${profileId}','${order}','${id}','REQUESTED','${TIED_AT}',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+
+    // -- case milestones: ordinal is unique only WITHIN a case, so three cases each hold ordinal 1 ----
+    const cases = group("case", 1, SMALL_GROUP)
+    await mk(
+        `insert into "CaseProject" ("id","workspaceId","reference","title","updatedAt") values ` +
+            rev(cases)
+                .map((id) => `('${id}','${workspaceId}','${id}','Tie',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+    const milestonesTied = group("ms", 1, SMALL_GROUP)
+    await mk(
+        `insert into "CaseMilestone" ("id","caseId","title","ordinal","status","dueAt","updatedAt") values ` +
+            rev(milestonesTied.map((id, i) => ({ id, caseId: cases[i] })))
+                .map((r) => `('${r.id}','${r.caseId}','Tie',1,'PENDING','${TIED_AT}',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+
+    // -- inventory: a catalogue at onHand 0, plus rows that must be dropped and rows that must never
+    //    appear at all. The last three groups are what tell a real column-to-column comparison from a
+    //    filter that merely looks like one.
+    const location = q("loc_001")
+    await mk(
+        `insert into "Location" ("id","workspaceId","name","updatedAt") values ('${location}','${workspaceId}','${location}',CURRENT_TIMESTAMP)`,
+    )
+    const product = q("prod_001")
+    await mk(
+        `insert into "DigitalProduct" ("id","profileId","title","updatedAt") values ('${product}','${profileId}','Tie',CURRENT_TIMESTAMP)`,
+    )
+    const inventoryTied = group("inv", 1, INV_TIED)
+    const inventoryHigher = group("inv", 101, 3)
+    const inventoryAbovePoint = group("inv", 201, 2)
+    const inventoryUntracked = group("inv", 301, 1)
+    const inventoryNoPoint = group("inv", 401, 1)
+    const inventoryRows = [
+        ...inventoryTied.map((id) => ({ id, onHand: 0, point: "5", tracked: "true" })),
+        ...inventoryHigher.map((id) => ({ id, onHand: 4, point: "5", tracked: "true" })),
+        // Above its own reorder point: excluded by the comparison itself, not by any other clause.
+        ...inventoryAbovePoint.map((id) => ({ id, onHand: 9, point: "5", tracked: "true" })),
+        // Opted out of stock control while sitting at zero.
+        ...inventoryUntracked.map((id) => ({ id, onHand: 0, point: "5", tracked: "false" })),
+        // No reorder point at all while sitting at zero.
+        ...inventoryNoPoint.map((id) => ({ id, onHand: 0, point: "null", tracked: "true" })),
+    ]
+    // (variantId, locationId) is unique, so one variant per item lets every item share one location.
+    await mk(
+        `insert into "ProductVariant" ("id","profileId","productId","title","updatedAt") values ` +
+            rev(inventoryRows)
+                .map((r) => `('${r.id}_v','${profileId}','${product}','Tie',CURRENT_TIMESTAMP)`)
+                .join(","),
+    )
+    await mk(
+        `insert into "InventoryItem" ("id","profileId","productId","locationId","variantId","onHand","reserved","reorderPoint","trackingEnabled","updatedAt") values ` +
+            rev(inventoryRows)
+                .map(
+                    (r) =>
+                        `('${r.id}','${profileId}','${product}','${location}','${r.id}_v',${r.onHand},0,${r.point},${r.tracked},CURRENT_TIMESTAMP)`,
+                )
+                .join(","),
+    )
+
+    return {
+        reservationsTied,
+        reservationsLater,
+        appointmentsTied,
+        fieldJobsTied,
+        inspectionsTied,
+        fulfilmentsTied,
+        returnsTied,
+        milestonesTied,
+        inventoryTied,
+        inventoryHigher,
+        inventoryNotCandidates: [...inventoryAbovePoint, ...inventoryUntracked, ...inventoryNoPoint],
+    }
+}
 
 async function seed(tx: Tx): Promise<Seeded> {
     const q = (s: string) => `${RUN}_${s}`
@@ -319,15 +762,28 @@ async function seed(tx: Tx): Promise<Seeded> {
         )
     }
 
+    // The tie-heavy fixture is TENANT A ONLY, and that is load-bearing twice over. It keeps tenant B a
+    // clean control for the isolation assertions - B's item list stays small enough to read - and it
+    // leaves B with items in profile-scoped domains only, which is the counterexample the mixed-scope
+    // assertions need.
+    const tie = await seedTieHeavy(tx, q("pra"), q("wsa"), q)
+    // Tenant B stays profile-scoped only - it is the mixed-scope counterexample - and carries the inventory
+    // shape in which the reorder comparison decides the answer. See the note on InventoryProbe.
+    const probeB = await seedInventoryProbe(tx, q("prb"), q("wsb"), q)
+
     return {
         wsA: q("wsa"),
         wsB: q("wsb"),
         userA: `clerk_${q("ua")}`,
         userB: `clerk_${q("ub")}`,
+        profileA: q("pra"),
+        profileB: q("prb"),
         jobA: q("joba"),
         jobB: q("jobb"),
         inspectionA: q("inspa"),
         inspectionB: q("inspb"),
+        tie,
+        probeB,
     }
 }
 
@@ -397,11 +853,58 @@ async function main() {
                     "the response declares what it covers and what it does not",
                     a.covers.length === OPERATIONS_DOMAINS.length && Object.keys(a.doesNotCover).length > 0,
                 )
-                // The mixed-boundary fact must be reported, not merely true.
+                // The mixed-boundary fact must be reported for what it is, and what it is turns out to be
+                // narrower than its name suggests. See the three assertions below.
+                const boundariesWithItems = (s: OperationsSummary) =>
+                    [...new Set(s.items.map((i) => OPERATIONS_DOMAIN_SCOPE[i.domain]))].sort().join(",")
+                const declaredBoundaries = [...new Set(Object.values(OPERATIONS_DOMAIN_SCOPE))].sort()
+                const aBoundaries = boundariesWithItems(a)
+                const bBoundaries = boundariesWithItems(b)
+                /**
+                 * WHAT THIS USED TO ASSERT, AND WHY THAT WAS NOT AN ASSERTION.
+                 *
+                 * The previous form was `a.mixedScope === true && a.domains.some(workspace) &&
+                 * a.domains.some(profile)`, named "the response reports that its total spans more than one
+                 * tenant boundary". Every clause of it is constant.
+                 *
+                 * `mixedScope` is computed at engine.ts as `scopes.size > 1` over the FROZEN
+                 * OPERATIONS_DOMAIN_SCOPE map, which always contains both "profile" and "workspace", so it
+                 * is true for every workspace, every profile and every dataset including an empty one. And
+                 * `a.domains` always lists all nine declared domains with their declared scope whether or
+                 * not any of them returned a row, so both `.some` clauses are constant too. The assertion
+                 * therefore restated the response's own constants back to itself: it could not have failed
+                 * for any data, and it would not have noticed if the field were wrong.
+                 *
+                 * It is replaced, not deleted, by three assertions that can each fail. The first MEASURES
+                 * what the returned rows actually span. The second is a live counterexample proving the
+                 * field cannot report that measurement. The third pins the narrow truth the field does
+                 * carry, recomputed here from the frozen map instead of read off the response - and it
+                 * keeps the original conjunction inside it, so nothing the old form checked is lost.
+                 *
+                 * The field is NOT changed here. `mixedScope` is consumed by due-work-plan.ts, by the
+                 * operations panel and by another harness that pins it true end to end; redefining it is an
+                 * integration decision with an owner, and this stage owns neither those files nor that
+                 * call. It is reported instead.
+                 */
                 checkInvertible(
-                    "the response reports that its total spans more than one tenant boundary",
-                    a.mixedScope === true && a.domains.some((d) => d.scope === "workspace") && a.domains.some((d) => d.scope === "profile"),
-                    `mixedScope=${String(a.mixedScope)}`,
+                    "MEASURED: tenant A's returned items really do span two tenant boundaries - derived from the items returned and each domain's boundary, not read off the response",
+                    aBoundaries === "profile,workspace" &&
+                        a.items.some((i) => ids.tie.milestonesTied.includes(i.id)) &&
+                        a.items.some((i) => i.id === ids.jobA),
+                    `A items span [${aBoundaries}]: workspace via caseMilestones, profile via fieldJobs`,
+                )
+                checkInvertible(
+                    "COUNTEREXAMPLE: tenant B's rows span exactly ONE boundary while mixedScope still reports true, so the field describes the declared coverage list and cannot describe a dataset",
+                    bBoundaries === "profile" && b.mixedScope === true,
+                    `B items span [${bBoundaries}] yet mixedScope=${String(b.mixedScope)} - constant-true by construction`,
+                )
+                checkInvertible(
+                    "mixedScope equals what the frozen coverage map forces, recomputed here independently - the narrow truth this field can carry, and all of it",
+                    a.mixedScope === (declaredBoundaries.length > 1) &&
+                        b.mixedScope === (declaredBoundaries.length > 1) &&
+                        a.domains.some((d) => d.scope === "workspace") &&
+                        a.domains.some((d) => d.scope === "profile"),
+                    `frozen map boundaries=[${declaredBoundaries.join(",")}] so mixedScope is ${String(declaredBoundaries.length > 1)} for every workspace and every dataset`,
                 )
                 check(
                     "the response reports the workspace it authorised, which workspace-scoped domains were read on",
@@ -411,6 +914,149 @@ async function main() {
                 check(
                     "every comparison in one response is made against a single clock reading",
                     a.asOf instanceof Date && a.items.length > 0 && a.items.every((i) => i.at === null || i.at instanceof Date),
+                )
+
+                // ---- determinism, on a fixture built so that a partial order cannot pass -----------
+                const idsIn = (s: OperationsSummary, domain: OperationsDomain) =>
+                    s.items.filter((i) => i.domain === domain).map((i) => i.id)
+                const short = (xs: readonly string[]) => xs.map((x) => x.replace(`${RUN}_`, "")).join(",")
+                const sorted = (xs: readonly string[]) => [...xs].sort(byId)
+                /**
+                 * Each expectation is the ONE sequence a total order permits, computed here from the
+                 * fixture rather than compared against a previous response. Two identical requests agreeing
+                 * would be much weaker evidence: an undefined order is free to be stable, so agreement can
+                 * be luck, while equality with the independently computed answer cannot.
+                 */
+                const expectOrder = (domain: OperationsDomain, expected: readonly string[], why: string) => {
+                    const got = idsIn(a, domain)
+                    checkInvertible(
+                        `${domain} come back in the one order a total ordering permits, on rows that tie on ${why}`,
+                        got.join(",") === expected.join(","),
+                        got.join(",") === expected.join(",") ? `${got.length} ids, exactly as ordered` : `expected [${short(expected)}] got [${short(got)}]`,
+                    )
+                }
+                expectOrder("reservations", sorted(ids.tie.reservationsTied).slice(0, CAP), "one startAt")
+                expectOrder("appointments", sorted(ids.tie.appointmentsTied), "one startTime")
+                // The tie-heavy jobs were created before the isolation fixture's own job, so createdAt still
+                // leads and the tie-break only settles the three that share it. If id had been placed ahead
+                // of createdAt this expectation would fail, which is the point of asserting the whole
+                // sequence rather than just the tied block.
+                expectOrder("fieldJobs", [...sorted(ids.tie.fieldJobsTied), ids.jobA], "a null scheduledStartAt AND one createdAt")
+                expectOrder("inspections", [...sorted(ids.tie.inspectionsTied), ids.inspectionA], "one createdAt")
+                expectOrder("fulfilments", sorted(ids.tie.fulfilmentsTied), "one createdAt")
+                expectOrder("returns", sorted(ids.tie.returnsTied), "one createdAt")
+                expectOrder("caseMilestones", sorted(ids.tie.milestonesTied), "one dueAt AND one ordinal")
+                expectOrder("inventory", sorted(ids.tie.inventoryTied).slice(0, CAP), "onHand 0")
+
+                /**
+                 * THE CAP MUST DROP THE LEAST IMPORTANT ROWS. Both groups below hold more urgent work than
+                 * the cap admits, so the rows that fall outside it are the test: if a later reservation or a
+                 * better-stocked item appeared while urgent work was cut, the bound would be actively
+                 * harmful rather than merely cheaper.
+                 */
+                const reservationIds = idsIn(a, "reservations")
+                checkInvertible(
+                    "the reservation cap drops LATER work, never earlier work - 22 rows share the earliest startAt and the cap is full of them",
+                    reservationIds.length === CAP && ids.tie.reservationsLater.every((id) => !reservationIds.includes(id)),
+                    `returned ${reservationIds.length} of ${RES_TIED + ids.tie.reservationsLater.length} candidates; the ${ids.tie.reservationsLater.length} later-dated rows are absent`,
+                )
+                const inventoryIds = idsIn(a, "inventory")
+                checkInvertible(
+                    "the inventory cap drops the BEST-STOCKED candidates first and never a stockout - 24 rows sit at onHand 0 and the cap is full of them",
+                    inventoryIds.length === CAP && ids.tie.inventoryHigher.every((id) => !inventoryIds.includes(id)),
+                    `returned ${inventoryIds.length}; the ${ids.tie.inventoryHigher.length} rows at onHand 4 are absent while stockouts fill the cap`,
+                )
+                checkInvertible(
+                    "no row above its own reorder point, opted out of stock control, or without a reorder point is ever reported - the comparison is a real column-to-column one",
+                    ids.tie.inventoryNotCandidates.every((id) => !inventoryIds.includes(id)),
+                    `${ids.tie.inventoryNotCandidates.length} non-candidates, none reported`,
+                )
+                /**
+                 * THE BOUND IS EQUIVALENT, NOT MERELY CHEAPER.
+                 *
+                 * The reorder comparison moved out of TypeScript and into SQL so that `take` could be
+                 * applied in the database. A bare `take` would have been a regression: the twenty
+                 * lowest-stock rows are not the twenty lowest-stock rows that are ALSO at or below their own
+                 * reorder point. So the OLD computation is performed here from scratch - every tracked row
+                 * with a reorder point, filtered and sorted and cut in TypeScript, with no ORDER BY asked of
+                 * the database at all - and the engine's answer must equal it exactly.
+                 */
+                const everyTrackedRow = await tx.inventoryItem.findMany({
+                    where: { profileId: ids.profileA, trackingEnabled: true, reorderPoint: { not: null } },
+                    select: { id: true, onHand: true, reorderPoint: true },
+                })
+                const oldWayCandidates = everyTrackedRow
+                    .filter((row) => row.reorderPoint !== null && row.onHand <= row.reorderPoint)
+                    .sort((x, y) => x.onHand - y.onHand || byId(x.id, y.id))
+                const oldWay = oldWayCandidates.slice(0, CAP).map((row) => row.id)
+                checkInvertible(
+                    "the database-bounded inventory read returns EXACTLY what the whole-table scan and TypeScript filter returned, so nothing that needs reordering was lost to the bound",
+                    inventoryIds.join(",") === oldWay.join(","),
+                    inventoryIds.join(",") === oldWay.join(",")
+                        ? `${oldWayCandidates.length} candidates over ${everyTrackedRow.length} tracked rows, same first ${oldWay.length}`
+                        : `expected [${short(oldWay)}] got [${short(inventoryIds)}]`,
+                )
+                const kept = new Set(inventoryIds)
+                const droppedOnHand = oldWayCandidates.filter((row) => !kept.has(row.id)).map((row) => row.onHand)
+                const keptOnHand = oldWayCandidates.filter((row) => kept.has(row.id)).map((row) => row.onHand)
+                checkInvertible(
+                    "every candidate the cap dropped is at least as well stocked as every candidate it kept, so the bound cannot hide more urgent work behind less urgent work",
+                    droppedOnHand.length > 0 && keptOnHand.length > 0 && Math.max(...keptOnHand) <= Math.min(...droppedOnHand),
+                    `kept onHand max=${keptOnHand.length > 0 ? Math.max(...keptOnHand) : "n/a"} dropped onHand min=${droppedOnHand.length > 0 ? Math.min(...droppedOnHand) : "n/a"}`,
+                )
+
+                /**
+                 * THE COMPARISON, OBSERVED RATHER THAN READ. Tenant B's shape is built so that ordering by
+                 * stock alone gives a different ANSWER from comparing each row against its own reorder point:
+                 * four rows hold LESS stock than a genuine candidate and are still not candidates, because
+                 * they are above their own reorder point. A `take` bolted onto a query that had lost the
+                 * comparison would return them. On tenant A it could not: 24 stockouts fill the cap there, so
+                 * that regression is invisible on A's data and is why this second shape exists.
+                 */
+                const bInventory = idsIn(b, "inventory")
+                checkInvertible(
+                    "a row holding LESS stock than a reported candidate is still excluded when it sits above its OWN reorder point, so the bound compares two columns and not one column against the cap",
+                    ids.probeB.nonCandidatesLowerStock.every((id) => !bInventory.includes(id)) &&
+                        ids.probeB.candidatesUrgent.every((id) => bInventory.includes(id)) &&
+                        ids.probeB.candidatesLessUrgent.every((id) => bInventory.includes(id)),
+                    `${ids.probeB.nonCandidatesLowerStock.length} lower-stock non-candidates excluded; all ${ids.probeB.candidatesUrgent.length + ids.probeB.candidatesLessUrgent.length} real candidates reported`,
+                )
+                checkInvertible(
+                    "tenant B's inventory is ordered by absolute stock with the id tie-break, urgent before less urgent, and the non-candidates that would have sorted between them are absent",
+                    bInventory.join(",") ===
+                        [...sorted(ids.probeB.candidatesUrgent), ...sorted(ids.probeB.candidatesLessUrgent)].join(","),
+                    bInventory.join(",") === [...sorted(ids.probeB.candidatesUrgent), ...sorted(ids.probeB.candidatesLessUrgent)].join(",")
+                        ? `${bInventory.length} ids, exactly as ordered`
+                        : `expected [${short([...sorted(ids.probeB.candidatesUrgent), ...sorted(ids.probeB.candidatesLessUrgent)])}] got [${short(bInventory)}]`,
+                )
+                const bTrackedRows = await tx.inventoryItem.findMany({
+                    where: { profileId: ids.profileB, trackingEnabled: true, reorderPoint: { not: null } },
+                    select: { id: true, onHand: true, reorderPoint: true },
+                })
+                const bOldWay = bTrackedRows
+                    .filter((row) => row.reorderPoint !== null && row.onHand <= row.reorderPoint)
+                    .sort((x, y) => x.onHand - y.onHand || byId(x.id, y.id))
+                    .slice(0, CAP)
+                    .map((row) => row.id)
+                checkInvertible(
+                    "on the shape where the comparison decides the answer, the bounded read still equals the whole-table scan and TypeScript filter exactly",
+                    bInventory.join(",") === bOldWay.join(","),
+                    bInventory.join(",") === bOldWay.join(",")
+                        ? `${bOldWay.length} candidates of ${bTrackedRows.length} tracked rows, identical`
+                        : `expected [${short(bOldWay)}] got [${short(bInventory)}]`,
+                )
+
+                // Repeated identical requests. Weaker evidence than the expectations above and kept for what
+                // it does add: it exercises the whole response rather than one domain at a time, and it is
+                // the shape of the complaint an owner would actually make - the same screen, twice, different.
+                identity.current = ids.userA
+                const sequence = (s: OperationsSummary) => s.items.map((i) => `${i.domain}:${i.id}`).join("|")
+                const again = await service.summary(ids.wsA)
+                const onceMore = await service.summary(ids.wsA)
+                checkInvertible(
+                    "three identical requests over the tie-heavy fixture return the identical ordered id sequence, across every domain at once",
+                    a.items.length > 0 && sequence(a) === sequence(again) && sequence(again) === sequence(onceMore),
+                    `${a.items.length} items; ${sequence(a) === sequence(again) && sequence(again) === sequence(onceMore) ? "identical across 3 calls" : "DIVERGED"}`,
                 )
 
                 // A signed-out caller must not get a summary at all.
@@ -459,6 +1105,57 @@ async function main() {
 
         const after = await prisma.fieldJob.count()
         check("harness left zero residue", before === after, `FieldJob ${before} -> ${after}`)
+
+        /**
+         * ZERO RESIDUE, PROVEN BY QUERY PER TABLE AND SCOPED TO THIS RUN.
+         *
+         * The count above is global, which makes it both weaker and more fragile than it looks: it says
+         * nothing about the eighteen other tables this fixture now touches, and it can be moved by any other
+         * process writing to the same database while this runs. Every id this harness inserts is prefixed
+         * with the run token, so the same question can be asked exactly - are any of MY rows still here -
+         * and answered per table, without a cascade being taken on trust and without another stage's
+         * concurrent work being able to change the answer.
+         *
+         * The three append-only ledgers are included and are asked about through their parent id, because
+         * their own ids are generated and would not carry the prefix. Nothing here inserts a ledger row; the
+         * assertion states that rather than assuming it.
+         */
+        const scoped = { id: { startsWith: RUN } }
+        const parent = (field: string) => ({ [field]: { startsWith: RUN } })
+        const residueProbes: ReadonlyArray<readonly [string, () => Promise<number>]> = [
+            ["User", () => prisma.user.count({ where: scoped })],
+            ["Profile", () => prisma.profile.count({ where: scoped })],
+            ["Workspace", () => prisma.workspace.count({ where: scoped })],
+            ["Membership", () => prisma.membership.count({ where: scoped })],
+            ["FieldJob", () => prisma.fieldJob.count({ where: scoped })],
+            ["FieldJobInspection", () => prisma.fieldJobInspection.count({ where: scoped })],
+            ["RestaurantTable", () => prisma.restaurantTable.count({ where: scoped })],
+            ["Reservation", () => prisma.reservation.count({ where: scoped })],
+            ["ServiceOffering", () => prisma.serviceOffering.count({ where: scoped })],
+            ["Booking", () => prisma.booking.count({ where: scoped })],
+            ["Order", () => prisma.order.count({ where: scoped })],
+            ["Fulfilment", () => prisma.fulfilment.count({ where: scoped })],
+            ["ReturnRequest", () => prisma.returnRequest.count({ where: scoped })],
+            ["Location", () => prisma.location.count({ where: scoped })],
+            ["DigitalProduct", () => prisma.digitalProduct.count({ where: scoped })],
+            ["ProductVariant", () => prisma.productVariant.count({ where: scoped })],
+            ["InventoryItem", () => prisma.inventoryItem.count({ where: scoped })],
+            ["CaseProject", () => prisma.caseProject.count({ where: scoped })],
+            ["CaseMilestone", () => prisma.caseMilestone.count({ where: scoped })],
+            ["ReservationEvent", () => prisma.reservationEvent.count({ where: parent("reservationId") })],
+            ["AppointmentEvent", () => prisma.appointmentEvent.count({ where: parent("bookingId") })],
+            ["InventoryMovement", () => prisma.inventoryMovement.count({ where: parent("itemId") })],
+        ]
+        const leftBehind: string[] = []
+        for (const [table, count] of residueProbes) {
+            const rows = await count()
+            if (rows !== 0) leftBehind.push(`${table}=${rows}`)
+        }
+        checkInvertible(
+            "not one fixture row survives the rollback, asked table by table for this run's own ids rather than inferred from a cascade",
+            leftBehind.length === 0,
+            leftBehind.length === 0 ? `${residueProbes.length} tables, all zero for this run` : `RESIDUE: ${leftBehind.join(" ")}`,
+        )
     } finally {
         await prisma.$disconnect()
     }

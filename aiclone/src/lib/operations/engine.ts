@@ -146,6 +146,32 @@ const DEFAULT_HORIZON_HOURS = 24
 const MAX_HORIZON_HOURS = 24 * 14
 const MAX_ITEMS_PER_DOMAIN = 20
 
+/**
+ * WHY EVERY READER BELOW ENDS ITS `orderBy` ON `id`.
+ *
+ * Each domain orders by a business key - a start time, a due date, a stock level - and none of those
+ * keys is unique. Twelve reservations can share one start time; a whole warehouse can sit at onHand 0.
+ * `ORDER BY` on a non-unique key leaves the order of tied rows undefined, so the database is free to
+ * return them differently on two identical requests, and it does not have to change anything for that
+ * to happen: a different plan, a different worker or a different physical row order is enough.
+ *
+ * Combined with `take`, that stops being cosmetic. When more rows tie than the cap admits, an undefined
+ * order over the tied rows makes the CUT undefined too, so two identical requests can return a
+ * different SET of items rather than merely a different arrangement of the same ones. An owner
+ * refreshing this view would watch work appear and disappear with nothing having changed.
+ *
+ * `id` is the primary key, so appending it makes each ordering a TOTAL order and the result exactly
+ * reproducible. It is appended LAST in every case, which is what makes it safe: it can only decide
+ * between rows that the business keys have already declared equal, so it cannot move a row past one
+ * the domain considers more urgent. The business ordering ahead of it - and therefore which rows the
+ * cap keeps and which it drops - is unchanged.
+ *
+ * `id` is a cuid, so the tie-break is arbitrary rather than meaningful. That is the point: it is a
+ * decision procedure for rows the domain has no preference between, not a claim that a lower id
+ * matters more. The alternative to an arbitrary-but-stable rule here is not a meaningful rule, it is
+ * no rule at all.
+ */
+
 /** Appointment statuses that still need somebody to do something. From appointments/lifecycle.ts. */
 const APPOINTMENT_OPEN_STATUSES = ["PENDING_PAYMENT", "HELD", "CONFIRMED", "CHECKED_IN"] as const
 /** Field-job statuses that mean the work is committed but not finished. */
@@ -253,7 +279,9 @@ export class OperationsService {
                     { status: { in: ["HELD", "CONFIRMED"] }, startAt: { lte: until } },
                 ],
             },
-            orderBy: { startAt: "asc" },
+            // startAt is not unique - a table turns over and several parties book the same slot - so
+            // id decides between rows that share one start time. See the note above MAX_ITEMS_PER_DOMAIN.
+            orderBy: [{ startAt: "asc" }, { id: "asc" }],
             take: MAX_ITEMS_PER_DOMAIN,
             select: { id: true, status: true, startAt: true, partySize: true },
         })
@@ -276,7 +304,8 @@ export class OperationsService {
                 status: { in: [...APPOINTMENT_OPEN_STATUSES] },
                 startTime: { lte: until },
             },
-            orderBy: { startTime: "asc" },
+            // A clinic on the hour books many appointments at one startTime; id decides between them.
+            orderBy: [{ startTime: "asc" }, { id: "asc" }],
             take: MAX_ITEMS_PER_DOMAIN,
             select: { id: true, status: true, startTime: true, visitorName: true },
         })
@@ -299,7 +328,11 @@ export class OperationsService {
                 status: { in: [...FIELD_JOB_OPEN_STATUSES] },
                 OR: [{ scheduledStartAt: { lte: until } }, { scheduledStartAt: null }],
             },
-            orderBy: [{ scheduledStartAt: "asc" }, { createdAt: "asc" }],
+            // scheduledStartAt asc puts NULL last, which is the intended reading: a dated visit comes
+            // before an undated commitment. createdAt then separates the undated ones - but two jobs
+            // created in the same transaction share a createdAt to the microsecond, so BOTH existing keys
+            // can tie at once and id is what actually makes this order reproducible.
+            orderBy: [{ scheduledStartAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
             take: MAX_ITEMS_PER_DOMAIN,
             select: { id: true, status: true, scheduledStartAt: true, reference: true, title: true },
         })
@@ -332,7 +365,8 @@ export class OperationsService {
                     { status: "COMPLETED", invoiceHandoffState: "READY" },
                 ],
             },
-            orderBy: { createdAt: "asc" },
+            // Inspections raised together off one job share a createdAt exactly; id decides between them.
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
             take: MAX_ITEMS_PER_DOMAIN,
             select: { id: true, status: true, reference: true, invoiceHandoffState: true, createdAt: true },
         })
@@ -355,34 +389,65 @@ export class OperationsService {
         })
     }
 
+    /**
+     * BOUNDED IN THE DATABASE, including the reorder comparison.
+     *
+     * This reader used to fetch EVERY tracked row with a reorder point for the profile, with no `take`,
+     * then compare the two columns in TypeScript and `.slice(0, 20)` the result. Two things were wrong
+     * with that, and the second is the serious one.
+     *
+     * It read the whole table to show twenty rows, so its cost grew with the profile's catalogue rather
+     * than with the answer.
+     *
+     * And `onHand` ties massively - a stockout puts an entire catalogue at 0 - so ordering by it alone
+     * left the order of the tied rows undefined, and slicing an undefined order in TypeScript made the
+     * SET undefined too. With more than twenty rows at the same onHand, two identical requests could
+     * legitimately return twenty DIFFERENT items. That is the worst form this bug takes: not a reshuffle
+     * an owner would ignore, but work appearing and disappearing between two refreshes.
+     *
+     * `onHand <= reorderPoint` is now a FIELD REFERENCE, so the comparison Prisma cannot express as a
+     * plain value filter happens in SQL, which is what allows `take` to be correct here. Bounding the
+     * query without it would have been a real regression: the twenty lowest-stock rows are not the same
+     * set as the twenty lowest-stock rows that are ALSO at or below their own reorder point, so a bare
+     * `take` would have silently dropped items that need reordering. The harness asserts the bounded
+     * query returns exactly what a whole-table scan followed by the old TypeScript filter returns.
+     *
+     * `reorderPoint: { not: null }` is kept although SQL's NULL comparison already excludes those rows.
+     * It states the intent that a row which opted out of a reorder point is not a candidate, and it
+     * keeps that intent legible next to the tenant filter rather than resting on three-valued logic.
+     *
+     * Ordering is unchanged in substance: lowest stock first, so the cap drops the best-stocked
+     * candidates and never a stockout. `id` only separates rows at the same onHand.
+     */
     private async inventory(profileId: string): Promise<AttentionItem[]> {
-        // Prisma cannot compare two columns in a `where`, so the reorder comparison is done in
-        // TypeScript over the tracked rows that have a reorder point at all. The filter below still
-        // does the tenant scoping and excludes rows that opted out of stock control.
         const rows = await this.ctx.db.inventoryItem.findMany({
-            where: { profileId, trackingEnabled: true, reorderPoint: { not: null } },
-            orderBy: { onHand: "asc" },
+            where: {
+                profileId,
+                trackingEnabled: true,
+                reorderPoint: { not: null },
+                onHand: { lte: this.ctx.db.inventoryItem.fields.reorderPoint },
+            },
+            orderBy: [{ onHand: "asc" }, { id: "asc" }],
+            take: MAX_ITEMS_PER_DOMAIN,
             select: { id: true, onHand: true, reserved: true, reorderPoint: true, updatedAt: true },
         })
-        return rows
-            .filter((row) => row.reorderPoint !== null && row.onHand <= row.reorderPoint)
-            .slice(0, MAX_ITEMS_PER_DOMAIN)
-            .map((row) =>
-                Object.freeze({
-                    domain: "inventory" as const,
-                    id: row.id,
-                    reason: row.onHand === 0 ? "out of stock" : "at or below reorder point",
-                    label: `${row.onHand} on hand, ${row.reserved} promised, reorder at ${String(row.reorderPoint)}`,
-                    at: null,
-                    overdue: false,
-                }),
-            )
+        return rows.map((row) =>
+            Object.freeze({
+                domain: "inventory" as const,
+                id: row.id,
+                reason: row.onHand === 0 ? "out of stock" : "at or below reorder point",
+                label: `${row.onHand} on hand, ${row.reserved} promised, reorder at ${String(row.reorderPoint)}`,
+                at: null,
+                overdue: false,
+            }),
+        )
     }
 
     private async fulfilments(profileId: string): Promise<AttentionItem[]> {
         const rows = await this.ctx.db.fulfilment.findMany({
             where: { profileId, state: { in: ["DRAFT", "PACKED"] } },
-            orderBy: { createdAt: "asc" },
+            // Shipments drafted in one batch share a createdAt; id decides between them.
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
             take: MAX_ITEMS_PER_DOMAIN,
             select: { id: true, state: true, reference: true, createdAt: true },
         })
@@ -401,7 +466,8 @@ export class OperationsService {
     private async returns(profileId: string): Promise<AttentionItem[]> {
         const rows = await this.ctx.db.returnRequest.findMany({
             where: { profileId, state: "REQUESTED" },
-            orderBy: { createdAt: "asc" },
+            // Returns raised against one order share a createdAt; id decides between them.
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
             take: MAX_ITEMS_PER_DOMAIN,
             select: { id: true, reference: true, createdAt: true },
         })
@@ -439,7 +505,10 @@ export class OperationsService {
                     { status: { in: ["PENDING", "IN_PROGRESS"] }, dueAt: { lte: until } },
                 ],
             },
-            orderBy: [{ dueAt: "asc" }, { ordinal: "asc" }],
+            // dueAt asc puts NULL last, so a BLOCKED milestone with no due date follows dated work -
+            // unchanged. ordinal is unique only WITHIN a case, so two cases each holding an ordinal-1
+            // milestone at the same dueAt tie on both keys; id is what settles them.
+            orderBy: [{ dueAt: "asc" }, { ordinal: "asc" }, { id: "asc" }],
             take: MAX_ITEMS_PER_DOMAIN,
             select: { id: true, title: true, status: true, dueAt: true, case: { select: { reference: true } } },
         })
@@ -472,6 +541,14 @@ export class OperationsService {
      *
      * Only two things happen here, and both are this view's own concerns rather than the cohort engine's:
      * the per-domain cap that every other domain applies, and the shape assertion below.
+     *
+     * DETERMINISM IS INHERITED HERE, NOT ABSENT. Every reader above appends `id` to its `orderBy` because
+     * a database will not order tied rows for you. This one does not sort at all, and must not: the cohort
+     * engine's `resolveCohortNeedsAction` already returns a TOTAL order, sorting on at, then reason, then
+     * the unique id, so the slice below cuts a defined sequence. Re-sorting it here would be a second
+     * opinion about cohort priority - the one thing this method exists not to have - and would silently
+     * override the owning engine the day its ordering changes. The harness asserts that the consumed
+     * declaration still ends its sort chain on the unique id, so this inheritance cannot lapse unnoticed.
      */
     private async cohortTasks(profileId: string, asOf: Date): Promise<AttentionItem[]> {
         const declared = await resolveCohortNeedsAction(this.ctx.db, profileId, asOf)
