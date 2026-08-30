@@ -21,32 +21,35 @@ and described H1 as unstarted when it was complete.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`086c835`**
+- Primary HEAD: **`ff50658`**
 - Origin unchanged; nothing pushed.
-- Waves A–G4 complete, plus surfaces, plus **H1 `fieldJobs:inspection` complete end to end**, plus
-  the two gaps H1 left, now closed: **`5822aa8`** the checklist-authoring surface, **`086c835`**
-  field service selectable during onboarding with enforced blueprint coverage.
-- **The check sweep is now 58.**
+- Waves A–G4 complete, plus surfaces, plus **H1 `fieldJobs:inspection` complete end to end**, plus the
+  two gaps H1 left (**`5822aa8`** checklist authoring, **`086c835`** field service selectable during
+  onboarding), plus the **unified daily operations view, end to end** (`dac6a23` runtime and API,
+  `0387d86` panel, `d06e122` case milestones and per-domain scope, `ff50658` route harness).
+- **The check sweep is now 60.**
 - **The capability registry has ZERO `planned` capabilities.** Two `partial` remain, both
   owner-gated: `appointments:reminders` and `appointments:deposits`, whose provider boundaries are
   inert.
-- **Every ACTIVE blueprint is now reachable from onboarding**, and a harness enforces it in both
+- **Every ACTIVE blueprint is reachable from onboarding**, and a harness enforces it in both
   directions, so adding a blueprint without an onboarding route fails loudly.
 - Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**, 18
-  migrations, none rolled back, 113 tables. The last two commits added no migration.
+  migrations, none rolled back, 113 tables. Nothing after `8b33a6a` added a migration.
 - Live `personalink`: verified untouched — 35 tables, no `_prisma_migrations`, 0 wave tables leaked,
   no `btree_gist`, `Profile` = 16.
 - Frozen worktrees intact: all six `kirocrew/*` still at `ea69595`.
 
-### Measured gates at `086c835`
+### Measured gates at `ff50658`
 
 | Gate | Result |
 |---|---|
 | `prisma validate` | 0 |
 | `tsc --noEmit` | 0 |
-| check harnesses | **58 of 58 exit 0** |
-| `check-onboarding-blueprint-coverage` | 20/20; inverted exit 1, 8 flipped; restored 20/20 exit 0 |
-| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged |
+| check harnesses | **60 of 60 exit 0** |
+| `check-operations-runtime` | 28/28; inverted exit 1, 13 flipped; restored 28/28 |
+| `check-operations-routes` | 26/26; inverted exit 1, 12 flipped |
+| `check-onboarding-blueprint-coverage` | 20/20; inverted exit 1, 8 flipped |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged all night |
 | `npm audit --omit=dev` | 0 vulnerabilities |
 | production build | exit 0 |
 

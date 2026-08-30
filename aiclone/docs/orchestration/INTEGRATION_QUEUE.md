@@ -1178,3 +1178,35 @@ Sweep is now **58**. Repo-wide lint unchanged at 43 (14 errors, 29 warnings) —
 | Repoint or delete the wave-c rehearsal runner | tooling, outside the repo | `<temp>\personalink-phase0\wave-c\run-on-rehearsal.js` hardcodes `APP_DIR` to a worktree 12+ commits behind and reports "17 migrations found" where there are 18 — indistinguishable from a missing migration. It gained a drift guard, but the honest fix is to repoint or delete it. It has now misled two separate resumes. |
 | G2 | appointments providers | Still **owner-gated**: real messages and real money. |
 | P1-007 | live `personalink` cutover | Still **owner-gated**. |
+
+
+---
+
+## Integrated at `ff50658` — the unified daily operations view
+
+Taken off the previous queue table and now **done, end to end**:
+
+| Commit | What landed |
+|---|---|
+| `dac6a23` | `src/lib/operations/**` + `/api/platform/operations/today` + 23-assertion runtime harness |
+| `0387d86` | `operations-panel.tsx`, mounted first in the shell, 14 new a11y assertions |
+| `d06e122` | case milestones covered; tenant boundary reported per domain (`scope`, `mixedScope`) |
+| `ff50658` | `check-operations-routes.ts`, 26 assertions at the HTTP boundary |
+
+Sweep **58 → 60**. Repo lint unchanged at 43 (14 errors, 29 warnings) across all four.
+
+Covers reservations, appointments, field jobs, inspections, stock, shipments, returns and case
+milestones. Does **not** cover cohort tasks or the durable TaskJob queue, and says so in the response
+and in the UI, with the reason for each.
+
+### Next in queue — revised after `ff50658`
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| **Blueprint installation runtime** | `src/lib/business-os/**` + new routes | Now the largest genuinely-missing package by a wide margin, and the prerequisite for everything vertical-facing. **Measured:** `business-os` is a static registry (`blueprints.ts` 418, `engines.ts` 261, `types.ts` 90, `validation.ts` 86, `workflow.ts` 42) with **zero API routes** — installation does not exist even in part. Needs durable state (installed-blueprint record with workspace/profile association, version, terminology pack, surface and navigation config, dashboard modules, workflow templates, installation history and audit), therefore a MIGRATION and the full rehearsal cycle. **Allow a fresh window of 3+ hours, not 90 minutes** — the comparable inspection package took most of a night with three workers. Read rule 23 before the rollback step. `check-onboarding-blueprint-coverage` asserts that no route installs a blueprint today; that assertion is deliberately what will force whoever builds this to revisit the wording of `CORRESPONDING_BLUEPRINT` in `src/lib/onboarding-needs.ts`. |
+| Extend operations coverage to cohort tasks | `src/lib/operations/engine.ts` | The remaining honest gap in the view, and NOT a mechanical addition. Cohort task and renewal state is spread across several models whose "needs action" condition is not a single field, so covering it means either the cohort engine declaring that condition first, or this view encoding a judgement the owning engine has not made. Do the former. The declared-coverage harness will force the domain to be added in both directions at once. |
+| Operations due-work processing | new, owner-gated in spirit | The directive that produced the view also asked for idempotent internal due-work processing. That is **not** built and the view claims no scheduler — asserted absent, including `setInterval`/`setTimeout`. Anything that runs on a timer needs real execution evidence before it may be described as existing. |
+| P1-009 slice 6 | repo-wide lint | Unchanged: 43 problems, **no safe mechanical slice remains**. This is a refusal. One data point from this run: a genuine `set-state-in-effect` fix took three attempts and produced better code — which is exactly why the remaining 10 cannot be swept. |
+| Repoint or delete the wave-c rehearsal runner | tooling, outside the repo | Has now misled two separate resumes. |
+| G2 | appointments providers | Still **owner-gated**: real messages and real money. |
+| P1-007 | live `personalink` cutover | Still **owner-gated**. |

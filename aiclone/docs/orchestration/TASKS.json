@@ -1,6 +1,6 @@
 {
-    "milestone": "H1 fieldJobs:inspection is complete end to end, and the TWO gaps it left are now closed: 5822aa8 added the checklist-AUTHORING surface (the five /inspection-templates/** endpoints had no owner surface at all, so a checklist could only be created through the API), and 086c835 made field service selectable during onboarding. That second one closed a real reachability hole: field-service-v1 shipped ACTIVE, composing a fully built engine with 13 routes and two panels, with NO onboarding role - the engine was unreachable from the product's own front door, and nothing failed because nothing checked. A 20-assertion harness now enforces that every ACTIVE blueprint is reachable from onboarding in BOTH directions, so adding a blueprint without an onboarding route fails loudly. Sweep is 58. Registry still has ZERO planned capabilities. Repo-wide lint deliberately unchanged at 43 (14 errors, 29 warnings): both packages add none, and P1-009 slice 6 remains a REFUSAL rather than a backlog item because no safe mechanical slice remains. STILL MISSING and owner-gated: appointments:reminders and appointments:deposits are partial because their provider boundaries are inert. STILL MISSING and not owner-gated: the blueprint INSTALLATION runtime does not exist even in part (business-os is a static registry with zero API routes), and the unified daily-operations runtime is undefined. Installation needs durable state and therefore a migration, so it was not started inside the run's final two hours.",
-    "updatedAt": "2026-08-30 05:35 +05:30",
+    "milestone": "H1 fieldJobs:inspection is complete end to end and BOTH gaps it left are closed (5822aa8 checklist authoring, 086c835 field service selectable during onboarding with enforced blueprint reachability). The UNIFIED DAILY OPERATIONS VIEW is now complete end to end as well: dac6a23 runtime and API, 0387d86 panel mounted first in the shell, d06e122 case milestones plus per-domain tenant scope, ff50658 HTTP-boundary harness. Sweep is 60. Registry still has ZERO planned capabilities. Repo-wide lint deliberately unchanged at 43 (14 errors, 29 warnings) across every commit tonight. STILL MISSING and owner-gated: appointments:reminders and appointments:deposits. STILL MISSING and NOT owner-gated: the blueprint INSTALLATION runtime does not exist even in part (business-os is a static registry with zero API routes); it needs durable state and therefore a migration, and it needs a fresh 3+ hour window rather than the tail of one - the comparable inspection package took most of a night with three workers. Operations does not cover cohort tasks or the durable TaskJob queue, states so in its own response and in the UI, and covering cohort tasks should wait for the cohort engine to declare its own needs-action condition rather than having this view invent one.",
+    "updatedAt": "2026-08-30 06:20 +05:30",
     "updatedBy": "root orchestrator (claude-opus-5), resumed after compaction",
     "baseline": "f8ee611",
     "maxParallelWorkers": 3,
@@ -1742,5 +1742,47 @@
         "build": "exit 0; all 9 inspection routes present in the manifest",
         "liveDatabase": "untouched - 35 tables, no _prisma_migrations, 0 wave tables leaked, Profile=16",
         "disposableDatabase": "unchanged, fully applied at 18 migrations; neither commit added a migration"
+    },
+    "operationsPackage": {
+        "commits": {
+            "runtimeAndApi": "dac6a23",
+            "panel": "0387d86",
+            "caseMilestonesAndScope": "d06e122",
+            "routeHarness": "ff50658"
+        },
+        "whyChosenOverBlueprintInstallation": "Installation was measured first: business-os is a static registry with zero API routes, so it does not exist even in part. It needs durable state and therefore a migration and the full rehearsal cycle. With under two hours left, starting it would have produced a half-package and risked leaving the disposable rehearsal database mid-cycle, which is the state this program guards most carefully. The operations view needs no schema, so it was the largest package that could be finished.",
+        "covers": [
+            "reservations",
+            "appointments",
+            "fieldJobs",
+            "inspections",
+            "inventory",
+            "fulfilments",
+            "returns",
+            "caseMilestones"
+        ],
+        "doesNotCover": {
+            "cohortTasks": "Needs-action condition is spread across several models and is not a single field. Covering it means the cohort engine declaring that condition, not this view inventing one.",
+            "durableTasks": "The shared TaskJob queue has its own surface and its own notion of overdue."
+        },
+        "designProblemItActuallyHad": "Not the aggregation. A cross-engine total is the most dangerous number in the product because an owner reads 0 as 'nothing anywhere' and stops looking. Coverage is therefore DECLARED and harness-enforced in both directions, and the panel renders covers/doesNotCover from the response rather than restating them - which paid off immediately when d06e122 moved case milestones from uncovered to covered and the panel needed no change.",
+        "readOnlyIsStructural": "No create/update/delete/upsert, no raw SQL, no transaction - asserted over EXECUTABLE lines only, because the comments legitimately discuss writes in order to say there are none and a whole-file scan would have flagged the explanation as the violation. The context accepts only profile.read, so there is no write permission path to widen. The route exports GET alone.",
+        "mixedTenantBoundary": "CaseProject carries workspaceId, not profileId, and a profile can own several workspaces - so one total spans two boundaries. Scoping cases by profileId would have returned cases from workspaces the caller may not access. The reader filters on the authorised workspaceId and the difference is REPORTED: OPERATIONS_DOMAIN_SCOPE per domain, scope on every summary, mixedScope on the response, and the panel marking those counts 'this workspace only'. Hiding it would have produced a total that silently fails to reconcile against another screen, which is a quieter failure than being wrong and a worse one.",
+        "whatTheRouteHarnessCaught": "The operations 503 said 'Field jobs are temporarily unavailable'. Reusing the fieldJobs envelope helper was right, but its 503 fallback SENTENCE was hardcoded to that domain, so the sentence came with the shape. failure() now takes the message as a defaulted parameter; check-fieldjob-routes still passes 54/54, which is what made that safe rather than hopeful. Two assertions there were impossible from the engine: asOf is serialised as an ISO string rather than a Date object, and a foreign workspace and a NONEXISTENT one produce byte-identical refusals compared as serialised bodies.",
+        "lintRuleNotSuppressed": "The panel's first version added a 15th repo error (react-hooks/set-state-in-effect). Two hypotheses were tested and both were wrong. What satisfies the rule is an inline async closure: it flags an effect calling a NAMED function reachable elsewhere that sets state. Suppressing it would have hidden the finding, and matching the pattern 8 other files already trip would have added an error to a count this run is holding flat. Third attempt produced better code."
+    },
+    "gatesAtFf50658": {
+        "prismaValidate": 0,
+        "tsc": 0,
+        "checkSweep": "60 of 60 exit 0",
+        "operationsRuntime": "28/28 exit 0; INVERT exit 1 with 13 flipped; restored 28/28",
+        "operationsRoutes": "26/26 exit 0; INVERT exit 1 with 12 flipped",
+        "onboardingCoverage": "20/20 exit 0; INVERT exit 1 with 8 flipped",
+        "fieldjobRoutes": "54/54 exit 0 - unchanged by the envelope-message parameter",
+        "repoLint": "43 problems (14 errors, 29 warnings) - unchanged across every commit tonight",
+        "npmAudit": "0 vulnerabilities",
+        "build": "exit 0",
+        "liveDatabase": "untouched - 35 tables, no _prisma_migrations, 0 wave tables leaked, Profile=16",
+        "disposableDatabase": "unchanged, fully applied at 18 migrations; nothing after 8b33a6a added a migration"
     }
 }

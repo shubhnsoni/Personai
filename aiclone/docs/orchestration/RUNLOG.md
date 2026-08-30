@@ -3418,3 +3418,114 @@ piece of state this program guards most carefully. Recorded as the next package 
 **P1-009 slice 6 remains a refusal, not a backlog item.** Unchanged from the previous entry: all 43
 remaining problems need per-component judgement, and the count is left at 43 rather than moved
 cosmetically.
+
+
+---
+
+## Same run, continued — the unified daily operations view, end to end
+
+Root: Claude Opus 5. Primary `recovered/aug20-wt-pr-32`. `156cace` → `ff50658`. No migration, no schema
+change, no write path added anywhere. Origin unchanged, nothing pushed.
+
+Chosen over the blueprint installation runtime deliberately, and the reasoning is worth keeping because
+it is a scheduling judgement rather than a preference. Installation was measured first:
+`src/lib/business-os/**` is a static registry with **zero API routes**, so it does not exist even in
+part. It needs durable state — an installed-blueprint record with workspace association, version,
+terminology, surfaces, modules and an audit trail — therefore a migration, therefore the full rehearsal
+cycle. The inspection package, which is comparable in size, took most of a night with three workers.
+With under two hours left, starting it would have produced a half-package and put the one piece of state
+this program guards most carefully at risk of being left mid-cycle. The operations view needs no schema,
+so it was the largest package that could actually be finished.
+
+| Commit | What landed |
+|---|---|
+| `dac6a23` | `src/lib/operations/**` — engine, boundary, composition root — plus `/api/platform/operations/today` and a 23-assertion harness |
+| `0387d86` | `operations-panel.tsx`, mounted first in the shell, with 14 new a11y assertions |
+| `d06e122` | case milestones covered, and the tenant boundary now reported per domain |
+| `ff50658` | `check-operations-routes.ts`, 26 assertions at the HTTP boundary |
+
+Sweep **58 → 60**. Repo-wide lint unchanged at 43 (14 errors, 29 warnings) throughout.
+
+### The design problem this package actually had
+
+Not the aggregation. A cross-engine total is the most dangerous number in this product, because an
+owner reads "0" as "nothing anywhere" and stops looking. The view reads seven domains and deliberately
+skips three, so a bare zero would be a lie by omission.
+
+So coverage is **declared and enforced**: `OPERATIONS_DOMAINS` names what is read, `UNCOVERED_DOMAINS`
+names what is not *with the reason*, and the harness asserts in both directions that every declared
+domain has a reader and every reader is declared. The panel renders `covers` and `doesNotCover` from
+the response rather than restating them — which paid for itself immediately: when `d06e122` moved case
+milestones from uncovered to covered, the panel updated with no change to its coverage rendering.
+
+Read-only is enforced structurally rather than promised: no create/update/delete/upsert, no raw SQL, no
+transaction, asserted over executable lines only — comments legitimately discuss writes in order to say
+there are none, so a whole-file scan would have flagged the explanation as the violation. The context
+accepts only `profile.read`, so there is no write permission path to widen. The route exports GET alone.
+
+Three smaller decisions that each prevent a specific wrong number: the clock is read **once** and
+passed down, so two figures in one response cannot disagree about whether the same record is overdue;
+`overdue` is computed server-side and never recomputed in the browser against a second clock; and
+`at: null` renders as "no due date" rather than as unknown, because three domains genuinely have no
+deadline and inventing one would compound.
+
+### The subtlety `d06e122` surfaced instead of hiding
+
+`CaseProject` carries `workspaceId`, not `profileId`. Every other domain here is profile-scoped, and a
+profile can own several workspaces — so covering case milestones makes one total span **two tenant
+boundaries**.
+
+Scoping them by `profileId` would have been wrong in a way that is easy to miss: it would have returned
+cases from the profile's other workspaces, which the caller may have no access to. So the reader filters
+through the relation on the authorised `workspaceId`, and the difference is reported —
+`OPERATIONS_DOMAIN_SCOPE` per domain, `scope` on every summary, `mixedScope` on the response, and the
+panel marking those counts "this workspace only" and explaining the split.
+
+Without that, an owner with two workspaces would eventually notice the total not reconciling against
+another screen and have no way to find out why. That is a quieter failure than being wrong, and a worse
+one.
+
+### What the route harness caught
+
+The operations 503 said **"Field jobs are temporarily unavailable"**.
+
+Reusing the fieldJobs envelope helper was right — one status map, one `{ ok, data }` shape — but its
+503 fallback *sentence* was hardcoded to that domain, so the sentence came along with the shape. An
+accurate envelope carrying an inaccurate sentence is still wrong, and it is the kind of wrong that
+reaches a user rather than a log. `failure()` now takes the message as a defaulted parameter;
+`check-fieldjob-routes` still passes 54/54, which is what made that a safe change rather than a hopeful
+one.
+
+Two assertions there could not have been made from the engine: `asOf` is serialised as an ISO **string**
+(a Date surviving as an object is only visible after serialisation), and a foreign workspace and a
+**nonexistent** one produce byte-identical refusals — compared as serialised bodies, because a status
+code alone would still let a caller learn which workspace ids are real.
+
+### A lint rule that took three attempts, and was not suppressed
+
+The panel's first version added a 15th repo-wide error: `react-hooks/set-state-in-effect`. Two
+hypotheses were tested and **both were wrong** — keying the cached value instead of clearing state in
+the effect did not help, and neither did lifting the horizon out of the effect's dependency chain.
+
+What satisfies the rule is an inline async closure: it flags an effect calling a *named* function that
+is also reachable elsewhere and sets state, and accepts a self-contained closure where the whole path is
+visible. Hence the inline mount fetch, with a comment saying so because it otherwise looks like
+duplication. The alternatives were both worse: suppressing hides the finding, and matching the pattern
+eight other files already trip would have added an error to a count this run is holding flat.
+
+34. **A rule that fires on a pattern eight other files already use is still your problem to solve, not
+    a precedent to follow.** The fix took three attempts and the third was genuinely better code.
+
+### Measured gates at `ff50658`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` | 0 |
+| `tsc --noEmit` | 0 |
+| check sweep | **60 of 60 exit 0** |
+| `check-operations-runtime` | 28/28; inverted exit 1, 13 flipped; restored 28/28 |
+| `check-operations-routes` | 26/26; inverted exit 1, 12 flipped |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged across all four commits |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run build` | exit 0 |
+| disposable rehearsal DB | unchanged, fully applied at 18 migrations; this package added no migration |
