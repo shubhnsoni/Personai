@@ -1,44 +1,76 @@
 # Next action
 
-Updated 2026-08-30, at the close of a night-run that was RESUMED after the previous one died
-mid-flight. The resume began by measuring inherited state rather than trusting the handover, and that
-is the single most useful habit this document can pass on: **three separate statements in the
-inherited description were wrong, and each would have caused real damage if believed.** See "What the
-last resume found wrong" below before acting on anything here.
+Updated 2026-08-30 at the close of a night-run that was RESUMED for a second time. **Read the
+compaction incident below before writing a single file.** A resumed session in this run overwrote
+thirteen committed files because it trusted a restored summary instead of measuring HEAD, and the only
+reason that cost twenty minutes rather than hours is that the work was committed.
+
+## Measure first — the one habit this document exists to pass on
+
+```powershell
+cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
+git log --oneline -5      # BEFORE anything else. A restored summary is a claim about the PAST.
+git rev-parse --short HEAD
+git status --porcelain    # `M` on a file you think you just created means it already existed
+Get-Date                  # the wall clock is a fact; a summary's sense of elapsed time is not
+```
+
+A restored handover is not evidence about the present. In this run the summary was four hours stale
+and described H1 as unstarted when it was complete.
 
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`f8ee611`** plus the docs commit carrying the closing sections
-- The three gaps this run recorded were then CLOSED in the same run: `a5906ab` (server-computed
-  `canRecord`), `eea2f7b` (the `invoiced` ban rewritten to target behaviour), `f8ee611` (the
-  inspection/inventory join asserted from the inventory side), plus a migration-drift guard on the
-  wave-c rehearsal runner.
-- Origin unchanged; nothing was pushed.
-- Waves A-G4 complete, plus surfaces, plus **H1: `fieldJobs:inspection` is complete end to end** -
-  schema, migration, runtime, 13 routes, an owner panel that is mounted and reachable, a promotion
-  with a real evidence file, and the first blueprint to install the engine.
-- **The check sweep is now 57.**
+- Primary HEAD: **`086c835`**
+- Origin unchanged; nothing pushed.
+- Waves A–G4 complete, plus surfaces, plus **H1 `fieldJobs:inspection` complete end to end**, plus
+  the two gaps H1 left, now closed: **`5822aa8`** the checklist-authoring surface, **`086c835`**
+  field service selectable during onboarding with enforced blueprint coverage.
+- **The check sweep is now 58.**
 - **The capability registry has ZERO `planned` capabilities.** Two `partial` remain, both
   owner-gated: `appointments:reminders` and `appointments:deposits`, whose provider boundaries are
   inert.
+- **Every ACTIVE blueprint is now reachable from onboarding**, and a harness enforces it in both
+  directions, so adding a blueprint without an onboarding route fails loudly.
 - Disposable rehearsal DB `personalink_phase0_rehearsal_20260826_210704`: **fully applied**, 18
-  migrations, none rolled back, 113 tables. This run added no migration.
-- Live `personalink`: verified untouched at the start and end - 35 tables, no `_prisma_migrations`,
-  0 wave tables leaked, no `btree_gist`, `Profile` = 16.
+  migrations, none rolled back, 113 tables. The last two commits added no migration.
+- Live `personalink`: verified untouched — 35 tables, no `_prisma_migrations`, 0 wave tables leaked,
+  no `btree_gist`, `Profile` = 16.
 - Frozen worktrees intact: all six `kirocrew/*` still at `ea69595`.
 
-### Measured gates at `f8ee611`
+### Measured gates at `086c835`
 
 | Gate | Result |
 |---|---|
+| `prisma validate` | 0 |
 | `tsc --noEmit` | 0 |
-| check harnesses | 57 of 57 exit 0 |
-| `check-fieldjob-inspection-runtime` | 100/100; inverted exit 1, 41 flipped |
-| `check-fieldjob-inspection-routes` | 59/59; inverted exit 1, 29 flipped |
-| repo-wide ESLint | 43 problems (14 errors, 29 warnings) |
+| check harnesses | **58 of 58 exit 0** |
+| `check-onboarding-blueprint-coverage` | 20/20; inverted exit 1, 8 flipped; restored 20/20 exit 0 |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged |
 | `npm audit --omit=dev` | 0 vulnerabilities |
 | production build | exit 0 |
+
+## The compaction incident, and what it should change about how you work
+
+A resumed session restored a summary describing HEAD as `435a5e9` with Phase H1 unstarted. The real
+HEAD was `7419669` and H1 was finished. Acting on the summary, the session rewrote
+`src/lib/fieldjobs/{http,inspection,runtime}.ts` and nine route files, replacing an evolved design
+with an earlier-generation one, and added a stray `inspection-http.ts` for a boundary the committed
+design had deliberately folded into `http.ts`.
+
+`git status` reported those files as **modified, not untracked**. A file you believe you just created
+cannot be "modified" — reading that single word is what caught it. `git checkout -- <paths>` restored
+all thirteen; `git diff HEAD` then returned empty and `tsc` was 0. Nothing was lost.
+
+31. **After a compaction, measure HEAD before writing anything.** Rule 22 — a tool pinned to the wrong
+    checkout lies quietly rather than erroring — applies to a resumed *agent* just as much as to a
+    script.
+32. **`M` versus `??` in `git status` is a fact about the world.** It was printed twice before it was
+    read.
+33. **Commit at every green point.** That is the entire reason this was a twenty-minute scare instead
+    of hours of lost work.
+
+The 30 rules from the previous entry all still hold.
 
 ## What the last resume found wrong, and what it cost
 
@@ -75,13 +107,26 @@ Read this before trusting any handover, including this one.
 | G3 + G6 course access levels | `src/lib/cohorts/access.ts` | 12 routes under `/api/platform/course-access/**` | `access-levels-panel.tsx` |
 | G4 + G6 field jobs | `src/lib/fieldjobs/engine.ts` | 10 routes under `/api/platform/field-job*/**` | `fieldjobs-panel.tsx` |
 | **H1 field-job inspection** | `src/lib/fieldjobs/inspection.ts` | **13 routes** under `/api/platform/inspections/**` and `/inspection-templates/**` | `inspection-panel.tsx` |
+| **H1 follow-up** checklist authoring | (same runtime) | (same 5 template routes, now reachable) | `inspection-templates-panel.tsx` |
 
 Active blueprints: `restaurant-venue-v3`, `coaching-studio-v2`, `consulting-agency-v1`,
 `ca-practice-v1`, `retail-storefront-v1`, **`field-service-v1`**. Deprecated:
 `restaurant-venue-v1`, `restaurant-venue-v2`, `coaching-studio-v1`. No blueprint is in draft, and
 **every engine is now composed by at least one blueprint.**
 
-### The one thing still honestly missing
+Onboarding reaches all six: `SHOP`, `RESTAURANT`, `CONSULTANT`, `CA`, `COACH` and — since `086c835` —
+`FIELD_SERVICE`. `check-onboarding-blueprint-coverage` enforces that in both directions, so a new
+active blueprint without an onboarding route fails a check rather than shipping unreachable.
+
+### What is NOT built, stated so nobody plans around a phantom
+
+- **Blueprint installation.** There is no installation runtime, no durable installed-blueprint record,
+  and no route that would create one. `src/lib/business-os/**` is a static registry with **zero API
+  routes**. `CORRESPONDING_BLUEPRINT` records a correspondence and is named accordingly.
+- **A unified daily-operations view.** Undefined in this repository. The eight domains it would
+  aggregate are all already persisted, so it needs no schema.
+
+### The one thing still honestly missing that is OWNER-GATED
 
 **`appointments:reminders` and `appointments:deposits`** are `partial` because their provider
 boundaries are inert. Wiring a real messaging or payment provider is **owner-gated**: it means real
@@ -93,7 +138,7 @@ messages and real money. Nothing else in the registry claims something that does
 
 ```powershell
 cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
-git rev-parse --short HEAD                       # expect 7b15cd3 or a later docs commit
+git rev-parse --short HEAD                       # expect 086c835 or later
 git status --porcelain                           # expect ONLY .codex-remote-attachments/ and P1_014_ACTION_INVENTORY.md
 node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\check-live-readonly.js"
 node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\probe-rehearsal-inspection.js"
@@ -104,27 +149,38 @@ node "C:\Users\shubh\AppData\Local\Temp\personalink-phase0\wave-c\probe-rehearsa
 
 Read `INTEGRATION_QUEUE.md` -> the last "Next in queue" table. In priority order:
 
-- **Template-authoring UI.** The five `/inspection-templates/**` endpoints have **no owner surface**,
-  so a checklist can currently only be created through the API. This is the honest remaining gap in
-  the H1 package and it is a real one: an owner cannot author a checklist from the product. The
-  inspection panel deliberately does not do it, and W4's brief never asked for it.
-- **An onboarding surface for `field-service-v1`.** The blueprint is active and selectable by the
-  registry, but nothing walks an owner through choosing it. Note that the critical `createProfile`
-  identity defect `HANDOFF.md` records is **already fixed** - it derives the actor from
-  `requireAuthenticatedUser()` and no longer accepts a caller-supplied `userId`.
-- **P1-009 slice 6.** 43 problems, and **there is no SAFE slice left** - treat this as a refusal, not
-  a backlog item to grind. `no-img-element` 25 warnings each change layout, loading and remote-image
-  configuration; `set-state-in-effect` 10 errors each need the effect redesigned per component;
+- **Blueprint installation runtime.** The largest genuinely-missing package and the prerequisite for
+  everything vertical-facing. Measured, not assumed: `src/lib/business-os/**` is a static registry
+  (`blueprints.ts` 418, `engines.ts` 261, `types.ts` 90, `validation.ts` 86, `workflow.ts` 42) with
+  **zero API routes**, so installation does not exist even in part. It needs durable state - an
+  installed-blueprint record with workspace/profile association, version, terminology, surfaces,
+  modules, workflow templates and an audit trail - therefore a MIGRATION, therefore **90+ minutes
+  minimum** and the full rehearsal cycle in Step 2. Read rule 23 first.
+
+  Note that `check-onboarding-blueprint-coverage` currently asserts **no route installs a blueprint**.
+  That assertion is deliberately the thing that will force whoever builds this to revisit the wording
+  of `CORRESPONDING_BLUEPRINT` in `src/lib/onboarding-needs.ts`, which is a correspondence and says so.
+
+- **Unified daily operations runtime.** A tenant-scoped read-only view over records that already
+  exist: reservations needing action, upcoming appointments and waitlist openings, case milestones and
+  approvals, cohort tasks and renewals, fulfilments and returns, inventory exceptions, field-job and
+  inspection exceptions, overdue durable tasks. **Needs no schema** - it aggregates eight domains that
+  are all already persisted, which makes it the largest available package that cannot be blocked by a
+  migration window. Inert adapters only; do not claim a scheduler exists without real execution
+  evidence.
+
+- **P1-009 slice 6 is a refusal, not a backlog item.** 43 problems and no safe mechanical slice
+  remains. `no-img-element` 25 warnings each change layout, loading and remote-image configuration;
+  `set-state-in-effect` 10 errors each need the effect redesigned per component;
   `preserve-manual-memoization` 3 need memoized-collection identity analysis; `exhaustive-deps` 3 need
   per-effect analysis; `no-explicit-any` 1 is the documented judgement call at
   `src/app/[slug]/page.tsx:70`; `no-unused-vars` 1 is a live DOM query in a puppeteer script.
   **Do not clear any of these to move the number.**
+
+- **Repoint or delete the wave-c rehearsal runner.** It has now misled two separate resumes.
+
 - **G2 appointments providers is OWNER-GATED.** Do not start without explicit approval.
 - **P1-007 live cutover is OWNER-GATED.**
-
-**`HANDOFF.md` is stale - do not plan from it.** All four defects in its critical/high table are
-closed, and its "next steps" list still describes P2-003 as blocked, which it has not been for several
-waves.
 
 ### Step 2 - migration sequence, if the package needs one
 

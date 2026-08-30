@@ -3284,3 +3284,137 @@ inventing work to fill the list:
 Also worth recording: **HANDOFF.md is stale and should not be used for planning.** All four entries in
 its critical/high defect table are closed, and its "next steps" list still describes P2-003 as blocked,
 which it has not been for several waves.
+
+
+---
+
+## Night run, resumed a second time — the two named H1 gaps closed, and a compaction incident
+
+Root: Claude Opus 5. Primary `recovered/aug20-wt-pr-32`. Starting HEAD `7419669`, ending HEAD
+`086c835`. No migration. Origin unchanged, nothing pushed.
+
+This entry exists mostly to record **a real incident**, because the run's other content is small and
+the incident is the useful part.
+
+### The incident: a compacted session resumed from a stale summary and overwrote committed work
+
+The root session's context was compacted. On resuming, it restored a summary that described the run
+as being at HEAD `435a5e9` with Phase H1 not yet started. **That summary was roughly four hours
+out of date.** The real HEAD was `7419669`, and H1 was complete: schema, migration, runtime, 13
+routes, two panels, a promotion and a blueprint.
+
+Acting on the stale summary, the session began "building" H1 again, and its file writes **overwrote
+four committed files** — `src/lib/fieldjobs/{http,inspection,runtime}.ts` and nine route files —
+replacing an evolved design with an earlier-generation one. It also wrote a stray
+`inspection-http.ts` for a boundary that the committed design had deliberately folded into
+`http.ts`.
+
+What caught it: `git status` reported the files as **modified rather than untracked**. A file you
+believe you have just created cannot be "modified". Reading that one word is what stopped it, four
+tool calls in.
+
+Recovery was complete and needed no history rewriting, because everything overwritten was committed:
+`git checkout -- <paths>` restored all thirteen files, the stray file was deleted, and `git diff HEAD`
+then returned empty with `tsc` at 0. **Nothing was lost.** Total cost: about twenty minutes and a
+scare.
+
+The lessons, in the order they would have prevented the damage:
+
+31. **After a compaction, measure HEAD before writing anything.** A restored summary is a claim about
+    the past, and the repository is the only statement about the present. `git log --oneline -5` and
+    the wall clock would each have caught this in one call. The run's own rule 22 — a tool pinned to
+    the wrong checkout lies quietly — turns out to apply to a resumed *agent* as well as to a script.
+32. **`git status` distinguishing `M` from `??` is a fact about the world, not noise.** It was
+    printed, twice, before it was read.
+33. **Everything committed is recoverable, so commit at every green point.** The reason this incident
+    cost twenty minutes instead of hours is that the work it overwrote had been committed. The same
+    incident against uncommitted work would have destroyed several hours of it.
+
+Also worth stating plainly: the earlier part of this same session, before compaction, produced
+`8b33a6a` (the inspection schema and migration) and `435a5e9` (six real defects fixed in the G4
+evidence harnesses, found by an independent audit worker). Those commits are real and were built on by
+the sessions that followed. The stale-summary problem was in the *handover*, not in the work.
+
+### Two gaps closed, both taken straight from the queue
+
+**`5822aa8` — owner surface for authoring inspection checklists.**
+
+The five `/inspection-templates/**` endpoints shipped with no owner surface, so a checklist could only
+be created by calling the API. `NEXT_ACTION` named this the one real remaining hole in H1.
+
+A separate panel rather than more of `inspection-panel.tsx`, for a reason worth keeping: authoring what
+you intend to ask and recording what a technician found are different jobs done by different people at
+different times, and folding them together would tempt a reader into treating a template LINE and a
+recorded ITEM as one object. They are not — the item is a snapshot of the line taken at inspection
+creation, which is exactly why editing a checklist cannot rewrite a past answer.
+
+The server stays the authority. A `MEASUREMENT` line with no unit and a range that ends below where it
+starts are both refused by a CHECK constraint and by the engine; the panel surfaces those verbatim and
+labels the unit field "required for a measurement" as a **hint only**. A new assertion fails if the
+panel ever starts refusing them locally, because a second copy of a rule in the client is the drift
+this program keeps paying for. Deactivation is explained rather than left to be guessed: it hides the
+checklist from new inspections, does not delete it, and does not touch inspections already created
+from it.
+
+`templateErrorCopy` is a separate function from `inspectionErrorCopy` rather than one function taking a
+noun, because the 403 wording is the load-bearing part of both and a caller passing the wrong noun
+would silently describe the wrong object. A read-only textarea was written and then removed before
+commit: it was a control that did nothing.
+
+**`086c835` — field service is selectable during onboarding, and that is now enforced.**
+
+`field-service-v1` shipped ACTIVE, composing a fully built engine with 13 routes and two panels, and
+had **no onboarding role at all**. An owner who sends people out to jobs could not say so when signing
+up, so the engine this program had just finished building was unreachable from the product's own front
+door. Every other active blueprint already had a role; only this one did not, and nothing failed
+because nothing checked.
+
+`FIELD_SERVICE` is now a role with a need entry, an icon and suggested addons. Two deliberate
+non-additions: it reuses the existing `TAKE_APPOINTMENTS` goal instead of inventing an eighth `Goal`
+value that would have left an unhandled case in every switch on it, and all its addons are existing
+ones, because field work reuses `ServiceOffering`, `AppointmentResource` and scheduling — that reuse is
+the point of a shared engine and a bespoke addon would have quietly denied it. No migration:
+`Profile.roleTemplate` is a `String` with a default, so a new value is data.
+
+`CORRESPONDING_BLUEPRINT` records which blueprint a role corresponds to. It is named *corresponding*
+and not *installs* because **there is no installation runtime in this repository**, and the harness
+asserts that absence rather than trusting it: 117 platform routes were enumerated and none installs a
+blueprint. The map lives on the onboarding side because the blueprint registry is deliberately
+self-contained and knows nothing about onboarding.
+
+The harness is the actual deliverable — 20 assertions checking the correspondence in **both**
+directions, so this class of defect cannot recur. The trap it guards that a reader would miss:
+`restaurant-venue-v1` and `v2` are deprecated and `v3` is active, so a map pointing at an older version
+would read as correct and be wrong. It also asserts every capability `field-service-v1` requires is
+available, tying the onboarding claim to engine reality — which is what an owner acts on when they pick
+the role.
+
+### Measured gates at `086c835`
+
+| Gate | Result |
+|---|---|
+| `prisma validate` | 0 |
+| `tsc --noEmit` | 0 |
+| check sweep | **58 of 58 exit 0** (was 57; one new harness) |
+| `check-onboarding-blueprint-coverage` | 20/20; inverted exit 1 with 8 flipped; restored 20/20 exit 0 |
+| `check-business-os-a11y` | PASS, with 16 new assertions for the authoring panel |
+| `check-business-os-render`, `-surface` | PASS |
+| repo-wide ESLint | **43 problems (14 errors, 29 warnings) — unchanged**; both packages add none |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run build` | exit 0; all 9 inspection routes in the manifest |
+| live `personalink` | untouched: 35 tables, no `_prisma_migrations`, 0 wave tables, `Profile` = 16 |
+| disposable rehearsal DB | unchanged, still fully applied at 18 migrations |
+
+### What was deliberately NOT started, and why
+
+**Blueprint installation runtime, and the unified daily-operations runtime.** Both were measured
+rather than assumed: `src/lib/business-os/` is a static registry of 418 + 261 + 90 + 86 + 42 lines
+with **zero API routes**, so installation does not exist even in part. Building it means durable state,
+which means a migration — and with under two hours left that collides with the standing rule against
+starting a migration inside 90 minutes, and with the harder rule that the rehearsal database must never
+be left between apply and reapply. Starting it would have produced a half-package and risked the one
+piece of state this program guards most carefully. Recorded as the next package instead.
+
+**P1-009 slice 6 remains a refusal, not a backlog item.** Unchanged from the previous entry: all 43
+remaining problems need per-component judgement, and the count is left at 43 rather than moved
+cosmetically.

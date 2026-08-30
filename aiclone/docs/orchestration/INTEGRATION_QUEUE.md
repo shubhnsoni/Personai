@@ -1153,3 +1153,28 @@ table are closed: `content.ts` and `image-to-3d` use `requireOwnedProfile`, `onb
 actor from the session, and the chat route binds a conversation to a signed per-profile capability
 cookie covered by `check-conversation-authz`. Its "next steps" list still describes P2-003 as blocked,
 which it has not been for several waves.
+
+
+---
+
+## Integrated at `086c835` — the two named H1 gaps
+
+Both items came straight off the previous "Next in queue" table and are now **done**:
+
+| Was queued as | Commit | What landed |
+|---|---|---|
+| Template-authoring UI | `5822aa8` | `inspection-templates-panel.tsx`, mounted in the shell. Create a checklist, add lines with kind / guidance / required / unit / expected range, rename, deactivate and reactivate. 16 new a11y assertions. The server stays the authority: the panel does not re-implement the measurement-unit or range rules, and an assertion fails if it ever starts. |
+| Onboarding surface for `field-service-v1` | `086c835` | `FIELD_SERVICE` role template with need entry, icon and addons, plus `CORRESPONDING_BLUEPRINT` and a 20-assertion harness that enforces every ACTIVE blueprint being reachable from onboarding in both directions. |
+
+Sweep is now **58**. Repo-wide lint unchanged at 43 (14 errors, 29 warnings) — both packages add none.
+
+### Next in queue — revised after `086c835`
+
+| Pkg | Scope | Notes |
+|---|---|---|
+| **Blueprint installation runtime** | `src/lib/business-os/**` + new routes | The largest genuinely-missing package, and the prerequisite for everything vertical-facing. **Measured, not assumed:** `business-os` is a static registry (`blueprints.ts` 418, `engines.ts` 261, `types.ts` 90, `validation.ts` 86, `workflow.ts` 42) with **zero API routes**. Installation does not exist even in part. It needs durable state — an installed-blueprint record with workspace/profile association, version, terminology, surfaces, modules, workflow templates and an audit trail — so it needs a MIGRATION and the full disposable-DB rehearsal cycle. Allow 90+ minutes minimum and read rule 23 first: hash the post-rollback snapshot against BOTH pre and post. Until it exists, `CORRESPONDING_BLUEPRINT` in `src/lib/onboarding-needs.ts` is a correspondence only, and its harness asserts no route installs anything — **that assertion is what should make whoever builds this revisit the wording there.** |
+| **Unified daily operations runtime** | new `src/lib/operations/**` | A tenant-scoped read-only view over records that already exist: reservations needing action, upcoming appointments and waitlist openings, case milestones and approvals, cohort tasks and renewals, fulfilments and returns, inventory exceptions, field-job and inspection exceptions, overdue durable tasks. **Needs no schema** — it aggregates eight domains that are all already persisted, which makes it the largest available package that cannot be blocked by a migration window. Use inert adapters only; do not claim a scheduler exists without real execution evidence. |
+| P1-009 slice 6 | repo-wide lint | Unchanged: 43 problems and **no safe mechanical slice remains**. This is a refusal. `no-img-element` 25 each change layout, loading and remote-image configuration; `set-state-in-effect` 10 each need the effect redesigned; `preserve-manual-memoization` 3 need memoized-collection identity analysis; `exhaustive-deps` 3 need per-effect analysis; `no-explicit-any` 1 is the documented call at `src/app/[slug]/page.tsx:70`; `no-unused-vars` 1 is a live DOM query in a puppeteer script. |
+| Repoint or delete the wave-c rehearsal runner | tooling, outside the repo | `<temp>\personalink-phase0\wave-c\run-on-rehearsal.js` hardcodes `APP_DIR` to a worktree 12+ commits behind and reports "17 migrations found" where there are 18 — indistinguishable from a missing migration. It gained a drift guard, but the honest fix is to repoint or delete it. It has now misled two separate resumes. |
+| G2 | appointments providers | Still **owner-gated**: real messages and real money. |
+| P1-007 | live `personalink` cutover | Still **owner-gated**. |
