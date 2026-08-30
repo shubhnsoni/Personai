@@ -53,7 +53,7 @@
  *   --quiet            suppress the per-finding lines, print only the counts
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { basename, join } from "node:path"
 import ts from "typescript"
 
@@ -78,7 +78,20 @@ type Finding = Readonly<{
     evidence: string
 }>
 
+/**
+ * What the coverage layer cannot follow. Printed on every run, because an unfollowed indirection is a
+ * silent hole and a silent hole in a control is worse than a declared one.
+ */
+const COVERAGE_LIMITS: readonly string[] = [
+    "a helper reached only through a value: passed as a callback, stored in an object or array, or selected by index or computed key",
+    "a condition-forwarding wrapper more than 2 levels above a real helper",
+    "a wrapper that BUILDS its condition from a non-boolean argument (expectOrder, protectedCase, expectRuntimeError) - deliberately not registered, because the callsite argument is not the condition; the real condition inside the wrapper body IS scanned, in place",
+    "a helper imported from another module: `import` bindings are not resolved (no harness in this tree shares a helper file today)",
+    "a condition assembled at runtime - built by string, selected from a table of predicates, or produced by a factory called with different arguments per callsite",
+]
+
 const SELF_NAME = "check-assertion-vacuity.ts"
+const MANIFEST_PATH = join(__dirname, "..", "gates", "gates.manifest.json")
 
 /** Classes that mean "this assertion cannot fail", i.e. a real defect. */
 const VACUOUS: readonly Classification[] = [
@@ -91,11 +104,14 @@ const VACUOUS: readonly Classification[] = [
 ]
 
 /**
- * Helper names seen across this repository's harnesses, with the argument index that carries the
- * condition. This is a FALLBACK: the real set is discovered per file from the AST, because the
- * parameter is variously named condition / pass / ok / observed / expectation and the exit-integrity
- * scanner's hardcoded set contains three names (`expect`, `mustAllow`, `mustRefuse`) that have zero
- * callsites in this tree while missing the `observed`/`expectation` variants that do exist.
+ * Helper names with the argument index that carries the condition. This is a FALLBACK ONLY: the real
+ * set is discovered per file from the AST, because the parameter is variously named
+ * condition / pass / ok / observed / expectation.
+ *
+ * Every use of this map is REPORTED (`FALLBACK_USED`), because a name covered only because it is
+ * written here is a name discovery failed on, and that is a hole worth seeing rather than a default
+ * worth trusting. As of the Q2-A audit the fallback fires for nothing: all three names are found from
+ * source in every file that uses them.
  */
 const FALLBACK_HELPERS: ReadonlyMap<string, number> = new Map([
     ["check", 1],
@@ -105,6 +121,9 @@ const FALLBACK_HELPERS: ReadonlyMap<string, number> = new Map([
 
 /** Parameter names this repository actually uses for "the thing that must be true". */
 const CONDITION_PARAMETERS = new Set(["condition", "pass", "passed", "ok", "holds", "observed", "expectation", "truth"])
+
+/** Targets whose mutation is a recorded verdict, so a helper that writes one is a real helper. */
+const VERDICT_TARGET = /result|failure|assertion|coverage|verdict|defect|problem/iu
 
 /** Roots that carry no observation of their own, so sharing one proves nothing about derivation. */
 const BUILTIN_ROOTS = new Set([
@@ -176,9 +195,16 @@ function recordsVerdict(body: ts.Node | undefined): boolean {
             && ts.isPropertyAccessExpression(candidate.expression)
             && candidate.expression.name.text === "push"
         ) return true
-        if (ts.isBinaryExpression(candidate) && candidate.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-            return /result|failure|assertion|coverage|verdict/iu.test(candidate.left.getText())
+        // `check-foundation-contracts.ts` records with `failures += 1`, not `=`. Requiring a plain
+        // assignment silently dropped that helper, so every assignment operator counts, and so does
+        // `failures++`.
+        if (ts.isBinaryExpression(candidate) && ASSIGNMENT_OPERATORS.has(candidate.operatorToken.kind)) {
+            return VERDICT_TARGET.test(candidate.left.getText())
         }
+        if (
+            (ts.isPostfixUnaryExpression(candidate) || ts.isPrefixUnaryExpression(candidate))
+            && (candidate.operator === ts.SyntaxKind.PlusPlusToken || candidate.operator === ts.SyntaxKind.MinusMinusToken)
+        ) return VERDICT_TARGET.test(candidate.operand.getText())
         return false
     })
 }
@@ -196,40 +222,199 @@ function conditionParameterIndex(parameters: ts.NodeArray<ts.ParameterDeclaratio
     return -1
 }
 
+type FunctionLike = Readonly<{
+    name: string
+    parameters: ts.NodeArray<ts.ParameterDeclaration>
+    body: ts.Node | undefined
+}>
+
+/** `function f`, `const f = () => {}`, `const f = function () {}`; anything else is not a named helper. */
+function asFunctionLike(node: ts.Node): FunctionLike | null {
+    if (ts.isFunctionDeclaration(node) && node.name) {
+        return { name: node.name.text, parameters: node.parameters, body: node.body }
+    }
+    if (
+        ts.isVariableDeclaration(node)
+        && ts.isIdentifier(node.name)
+        && node.initializer
+        && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
+        return { name: node.name.text, parameters: node.initializer.parameters, body: node.initializer.body }
+    }
+    return null
+}
+
+/**
+ * Which of `parameters` appear in BOOLEAN POSITION inside `expression`.
+ *
+ * Boolean position means: the whole expression, the operand of `!`, an operand of `&&`/`||`/`??`, or
+ * the test or either branch of `?:`. Descent stops at anything else - a comparison, a call, a property
+ * access - because past that point the parameter is an INPUT to the condition rather than the
+ * condition, and treating it as the condition is how a scanner invents defects.
+ */
+function collectBooleanPositions(expression: ts.Expression, parameters: ReadonlySet<string>, out: Set<string>): void {
+    const target = unwrap(expression)
+    if (ts.isIdentifier(target)) {
+        if (parameters.has(target.text)) out.add(target.text)
+        return
+    }
+    if (ts.isAwaitExpression(target)) {
+        collectBooleanPositions(target.expression, parameters, out)
+        return
+    }
+    if (ts.isPrefixUnaryExpression(target) && target.operator === ts.SyntaxKind.ExclamationToken) {
+        collectBooleanPositions(target.operand, parameters, out)
+        return
+    }
+    if (ts.isBinaryExpression(target)) {
+        const kind = target.operatorToken.kind
+        if (
+            kind === ts.SyntaxKind.AmpersandAmpersandToken
+            || kind === ts.SyntaxKind.BarBarToken
+            || kind === ts.SyntaxKind.QuestionQuestionToken
+        ) {
+            collectBooleanPositions(target.left, parameters, out)
+            collectBooleanPositions(target.right, parameters, out)
+        }
+        return
+    }
+    if (ts.isConditionalExpression(target)) {
+        collectBooleanPositions(target.condition, parameters, out)
+        collectBooleanPositions(target.whenTrue, parameters, out)
+        collectBooleanPositions(target.whenFalse, parameters, out)
+    }
+}
+
+type HelperDiscovery = Readonly<{
+    helpers: ReadonlyMap<string, number>
+    /** Names found by direct verdict recording, the strongest evidence. */
+    direct: ReadonlySet<string>
+    wrappers: readonly string[]
+    aliases: readonly string[]
+    /** Names covered ONLY because FALLBACK_HELPERS names them: a discovery miss worth seeing. */
+    fallbackUsed: readonly string[]
+    notes: readonly string[]
+}>
+
 /**
  * The assertion helpers this file actually defines, with the index of the condition argument.
- * Discovered from the AST so a helper with an unusual parameter name is not missed, then merged
- * with the fallback set so a file that imports its helper is still covered.
+ * Discovered from the AST so a helper with an unusual parameter name is not missed, then extended
+ * along two paths that a name-only scan cannot see, and only then backstopped by the fallback set.
+ *
+ * ALIASES. `const ok = checkInvertible` makes every `ok(...)` an assertion whose condition lives at
+ * the callsite. MEASURED: no harness in this tree does this today. It is followed anyway, because the
+ * cost is six lines and the failure mode is a whole harness silently uncovered.
+ *
+ * FORWARDING WRAPPERS. This one is not hypothetical. EIGHT harnesses declare
+ *
+ *     function checkInvertible(name: string, pass: boolean, detail = "") {
+ *         check(name, INVERT ? !pass : pass, detail)
+ *     }
+ *
+ * which records nothing itself - it hands `pass` to `check`. `recordsVerdict` is false for it, so
+ * discovery MISSED it and it was covered only because the literal name `checkInvertible` happens to
+ * be in the fallback map. Rename it and eight harnesses would have gone silently unscanned. Wrappers
+ * are now derived, so the coverage no longer depends on a name.
+ *
+ * THE SOUNDNESS RULE. A wrapper is registered only when a parameter reaches the base helper's
+ * condition slot in BOOLEAN POSITION - as the whole condition, under `!`, as an operand of
+ * `&&`/`||`/`??`, or as a branch or test of `?:`. A parameter appearing as an operand of `===`, or as
+ * a property or call receiver, does NOT count, and that exclusion is what keeps this honest:
+ *
+ *     expectRuntimeError(action, code, msg) -> assert(caught instanceof E && caught.code === code)
+ *     expectOrder(domain, expected, why)    -> checkInvertible(..., got.join(",") === expected.join(","))
+ *     protectedCase(test)                   -> check(..., await test.ownerSucceeded())
+ *
+ * In all three the wrapper BUILDS the condition; the argument at the callsite is a string, an array
+ * or a fixture handle. Registering them would hand a non-boolean to the detectors, and `fold` would
+ * report a string argument as a constant-true VACUOUS_LITERAL - a fabricated defect. Their real
+ * conditions are already scanned in place, inside the wrapper body, where they are written.
  */
-function discoverHelpers(source: ts.SourceFile): Map<string, number> {
+function discoverHelpers(source: ts.SourceFile): HelperDiscovery {
     const helpers = new Map<string, number>()
+    const notes: string[] = []
+
+    // ---- tier 1: direct recorders --------------------------------------------------------------
     walk(source, (node) => {
-        let name: string | undefined
-        let parameters: ts.NodeArray<ts.ParameterDeclaration> | undefined
-        let body: ts.Node | undefined
-        if (ts.isFunctionDeclaration(node) && node.name) {
-            name = node.name.text
-            parameters = node.parameters
-            body = node.body
-        } else if (
-            ts.isVariableDeclaration(node)
-            && ts.isIdentifier(node.name)
-            && node.initializer
-            && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
-        ) {
-            name = node.name.text
-            parameters = node.initializer.parameters
-            body = node.initializer.body
-        }
-        if (!name || !parameters) return
-        const index = conditionParameterIndex(parameters)
+        const candidate = asFunctionLike(node)
+        if (!candidate) return
+        const index = conditionParameterIndex(candidate.parameters)
         if (index < 0) return
-        if (!recordsVerdict(body)) return
-        const existing = helpers.get(name)
-        if (existing === undefined || existing === index) helpers.set(name, index)
+        if (!recordsVerdict(candidate.body)) return
+        const existing = helpers.get(candidate.name)
+        if (existing === undefined || existing === index) helpers.set(candidate.name, index)
     })
-    for (const [name, index] of FALLBACK_HELPERS) if (!helpers.has(name)) helpers.set(name, index)
-    return helpers
+    const direct = new Set(helpers.keys())
+
+    // ---- tier 2: condition-forwarding wrappers, then wrappers of wrappers ----------------------
+    const wrappers: string[] = []
+    for (let round = 0; round < 2; round += 1) {
+        let grew = false
+        walk(source, (node) => {
+            const candidate = asFunctionLike(node)
+            if (!candidate || !candidate.body || helpers.has(candidate.name)) return
+            const parameters = new Map<string, number>()
+            candidate.parameters.forEach((parameter, index) => {
+                if (ts.isIdentifier(parameter.name)) parameters.set(parameter.name.text, index)
+            })
+            if (parameters.size === 0) return
+            let registered: number | null = null
+            let via = ""
+            walk(candidate.body as ts.Node, (inner) => {
+                if (registered !== null) return
+                if (!ts.isCallExpression(inner)) return
+                const callee = calleeName(inner)
+                if (!callee) return
+                const conditionIndex = helpers.get(callee)
+                if (conditionIndex === undefined) return
+                const condition = inner.arguments[conditionIndex]
+                if (!condition) return
+                const forwarded = new Set<string>()
+                collectBooleanPositions(condition, new Set(parameters.keys()), forwarded)
+                if (forwarded.size !== 1) return
+                const name = [...forwarded][0]
+                registered = parameters.get(name) as number
+                via = `${callee}(arg${conditionIndex} carries parameter \`${name}\`)`
+            })
+            if (registered === null) return
+            helpers.set(candidate.name, registered)
+            wrappers.push(`${candidate.name} @cond=${registered} via ${via} (round ${round + 1})`)
+            grew = true
+        })
+        if (!grew) break
+    }
+
+    // ---- tier 3: direct identifier aliases -----------------------------------------------------
+    const aliases: string[] = []
+    for (let round = 0; round < 4; round += 1) {
+        let grew = false
+        walk(source, (node) => {
+            if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name) || !node.initializer) return
+            if (!ts.isIdentifier(node.initializer)) return
+            const target = helpers.get(node.initializer.text)
+            if (target === undefined || helpers.has(node.name.text)) return
+            helpers.set(node.name.text, target)
+            aliases.push(`${node.name.text} = ${node.initializer.text} @cond=${target}`)
+            grew = true
+        })
+        if (!grew) break
+    }
+
+    // ---- tier 4: the fallback, reported whenever it is the only reason a name is covered --------
+    const fallbackUsed: string[] = []
+    for (const [name, index] of FALLBACK_HELPERS) {
+        if (helpers.has(name)) continue
+        // Only note it when the file actually calls the name; an unused fallback entry is harmless.
+        let called = false
+        walk(source, (node) => {
+            if (ts.isCallExpression(node) && calleeName(node) === name) called = true
+        })
+        helpers.set(name, index)
+        if (called) fallbackUsed.push(name)
+    }
+
+    for (const name of direct) notes.push(`${name} @cond=${helpers.get(name)} (declared, records a verdict)`)
+    return { helpers, direct, wrappers, aliases, fallbackUsed, notes }
 }
 
 function calleeName(node: ts.CallExpression): string | null {
@@ -244,16 +429,34 @@ function calleeName(node: ts.CallExpression): string | null {
 
 type Definition = Readonly<{
     initializer: ts.Expression | null
-    /** `true` when the binding is `const`, or a `let` never reassigned. */
+    /** `true` when the binding is `const`, or a `let` never reassigned AND never mutated in place. */
     stable: boolean
+    /** Plain `x = ...` reassignments only. The detectors that read `.right` need that shape. */
     assignments: readonly ts.BinaryExpression[]
     declaration: ts.VariableDeclaration
 }>
 
-/** Every simple `const`/`let x = init` binding in the file, with its reassignments counted. */
+/**
+ * Every simple `const`/`let x = init` binding in the file, with its reassignments counted.
+ *
+ * STABILITY MUST INCLUDE `+=` AND `++`. This originally counted only `=`, and the cost was measurable:
+ * `let refusedCount = 0 ... refusedCount += 1 ... check(..., totalIllegal > 0 && refusedCount === totalIllegal)`
+ * has two counters that both LOOK like the constant 0 to a scanner that ignores `+=`. `canonical`
+ * inlined both initialisers, the two sides became the identical text `(0)`, and three harnesses
+ * (check-appointment-authz, check-case-runtime, check-reservation-authz) were reported as
+ * "resolves to the same expression - looks like x === x" when they are live counter comparisons with a
+ * `> 0` guard already in the same condition. Three of the twenty-three unresolved findings at Q2-A were
+ * this scanner's own bug, not a property of the tree.
+ *
+ * `assignments` deliberately stays `=`-only: `detectConditionalInit` and `detectDerivedExpectation`
+ * read `assignment.right` to reason about what value was stored, and `x += 1` has no such right-hand
+ * value in that sense. An in-place mutation makes the binding unstable without pretending to say
+ * what it became.
+ */
 function buildDefinitions(source: ts.SourceFile): Map<string, Definition> {
     const declarations = new Map<string, ts.VariableDeclaration>()
     const assignments = new Map<string, ts.BinaryExpression[]>()
+    const mutated = new Set<string>()
     walk(source, (node) => {
         if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
             // A name declared twice in one file cannot be resolved without full scope analysis;
@@ -261,15 +464,18 @@ function buildDefinitions(source: ts.SourceFile): Map<string, Definition> {
             if (declarations.has(node.name.text)) declarations.set(node.name.text, node)
             else declarations.set(node.name.text, node)
         }
-        if (
-            ts.isBinaryExpression(node)
-            && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
-            && ts.isIdentifier(node.left)
-        ) {
+        if (ts.isBinaryExpression(node) && ts.isIdentifier(node.left) && ASSIGNMENT_OPERATORS.has(node.operatorToken.kind)) {
+            mutated.add(node.left.text)
+            if (node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return
             const list = assignments.get(node.left.text) ?? []
             list.push(node)
             assignments.set(node.left.text, list)
         }
+        if (
+            (ts.isPostfixUnaryExpression(node) || ts.isPrefixUnaryExpression(node))
+            && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+            && ts.isIdentifier(node.operand)
+        ) mutated.add(node.operand.text)
     })
     const duplicated = new Set<string>()
     const seen = new Set<string>()
@@ -285,7 +491,7 @@ function buildDefinitions(source: ts.SourceFile): Map<string, Definition> {
         const reassignments = assignments.get(name) ?? []
         definitions.set(name, {
             initializer: declaration.initializer ?? null,
-            stable: reassignments.length === 0,
+            stable: !mutated.has(name),
             assignments: reassignments,
             declaration,
         })
@@ -1193,11 +1399,17 @@ function fixtureEvidence(context: Context, assertion: ts.CallExpression): string
 // the scan
 // ---------------------------------------------------------------------------------------------
 
-type ScanResult = Readonly<{ findings: readonly Finding[]; assertionCount: number; helpers: readonly string[] }>
+type ScanResult = Readonly<{
+    findings: readonly Finding[]
+    assertionCount: number
+    helpers: readonly string[]
+    discovery: HelperDiscovery
+}>
 
 function scan(file: string, text: string): ScanResult {
     const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true)
-    const helpers = discoverHelpers(source)
+    const discovery = discoverHelpers(source)
+    const helpers = discovery.helpers
     const definitions = buildDefinitions(source)
     const facts = buildFieldFacts(source)
 
@@ -1263,7 +1475,7 @@ function scan(file: string, text: string): ScanResult {
         }
     }
 
-    return { findings, assertionCount: assertions.length, helpers: [...helpers.keys()].sort() }
+    return { findings, assertionCount: assertions.length, helpers: [...helpers.keys()].sort(), discovery }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1363,6 +1575,136 @@ const VACUOUS_FIXTURES: readonly Fixture[] = [
             "check('every item date is an ISO string or null', items.every((i) => i.at === null || typeof i.at === 'string'))",
         ].join("\n"),
     },
+    {
+        name: "tautology-excluded-middle",
+        expect: "VACUOUS_TAUTOLOGY",
+        body: [
+            "declare const settled: boolean",
+            "declare const rows: string[]",
+            "check('the read either settled or did not', settled || !settled, String(rows.length))",
+        ].join("\n"),
+    },
+    {
+        name: "derived-expectation-guarded-let",
+        expect: "VACUOUS_DERIVED_EXPECTATION",
+        body: [
+            "declare const called: { status: number; keys: string }",
+            "let expectedEnvelope = 'error,ok'",
+            "if (called.status < 400) { expectedEnvelope = 'data,ok' }",
+            "check('the response uses the shared envelope shape', called.keys === expectedEnvelope, called.keys)",
+        ].join("\n"),
+    },
+    {
+        name: "alias-followed",
+        expect: "VACUOUS_SELF_COMPARISON",
+        body: [
+            "declare const renamed: { title: string }",
+            "const ok = check",
+            "ok('a variant can be renamed', renamed.title === renamed.title, renamed.title)",
+        ].join("\n"),
+    },
+    {
+        name: "forwarding-wrapper-followed",
+        expect: "VACUOUS_SELF_COMPARISON",
+        body: [
+            "declare const INVERT: boolean",
+            "declare const renamed: { title: string }",
+            "function checkInverted(name: string, pass: boolean, detail = '') {",
+            "    check(name, INVERT ? !pass : pass, detail)",
+            "}",
+            "checkInverted('a variant can be renamed', renamed.title === renamed.title, renamed.title)",
+        ].join("\n"),
+    },
+    {
+        name: "forwarding-wrapper-two-levels",
+        expect: "VACUOUS_LITERAL",
+        body: [
+            "declare const observedTitle: string",
+            "// Declared BEFORE the wrapper it wraps, on purpose: a single discovery pass cannot register",
+            "// `checkNamed`, because `checkInverted` is not a known helper yet when this line is walked.",
+            "// Only the second round closes the chain, so this fixture genuinely exercises depth 2.",
+            "function checkNamed(name: string, ok: boolean, detail = '') { checkInverted(name, ok, detail) }",
+            "function checkInverted(name: string, pass: boolean, detail = '') { check(name, pass, detail) }",
+            "checkNamed('a variant can be renamed', true, observedTitle)",
+        ].join("\n"),
+    },
+    {
+        name: "compound-assignment-helper-discovered",
+        expect: "VACUOUS_LITERAL",
+        body: [
+            "let failures = 0",
+            "declare const observedTitle: string",
+            "function assertThat(condition: unknown, message: string) { if (!condition) { failures += 1; console.error(message) } }",
+            "assertThat(true, `a variant can be renamed: ${observedTitle}`)",
+        ].join("\n"),
+    },
+]
+
+/**
+ * Fixtures for the classes that are NOT defects but ARE verdicts this scanner reaches, so each of
+ * those paths is proven too. Without these, "10 INTENTIONAL_FIXTURE_SELF_CHECK, 23 UNRESOLVED" would
+ * be two numbers no fixture had ever exercised.
+ */
+const NON_DEFECT_FIXTURES: readonly Fixture[] = [
+    {
+        name: "intentional-failure-marker",
+        expect: "INTENTIONAL_FIXTURE_SELF_CHECK",
+        body: [
+            "declare const r: { seedFailed: boolean; detail: string }",
+            "function run() {",
+            "    if (r.seedFailed) { check('SEED FAILED, rule never reached', false, r.detail); return }",
+            "}",
+        ].join("\n"),
+    },
+    {
+        name: "intentional-deliberate-vacuity",
+        expect: "INTENTIONAL_FIXTURE_SELF_CHECK",
+        body: [
+            "declare const rows: string[]",
+            "// A deliberate scaffold: this asserts the harness is wired, by construction, not any behaviour.",
+            "check('fixture wiring: the probe ran at all', rows.length >= 0, String(rows.length))",
+        ].join("\n"),
+    },
+    {
+        name: "unresolved-two-observations-same-text",
+        expect: "UNRESOLVED",
+        body: [
+            "declare const table: { rows: readonly string[] }",
+            "const before = table.rows.join(',')",
+            "const after = table.rows.join(',')",
+            "check('the preview wrote nothing', before === after, after)",
+        ].join("\n"),
+    },
+    {
+        name: "unresolved-conditional-init-unpinned",
+        expect: "UNRESOLVED",
+        body: [
+            "declare function settlesWithin(p: Promise<unknown>, ms: number): Promise<boolean>",
+            "declare const t2: Promise<unknown>",
+            "declare const reached: boolean",
+            "async function measure() {",
+            "    let settled = false",
+            "    if (reached) { settled = await settlesWithin(t2, 1500) }",
+            "    checkInvertible('T2 settled', !settled, 'x')",
+            "}",
+        ].join("\n"),
+    },
+    {
+        name: "unresolved-constant-false-no-evidence",
+        expect: "UNRESOLVED",
+        body: [
+            "declare const rows: string[]",
+            "check('rows came back', 1 === 2, String(rows.length))",
+        ].join("\n"),
+    },
+    {
+        name: "unresolved-imported-receiver-every",
+        expect: "UNRESOLVED",
+        body: [
+            "import { REGISTRY } from '@/lib/registry'",
+            "check('every registry entry is tagged', REGISTRY.every((entry: { tag?: string }) => Boolean(entry.tag)))",
+        ].join("\n"),
+    },
 ]
 
 /**
@@ -1436,15 +1778,93 @@ const LIVE_CONTROLS: readonly Fixture[] = [
             "check('every item date is an ISO string or null', items.length > 0 && items.every((i) => i.at === null || typeof i.at === 'string'))",
         ].join("\n"),
     },
+    {
+        name: "live-real-disjunction",
+        expect: "LIVE",
+        body: [
+            "declare const settled: boolean",
+            "declare const timedOut: boolean",
+            "check('the read either settled or timed out', settled || timedOut, String(settled))",
+        ].join("\n"),
+    },
+    {
+        name: "live-guarded-let-on-a-different-observation",
+        expect: "LIVE",
+        body: [
+            "declare const called: { status: number; keys: string }",
+            "declare const requestedKind: string",
+            "let expectedEnvelope = 'error,ok'",
+            "if (requestedKind === 'data') { expectedEnvelope = 'data,ok' }",
+            "check('the response uses the shared envelope shape', called.keys === expectedEnvelope, called.keys)",
+        ].join("\n"),
+    },
+    {
+        name: "live-through-a-forwarding-wrapper",
+        expect: "LIVE",
+        body: [
+            "declare const INVERT: boolean",
+            "declare const renamed: { title: string }",
+            "function checkInverted(name: string, pass: boolean, detail = '') {",
+            "    check(name, INVERT ? !pass : pass, detail)",
+            "}",
+            "checkInverted('a variant can be renamed', renamed.title === 'Small (UK)', renamed.title)",
+        ].join("\n"),
+    },
+    {
+        name: "live-wrapper-that-builds-its-own-condition",
+        expect: "LIVE",
+        body: [
+            "declare const got: readonly string[]",
+            "// expectOrder's shape: `expected` is an ARRAY at the callsite, never a condition. Registering",
+            "// this wrapper would make the detectors read an array literal as a condition and fold it true.",
+            "const expectOrder = (domain: string, expected: readonly string[], why: string) => {",
+            "    checkInvertible(`${domain} come back in one order, tying on ${why}`, got.join(',') === expected.join(','), why)",
+            "}",
+            "expectOrder('reservations', ['a', 'b'], 'one startAt')",
+        ].join("\n"),
+    },
+    {
+        name: "live-counter-compared-to-its-total",
+        expect: "LIVE",
+        body: [
+            "declare const transitions: ReadonlyArray<{ ok: boolean }>",
+            "// Regression control for a real bug in THIS scanner: both counters are `let x = 0` mutated only",
+            "// by `+=`, so a stability check that looked at `=` alone inlined both to the text `(0)` and",
+            "// reported a live counter comparison as `x === x`. Three harnesses were mis-flagged this way.",
+            "let refusedCount = 0",
+            "let totalIllegal = 0",
+            "for (const t of transitions) {",
+            "    totalIllegal += 1",
+            "    if (!t.ok) refusedCount += 1",
+            "}",
+            "check('every illegal transition is refused', totalIllegal > 0 && refusedCount === totalIllegal, `${refusedCount}/${totalIllegal}`)",
+        ].join("\n"),
+    },
+    {
+        name: "live-counter-mutated-by-increment",
+        expect: "LIVE",
+        body: [
+            "declare const rows: ReadonlyArray<{ stale: boolean }>",
+            "let staleSeen = 0",
+            "for (const row of rows) { if (row.stale) staleSeen++ }",
+            "check('no stale row came back', rows.length > 0 && staleSeen === 0, String(staleSeen))",
+        ].join("\n"),
+    },
 ]
 
 function fixtureSource(fixture: Fixture): string {
     return `${PRELUDE}\n${fixture.body}\n`
 }
 
+function fixtureNamed(name: string): Fixture {
+    const found = VACUOUS_FIXTURES.find((fixture) => fixture.name === name)
+    if (!found) throw new Error(`no fixture named ${name}`)
+    return found
+}
+
 /** The synthetic defect used by --prove-failure, so a clean tree can still be shown to exit 1. */
 function controlledBadFixture(): ScanResult {
-    return scan("controlled-bad-fixture.ts", fixtureSource(VACUOUS_FIXTURES[6]))
+    return scan("controlled-bad-fixture.ts", fixtureSource(fixtureNamed("conditional-init")))
 }
 
 function runSelfTest(): boolean {
@@ -1460,6 +1880,26 @@ function runSelfTest(): boolean {
         }
         console.log(`PASS self-test ${fixture.name}: ${fixture.expect} at fixture line ${hit.line}`)
     }
+    for (const fixture of NON_DEFECT_FIXTURES) {
+        const result = scan(`fixture-${fixture.name}.ts`, fixtureSource(fixture))
+        const hit = result.findings.find((finding) => finding.classification === fixture.expect)
+        if (!hit) {
+            const saw = result.findings.map((finding) => `${finding.classification}@${finding.line}`).join(", ") || "nothing"
+            console.error(`FAIL self-test ${fixture.name}: expected ${fixture.expect}, saw ${saw}`)
+            ok = false
+            continue
+        }
+        // A non-defect fixture must ALSO not be counted as a defect, or the class boundary is fiction.
+        const flagged = result.findings.filter((finding) => VACUOUS.includes(finding.classification))
+        if (flagged.length > 0) {
+            console.error(
+                `FAIL self-test ${fixture.name}: a non-defect fixture was ALSO counted as a defect: ${flagged.map((f) => `${f.classification}@${f.line}`).join(", ")}`,
+            )
+            ok = false
+            continue
+        }
+        console.log(`PASS self-test ${fixture.name}: ${fixture.expect} at fixture line ${hit.line}, and not counted as a defect`)
+    }
     for (const control of LIVE_CONTROLS) {
         const result = scan(`control-${control.name}.ts`, fixtureSource(control))
         const flagged = result.findings.filter((finding) => VACUOUS.includes(finding.classification))
@@ -1472,7 +1912,141 @@ function runSelfTest(): boolean {
         }
         console.log(`PASS self-test ${control.name}: live control not flagged (${result.assertionCount} assertion(s) parsed)`)
     }
+
+    // Coverage plumbing, proven rather than asserted in a comment.
+    const aliasResult = scan("coverage-alias.ts", fixtureSource(fixtureNamed("alias-followed")))
+    if (aliasResult.discovery.aliases.length === 0) {
+        console.error("FAIL self-test coverage-alias: the alias fixture registered no alias, so alias following is not actually wired")
+        ok = false
+    } else {
+        console.log(`PASS self-test coverage-alias: followed ${aliasResult.discovery.aliases.join("; ")}`)
+    }
+    const wrapperResult = scan("coverage-wrapper.ts", fixtureSource(fixtureNamed("forwarding-wrapper-followed")))
+    if (wrapperResult.discovery.wrappers.length === 0) {
+        console.error("FAIL self-test coverage-wrapper: the wrapper fixture registered no wrapper, so wrapper following is not actually wired")
+        ok = false
+    } else {
+        console.log(`PASS self-test coverage-wrapper: followed ${wrapperResult.discovery.wrappers.join("; ")}`)
+    }
+    const rejectResult = scan("coverage-reject.ts", fixtureSource(
+        LIVE_CONTROLS.find((control) => control.name === "live-wrapper-that-builds-its-own-condition") as Fixture,
+    ))
+    if (rejectResult.discovery.wrappers.some((wrapper) => wrapper.startsWith("expectOrder"))) {
+        console.error("FAIL self-test coverage-reject: a wrapper that BUILDS its condition was registered; the callsite argument is an array, and folding it would fabricate a defect")
+        ok = false
+    } else {
+        console.log("PASS self-test coverage-reject: a condition-building wrapper was correctly NOT registered as a helper")
+    }
+
+    for (const fixture of INVENTORY_FIXTURES) {
+        const found = reconcile(fixture.declared, fixture.onDisk)
+        if (fixture.expect === null) {
+            if (found.length > 0) {
+                console.error(`FAIL self-test ${fixture.name}: expected no finding, saw ${found.map((f) => f.kind).join(", ")}`)
+                ok = false
+                continue
+            }
+            console.log(`PASS self-test ${fixture.name}: nothing flagged, as required`)
+            continue
+        }
+        if (!found.some((finding) => finding.kind === fixture.expect)) {
+            console.error(`FAIL self-test ${fixture.name}: expected ${fixture.expect}, saw ${found.map((f) => f.kind).join(", ") || "nothing"}`)
+            ok = false
+            continue
+        }
+        console.log(`PASS self-test ${fixture.name}: ${fixture.expect}`)
+    }
     return ok
+}
+
+// ---------------------------------------------------------------------------------------------
+// inventory, from the gate driver's manifest
+// ---------------------------------------------------------------------------------------------
+
+type IntegrityFinding = Readonly<{ kind: string; detail: string }>
+
+type Manifest = Readonly<{ harnesses: ReadonlyArray<{ file: string }> }>
+
+/**
+ * Reconcile the declared inventory against disk. Pure, so the self-test can prove each kind fires.
+ *
+ * The point is not tidiness. A bare `readdirSync` cannot disagree with itself, so it can silently
+ * scan a different set from the one `run-gates.js` runs, and then two green numbers would be about
+ * two different populations. A harness present in one and absent from the other must be loud.
+ */
+function reconcile(declared: readonly string[], onDisk: readonly string[]): IntegrityFinding[] {
+    const integrity: IntegrityFinding[] = []
+    const sorted = [...declared].sort()
+    const declaredSet = new Set(sorted)
+    const diskSet = new Set(onDisk)
+    for (const file of sorted) {
+        if (!diskSet.has(file)) {
+            integrity.push({
+                kind: "MANIFEST_ENTRY_MISSING_ON_DISK",
+                detail: `gates.manifest.json declares ${file}, which is not on disk; the manifest and the tree disagree.`,
+            })
+        }
+    }
+    for (const file of onDisk) {
+        if (!declaredSet.has(file)) {
+            integrity.push({
+                kind: "ON_DISK_NOT_IN_MANIFEST",
+                detail: `${file} exists but gates.manifest.json does not declare it, so the gate sweep would not run it while this scanner did. Add a manifest entry.`,
+            })
+        }
+    }
+    const duplicates = sorted.filter((file, index) => index > 0 && sorted[index - 1] === file)
+    for (const file of new Set(duplicates)) {
+        integrity.push({ kind: "DUPLICATE_MANIFEST_ENTRY", detail: `${file} is declared more than once in gates.manifest.json.` })
+    }
+    return integrity
+}
+
+const INVENTORY_FIXTURES: ReadonlyArray<Readonly<{
+    name: string
+    declared: readonly string[]
+    onDisk: readonly string[]
+    expect: string | null
+}>> = [
+    { name: "inventory-agreeing", declared: ["check-a.ts", "check-b.ts"], onDisk: ["check-a.ts", "check-b.ts"], expect: null },
+    { name: "inventory-manifest-entry-missing", declared: ["check-a.ts", "check-gone.ts"], onDisk: ["check-a.ts"], expect: "MANIFEST_ENTRY_MISSING_ON_DISK" },
+    { name: "inventory-on-disk-undeclared", declared: ["check-a.ts"], onDisk: ["check-a.ts", "check-new.ts"], expect: "ON_DISK_NOT_IN_MANIFEST" },
+    { name: "inventory-duplicate-entry", declared: ["check-a.ts", "check-a.ts"], onDisk: ["check-a.ts"], expect: "DUPLICATE_MANIFEST_ENTRY" },
+]
+
+/** The declared harness list, reconciled against disk. Falls back to a listing only if unreadable. */
+function manifestInventory(): Readonly<{ files: readonly string[]; integrity: IntegrityFinding[]; source: string }> {
+    const onDisk = readdirSync(__dirname).filter((file) => /^check-.*\.ts$/u.test(file)).sort()
+    if (!existsSync(MANIFEST_PATH)) {
+        return {
+            files: onDisk.filter((file) => file !== SELF_NAME),
+            integrity: [{
+                kind: "MANIFEST_UNREADABLE",
+                detail: `${MANIFEST_PATH} does not exist, so this scan and run-gates.js can no longer be shown to cover the same set.`,
+            }],
+            source: "readdir (manifest missing)",
+        }
+    }
+    let manifest: Manifest
+    try {
+        manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8")) as Manifest
+    } catch (error) {
+        return {
+            files: onDisk.filter((file) => file !== SELF_NAME),
+            integrity: [{
+                kind: "MANIFEST_UNREADABLE",
+                detail: `${MANIFEST_PATH} did not parse: ${error instanceof Error ? error.message : String(error)}`,
+            }],
+            source: "readdir (manifest unparseable)",
+        }
+    }
+    const declared = manifest.harnesses.map((entry) => entry.file).sort()
+    const diskSet = new Set(onDisk)
+    return {
+        files: declared.filter((file) => diskSet.has(file) && file !== SELF_NAME),
+        integrity: reconcile(declared, onDisk),
+        source: "scripts/gates/gates.manifest.json",
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1490,12 +2064,12 @@ for (let index = 0; index < argv.length; index += 1) {
 }
 
 const missing = explicit.filter((path) => !existsSync(path))
+const declaredInventory = explicit.length > 0
+    ? { files: [] as readonly string[], integrity: [] as IntegrityFinding[], source: "--file (explicit; inventory reconciliation skipped)" }
+    : manifestInventory()
 const targets = explicit.length > 0
     ? explicit.filter((path) => existsSync(path) && basename(path) !== SELF_NAME)
-    : readdirSync(__dirname)
-        .filter((file) => /^check-.*\.ts$/u.test(file) && file !== SELF_NAME)
-        .sort()
-        .map((file) => join(__dirname, file))
+    : declaredInventory.files.map((file) => join(__dirname, file))
 
 const results = targets.map((path) => scan(basename(path), readFileSync(path, "utf8")))
 const proveFailure = argv.includes("--prove-failure")
@@ -1518,9 +2092,30 @@ if (!quiet) {
 
 for (const path of missing) console.log(`SKIPPED ${path}: file does not exist`)
 console.log(
-    `Scanned ${targets.length} file(s)${explicit.length > 0 ? " (explicit)" : ` in ${__dirname}`}, excluding ${SELF_NAME}: its detector logic and its fixtures necessarily contain every shape it hunts.`,
+    `Inventory source: ${declaredInventory.source}. Scanned ${targets.length} file(s)${explicit.length > 0 ? " (explicit)" : ` in ${__dirname}`}, excluding ${SELF_NAME}: its detector logic and its fixtures necessarily contain every shape it hunts.`,
 )
 console.log(`Assertion helpers in use: ${helperNames.join(", ")}. Assertion calls examined: ${assertionTotal}.`)
+
+// ---- how the helper set was arrived at, per path, so no coverage claim rests on a hardcoded name --
+const directNames = [...new Set(results.flatMap((result) => [...result.discovery.direct]))].sort()
+const wrapperNotes = new Map<string, number>()
+for (const result of results) {
+    for (const wrapper of result.discovery.wrappers) wrapperNotes.set(wrapper, (wrapperNotes.get(wrapper) ?? 0) + 1)
+}
+const aliasNotes = results.flatMap((result) => result.discovery.aliases)
+const fallbackNotes = new Map<string, number>()
+for (const result of results) {
+    for (const name of result.discovery.fallbackUsed) fallbackNotes.set(name, (fallbackNotes.get(name) ?? 0) + 1)
+}
+console.log(`  discovered directly (declared, records a verdict): ${directNames.join(", ") || "none"}.`)
+console.log(
+    `  discovered as condition-forwarding wrappers: ${wrapperNotes.size > 0 ? [...wrapperNotes].sort().map(([note, count]) => `${note} in ${count} file(s)`).join("; ") : "none"}.`,
+)
+console.log(`  discovered as direct aliases: ${aliasNotes.length > 0 ? aliasNotes.join("; ") : "none present in this tree"}.`)
+console.log(
+    `  covered ONLY by the hardcoded fallback (a discovery miss, not a pass): ${fallbackNotes.size > 0 ? [...fallbackNotes].sort().map(([name, count]) => `${name} in ${count} file(s)`).join("; ") : "none"}.`,
+)
+console.log(`  NOT followed: ${COVERAGE_LIMITS.map((item, index) => `(${index + 1}) ${item}`).join(" ")}`)
 const perClass = VACUOUS.map(
     (classification) => `${classification}=${findings.filter((finding) => finding.classification === classification).length}`,
 ).join("; ")
@@ -1535,14 +2130,18 @@ console.log(`REAL vacuous assertions (cannot fail): ${defects.length}.`)
  * in real committed harnesses in this repository and fixed - so they are actionable, bounded, and must
  * not come back. LITERAL and TAUTOLOGY gate too; there are currently none.
  *
- * UNGUARDED_EVERY does NOT gate, and that is a deliberate decision rather than an oversight. There are
- * 47 of them, they predate this scanner, and 9 are already mitigated at suite level by a sibling
- * assertion that pins the collection's length. Gating on them would make this scanner permanently red
- * on arrival, which turns a new control into a disabled one - and this repository has already shipped
- * "a control wired to nothing" once. They are printed with a count so the debt is visible and cannot
- * quietly grow, and the count belongs in the run's documentation as owed work.
+ * UNGUARDED_EVERY does NOT gate, and that is a deliberate decision rather than an oversight. Gating on
+ * them would make this scanner permanently red on arrival, which turns a new control into a disabled
+ * one - and this repository has already shipped "a control wired to nothing" once. They are printed
+ * with a count so the debt is visible and cannot quietly grow.
  *
- * If that debt is ever cleared, move UNGUARDED_EVERY into GATING and delete this comment.
+ * THE COUNT MOVES, AND THAT IS THE POINT. It was 47 when this scanner landed; 8 at Q2-A, after the
+ * intervening work cleared most of them and Q1's `check-operations-runtime.ts` rewrite added five new
+ * ones. Every surviving case is triaged INDIVIDUALLY in the Q2-A report - three long-standing and five
+ * introduced by Q1 - because a bulk justification for this class is indistinguishable from ignoring it.
+ * Do not update this paragraph with a new number; read the count off a run.
+ *
+ * If the debt is ever cleared, move UNGUARDED_EVERY into GATING and delete this comment.
  */
 const GATING: readonly Finding["classification"][] = [
     "VACUOUS_LITERAL",
@@ -1559,4 +2158,9 @@ console.log(
 
 const selfTestOk = argv.includes("--self-test") ? runSelfTest() : true
 
-if (gatingDefects.length > 0 || !selfTestOk || missing.length > 0) process.exitCode = 1
+for (const problem of declaredInventory.integrity) console.log(`INTEGRITY ${problem.kind}: ${problem.detail}`)
+console.log(`Inventory integrity findings: ${declaredInventory.integrity.length}.`)
+
+if (gatingDefects.length > 0 || !selfTestOk || missing.length > 0 || declaredInventory.integrity.length > 0) {
+    process.exitCode = 1
+}
