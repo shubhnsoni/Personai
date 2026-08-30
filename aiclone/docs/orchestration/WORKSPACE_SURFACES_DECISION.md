@@ -100,6 +100,32 @@ Three options, and only one is honest:
 every derived value `role-derived`. A caller that wants to render configured-vs-not can; a caller that only
 wants surfaces still works.
 
+### CORRECTION, after S1-A's evaluation — the above is superseded
+
+S1-A implemented and proved the opposite and was right. Recorded rather than quietly replaced, because the
+reasoning matters more than the conclusion.
+
+The regression this section feared **cannot occur**, and measurement 3 is why: nothing currently consumes a
+workspace-aware resolver, because no existing surface consumer has a workspace id. So "empty" is not a
+regression, it is a choice about what a *new* consumer sees — and the only new consumer is the Business OS
+console, which is looking at one specific workspace. Showing that panel the *profile's* surfaces would be
+precisely the profile/workspace conflation this whole document exists to prevent.
+
+The shipped design is therefore **two separate methods**, not one method with a fallback flag:
+
+- `forWorkspace(workspaceId)` — installation-derived, or **explicitly empty** with
+  `source: "no-active-blueprint-installation"`. Never falls back to profile state.
+- `withoutWorkspace(profile)` — the legacy answer, taking the profile values as an **argument**, so it is
+  structurally incapable of querying memberships and therefore of guessing a workspace.
+
+This is better than the flagged fallback specified above for a reason worth keeping: it moves the
+fall-back decision **to the caller, where it is visible**, instead of hiding it inside the resolver behind
+a `source` field a caller could ignore while still receiving surfaces. A flag that must be read to avoid a
+wrong conclusion is a weaker guarantee than two functions that cannot be confused.
+
+The four-outcome table below still describes the system, but `profile-fallback` is now the *caller's*
+composition of the two methods rather than a mode of one.
+
 So the resolver has four outcomes, and they must be distinguishable rather than collapsed:
 
 | Context | Source of surfaces | `source` |
