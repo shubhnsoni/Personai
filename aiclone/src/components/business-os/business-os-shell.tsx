@@ -27,6 +27,7 @@ import { AccessLevelsPanel } from "@/components/business-os/access-levels-panel"
 import { AppointmentsPanel } from "@/components/business-os/appointments-panel"
 import { BlueprintPreviewPanel } from "@/components/business-os/blueprint-preview-panel"
 import { BlueprintInstallPanel } from "@/components/business-os/blueprint-install-panel"
+import { WorkspaceSurfacesPanel } from "@/components/business-os/workspace-surfaces-panel"
 import { CasesPanel } from "@/components/business-os/cases-panel"
 import { CohortsPanel } from "@/components/business-os/cohorts-panel"
 import { CommercePanel } from "@/components/business-os/commerce-panel"
@@ -635,6 +636,12 @@ export function BusinessOsShell({
                                 the choice durably. It grants nothing: surfaces stay per-profile, and the
                                 owner console still needs its own explicit opt-in. */}
                             <BlueprintInstallPanel workspaceId={selectedWorkspaceId} />
+
+                            {/* What the installed blueprint actually resolves to FOR THIS WORKSPACE.
+                                Reads the frozen install config, never the profile - and reports
+                                "no blueprint installed" as a real answer, which today is every
+                                workspace, because onboarding installs nothing. */}
+                            <WorkspaceSurfacesPanel workspaceId={selectedWorkspaceId} />
 
                             <ReservationsPanel workspaceId={selectedWorkspaceId} />
 
