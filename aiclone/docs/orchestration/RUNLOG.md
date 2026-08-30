@@ -4207,3 +4207,77 @@ cohort-runtime 1→99, course-access 1→78, reservation-authz 1→33, fieldjob-
 fieldjob-schema-invariants 12→78, capability-contract 20→230, fieldjob-routes 7→49, retainer-runtime 1→79,
 retainer-routes 1→55, retainer-schema-invariants 1→76, cohort-schema-invariants 1→59,
 cohort-needs-action 1→29. Normal assertion counts identical in every single case.
+
+
+---
+
+# Wave N1 - two proofs upgraded from argument to observation, and one audit that correctly found nothing
+
+Root `claude-opus-5`, sole integration owner, three workers. Baseline `14eccca`, sweep 68/68, lint 43.
+Integrated: `f7008f8` (root, due-work contract as types), `be36ea7` (N1-A), `ed5991c` (N1-B), `edc4a20`
+(N1-C, applied by root because the worker produced no commit).
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | 0 |
+| sweep | **70** checks (68 + two new harnesses), FAILED 0 |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) - unchanged |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| production build | 0 |
+| live `personalink` | untouched - 35 tables, `Profile` = 16, no `_prisma_migrations`, 0 wave tables |
+| triggers | 24 total, 0 disabled |
+| origin | unchanged at `4b386d1d` |
+| frozen worktrees | all six at `ea69595` |
+
+53. **PROVE THE CONTROL AGAINST THE REAL ARTIFACT, NOT A MODEL OF IT.** N1-C's meta-harness came with a
+    five-line in-memory fixture containing the bad shape, and it did go red on it. That is necessary and it
+    is not sufficient: a five-line fixture has no nested helpers, no report object, no 337 preceding
+    assertions, and no `main()` wrapper, so passing it says little about a real 1866-line harness. Root
+    re-ran the proof on the actual file the defect historically occurred in - moving the verdict block of
+    `check-business-os-a11y.ts` above its final assertion - and the scanner named all three facets: the
+    frozen `process.exitCode` and *both* frozen report summaries. The synthetic fixture would not have
+    revealed that the summary-freezing detection worked at all. When a control exists to prevent a specific
+    past regression, reproduce that regression.
+
+54. **"NO DEFECT FOUND" IS A COMPLETE RESULT, AND THE DELIVERABLE IS THEN THE CONTROL.** N1-C audited 69
+    harnesses for frozen verdicts and found zero. The package had been queued in the expectation of finding
+    several, because one had just been found by hand. The temptation is to treat a null result as a wasted
+    slot and go looking for something to tidy. That would have been the wrong call twice over: the null
+    result is *information* (the fix in `c614001` was the only instance, so the class was not systemic), and
+    the durable output is the permanent scanner, which the sweep auto-discovers and which now cannot let the
+    shape return silently. A worker slot that returns a defensible zero has done its job.
+
+55. **A MISSING COMPLETION EVENT IS NOT A MISSING WORKER, AND ROOT RECORDED THAT WRONG ONCE.** A dispatch
+    probe was marked FAILED_NO_START after no artifact appeared and the registry showed only elapsed
+    seconds. The correct reading was narrower: the spawn returns
+    `parent_session UNRESOLVED - these subagents are orphaned: completion events will NOT arrive`, so the
+    *notification* channel is broken while the worker itself runs normally. Every N1 and N2 worker ran and
+    produced real commits under exactly that warning. The orchestrator must poll git state and report files
+    and must not infer worker death from silence. Registry elapsed time is still not progress - but neither
+    is registry silence evidence of failure.
+
+56. **A ZOMBIE SLOT IS CHEAPER THAN A BLIND KILL.** One probe sat `[running]` for 45+ minutes with no
+    artifact directory; `spawn_steer` returned `session_starting: the run is alive but its session has not
+    registered`, i.e. a process hung before registering. It permanently occupied one of three concurrency
+    slots, delaying N2-C behind the queue. Root looked for the OS process and declined to kill anything:
+    agent ids cannot be mapped to PIDs on this host, two live workers were mid-flight, and one of them was
+    mid-transaction against the shared disposable database. Losing one third of parallelism is a bounded
+    cost; killing a live worker mid-write is not. Queued work drains automatically when a real slot frees.
+
+57. **ROOT PREPARED TWO OF THREE WORKER CLIENTS AND ASSUMED IT HAD DONE ALL THREE.** N1-B reported 15 tsc
+    errors in `install.ts` and `workspace-surfaces.ts` - files it did not own and had not touched - because
+    its worktree's generated Prisma client predated the `blueprintInstallation*` models by fourteen hours.
+    Root had pre-generated clients to keep workers away from `prisma generate`, which was right, but
+    verified none of them afterwards. The worker was left to either report noise or waste time on a
+    dead end, and it correctly did the former. Verify the artifact you provisioned, per worktree, rather
+    than trusting the memory of having provisioned it. Root now checks
+    `node_modules/.prisma/client/index.d.ts` for the newest model name in every worktree before dispatch.
+
+58. **THREE DEFENCES THAT LOOK REDUNDANT CAN EACH BE LOAD-BEARING - MUTATE THEM ONE AT A TIME.** The
+    workspace-surfaces panel carries a `superseded` write guard and two read-time key gates, and a reviewer
+    could reasonably call the write guard dead code: the key gate already prevents the wrong workspace's
+    data from rendering. Removing each separately shows they are not duplicates. Deleting the write guard
+    goes red on six assertions because a late response for the *old* workspace overwrites the *current*
+    workspace's stored value - the payload never renders, but the correct data is erased and the panel sits
+    on its skeleton forever. The key gates stop the wrong data being shown; the write guard stops the right
+    data being destroyed. One mutation removing all three would have proven only that the group matters.

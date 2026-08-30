@@ -1393,3 +1393,71 @@ Any "a11y PASS" recorded before `c614001` covered only the assertions above that
 | Wire the due-work plan to a surface | new route + UI | Unchanged. `planDueWork` is pure and invoked by nobody. It must stay explicitly invoked: no timer, no scheduler, no background execution without measured execution evidence. |
 | P1-009 slice 6 | repo-wide lint | Unchanged, still a refusal. |
 | G2 / P1-007 | providers / live cutover | Still **owner-gated**. |
+
+
+---
+
+## Accepted - N1: three open packages closed, one of them by finding nothing
+
+Root: `claude-opus-5`, sole integration owner. Baseline for this wave: `14eccca`, sweep 68/68, lint 43.
+
+| Commit | What landed | Author |
+|---|---|---|
+| `f7008f8` | the due-work preview contract, published as a **type file** rather than a design document | root |
+| `be36ea7` | deterministic proof that the inventory reservation `FOR UPDATE` is load-bearing | N1-A `gpt-5.6-sol` |
+| `ed5991c` | the workspace-surfaces stale-response race, proven by really mounting the component | N1-B `gpt-5.6-sol` |
+| `edc4a20` | AST exit-integrity meta-harness; audit of all 69 harnesses found **0 real defects** | N1-C `gpt-5.6-terra`, applied by root |
+
+Sweep is now **70** checks (68 + the two new harnesses, both passing under the sweep's own stricter
+invocation), FAILED 0. Repo lint unchanged at **43 problems (14 errors, 29 warnings)**. tsc 0. build 0.
+`npm audit --omit=dev` 0 vulnerabilities.
+
+### The three previously-open packages, and what each turned out to be
+
+**Inventory lock necessity - now measured, not assumed.** Every inventory balance path funnels through the
+single `FOR UPDATE` in `InventoryContext.lockItem()` (`src/lib/inventory/shared.ts:183`). A Prisma
+middleware barrier parks T1 after its balance read and engine guard but before the absolute `reserved`
+write, then lets T2 run the same service method. Normal: 88/88, exit 0. With that sole `for update`
+deleted: `item=5/3` instead of `2/6`, `held=2` instead of `6`, 85/88, exit 1, three named assertions red.
+Restored: 88/88. Root reproduced this independently rather than accepting the report.
+
+**The panel stale-response race - now observed, not argued.** Previously the defence was a source-level
+argument, and `renderToStaticMarkup` cannot reach it because it never runs effects. N1-B mounts the real
+component through `react-dom/client` into a small in-memory DOM host with `act()`, and adds **no
+dependency** - the repo has no test renderer, jsdom or Testing Library, and none was installed. 31/31
+assertions, all 31 flipping under inversion. Three separate source mutations each go red on a distinct
+subset, which is what shows the three defences are not duplicates of one another: the `superseded` write
+guard stops the *right* data being erased, and the two key gates stop the *wrong* data being shown.
+
+**The mid-file exit audit - the answer is that there is nothing to fix.** This package was queued on the
+suspicion that if one harness froze its verdict early, others would too. Across the 69 pre-existing
+harnesses: 190 exit/summary candidates, 77 intentional disposable-target or precondition guards, 2 safe
+summaries that are recomputed before the real verdict, **0 real defects**. The value delivered is therefore
+not a fix but a permanent control: `check-harness-exit-integrity.ts`, which the sweep auto-discovers, so
+the defect cannot come back silently.
+
+Root did not accept the worker's five-line synthetic fixture as the whole falsifiability proof. The proof
+was re-run against the real file the defect actually occurred in: moving the verdict block of the
+1866-line `check-business-os-a11y.ts` ahead of its final assertion turned the audit red, exit 1, naming the
+frozen `process.exitCode` **and** both frozen report summaries. Restored, it returns to 0. A control proven
+only against a toy resembling the bug is not proven.
+
+### Next in queue - this table supersedes every earlier one
+
+| Pkg | Scope | State |
+|---|---|---|
+| Due-work preview API | `operations/due-work-*`, new route, new harness | **N2-A in flight.** Contract already published as types (`f7008f8`), so wording and shape are compiler-enforced, not review-enforced. GET only, by construction. |
+| `CommercePanel` double empty state | the three commerce components + additive a11y assertions | **N2-B in flight.** Upgraded from cosmetic: the shell no longer auto-selects when a user has several workspaces, so the no-workspace state is now genuinely reachable rather than a momentary flash. |
+| Assertion vacuity audit | new `check-assertion-vacuity.ts` | **N2-C in flight.** The layer below exit integrity: an exit code that fires correctly still proves nothing if the assertion cannot fail. Static classification of all 70 harnesses. |
+| Inventory barrier review | new `check-inventory-barrier-review.ts` | **Briefed, N3-C.** Adversarial review of `be36ea7`: does T2 block on the row lock, or merely on the connection pool? Is the reserve path even in one transaction? `FOR UPDATE` outside a transaction has no lifetime. Also whether the absolute `reserved` write means the lock is sufficient but not strictly necessary. |
+| Owner Due Work panel | UI on top of N2-A | **Briefed pending N2-A**, N3-A. |
+| Due-work security and honesty audit | independent review of N2-A | **Briefed pending N2-A**, N3-B. |
+| P1-009 slice 6 | repo-wide lint | Still a refusal. Cosmetic work to reduce a count is not worth a worker slot. |
+| G2 / P1-007 | providers / live cutover | Still **owner-gated**. Unchanged. |
+
+### Preservation, re-verified this wave
+
+Live `personalink` untouched: 35 tables, `_prisma_migrations` absent, 0 wave tables leaked, `Profile` = 16
+rows. 24 guard and append-only triggers, 0 disabled. `origin/recovered/aug20-wt-pr-32` still
+`4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`. All six frozen `kirocrew/*` worktrees still at `ea69595`. The
+two preserved untracked paths still present and still untracked.
