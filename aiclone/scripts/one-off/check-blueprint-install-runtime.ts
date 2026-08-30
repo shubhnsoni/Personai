@@ -705,39 +705,64 @@ async function main() {
                 `installs=${Number(scoped[0].n)} events=${Number(scopedEvents[0].n)}`,
             )
             // And the idempotency key was not consumed, so a retry after a failure can still succeed.
-            const working = new BlueprintInstallService(ctx, new BlueprintPreviewService())
-            const retried = await working.install({
-                workspaceId: atomicIds.workspace,
-                blueprintId: OK_BLUEPRINT,
-                idempotencyKey: `${RUN}-atomic`,
-                actor: "owner:atomic",
-            })
-            checkInvertible(
-                "MEASURED: retrying the SAME key after an atomic failure succeeds - the failure consumed nothing",
-                retried.outcome === "installed",
-                `outcome=${retried.outcome}`,
+            const keyRow = await prisma.$queryRawUnsafe<{ n: bigint }[]>(
+                `select count(*)::bigint as n from "BlueprintInstallation" where "idempotencyKey" = '${RUN}-atomic'`,
             )
+            checkInvertible(
+                "MEASURED: the failed install consumed no idempotency key - the row that would claim it does not exist",
+                Number(keyRow[0].n) === 0,
+                `rows holding the key: ${Number(keyRow[0].n)}`,
+            )
+            // The retry itself is proven in a rolled-back transaction rather than for real. A successful
+            // install writes a ledger line, and a ledger line is PERMANENT - it cannot be deleted, nor can
+            // its installation, workspace or profile, because a cascaded DELETE still fires the BEFORE
+            // DELETE trigger. Leaving one behind is not a cosmetic matter: check-schema-invariants.ts
+            // projects every Profile into a Workspace, so a single surviving profile-with-workspace makes
+            // that harness fail with a unique-constraint violation. Residue in a shared database is a
+            // defect, and "it is only the rehearsal database" is how it becomes somebody else's failure.
+            try {
+                await prisma.$transaction(async (tx) => {
+                    const retryCtx = new InstallContext(tx as unknown as PrismaClient, new PersistedTenancy(tx as unknown as PrismaClient, identity))
+                    const retrying = new BlueprintInstallService(retryCtx, new BlueprintPreviewService(), {
+                        runInTransaction: async (fn) => fn(tx),
+                    })
+                    const retried = await retrying.install({
+                        workspaceId: atomicIds.workspace,
+                        blueprintId: OK_BLUEPRINT,
+                        idempotencyKey: `${RUN}-atomic`,
+                        actor: "owner:atomic",
+                    })
+                    checkInvertible(
+                        "MEASURED: retrying the SAME key after an atomic failure succeeds - the failure consumed nothing",
+                        retried.outcome === "installed",
+                        `outcome=${retried.outcome}`,
+                    )
+                    throw new Rollback("done")
+                })
+            } catch (e) {
+                if (!(e instanceof Rollback)) throw e
+            }
         } finally {
-            // The ledger is append-only, so the successful retry above cannot be deleted and neither can
-            // its workspace or profile. Cleanup therefore removes only what CAN be removed, and the
-            // residue assertion below accounts for the rest explicitly rather than pretending it is gone.
-            await prisma.$executeRawUnsafe(
-                `delete from "Membership" where "id" = '${atomicIds.membership}'`,
-            ).catch(() => undefined)
+            // Nothing append-only survived, so this cleanup can actually complete. Deleting the User
+            // cascades to its Profile, and the Profile's Workspace and Membership go with it.
+            await prisma
+                .$executeRawUnsafe(`delete from "Membership" where "id" = '${atomicIds.membership}'`)
+                .catch(() => undefined)
+            await prisma
+                .$executeRawUnsafe(`delete from "Workspace" where "id" = '${atomicIds.workspace}'`)
+                .catch(() => undefined)
+            await prisma.$executeRawUnsafe(`delete from "Profile" where "id" = '${atomicIds.profile}'`).catch(() => undefined)
+            await prisma.$executeRawUnsafe(`delete from "User" where "id" = '${atomicIds.user}'`).catch(() => undefined)
         }
 
         // ---- residue ------------------------------------------------------
         const finalCounts = await installCounts(prisma)
         const finalWorkspaces = await prisma.workspace.count()
-        // MODE 1 left nothing at all. MODE 2 deliberately leaves ONE installation and ONE ledger line -
-        // the successful retry that proves the failed attempt consumed no idempotency key - because an
-        // append-only ledger cannot be cleaned up and pretending otherwise would require disabling a
-        // trigger. Stated as an exact expected number so unexpected residue still fails.
         checkInvertible(
-            "residue is EXACTLY the one retry-proof install the append-only ledger makes permanent, and nothing else",
-            finalCounts.installs === baseline.installs + 1 &&
-                finalCounts.events === baseline.events + 1 &&
-                finalWorkspaces === baselineWorkspaces + 1,
+            "harness left ZERO residue - no installation, no ledger line, no workspace",
+            finalCounts.installs === baseline.installs &&
+                finalCounts.events === baseline.events &&
+                finalWorkspaces === baselineWorkspaces,
             `installs ${baseline.installs}->${finalCounts.installs}, events ${baseline.events}->${finalCounts.events}, workspaces ${baselineWorkspaces}->${finalWorkspaces}`,
         )
 
