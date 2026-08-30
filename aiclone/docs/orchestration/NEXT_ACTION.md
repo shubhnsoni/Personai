@@ -21,11 +21,12 @@ and described H1 as unstarted when it was complete.
 ## Where things stand
 
 - Primary: `recovered/aug20-wt-pr-32`
-- Primary HEAD: **`ff50658`**
+- Primary HEAD: **`eb35b32`**
 - Origin unchanged; nothing pushed.
 - Waves A–G4 complete, plus surfaces, plus **H1 `fieldJobs:inspection` complete end to end**, plus the
   two gaps H1 left (**`5822aa8`** checklist authoring, **`086c835`** field service selectable during
-  onboarding), plus the **unified daily operations view, end to end** (`dac6a23` runtime and API,
+  onboarding), plus checklist line editing and removal with the snapshot-survival claim now proven
+  (**`eb35b32`**), plus the **unified daily operations view, end to end** (`dac6a23` runtime and API,
   `0387d86` panel, `d06e122` case milestones and per-domain scope, `ff50658` route harness).
 - **The check sweep is now 60.**
 - **The capability registry has ZERO `planned` capabilities.** Two `partial` remain, both
@@ -39,13 +40,14 @@ and described H1 as unstarted when it was complete.
   no `btree_gist`, `Profile` = 16.
 - Frozen worktrees intact: all six `kirocrew/*` still at `ea69595`.
 
-### Measured gates at `ff50658`
+### Measured gates at `eb35b32`
 
 | Gate | Result |
 |---|---|
 | `prisma validate` | 0 |
 | `tsc --noEmit` | 0 |
 | check harnesses | **60 of 60 exit 0** |
+| `check-fieldjob-inspection-runtime` | 112/112; inverted exit 1, 49 flipped |
 | `check-operations-runtime` | 28/28; inverted exit 1, 13 flipped; restored 28/28 |
 | `check-operations-routes` | 26/26; inverted exit 1, 12 flipped |
 | `check-onboarding-blueprint-coverage` | 20/20; inverted exit 1, 8 flipped |

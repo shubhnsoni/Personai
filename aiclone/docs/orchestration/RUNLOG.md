@@ -3529,3 +3529,69 @@ eight other files already trip would have added an error to a count this run is 
 | `npm audit --omit=dev` | 0 vulnerabilities |
 | `npm run build` | exit 0 |
 | disposable rehearsal DB | unchanged, fully applied at 18 migrations; this package added no migration |
+
+
+---
+
+## Same run, closing package — checklist line editing, and a claim finally proven
+
+Root: Claude Opus 5. `c784922` → `eb35b32`. No migration, no schema change.
+
+`5822aa8` let an owner author a checklist but never fix a typo in one or remove a line — a real hole in
+a surface shipped hours earlier, and the kind that makes somebody recreate a whole checklist to change
+one word. `updateItem` and `removeItem` close it, with a PATCH/DELETE route and per-line controls in
+the panel.
+
+Three decisions worth keeping:
+
+`updateItem` takes only the fields present in the body, so correcting a label cannot clear a range by
+omission. `removeItem` returns `snapshotsRetained`, so the UI states "this stops being asked; N past
+inspections keep it" instead of leaving an owner to guess whether they just destroyed records. `kind`
+is deliberately **not** editable — turning a CHECK into a MEASUREMENT would leave every inspection
+snapshotted from that line describing a different question than the one now on record, with a unit and
+range those snapshots never had.
+
+### The claim that had been asserted but not proven
+
+The panel and `5822aa8`'s message both say editing a checklist never changes what a past inspection
+asked or answered. The existing harness proved that against a **direct database edit**, which
+establishes the schema design — but it never exercised these engine paths, and `removeItem` is where
+the real risk lives: it DELETES the line and relies on `onDelete: SetNull` to leave the snapshot
+standing. A cascade there would silently destroy recorded answers and nothing would have noticed.
+
+It is now measured: an answer is recorded, the line is removed, the inspection is re-read, and it has
+the same number of lines, the same question wording, the same PASS result, and `templateItemId` null —
+the snapshot loses its provenance pointer and nothing else.
+
+### A defect I reproduced hours after fixing it in someone else's code
+
+The first version of the new refusal test compared a "foreign line" against a "nonexistent line" and
+failed — because the foreign case passed another tenant's **workspace**, so it refused at workspace
+authorization and never reached line ownership.
+
+That is exactly W3 audit finding 10, which this same run fixed in `check-fieldjob-routes.ts` a few
+hours earlier. Knowing about a defect class is not the same as not writing it.
+
+The corrected test compares a real line belonging to a **different checklist of the same tenant**
+against a line that does not exist. Both reach `ownedTemplateItem`, the only code that can tell them
+apart, and both return byte-identical refusals. The workspace-level refusal is asserted separately,
+because it is a different refusal and conflating them is how a non-enumeration test stops testing
+non-enumeration.
+
+35. **Fixing a defect class in one file does not inoculate you against writing it in the next one.**
+    The routes audit finding and this were the same mistake, hours apart, by the same author. The thing
+    that caught it both times was an assertion that compared *serialized bodies* rather than trusting
+    that two refusals looked alike.
+
+Validation is also asserted to survive an EDIT and not only an insert: clearing a measurement line's
+unit and inverting its expected range are both refused on update.
+
+### Measured gates at `eb35b32`
+
+| Gate | Result |
+|---|---|
+| `tsc --noEmit` | 0 |
+| check sweep | **60 of 60 exit 0** |
+| `check-fieldjob-inspection-runtime` | **112/112** (was 100); inverted exit 1, 49 flipped |
+| repo-wide ESLint | 43 problems (14 errors, 29 warnings) — unchanged |
+| `npm run build` | exit 0; the new `items/[itemId]` route in the manifest |
