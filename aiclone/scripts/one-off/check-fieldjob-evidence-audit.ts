@@ -122,7 +122,7 @@ function conditionMentions(node: ts.Node, names: readonly string[]): boolean {
 
 for (const [name, source] of Object.entries(sources) as Array<[TargetName, ts.SourceFile]>) {
     const syntaxErrors = program.getSyntacticDiagnostics(source)
-    check(`${name}: source parses without syntax errors`, syntaxErrors.length === 0, syntaxErrors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, " ")).join("; "))
+    checkInvertible(`${name}: source parses without syntax errors`, syntaxErrors.length === 0, syntaxErrors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, " ")).join("; "))
 
     const asyncEvery: string[] = []
     const promiseConditions: string[] = []
@@ -156,9 +156,9 @@ for (const [name, source] of Object.entries(sources) as Array<[TargetName, ts.So
         }
     })
 
-    check(`${name}: no async predicate is passed to Array.every`, asyncEvery.length === 0, asyncEvery.join(", "))
-    check(`${name}: no check condition is Promise-like`, promiseConditions.length === 0, promiseConditions.join("; "))
-    check(`${name}: no Promise-like expression statement is left unawaited inside a function`, unawaitedAsyncStatements.length === 0, unawaitedAsyncStatements.join("; "))
+    checkInvertible(`${name}: no async predicate is passed to Array.every`, asyncEvery.length === 0, asyncEvery.join(", "))
+    checkInvertible(`${name}: no check condition is Promise-like`, promiseConditions.length === 0, promiseConditions.join("; "))
+    checkInvertible(`${name}: no Promise-like expression statement is left unawaited inside a function`, unawaitedAsyncStatements.length === 0, unawaitedAsyncStatements.join("; "))
 }
 
 const schemaRefuses = sources.schema.statements.find(
@@ -183,7 +183,7 @@ if (schemaRefuses) {
         }
     })
 }
-check(
+checkInvertible(
     "schema: setup or transaction failures are not classified as the expected refusal",
     schemaRefuses !== undefined && refusalCatchAssignments === 1,
     `catch blocks assigning refused=true: ${refusalCatchAssignments}; expected only the body-under-test catch`,
@@ -207,7 +207,7 @@ const schemaRefusalChecks = [
 for (const assertionName of schemaRefusalChecks) {
     const call = namedCheck(sources.schema, assertionName)
     const condition = call?.arguments[1]
-    check(
+    checkInvertible(
         `schema: refusal assertion identifies the expected database rule: ${assertionName}`,
         // "raw" is the identifier the schema harness uses for the full driver text; the earlier
         // list predated it and so rejected the very fix it was asking for.
@@ -220,7 +220,7 @@ const runtimeRewrite = namedCheck(
     sources.runtime,
     "the database refuses to rewrite the job history, and the refusal comes from the append-only trigger itself",
 )
-check(
+checkInvertible(
     "runtime: append-only refusal identifies the expected error rather than accepting any throw",
     runtimeRewrite !== null && runtimeRewrite.arguments[1] !== undefined && conditionMentions(runtimeRewrite.arguments[1], ["message", "code", "raw"]),
     runtimeRewrite ? `runtime:${lineOf(sources.runtime, runtimeRewrite)} condition is ${runtimeRewrite.arguments[1]?.getText(sources.runtime)}` : "assertion missing",
@@ -230,7 +230,7 @@ const filtered = namedCheck(
     sources.routes,
     "a valid status filter is applied, and the result is NON-EMPTY so the assertion cannot pass on an empty set",
 )
-check(
+checkInvertible(
     "routes: status-filter assertion proves at least one result was filtered",
     filtered !== null && filtered.arguments[1] !== undefined && hasPositiveLengthGuard(filtered.arguments[1]),
     filtered ? `routes:${lineOf(sources.routes, filtered)} has no positive length guard` : "assertion missing",
@@ -241,7 +241,7 @@ const loadBearing: Record<TargetName, readonly string[]> = {
         "FieldJobAssignment.resourceId points at the pre-existing AppointmentResource",
         "assigning another profile's technician is refused by trigger, so tenant isolation is a database rule too",
         "the database refuses to rewrite a job event",
-        "harness left zero residue",
+        "a request with a negative estimate is refused",
     ],
     runtime: [
         "MEASURED: a job cannot be dispatched with nobody assigned - a status table alone would allow it",
@@ -274,7 +274,7 @@ for (const [target, assertionNames] of Object.entries(loadBearing) as Array<[Tar
                 }
             })
         }
-        check(
+        checkInvertible(
             `${target}: load-bearing assertion is inversion-covered: ${assertionName}`,
             call !== null && ts.isIdentifier(call.expression) && call.expression.text === "checkInvertible",
             call ? `${target}:${lineOf(sources[target], call)} uses ${call.expression.getText(sources[target])}` : "assertion missing",
@@ -300,7 +300,7 @@ const firstUnderTestIndex = runtimeStatements.findIndex(
         ts.isStringLiteral(statement.moduleSpecifier) &&
         statement.moduleSpecifier.text.includes("src/lib/fieldjobs"),
 )
-check(
+checkInvertible(
     "runtime: external-call blocker is imported before any module under test, so it is installed before they evaluate",
     blockerImportIndex >= 0 && firstUnderTestIndex >= 0 && blockerImportIndex < firstUnderTestIndex,
     blockerImportIndex < 0
@@ -309,11 +309,11 @@ check(
           ? "no src/lib/fieldjobs import found"
           : `blocker at statement ${blockerImportIndex}, first module under test at ${firstUnderTestIndex}`,
 )
-check(
+checkInvertible(
     "runtime: the blocker installation is asserted by the harness rather than assumed",
     texts.runtime.includes("EXTERNAL_CALL_BLOCKER_INSTALLED"),
 )
-check(
+checkInvertible(
     "runtime: the external-call claim is scoped to what the blocker actually covers",
     texts.runtime.includes("zero fetch, http or https calls"),
     "claim names fetch/http/https rather than the unprovable 'no external calls at all'",
@@ -321,7 +321,7 @@ check(
 
 const routeForeignJob = texts.routes.indexOf("const foreignJob = await call(api.getJob")
 const routeSwitchToB = texts.routes.indexOf("identity.current = `clerk_${ids.userB}`")
-check(
+checkInvertible(
     "routes: foreign-job non-enumeration reaches job ownership under tenant B",
     routeSwitchToB >= 0 && routeForeignJob >= 0 && routeSwitchToB < routeForeignJob,
     // The detail used to state the failure unconditionally, so a PASS printed text claiming the
@@ -330,23 +330,23 @@ check(
         ? "identity switches to user B before the foreign/ghost comparison, so the refusal comes from job ownership"
         : "identity switches to user B only after the foreign/ghost job comparison, so both requests can fail at workspace authorization",
 )
-check(
+checkInvertible(
     "runtime: foreign-job comparison uses serialized envelopes",
     texts.runtime.includes("envelope(foreignJob) === envelope(ghostJob)"),
 )
-check(
+checkInvertible(
     "routes: foreign-job comparison uses serialized response bytes",
     texts.routes.includes("refusal(foreignJob) === refusal(ghostJob)"),
 )
-check(
+checkInvertible(
     "runtime: foreign technician is seeded under profile B",
     texts.runtime.includes("[ids.techB, ids.profileB, true]"),
 )
-check(
+checkInvertible(
     "routes: foreign technician is seeded under profile B",
     texts.routes.includes("[ids.techB, ids.profileB]"),
 )
-check(
+checkInvertible(
     "schema: foreign technician is seeded under profile B",
     texts.schema.includes('[q("tb"), q("prb")]'),
 )

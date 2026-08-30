@@ -162,18 +162,18 @@ async function main() {
         // ---- 1. anonymous ----------------------------------------------------
         identity.current = null
         const anon = await call(api.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}`)))
-        check("anonymous list is 401", anon.status === 401, `status=${anon.status}`)
-        check("the 401 uses the shared envelope", errCode(anon) === "UNAUTHORIZED", errCode(anon))
+        checkInvertible("anonymous list is 401", anon.status === 401, `status=${anon.status}`)
+        checkInvertible("the 401 uses the shared envelope", errCode(anon) === "UNAUTHORIZED", errCode(anon))
 
         // ---- 2. vocabulary versus state ------------------------------------
         identity.current = `clerk_${ids.userA}`
         const req = await call(
             api.createRequest(send(REQ, { workspaceId: ids.wsA, source: "phone", summary: "No heat", siteAddress: "1 A St", idempotencyKey: "r1" })),
         )
-        check("creating a request is 201", req.status === 201, `status=${req.status}`)
+        checkInvertible("creating a request is 201", req.status === 201, `status=${req.status}`)
         const requestId = String((dataOf(req).request as { id: string }).id)
         const replay = await call(api.createRequest(send(REQ, { workspaceId: ids.wsA, source: "web", summary: "other", idempotencyKey: "r1" })))
-        check("a replayed request create is 200 with replayed true", replay.status === 200 && dataOf(replay).replayed === true)
+        checkInvertible("a replayed request create is 200 with replayed true", replay.status === 200 && dataOf(replay).replayed === true)
 
         const badStatus = await call(api.transitionRequest(requestId, send(`${REQ}/${requestId}`, { workspaceId: ids.wsA, status: "MAYBE" }, "PATCH")))
         checkInvertible(
@@ -188,35 +188,35 @@ async function main() {
             `${illegalStatus.status} ${errMessage(illegalStatus)}`,
         )
         const manualConvert = await call(api.transitionRequest(requestId, send(`${REQ}/${requestId}`, { workspaceId: ids.wsA, status: "CONVERTED" }, "PATCH")))
-        check(
+        checkInvertible(
             "a request cannot be marked converted by hand over HTTP either",
             manualConvert.status === 409,
             `${manualConvert.status} ${errMessage(manualConvert)}`,
         )
         const silentDecline = await call(api.transitionRequest(requestId, send(`${REQ}/${requestId}`, { workspaceId: ids.wsA, status: "DECLINED" }, "PATCH")))
-        check("declining without a reason is 409", silentDecline.status === 409, `${silentDecline.status} ${errMessage(silentDecline)}`)
+        checkInvertible("declining without a reason is 409", silentDecline.status === 409, `${silentDecline.status} ${errMessage(silentDecline)}`)
 
         await call(api.transitionRequest(requestId, send(`${REQ}/${requestId}`, { workspaceId: ids.wsA, status: "QUALIFYING" }, "PATCH")))
         const negQuote = await call(api.quoteRequest(requestId, send(`${REQ}/${requestId}/quote`, { workspaceId: ids.wsA, estimateCents: -5 }, "PATCH")))
-        check("a negative quote is 409", negQuote.status === 409, `${negQuote.status} ${errMessage(negQuote)}`)
+        checkInvertible("a negative quote is 409", negQuote.status === 409, `${negQuote.status} ${errMessage(negQuote)}`)
         const floatQuote = await call(api.quoteRequest(requestId, send(`${REQ}/${requestId}/quote`, { workspaceId: ids.wsA, estimateCents: 1.5 }, "PATCH")))
-        check("a non-integer quote is 400, not 409", floatQuote.status === 400, `${floatQuote.status} ${errMessage(floatQuote)}`)
+        checkInvertible("a non-integer quote is 400, not 409", floatQuote.status === 400, `${floatQuote.status} ${errMessage(floatQuote)}`)
         const quoted = await call(api.quoteRequest(requestId, send(`${REQ}/${requestId}/quote`, { workspaceId: ids.wsA, estimateCents: 15000 }, "PATCH")))
-        check("a valid quote is 200 and moves the request to QUOTED", quoted.status === 200 && (dataOf(quoted).request as { status: string }).status === "QUOTED")
+        checkInvertible("a valid quote is 200 and moves the request to QUOTED", quoted.status === 200 && (dataOf(quoted).request as { status: string }).status === "QUOTED")
 
         await call(api.transitionRequest(requestId, send(`${REQ}/${requestId}`, { workspaceId: ids.wsA, status: "ACCEPTED" }, "PATCH")))
         const converted = await call(
             api.convertRequest(requestId, send(`${REQ}/${requestId}/convert`, { workspaceId: ids.wsA, reference: "J-1", title: "Heating call", priority: "HIGH" })),
         )
-        check("conversion is 201", converted.status === 201, `status=${converted.status}`)
+        checkInvertible("conversion is 201", converted.status === 201, `status=${converted.status}`)
         const jobId = String((dataOf(converted).job as { id: string }).id)
-        check(
+        checkInvertible(
             "the job carries the quote and site forward from the request",
             (dataOf(converted).job as { estimateCents: number; siteAddress: string }).estimateCents === 15000 &&
                 (dataOf(converted).job as { siteAddress: string }).siteAddress === "1 A St",
         )
         const badPriority = await call(api.createJob(send(JOBS, { workspaceId: ids.wsA, reference: "J-X", title: "x", siteAddress: "y", priority: "PANIC" })))
-        check("an unrecognised priority is 400 and lists the accepted values", badPriority.status === 400 && /LOW/.test(errMessage(badPriority)), errMessage(badPriority))
+        checkInvertible("an unrecognised priority is 400 and lists the accepted values", badPriority.status === 400 && /LOW/.test(errMessage(badPriority)), errMessage(badPriority))
 
         // ---- 3. THE ACTOR BOUNDARY ---------------------------------------
         const customerActor = await call(
@@ -230,7 +230,7 @@ async function main() {
         const systemActor = await call(
             api.transitionJob(jobId, send(`${JOBS}/${jobId}`, { workspaceId: ids.wsA, status: "SCHEDULED", actorType: "SYSTEM" }, "PATCH")),
         )
-        check(
+        checkInvertible(
             "MEASURED: a request cannot claim to be the SYSTEM either - an audit trail must not believe that",
             systemActor.status === 400,
             `${systemActor.status} ${errMessage(systemActor)}`,
@@ -238,7 +238,7 @@ async function main() {
 
         // ---- 4. side conditions survive the HTTP boundary ---------------
         const noWindow = await call(api.transitionJob(jobId, send(`${JOBS}/${jobId}`, { workspaceId: ids.wsA, status: "SCHEDULED" }, "PATCH")))
-        check(
+        checkInvertible(
             "a job with no visit window cannot be scheduled over HTTP",
             noWindow.status === 409,
             `${noWindow.status} ${errMessage(noWindow)}`,
@@ -246,11 +246,11 @@ async function main() {
         const halfWindow = await call(
             api.scheduleJob(jobId, send(`${JOBS}/${jobId}/schedule`, { workspaceId: ids.wsA, startAt: new Date(Date.now() + 3_600_000).toISOString() }, "PATCH")),
         )
-        check("half a visit window is 409", halfWindow.status === 409, `${halfWindow.status} ${errMessage(halfWindow)}`)
+        checkInvertible("half a visit window is 409", halfWindow.status === 409, `${halfWindow.status} ${errMessage(halfWindow)}`)
         const badTimestamp = await call(
             api.scheduleJob(jobId, send(`${JOBS}/${jobId}/schedule`, { workspaceId: ids.wsA, startAt: "not-a-date", endAt: "also-not" }, "PATCH")),
         )
-        check("an unparseable timestamp is 400", badTimestamp.status === 400, `${badTimestamp.status} ${errMessage(badTimestamp)}`)
+        checkInvertible("an unparseable timestamp is 400", badTimestamp.status === 400, `${badTimestamp.status} ${errMessage(badTimestamp)}`)
         const scheduled = await call(
             api.scheduleJob(
                 jobId,
@@ -261,7 +261,7 @@ async function main() {
                 ),
             ),
         )
-        check("a full visit window is 200 and the job reports isScheduled", scheduled.status === 200 && (dataOf(scheduled).job as { isScheduled: boolean }).isScheduled === true)
+        checkInvertible("a full visit window is 200 and the job reports isScheduled", scheduled.status === 200 && (dataOf(scheduled).job as { isScheduled: boolean }).isScheduled === true)
 
         await call(api.transitionJob(jobId, send(`${JOBS}/${jobId}`, { workspaceId: ids.wsA, status: "SCHEDULED" }, "PATCH")))
         const noLead = await call(api.transitionJob(jobId, send(`${JOBS}/${jobId}`, { workspaceId: ids.wsA, status: "DISPATCHED" }, "PATCH")))
@@ -274,52 +274,52 @@ async function main() {
         // ---- 5. assignments and non-enumeration -------------------------
         const foreignTech = await call(api.assign(jobId, send(`${JOBS}/${jobId}/assignments`, { workspaceId: ids.wsA, resourceId: ids.techB })))
         const ghostTech = await call(api.assign(jobId, send(`${JOBS}/${jobId}/assignments`, { workspaceId: ids.wsA, resourceId: `${RUN}_ghost` })))
-        check("another profile's technician is 403", foreignTech.status === 403, `status=${foreignTech.status}`)
+        checkInvertible("another profile's technician is 403", foreignTech.status === 403, `status=${foreignTech.status}`)
         checkInvertible(
             "MEASURED: a foreign technician and a nonexistent one are BYTE-IDENTICAL",
             refusal(foreignTech) === refusal(ghostTech),
             `${refusal(foreignTech)} vs ${refusal(ghostTech)}`,
         )
         const badRole = await call(api.assign(jobId, send(`${JOBS}/${jobId}/assignments`, { workspaceId: ids.wsA, resourceId: ids.tech1, role: "BOSS" })))
-        check("an unrecognised role is 400", badRole.status === 400 && /LEAD/.test(errMessage(badRole)), errMessage(badRole))
+        checkInvertible("an unrecognised role is 400", badRole.status === 400 && /LEAD/.test(errMessage(badRole)), errMessage(badRole))
 
         const lead = await call(
             api.assign(jobId, send(`${JOBS}/${jobId}/assignments`, { workspaceId: ids.wsA, resourceId: ids.tech1, role: "LEAD", idempotencyKey: "a1" })),
         )
-        check("assigning a lead is 201", lead.status === 201, `status=${lead.status}`)
+        checkInvertible("assigning a lead is 201", lead.status === 201, `status=${lead.status}`)
         const assignmentId = String((dataOf(lead).assignment as { id: string }).id)
-        check("the assignment reports the technician's name from AppointmentResource", (dataOf(lead).assignment as { resourceName: string }).resourceName === ids.tech1)
+        checkInvertible("the assignment reports the technician's name from AppointmentResource", (dataOf(lead).assignment as { resourceName: string }).resourceName === ids.tech1)
         const leadReplay = await call(
             api.assign(jobId, send(`${JOBS}/${jobId}/assignments`, { workspaceId: ids.wsA, resourceId: ids.tech1, role: "LEAD", idempotencyKey: "a1" })),
         )
-        check("a replayed assignment is 200", leadReplay.status === 200 && dataOf(leadReplay).replayed === true)
+        checkInvertible("a replayed assignment is 200", leadReplay.status === 200 && dataOf(leadReplay).replayed === true)
         const secondLead = await call(api.assign(jobId, send(`${JOBS}/${jobId}/assignments`, { workspaceId: ids.wsA, resourceId: ids.tech2, role: "LEAD" })))
-        check("a second active lead is 409", secondLead.status === 409, `${secondLead.status} ${errMessage(secondLead)}`)
+        checkInvertible("a second active lead is 409", secondLead.status === 409, `${secondLead.status} ${errMessage(secondLead)}`)
 
         const skip = await call(
             api.transitionAssignment(jobId, assignmentId, send(`${JOBS}/${jobId}/assignments/${assignmentId}`, { workspaceId: ids.wsA, state: "ON_SITE", actorType: "TECHNICIAN" }, "PATCH")),
         )
-        check("a job card cannot skip acceptance over HTTP", skip.status === 409, `${skip.status} ${errMessage(skip)}`)
+        checkInvertible("a job card cannot skip acceptance over HTTP", skip.status === 409, `${skip.status} ${errMessage(skip)}`)
         const accepted = await call(
             api.transitionAssignment(jobId, assignmentId, send(`${JOBS}/${jobId}/assignments/${assignmentId}`, { workspaceId: ids.wsA, state: "ACCEPTED", actorType: "TECHNICIAN" }, "PATCH")),
         )
-        check("a TECHNICIAN actor is accepted and the card moves", accepted.status === 200, `status=${accepted.status}`)
+        checkInvertible("a TECHNICIAN actor is accepted and the card moves", accepted.status === 200, `status=${accepted.status}`)
         const silentRelease = await call(
             api.transitionAssignment(jobId, assignmentId, send(`${JOBS}/${jobId}/assignments/${assignmentId}`, { workspaceId: ids.wsA, state: "RELEASED" }, "PATCH")),
         )
-        check("releasing a card without a reason is 409", silentRelease.status === 409, `${silentRelease.status} ${errMessage(silentRelease)}`)
+        checkInvertible("releasing a card without a reason is 409", silentRelease.status === 409, `${silentRelease.status} ${errMessage(silentRelease)}`)
 
         // ---- 6. nothing is notified -------------------------------------
         const timeline = await call(api.timeline(jobId, get(`${JOBS}/${jobId}/timeline?workspaceId=${ids.wsA}`)))
         const events = dataOf(timeline).events as Array<{ kind: string; to: string; actor: string; seq: unknown; metadata: unknown }>
         const assignEvents = events.filter((e) => e.kind === "ASSIGNMENT" && e.to === "ASSIGNED")
-        check(
+        checkInvertible(
             "MEASURED: every assignment event carries notified: false, so the record cannot be read as a claim that a technician was told",
             assignEvents.length > 0 && assignEvents.every((e) => (e.metadata as { notified?: boolean } | null)?.notified === false),
             `assignEvents=${assignEvents.length}`,
         )
-        check("both STAFF and TECHNICIAN appear as actors in the history", new Set(events.map((e) => e.actor)).size >= 2, [...new Set(events.map((e) => e.actor))].join(","))
-        check("sequence numbers are serialised as strings", events.every((e) => typeof e.seq === "string"))
+        checkInvertible("both STAFF and TECHNICIAN appear as actors in the history", new Set(events.map((e) => e.actor)).size >= 2, [...new Set(events.map((e) => e.actor))].join(","))
+        checkInvertible("sequence numbers are serialised as strings", events.every((e) => typeof e.seq === "string"))
 
         // ---- 7. tenant isolation ----------------------------------------
         // W3 audit finding 10: these two calls used workspaceId=wsB while identity was still user
@@ -330,17 +330,17 @@ async function main() {
         identity.current = `clerk_${ids.userB}`
         const foreignJob = await call(api.getJob(jobId, get(`${JOBS}/${jobId}?workspaceId=${ids.wsB}`)))
         const ghostJob = await call(api.getJob(`${RUN}_ghostjob`, get(`${JOBS}/${RUN}_ghostjob?workspaceId=${ids.wsB}`)))
-        check("reading another profile's job is 403", foreignJob.status === 403, `status=${foreignJob.status}`)
+        checkInvertible("reading another profile's job is 403", foreignJob.status === 403, `status=${foreignJob.status}`)
         checkInvertible(
             "MEASURED: a foreign job and a nonexistent job are BYTE-IDENTICAL",
             refusal(foreignJob) === refusal(ghostJob),
             refusal(ghostJob),
         )
         const bList = await call(api.listJobs(get(`${JOBS}?workspaceId=${ids.wsB}`)))
-        check("the other profile's job list is 200 and empty", bList.status === 200 && (dataOf(bList).jobs as unknown[]).length === 0)
+        checkInvertible("the other profile's job list is 200 and empty", bList.status === 200 && (dataOf(bList).jobs as unknown[]).length === 0)
         // Proof that the refusal above was NOT a workspace-authorization failure: the same
         // identity, in the same workspace, can read its own list successfully.
-        check(
+        checkInvertible(
             "user B really did have access to workspace B, so the 403 above came from job ownership and not from tenancy",
             bList.status === 200,
             `bList=${bList.status}`,
@@ -349,7 +349,7 @@ async function main() {
 
         // ---- 8. status filter -------------------------------------------
         const badFilter = await call(api.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}&status=NOPE`)))
-        check("an unrecognised status filter is 400 rather than silently ignored", badFilter.status === 400, `${badFilter.status} ${errMessage(badFilter)}`)
+        checkInvertible("an unrecognised status filter is 400 rather than silently ignored", badFilter.status === 400, `${badFilter.status} ${errMessage(badFilter)}`)
         // W3 audit finding 4: this asserted `.every(...)` over the filtered rows, which is
         // vacuously true on an empty result. The filter is now chosen from a status that a real
         // job actually holds, and the row count is compared against an independently computed
@@ -360,7 +360,7 @@ async function main() {
         const expectedForStatus = allRows.filter((j) => j.status === presentStatus).length
         const filtered = await call(api.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}&status=${presentStatus}`)))
         const filteredRows = dataOf(filtered).jobs as Array<{ status: string }>
-        check(
+        checkInvertible(
             "a valid status filter is applied, and the result is NON-EMPTY so the assertion cannot pass on an empty set",
             filtered.status === 200 &&
                 allRows.length > 0 &&
@@ -388,7 +388,7 @@ async function main() {
             ),
         )
         const broken = await call(brokenApi.listJobs(get(`${JOBS}?workspaceId=${ids.wsA}`)))
-        check("a dependency failure is 503", broken.status === 503, `status=${broken.status}`)
+        checkInvertible("a dependency failure is 503", broken.status === 503, `status=${broken.status}`)
         checkInvertible(
             "MEASURED: the 503 body leaks no DSN, host or driver text",
             !/SECRET_DETAIL|postgres:\/\//.test(broken.raw) && errCode(broken) === "DEPENDENCY_UNAVAILABLE",
@@ -407,7 +407,7 @@ async function main() {
         ] as Array<[string, Called]>) {
             const keys = Object.keys(c.body).sort().join(",")
             const expected = c.status < 400 ? "data,ok" : "error,ok"
-            check(`the ${label} response uses the shared envelope shape`, keys === expected, `keys=${keys}`)
+            checkInvertible(`the ${label} response uses the shared envelope shape`, keys === expected, `keys=${keys}`)
         }
     } finally {
         const profileList = `'${ids.profileA}','${ids.profileB}'`

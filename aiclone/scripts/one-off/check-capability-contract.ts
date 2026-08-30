@@ -47,7 +47,7 @@ for (const [engineId, capabilityIds] of Object.entries(requiredGranularCapabilit
     ),
   )
   for (const capabilityId of capabilityIds) {
-    check(`declares granular capability ${engineId}:${capabilityId}`, declared.has(capabilityId))
+    checkInvertible(`declares granular capability ${engineId}:${capabilityId}`, declared.has(capabilityId))
   }
 }
 
@@ -55,15 +55,15 @@ const allowedMaturity = new Set<CapabilityMaturity>(["planned", "partial", "avai
 for (const engine of Object.values(businessEngineDescriptors)) {
   const ids = new Set<string>()
   for (const capability of engine.capabilities) {
-    check(`${engine.id}:${capability.id} has a unique id`, !ids.has(capability.id))
+    checkInvertible(`${engine.id}:${capability.id} has a unique id`, !ids.has(capability.id))
     ids.add(capability.id)
-    check(`${engine.id}:${capability.id} has valid maturity`, allowedMaturity.has(capability.maturity))
-    check(`${engine.id}:${capability.id} has evidence`, capability.evidence.trim().length > 0)
-    check(
+    checkInvertible(`${engine.id}:${capability.id} has valid maturity`, allowedMaturity.has(capability.maturity))
+    checkInvertible(`${engine.id}:${capability.id} has evidence`, capability.evidence.trim().length > 0)
+    checkInvertible(
       `${engine.id}:${capability.id} planned capability uses none evidence`,
       capability.maturity !== "planned" || capability.evidence === "none",
     )
-    check(
+    checkInvertible(
       `${engine.id}:${capability.id} implemented capability cites evidence`,
       capability.maturity === "planned" || capability.evidence !== "none",
     )
@@ -73,50 +73,50 @@ for (const engine of Object.values(businessEngineDescriptors)) {
 const restaurantV1 = getBusinessBlueprint("restaurant-venue-v1")
 const restaurantV2 = getBusinessBlueprint("restaurant-venue-v2")
 const restaurantV3 = getBusinessBlueprint("restaurant-venue-v3")
-check("restaurant v1 remains addressable", restaurantV1?.id === "restaurant-venue-v1")
-check("restaurant v1 is historical", restaurantV1?.status === "deprecated")
-check("restaurant v2 remains addressable", restaurantV2?.version === "2.0.0")
-check("restaurant v2 is historical now that v3 exists", restaurantV2?.status === "deprecated")
-check("restaurant v3 exists", restaurantV3?.version === "3.0.0")
-check("restaurant v3 is active", restaurantV3?.status === "active")
-check("restaurant v3 links to v2", restaurantV3?.supersedes === "restaurant-venue-v2")
+checkInvertible("restaurant v1 remains addressable", restaurantV1?.id === "restaurant-venue-v1")
+checkInvertible("restaurant v1 is historical", restaurantV1?.status === "deprecated")
+checkInvertible("restaurant v2 remains addressable", restaurantV2?.version === "2.0.0")
+checkInvertible("restaurant v2 is historical now that v3 exists", restaurantV2?.status === "deprecated")
+checkInvertible("restaurant v3 exists", restaurantV3?.version === "3.0.0")
+checkInvertible("restaurant v3 is active", restaurantV3?.status === "active")
+checkInvertible("restaurant v3 links to v2", restaurantV3?.supersedes === "restaurant-venue-v2")
 
 function composition(engineId: "venueOrders" | "commerce") {
     return restaurantV3?.engines.find((engine) => engine.engineId === engineId)
 }
 
-check(
+checkInvertible(
   "restaurant v3 venue required capabilities are exact",
   JSON.stringify(composition("venueOrders")?.capabilities) ===
     JSON.stringify(["qrOrdering", "guestTracking", "reservations"]),
 )
-check(
+checkInvertible(
   "restaurant v3 commerce required capabilities now include inventory",
   JSON.stringify(composition("commerce")?.capabilities) === JSON.stringify(["catalog", "orders", "inventory"]),
 )
-check(
+checkInvertible(
   "restaurant reservations are no longer a planned backlog item",
   composition("venueOrders")?.plannedCapabilities === undefined,
 )
-check(
+checkInvertible(
   "restaurant reservations capability is declared available with real evidence",
   (() => {
     const capability = businessEngineDescriptors.venueOrders.capabilities.find((c) => c.id === "reservations")
     return capability?.maturity === "available" && capability.evidence !== "none"
   })(),
 )
-check(
+checkInvertible(
   "restaurant inventory is no longer a planned backlog item either",
   composition("commerce")?.plannedCapabilities === undefined,
 )
-check(
+checkInvertible(
   "commerce inventory capability is now declared available with real evidence",
   (() => {
     const capability = businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "inventory")
     return capability?.maturity === "available" && capability.evidence !== "none"
   })(),
 )
-check("all registry blueprints validate", listBusinessBlueprints().every((blueprint) => validateBusinessBlueprint(blueprint).ok))
+checkInvertible("all registry blueprints validate", listBusinessBlueprints().every((blueprint) => validateBusinessBlueprint(blueprint).ok))
 
 // Negative test: an active blueprint may not REQUIRE a capability whose maturity is
 // planned. The descriptor is synthetic by construction so this remains meaningful after
@@ -159,7 +159,7 @@ const activeWithPlannedRequiredCapability: BusinessBlueprint = {
 }
 const negativeResult = validateBusinessBlueprint(activeWithPlannedRequiredCapability, syntheticRegistry)
 checkInvertible("active blueprint requiring synthetic planned capability is rejected", !negativeResult.ok)
-check(
+checkInvertible(
   "synthetic planned rejection identifies maturity enforcement",
   negativeResult.issues.some(
     (validationIssue) =>
@@ -179,7 +179,7 @@ const draftWithPlannedRequiredCapability: BusinessBlueprint = {
   id: "valid-draft-planned-capability",
   status: "draft",
 }
-check(
+checkInvertible(
   "draft blueprint may reference synthetic planned capability",
   validateBusinessBlueprint(draftWithPlannedRequiredCapability, syntheticRegistry).ok,
 )
@@ -189,7 +189,7 @@ const proposedWithPlannedRequiredCapability: BusinessBlueprint = {
   id: "valid-proposed-planned-capability",
   status: "proposed",
 }
-check(
+checkInvertible(
   "proposed blueprint may reference synthetic planned capability",
   validateBusinessBlueprint(proposedWithPlannedRequiredCapability, syntheticRegistry).ok,
 )
@@ -199,14 +199,14 @@ const activeWithAvailableRequiredCapability: BusinessBlueprint = {
   id: "valid-active-available-capability",
   engines: [{ engineId: "fieldJobs", capabilities: ["__contractTestAvailable"], required: true }],
 }
-check(
+checkInvertible(
   "active blueprint requiring synthetic available capability is allowed",
   validateBusinessBlueprint(activeWithAvailableRequiredCapability, syntheticRegistry).ok,
 )
 
 const defaultRegistryResult = validateBusinessBlueprint(activeWithPlannedRequiredCapability)
 const explicitRegistryResult = validateBusinessBlueprint(activeWithPlannedRequiredCapability, businessEngineDescriptors)
-check(
+checkInvertible(
   "validator default registry matches the explicit real registry",
   JSON.stringify(defaultRegistryResult) === JSON.stringify(explicitRegistryResult),
 )
@@ -274,7 +274,7 @@ checkInvertible(
 
 const activeVerticals = activeBlueprints.map((blueprint) => blueprint.vertical)
 const duplicateActiveVerticals = activeVerticals.filter((v, i, all) => all.indexOf(v) !== i)
-check(
+checkInvertible(
   "no two active blueprints claim the same vertical",
   duplicateActiveVerticals.length === 0,
   [...new Set(duplicateActiveVerticals)].join(", "),
@@ -285,8 +285,8 @@ check(
 for (const blueprint of listBusinessBlueprints()) {
   if (!blueprint.supersedes) continue
   const previous = getBusinessBlueprint(blueprint.supersedes)
-  check(`${blueprint.id} supersedes an existing blueprint`, previous !== null, blueprint.supersedes)
-  check(`${blueprint.supersedes} is deprecated now that ${blueprint.id} supersedes it`, previous?.status === "deprecated", previous?.status)
+  checkInvertible(`${blueprint.id} supersedes an existing blueprint`, previous !== null, blueprint.supersedes)
+  checkInvertible(`${blueprint.supersedes} is deprecated now that ${blueprint.id} supersedes it`, previous?.status === "deprecated", previous?.status)
 }
 
 // Second negative test: PARTIAL is not good enough either. This targets
@@ -305,7 +305,7 @@ const activeWithPartialRequiredCapability: BusinessBlueprint = {
 }
 const partialResult = validateBusinessBlueprint(activeWithPartialRequiredCapability)
 checkInvertible("active blueprint requiring partial capability is rejected", !partialResult.ok)
-check(
+checkInvertible(
   "partial rejection identifies maturity enforcement",
   partialResult.issues.some(
     (validationIssue) =>
@@ -335,23 +335,23 @@ check(
   activeWithPartialOptionalCapability.engines[0]?.capabilities[0] === "reminders" &&
     activeWithPartialOptionalCapability.engines[0]?.required === false,
 )
-check(
+checkInvertible(
   "commerce returns is now available, so it can no longer serve as the planned example",
   businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "returns")?.maturity === "available",
 )
-check(
+checkInvertible(
   "casesProjects retainers is now available, so it can no longer serve as the planned example either",
   businessEngineDescriptors.casesProjects.capabilities.find((c) => c.id === "retainers")?.maturity === "available",
 )
-check(
+checkInvertible(
   "contentCohorts accessLevels is now available, so it can no longer serve as the planned example either",
   businessEngineDescriptors.contentCohorts.capabilities.find((c) => c.id === "accessLevels")?.maturity === "available",
 )
-check(
+checkInvertible(
   "fieldJobs dispatch is now available, so it can no longer serve as the planned example either",
   businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "dispatch")?.maturity === "available",
 )
-check(
+checkInvertible(
   "fieldJobs intake is now available too",
   businessEngineDescriptors.fieldJobs.capabilities.find((c) => c.id === "intake")?.maturity === "available",
 )
@@ -367,7 +367,7 @@ for (const [blueprintId, engineId, capabilityId] of [
 ] as Array<[string, string, string]>) {
   const blueprint = getBusinessBlueprint(blueprintId)
   const composition = blueprint?.engines.find((e) => e.engineId === engineId)
-  check(
+  checkInvertible(
     `${blueprintId} now requires ${engineId}:${capabilityId} instead of listing it as planned`,
     composition?.capabilities.includes(capabilityId) === true &&
       (composition?.plannedCapabilities ?? []).includes(capabilityId) === false,
@@ -402,7 +402,7 @@ checkInvertible(
   falseBacklog.length === 0,
   falseBacklog.join("; ") || "none",
 )
-check(
+checkInvertible(
   "every stale backlog entry belongs to a deprecated blueprint, and to one this harness already knows about",
   exemptedBacklog.every((entry) => HISTORICAL_BACKLOG_EXEMPTIONS.some((id) => entry.startsWith(`${id} `))),
   exemptedBacklog.join("; ") || "none",
@@ -420,8 +420,8 @@ for (const [blueprintId, expectedStatus] of [
   ["retail-storefront-v1", "active"],
 ] as Array<[string, string]>) {
   const blueprint = getBusinessBlueprint(blueprintId)
-  check(`${blueprintId} exists`, blueprint !== null)
-  check(`${blueprintId} status is ${expectedStatus}`, blueprint?.status === expectedStatus, blueprint?.status)
+  checkInvertible(`${blueprintId} exists`, blueprint !== null)
+  checkInvertible(`${blueprintId} status is ${expectedStatus}`, blueprint?.status === expectedStatus, blueprint?.status)
 }
 
 // Retail is active as of Wave G. The previous version of this block asserted the opposite —
@@ -430,19 +430,19 @@ for (const [blueprintId, expectedStatus] of [
 // is not "retail is active" (a string in blueprints.ts) but "retail activation is what the
 // validator produces given the real capability registry".
 const retail = getBusinessBlueprint("retail-storefront-v1")
-check("retail storefront requires inventory", retail?.engines[0]?.capabilities.includes("inventory") === true)
-check(
+checkInvertible("retail storefront requires inventory", retail?.engines[0]?.capabilities.includes("inventory") === true)
+checkInvertible(
   "retail storefront also requires variants, fulfilment and returns",
   ["variants", "fulfilment", "returns"].every((c) => retail?.engines[0]?.capabilities.includes(c) === true),
 )
 const retailActivation = retail === null ? null : validateBusinessBlueprint({ ...retail, status: "active" })
 checkInvertible("activating retail is accepted", retailActivation !== null && retailActivation.ok)
-check(
+checkInvertible(
   "retail activation carries no outstanding issue",
   (retailActivation?.issues ?? []).length === 0,
   (retailActivation?.issues ?? []).map((i) => i.message).join(" | ").slice(0, 200),
 )
-check(
+checkInvertible(
   "every capability retail requires is available with an evidence file that exists",
   (retail?.engines[0]?.capabilities ?? []).every((capabilityId) => {
     const capability = businessEngineDescriptors.commerce.capabilities.find((c) => c.id === capabilityId)
@@ -476,14 +476,14 @@ for (const capabilityId of retailRequired) {
       `downgrading commerce:${capabilityId} to ${downgradedTo} blocks retail activation`,
       !result.ok,
     )
-    check(
+    checkInvertible(
       `the ${capabilityId}/${downgradedTo} rejection names the capability it blocked on`,
       messages.includes(`commerce:${capabilityId}`) && messages.includes(`maturity is ${downgradedTo}`),
       messages.slice(0, 160),
     )
   }
 }
-check(
+checkInvertible(
   "the downgrade test covered all six required retail capabilities in both directions",
   downgradeEvidence.length === 12 && new Set(downgradeEvidence.map((d) => d.capability)).size === 6,
   `${downgradeEvidence.length} cases`,
@@ -497,7 +497,7 @@ check(
   ),
 )
 const retailAfterDowngradeTest = retail === null ? null : validateBusinessBlueprint({ ...retail, status: "active" })
-check(
+checkInvertible(
   "retail still activates cleanly after the downgrade test restored the registry",
   retailAfterDowngradeTest !== null && retailAfterDowngradeTest.ok,
 )
@@ -506,21 +506,21 @@ check(
 // reader would most reasonably assume from an active retail storefront, and none of them
 // is true, so the blueprint text has to say so.
 const retailProse = `${retail?.summary ?? ""}`
-check(
+checkInvertible(
   "the retail summary does not claim a carrier integration",
   !/\b(carrier api|carrier integration|live tracking|real-time tracking)\b/i.test(retailProse),
 )
-check(
+checkInvertible(
   "the retail summary states that tracking is owner-entered and refunds are not executed",
   /owner-entered/i.test(retailProse) && /referenced rather than executed/i.test(retailProse),
 )
-check(
+checkInvertible(
   "the fulfilment capability description states that no carrier is contacted",
   /No carrier is contacted/i.test(
     businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "fulfilment")?.description ?? "",
   ),
 )
-check(
+checkInvertible(
   "the returns capability description states that no refund is executed",
   /No refund is executed/i.test(
     businessEngineDescriptors.commerce.capabilities.find((c) => c.id === "returns")?.description ?? "",

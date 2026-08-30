@@ -332,20 +332,20 @@ async function main() {
             )
         ).map((r) => r.table_name)
         const missing = NEW_TABLES.filter((t) => !tables.includes(t))
-        check("all 4 fieldJobs tables present", missing.length === 0, missing.length ? `missing: ${missing}` : "4/4")
+        checkInvertible("all 4 fieldJobs tables present", missing.length === 0, missing.length ? `missing: ${missing}` : "4/4")
         const forked = FORBIDDEN_TABLES.filter((t) => tables.includes(t))
-        check(
+        checkInvertible(
             "no Technician, Crew, WorkOrder or JobCard table was created - the technician IS an AppointmentResource",
             forked.filter((t) => ["Technician", "FieldTechnician", "Crew", "CrewMember", "FieldJobTechnician", "WorkOrder", "WorkOrderLine", "Job", "JobCard"].includes(t)).length === 0,
             forked.join(",") || "none",
         )
-        check(
+        checkInvertible(
             "no Route, Inspection, Part, Asset, Invoice or Notification table was created - this foundation does not claim them",
             forked.filter((t) => ["FieldJobRoute", "Route", "RouteStop", "FieldJobInspection", "Inspection", "FieldJobPart", "Part", "FieldJobAsset", "Asset", "FieldJobInvoice", "FieldJobNotification"].includes(t)).length === 0,
             forked.join(",") || "none",
         )
         for (const t of ["AppointmentResource", "ServiceOffering", "Location", "Booking", "Profile"]) {
-            check(`pre-existing ${t} still exists`, tables.includes(t), tables.includes(t) ? "present" : "MISSING")
+            checkInvertible(`pre-existing ${t} still exists`, tables.includes(t), tables.includes(t) ? "present" : "MISSING")
         }
 
         // ---- 2. enums -------------------------------------------------------
@@ -354,18 +354,18 @@ async function main() {
         )
         for (const [name, expected] of NEW_ENUMS) {
             const n = enums.filter((e) => e.typname === name).length
-            check(`enum ${name} has ${expected} labels`, n === expected, `count=${n}`)
+            checkInvertible(`enum ${name} has ${expected} labels`, n === expected, `count=${n}`)
         }
-        check(
+        checkInvertible(
             "AppointmentResourceKind is unchanged at 3 labels, so reusing it did not require widening it",
             enums.filter((e) => e.typname === "AppointmentResourceKind").length === 3,
         )
-        check(
+        checkInvertible(
             "FieldJobAssignmentState carries both ACCEPTED and DECLINED, so a silent refusal cannot look like agreement",
             enums.some((e) => e.typname === "FieldJobAssignmentState" && e.enumlabel === "ACCEPTED") &&
                 enums.some((e) => e.typname === "FieldJobAssignmentState" && e.enumlabel === "DECLINED"),
         )
-        check(
+        checkInvertible(
             "FieldJobRequestStatus carries DECLINED and CONVERTED separately, so a declined request stays a record",
             enums.some((e) => e.typname === "FieldJobRequestStatus" && e.enumlabel === "DECLINED") &&
                 enums.some((e) => e.typname === "FieldJobRequestStatus" && e.enumlabel === "CONVERTED"),
@@ -376,28 +376,28 @@ async function main() {
             `select table_name, column_name, is_nullable, data_type from information_schema.columns where table_schema='public'`,
         )
         for (const t of NEW_TABLES) {
-            check(
+            checkInvertible(
                 `${t} has no workspaceId - tenancy is profileId, which is forced by sharing AppointmentResource`,
                 !cols.some((c) => c.table_name === t && c.column_name === "workspaceId"),
             )
         }
         for (const t of ["FieldJobRequest", "FieldJob"]) {
-            check(
+            checkInvertible(
                 `${t} is profile-scoped and the column is NOT NULL`,
                 cols.some((c) => c.table_name === t && c.column_name === "profileId" && c.is_nullable === "NO"),
             )
         }
         // Reuse must be by reference, not by column addition.
         const resourceCols = cols.filter((c) => c.table_name === "AppointmentResource").map((c) => c.column_name)
-        check(
+        checkInvertible(
             "AppointmentResource gained no columns - it is referenced, not extended",
             !resourceCols.some((c) => /^fieldJob/i.test(c)) && resourceCols.length === 9,
             `columns=${resourceCols.length}`,
         )
         const offeringCols = cols.filter((c) => c.table_name === "ServiceOffering").map((c) => c.column_name)
-        check("ServiceOffering gained no fieldJob column", !offeringCols.some((c) => /^fieldJob/i.test(c)))
+        checkInvertible("ServiceOffering gained no fieldJob column", !offeringCols.some((c) => /^fieldJob/i.test(c)))
         const locationCols = cols.filter((c) => c.table_name === "Location").map((c) => c.column_name)
-        check("Location gained no fieldJob column", !locationCols.some((c) => /^fieldJob/i.test(c)))
+        checkInvertible("Location gained no fieldJob column", !locationCols.some((c) => /^fieldJob/i.test(c)))
 
         // ---- 4. what dispatch does NOT do ----------------------------------
         const fieldJobColumnNames = cols.filter((c) => NEW_TABLES.includes(c.table_name as (typeof NEW_TABLES)[number])).map((c) => c.column_name)
@@ -414,12 +414,12 @@ async function main() {
             "pushSentAt",
             "providerMessageId",
         ]) {
-            check(
+            checkInvertible(
                 `no ${banned} column anywhere in fieldJobs - this foundation optimises no route and notifies nobody`,
                 !fieldJobColumnNames.includes(banned),
             )
         }
-        check(
+        checkInvertible(
             "the customer site is free text, not a Location foreign key, so customer addresses do not pollute a table three other engines read",
             cols.some((c) => c.table_name === "FieldJob" && c.column_name === "siteAddress" && c.is_nullable === "NO"),
         )
@@ -440,20 +440,20 @@ async function main() {
         const constraints = (
             await prisma.$queryRawUnsafe<{ conname: string }[]>("select conname from pg_constraint where contype = 'c'")
         ).map((r) => r.conname)
-        for (const name of CHECK_CONSTRAINTS) check(`CHECK ${name} exists`, constraints.includes(name))
+        for (const name of CHECK_CONSTRAINTS) checkInvertible(`CHECK ${name} exists`, constraints.includes(name))
         const indexes = await prisma.$queryRawUnsafe<{ indexname: string; indexdef: string }[]>(
             "select indexname, indexdef from pg_indexes where schemaname='public'",
         )
         const leadIdx = indexes.find((i) => i.indexname === "FieldJobAssignment_one_active_lead_per_job")
-        check("partial unique index FieldJobAssignment_one_active_lead_per_job exists", Boolean(leadIdx))
-        check(
+        checkInvertible("partial unique index FieldJobAssignment_one_active_lead_per_job exists", Boolean(leadIdx))
+        checkInvertible(
             "it is genuinely partial, excluding DECLINED and RELEASED so history can accumulate",
             Boolean(leadIdx && /WHERE/i.test(leadIdx.indexdef) && /DECLINED/.test(leadIdx.indexdef) && /RELEASED/.test(leadIdx.indexdef)),
             leadIdx?.indexdef.slice(0, 150) ?? "absent",
         )
         const perResourceIdx = indexes.find((i) => i.indexname === "FieldJobAssignment_one_active_per_resource_per_job")
-        check("partial unique index FieldJobAssignment_one_active_per_resource_per_job exists", Boolean(perResourceIdx))
-        check(
+        checkInvertible("partial unique index FieldJobAssignment_one_active_per_resource_per_job exists", Boolean(perResourceIdx))
+        checkInvertible(
             "FieldJob.requestId is unique, so one request converts to at most one job",
             indexes.some((i) => i.indexname === "FieldJob_requestId_key"),
         )
@@ -461,9 +461,9 @@ async function main() {
             await prisma.$queryRawUnsafe<{ tgname: string }[]>("select tgname from pg_trigger where not tgisinternal")
         ).map((r) => r.tgname)
         for (const t of ["FieldJobEvent_append_only", "FieldJobAssignment_tenant_guard"]) {
-            check(`trigger ${t} is attached`, triggers.includes(t))
+            checkInvertible(`trigger ${t} is attached`, triggers.includes(t))
         }
-        check(
+        checkInvertible(
             "the pre-existing appointment exclusion constraint is untouched",
             (await prisma.$queryRawUnsafe<{ n: bigint }[]>("select count(*) as n from pg_constraint where contype = 'x'")).every(
                 (r) => Number(r.n) === 2,
@@ -477,14 +477,14 @@ async function main() {
                  values ('${RUN}_ne_x','${s.profileA}','web','X',-1,CURRENT_TIMESTAMP)`,
             )
         })
-        check("a request with a negative estimate is refused", negEstimate.refused && /FieldJobRequest_estimateCents_nonnegative/.test(negEstimate.raw), negEstimate.refused ? `FieldJobRequest_estimateCents_nonnegative | ${negEstimate.detail}` : "ACCEPTED - no refusal")
+        checkInvertible("a request with a negative estimate is refused", negEstimate.refused && /FieldJobRequest_estimateCents_nonnegative/.test(negEstimate.raw), negEstimate.refused ? `FieldJobRequest_estimateCents_nonnegative | ${negEstimate.detail}` : "ACCEPTED - no refusal")
 
         const halfSchedule = await refuses("hs", async (tx, s) => {
             await tx.$executeRawUnsafe(
                 `update "FieldJob" set "scheduledStartAt" = CURRENT_TIMESTAMP where "id" = '${s.jobA}'`,
             )
         })
-        check(
+        checkInvertible(
             "a job with a start and no end is refused, because it has no duration",
             halfSchedule.refused && /FieldJob_schedule_complete/.test(halfSchedule.raw),
             halfSchedule.refused ? `FieldJob_schedule_complete | ${halfSchedule.detail}` : "ACCEPTED - no refusal",
@@ -492,25 +492,25 @@ async function main() {
         const halfSchedule2 = await refuses("hs2", async (tx, s) => {
             await tx.$executeRawUnsafe(`update "FieldJob" set "scheduledEndAt" = CURRENT_TIMESTAMP where "id" = '${s.jobA}'`)
         })
-        check("a job with an end and no start is refused too", halfSchedule2.refused && /FieldJob_schedule_complete/.test(halfSchedule2.raw), halfSchedule2.refused ? `FieldJob_schedule_complete | ${halfSchedule2.detail}` : "ACCEPTED - no refusal")
+        checkInvertible("a job with an end and no start is refused too", halfSchedule2.refused && /FieldJob_schedule_complete/.test(halfSchedule2.raw), halfSchedule2.refused ? `FieldJob_schedule_complete | ${halfSchedule2.detail}` : "ACCEPTED - no refusal")
         const backwards = await refuses("bw", async (tx, s) => {
             await tx.$executeRawUnsafe(
                 `update "FieldJob" set "scheduledStartAt" = CURRENT_TIMESTAMP, "scheduledEndAt" = CURRENT_TIMESTAMP - interval '1 hour' where "id" = '${s.jobA}'`,
             )
         })
-        check("a job that ends before it starts is refused", backwards.refused && /FieldJob_schedule_ordered/.test(backwards.raw), backwards.refused ? `FieldJob_schedule_ordered | ${backwards.detail}` : "ACCEPTED - no refusal")
+        checkInvertible("a job that ends before it starts is refused", backwards.refused && /FieldJob_schedule_ordered/.test(backwards.raw), backwards.refused ? `FieldJob_schedule_ordered | ${backwards.detail}` : "ACCEPTED - no refusal")
         const goodSchedule = await refuses("gs", async (tx, s) => {
             await tx.$executeRawUnsafe(
                 `update "FieldJob" set "scheduledStartAt" = CURRENT_TIMESTAMP, "scheduledEndAt" = CURRENT_TIMESTAMP + interval '2 hours' where "id" = '${s.jobA}'`,
             )
             throw new Error("ACCEPTED")
         })
-        check("a job with both a start and a later end is accepted", goodSchedule.detail === "ACCEPTED", goodSchedule.detail)
+        checkInvertible("a job with both a start and a later end is accepted", goodSchedule.detail === "ACCEPTED", goodSchedule.detail)
 
         const silentDecline = await refuses("sd", async (tx, s) => {
             await tx.$executeRawUnsafe(`update "FieldJobAssignment" set "state" = 'DECLINED' where "id" = '${s.leadA}'`)
         })
-        check(
+        checkInvertible(
             "declining an assignment without saying why is refused - an unexplained refusal reads as a mistake later",
             silentDecline.refused && /FieldJobAssignment_decline_has_reason/.test(silentDecline.raw),
             silentDecline.refused ? `FieldJobAssignment_decline_has_reason | ${silentDecline.detail}` : "ACCEPTED - no refusal",
@@ -521,13 +521,13 @@ async function main() {
             )
             throw new Error("ACCEPTED")
         })
-        check("declining with a reason is accepted", explainedDecline.detail === "ACCEPTED", explainedDecline.detail)
+        checkInvertible("declining with a reason is accepted", explainedDecline.detail === "ACCEPTED", explainedDecline.detail)
         const blankRelease = await refuses("br", async (tx, s) => {
             await tx.$executeRawUnsafe(
                 `update "FieldJobAssignment" set "state" = 'RELEASED', "releaseReason" = '   ' where "id" = '${s.leadA}'`,
             )
         })
-        check("releasing with a whitespace-only reason is refused, not just a NULL one", blankRelease.refused && /FieldJobAssignment_release_has_reason/.test(blankRelease.raw), blankRelease.refused ? `FieldJobAssignment_release_has_reason | ${blankRelease.detail}` : "ACCEPTED - no refusal")
+        checkInvertible("releasing with a whitespace-only reason is refused, not just a NULL one", blankRelease.refused && /FieldJobAssignment_release_has_reason/.test(blankRelease.raw), blankRelease.refused ? `FieldJobAssignment_release_has_reason | ${blankRelease.detail}` : "ACCEPTED - no refusal")
 
         const twoLeads = await refuses("tl", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -535,7 +535,7 @@ async function main() {
                  values ('${RUN}_tl_x','${s.jobA}','${s.techA2}','LEAD','ASSIGNED',CURRENT_TIMESTAMP)`,
             )
         })
-        check("a second active LEAD on one job is refused, because two leads means nobody is accountable", twoLeads.refused && /Key \("jobId"\)=/.test(twoLeads.raw), twoLeads.refused ? `Key ("jobId")= | ${twoLeads.detail}` : "ACCEPTED - no refusal")
+        checkInvertible("a second active LEAD on one job is refused, because two leads means nobody is accountable", twoLeads.refused && /Key \("jobId"\)=/.test(twoLeads.raw), twoLeads.refused ? `Key ("jobId")= | ${twoLeads.detail}` : "ACCEPTED - no refusal")
 
         const leadAfterRelease = await refuses("lar", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -547,7 +547,7 @@ async function main() {
             )
             throw new Error("ACCEPTED")
         })
-        check(
+        checkInvertible(
             "a new LEAD after the previous one is released is accepted, and the released row survives",
             leadAfterRelease.detail === "ACCEPTED",
             leadAfterRelease.detail,
@@ -560,7 +560,7 @@ async function main() {
             )
             throw new Error("ACCEPTED")
         })
-        check("a HELPER alongside a LEAD is accepted", helperOk.detail === "ACCEPTED", helperOk.detail)
+        checkInvertible("a HELPER alongside a LEAD is accepted", helperOk.detail === "ACCEPTED", helperOk.detail)
 
         const doubleAssign = await refuses("da", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -568,7 +568,7 @@ async function main() {
                  values ('${RUN}_da_x','${s.jobA}','${s.techA1}','HELPER','ASSIGNED',CURRENT_TIMESTAMP)`,
             )
         })
-        check(
+        checkInvertible(
             "assigning the same technician to the same job twice while both are active is refused",
             doubleAssign.refused && /Key \("jobId", "resourceId"\)=/.test(doubleAssign.raw),
             doubleAssign.refused ? `Key ("jobId", "resourceId")= | ${doubleAssign.detail}` : "ACCEPTED - no refusal",
@@ -592,7 +592,7 @@ async function main() {
                  values ('${RUN}_tj_x','${s.profileA}','${s.requestA}','${RUN}_tj_x','Second job','1 Other Street',CURRENT_TIMESTAMP)`,
             )
         })
-        check("one request cannot convert into two jobs", twoJobsOneRequest.refused && /Key \("requestId"\)=/.test(twoJobsOneRequest.raw), twoJobsOneRequest.refused ? `Key ("requestId")= | ${twoJobsOneRequest.detail}` : "ACCEPTED - no refusal")
+        checkInvertible("one request cannot convert into two jobs", twoJobsOneRequest.refused && /Key \("requestId"\)=/.test(twoJobsOneRequest.raw), twoJobsOneRequest.refused ? `Key ("requestId")= | ${twoJobsOneRequest.detail}` : "ACCEPTED - no refusal")
 
         const dupReference = await refuses("dr", async (tx, s) => {
             await tx.$executeRawUnsafe(
@@ -600,7 +600,7 @@ async function main() {
                  values ('${RUN}_dr_x','${s.profileA}','${s.jobA}','Clash','2 Other Street',CURRENT_TIMESTAMP)`,
             )
         })
-        check("two jobs cannot share a reference within a profile", dupReference.refused && /Key \("profileId", reference\)=/.test(dupReference.raw), dupReference.refused ? `Key ("profileId", reference)= | ${dupReference.detail}` : "ACCEPTED - no refusal")
+        checkInvertible("two jobs cannot share a reference within a profile", dupReference.refused && /Key \("profileId", reference\)=/.test(dupReference.raw), dupReference.refused ? `Key ("profileId", reference)= | ${dupReference.detail}` : "ACCEPTED - no refusal")
 
         // ---- 8. the history cannot be rewritten ----------------------------
         const rewrite = await refuses("aw", async (tx, s) => {
@@ -618,14 +618,14 @@ async function main() {
             )
             await tx.$executeRawUnsafe(`delete from "FieldJobEvent" where "id" = '${RUN}_ae_x'`)
         })
-        check("the database refuses to erase a job event", erase.refused && /is append-only; DELETE is forbidden/.test(erase.raw), erase.refused ? `is append-only; DELETE is forbidden | ${erase.detail}` : "ACCEPTED - no refusal")
+        checkInvertible("the database refuses to erase a job event", erase.refused && /is append-only; DELETE is forbidden/.test(erase.raw), erase.refused ? `is append-only; DELETE is forbidden | ${erase.detail}` : "ACCEPTED - no refusal")
 
         // ---- 9. residue ----------------------------------------------------
         const after = await counts(prisma)
         const residue = Object.entries(after)
             .filter(([k, v]) => v !== baseline[k])
             .map(([k, v]) => `${k}:${baseline[k]}->${v}`)
-        checkInvertible("harness left zero residue", residue.length === 0, residue.join(", ") || "clean")
+        check("harness left zero residue", residue.length === 0, residue.join(", ") || "clean")
     } finally {
         await prisma.$disconnect()
     }
