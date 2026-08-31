@@ -64,7 +64,7 @@ class ControlledIdentity implements PlatformIdentity {
     }
 }
 
-type Called = Readonly<{ status: number; body: Record<string, unknown>; raw: string }>
+type Called = Readonly<{ status: number; body: Record<string, unknown>; raw: string; headers: Readonly<Record<string, string>> }>
 
 async function call(promise: Promise<Response>): Promise<Called> {
     const response = await promise
@@ -75,11 +75,26 @@ async function call(promise: Promise<Response>): Promise<Called> {
     } catch {
         body = {}
     }
-    return Object.freeze({ status: response.status, body, raw })
+    // Header names are lowercased on the way in: HTTP header names are case-insensitive, so asserting
+    // against "allow" rather than whatever case the helper happened to write makes the assertion about the
+    // header rather than about its spelling.
+    const headers: Record<string, string> = {}
+    response.headers.forEach((value, key) => {
+        headers[key.toLowerCase()] = value
+    })
+    return Object.freeze({ status: response.status, body, raw, headers: Object.freeze(headers) })
 }
 
 function get(url: string): Request {
     return new Request(url, { method: "GET" })
+}
+/**
+ * A request with an arbitrary method. `POST` and `PUT` carry no body on purpose: the point of these
+ * requests is the METHOD, and a surface that refused them only because their body was unparseable would
+ * have proven nothing about the method guard.
+ */
+function withMethod(method: string, url: string): Request {
+    return new Request(url, { method })
 }
 function errCode(called: Called): string {
     const error = called.body.error as { code?: string } | undefined
@@ -289,6 +304,161 @@ async function main() {
                         `status=${called.status} keys=${keys}`,
                     )
                 }
+
+                // ---- THE METHOD GUARD ON THE SERVICE, NOT ON THE ROUTE FILE ----
+                /**
+                 * WHAT WAS MEASURED BEFORE THIS BLOCK EXISTED. `OperationsApiService.today` never read
+                 * `request.method`, and `operationsApi` is an exported singleton - so a direct caller got
+                 * 200 and the full workspace summary for POST and for OPTIONS. Nothing was exposed over
+                 * HTTP (the route module exports only GET, so next@16.3.3 refuses the rest itself and
+                 * answers OPTIONS itself) and no write occurred (the engine has no write path), which is
+                 * exactly why this was worth fixing rather than shrugging at: the read-only guarantee
+                 * rested on one file's export list. The structural assertions at the top of this harness
+                 * verify that file. They cannot verify the service, and the service is what the singleton
+                 * hands to any future caller.
+                 *
+                 * These assertions are therefore about the SERVICE, reached directly, with no route module
+                 * involved at all.
+                 */
+
+                /**
+                 * A SPY ENGINE, WHICH IS THE ZERO-SIDE-EFFECT PROOF.
+                 *
+                 * Counting rows after a refusal proves that THIS refusal wrote nothing. Proving the engine
+                 * was never invoked proves a refusal CANNOT write - it never reaches a database connection,
+                 * so there is no query to be a write, no transaction to leave open and no sequence to
+                 * advance. That is the stronger claim and it is the one the guard actually makes, so it is
+                 * the one asserted. The spy throws rather than returning, so a guard that fell through
+                 * would produce a 503 here and fail loudly instead of quietly answering 200 with empty data.
+                 */
+                let engineCalls = 0
+                const spyApi = new OperationsApiService({
+                    summary: async () => {
+                        engineCalls += 1
+                        throw new Error("SPY: the engine was reached on a request that should have been refused")
+                    },
+                } as unknown as OperationsService)
+
+                const refusedMethods = ["POST", "PUT", "PATCH", "DELETE"] as const
+                const spyRefusals: Called[] = []
+                for (const verb of refusedMethods) {
+                    spyRefusals.push(await call(spyApi.today(withMethod(verb, `${BASE}?workspaceId=${ids.wsA}`))))
+                }
+                checkInvertible(
+                    "MEASURED: every state-changing method is refused 405 METHOD_NOT_ALLOWED by the SERVICE, not merely by the route module's export list",
+                    spyRefusals.every((r) => r.status === 405 && errCode(r) === "METHOD_NOT_ALLOWED"),
+                    spyRefusals.map((r, i) => `${refusedMethods[i]}=${r.status}/${errCode(r)}`).join(" "),
+                )
+                checkInvertible(
+                    "MEASURED: a refused method carries Allow: GET, HEAD, OPTIONS - the byte-identical string next@16.3.3 puts on its own auto-implemented OPTIONS for this route",
+                    spyRefusals.every((r) => r.headers.allow === "GET, HEAD, OPTIONS"),
+                    spyRefusals.map((r, i) => `${refusedMethods[i]}:[${r.headers.allow ?? "NO ALLOW HEADER"}]`).join(" "),
+                )
+                // THE ZERO-SIDE-EFFECT PROOF. Not "no row changed" - "no query was possible".
+                checkInvertible(
+                    "MEASURED: a refused method NEVER REACHES THE ENGINE, so a refusal cannot write, cannot open a transaction and cannot advance a sequence - zero side effects by construction rather than by observation",
+                    engineCalls === 0,
+                    `engine invocations during ${refusedMethods.length} refused requests: ${engineCalls}`,
+                )
+                // OPTIONS answers the method set without authenticating and without reaching the engine,
+                // which is what the framework already does on this route over HTTP. Previously a direct
+                // caller got 200 and a full summary here.
+                const options = await call(spyApi.today(withMethod("OPTIONS", `${BASE}?workspaceId=${ids.wsA}`)))
+                checkInvertible(
+                    "MEASURED: OPTIONS is 204 with Allow and NO content, matching what the framework already answers over HTTP - it was 200 with a full workspace summary before this guard",
+                    options.status === 204 && options.raw === "" && options.headers.allow === "GET, HEAD, OPTIONS" && engineCalls === 0,
+                    `status=${options.status} bodyBytes=${options.raw.length} allow=[${options.headers.allow ?? "none"}] engineCalls=${engineCalls}`,
+                )
+
+                /**
+                 * NON-ENUMERATION THROUGH THE NEW DOOR, which is the assertion the guard could most easily
+                 * have broken.
+                 *
+                 * The guard runs BEFORE `param` and before the engine, so a refused method must answer
+                 * identically whether the workspace named is the caller's own, somebody else's, one that
+                 * does not exist, or absent entirely. Had the guard been placed after `param`, the
+                 * difference between 400 and 405 would have leaked whether a workspaceId was well-formed;
+                 * after the engine call, the difference between 403 and 405 would have leaked membership.
+                 * Compared as BYTES, not by status, because a status match with a differing message would
+                 * still be an oracle.
+                 */
+                const postOwn = await call(spyApi.today(withMethod("POST", `${BASE}?workspaceId=${ids.wsA}`)))
+                const postForeign = await call(spyApi.today(withMethod("POST", `${BASE}?workspaceId=${ids.wsB}`)))
+                const postGhost = await call(spyApi.today(withMethod("POST", `${BASE}?workspaceId=${RUN}_ghost_ws`)))
+                const postNone = await call(spyApi.today(withMethod("POST", BASE)))
+                const postShapes = new Set([postOwn, postForeign, postGhost, postNone].map((r) => `${r.status}|${refusal(r)}|${r.headers.allow ?? ""}`))
+                checkInvertible(
+                    "MEASURED: a refused method is BYTE-IDENTICAL for the caller's own workspace, a foreign one, a nonexistent one and none at all - the method guard is not an enumeration oracle",
+                    postShapes.size === 1 && postOwn.status === 405,
+                    `${postShapes.size} distinct refusal(s): ${[...postShapes].join("  ||  ")}`,
+                )
+
+                /**
+                 * HEAD RUNS THE WHOLE GET PATH, INCLUDING AUTHORIZATION, and is deliberately not
+                 * short-circuited. RFC 9110 section 9.1 requires HEAD of a general-purpose server and
+                 * section 9.3.2 requires it to carry no content; short-circuiting it ahead of
+                 * authorization would have turned an unauthenticated HEAD into a 200 and made this surface
+                 * a membership oracle, which is the failure the due-work surface already had and fixed.
+                 */
+                const headOk = await call(api.today(withMethod("HEAD", `${BASE}?workspaceId=${ids.wsA}`)))
+                checkInvertible(
+                    "MEASURED: HEAD answers 200 with NO content and a Content-Length equal to the byte length the GET content would have had",
+                    headOk.status === 200 &&
+                        headOk.raw === "" &&
+                        headOk.headers["content-length"] === String(new TextEncoder().encode(ok.raw).length),
+                    `status=${headOk.status} bodyBytes=${headOk.raw.length} content-length=${headOk.headers["content-length"]} getBytes=${new TextEncoder().encode(ok.raw).length}`,
+                )
+                identity.current = null
+                const headAnon = await call(api.today(withMethod("HEAD", `${BASE}?workspaceId=${ids.wsA}`)))
+                checkInvertible(
+                    "MEASURED: HEAD authorizes - a signed-out HEAD is 401 with no content, so HEAD is not a way around the 401 that GET returns",
+                    headAnon.status === 401 && headAnon.raw === "",
+                    `status=${headAnon.status} bodyBytes=${headAnon.raw.length}`,
+                )
+                identity.current = ids.userA
+                const headForeign = await call(api.today(withMethod("HEAD", `${BASE}?workspaceId=${ids.wsB}`)))
+                const headGhost = await call(api.today(withMethod("HEAD", `${BASE}?workspaceId=${RUN}_ghost_ws`)))
+                checkInvertible(
+                    "MEASURED: HEAD preserves non-enumeration too - a foreign workspace and a nonexistent one are identical in status, headers and (absent) content",
+                    headForeign.status === 403 &&
+                        headForeign.status === headGhost.status &&
+                        headForeign.raw === "" &&
+                        headGhost.raw === "" &&
+                        headForeign.headers["content-length"] === headGhost.headers["content-length"],
+                    `${headForeign.status}/${headGhost.status} content-length ${headForeign.headers["content-length"]}/${headGhost.headers["content-length"]}`,
+                )
+                // GET is unchanged by all of this. Asserted rather than assumed: the guard is new code on
+                // the one path that was already working.
+                const okAfterGuard = await call(api.today(get(`${BASE}?workspaceId=${ids.wsA}`)))
+                checkInvertible(
+                    "MEASURED: GET is byte-unchanged by the method guard - same status, same envelope keys, same item count as before the guard existed",
+                    okAfterGuard.status === 200 &&
+                        Object.keys(okAfterGuard.body).sort().join(",") === "data,ok" &&
+                        ((okAfterGuard.body.data as { items?: unknown[] }).items ?? []).length === items.length,
+                    `status=${okAfterGuard.status} items=${((okAfterGuard.body.data as { items?: unknown[] }).items ?? []).length} vs ${items.length}`,
+                )
+                // And no refusal, of any method, touched a row. The engine-never-reached assertion above is
+                // the structural proof; this is the independent empirical one, taken over this run's own
+                // rows rather than globally, so a concurrent harness seeding the same database cannot move it.
+                const runRows = async () => {
+                    const counted = await tx.$queryRawUnsafe<{ n: bigint }[]>(
+                        `select (select count(*) from "FieldJob" where "id" like '${RUN}%')
+                              + (select count(*) from "Workspace" where "id" like '${RUN}%')
+                              + (select count(*) from "Membership" where "id" like '${RUN}%')
+                              + (select count(*) from "Profile" where "id" like '${RUN}%')
+                              + (select count(*) from "User" where "id" like '${RUN}%') as n`,
+                    )
+                    return Number(counted[0].n)
+                }
+                const rowsAfterRefusals = await runRows()
+                for (const verb of ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const) {
+                    await call(api.today(withMethod(verb, `${BASE}?workspaceId=${ids.wsA}`)))
+                }
+                checkInvertible(
+                    "MEASURED: a full round of refusals against the REAL engine-backed service changes this run's row count by zero - the empirical half of the zero-side-effect proof",
+                    (await runRows()) === rowsAfterRefusals && rowsAfterRefusals > 0,
+                    `this run's rows before=${rowsAfterRefusals} after=${await runRows()} (a zero baseline would make this vacuous)`,
+                )
 
                 throw new Rollback()
             })

@@ -957,44 +957,57 @@ async function main() {
                 // served by invoking THIS handler with method "HEAD", and answers OPTIONS itself with 204
                 // and `Allow: GET, HEAD, OPTIONS` without reaching a handler at all.
                 //
-                // WHAT THAT MEANS HERE, AND IT IS NOT THE SAME ANSWER AS FOR DUE-WORK. `OperationsApiService`
-                // has NO method guard: `today` never looks at `request.method`. So:
+                // THE GAP THIS BLOCK USED TO DECLARE IS NOW CLOSED, and the assertions below are the
+                // reason the declaration was worth writing. It read:
                 //
-                //   HEAD     is answered exactly as GET, which is what RFC 9110 9.3.2 asks for. The
-                //            response object it returns still carries content; over HTTP the transport
-                //            suppresses a HEAD body, so an HTTP caller sees the correct thing. A direct
-                //            caller of the service object does not, and that difference is real.
-                //   OPTIONS  never reaches `today` over HTTP - the framework answers it. A DIRECT caller
-                //            gets the summary instead of a method directory, because nothing here refuses.
-                //   POST     is refused by the framework with its own bare 405. `today` itself does not
-                //            refuse it: called directly with a POST Request it answers 200 with data. The
-                //            surface's read-only guarantee therefore rests ENTIRELY on the route module's
-                //            exports, which is precisely the weakness due-work-http.ts's own header
-                //            describes and guards against with `requireAllowedMethod`.
+                //   "MEASURED AND DECLARED AS A GAP: `today` has no method guard at all, so called
+                //    DIRECTLY it answers OPTIONS and even POST with 200 and data. ... recorded, not fixed"
                 //
-                // RECORDED, NOT FIXED. src/lib/operations/http.ts is outside this package's owned paths, so
-                // adding the guard there is not this package's change to make. Asserting the measured truth
-                // is: it declares the gap, and it goes red the day someone closes or widens it, instead of
-                // this file continuing to imply a GET-only surface that the framework never delivered.
+                // and it asserted `opsOptions === 200 && opsPost === 200`. That was true when written:
+                // `today` never read `request.method`, and `operationsApi` is an exported singleton, so the
+                // surface's read-only guarantee rested entirely on one route module's export list. The
+                // declaration named the gap, said why it was not that package's change to make - http.ts
+                // was outside its owned paths - and was built to GO RED the day someone closed it.
+                //
+                // It went red. `requireAllowedMethod` now exists in src/lib/operations/http.ts, so the
+                // measured facts have changed and this records the new ones rather than the old:
+                //
+                //   HEAD     runs the whole GET path including authorization, then has its content removed
+                //            per RFC 9110 9.3.2. Status and headers are preserved on the failure paths too.
+                //   OPTIONS  answers 204 with `Allow`, which is byte-identical to what the framework
+                //            already answered over HTTP - so an HTTP caller sees no change at all.
+                //   POST     is refused by the SERVICE with 405 and `Allow`, not merely by the framework.
+                //
+                // KEPT DELIBERATELY SHALLOW HERE. This harness exercises the ENGINE; the boundary is
+                // check-operations-routes.ts's subject, and that is where the non-enumeration and
+                // zero-side-effect proofs for the guard live. What is asserted here is only that this
+                // harness's own picture of the surface's method behaviour is still accurate, because that
+                // picture is what the export scan above would otherwise be silently misread as.
                 // =============================================================================
                 identity.current = ids.userA
                 const opsApi = new OperationsApiService(service)
                 const opsUrl = `http://ops.test/api/platform/operations?workspaceId=${ids.wsA}`
-                const opsStatus = async (method: string) =>
-                    (await opsApi.today(new Request(opsUrl, { method }))).status
-                const opsGet = await opsStatus("GET")
-                const opsHead = await opsStatus("HEAD")
-                const opsOptions = await opsStatus("OPTIONS")
-                const opsPost = await opsStatus("POST")
+                const opsCall = async (method: string) => {
+                    const response = await opsApi.today(new Request(opsUrl, { method }))
+                    return { status: response.status, bodyBytes: (await response.text()).length, allow: response.headers.get("allow") }
+                }
+                const opsGet = await opsCall("GET")
+                const opsHead = await opsCall("HEAD")
+                const opsOptions = await opsCall("OPTIONS")
+                const opsPost = await opsCall("POST")
                 checkInvertible(
-                    "MEASURED: HEAD on the operations surface is answered exactly as GET - the framework routes it to this handler and nothing here refuses it, which is what RFC 9110 9.3.2 requires",
-                    opsGet === 200 && opsHead === 200,
-                    `GET=${opsGet} HEAD=${opsHead}`,
+                    "MEASURED: HEAD on the operations surface runs the same authorized path as GET and answers the same status with NO content - RFC 9110 9.3.2, and now true for a direct caller of the singleton and not only over the transport",
+                    opsGet.status === 200 && opsHead.status === 200 && opsGet.bodyBytes > 0 && opsHead.bodyBytes === 0,
+                    `GET=${opsGet.status}/${opsGet.bodyBytes}b HEAD=${opsHead.status}/${opsHead.bodyBytes}b`,
                 )
                 checkInvertible(
-                    "MEASURED AND DECLARED AS A GAP: `today` has no method guard at all, so called DIRECTLY it answers OPTIONS and even POST with 200 and data. Over HTTP the framework refuses POST and answers OPTIONS itself, so nothing is exposed today - but this surface's read-only guarantee rests only on the route module's exports. src/lib/operations/http.ts is outside this package's owned paths; recorded, not fixed",
-                    opsOptions === 200 && opsPost === 200,
-                    `direct OPTIONS=${opsOptions} direct POST=${opsPost} (framework: OPTIONS=204 with Allow, POST=405 with no Allow)`,
+                    "MEASURED: THE DECLARED GAP IS CLOSED - `today` now guards its own method, so a direct OPTIONS is 204 with Allow and a direct POST is 405 with Allow, instead of both answering 200 with a full workspace summary",
+                    opsOptions.status === 204 &&
+                        opsOptions.bodyBytes === 0 &&
+                        opsOptions.allow === "GET, HEAD, OPTIONS" &&
+                        opsPost.status === 405 &&
+                        opsPost.allow === "GET, HEAD, OPTIONS",
+                    `direct OPTIONS=${opsOptions.status} allow=[${opsOptions.allow ?? "none"}] direct POST=${opsPost.status} allow=[${opsPost.allow ?? "none"}]`,
                 )
                 identity.current = ids.userB
 
