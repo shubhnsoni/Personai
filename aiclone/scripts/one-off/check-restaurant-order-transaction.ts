@@ -3,8 +3,24 @@ import { dishGroups } from "../../src/lib/dish-options"
 import { createRestaurantOrderRecord } from "../../src/lib/restaurant-order-service"
 import { businessDateKey } from "../../src/lib/restaurant-orders"
 
+/**
+ * ASSERTION EVIDENCE. Counted INSIDE the real assertion helper so the number the gate reads is
+ * produced by the same call that decides the verdict. What is counted is the INVARIANT/assertion
+ * calls — idempotent replay, stored-order shape, totals arithmetic, table snapshot, scan count —
+ * NOT the rows written or read (those are fixture size, not proof strength). `assert` stays a
+ * throwing recorder: every call increments `assertionsRun`; only a call whose condition held
+ * reaches `assertionsPassed`, so a failing assertion LOWERS the passed count and exits non-zero.
+ * The total is never hard-coded. The two pre-flight `if (...) throw` database-target guards are
+ * deliberately NOT routed through this helper: they gate the environment, they are not invariants
+ * of the code under test.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function assert(condition: unknown, message: string): asserts condition {
+    assertionsRun += 1
     if (!condition) throw new Error(message)
+    assertionsPassed += 1
 }
 
 async function main() {
@@ -134,4 +150,11 @@ main()
     })
     .finally(async () => {
         await prisma.$disconnect()
+    })
+    .finally(() => {
+        // Machine-readable assertion evidence for scripts/gates/run-gates.js, emitted after the
+        // report and after DB cleanup+disconnect, on both the pass and fail paths. The GATE-EVIDENCE
+        // line must be whole and name this file exactly, else the driver reports EVIDENCE_IDENTITY_MISMATCH.
+        console.log(`GATE-EVIDENCE harness=check-restaurant-order-transaction.ts assertions=${assertionsPassed}`)
+        console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
     })
