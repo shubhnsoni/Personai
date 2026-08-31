@@ -18,101 +18,73 @@
   "evidence": {
     "required": true,
     "contract": "A harness counts as passed only if it yields machine-readable evidence carrying a harness identity and a POSITIVE assertion count. Exit 0 alone cannot distinguish a harness that proved sixty invariants from one that asserted nothing, which is exactly the hole this closes. The driver reads evidence the harnesses ALREADY print — '58/58 assertions passed', '39/39 invariants passed', '46/46 installation route assertions passed', a JSON report carrying \"assertions\": 41 or \"assertions\": [ ... ], a 'SUMMARY ... passed=41 failed=0' line — so enforcement needed no harness edits. Missing, malformed, zero, negative, duplicate, forged and stale evidence each fail the run under their own named EVIDENCE_* finding.",
-    "allowlistDeclaredSize": 13,
+    "allowlistDeclaredSize": 9,
     "allowlistNote": "THE SIZE OF THIS LIST IS THE HONEST MEASURE OF WHAT THIS GATE DOES NOT CHECK. 13 of the 74 executed harnesses are exempt; the other 61 are enforced. Entries are EXACT filenames — the driver refuses any entry containing a wildcard, glob, regex or path metacharacter (EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN), because one pattern would silently cover harnesses added later and the count would stop being a measurement. The driver also fails if an entry names a file that is not on disk, if an entry lacks a concrete reason or the temporary/migrationPending markers, and if this declared size disagrees with the real length — so the list cannot grow without a visible, reviewable edit. Every entry is printed on the console and in both summaries on every run.",
     "allowlist": [
-      {
-        "file": "check-assertion-vacuity.ts",
-        "reason": "A static scanner over the harness corpus. It prints coverage figures about OTHER files ('Assertion calls examined: N', 'Per class: ...=0', 'REAL vacuous assertions (cannot fail): N') and never a count of assertions it evaluated itself. 'Assertion calls examined' is deliberately NOT read as evidence: it counts the corpus it scanned, not what it proved, and recognising it would inflate the enforced number with a figure that means something else.",
-        "temporary": true,
-        "migrationPending": "Emit a final 'N/N invariants passed' line, or a personai.gates.evidence/1 sidecar, counting the scanner's own gating invariants rather than the corpus it scanned.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-auth-http-regressions.ts",
-        "reason": "Prints one JSON report whose keys are result, inversion, portCleared and failures. There is no assertion or check count anywhere in its output, so exit 0 is currently its only evidence.",
-        "temporary": true,
-        "migrationPending": "Add \"assertions\": results.length to the report object it already builds; it tracks per-result records internally.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-business-os-a11y.ts",
-        "reason": "Prints one JSON report whose keys are rendered, headingSequence, result and failures. It carries render byte counts but no count of the accessibility assertions it made.",
-        "temporary": true,
-        "migrationPending": "Add \"assertions\": <count> to the report; its check() helper already pushes into a failures array and could count calls.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-business-os-render.ts",
-        "reason": "Prints one JSON report whose keys are rendered, result and failures. rendered carries markup byte counts, which are not assertion counts.",
-        "temporary": true,
-        "migrationPending": "Add \"assertions\": <count> to the report object.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-business-os-surface.ts",
-        "reason": "Prints one JSON report whose keys are authorization, routing, registry, files, paramParsing, negativeValidation, result and failures. Each is a structured sub-report; none is an assertion count.",
-        "temporary": true,
-        "migrationPending": "Add \"assertions\": <count> to the report object.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-capability-contract.ts",
-        "reason": "Prints one JSON report whose keys are granularCapabilities, restaurantBlueprint, negativeTest, retailActivation, waveE, result and failures. No assertion count is emitted.",
-        "temporary": true,
-        "migrationPending": "Add \"assertions\": <count> to the report object.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-copilot-runtime.ts",
-        "reason": "Its entire success output is the single line 'copilot runtime contract checks passed' — no number at all. Its log is one of the smallest in the sweep, which is precisely the shape that made 'exited 0' worthless as evidence.",
-        "temporary": true,
-        "migrationPending": "Change the final line to 'N/N assertions passed' using a counter on the assert() helper it already uses.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-disposable-db-guard.ts",
-        "reason": "Prints one JSON report whose keys are accepted, liveVariantsRejected, otherRejections, redactedExample, result and failures. Those are counts of database-name variants exercised, not of assertions evaluated, so reading them as evidence would misreport what was proven.",
-        "temporary": true,
-        "migrationPending": "Add \"assertions\": <count> to the report alongside the existing variant counts.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-executable-copilot-runtime.ts",
-        "reason": "Its success output is 'executable copilot runtime checks passed' plus a prose 'evidence:' line listing coverage areas by name. Neither carries a number.",
-        "temporary": true,
-        "migrationPending": "Change the first line to 'N/N assertions passed'; the prose coverage line can stay as it is.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-foundation-contracts.ts",
-        "reason": "Prints a JSON report that maps each contract name to the string 'ok' plus a numeric failures key, then the line 'All foundation contract checks passed.'. The number of 'ok' values IS a count, but reading it would mean hard-coding this one harness's report shape into the parser rather than recognising a general evidence form.",
-        "temporary": true,
-        "migrationPending": "Add \"assertions\": Object.keys(report).length - 1, or change the sign-off line to 'N/N checks passed'.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-harness-exit-integrity.ts",
-        "reason": "A static scanner like check-assertion-vacuity.ts. It prints candidate, verdict, guard and defect counts over the files it scanned ('Candidates: N; final verdicts: N; ...; real defects: N'), which describe the corpus rather than its own assertions.",
-        "temporary": true,
-        "migrationPending": "Emit a final 'N/N invariants passed' line counting the scanner's own gating invariants.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-restaurant-order-transaction.ts",
-        "reason": "Prints one JSON report of observed values — database, orderNumber, lines, events, totalCents, replayedOrderIdMatched, tableScans. lines and events are row counts from the order under test, not assertion counts, and treating them as evidence would report the size of a fixture as the strength of a proof.",
-        "temporary": true,
-        "migrationPending": "Add \"assertions\": <count> driven by the assert() helper it already uses.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      },
-      {
-        "file": "check-restaurant-phase0-behavior.ts",
-        "reason": "Prints one JSON report of observed values — concurrentAllocation, authoritativeThreeLineOrder, rejectionChecks, cleanup. rejectionChecks is a map of booleans, not a count, and no key totals the assertions made.",
-        "temporary": true,
-        "migrationPending": "Add \"assertions\": <count> to the report object.",
-        "declaredBy": "Q4-E, assertion-evidence contract"
-      }
-    ]
+        {
+          "file": "check-auth-http-regressions.ts",
+          "reason": "Prints one JSON report whose keys are result, inversion, portCleared and failures. There is no assertion or check count anywhere in its output, so exit 0 is currently its only evidence.",
+          "temporary": true,
+          "migrationPending": "Add \"assertions\": results.length to the report object it already builds; it tracks per-result records internally.",
+          "declaredBy": "Q4-E, assertion-evidence contract"
+        },
+        {
+          "file": "check-business-os-a11y.ts",
+          "reason": "Prints one JSON report whose keys are rendered, headingSequence, result and failures. It carries render byte counts but no count of the accessibility assertions it made.",
+          "temporary": true,
+          "migrationPending": "Add \"assertions\": <count> to the report; its check() helper already pushes into a failures array and could count calls.",
+          "declaredBy": "Q4-E, assertion-evidence contract"
+        },
+        {
+          "file": "check-business-os-render.ts",
+          "reason": "Prints one JSON report whose keys are rendered, result and failures. rendered carries markup byte counts, which are not assertion counts.",
+          "temporary": true,
+          "migrationPending": "Add \"assertions\": <count> to the report object.",
+          "declaredBy": "Q4-E, assertion-evidence contract"
+        },
+        {
+          "file": "check-business-os-surface.ts",
+          "reason": "Prints one JSON report whose keys are authorization, routing, registry, files, paramParsing, negativeValidation, result and failures. Each is a structured sub-report; none is an assertion count.",
+          "temporary": true,
+          "migrationPending": "Add \"assertions\": <count> to the report object.",
+          "declaredBy": "Q4-E, assertion-evidence contract"
+        },
+        {
+          "file": "check-capability-contract.ts",
+          "reason": "Prints one JSON report whose keys are granularCapabilities, restaurantBlueprint, negativeTest, retailActivation, waveE, result and failures. No assertion count is emitted.",
+          "temporary": true,
+          "migrationPending": "Add \"assertions\": <count> to the report object.",
+          "declaredBy": "Q4-E, assertion-evidence contract"
+        },
+        {
+          "file": "check-copilot-runtime.ts",
+          "reason": "Its entire success output is the single line 'copilot runtime contract checks passed' — no number at all. Its log is one of the smallest in the sweep, which is precisely the shape that made 'exited 0' worthless as evidence.",
+          "temporary": true,
+          "migrationPending": "Change the final line to 'N/N assertions passed' using a counter on the assert() helper it already uses.",
+          "declaredBy": "Q4-E, assertion-evidence contract"
+        },
+        {
+          "file": "check-executable-copilot-runtime.ts",
+          "reason": "Its success output is 'executable copilot runtime checks passed' plus a prose 'evidence:' line listing coverage areas by name. Neither carries a number.",
+          "temporary": true,
+          "migrationPending": "Change the first line to 'N/N assertions passed'; the prose coverage line can stay as it is.",
+          "declaredBy": "Q4-E, assertion-evidence contract"
+        },
+        {
+          "file": "check-restaurant-order-transaction.ts",
+          "reason": "Prints one JSON report of observed values — database, orderNumber, lines, events, totalCents, replayedOrderIdMatched, tableScans. lines and events are row counts from the order under test, not assertion counts, and treating them as evidence would report the size of a fixture as the strength of a proof.",
+          "temporary": true,
+          "migrationPending": "Add \"assertions\": <count> driven by the assert() helper it already uses.",
+          "declaredBy": "Q4-E, assertion-evidence contract"
+        },
+        {
+          "file": "check-restaurant-phase0-behavior.ts",
+          "reason": "Prints one JSON report of observed values — concurrentAllocation, authoritativeThreeLineOrder, rejectionChecks, cleanup. rejectionChecks is a map of booleans, not a count, and no key totals the assertions made.",
+          "temporary": true,
+          "migrationPending": "Add \"assertions\": <count> to the report object.",
+          "declaredBy": "Q4-E, assertion-evidence contract"
+        }
+      ]
   },
   "harnesses": [
     { "file": "check-actions-authz.ts", "package": "authz", "run": true },

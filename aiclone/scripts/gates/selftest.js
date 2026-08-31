@@ -995,7 +995,7 @@ const CASES = [
   },
   {
     name: "evidence-real-manifest-allowlist-is-honest",
-    why: "the committed allowlist is exactly 13 exactly-named, reasoned, on-disk harnesses out of 75 executed — the number root will check",
+    why: "the committed allowlist is exactly 9 exactly-named, reasoned, on-disk harnesses out of 76 executed — the number root will check",
     args: ["--integrity-only"],
     expectExit: 0,
     assert: (r) => {
@@ -1005,15 +1005,14 @@ const CASES = [
       return (
         r.summary.integrityFindings.length === 0 &&
         ev.required === true &&
-        ev.allowlist.actualSize === 13 &&
-        ev.allowlist.declaredSize === 13 &&
+        ev.allowlist.actualSize === 9 &&
+        ev.allowlist.declaredSize === 9 &&
         runnable === 76 &&
-        // Honest arithmetic: 76 runnable = 63 enforced + 13 allowlisted. The two most
-        // recent additions are check-vertical-pack-candidates.ts (its own
-        // identity-bearing GATE-EVIDENCE line, count taken from its assertion helper)
-        // and check-http-method-classifier.ts (a ratio line). Both are registered
-        // ENFORCED rather than allowlisted, which is why the allowlist stays at 13.
-        runnable - ev.allowlist.actualSize === 63 &&
+        // Honest arithmetic: 76 runnable = 67 enforced + 9 allowlisted. T1 group A
+        // migrated the four meta/contract harnesses (assertion-vacuity,
+        // harness-exit-integrity, disposable-db-guard, foundation-contracts) to emit
+        // their own dynamically-counted evidence, so they moved allowlisted -> enforced.
+        runnable - ev.allowlist.actualSize === 67 &&
         ev.allowlist.files.length === new Set(ev.allowlist.files).size &&
         ev.allowlist.entries.every(
           (e) =>
@@ -1354,8 +1353,8 @@ const CASES = [
         s.integrityFindings.length === 0 &&
         // Additive: the evidence block and every count key still read exactly as before.
         s.evidence.schema === "personai.gates.evidence-summary/1" &&
-        s.evidence.allowlist.actualSize === 13 &&
-        s.evidence.allowlist.declaredSize === 13 &&
+        s.evidence.allowlist.actualSize === 9 &&
+        s.evidence.allowlist.declaredSize === 9 &&
         typeof s.corroboration === "object" &&
         s.corroboration.schema === "personai.gates.corroboration/1" &&
         // Every rejection reason is enumerable from the summary, like the evidence kinds are.
