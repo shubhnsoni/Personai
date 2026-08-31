@@ -91,6 +91,36 @@
  *                                   harness can satisfy. Treat a bare global digest change as a
  *                                   signal to investigate, not as a verdict.
  *
+ * SEQUENCES ARE NOW ATTRIBUTED INSTEAD OF COMPARED GLOBALLY
+ * --------------------------------------------------------
+ * `pg_sequences.last_value` is shared counter state. It was read globally and any movement in it
+ * was a `clean = false`, which is the same category error as comparing a global row count:
+ *
+ *   FALSE PASS BY CANCELLATION  our own advance is invisible if something else `setval`s the same
+ *                               counter back down inside the window - two deltas, one number.
+ *   FALSE FAILURE               a concurrent harness inserting one row advances the same counter, so
+ *                               the verdict went red for a reason that is not a property of the code
+ *                               under test. That is a scheduling constraint, not a proof.
+ *   VACUOUS PASS                a schema with no sequences, or a window in which none moved, satisfied
+ *                               the sequence leg without the leg ever having been able to speak.
+ *
+ * So a sequence advance is now ATTRIBUTED (see `SequenceAttribution`) before it is allowed anywhere
+ * near the verdict, and the owning table/column comes from the CATALOG (`sequenceOwnership`), never
+ * from munging the sequence's name. `clean` is false only for an advance this execution demonstrably
+ * caused; an advance nothing ties to this run is REPORTED in the summary under `unattributed` and is
+ * never asserted on. What this deliberately does NOT claim: an advance caused by our own code on a
+ * connection we do not intercept, which left no row behind, is indistinguishable from a concurrent
+ * harness's advance, and lands in `unattributed`. That residual is stated here rather than hidden,
+ * because the alternative - failing on it - is the false-failure defect this replaces.
+ *
+ * RUN SCOPE PRIMITIVES
+ * --------------------
+ * `assertRunToken` / `runPrefixPredicate` / `runTokenTextPredicate` / `countRunScopedRows` are the
+ * shared spelling of "rows THIS execution owns". The residue assertions in the one-off harnesses are
+ * built from them so that there is exactly one definition of the scope, and so that the LIKE
+ * underscore-escaping lesson recorded in `sweepRunToken` below is applied everywhere rather than
+ * re-learned per harness.
+ *
  * USAGE
  *   const detector = await createWriteDetector({ client: prisma, runToken: RUN })
  *   await detector.begin([{ table: "FieldJob", where: `"id" like '${RUN}%'` }])
@@ -291,12 +321,33 @@ export type Fingerprint = Readonly<{
     sequences: Readonly<Record<string, string>>
 }>
 
+/**
+ * Why a sequence advance is, or is not, evidence about THIS execution. Checked in this order:
+ *
+ *   run-named          the sequence's own name carries this run's token, so this run created it.
+ *   run-written-table  an intercepted write of ours targeted the table the catalog says owns this
+ *                      sequence. Survives the row being rolled back or deleted afterwards.
+ *   run-scoped-row     a row matching THIS RUN's scope occupies a value inside the advanced span,
+ *                      so the values consumed are provably ours.
+ *   unattributed       nothing ties the movement to this execution. REPORTED, never asserted on -
+ *                      a concurrent harness's insert advances the same counter, and failing on that
+ *                      is the false-failure defect this attribution exists to remove.
+ */
+export type SequenceAttribution = "run-named" | "run-written-table" | "run-scoped-row" | "unattributed"
+
 export type FingerprintDiff = Readonly<{
     kind: "table" | "sequence"
     name: string
     component: "rows" | "digest" | "maxUpdatedAt" | "lastValue" | "presence"
     before: string
     after: string
+    /**
+     * Sequence diffs only. A table diff needs no attribution: its scope is the spec's own `where`,
+     * so a scoped table digest already only contains this run's rows.
+     */
+    attribution?: SequenceAttribution
+    /** Sequence diffs only: `Table.column` the catalog says owns the sequence, when one does. */
+    owner?: string
 }>
 
 export type RunTokenHit = Readonly<{ table: string; rows: number }>
@@ -307,6 +358,10 @@ export type WriteDetectorVerdict = Readonly<{
     writes: readonly ObservedCall[]
     classes: readonly MutationClass[]
     fingerprintDiffs: readonly FingerprintDiff[]
+    /** Sequence advances this execution demonstrably caused. These DO make the verdict unclean. */
+    attributedSequenceDiffs: readonly FingerprintDiff[]
+    /** Sequence advances nothing ties to this execution. Reported only - never part of `clean`. */
+    unattributedSequenceDiffs: readonly FingerprintDiff[]
     runTokenHits: readonly RunTokenHit[]
     before: Fingerprint | null
     after: Fingerprint | null
@@ -332,6 +387,89 @@ function scalar(rows: unknown, key: string): string | null {
     return String(value)
 }
 
+// ---------------------------------------------------------------------------
+// RUN SCOPE PRIMITIVES — one definition of "rows THIS execution owns".
+//
+// Every residue assertion in the one-off harnesses is built from these instead of from a global
+// `count(*)`. A global total cannot answer the question a residue assertion asks: our own leak can
+// cancel against an unrelated concurrent delete (false pass), an unrelated concurrent insert makes a
+// clean run fail (false failure), and an empty table satisfies `0 == 0` without the assertion ever
+// having been able to speak (vacuous pass). A run-scoped count has none of those properties: no
+// other execution can put a row in this scope, and no other execution can take one out of it.
+// ---------------------------------------------------------------------------
+
+/** A run token must be safely interpolatable, because these predicates are built by hand. */
+export function assertRunToken(token: string): string {
+    if (!/^[A-Za-z0-9_]+$/.test(token)) {
+        throw new Error(`Run token ${JSON.stringify(token)} must be alphanumeric/underscore to be scoped safely.`)
+    }
+    return token
+}
+
+/**
+ * Escapes a literal for use inside a LIKE pattern with `escape '\'`.
+ *
+ * `_` IS ESCAPED. In LIKE it is a single-character wildcard, and every run token in this repository
+ * contains at least two of them (`wf3_1756..._482910`), so an unescaped prefix pattern matches
+ * tokens that merely look like ours. That direction errs toward false ALARMS rather than false clean,
+ * but a wildcard where a literal was meant is still not what the predicate claims to do.
+ */
+export function likeEscape(literal: string): string {
+    return literal.replace(/\\/g, "\\\\").replace(/_/g, "\\_").replace(/%/g, "\\%")
+}
+
+/** `"column" like '<token>%' escape '\'` — rows whose column STARTS WITH this run's token. */
+export function runPrefixPredicate(column: string, token: string): string {
+    assertIdentifier(column)
+    assertRunToken(token)
+    return `"${column}" like '${likeEscape(token)}%' escape '\\'`
+}
+
+/**
+ * `(<alias>.*)::text like '%<token>%' escape '\'` — rows mentioning this run's token in ANY column.
+ * The whole-row cast is what makes this work for link tables and for rows whose own id is a cuid but
+ * whose foreign keys point at this run's fixtures.
+ */
+export function runTokenTextPredicate(token: string, alias = "q"): string {
+    assertIdentifier(alias)
+    assertRunToken(token)
+    return `(${alias}.*)::text like '%${likeEscape(token)}%' escape '\\'`
+}
+
+/** One table, and the predicate that selects the rows THIS execution owns in it. */
+export type RunScopeSpec = Readonly<{
+    /** Human label used in assertion detail, e.g. `InventoryMovement rows owned by this run`. */
+    label: string
+    table: string
+    /**
+     * Raw SQL predicate over alias `q`, scoping the count to this run's rows. TRUSTED CALLER INPUT.
+     * Build it with `runPrefixPredicate` / `runTokenTextPredicate` rather than by hand.
+     */
+    where: string
+}>
+
+export type RunScopeHit = Readonly<{ label: string; table: string; rows: number }>
+
+/**
+ * Counts the rows each scope owns. EVERY spec is returned, zeros included, on purpose: a residue
+ * assertion needs the zeros, and the same call taken mid-run is how a harness proves its scope can
+ * actually see its own fixture instead of passing over an empty result.
+ */
+export async function countRunScopedRows(
+    client: PrismaClient,
+    specs: readonly RunScopeSpec[],
+): Promise<RunScopeHit[]> {
+    const out: RunScopeHit[] = []
+    for (const spec of specs) {
+        const table = assertIdentifier(spec.table)
+        const rows = (await client.$queryRawUnsafe(
+            `select count(*)::text as n from "${table}" q where ${spec.where}`,
+        )) as RawRow[]
+        out.push(Object.freeze({ label: spec.label, table, rows: Number(scalar(rows, "n") ?? "-1") }))
+    }
+    return out
+}
+
 /** Every base table in the `public` schema, ordered. Read from the catalog, never hardcoded. */
 export async function listBaseTables(client: PrismaClient): Promise<string[]> {
     const rows = (await client.$queryRawUnsafe(
@@ -350,14 +488,119 @@ export async function listTablesWithUpdatedAt(client: PrismaClient): Promise<Set
     return new Set(rows.map((r) => String(r.table_name)))
 }
 
-/** Every sequence's `last_value`. This is what catches an identity advance with no row behind it. */
-export async function sequenceSnapshot(client: PrismaClient): Promise<Record<string, string>> {
+/**
+ * Every sequence's `last_value`. This is what catches an identity advance with no row behind it.
+ *
+ * The READ is deliberately still schema-wide: it is the evidence base attribution is computed from,
+ * and reading a counter costs nothing and claims nothing. What changed is that its movement is no
+ * longer compared as a global equality - see `SequenceAttribution` and `attributeSequenceDiffs`.
+ * Pass `only` to narrow the read to sequences a caller has declared as its own.
+ */
+export async function sequenceSnapshot(
+    client: PrismaClient,
+    only?: readonly string[],
+): Promise<Record<string, string>> {
     const rows = (await client.$queryRawUnsafe(
         `select sequencename, last_value from pg_sequences where schemaname = 'public' order by sequencename`,
     )) as RawRow[]
+    const wanted = only === undefined ? null : new Set(only)
     const out: Record<string, string> = {}
     for (const row of rows) {
-        out[String(row.sequencename)] = row.last_value === null ? "unset" : String(row.last_value)
+        const name = String(row.sequencename)
+        if (wanted !== null && !wanted.has(name)) continue
+        out[name] = row.last_value === null ? "unset" : String(row.last_value)
+    }
+    return out
+}
+
+/** The table and column a sequence backs, when it backs one. */
+export type SequenceOwner = Readonly<{ table: string; column: string }>
+
+/**
+ * Which table/column each sequence belongs to, FROM THE CATALOG.
+ *
+ * Attribution needs this and the alternative was string-munging the sequence's name
+ * (`name.replace(/_seq_seq$/, "")`), which guesses at a naming convention Postgres does not promise:
+ * a renamed sequence, a sequence attached by `owned by`, or a table whose own name ends in `_seq`
+ * all defeat it silently. `pg_depend` is the only source that actually knows.
+ */
+export async function sequenceOwnership(client: PrismaClient): Promise<Map<string, SequenceOwner>> {
+    const rows = (await client.$queryRawUnsafe(
+        `select s.relname as sequence, t.relname as tbl, a.attname as col
+           from pg_class s
+           join pg_namespace n on n.oid = s.relnamespace
+           join pg_depend d on d.objid = s.oid and d.classid = 'pg_class'::regclass and d.deptype in ('a', 'i')
+           join pg_class t on t.oid = d.refobjid
+           join pg_attribute a on a.attrelid = t.oid and a.attnum = d.refobjsubid
+          where s.relkind = 'S' and n.nspname = 'public' and d.refobjsubid > 0`,
+    )) as RawRow[]
+    const out = new Map<string, SequenceOwner>()
+    for (const row of rows) {
+        out.set(String(row.sequence), Object.freeze({ table: String(row.tbl), column: String(row.col) }))
+    }
+    return out
+}
+
+/** What attribution needs to know about this execution. */
+export type SequenceAttributionContext = Readonly<{
+    /** This run's unique token, when it has one. Without it only `run-written-table` can fire. */
+    runToken?: string
+    /** Catalog-derived owner per sequence. */
+    owners: ReadonlyMap<string, SequenceOwner>
+    /** Per-table run scope declared by the caller's fingerprint specs, keyed by table name. */
+    scopeByTable: ReadonlyMap<string, string>
+    /** Tables our INTERCEPTED writes touched, lowercased. */
+    writtenTables: ReadonlySet<string>
+}>
+
+function numericOrNull(value: string): string | null {
+    return /^-?\d+$/.test(value) ? value : null
+}
+
+/**
+ * Decides, per sequence diff, whether THIS execution caused it. See `SequenceAttribution` for the
+ * order of the rules and for what deliberately lands in `unattributed`.
+ *
+ * `run-scoped-row` is the interesting one: it asks whether any row matching this run's scope holds a
+ * value inside the span the counter moved through. If one does, those values were consumed by us and
+ * no concurrent harness can be blamed for them. It needs both ends of the span to be numeric, so a
+ * sequence that appeared or was reset inside the window falls through to the other rules.
+ */
+export async function attributeSequenceDiffs(
+    observer: PrismaClient,
+    diffs: readonly FingerprintDiff[],
+    context: SequenceAttributionContext,
+): Promise<FingerprintDiff[]> {
+    const out: FingerprintDiff[] = []
+    for (const diff of diffs) {
+        if (diff.kind !== "sequence") {
+            out.push(diff)
+            continue
+        }
+        const owner = context.owners.get(diff.name)
+        const ownerLabel = owner === undefined ? undefined : `${owner.table}.${owner.column}`
+        let attribution: SequenceAttribution = "unattributed"
+
+        if (context.runToken !== undefined && diff.name.includes(context.runToken)) {
+            attribution = "run-named"
+        } else if (owner !== undefined && context.writtenTables.has(owner.table.toLowerCase())) {
+            attribution = "run-written-table"
+        } else if (owner !== undefined) {
+            const scope = context.scopeByTable.get(owner.table) ??
+                (context.runToken === undefined ? null : runTokenTextPredicate(context.runToken))
+            const low = numericOrNull(diff.before)
+            const high = numericOrNull(diff.after)
+            if (scope !== null && low !== null && high !== null) {
+                const rows = (await observer.$queryRawUnsafe(
+                    `select count(*)::text as n from "${assertIdentifier(owner.table)}" q
+                      where q."${assertIdentifier(owner.column)}"::numeric > ${low}::numeric
+                        and q."${assertIdentifier(owner.column)}"::numeric <= ${high}::numeric
+                        and (${scope})`,
+                )) as RawRow[]
+                if (Number(scalar(rows, "n") ?? "0") > 0) attribution = "run-scoped-row"
+            }
+        }
+        out.push(Object.freeze({ ...diff, attribution, ...(ownerLabel === undefined ? {} : { owner: ownerLabel }) }))
     }
     return out
 }
@@ -416,9 +659,7 @@ export async function sweepRunToken(
     token: string,
     tables: readonly string[],
 ): Promise<RunTokenHit[]> {
-    if (!/^[A-Za-z0-9_]+$/.test(token)) {
-        throw new Error(`Run token ${JSON.stringify(token)} must be alphanumeric to be swept safely.`)
-    }
+    assertRunToken(token)
     const hits: RunTokenHit[] = []
     for (const raw of tables) {
         const table = assertIdentifier(raw)
@@ -579,6 +820,9 @@ export async function createWriteDetector(options: WriteDetectorOptions): Promis
     const observer = options.observer ?? new PrismaClient()
     const updatedAtTables = await listTablesWithUpdatedAt(observer)
     const sweepTables = options.sweepTables ?? (await listBaseTables(observer))
+    // Read ONCE, from the catalog: which table/column each sequence backs. This is what lets a
+    // sequence advance be attributed to this execution instead of compared as a global equality.
+    const sequenceOwners = await sequenceOwnership(observer)
 
     let specs: readonly TableFingerprintSpec[] = []
     let before: Fingerprint | null = null
@@ -612,9 +856,51 @@ export async function createWriteDetector(options: WriteDetectorOptions): Promis
             after = await take()
             const writes = observed.filter((c) => c.mutationClass !== null)
             const classes = [...new Set(writes.map((c) => c.mutationClass as MutationClass))].sort()
-            const fingerprintDiffs = diffFingerprints(before, after)
+
+            // Which tables our own writes touched. A model write names its model; a raw write names
+            // its table only inside the statement, so the statement text is scanned too - otherwise a
+            // raw insert would make its sequence UNATTRIBUTABLE purely because Prisma had no model to
+            // report. Substring matching over-attributes (a table name can appear inside another
+            // table's name, or in `order by`), and that direction is deliberate: over-attribution
+            // costs a red run, under-attribution costs the claim.
+            const writtenTables = new Set<string>()
+            for (const write of writes) {
+                if (write.model !== null) writtenTables.add(write.model.toLowerCase())
+            }
+            const rawWriteText = writes
+                .filter((c) => c.model === null)
+                .map((c) => (c.statement ?? "").toLowerCase())
+                .join(" ; ")
+            if (rawWriteText !== "") {
+                for (const table of sweepTables) {
+                    if (rawWriteText.includes(table.toLowerCase())) writtenTables.add(table.toLowerCase())
+                }
+            }
+
+            const scopeByTable = new Map<string, string>()
+            for (const spec of specs) {
+                if (spec.where !== undefined) scopeByTable.set(spec.table, spec.where)
+            }
+            const fingerprintDiffs = await attributeSequenceDiffs(observer, diffFingerprints(before, after), {
+                runToken: options.runToken,
+                owners: sequenceOwners,
+                scopeByTable,
+                writtenTables,
+            })
+            const tableDiffs = fingerprintDiffs.filter((d) => d.kind === "table")
+            const sequenceDiffs = fingerprintDiffs.filter((d) => d.kind === "sequence")
+            const attributedSequenceDiffs = sequenceDiffs.filter((d) => d.attribution !== "unattributed")
+            const unattributedSequenceDiffs = sequenceDiffs.filter((d) => d.attribution === "unattributed")
+
             const runTokenHits = await sweep()
-            const clean = writes.length === 0 && fingerprintDiffs.length === 0 && runTokenHits.length === 0
+            // `clean` asks about THIS execution only. An unattributed sequence advance is shared
+            // counter state moved by someone else as far as any available evidence goes, and failing
+            // on it is the false-failure defect this attribution exists to remove.
+            const clean =
+                writes.length === 0 &&
+                tableDiffs.length === 0 &&
+                attributedSequenceDiffs.length === 0 &&
+                runTokenHits.length === 0
             const parts: string[] = []
             if (writes.length > 0) {
                 parts.push(
@@ -630,12 +916,26 @@ export async function createWriteDetector(options: WriteDetectorOptions): Promis
                             .join(" ; "),
                 )
             }
-            if (fingerprintDiffs.length > 0) {
+            const asserted = [...tableDiffs, ...attributedSequenceDiffs]
+            if (asserted.length > 0) {
                 parts.push(
-                    `FINGERPRINT moved on ${fingerprintDiffs.length} component(s): ` +
-                        fingerprintDiffs
+                    `FINGERPRINT moved on ${asserted.length} component(s): ` +
+                        asserted
                             .slice(0, 8)
-                            .map((d) => `${d.name}.${d.component} ${d.before} -> ${d.after}`)
+                            .map(
+                                (d) =>
+                                    `${d.name}.${d.component} ${d.before} -> ${d.after}` +
+                                    `${d.attribution === undefined ? "" : ` [${d.attribution}${d.owner === undefined ? "" : ` via ${d.owner}`}]`}`,
+                            )
+                            .join(" ; "),
+                )
+            }
+            if (unattributedSequenceDiffs.length > 0) {
+                parts.push(
+                    `REPORT ${unattributedSequenceDiffs.length} unattributed sequence advance(s), shared counter state, NOT asserted on: ` +
+                        unattributedSequenceDiffs
+                            .slice(0, 8)
+                            .map((d) => `${d.name} ${d.before}->${d.after}`)
                             .join(" ; "),
                 )
             }
@@ -651,6 +951,8 @@ export async function createWriteDetector(options: WriteDetectorOptions): Promis
                 writes: Object.freeze(writes),
                 classes: Object.freeze(classes),
                 fingerprintDiffs: Object.freeze(fingerprintDiffs),
+                attributedSequenceDiffs: Object.freeze(attributedSequenceDiffs),
+                unattributedSequenceDiffs: Object.freeze(unattributedSequenceDiffs),
                 runTokenHits: Object.freeze(runTokenHits),
                 before,
                 after,

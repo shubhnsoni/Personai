@@ -6,7 +6,8 @@
  * status, envelope and body for every principal class.
  *
  * Negative claims are measured, not asserted in prose:
- *   - a refusal writes no row and appends no movement (counts before/after)
+ *   - a refusal writes no row and appends no movement (RUN-SCOPED counts before/after: the
+ *     question is always about rows THIS execution owns, never about a table's global total)
  *   - a refusal reaches no external service (globalThis.fetch is replaced by a counting
  *     blocker for the whole run; any call is both counted and thrown)
  *   - a foreign record and a nonexistent record produce byte-identical responses
@@ -24,6 +25,7 @@ import { InventoryApiService } from "../../src/lib/inventory/http"
 import { InventoryContext } from "../../src/lib/inventory/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
+import { countRunScopedRows, runPrefixPredicate, type RunScopeSpec } from "../lib/write-detector"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
@@ -33,6 +35,77 @@ const INV = "http://127.0.0.1/api/platform/inventory"
 const results: Array<{ name: string; pass: boolean; detail: string }> = []
 function check(name: string, pass: boolean, detail = "") {
     results.push({ name, pass, detail })
+}
+
+// ---------------------------------------------------------------------------
+// THE RESIDUE SCOPE. Every "wrote nothing" and "left nothing" assertion below is a question about
+// rows THIS EXECUTION owns, never about a table's global total.
+//
+// A global before/after total cannot answer it, three separate ways:
+//   (a) FALSE PASS BY CANCELLATION - one leaked row of ours plus one unrelated concurrent delete is
+//       a delta of zero, and the old assertion reported success with real residue left behind. This
+//       is the hole that mattered: it fails silently and in the safe-looking direction.
+//   (b) FALSE FAILURE - an unrelated concurrent insert that stays makes a perfectly clean run red.
+//   (c) VACUOUS PASS - on an empty table `0 == 0` holds without this run having cleaned up anything;
+//       the baseline output of this harness was literally `baseline=0 end=0`.
+//
+// The scope is the unique RUN token, following check-workspace-surface-boundary.ts. InventoryItem
+// rows carry it in `profileId`. Movement and reservation rows are created by the SERVICE with cuid
+// ids, so they carry it indirectly: via `itemId` (a stock record of ours), or via `idempotencyKey`,
+// `orderLineId` or `orderId`, all of which this harness supplies RUN-prefixed.
+// ---------------------------------------------------------------------------
+const CUID = /^[A-Za-z0-9_-]+$/
+const ownedItems = new Set<string>()
+
+/** Re-reads the stock records this run owns. Cheap, and correct at any point in the run. */
+async function captureOwnedItems(prisma: PrismaClient): Promise<void> {
+    const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
+        `select "id" from "InventoryItem" q where ${runPrefixPredicate("profileId", RUN)}`,
+    )
+    for (const row of rows) {
+        if (!CUID.test(row.id)) throw new Error(`refusing to interpolate item id ${JSON.stringify(row.id)}`)
+        ownedItems.add(row.id)
+    }
+}
+
+/**
+ * A LITERAL id list, deliberately not a subquery. Teardown DELETES the InventoryItem rows, so
+ * `itemId in (select "id" from "InventoryItem" where "profileId" like '<RUN>%')` would come back
+ * empty afterwards and the residue assertion would pass by having no scope left to look in - which
+ * is the same vacuity this change exists to remove, just wearing a subquery.
+ */
+function ownedItemList(): string {
+    return ownedItems.size === 0 ? `'${RUN}_no_item'` : [...ownedItems].map((id) => `'${id}'`).join(",")
+}
+
+function runScopes(): RunScopeSpec[] {
+    const byItem = `"itemId" in (${ownedItemList()})`
+    return [
+        {
+            label: "InventoryItem rows owned by this run",
+            table: "InventoryItem",
+            where: runPrefixPredicate("profileId", RUN),
+        },
+        {
+            label: "InventoryMovement rows owned by this run",
+            table: "InventoryMovement",
+            where: `${byItem} or ${runPrefixPredicate("idempotencyKey", RUN)} or ${runPrefixPredicate("orderLineId", RUN)} or ${runPrefixPredicate("orderId", RUN)}`,
+        },
+        {
+            label: "InventoryReservation rows owned by this run",
+            table: "InventoryReservation",
+            where: `${byItem} or ${runPrefixPredicate("idempotencyKey", RUN)} or ${runPrefixPredicate("orderLineId", RUN)}`,
+        },
+    ]
+}
+
+/** How many rows one table's run scope holds RIGHT NOW. The owned-item list is refreshed first. */
+async function scopedRows(prisma: PrismaClient, table: string): Promise<number> {
+    await captureOwnedItems(prisma)
+    const spec = runScopes().find((s) => s.table === table)
+    if (spec === undefined) throw new Error(`no run scope is declared for ${table}`)
+    const [hit] = await countRunScopedRows(prisma, [spec])
+    return hit.rows
 }
 
 class ControlledIdentity implements PlatformIdentity {
@@ -122,6 +195,7 @@ async function main() {
         orderA: `${RUN}_oa`,
     }
     const profileList = `'${ids.profileA}','${ids.profileB}'`
+    // GLOBAL totals. Kept, but REPORTED and never asserted on - see the residue block at the end.
     const base = { items: 0, movements: 0, reservations: 0 }
     let itemId = ""
     const line = (n: number) => `${RUN}_ol${n}`
@@ -161,8 +235,11 @@ async function main() {
 
         // ---- 1. anonymous: 401 on every endpoint, zero writes -----------
         identity.current = null
-        const beforeItems = await prisma.inventoryItem.count()
-        const beforeMoves = await prisma.inventoryMovement.count()
+        // Scoped to this run, not global: a refusal that wrote a row would write it against THIS
+        // run's workspace, product and order lines, so it lands in this scope - and a concurrent
+        // harness's row can neither enter it nor cancel a leak out of it.
+        const beforeItems = await scopedRows(prisma, "InventoryItem")
+        const beforeMoves = await scopedRows(prisma, "InventoryMovement")
         const anonFetch = fetchCalls
         const q = `workspaceId=${ids.wsA}`
         const anon = {
@@ -178,8 +255,10 @@ async function main() {
         }
         const notUnauthorized = Object.entries(anon).filter(([, v]) => v.status !== 401).map(([k, v]) => `${k}=${v.status}`)
         check(`anonymous is 401 on all ${Object.keys(anon).length} inventory endpoints`, notUnauthorized.length === 0, notUnauthorized.join(" ") || "all 401")
-        check("anonymous refusal wrote zero stock records", beforeItems === (await prisma.inventoryItem.count()), `before=${beforeItems}`)
-        check("anonymous refusal appended zero movements", beforeMoves === (await prisma.inventoryMovement.count()), `before=${beforeMoves}`)
+        const afterAnonItems = await scopedRows(prisma, "InventoryItem")
+        const afterAnonMoves = await scopedRows(prisma, "InventoryMovement")
+        check("anonymous refusal wrote zero stock records", beforeItems === afterAnonItems, `prefix=${RUN} scoped ${beforeItems}->${afterAnonItems}`)
+        check("anonymous refusal appended zero movements", beforeMoves === afterAnonMoves, `prefix=${RUN} scoped ${beforeMoves}->${afterAnonMoves}`)
         check("anonymous refusal made zero external calls", fetchCalls === anonFetch, `calls=${fetchCalls - anonFetch}`)
         check("anonymous body is an error envelope with no data key", pick(anon.list.body, "ok") === false && pick(anon.list.body, "data") === undefined, anon.list.text.slice(0, 90))
 
@@ -189,7 +268,8 @@ async function main() {
         const outsiderWrite = await call(api.create(send(INV, { workspaceId: ids.wsA, productId: ids.prodA, locationId: ids.locA })))
         check("authenticated non-member list is 403", outsider.status === 403, `status=${outsider.status}`)
         check("authenticated non-member create is 403", outsiderWrite.status === 403, `status=${outsiderWrite.status}`)
-        check("non-member refusal wrote zero stock records", beforeItems === (await prisma.inventoryItem.count()), `before=${beforeItems}`)
+        const afterOutsiderItems = await scopedRows(prisma, "InventoryItem")
+        check("non-member refusal wrote zero stock records", beforeItems === afterOutsiderItems, `prefix=${RUN} scoped ${beforeItems}->${afterOutsiderItems}`)
 
         // ---- 3. valid member opens a stock record --------------------
         identity.current = `clerk_${ids.userA}`
@@ -253,9 +333,12 @@ async function main() {
             pickNumber(oversell.body, "error", "details", "available") === 2,
             oversell.text.slice(0, 160),
         )
-        const beforeOversell = await prisma.inventoryMovement.count()
+        const beforeOversell = await scopedRows(prisma, "InventoryMovement")
         await call(api.reserve(itemId, send(`${INV}/${itemId}/reservations`, { workspaceId: ids.wsA, orderLineId: line(4), qty: 99 })))
-        check("a refused hold appends no movement", beforeOversell === (await prisma.inventoryMovement.count()), `before=${beforeOversell}`)
+        const afterOversell = await scopedRows(prisma, "InventoryMovement")
+        // Non-vacuous by construction: by this point the scope holds this run's real movement rows,
+        // so it is being asked to notice one MORE row among several, not to compare 0 with 0.
+        check("a refused hold appends no movement", beforeOversell === afterOversell, `prefix=${RUN} scoped ${beforeOversell}->${afterOversell}`)
 
         const badState = await call(api.settleReservation(itemId, reservationId, send(`${INV}/${itemId}/reservations/${reservationId}`, { workspaceId: ids.wsA, state: "VANISHED" }, "PATCH")))
         check("an unknown reservation state is 400 not 409", badState.status === 400, `status=${badState.status}`)
@@ -294,7 +377,7 @@ async function main() {
 
         // ---- 7. wrong tenant is indistinguishable from nonexistent
         identity.current = `clerk_${ids.userB}`
-        const beforeForeign = await prisma.inventoryMovement.count()
+        const beforeForeign = await scopedRows(prisma, "InventoryMovement")
         const foreignFetch = fetchCalls
         const qb = `workspaceId=${ids.wsB}`
         const foreign = await call(api.get(itemId, get(`${INV}/${itemId}?${qb}`)))
@@ -310,7 +393,8 @@ async function main() {
         check("a foreign mutation and a nonexistent mutation are byte-identical", foreignMutate.status === absentMutate.status && foreignMutate.text === absentMutate.text, `${foreignMutate.status}/${absentMutate.status}`)
         const foreignLedger = await call(api.movements(itemId, get(`${INV}/${itemId}/movements?${qb}`)))
         check("wrong-tenant ledger read is 403 and leaks no balances", foreignLedger.status === 403 && !/onHandAfter/.test(foreignLedger.text), foreignLedger.text.slice(0, 90))
-        check("cross-tenant refusal appended zero movements", beforeForeign === (await prisma.inventoryMovement.count()), `before=${beforeForeign}`)
+        const afterForeign = await scopedRows(prisma, "InventoryMovement")
+        check("cross-tenant refusal appended zero movements", beforeForeign === afterForeign, `prefix=${RUN} scoped ${beforeForeign}->${afterForeign}`)
         check("cross-tenant refusal made zero external calls", fetchCalls === foreignFetch, `calls=${fetchCalls - foreignFetch}`)
         const listB = await call(api.list(get(`${INV}?${qb}`)))
         check("tenant B's list never contains tenant A's stock", !pickArray(listB.body, "data", "items").some((i) => pickString(i, "id") === itemId), `n=${pickArray(listB.body, "data", "items").length}`)
@@ -345,6 +429,12 @@ async function main() {
         // ---- 10. whole-run external call tally ------------------
         check("no external call was EVER made in this run", fetchCalls === 0, `calls=${fetchCalls}`)
     } finally {
+        // The residue scope is captured BEFORE teardown, while the fixture still exists. Movement and
+        // reservation rows point at this run's stock records by cuid, and teardown deletes those
+        // records - so the id list has to be taken now or the scope would have nothing to match on.
+        await captureOwnedItems(prisma)
+        const inWindow = await countRunScopedRows(prisma, runScopes())
+
         try {
             await prisma.$executeRawUnsafe(`alter table "InventoryMovement" disable trigger "InventoryMovement_append_only"`)
             await prisma.$executeRawUnsafe(
@@ -375,13 +465,47 @@ async function main() {
         )
         check("InventoryMovement append-only trigger re-armed", Number(armed[0].n) >= 1, `triggers=${armed[0].n}`)
 
-        for (const [label, expected, actual] of [
-            ["InventoryItem rows", base.items, await prisma.inventoryItem.count()],
-            ["InventoryMovement rows", base.movements, await prisma.inventoryMovement.count()],
-            ["InventoryReservation rows", base.reservations, await prisma.inventoryReservation.count()],
-        ] as Array<[string, number, number]>) {
-            check(`${label} returned to baseline`, actual === expected, `baseline=${expected} end=${actual}`)
+        // ---- 11. residue, scoped to THIS execution --------------------
+        //
+        // WHAT THIS REPLACED: three assertions of the form
+        //   check(`${label} returned to baseline`, globalCountNow === globalCountAtStart)
+        // which compared a table's GLOBAL total before and after the run. That is unsound by
+        // cancellation (our leak plus an unrelated concurrent delete is a delta of zero and the
+        // assertion says PASS), unsound by concurrency (an unrelated insert fails a clean run), and
+        // vacuous on an empty table (`baseline=0 end=0` proved nothing about this run at all).
+        //
+        // What is asserted now: zero rows remain in the scope THIS RUN owns. No other execution can
+        // put a row into that scope, and no other execution can remove one from it, so the number
+        // cannot be moved - in either direction - by anything but this harness.
+        const residue = await countRunScopedRows(prisma, runScopes())
+        for (const hit of residue) {
+            check(`${hit.label}: zero remain after teardown`, hit.rows === 0, `prefix=${RUN} rows=${hit.rows}`)
         }
+        // ANTI-VACUITY. The scope above must be one that could have failed: it has to have seen this
+        // run's own rows while they existed. Without this, deleting the fixture and then asserting
+        // "nothing of mine is left" would be satisfied by a scope that never matched anything.
+        const inWindowSeen = inWindow.filter((h) => h.rows > 0)
+        check(
+            "the residue scope demonstrably held this run's own rows before teardown, so zero-after is not vacuous",
+            inWindowSeen.length === inWindow.length,
+            `prefix=${RUN} in-window ${inWindow.map((h) => `${h.table}=${h.rows}`).join(",")}`,
+        )
+        // REPORTED, NEVER ASSERTED. These are the numbers the old assertions used. They move for
+        // reasons that have nothing to do with this harness, which is precisely why they are printed
+        // rather than checked - and printing them is what makes a cancellation visible: a global
+        // delta of zero next to a non-zero scoped residue is the false pass this change removes.
+        const globalEnd = {
+            items: await prisma.inventoryItem.count(),
+            movements: await prisma.inventoryMovement.count(),
+            reservations: await prisma.inventoryReservation.count(),
+        }
+        console.log(
+            `REPORT  GLOBAL row totals (the old mechanism's signal, NOT asserted on): ` +
+                `InventoryItem ${base.items}->${globalEnd.items}, ` +
+                `InventoryMovement ${base.movements}->${globalEnd.movements}, ` +
+                `InventoryReservation ${base.reservations}->${globalEnd.reservations}`,
+        )
+        console.log(`RUN_PREFIX=${RUN}`)
         await prisma.$disconnect()
         globalThis.fetch = realFetch
     }
