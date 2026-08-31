@@ -1,0 +1,23 @@
+[fixture:scanner] Harness-shaped output in which EVERY credential must be detected.
+[fixture:scanner] Every value below is FABRICATED and matches nothing real. It exists so
+[fixture:scanner] scripts/gates/selftest.js can prove the scanner fires rather than assert it.
+[fixture:scanner] Each line carries a [tag] the self-test anchors its expectation on.
+[fixture:scanner] Key material here is 21 characters: above the scanner's 20-character floor,
+[fixture:scanner] below the 24-character floor the vendor push-protection patterns use, so a
+[fixture:scanner] fixture can never block a push.
+[form:plain] CLERK_SECRET_KEY=sk_live_4f8FIXTUREb7Lm9Kd3Tz6
+[form:quoted] CLERK_SECRET_KEY="sk_live_4f8FIXTUREb7Lm9Kd3Tz6"
+[form:single] CLERK_SECRET_KEY='sk_live_4f8FIXTUREb7Lm9Kd3Tz6'
+[form:spaced] CLERK_SECRET_KEY = sk_live_4f8FIXTUREb7Lm9Kd3Tz6
+[form:colon] CLERK_SECRET_KEY:  sk_live_4f8FIXTUREb7Lm9Kd3Tz6
+[form:export] export CLERK_SECRET_KEY=sk_live_4f8FIXTUREb7Lm9Kd3Tz6
+[key:bare] rotated the old key sk_test_9Zx1FIXTUREb5Kq7Ws2Ed out of the tenant
+[dsn:userinfo-only] connecting to postgres://svc_reader@db.internal:5432/appdb
+[dsn:encoded-colon] connecting to postgresql://svc%3AZq9-fixture-pw@db.internal:5432/appdb
+[dsn:encoded-at] connecting to postgresql://svc:pw%40rd-fixture@db.internal:5432/appdb
+[dsn:plain-secret] connecting to postgresql://gateuser:hunter2@127.0.0.1:5432/fixture_db_scratch
+[kv:env] PGPASSWORD=hunter2
+[kv:spaced] password = hunter2
+[kv:colon] pwd:  hunter2
+[kv:webhook] STRIPE_WEBHOOK_SECRET="whsec_7Hj9FIXTUREn3Op5Qr7St"
+[kv:apikey] RESEND_API_KEY=re_9Fk2FIXTUREp6Qr8St0Uv

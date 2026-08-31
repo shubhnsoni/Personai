@@ -1,0 +1,19 @@
+[safe] Realistic near-misses. NOTHING in this file may produce a finding of any kind.
+[safe] A scanner that goes red on documentation teaches its readers to ignore it, and a
+[safe] shape finding inside a driver-authored summary is fatal, so each line below is a
+[safe] form that really does appear in READMEs, .env.example files and source comments.
+[safe:doc-key-short] CLERK_SECRET_KEY=sk_live_xxxxxxxx
+[safe:doc-key-long] CLERK_SECRET_KEY=sk_live_xxxxxxxxxxxxxxxxxxxxxx
+[safe:doc-named] CLERK_SECRET_KEY=your_secret_key_here
+[safe:doc-template] CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+[safe:doc-dsn] see postgres://user:password@localhost:5432/mydb in the setup guide
+[safe:base64] sample_payload=dGhpcyBpcyBub3QgYSBrZXksIGp1c3QgYmFzZTY0IHRleHQ=
+[safe:comment] // SECRET_KEY_SHAPE matches sk_live_ and sk_test_ plus 20+ base62 characters
+[safe:comment-dsn] // DSN_WITH_PASSWORD reads the userinfo of a scheme://user@host span
+[safe:publishable] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_4f8FIXTUREb7Lm9Kd3Tz6
+[safe:publishable-stripe] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_9Zx1FIXTUREb5Kq7Ws2Ed
+[safe:digest] "sha256": "9f2c1b7d4e6a8c0f2b4d6e8a0c2e4f6a8b0d2f4e6a8c0e2f4b6d8a0c2e4f6b8d"
+[safe:git-remote] fetched from git+ssh://git@github.com/org/repo.git
+[safe:redacted-dsn] connecting to postgresql://<redacted>@<redacted>/fixture_db_scratch
+[safe:redacted-kv] password=<redacted>
+[safe:redacted-key] CLERK_SECRET_KEY=sk_live_<redacted>
