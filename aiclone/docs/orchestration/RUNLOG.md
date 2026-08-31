@@ -4649,3 +4649,55 @@ is linear and two unconditional statements precede leg 1: `scratchDatabaseName()
 and throws when it is unset, then `new PrismaClient()` is constructed. There is no leg selector, and
 legs 3, 5 and 6 read and write Prisma directly, so an in-process HTTP harness alone would still not
 make it runnable. No leg is free of both an origin and the database; `run: false` is correct and stays.
+
+
+## R-wave round 4 - the continuation queue, and two failures that cost nothing
+
+The wave did not stop at R3 to report. Three more packages went out against the integrated tree.
+**One succeeded, one produced nothing, and one produced unfinished work with no report** - and the
+interesting result is how little the two failures cost.
+
+`PKG-M` resolved six UNRESOLVED findings in `check-appointment-lifecycle.ts` and
+`check-blueprint-preview.ts` by pinning expected collection sizes inside each assertion's own
+condition, moving UNRESOLVED from 11 to 5. It also declined to claim six clean wins: one of its six
+was not a silent pass under emptiness, because an existing conjunct already caught that, so the
+finding there was a scanner precision limit rather than a hole. It supplied a different mutation - a
+lifecycle vocabulary gaining a terminal state - which leaves the unmodified harness fully green at
+49/49 while the rule covers nothing of the new state. That is the more useful proof, and reporting it
+that way is what makes the other five believable.
+
+`PKG-N` returned nothing at all: zero commits, zero modified files, no report. Its four findings are
+still open and are named in the queue rather than quietly dropped.
+
+`PKG-J` returned no report beyond a baseline stub and committed nothing, but had left a substantive
+credential-vocabulary widening and two carefully-built fixtures uncommitted in its worktree - with the
+self-test cases **unwritten**. The tell was mechanical: its fixtures were unused, the suite still read
+55/55, and four unused-variable warnings had appeared. Root judged the patterns on their merits, wrote
+the two missing cases, and supplied the proof the stage never did: every one of the 26 credential lines
+fires across five patterns with no fragment of any value surviving, the near-miss fixture yields zero
+findings and redaction rewrites exactly the two documentation DSNs, and collapsing the vocabulary back
+to `password` alone makes the all-fire case fail at 54/57. Self-test 55 → 57.
+
+Two of that widening's restrictions are load-bearing and are commented as such, because they are what
+keeps it from becoming the false-positive class this run already fixed once. The keyword prefix must
+end in `_`, `.` or `-`, or every word *ending* in a keyword becomes a credential key - `bypass=true`,
+`compass=north`, `encompass=false`. And there is no suffix allowance, which is why `passed=41`, a
+string the driver's own summary lines carry, cannot match: after `pass` the pattern demands `=` or `:`
+and finds `e`. The near-miss fixture pins both of those by tag rather than by count.
+
+### Why the two failures were cheap, verified rather than assumed
+
+In the Q-wave, two stages died mid-edit and left unexplained partial edits in the **primary** tree,
+which cost that run its clean baseline and a long forensic detour. Here two of three stages failed and
+the primary tree stayed clean at its integrated HEAD. That was checked, not hoped: primary
+`git status` showed only the two untracked preservation paths, `wt-n-vac2` held nothing at all, and
+`wt-j-scanner2`'s partial work sat entirely inside its own worktree, where root could read it, test it,
+and decide to take it. Confining each worker to its own worktree on its own branch converted a
+run-threatening failure mode into a discarded branch and an hour of root's time.
+
+One standing risk recorded from the artefact sweep: across all 2614 artefact files the widened scanner
+finds exactly one hit, in a **stale** run directory the driver does not scan, where a harness had
+printed a truncated test DSN inside its own `PASS` label. The current run's 76 artefacts are clean and
+the driver reports 0 critical, 0 shape, 0 fatal. But a harness that prints a bare
+`user:pass@host:5432/db` fragment in an assertion label will now be flagged, and that is the shape to
+watch.

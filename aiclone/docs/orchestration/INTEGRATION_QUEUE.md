@@ -1677,3 +1677,32 @@ Real reminders, payments and provider messages; the live personalink cutover; pu
 tunnel; deletion or modification of the six frozen KiroCrew evidence worktrees; secrets and external
 side effects. `check-order-stream` stays `run: false` - measurement showed no leg is free of both an
 HTTP origin and the database, correcting the Q-wave's claim that leg 1 needed neither.
+
+
+### R-wave round 4 - continuation queue (addendum to the table above)
+
+| Package | Outcome | Commits | Merge |
+|---|---|---|---|
+| M - vacuity, appointment + blueprint | **ACCEPTED** - 6 UNRESOLVED resolved, UNRESOLVED 11 → 5 | `e1208b0`, `d0a09a1` | `d454c92` |
+| J - remaining credential/DSN forms | **SALVAGED AND FINISHED BY ROOT** - stage gave no report and committed nothing; its self-test cases were unwritten | `99e8e06` (root) | direct |
+| N - vacuity, fieldjob/retainer/workspace | **PRODUCED NOTHING** - 0 commits, 0 dirty files, no report; its 4 findings remain open | — | — |
+
+10 of 12 stages across the whole wave reported. Both failures were confined to their own worktrees and
+the primary tree stayed clean at its integrated HEAD - verified after the fact, not assumed.
+
+**Revised counts at close:** sweep 74 executed / 74 passed / FAILED 0 / 1 declared skip. Self-test
+**57/57**. Repository lint 38 (9 errors, 29 warnings). Vacuity debt **UNGUARDED_EVERY 11 → 2**,
+**UNRESOLVED 19 → 5**. Credential scan clean: 77 artefacts, 0 critical, 0 shape, 0 fatal.
+
+**Queue item 2 is now closed** (`DB_PW=`, `pw:`, plus Go `@tcp(...)`/`@unix(...)`, bare
+`user:pass@host:<db-port>`, libpq keyword strings and JDBC userinfo/query/semicolon forms). **Queue
+item 6 shrinks** to 2 UNGUARDED_EVERY and 5 UNRESOLVED, of which three are explicitly justified
+(cohort-needs-action ×2, and order-stream which sits inside the declared-skip harness). The four
+findings PKG-N was meant to take are unchanged and still first in line:
+`check-fieldjob-inspection-runtime.ts`, `check-retainer-runtime.ts`,
+`check-workspace-surface-boundary.ts`, `check-workspace-surface-contract.ts`.
+
+**New standing risk to watch:** the widened scanner finds one hit across all 2614 artefact files, in a
+stale run directory the driver does not scan, where a harness printed a truncated test DSN inside its
+own `PASS` label. Current artefacts are clean, but a harness printing a bare `user:pass@host:5432/db`
+fragment in an assertion label will now be flagged.

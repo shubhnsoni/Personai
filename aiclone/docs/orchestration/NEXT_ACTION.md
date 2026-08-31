@@ -597,3 +597,49 @@ checked out, modified or removed. `.codex-remote-attachments/` and
 personalink untouched - and positively evidenced, because a direct harness run was *refused* by the
 disposable-database guard during this run. No Prisma or migration work beyond read-only validate and
 generate. Nothing pushed; no PR, deployment or tunnel.
+
+
+## Round-4 addendum - revised numbers and a shorter queue
+
+Measured at `99e8e06`. Sweep 74 executed / 74 passed / FAILED 0 / 1 declared skip. Self-test **57/57**.
+Repository lint 38 (9 errors, 29 warnings). Credential scan clean: 77 artefacts, 0 critical, 0 shape,
+0 fatal. Vacuity debt now **2 UNGUARDED_EVERY and 5 UNRESOLVED** (from 11 and 19).
+
+**Queue item 2 is closed.** `DB_PW=` and `pw:` are covered, along with Go `@tcp(...)`/`@unix(...)`,
+bare `user:pass@host:<known-db-port>`, libpq keyword strings, and JDBC userinfo/query/semicolon forms.
+Two restrictions in that widening are load-bearing and must not be relaxed: the keyword prefix has to
+end in `_`, `.` or `-` (otherwise `bypass=`, `compass=` and `encompass=` all become credential keys),
+and there is no suffix allowance (which is why `passed=41`, carried by the driver's own summary lines,
+cannot match). Both are pinned by tag in the near-miss fixture.
+
+**Next, and it is a small, well-specified job:** four UNRESOLVED findings were dispatched to a stage
+that produced nothing, so they are untouched and ready:
+
+- `check-fieldjob-inspection-runtime.ts` - `OPEN_INSPECTION_STATUSES` matches the pattern
+- `check-retainer-runtime.ts` - "replaying every delta reproduces every stored after-state". If the
+  delta list can be empty this reports that replay works without replaying anything. Pin the expected
+  delta count.
+- `check-workspace-surface-boundary.ts` - "install/read keeps PERMISSION_KEYS byte-identical". An
+  empty key set makes this trivially true and hides exactly the regression it exists to catch. Pin the
+  expected key count. Take care: this harness is the repository's reference implementation for
+  run-scoped residue evidence, so do not disturb its residue logic.
+- `check-workspace-surface-contract.ts` - "resolving surfaces neither changes nor returns ..."
+
+The three remaining findings after those are **already justified** and should be left alone unless the
+argument is shown wrong: `check-cohort-needs-action.ts:641` and `:503` (the guard is in the same
+condition and provably bounds the receiver), and `check-order-stream.ts:334`, which sits inside the one
+declared-skip harness and cannot be exercised.
+
+**One new risk to watch.** Sweeping all 2614 artefact files with the widened scanner produces exactly
+one hit, in a stale run directory the driver does not scan, where a harness had printed a truncated test
+DSN inside its own `PASS` label. Current artefacts are clean and the driver reports 0 critical / 0 shape
+/ 0 fatal - but a harness that prints a bare `user:pass@host:5432/db` fragment in an assertion label
+will now be flagged, and a fatal finding against the driver's own output is how green becomes
+unreachable.
+
+**Orchestration lesson, restated because it is the cheapest win available.** Two of round 4's three
+stages failed - one produced nothing, one produced unfinished work with no report - and the primary tree
+stayed clean at its integrated HEAD. Confining every worker to its own worktree on its own branch is
+what made that true, and it was verified after the failure rather than assumed. Keep doing it. Also keep
+the mandatory-report rule: the failed stage's baseline stub was still enough to tell root what it had
+and had not measured, which is why its work could be judged rather than guessed at.
