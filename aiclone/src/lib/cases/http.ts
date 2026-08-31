@@ -1,3 +1,4 @@
+import { logDependencyFailure } from "@/lib/operations/dependency-failure-log"
 import { PersistenceError } from "@/lib/persistence/errors"
 
 import type { CaseIntakeService, CaseProjectService } from "./engine"
@@ -138,6 +139,12 @@ function param(request: Request, name: string): string {
     return str(new URL(request.url).searchParams.get(name), name)
 }
 
+/**
+ * The surface tag for the shared sanitizing failure logger. A fixed literal, never derived from a request;
+ * `logDependencyFailure` now checks that shape rather than trusting it - see `safeScope` there.
+ */
+const FAILURE_LOG_SCOPE = "[cases]"
+
 export class CaseApiService {
     constructor(
         private readonly intakes: CaseIntakeService,
@@ -146,8 +153,25 @@ export class CaseApiService {
         private readonly retainers: CaseRetainerService,
     ) {}
 
+    /**
+     * THE ONE FAILURE FUNNEL FOR THIS SURFACE, AND NOW THE ONE PLACE IT IS TRACED.
+     *
+     * This was `op().catch(failure)`, which answered every unexpected dependency failure on every method of
+     * this boundary with a 503 and NO server-side trace whatsoever: an outage here was invisible, and the
+     * client was told to retry against something nothing had recorded. The shared sanitizing logger closes
+     * that WITHOUT touching the response - `failure` still receives exactly the one argument a rejected
+     * promise handed it, so status, body and headers are byte-identical to what this line produced before,
+     * and `logDependencyFailure` swallows its own failures so a broken log cannot become a broken response.
+     *
+     * A `PersistenceError` - every 400/401/403/404/409 this surface raises - is skipped inside the logger,
+     * so routine refusals do not bury the one line that matters, and the log cannot be read to tell a
+     * foreign id from a nonexistent one.
+     */
     private run(op: () => Promise<Response>): Promise<Response> {
-        return op().catch(failure)
+        return op().catch((error: unknown) => {
+            logDependencyFailure(FAILURE_LOG_SCOPE, error)
+            return failure(error)
+        })
     }
     private actor(): CaseActor {
         return { actorType: "STAFF", actorId: null }
