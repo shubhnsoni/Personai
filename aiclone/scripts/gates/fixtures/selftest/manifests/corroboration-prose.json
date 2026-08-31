@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "description": "THE AST-VERSUS-REGEX CASE. One harness whose only apparent assertions are comments, string literals and output formatting. It prints a perfect '58/58 assertions passed' line and exits 0, so the assertion-evidence contract reads a positive count and every earlier guard passes it. Its source contains no executable assertion callsite, so it must fail with CORROBORATION_NO_EXECUTABLE_ASSERTIONS. A regex over source text counts several matches in this file; the parser produces no node for a comment and never mistakes a string literal for a call, which is why this layer uses the TypeScript compiler API.",
+  "harnessDir": "scripts/gates/fixtures/selftest/corroboration/prose",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "expected": { "executedChecks": 1, "declaredSkips": 0, "harnessesOnDisk": 1 },
+  "harnesses": [{ "file": "check-prose.js", "package": "corroboration", "run": true }]
+}

@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "description": "THE LOOP CASE. One harness that makes 40 real assertions from a SINGLE assertion callsite inside a loop. It must PASS. This is the control against the most tempting wrong version of the corroboration layer - demanding that the runtime count equal the static callsite count. That equality is not a property of correct code (a loop runs one callsite many times, an untaken branch runs it zero), so only the zero-versus-positive contradiction is enforced.",
+  "harnessDir": "scripts/gates/fixtures/selftest/corroboration/loop",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "expected": { "executedChecks": 1, "declaredSkips": 0, "harnessesOnDisk": 1 },
+  "harnesses": [{ "file": "check-loop.js", "package": "corroboration", "run": true }]
+}

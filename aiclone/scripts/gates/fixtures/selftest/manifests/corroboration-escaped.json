@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "description": "THE EXPLICIT-REFUSAL CASE. One harness that really does assert four things, but makes every call through a VALUE - the helper is passed into a driver function and pulled out of an object by a computed key. Neither route can be followed on source text, so the callsite count is an undercount of unknown size and the harness is REFUSED by name with CORROBORATION_HELPER_ESCAPES_AS_VALUE. Counting what can be seen and calling it corroborated would present an unscanned harness as clean, which is the dangerous direction.",
+  "harnessDir": "scripts/gates/fixtures/selftest/corroboration/escaped",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "expected": { "executedChecks": 1, "declaredSkips": 0, "harnessesOnDisk": 1 },
+  "harnesses": [{ "file": "check-escaped.js", "package": "corroboration", "run": true }]
+}
