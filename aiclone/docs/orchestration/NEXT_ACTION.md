@@ -697,3 +697,53 @@ The lesson is specific and cheap to apply: **a junction-linked shared `node_modu
 worktree must not be removed with `git worktree remove --force`.** Delete or rename the junction first,
 then remove the worktree. The isolation technique itself is still the right one - it is what kept two
 failed stages from touching the primary tree - it just needs that one extra step at teardown.
+
+
+
+## S-wave close (S0 + S1 + S2) - measured at b010d71
+
+Sweep 77 on disk / 76 executed / 76 passed / **FAILED 0** / 1 declared skip / 0 integrity findings, in
+the primary tree and an isolated clean worktree at the same SHA. Self-test **68/68**. Assertion
+evidence ENFORCED 63/76, 0 unevidenced. **Source corroboration ENFORCED 63/63, 0 contradicted, 0
+refused.** Credential scan clean (79 artefacts). TypeScript 0. Repository lint 38. `npm audit
+--omit=dev` 0. Prisma validate/generate 0, no schema diff. Build compiled. Vacuity 2 UNGUARDED_EVERY /
+2 UNRESOLVED, all four justified.
+
+### What changed since the R-wave close
+
+- The auxiliary vertical packs are in source; **nothing is registered** and no blueprint is active.
+- "Green" now requires that a harness's runtime assertion count be backed by an executable assertion
+  callsite in its own source (AST-checked). The empty-harness and print-only-liar failure modes are
+  closed and mutation-proved.
+- The `PERMISSION_KEYS` tautology is a live authorization-boundary proof that fails when the permission
+  set is widened.
+- Five/seven HTTP method classifiers are one canonical AST classifier; `OperationsApiService.today` is
+  guarded through the real boundary.
+
+### Next, in order
+
+1. **Reduce the 13-entry evidence allowlist** - now the top item. Each allowlisted harness emits no
+   count today; teach one at a time to emit a real `GATE-EVIDENCE`/ratio line derived from its own
+   assertions (the S0 vertical-pack harness is the worked example), which moves it to
+   enforced+corroborated and drops the allowlist by one. Do NOT batch this or loosen the contract.
+2. **Migrate the seventh method-classifier site** - `check-workspace-surface-boundary.ts`. S1-C
+   measured the migration is verdict-neutral (its only export is `export async function GET`); add it
+   to the classifier's `OLD_SITES` and register that. Small, proven-safe.
+3. **Falsifiability corroboration** - a non-constant always-true condition still satisfies both the
+   evidence and corroboration layers. This is the vacuity scanner's remit; the corroboration layer
+   deliberately does not try to judge it.
+4. `operations/http.ts` still lacks the sanitizing failure logger `due-work-http.ts` carries - needs
+   its own leak proofs.
+5. The 4 justified vacuity findings - leave them unless their arguments are shown wrong.
+
+### Do not
+
+- Touch the 9 React-hook lint errors without a behavioural UI test. Lint must stay at or below 38.
+- Register any vertical pack as an active blueprint. home-services-v1 in particular is now guarded by
+  an executable alias constraint: while its engine fingerprint matches field-service-v1 it must stay
+  unregistered and name field-service-v1 as its fold target.
+- Remove a worktree whose `node_modules` is a junction, and prefer a real `npm ci` per worktree. A
+  fresh worktree also needs `aiclone/.env` as a file (some harnesses open it directly) and a
+  `prisma generate` (npm ci does not run it). Supply `.env` as a hard link, never a junction.
+- Read a 503 `DEPENDENCY_UNAVAILABLE` in the suite as a code failure before re-running - it is usually
+  connection exhaustion from concurrent or back-to-back sweeps.

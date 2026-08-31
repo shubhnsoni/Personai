@@ -1736,3 +1736,47 @@ harness, and the harness asserts `blueprints.ts` does not reference it.
   back-to-back sweeps, not a defect; re-run before investigating.
 - **Do not remove a worktree whose `node_modules` is a junction**, and prefer a real `npm ci` per
   worktree - S0 used an independent install and verified `IsReparsePoint=False`.
+
+
+## Accepted - S-wave phases S1 + S2: the load-bearing hardening gaps
+
+| # | Package | Outcome | Merge |
+|---|---|---|---|
+| S1-A | Source-side assertion corroboration (AST) | **ACCEPTED** - `codex/s1a-corroborate`, 4 commits | via S1 chain into `b010d71` |
+| S1-B | PERMISSION_KEYS tautology → live boundary proof | **ACCEPTED** - `codex/s1b-permkeys`, 3 commits | `b010d71` |
+| S1-C | One canonical HTTP method classifier + `today` guard | **ACCEPTED** - `codex/s1c-methods`, 3 commits; harness registered by root `e73d526` | `b010d71` |
+| S2 | Guard the `.every` assertions the S1 harnesses introduced | **ACCEPTED** (root) `b010d71` | direct |
+
+Measured at `b010d71`, primary and isolated clean worktree identical: 77 on disk / 76 executed / **76
+passed / 0 failed** / 1 declared skip / 0 integrity findings. Assertion evidence ENFORCED 63/76, 0
+unevidenced. **Source corroboration ENFORCED 63/63, 0 contradicted, 0 refused.** Self-test 68/68.
+Credential scan clean (79 artefacts). TypeScript 0. Targeted ESLint 0. Repository lint 38. `npm audit
+--omit=dev` 0. Prisma validate/generate 0, no schema diff. Build compiled. Vacuity 2 UNGUARDED_EVERY /
+2 UNRESOLVED.
+
+### Queue delta
+
+- **Item 1 (corroborate assertion counts) is CLOSED at the structural level** and mutation-proved both
+  ways. The residue: a *non-constant* always-true condition could still satisfy both the evidence and
+  corroboration layers - that is falsifiability, which is the vacuity scanner's job, and it is the
+  named next slice. 71 of 77 harnesses are corroborated statically only.
+- **Item 3 (unify HTTP method classifiers) is CLOSED** for six of the seven sites. **Left for a future
+  slice:** `check-workspace-surface-boundary.ts` is the seventh site; S1-C measured its migration is
+  verdict-neutral (its one export is `export async function GET`) and left the exact edit for root, but
+  it was owned by S1-B this wave so it was not migrated. Adding it to the classifier's `OLD_SITES` is
+  the only remaining step, plus registering it there.
+- **Item 4 (guard `today`) is CLOSED.**
+- **Item 6 (vacuity) shrinks to 2/2, all justified.**
+- **Still open, and now the top of the queue:** reduce the 13-entry evidence allowlist. Not attempted
+  this wave - the entries genuinely emit no count, and corroboration is the safer lever than a rushed
+  migration. Each allowlisted harness that can be taught to emit a real count drops the allowlist by
+  one and moves to enforced+corroborated.
+- **Still open:** the 9 React-hook lint errors (need behavioural tests first); `operations/http.ts`
+  lacks the sanitizing failure logger `due-work-http.ts` has (needs its own leak proofs).
+
+### Owner-gated, untouched
+
+Real reminders/payments/provider messages; live personalink cutover; push, PR, deployment, tunnel;
+the six frozen KiroCrew worktrees; secrets and external side effects. `check-order-stream` stays
+`run: false`. **All six vertical packs remain unregistered, non-visible candidates** - no blueprint
+became active in S0, S1 or S2.

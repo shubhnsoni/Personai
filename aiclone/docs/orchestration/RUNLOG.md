@@ -4780,3 +4780,93 @@ connection exhaustion from two 75-harness sweeps back to back. Re-running that h
 26/26 exit 0 and the full re-run was clean, so it was transient. Its residue assertion passed
 throughout, so nothing was left in the database. Worth knowing before reading a 503 here as a code
 failure.
+
+
+
+# S-wave phases S1 + S2 - "green" now means assertions ran, checked against source
+
+`7a34f40` → `b010d71`. Three path-disjoint worker packages plus root, each worker in its own worktree
+with an **independent `npm ci`** (node_modules verified real, not a junction) and its own generated
+Prisma client. Ownership was published before dispatch and the three returned diffs were confirmed
+strictly disjoint. All three reported; all three accepted.
+
+Final state, primary and an isolated clean worktree at the same SHA, identical: **77 on disk, 76
+executed, 76 passed, 0 failed, 1 declared skip, 0 integrity findings**; assertion evidence enforced
+63/76 with 0 unevidenced; **source corroboration enforced 63/63, 0 contradicted, 0 refused**;
+self-test 68/68; credential scan clean over 79 artefacts; TypeScript 0; targeted ESLint 0; repository
+lint 38 unchanged; `npm audit --omit=dev` 0; Prisma validate/generate 0 with no schema diff; build
+compiled; vacuity debt 2/2 - the lowest of the whole run.
+
+### S1-A - the evidence contract stopped being purely self-reported
+
+The gap this closes was measured in S0: neutering a harness's assertion helper collapsed its count
+from 447 to 14 and it still exited 0. The count stayed honest; nothing noticed 433 assertions had
+stopped running. `scripts/gates/lib/corroborate.js` now requires that a positive runtime count also
+have at least one **executable** assertion callsite in the harness's own source, found by a
+TypeScript-AST analyser - the same tool the exit-integrity and vacuity harnesses use, chosen precisely
+because it is not fooled by a verb or an `assert(` inside a comment or string. Constant conditions like
+`assert("x", true)` do not count, which closes the cheapest bypass.
+
+The honest part is the fixtures. Root's warning that the five stub fixtures scored zero *understated*
+it - every fixture standing in for a passing harness was a print-only liar, and enforcement dropped the
+self-test to 47/57. Nothing was exempted. Ten fixtures were rewritten with real, falsifiable assertion
+machinery whose printed count comes from a helper, and five new fixtures were added. The adversarial
+audit's own three liar harnesses, previously wired into nothing, are now the headline enforcement case:
+a forged-evidence manifest gives exit 2 while the evidence layer alone counts 104153 assertions, and a
+documented fault switch that disables corroboration makes the liars pass again *and stamps the run
+void* so the switch cannot buy a gate.
+
+A helper reached through a value - `runSuite(record)`, `table[key](…)` - is **refused by name**
+(`CORROBORATION_HELPER_ESCAPES_AS_VALUE`) rather than silently under-counted, because a silent
+under-count is the dangerous direction: it reports an unscanned harness as clean. And only the
+zero-versus-positive contradiction is enforced; a loop legitimately runs one callsite many times, so
+runtime count is never required to equal static callsite count. The declared limit, written down
+rather than hidden: a *non-constant* always-true condition could still satisfy both layers today -
+that remains the vacuity scanner's job and is a named next slice.
+
+### S1-B - a tautology became a live authorization proof
+
+Both workspace harnesses had asserted that a boundary keeps `PERMISSION_KEYS` byte-identical by
+comparing two reads of the same frozen constant - `f(x) === f(x)`, true on every run, false on none.
+They now take **90 live authorization decisions each** (5 seeded roles × 18 permissions) through
+`PersistedTenancy.requireAccess`, canonicalise the observed admissions *and refusals* into a new
+`src/lib/tenancy/boundary.ts`, and pin them to a sha256. Three rules stop it being a second tautology:
+`boundary.ts` does not import the grant table (drift needs two edits), a hash can never be the *actual*
+side, and a least-privilege policy is asserted over the observation so re-pinning buys no silence.
+
+The acceptance test is that widening the boundary set makes it fail - and it does: `STAFF += audit.read`
+takes both harnesses red on the digest while the *old surviving conjuncts stay green*, a direct
+measurement that the removed tautology was worth nothing. Non-enumeration is asserted explicitly: a
+real-but-ungranted key and a nonexistent key yield identical refusals, and foreign versus nonexistent
+workspaces reduce to one refusal leaking neither a key name nor a workspace id. UNRESOLVED fell 5 → 3
+and the residue evidence still reports.
+
+### S1-C - one classifier, and a guard on `today`
+
+Not five classifiers but **seven sites → five shapes**. Re-measured: 154 API route files;
+`export function GET` in 26, `export const <VERB>` in 5 - both of root's earlier figures confirmed - and
+the misses were *understated*: the async-only pattern misses 28 files and the narrow write pattern
+misses 21 routes that really do export a state-changing verb. A hole no regex could close:
+`export { handler as POST }` was a false negative for all seven old patterns and the canonical AST
+classifier catches it. HEAD and OPTIONS stay safe methods; per-consumer equivalence was proven and no
+verdict moved under migration.
+
+`OperationsApiService.today` had no method guard - a direct singleton caller got 200 + data for POST
+and OPTIONS. It now refuses with `405 / Allow: GET, HEAD, OPTIONS`, answers OPTIONS 204, and runs HEAD
+through the authorized path before stripping content, with **no HTTP-visible change**. The guard sits
+before the parameter read, and mutation M2 - moving it *after* the read - fails exactly the one
+non-enumeration assertion, which is the surgical proof that placement, not merely existence, is
+load-bearing. One declared-gap assertion in `check-operations-runtime.ts`, written to go red when the
+gap closed, did exactly that and was converted to assert the closed guarantee.
+
+### S2 - the debt the new harnesses brought, closed in the same wave
+
+S1-B's fix cleared two UNRESOLVED findings, but the harnesses landed alongside it brought six fresh
+`.every` assertions with no non-emptiness guard, so the repo-wide count had risen to 4/6. Rather than
+defer debt introduced in this wave, six assertions now pin their collection size inside their own
+condition - each collection is compile-time fixed, so the pin is an exact expected count. Proven by
+forcing `refusedMethods` empty (35/37 exit 1, both pins named; restored 37/37). The count is back to
+**2 UNGUARDED_EVERY / 2 UNRESOLVED**, and all four remaining are justified with exact file, line and
+reason. The 13-entry evidence allowlist was left unchanged: it is genuinely un-migrated, and S1-A's
+corroboration layer is the safer place to earn a reduction than a rushed migration at the end of a long
+run. The nine React-hook lint errors were deliberately not touched.
