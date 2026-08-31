@@ -187,8 +187,37 @@ async function main() {
             }
         }
         check("deposit transition table is total over all state pairs", depositLegal + depositIllegal === DEPOSIT_STATES.length ** 2, `legal=${depositLegal} illegal=${depositIllegal}`)
-        check("terminal deposit states allow nothing", DEPOSIT_STATES.filter((s) => ["REFUNDED", "FORFEITED"].includes(s)).length > 0 && DEPOSIT_STATES.filter((s) => ["REFUNDED", "FORFEITED"].includes(s)).every((s) => DEPOSIT_STATES.every((t) => !canTransitionDeposit(s, t))))
-        check("waitlist terminal states allow nothing", (["CONVERTED", "EXPIRED", "CANCELLED"] as WaitlistStatus[]).every((s) => WAITLIST_STATUSES.every((t) => !canTransitionWaitlist(s, t))))
+
+        // The two terminal-state rules below are of the shape that passes over an empty collection:
+        // `[].every(...)` is true, so "terminal states allow nothing" is green when the vocabulary is
+        // empty, when the terminal subset is empty, and when the inner state list is empty - having
+        // examined no pair at all. The expected COUNTS are therefore pinned as literals inside each
+        // condition, which buys two separate things:
+        //   1. the rule can fail. An empty DEPOSIT_STATES or WAITLIST_STATUSES now turns it red
+        //      instead of satisfying it vacuously.
+        //   2. the terminal sets are written out BY HAND rather than derived from the transition
+        //      table, precisely so this asserts an expectation instead of comparing the table with
+        //      itself. The cost of that choice is that a state added to the table with no outgoing
+        //      edge would be a NEW terminal state the hand-written list silently stops covering.
+        //      Pinning the vocabulary size makes that addition fail HERE, where the omission is.
+        // MEASURED at src/lib/appointments/lifecycle.ts: 7 deposit states, 2 of them terminal;
+        // 5 waitlist statuses, 3 of them terminal.
+        const terminalDeposit = DEPOSIT_STATES.filter((s) => ["REFUNDED", "FORFEITED"].includes(s))
+        const terminalWaitlist: readonly WaitlistStatus[] = ["CONVERTED", "EXPIRED", "CANCELLED"]
+        check(
+            "terminal deposit states allow nothing",
+            DEPOSIT_STATES.length === 7
+                && terminalDeposit.length === 2
+                && terminalDeposit.every((s) => DEPOSIT_STATES.every((t) => !canTransitionDeposit(s, t))),
+            `vocabulary=${DEPOSIT_STATES.length} terminal=${terminalDeposit.join(",")}`,
+        )
+        check(
+            "waitlist terminal states allow nothing",
+            WAITLIST_STATUSES.length === 5
+                && terminalWaitlist.length === 3
+                && terminalWaitlist.every((s) => WAITLIST_STATUSES.every((t) => !canTransitionWaitlist(s, t))),
+            `vocabulary=${WAITLIST_STATUSES.length} terminal=${terminalWaitlist.join(",")}`,
+        )
 
         // ---- 2. anonymous is refused everywhere, zero provider calls -------
         identity.current = null
