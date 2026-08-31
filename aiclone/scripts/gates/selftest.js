@@ -30,6 +30,10 @@ const SCANNER = require("./lib/redact");
 // spawned run can show which recogniser fired or what it read. run-gates.js guards its own
 // main() behind require.main === module, so this require does not launch a sweep.
 const EVIDENCE = require("./run-gates");
+// The corroboration analyser is required directly as well, because several cases assert on what it
+// RETURNS - which helper tiers fired, what a regex would have scored on the same file, the static
+// signal for all 76 production harnesses - and no spawned run can show any of that.
+const CORROBORATE = require("./lib/corroborate");
 
 const GATES_DIR = __dirname;
 const APP_DIR = path.resolve(GATES_DIR, "..", "..");
@@ -1061,6 +1065,305 @@ const CASES = [
         // Per-harness evidence is an added field on the existing records, not a replacement.
         s.harnesses.every((h) => "file" in h && "status" in h && "exitCode" in h) &&
         s.harnesses.filter((h) => h.status === "passed").every((h) => h.evidence && h.evidence.assertions > 0)
+      );
+    },
+  },
+
+  // ---- source-side corroboration (appended; nothing above is renumbered) ---
+  //
+  // WHAT THESE ARE FOR. The evidence cases above pin down "a harness must print a positive assertion
+  // count". Two measurements showed that is not enough. An adversarial audit wrote three harnesses
+  // with no imports, no comparisons and no subject under test; they printed perfect evidence lines
+  // and obtained `verdict PASS; gate ESTABLISHED` with 104153 assertions counted, exit 0. And
+  // neutering the assertion helper inside check-vertical-pack-candidates.ts dropped its reported
+  // count from 447 to 14 while it STILL EXITED 0 - the count stayed honest and nothing noticed that
+  // 433 assertions had stopped running. So the evidence contract measures willingness to print a
+  // number, and the cases below pin down the second, independently derived signal: the harness's own
+  // source must contain an executable assertion callsite.
+  {
+    name: "corroboration-print-only-liars-all-fail",
+    why: "THE HEADLINE CASE: the adversarial audit's own three fixtures - no imports, no comparisons, no subject under test - printed perfect evidence and passed; all three must now fail",
+    args: [`--manifest=${path.relative(APP_DIR, path.join(GATES_DIR, "fixtures", "audit-forgery", "manifest.json")).split(path.sep).join("/")}`],
+    expectExit: 2,
+    assert: (r) => {
+      const findings = r.summary ? r.summary.integrityFindings.filter((f) => f.kind === "CORROBORATION_NO_EXECUTABLE_ASSERTIONS") : [];
+      const named = new Set(findings.map((f) => f.harness));
+      const co = r.summary && r.summary.corroboration;
+      return (
+        r.summary.verdict === "INTEGRITY-FAILURE" &&
+        r.summary.gateEstablished === false &&
+        // Every earlier guard passes them: three real exit-0s, three non-empty logs, no duplicates.
+        r.summary.counts.executed === 3 &&
+        r.summary.counts.failed === 0 &&
+        r.summary.harnesses.every((h) => h.exitCode === 0 && h.logBytes > 0) &&
+        // And the evidence layer DID read their numbers - which is the whole point: on its own it
+        // would have counted 104191 assertions and reported a green sweep.
+        r.summary.evidence.counts.evidenced === 3 &&
+        r.summary.evidence.counts.totalAssertions === 58 + 99999 + 4096 &&
+        // All three are named individually, so a reader is told which harness is unsupported.
+        findings.length === 3 &&
+        named.has("check-empty-liar.js") &&
+        named.has("check-idliar.js") &&
+        named.has("check-liar.js") &&
+        co.enabled === true &&
+        co.counts.judged === 3 &&
+        co.counts.corroborated === 0 &&
+        co.counts.contradicted === 3 &&
+        co.records.every((rec) => rec.staticSignal === 0 && rec.runtimeAssertions > 0)
+      );
+    },
+  },
+  {
+    name: "corroboration-MUTATION-liars-pass-again-when-the-layer-is-disabled",
+    why: "MUTATION PROOF that the corroboration layer is load-bearing and not decoration: with it disabled the same three liars go green again, and only the layer's absence changed",
+    args: [`--manifest=${path.relative(APP_DIR, path.join(GATES_DIR, "fixtures", "audit-forgery", "manifest.json")).split(path.sep).join("/")}`],
+    env: { GATES_SELFTEST_FAULT: "disable-corroboration" },
+    expectExit: 0,
+    assert: (r) =>
+      // The liars pass. This is the pre-corroboration behaviour, reproduced on demand.
+      r.summary.verdict === "PASS" &&
+      r.summary.counts.failed === 0 &&
+      r.summary.integrityFindings.length === 0 &&
+      r.summary.evidence.counts.evidenced === 3 &&
+      r.summary.evidence.counts.totalAssertions === 104153 &&
+      // The layer reports itself off, so the reason is visible rather than inferred.
+      r.summary.corroboration.enabled === false &&
+      r.summary.corroboration.counts.judged === 0 &&
+      r.stdout.includes("source corroboration: DISABLED by a self-test fault — THIS RUN IS VOID") &&
+      // And the switch cannot be used to obtain a gate: any faulted run is void by construction.
+      r.summary.selfTestFault === "disable-corroboration" &&
+      r.summary.gateEstablished === false,
+  },
+  {
+    name: "corroboration-comments-and-strings-are-not-assertions",
+    why: "the AST-versus-regex case: a harness whose only assertions are in comments and string literals prints 58/58 and must still fail",
+    args: [fixture("corroboration-prose.json")],
+    expectExit: 2,
+    assert: (r) =>
+      hasFinding(r, "CORROBORATION_NO_EXECUTABLE_ASSERTIONS") &&
+      r.summary.counts.failed === 0 &&
+      r.summary.harnesses[0].exitCode === 0 &&
+      // The evidence layer read 58 out of its output, so this harness is rejected by corroboration
+      // alone and by nothing else.
+      r.summary.evidence.counts.evidenced === 1 &&
+      r.summary.evidence.counts.totalAssertions === 58 &&
+      r.summary.corroboration.records[0].staticSignal === 0,
+  },
+  {
+    name: "corroboration-regex-would-have-passed-the-prose-fixture",
+    why: "the claim 'an AST was necessary' is measured, not asserted: the same file scores positive under a source-text regex and zero under the parser",
+    probe: () => {
+      const file = path.join(GATES_DIR, "fixtures", "selftest", "corroboration", "prose", "check-prose.js");
+      const text = fs.readFileSync(file, "utf8");
+      // A representative naive scanner: the shape a regex-based implementation would use.
+      const naive = text.match(/\b(?:assert|check|expect|invariant)\s*\(|\bthrow new Error\s*\(/gu) || [];
+      const ast = CORROBORATE.analyzeSource("check-prose.js", text);
+      // And the control in the other direction: a file with REAL machinery must score positive under
+      // both, so the AST is not simply refusing everything.
+      const realFile = path.join(GATES_DIR, "fixtures", "selftest", "corroboration", "loop", "check-loop.js");
+      const realAst = CORROBORATE.analyzeSource("check-loop.js", fs.readFileSync(realFile, "utf8"));
+      return {
+        regexMatches: naive.length,
+        astSignal: ast.signal,
+        astHelpers: ast.helpers.length,
+        astParsed: ast.parsed,
+        realAstSignal: realAst.signal,
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      // The regex is fooled - and by a wide margin, so this is not a knife-edge difference.
+      r.probe.regexMatches >= 8 &&
+      // The parser is not. No comment produces a node; no string literal is a call.
+      r.probe.astParsed === true &&
+      r.probe.astSignal === 0 &&
+      r.probe.astHelpers === 0 &&
+      // And the parser still finds the real thing, so scoring zero is discrimination and not refusal.
+      r.probe.realAstSignal === 1,
+  },
+  {
+    name: "corroboration-loop-runtime-count-may-exceed-static-callsites",
+    why: "40 runtime assertions from ONE callsite inside a loop must PASS: requiring runtime == static would fail correct code and would then be relaxed until it measured nothing",
+    args: [fixture("corroboration-loop.json")],
+    expectExit: 0,
+    assert: (r) => {
+      const rec = r.summary && r.summary.corroboration.records[0];
+      const md = fs.readFileSync(path.join(r.outDir, "latest.md"), "utf8");
+      return (
+        r.summary.verdict === "PASS" &&
+        r.summary.gateEstablished === true &&
+        r.summary.integrityFindings.length === 0 &&
+        rec &&
+        rec.harness === "check-loop.js" &&
+        // The contradiction the layer enforces is zero-versus-positive, and this row is the proof
+        // that inequality on its own is not treated as one.
+        rec.runtimeAssertions === 40 &&
+        rec.staticSignal === 1 &&
+        r.summary.corroboration.counts.corroborated === 1 &&
+        r.summary.corroboration.counts.contradicted === 0 &&
+        // The numbers must reach the HUMAN-READABLE summary too. A control whose result lives only
+        // in JSON is a control nobody reads, and the 40-against-1 row is the one a reviewer needs to
+        // see to understand why equality is not required.
+        md.includes("## Source-side corroboration") &&
+        md.includes("are **not** required to match") &&
+        /\|\s*`check-loop\.js`\s*\|\s*40\s*\|\s*1\s*\|/u.test(md)
+      );
+    },
+  },
+  {
+    name: "corroboration-aliased-and-wrapped-helpers-are-followed",
+    why: "five assertions made only through a three-link forwarding chain and two alias levels must PASS; eight production harnesses forward through a wrapper and would otherwise score zero",
+    args: [fixture("corroboration-wrapped.json")],
+    expectExit: 0,
+    assert: (r) => {
+      const rec = r.summary && r.summary.corroboration.records[0];
+      return (
+        r.summary.verdict === "PASS" &&
+        r.summary.integrityFindings.length === 0 &&
+        rec &&
+        rec.runtimeAssertions === 5 &&
+        // All five callsites are found even though none calls the recorder directly.
+        rec.staticSignal === 5 &&
+        // The chain and both aliases are registered, so the coverage is visible in the summary
+        // rather than being a claim in a comment.
+        rec.helpers.some((h) => h.startsWith("record (")) &&
+        rec.helpers.includes("forward (wrapper)") &&
+        rec.helpers.includes("mustHold (wrapper)") &&
+        rec.helpers.includes("deepHold (wrapper)") &&
+        rec.helpers.includes("requireThat (alias)") &&
+        rec.helpers.includes("insist (alias)")
+      );
+    },
+  },
+  {
+    name: "corroboration-unfollowable-indirection-is-refused-by-name",
+    why: "a harness that really asserts but only through a passed-in helper and a computed key is REFUSED explicitly, because silent under-counting would report an unscanned harness as clean",
+    args: [fixture("corroboration-escaped.json")],
+    expectExit: 2,
+    assert: (r) => {
+      const finding = r.summary && r.summary.integrityFindings.find((f) => f.kind === "CORROBORATION_HELPER_ESCAPES_AS_VALUE");
+      return (
+        Boolean(finding) &&
+        finding.harness === "check-escaped.js" &&
+        // The finding must say WHICH helper escaped and where, or it is not actionable.
+        finding.detail.includes("`record`") &&
+        // It is a refusal, not a contradiction: the two are reported distinctly.
+        !hasFinding(r, "CORROBORATION_NO_EXECUTABLE_ASSERTIONS") &&
+        r.summary.corroboration.counts.refused === 1 &&
+        r.summary.corroboration.counts.corroborated === 0 &&
+        r.summary.counts.failed === 0
+      );
+    },
+  },
+  {
+    name: "corroboration-real-corpus-has-no-zero-scoring-harness",
+    why: "the enforcement must not break the 76 production harnesses: every one of them, measured here without running the sweep, has executable assertion callsites and none is refused",
+    probe: () => {
+      const dir = path.join(APP_DIR, "scripts", "one-off");
+      const files = fs.readdirSync(dir).filter((n) => /^check-.*\.ts$/u.test(n)).sort();
+      const rows = files.map((name) => CORROBORATE.analyzeFile(path.join(dir, name), name));
+      return {
+        files: files.length,
+        zero: rows.filter((x) => x.signal === 0).map((x) => x.file),
+        refused: rows.filter((x) => x.refusals.length > 0).map((x) => x.file),
+        unparseable: rows.filter((x) => !x.parsed).map((x) => x.file),
+        totalSignal: rows.reduce((sum, x) => sum + x.signal, 0),
+        // The wrapper loop must reach its fixed point on every file; hitting the runaway guard
+        // would mean the helper set could be incomplete.
+        notFixedPoint: rows.filter((x) => x.wrapperFixedPoint === false).map((x) => x.file),
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      r.probe.files === 76 &&
+      r.probe.zero.length === 0 &&
+      r.probe.refused.length === 0 &&
+      r.probe.unparseable.length === 0 &&
+      r.probe.notFixedPoint.length === 0 &&
+      r.probe.totalSignal > 2000,
+  },
+  {
+    name: "corroboration-cannot-substitute-for-runtime-evidence",
+    why: "a harness with real assertion machinery that prints NO count must still fail: corroboration is an additional condition and can never become the reason an unevidenced harness passes",
+    args: [fixture("corroboration-mute-but-asserting.json")],
+    expectExit: 2,
+    assert: (r) =>
+      hasFinding(r, "EVIDENCE_MISSING") &&
+      // Its source really does carry assertions, so it is not failing for want of a static signal.
+      CORROBORATE.analyzeFile(
+        path.join(GATES_DIR, "fixtures", "selftest", "corroboration", "mute", "check-mute-but-asserting.js"),
+        "check-mute-but-asserting.js",
+      ).signal === 3 &&
+      // And corroboration judged nothing, because there was no positive runtime count to corroborate.
+      r.summary.corroboration.counts.judged === 0 &&
+      !hasFinding(r, "CORROBORATION_NO_EXECUTABLE_ASSERTIONS"),
+  },
+  {
+    name: "corroboration-constant-conditions-do-not-count-as-machinery",
+    why: "the cheapest bypass is one line of machinery that cannot fail; a literal condition scores zero and the same line over a computed value scores one",
+    probe: () => {
+      // A liar that has read the corroboration layer's description and added the minimum machinery.
+      const cheapBypass = [
+        "let passed = 0;",
+        "const failures = [];",
+        "function assert(name, condition) { if (!condition) failures.push(name); else passed += 1; }",
+        'assert("precondition", true);',
+        "if (1 === 1) passed += 1;",
+        'console.log("58/58 assertions passed");',
+      ].join("\n");
+      // The same file with ONE character's worth of real computation in each condition.
+      const real = [
+        "let passed = 0;",
+        "const failures = [];",
+        "function assert(name, condition) { if (!condition) failures.push(name); else passed += 1; }",
+        'assert("precondition", process.pid > 0);',
+        "if (process.argv.length > 1) passed += 1;",
+        'console.log("58/58 assertions passed");',
+      ].join("\n");
+      const bypass = CORROBORATE.analyzeSource("check-cheap.js", cheapBypass);
+      const honest = CORROBORATE.analyzeSource("check-honest.js", real);
+      return {
+        bypassSignal: bypass.signal,
+        bypassConstants: bypass.constantCallsites,
+        bypassHelpers: bypass.helpers.length,
+        honestSignal: honest.signal,
+        honestConstants: honest.constantCallsites,
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      // The bypass is refused: the helper IS discovered, but neither the literal callsite nor the
+      // `1 === 1` guard is counted, so the file still contradicts its own printed 58.
+      r.probe.bypassHelpers === 1 &&
+      r.probe.bypassSignal === 0 &&
+      r.probe.bypassConstants === 1 &&
+      // And the honest version scores: one real callsite plus one real guard. The layer discriminates
+      // on whether anything was COMPUTED, not on the presence of assertion-shaped syntax.
+      r.probe.honestSignal === 2 &&
+      r.probe.honestConstants === 0,
+  },
+  {
+    name: "corroboration-block-is-additive-and-the-allowlist-did-not-grow",
+    why: "the new block is a sibling of the evidence block, no existing field changed, and the committed allowlist is still exactly 13 - no new exemption was bought to make this pass",
+    args: ["--integrity-only"],
+    expectExit: 0,
+    assert: (r) => {
+      const s = r.summary;
+      return (
+        s.integrityFindings.length === 0 &&
+        // Additive: the evidence block and every count key still read exactly as before.
+        s.evidence.schema === "personai.gates.evidence-summary/1" &&
+        s.evidence.allowlist.actualSize === 13 &&
+        s.evidence.allowlist.declaredSize === 13 &&
+        typeof s.corroboration === "object" &&
+        s.corroboration.schema === "personai.gates.corroboration/1" &&
+        // Every rejection reason is enumerable from the summary, like the evidence kinds are.
+        Object.keys(s.corroboration.rejectionKinds).length === 4 &&
+        Object.keys(s.corroboration.rejectionKinds).every((k) => k.startsWith("CORROBORATION_")) &&
+        // Nothing was executed, so nothing was judged - and the block says so rather than implying
+        // a clean result.
+        s.corroboration.enabled === false &&
+        s.corroboration.counts.judged === 0
       );
     },
   },
