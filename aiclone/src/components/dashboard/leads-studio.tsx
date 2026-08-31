@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { Calendar, Copy, Download, Link2, Mail, MessageSquare, Plus, Search, Trash2 } from "lucide-react"
 import { toast } from "sonner"
@@ -276,11 +276,29 @@ function LeadDetail({
     onStatus: (id: string, status: string) => void
     onDelete: (id: string) => void
 }) {
-    const [note, setNote] = useState("")
-
-    useEffect(() => {
+    // The note is seeded from the lead and re-seeded whenever a DIFFERENT lead is shown or the
+    // stored note changes underneath us. This is done by adjusting state during render - the
+    // pattern React documents for "a prop changed, reset some state" - rather than in an effect.
+    //
+    // It matters here beyond tidiness. With the effect, switching from lead A to lead B committed a
+    // frame in which the Sheet already showed B's name and email while the textarea still held A's
+    // note. In that frame `note` was A's text and `lead.note` was B's, so
+    // `disabled={pending || note === lead.note}` was FALSE and "Save note" was live: a click landing
+    // there wrote A's private note onto B's record. React discards the render that calls setState
+    // during render and re-renders before committing, so that frame cannot exist.
+    //
+    // The re-seed conditions are exactly the old effect's dependencies, `[lead?.id, lead?.note]`, so
+    // an in-progress edit is still overwritten when the server sends a new note - unchanged
+    // behaviour, deliberately, since no lint error asks for that to change.
+    const [note, setNote] = useState(lead?.note || "")
+    const [seededFrom, setSeededFrom] = useState<{ id?: string; note?: string }>({
+        id: lead?.id,
+        note: lead?.note,
+    })
+    if (seededFrom.id !== lead?.id || seededFrom.note !== lead?.note) {
+        setSeededFrom({ id: lead?.id, note: lead?.note })
         setNote(lead?.note || "")
-    }, [lead?.id, lead?.note])
+    }
 
     return (
         <Sheet open={open} onOpenChange={(v) => !v && onClose()}>

@@ -41,3 +41,31 @@ export function recordCommits(container: HTMLElement) {
 export function framesSince(frames: string[], mark: number) {
     return frames.slice(mark)
 }
+
+
+/**
+ * Like `recordCommits`, but captures an arbitrary projection of the DOM on every commit instead of
+ * just text content. Use it when the property under test involves attributes or form values, which
+ * `textContent` does not include - for example "was the Save button enabled while the textarea still
+ * held the previous record's text".
+ *
+ * The projection MUST run in the Profiler's onRender callback, not in a component body: a component
+ * body runs in the render phase, before React has mutated the DOM, so it would observe the previous
+ * commit and quietly pass.
+ */
+export function recordSnapshots<T>(project: () => T) {
+    const snapshots: T[] = []
+    function Recorder({ children }: { children: ReactNode }) {
+        return (
+            <Profiler
+                id="snapshot-recorder"
+                onRender={() => {
+                    snapshots.push(project())
+                }}
+            >
+                {children}
+            </Profiler>
+        )
+    }
+    return { snapshots, Recorder }
+}
