@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "description": "ADVERSARIAL AUDIT (PKG-H-AUDIT) target 1: three harnesses that assert NOTHING but print perfect, self-consistent, identity-correct assertion evidence and exit 0. If the driver reports PASS with a large positive assertion total, the assertion-evidence contract measures self-report, not work.",
+  "harnessDir": "scripts/gates/fixtures/audit-forgery",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": { "timeoutMs": 15000, "databaseName": "audit_scratch_h_pkg" },
+  "expected": { "executedChecks": 3, "declaredSkips": 0, "harnessesOnDisk": 3 },
+  "harnesses": [
+    { "file": "check-empty-liar.js", "package": "audit", "run": true },
+    { "file": "check-idliar.js", "package": "audit", "run": true },
+    { "file": "check-liar.js", "package": "audit", "run": true }
+  ]
+}

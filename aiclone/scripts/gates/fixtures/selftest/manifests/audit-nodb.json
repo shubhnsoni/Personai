@@ -1,0 +1,10 @@
+{
+  "manifestVersion": 1,
+  "description": "A manifest that declares requiresDatabase: false - the shape lib/inventory.js admits via `defaults.requiresDatabase !== false`. The driver used to dereference a null database target for this shape and die on an unhandled TypeError, writing no summary. It must now complete normally AND withhold the ambient DATABASE_URL, which has not passed the denylist or the disposable-name assertion.",
+  "harnessDir": "scripts/gates/fixtures/audit-nodb",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": { "timeoutMs": 15000, "requiresDatabase": false },
+  "expected": { "executedChecks": 1, "declaredSkips": 0, "harnessesOnDisk": 1 },
+  "harnesses": [{ "file": "check-nodb.js", "package": "audit", "run": true }]
+}

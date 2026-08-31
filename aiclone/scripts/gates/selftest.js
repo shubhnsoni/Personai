@@ -843,6 +843,27 @@ const CASES = [
     },
   },
   {
+    name: "no-database-manifest-neither-crashes-nor-forwards-an-unvalidated-url",
+    why: "a requiresDatabase:false manifest used to die on an unhandled TypeError (null database target); it must complete AND withhold the ambient DATABASE_URL, which has passed no denylist",
+    args: [fixture("audit-nodb.json")],
+    // Load-bearing: without a DATABASE_URL in the driver's own environment the harness's
+    // "was it withheld?" check passes trivially and this guard proves nothing. Setting one here is
+    // what makes the withholding observable. It is never connected to - requiresDatabase:false means
+    // the target is never even resolved - and the name is disposable-shaped regardless.
+    env: { DATABASE_URL: "postgresql://probe:probe@127.0.0.1:5432/audit_scratch_probe" },
+    expectExit: 0,
+    assert: (r) =>
+      r.summary.verdict === "PASS" &&
+      r.summary.gateEstablished === true &&
+      r.summary.counts.executed === 1 &&
+      r.summary.counts.failed === 0 &&
+      // The harness itself asserts DATABASE_URL was absent; if the driver had forwarded it, the
+      // harness exits 1 and this leg goes red rather than merely losing a nicety.
+      r.summary.evidence.counts.evidenced === 1 &&
+      // A crash wrote no summary at all, so the presence of a parsed verdict is part of the guard.
+      !r.stdout.includes("TypeError"),
+  },
+  {
     name: "evidence-block-is-additive-to-the-summary-schema",
     why: "the fields other workers and root read must be untouched; the evidence block is a new sibling, not a rename",
     args: [fixture("evidence-good.json")],

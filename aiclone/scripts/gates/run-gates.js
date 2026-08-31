@@ -1284,13 +1284,30 @@ async function main() {
     fs.mkdirSync(evidenceDir, { recursive: true });
     const childEnv = {
       ...process.env,
-      DATABASE_URL: dbTarget.effectiveUrl,
       // The evidence channel. A harness may write <GATES_EVIDENCE_DIR>/<its own filename>.evidence.json
       // stamped with GATES_RUN_ID; anything carrying another run's id is rejected as stale.
       GATES_RUN_ID: runId,
       GATES_EVIDENCE_DIR: evidenceDir,
       GATES_EVIDENCE_SCHEMA: EVIDENCE_SCHEMA,
     };
+    if (dbTarget) {
+      childEnv.DATABASE_URL = dbTarget.effectiveUrl;
+    } else {
+      // No validated target was resolved, which is the `requiresDatabase: false` manifest shape
+      // that lib/inventory.js explicitly admits. Two things must NOT happen here.
+      //
+      // 1. This used to read dbTarget.effectiveUrl unconditionally and die on an unhandled
+      //    TypeError, printing a stack trace and writing no summary at all - a crash rather than a
+      //    diagnosed condition, in the one file whose job is to produce a trustworthy verdict.
+      //
+      // 2. Falling back to the ambient DATABASE_URL would be worse than the crash. That value has
+      //    NOT been through resolveDatabaseTarget, so it has passed neither the `personalink`
+      //    denylist nor the disposable-name assertion: a manifest that merely declines to require a
+      //    database would silently hand every harness whatever aiclone/.env points at. So the
+      //    variable is WITHHELD instead of forwarded. A harness that unexpectedly reaches for a
+      //    database then fails for want of a connection string, which is the safe direction.
+      delete childEnv.DATABASE_URL;
+    }
     say("");
     say(`running ${selected.length} harness(es) serially, timeout ${fmtMs(opts.timeoutMs || manifest.defaultTimeoutMs)} each`);
     say(`  evidence run id ${runId}`);
