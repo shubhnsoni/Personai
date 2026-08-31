@@ -1,11 +1,8 @@
 /**
- * CANDIDATE vertical packs - the unregistered set.
+ * Vertical pack inventory.
  *
- * THIS MODULE IS READ-ONLY AND REGISTERS NOTHING. `../blueprints.ts` does not import it, so
- * `listBusinessBlueprints()` and `getBusinessBlueprint()` cannot reach a candidate, no onboarding role
- * maps to one, and neither preview nor install can resolve one. That is the point: a candidate is a
- * described recombination of engines that already exist, held where it can be reviewed without being
- * installable.
+ * Four reviewed packs are registered by `../blueprints.ts`; two remain explicitly unregistered. Keeping
+ * those sets separate prevents a catalog-only candidate from becoming installable by accident.
  *
  * It IS now read by two owner-facing read-only surfaces, both behind the Business OS guard: the
  * `/api/business-os/vertical-candidates` route and the dashboard Vertical Candidate Catalog page. Both
@@ -26,7 +23,7 @@ import { homeServicesV1 } from "./home-services-v1"
 import { realEstateBrokerageV1 } from "./real-estate-brokerage-v1"
 import { recruitmentAgencyV1 } from "./recruitment-agency-v1"
 import { salonSpaV1 } from "./salon-spa-v1"
-import type { VerticalPackCandidate } from "./types"
+import type { RegisteredVerticalPack, VerticalPackCandidate } from "./types"
 
 export type {
   CandidateReadiness,
@@ -35,18 +32,24 @@ export type {
   OwnerGatedFunction,
   OwnerWorkflowConfiguration,
   ProviderBoundary,
+  RegisteredOnboardingConfiguration,
+  RegisteredReadiness,
+  RegisteredVerticalPack,
   UnsupportedFunction,
   VerticalPackCandidate,
 } from "./types"
-export { CANDIDATE_ALLOWED_ACTION_KINDS, CANDIDATE_STATUS } from "./types"
+export { CANDIDATE_ALLOWED_ACTION_KINDS, CANDIDATE_STATUS, REGISTERED_STATUS } from "./types"
 
 const candidates: readonly VerticalPackCandidate[] = [
+  homeServicesV1,
+  clinicPracticeV1,
+]
+
+const registered: readonly RegisteredVerticalPack[] = [
   salonSpaV1,
   eventsStudioV1,
   realEstateBrokerageV1,
-  homeServicesV1,
   recruitmentAgencyV1,
-  clinicPracticeV1,
 ]
 
 /**
@@ -60,8 +63,13 @@ export const verticalPackCandidates: readonly VerticalPackCandidate[] = candidat
   return candidate
 })
 
-const duplicateCandidateIds = verticalPackCandidates
-  .map((candidate) => candidate.blueprint.id)
+export const registeredVerticalPacks: readonly RegisteredVerticalPack[] = registered.map((pack) => {
+  assertValidBusinessBlueprint(pack.blueprint)
+  return pack
+})
+
+const allPackIds = [...verticalPackCandidates, ...registeredVerticalPacks].map((pack) => pack.blueprint.id)
+const duplicateCandidateIds = allPackIds
   .filter((id, index, all) => all.indexOf(id) !== index)
 
 if (duplicateCandidateIds.length > 0) {
@@ -76,6 +84,14 @@ export function listVerticalPackCandidates(): readonly VerticalPackCandidate[] {
 
 export function getVerticalPackCandidate(id: string): VerticalPackCandidate | null {
   return verticalPackCandidates.find((candidate) => candidate.blueprint.id === id) ?? null
+}
+
+export function listRegisteredVerticalPacks(): readonly RegisteredVerticalPack[] {
+  return registeredVerticalPacks
+}
+
+export function getRegisteredVerticalPack(id: string): RegisteredVerticalPack | null {
+  return registeredVerticalPacks.find((pack) => pack.blueprint.id === id) ?? null
 }
 
 export {

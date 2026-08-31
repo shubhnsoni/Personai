@@ -30,6 +30,16 @@ export interface CreateProfileResult {
     next: string
 }
 
+const DEFAULT_SERVICE_BY_ROLE: Readonly<Record<string, { name: string; description: string }>> = {
+    CONSULTANT: { name: "Fit call", description: "A first conversation to see if we should work together." },
+    CA: { name: "Fit call", description: "A first conversation to see if we should work together." },
+    COACH: { name: "Intro session", description: "A first conversation to see if we should work together." },
+    SALON_SPA: { name: "Consultation", description: "A first appointment before choosing a treatment." },
+    EVENTS_STUDIO: { name: "Event discovery call", description: "A first conversation about the event brief." },
+    REAL_ESTATE_BROKERAGE: { name: "Property consultation", description: "A first conversation about a mandate or viewing." },
+    RECRUITMENT_AGENCY: { name: "Hiring brief", description: "A first conversation about the role to fill." },
+}
+
 async function availableBusinessSlug(displayName: string): Promise<string> {
     const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "page"
     let candidate = base
@@ -52,6 +62,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
 
     const slug = await availableBusinessSlug(displayName)
     const extras = extrasFromAddons(data.roleTemplate, data.addons || [])
+    const defaultService = DEFAULT_SERVICE_BY_ROLE[data.roleTemplate]
     const profile = await prisma.$transaction(async (tx) => {
         const created = await tx.profile.create({
             data: {
@@ -112,12 +123,12 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             })
         }
 
-        if (data.roleTemplate === "CONSULTANT" || data.roleTemplate === "CA" || data.roleTemplate === "COACH") {
+        if (defaultService) {
             await tx.serviceOffering.create({
                 data: {
                     profileId: created.id,
-                    name: data.roleTemplate === "COACH" ? "Intro session" : "Fit call",
-                    description: "A first conversation to see if we should work together.",
+                    name: defaultService.name,
+                    description: defaultService.description,
                     priceCents: 0,
                     isFree: true,
                     durationMinutes: 30,
@@ -137,7 +148,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             })
         }
 
-        if (data.addons?.includes("services") && data.roleTemplate !== "CONSULTANT" && data.roleTemplate !== "CA" && data.roleTemplate !== "COACH" && data.roleTemplate !== "RESTAURANT") {
+        if (data.addons?.includes("services") && !defaultService && data.roleTemplate !== "RESTAURANT") {
             await tx.serviceOffering.create({
                 data: {
                     profileId: created.id,

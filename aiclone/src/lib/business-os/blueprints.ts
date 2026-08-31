@@ -1,5 +1,6 @@
 import type { BusinessBlueprint } from "./types"
 import { assertValidBusinessBlueprint } from "./validation"
+import { listRegisteredVerticalPacks } from "./vertical-packs"
 
 const restaurantWorkflows: BusinessBlueprint["workflows"] = [
   {
@@ -401,6 +402,7 @@ const builtInBlueprints: BusinessBlueprint[] = [
     ownerCopilotPrompts: restaurantOwnerCopilotPrompts,
     supersedes: "restaurant-venue-v2",
   },
+  ...listRegisteredVerticalPacks().map((pack) => pack.blueprint),
 ]
 
 /**

@@ -10,20 +10,21 @@
     "databaseName": "personalink_phase0_rehearsal_20260826_210704"
   },
   "expected": {
-    "harnessesOnDisk": 81,
-    "executedChecks": 80,
+    "harnessesOnDisk": 82,
+    "executedChecks": 81,
     "declaredSkips": 1,
-    "note": "Derived from the declared inventory below (81 entries, 1 declared skip), not from any prior run. The driver reports what it measured; if a run disagrees with these numbers it raises EXECUTED_COUNT_DRIFT. Investigate the difference — do not edit this block to make a run agree with it."
+    "note": "Derived from the declared inventory below (82 entries, 1 declared skip), not from any prior run. The driver reports what it measured; if a run disagrees with these numbers it raises EXECUTED_COUNT_DRIFT. Investigate the difference — do not edit this block to make a run agree with it."
   },
   "evidence": {
     "required": true,
     "contract": "A harness counts as passed only if it yields machine-readable evidence carrying a harness identity and a POSITIVE assertion count. Exit 0 alone cannot distinguish a harness that proved sixty invariants from one that asserted nothing, which is exactly the hole this closes. The driver reads evidence the harnesses ALREADY print — '58/58 assertions passed', '39/39 invariants passed', '46/46 installation route assertions passed', a JSON report carrying \"assertions\": 41 or \"assertions\": [ ... ], a 'SUMMARY ... passed=41 failed=0' line — so enforcement needed no harness edits. Missing, malformed, zero, negative, duplicate, forged and stale evidence each fail the run under their own named EVIDENCE_* finding.",
     "allowlistDeclaredSize": 0,
-    "allowlistNote": "THE SIZE OF THIS LIST IS THE HONEST MEASURE OF WHAT THIS GATE DOES NOT CHECK. All 80 executed harnesses are evidence-enforced and zero are exempt. Entries are EXACT filenames — the driver refuses any entry containing a wildcard, glob, regex or path metacharacter (EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN), because one pattern would silently cover harnesses added later and the count would stop being a measurement. The driver also fails if an entry names a file that is not on disk, if an entry lacks a concrete reason or the temporary/migrationPending markers, and if this declared size disagrees with the real length — so the list cannot grow without a visible, reviewable edit. Every entry is printed on the console and in both summaries on every run.",
+    "allowlistNote": "THE SIZE OF THIS LIST IS THE HONEST MEASURE OF WHAT THIS GATE DOES NOT CHECK. All 81 executed harnesses are evidence-enforced and zero are exempt. Entries are EXACT filenames — the driver refuses any entry containing a wildcard, glob, regex or path metacharacter (EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN), because one pattern would silently cover harnesses added later and the count would stop being a measurement. The driver also fails if an entry names a file that is not on disk, if an entry lacks a concrete reason or the temporary/migrationPending markers, and if this declared size disagrees with the real length — so the list cannot grow without a visible, reviewable edit. Every entry is printed on the console and in both summaries on every run.",
     "allowlist": []
   },
   "harnesses": [
     { "file": "check-actions-authz.ts", "package": "authz", "run": true },
+    { "file": "check-activated-vertical-packs.ts", "package": "blueprint", "run": true },
     { "file": "check-appointment-authz.ts", "package": "appointment", "run": true },
     { "file": "check-appointment-lifecycle.ts", "package": "appointment", "run": true },
     { "file": "check-appointment-routes.ts", "package": "appointment", "run": true },

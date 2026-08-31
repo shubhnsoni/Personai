@@ -1,8 +1,8 @@
-import { CANDIDATE_STATUS } from "./types"
-import type { VerticalPackCandidate } from "./types"
+import { REGISTERED_STATUS } from "./types"
+import type { RegisteredVerticalPack } from "./types"
 
 /**
- * Recruitment agency - CANDIDATE, not registered.
+ * Recruitment agency - active, registered, and mapped from onboarding.
  *
  * WHY THE CASES ENGINE FITS: a vacancy is a matter opened for a client, worked through stages, gated by
  * documents that must actually arrive, and billed on an outcome. `casesProjects:pipeline` captures the
@@ -25,11 +25,11 @@ import type { VerticalPackCandidate } from "./types"
  * uploaded and whether a request was satisfied. It does not screen, score, rank or vet anybody, and it
  * runs no background check.
  */
-export const recruitmentAgencyV1: VerticalPackCandidate = {
+export const recruitmentAgencyV1: RegisteredVerticalPack = {
   blueprint: {
     id: "recruitment-agency-v1",
     version: "1.0.0",
-    status: CANDIDATE_STATUS,
+    status: REGISTERED_STATUS,
     name: "Recruitment agency",
     vertical: "recruitment-agency",
     summary:
@@ -107,8 +107,8 @@ export const recruitmentAgencyV1: VerticalPackCandidate = {
       "Which placements have no fee record yet?",
     ],
   },
-  readiness: "candidate-not-registered",
-  registered: false,
+  readiness: "active-registered",
+  registered: true,
   proposedTerminology: {
     calendar: "interview schedule",
     case: "vacancy",
@@ -116,11 +116,11 @@ export const recruitmentAgencyV1: VerticalPackCandidate = {
     milestone: "hiring stage",
   },
   terminologyNote:
-    "Proposed only. BusinessBlueprint declares no terminology in this product; preview.ts resolves it from the onboarding role and tags it source: \"role-derived\". No role points at this candidate, so none of these labels resolves anywhere today.",
+    "Role-derived. Preview resolves these labels from the RECRUITMENT_AGENCY onboarding role and tags them source: \"role-derived\".",
   intendedSurfaces: ["home", "profile", "inbox", "leads", "services", "calendar", "sales"],
   onboarding: {
     proposedRoleKey: "RECRUITMENT_AGENCY",
-    correspondsToExistingRole: false,
+    correspondsToExistingRole: true,
     steps: [
       "List the roles or disciplines recruited for and the stages each vacancy passes through.",
       "List the documents a candidate must supply before being put forward.",
@@ -212,8 +212,8 @@ export const recruitmentAgencyV1: VerticalPackCandidate = {
   ],
   integrationNotes: [
     "Composes casesProjects and appointments only, both of which already back live blueprints, so it adds no engine and no migration.",
-    "Its vertical string 'recruitment-agency' is claimed by no registered blueprint.",
+    "Its vertical string 'recruitment-agency' is unique in the active registry and maps from the RECRUITMENT_AGENCY onboarding role.",
     "An agency doing RETAINED search would want casesProjects:retainers added to the required composition. It is available, so that is a one-line change - but it is a change of what the pack claims about the vertical, and belongs to whoever registers it.",
-    "This pack holds personal documents about third parties. No retention, deletion or subject-access behaviour exists in the product, so registering it has a data-protection question attached that the blueprint contract does not answer.",
+    "This pack can hold personal documents about third parties. No retention, deletion or subject-access automation is claimed; owners remain responsible for those policies.",
   ],
 }

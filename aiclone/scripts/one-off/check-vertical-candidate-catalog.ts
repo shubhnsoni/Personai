@@ -23,7 +23,7 @@ import type { VerticalPackCandidate } from "../../src/lib/business-os/vertical-p
  *   RENDERING - the catalog renders for POPULATED and for EMPTY input, and every field the surface
  *   promises (terminology, engines with capabilities and required/optional, readiness, workflows,
  *   unsupported functions, owner-gated dependencies) actually reaches the markup for every one of
- *   the six candidates.
+ *   the two candidates that remain unregistered.
  *
  *   TRUTHFULNESS - each candidate's own card carries Candidate / not installed / not active, so a
  *   reader who sees one card is told. No candidate id is in `listBusinessBlueprints()`. The markup
@@ -103,9 +103,9 @@ function textOf(markup: string): string {
 const ALIAS_CANDIDATE_ID = "home-services-v1"
 const ALIAS_BASE_ID = "field-service-v1"
 const CLINICAL_CANDIDATE_ID = "clinic-practice-v1"
-const NON_CLINICAL_CANDIDATE_ID = "salon-spa-v1"
+const NON_CLINICAL_CANDIDATE_ID = "home-services-v1"
 
-check("the candidate set is the expected six", candidates.length === 6, `found ${candidates.length}`)
+check("the candidate set is the expected two", candidates.length === 2, `found ${candidates.length}`)
 check("populated markup is non-trivial", populated.length > 5000, `${populated.length} bytes`)
 check("the page title renders", populated.includes("Vertical candidate catalog"))
 

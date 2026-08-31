@@ -32,7 +32,7 @@ const SCANNER = require("./lib/redact");
 const EVIDENCE = require("./run-gates");
 // The corroboration analyser is required directly as well, because several cases assert on what it
 // RETURNS - which helper tiers fired, what a regex would have scored on the same file, the static
-// signal for all 81 production harnesses - and no spawned run can show any of that.
+  // signal for all 82 production harnesses - and no spawned run can show any of that.
 const CORROBORATE = require("./lib/corroborate");
 
 const GATES_DIR = __dirname;
@@ -1088,12 +1088,12 @@ const CASES = [
         ev.required === true &&
         ev.allowlist.actualSize === 0 &&
         ev.allowlist.declaredSize === 0 &&
-        runnable === 80 &&
-        // Honest arithmetic: 80 runnable = 80 enforced + 0 allowlisted. T1 groups A, B and C
+        runnable === 81 &&
+        // Honest arithmetic: 81 runnable = 81 enforced + 0 allowlisted. T1 groups A, B and C
         // migrated the four meta/contract harnesses (assertion-vacuity,
         // migrated all 13 formerly-allowlisted harnesses to emit their own dynamically
         // counted evidence, so the allowlist reached zero and enforced reached runnable.
-        runnable - ev.allowlist.actualSize === 80 &&
+        runnable - ev.allowlist.actualSize === 81 &&
         ev.allowlist.files.length === new Set(ev.allowlist.files).size &&
         // The allowlist is empty, so there are no entries to shape-check here; that is
         // stated as an explicit equality rather than left to `entries.every` passing
@@ -1344,7 +1344,7 @@ const CASES = [
   },
   {
     name: "corroboration-real-corpus-has-no-zero-scoring-harness",
-    why: "the enforcement must not break the 81 production harnesses: every one of them, measured here without running the sweep, has executable assertion callsites and none is refused",
+    why: "the enforcement must not break the 82 production harnesses: every one of them, measured here without running the sweep, has executable assertion callsites and none is refused",
     probe: () => {
       const dir = path.join(APP_DIR, "scripts", "one-off");
       const files = fs.readdirSync(dir).filter((n) => /^check-.*\.ts$/u.test(n)).sort();
@@ -1362,7 +1362,7 @@ const CASES = [
     },
     expectExit: 0,
     assert: (r) =>
-      r.probe.files === 81 &&
+      r.probe.files === 82 &&
       r.probe.zero.length === 0 &&
       r.probe.refused.length === 0 &&
       r.probe.unparseable.length === 0 &&
@@ -1468,7 +1468,7 @@ const CASES = [
   //   - the mutation switch cannot buy a green run, and refuses a key it does not know.
   //
   // They spawn the scanner through ts-node with `--file` scoping, so each run costs ~2.5s instead of
-  // scanning all 80 other harnesses: the fixtures and the mutation proofs run on every invocation regardless
+  // scanning all 81 other harnesses: the fixtures and the mutation proofs run on every invocation regardless
   // of how much corpus is in scope, so the scoping changes the cost and not what is proven.
   {
     name: "vacuity-falsifiability-positive-fixtures-are-all-caught",

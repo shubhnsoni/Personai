@@ -54,7 +54,7 @@ import type { BusinessBlueprint } from "./types"
  * otherwise reasonably assume, and each was true at the time this was written:
  */
 const LIMITATIONS: readonly string[] = Object.freeze([
-    "Installation does not exist yet. This is a preview of what choosing this blueprint would mean, not a report of anything configured - there is no durable installed-blueprint record and no route that creates one.",
+    "This registry preview does not read a workspace's installed-blueprint record. Use the workspace blueprint surface for installed state; this view describes the static blueprint contract only.",
     "Surfaces and terminology are not declared by any blueprint. They are resolved through the onboarding role this blueprint corresponds to, and every such value is tagged source: \"role-derived\".",
     "Surfaces are stored per PROFILE, as JSON on Profile.personalityConfig, not per workspace. A profile with several workspaces has one set of surfaces across all of them.",
     "The owner console surface (businessOs) is never granted by a role kit. It requires an explicit per-profile opt-in, so choosing a blueprint would not switch it on.",

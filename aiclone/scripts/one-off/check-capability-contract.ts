@@ -139,7 +139,7 @@ checkInvertible(
 const registryBlueprints = listBusinessBlueprints()
 checkInvertible(
   "the registry actually yields blueprints, so the validation sweep below cannot pass by iterating nothing",
-  registryBlueprints.length === 9,
+  registryBlueprints.length === 13,
   `${registryBlueprints.length} blueprint(s): ${registryBlueprints.map((blueprint) => blueprint.id).join(", ")}`,
 )
 checkInvertible("all registry blueprints validate", registryBlueprints.length > 0 && registryBlueprints.every((blueprint) => validateBusinessBlueprint(blueprint).ok))
