@@ -1,7 +1,7 @@
 {
-    "milestone": "WORKSPACE-SCOPED SURFACES AND COHORT OPERATIONS COVERAGE ARE COMPLETE. Sweep 64 -> 68, FAILED 0. Installation already froze the surfaces a blueprint implies into BlueprintInstallation.configJson but nothing applied them, because surface resolution had no notion of a workspace at all. That is now closed WITHOUT a migration and WITHOUT a second table: S1-A proved configJson sufficient, and the keystone measurement is that NOT ONE FILE under src/app/dashboard/** mentions workspaceId, so a workspace-aware resolver cannot change any existing behaviour - there was no code path where a workspace id was available and being ignored. OPERATIONS NOW COVERS COHORT WORK as its ninth domain, by CONSUMING the cohort engine's own declaration rather than restating cohort rules - discharging the refusal that had been recorded in UNCOVERED_DOMAINS. THE HARNESS AUDIT RAN FOUR PASSES: 14 assertions examined by real source mutation, 14 proven real, 1 vacuity found and fixed. The suite is substantially honest and three of four auditors correctly returned NO_CHANGE. TWO NEW DEFECT CLASSES WERE NAMED AND ONE TECHNIQUE BUILT. An OVER-CLAIMING assertion tests something real while its NAME claims a mechanism it never exercises - mutation cannot distinguish it from vacuity because both come back green. The retainer FOR UPDATE claim was exactly that, and S4-B built the DETERMINISTIC READ INTERLEAVING technique the repository lacked and PROVED it: with both locks removed, T2 commits 5 while T1 is held and T1 then overwrites with a stale 3, a forced lost update. The second class is a PROOF-MECHANISM weakness: INVERT_ASSERTION=1 flipped exactly ONE assertion in nine large harnesses, so the documented control exited non-zero while proving almost nothing. Now widened across nine files. STILL OPEN and recorded with its closing package: the SHELL selects a workspace on the user's behalf, falling back to an alphabetically-first membership. Not a leak - the user is a member - but they may believe they are seeing a different workspace. Repo-wide lint still exactly 43 (14 errors, 29 warnings) at every commit in this run. Live personalink untouched, origin unchanged, six frozen worktrees at ea69595.",
-    "updatedAt": "2026-08-31T21:30:00+05:30",
-    "updatedBy": "root claude-opus-5 (T-wave close)",
+    "milestone": "U-WAVE RECOVERY IS INTEGRATED. The falsifiability scanner now reports 0 real vacuous assertions, 0 UNGUARDED_EVERY and 0 UNRESOLVED; sanitised dependency-failure logging covers the adopted platform boundaries; a real jsdom UI suite proves the hook repairs; four reviewed vertical packs are active and wired into onboarding and role-derived surfaces; the repository lint baseline is now 0 errors and 28 warnings. The repository-owned gate passes 81/81 with 5437 assertions, one declared skip and no allowlist. Live personalink, origin and the six frozen evidence worktrees remain untouched.",
+    "updatedAt": "2026-09-01T00:28:00+05:30",
+    "updatedBy": "Codex root takeover (U-wave close)",
     "baseline": "f8ee611",
     "maxParallelWorkers": 3,
     "baseCommitPolicy": "Lanes must branch from a commit where tsc --noEmit and next build both exit 0. Qualifying commits: e97edf4 and later. The consolidation branched from a4d9fba. See ADR-007.",
@@ -1769,10 +1769,50 @@
             ],
             "schemaInvariantsRepair": "check-schema-invariants.ts projected a Workspace for every Profile using `on conflict (\"id\") do nothing`, but Workspace.profileId is UNIQUE so the collision that actually occurs is on profileId and cannot be absorbed. It passed only because no Profile in the disposable database owned a Workspace - a fact root had proved by accident when leftover harness residue turned the sweep red. Fixed with a `not exists` guard plus the correct conflict target, and the profile-that-already-owns-a-workspace case is now SEEDED so the fix demonstrates something. 18 -> 22 assertions. Root independently reverted the conflict target and reproduced the original 23505 on profileId with 6 assertions red.",
             "dueWorkPlanning": "A pure function from an OperationsSummary to an ordered, EXPLAINED plan. It plans and is incapable of doing: no external write, no message, no money, no provider call, and NO SCHEDULER - asserted over executable lines only against 14 background/external-action identifiers, because its own comments legitimately discuss the absence of schedulers and a whole-file scan would flag the explanation. It reads no clock, taking asOf from the summary, so two calls with the same input are byte-identical. Every planned item traces to an input AttentionItem by index. It never re-derives overdue, partitioning on the supplied boolean instead. mixedScope is surfaced with a notice, because ranking a workspace-scoped milestone against a profile-scoped reservation compares two different populations. 12 assertions, all invertible, inversion flips all 12."
+        },
+        {
+            "id": "P2-027",
+            "title": "U-wave recovery: falsifiability, sanitised failure logging and behavioural UI proof",
+            "status": "done",
+            "owner": "U1-A, U1-B and U4 lanes; independently integrated and completed by Codex root",
+            "base": "dee68ff3426391082b1860e0bb3beaf5b2944323",
+            "integrationBranch": "grok/u-wave-integration",
+            "integrationCommit": "3a6f798ef6d18d771a51a1c2baebb9125567dd81",
+            "acceptedMerges": [
+                "5a00f94 Merge U1-A falsifiability corroboration",
+                "bdc4fed Merge U1-B sanitized logger with rehearsal DB harness",
+                "40238b3 Merge U4 behavioral UI test tooling and hook repairs"
+            ],
+            "rootFollowUps": [
+                "6910429 registered the failure-log proof and reconciled gate inventory",
+                "e1d701d removed every remaining scanner finding without exemption",
+                "59e7200 removed the final lint error with real client-mount and hydration tests"
+            ],
+            "result": "check-assertion-vacuity reports 122/122, 0 real vacuous assertions, 0 UNGUARDED_EVERY and 0 UNRESOLVED. Sanitised dependency failure logging is proven across the adopted platform boundaries. The jsdom suite passes 66/66 and includes a real hydrateRoot proof with zero recoverable hydration errors. No worker-independence claim is made for the Codex takeover."
+        },
+        {
+            "id": "P2-028",
+            "title": "Truthful activation of four reviewed vertical packs",
+            "status": "done",
+            "owner": "Codex root takeover",
+            "commit": "c16f7ab",
+            "followUp": "f753761",
+            "integrationCommit": "3a6f798ef6d18d771a51a1c2baebb9125567dd81",
+            "activated": [
+                "salon-spa-v1",
+                "events-studio-v1",
+                "real-estate-brokerage-v1",
+                "recruitment-agency-v1"
+            ],
+            "intentionallyInactive": {
+                "home-services-v1": "remains the guarded alias/fold candidate for field-service-v1 while their engine fingerprints match",
+                "clinic-practice-v1": "remains visible but unregistered and explicitly non-clinical"
+            },
+            "proof": "check-activated-vertical-packs passes 90/90. The four active packs are registered, installable through the existing blueprint machinery, mapped to onboarding roles/needs, and receive exact role-derived surfaces with no provider, payment, clinical or fabricated-data claim."
         }
     ],
     "laneState": {
-        "observedAt": "2026-08-30 04:05 +05:30",
+        "observedAt": "2026-09-01 00:28 +05:30",
         "activeWorkers": 0,
         "kirocrewSessions": "No worker or cron job is active; cron_list returns 'No cron jobs.' and spawn_list returns 'No subagents running.' at the observed time. Catalog, course/profile, and import/library dispatches failed before starting; root completed and integrated all three packages serially. The pinned Lane F worker also failed before start; root fallback executed all real boundaries and closed P1-014 without claiming a worker ran. P2-003 was likewise implemented and reviewed by root directly, not by a worker.",
         "supervisorProcesses": 0,
@@ -1831,7 +1871,7 @@
                 "dirty": 1
             }
         ],
-        "supervisionMode": "Wave H1 integrated green at 7b15cd3, root-serial integration of five worker packages. fieldJobs:inspection is complete and the registry has no planned capability left. Next READY packages are listed in INTEGRATION_QUEUE.md; the largest remaining honest gaps are owner-gated (appointments providers) or judgement-heavy (P1-009 no-img-element).",
+        "supervisionMode": "U-wave recovered and integrated at 3a6f798 by Codex root after Kiro suspension and an unreliable Grok handoff. Work was measured and completed serially; no fake parallelism or worker independence is claimed. All currently identified safe U-wave packages are complete; remaining boundaries are listed in NEXT_ACTION.md.",
         "activeCronJobs": []
     },
     "runtime": {
@@ -2426,5 +2466,25 @@
             "rootOwnedReconciliations": "Workers correctly refused to edit shared files they did not own and reported the required change instead. Root then: registered three new harnesses (77 -> 80 on disk, 76 -> 79 executed), raised check-business-os-surface's pinned expectedRoutes for the new API route, raised check-http-method-classifier's pinned corpus count 154 -> 155 (measured), corrected the classifier's stale site-count prose, and rewrote the vertical-packs header that still claimed the module was 'not wired into the product'."
         },
         "preservation": "Origin unchanged at 4b386d1d. Six frozen KiroCrew worktrees still at ea69595, never touched. .codex-remote-attachments/ and P1_014_ACTION_INVENTORY.md remain the only untracked paths. Live personalink never addressed - every DB-backed harness ran against personalink_phase0_rehearsal_20260826_210704 with the target rewritten and parsed back in-process. No worktree removed, no dependency junction created, .env only ever hard-linked and never edited. No push, PR, deployment, tunnel, migration or schema change."
+    },
+    "gatesAtUWave": {
+        "startingSha": "dee68ff3426391082b1860e0bb3beaf5b2944323",
+        "verifiedCodeTip": "59e7200662af",
+        "primaryIntegrationCommit": "3a6f798ef6d18d771a51a1c2baebb9125567dd81",
+        "scope": "U1-A falsifiability, U1-B platform sanitised failure logging, U4 behavioural UI repairs, zero-finding vacuity close, four truthful vertical activations and the last repository lint error",
+        "repositoryGate": "PASS exit 0 - onDisk 82, manifest 82, runnable 81, executed 81, passed 81, failed 0, declaredSkips 1, integrityFindings 0",
+        "assertionEvidence": "ENFORCED 81/81, 5437 assertions, 0 unevidenced, allowlist 0",
+        "sourceCorroboration": "ENFORCED 81/81, 0 contradicted, 0 refused",
+        "gateSelfTest": "78/78 guards behaved as declared",
+        "vacuity": "check-assertion-vacuity 122/122; 0 real findings, 0 UNGUARDED_EVERY, 0 UNRESOLVED",
+        "activatedVerticals": "check-activated-vertical-packs 90/90 for salon-spa-v1, events-studio-v1, real-estate-brokerage-v1 and recruitment-agency-v1",
+        "ui": "Vitest 7 files / 66 tests passed; AuthLookSwiper hydration test observed zero recoverable hydration errors",
+        "typescript": 0,
+        "repositoryLint": "28 problems (0 errors, 28 warnings), down from 37 (8 errors, 29 warnings)",
+        "prisma": "validate 0; generate 0; no schema or migration change in this wave",
+        "npmAudit": "0 vulnerabilities",
+        "productionBuild": "Next.js 16.3.3 compiled successfully; only the already-known middleware convention warning",
+        "executionTruth": "Kiro was suspended before resumed dispatch. Grok first misdiagnosed the valid HEAD and did not integrate into primary. Codex re-measured the repository, completed the remaining repair and performed serial integration. No fake parallelism or independent-agent review is claimed for the takeover.",
+        "preservation": "Origin remains 4b386d1d; six frozen KiroCrew worktrees remain at ea69595; live personalink was not mutated; only the guarded rehearsal target was addressed by DB-backed gates; no push, PR, deployment, tunnel, worktree removal or provider side effect."
     }
 }

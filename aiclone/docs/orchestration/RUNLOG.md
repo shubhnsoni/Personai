@@ -4972,3 +4972,52 @@ A worker reported `tsc` at 254 errors and, to its credit, proved its own change 
 error sets. The cause was root's own setup omission: that worktree never had `prisma generate` run. In the
 primary tree TypeScript is 0. A fresh worktree needs both a real `npm ci` **and** `prisma generate` before
 its type numbers mean anything.
+
+
+# U-wave recovery close - 2026-09-01 00:28 +05:30
+
+Kiro stopped mid-wave after the account was temporarily suspended. Grok then reported a valid repository
+HEAD as an invalid placeholder, created no primary commit, and repeatedly tried to prepare an already-valid
+integration worktree. Codex took over by measuring Git and the existing worktrees directly. The primary
+started at `dee68ff3426391082b1860e0bb3beaf5b2944323`; the isolated integration branch was verified at
+`59e7200` and merged locally with `3a6f798ef6d18d771a51a1c2baebb9125567dd81`. Work during the takeover was
+serial. No parallel-agent or independent-review claim is made.
+
+## Accepted recovery lanes
+
+- U1-A merged at `5a00f94`: the falsifiability scanner detects the five added structural classes and its
+  detector-disable mutations prove each class is load-bearing. Root completed the remaining findings at
+  `e1d701d`. Final scanner result: **122/122**, 0 real vacuous assertions, 0 `UNGUARDED_EVERY`, 0
+  `UNRESOLVED`.
+- U1-B merged at `bdc4fed`, then registered at `6910429`: sanitised dependency-failure logging covers the
+  adopted platform boundaries and its rehearsal-target harness passes 24/24 without secret output or
+  tenant enumeration.
+- U4 merged at `40238b3`: a real Vitest/jsdom suite now protects the UI hook repairs. The last lint error in
+  `AuthLookSwiper` was not papered over: `59e7200` uses `useSyncExternalStore`, and the test proves a
+  one-frame client mount plus real `hydrateRoot` with zero recoverable hydration errors. Final UI suite:
+  **7 files / 66 tests passed**.
+
+## Truthful vertical activation
+
+`c16f7ab` activated exactly four reviewed packs: `salon-spa-v1`, `events-studio-v1`,
+`real-estate-brokerage-v1` and `recruitment-agency-v1`. They are registered through the existing blueprint
+machinery, mapped to onboarding roles and needs, and receive exact role-derived surfaces. The executable
+contract passes **90/90**. `home-services-v1` remains the guarded alias/fold candidate for
+`field-service-v1`; `clinic-practice-v1` remains visible but unregistered and explicitly non-clinical.
+No payment, provider, clinical, fabricated-data or automatic-install claim was added.
+
+## Final measured gates
+
+- Repository gate: **82 on disk / 82 manifest / 81 runnable / 81 executed / 81 passed / 0 failed / 1
+  declared skip**, 5,437 assertions, evidence allowlist 0, corroboration 81/81 with 0 contradicted and 0
+  refused, credential scan clean.
+- Gate self-test: **78/78**.
+- Prisma validate 0; Prisma generate 0; TypeScript 0; targeted ESLint 0.
+- Repository lint: **28 warnings, 0 errors**, down from 37 problems (8 errors, 29 warnings).
+- `npm audit --omit=dev`: 0 vulnerabilities. Production build: 0; only the known middleware-convention
+  warning remains.
+
+Origin remains `4b386d1d0c5c3ff0b5bf6b6957fce1f032087827`; nothing was pushed. Live `personalink`
+was not mutated, the six frozen KiroCrew evidence worktrees remain at `ea69595`, and no worktree was
+removed. The two user-owned untracked paths remain intact. No deployment, tunnel, external-provider write
+or schema/migration change occurred.

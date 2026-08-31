@@ -1831,3 +1831,35 @@ Real reminders/payments/provider messages; live personalink cutover; push, PR, d
 six frozen KiroCrew worktrees; secrets and external side effects; **active registration of the six
 candidate vertical packs**. `check-order-stream` stays `run: false`. Adding a UI test framework is a
 dependency change and therefore owner-gated.
+
+
+## U-wave close - this queue supersedes every earlier READY table
+
+Integrated locally on `recovered/aug20-wt-pr-32` at `3a6f798`:
+
+| Package | Outcome | Evidence |
+|---|---|---|
+| U1-A falsifiability | **DONE** | Scanner 122/122; 0 real findings, 0 `UNGUARDED_EVERY`, 0 `UNRESOLVED` |
+| U1-B sanitised logging | **DONE** | Shared logger adopted at the reviewed platform boundaries; failure-log harness green |
+| U4 UI behaviour | **DONE** | 7 Vitest files / 66 tests; repository lint now 0 errors |
+| Four reviewed verticals | **DONE** | Activation contract 90/90; onboarding and role surfaces wired |
+| U-wave combined integration | **DONE** | Gate 81/81, self-test 78/78, TypeScript/Prisma/audit/build all 0 |
+
+### Remaining safe maintenance
+
+There is no unfinished dependency-ready U-wave package. Future safe work should be a new scoped wave, not
+reported as U-wave residue:
+
+1. Reduce the remaining **28 warnings** only in path-disjoint slices with behavioural proof and with the
+   total never increasing. Most are `no-img-element`; one is an exhaustive-deps warning.
+2. Keep `home-services-v1` folded into `field-service-v1` while their guarded engine fingerprints match.
+   Split it only if a real capability divergence is designed and proved.
+3. Keep `clinic-practice-v1` visible but inactive until a separately authorised, non-clinical product
+   scope exists. Do not infer permission for clinical records, PHI, diagnosis or prescriptions.
+
+### Owner-gated / prohibited without new authority
+
+Real reminders, deposits, payments or provider messages; live `personalink` cutover; candidate clinical
+activation; push, PR, deployment or tunnel; deleting any frozen evidence worktree; secrets or external
+side effects. `check-order-stream` remains the one declared skip because its dependencies are not an
+offline-safe gate.
