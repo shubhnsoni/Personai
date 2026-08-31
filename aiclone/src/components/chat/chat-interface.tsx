@@ -1,5 +1,12 @@
 "use client"
-import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react"
+import {
+    useState,
+    useRef,
+    useEffect,
+    useCallback,
+    useSyncExternalStore,
+    type ReactNode,
+} from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Chip } from "@/components/ui/chip"
@@ -658,6 +665,26 @@ export function ChatInterface({
     )
 }
 
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)"
+
+function subscribeToReducedMotion(onStoreChange: () => void) {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => {}
+
+    const media = window.matchMedia(REDUCED_MOTION_QUERY)
+    media.addEventListener("change", onStoreChange)
+    return () => media.removeEventListener("change", onStoreChange)
+}
+
+function readReducedMotion() {
+    return typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia(REDUCED_MOTION_QUERY).matches
+        : false
+}
+
+function useReducedMotionPreference() {
+    return useSyncExternalStore(subscribeToReducedMotion, readReducedMotion, () => false)
+}
+
 function WelcomeIntro({
     name,
     welcome,
@@ -687,28 +714,26 @@ function WelcomeIntro({
     const [typed, setTyped] = useState("")
     const [lineVisible, setLineVisible] = useState(false)
     const readyOnce = useRef(false)
+    const reduce = useReducedMotionPreference()
+    const visibleStage = reduce ? "ready" : stage
+    const visibleTyped = reduce ? full : typed
+    const visibleLine = reduce || lineVisible
 
     useEffect(() => {
-        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        if (reduce) {
-            setTyped(full)
-            setLineVisible(true)
-            setStage("ready")
-            return
-        }
+        if (reduce) return
         // Fade in (~0.4s) + short hold, then exit. No empty beat after Hi.
         const leave = window.setTimeout(() => setStage("type"), 880)
         return () => window.clearTimeout(leave)
-    }, [full])
+    }, [reduce])
 
     useEffect(() => {
-        if (stage !== "type" || lineVisible) return
+        if (reduce || stage !== "type" || lineVisible) return
         const fallback = window.setTimeout(() => setLineVisible(true), 360)
         return () => window.clearTimeout(fallback)
-    }, [stage, lineVisible])
+    }, [reduce, stage, lineVisible])
 
     useEffect(() => {
-        if (stage !== "type" || !lineVisible) return
+        if (reduce || stage !== "type" || !lineVisible) return
         if (typed.length >= full.length) {
             const pause = window.setTimeout(() => setStage("orb"), 320)
             return () => window.clearTimeout(pause)
@@ -719,32 +744,35 @@ function WelcomeIntro({
         const speed = typed.length === 0 ? 160 : inPrefix ? 110 : atWordBreak ? 70 : 42
         const tick = window.setTimeout(() => setTyped(full.slice(0, typed.length + 1)), speed)
         return () => window.clearTimeout(tick)
-    }, [stage, lineVisible, typed, full, prefix.length])
+    }, [reduce, stage, lineVisible, typed, full, prefix.length])
 
     useEffect(() => {
-        if (stage !== "orb") return
+        if (reduce || stage !== "orb") return
         const t = window.setTimeout(() => setStage("ready"), 1480)
         return () => window.clearTimeout(t)
-    }, [stage])
+    }, [reduce, stage])
 
     useEffect(() => {
-        onStage?.(stage)
-    }, [stage, onStage])
+        onStage?.(visibleStage)
+    }, [visibleStage, onStage])
 
     useEffect(() => {
-        if (stage !== "ready" || readyOnce.current) return
+        if (visibleStage !== "ready" || readyOnce.current) return
         readyOnce.current = true
         onReady()
-    }, [stage, onReady])
+    }, [visibleStage, onReady])
 
-    const showCaret = (stage === "type" && typed.length < full.length) || (stage === "type" && !lineVisible)
-    const typedPrefix = typed.slice(0, Math.min(typed.length, prefix.length))
-    const typedRest = typed.slice(prefix.length)
+    const showCaret =
+        !reduce &&
+        ((visibleStage === "type" && visibleTyped.length < full.length) ||
+            (visibleStage === "type" && !visibleLine))
+    const typedPrefix = visibleTyped.slice(0, Math.min(visibleTyped.length, prefix.length))
+    const typedRest = visibleTyped.slice(prefix.length)
 
     return (
         <div className="relative flex h-full flex-col items-center justify-center gap-7 px-3 py-4">
             <AnimatePresence>
-                {(stage === "orb" || stage === "ready") && (
+                {(visibleStage === "orb" || visibleStage === "ready") && (
                     <motion.div
                         key="orb-slot"
                         className="relative z-[1] flex h-[180px] w-[180px] items-center justify-center overflow-visible"
@@ -795,10 +823,10 @@ function WelcomeIntro({
                 <AnimatePresence
                     mode="wait"
                     onExitComplete={() => {
-                        if (stage === "type") setLineVisible(true)
+                        if (!reduce && stage === "type") setLineVisible(true)
                     }}
                 >
-                    {stage === "hi" && (
+                    {visibleStage === "hi" && (
                         <motion.h1
                             key="hi"
                             initial={{ opacity: 0, y: 8, filter: "blur(8px)" }}
@@ -810,7 +838,7 @@ function WelcomeIntro({
                             Hi!
                         </motion.h1>
                     )}
-                    {(stage === "type" || stage === "orb" || stage === "ready") && (
+                    {(visibleStage === "type" || visibleStage === "orb" || visibleStage === "ready") && (
                         <motion.div
                             key="line"
                             initial={{ opacity: 0 }}
@@ -830,7 +858,7 @@ function WelcomeIntro({
                                     />
                                 )}
                             </h1>
-                            {stage === "ready" ? (
+                            {visibleStage === "ready" ? (
                                 <AskAboutLine welcome={welcome} topics={topics} />
                             ) : null}
                         </motion.div>
@@ -839,7 +867,7 @@ function WelcomeIntro({
             </div>
 
             <div className="relative z-[1] flex min-h-[2.75rem] flex-wrap justify-center gap-2 max-w-xl">
-                {stage === "ready" && chips.map((chip, i) => (
+                {visibleStage === "ready" && chips.map((chip, i) => (
                     <motion.div
                         key={chip.id}
                         initial={{ opacity: 0, y: 14, filter: "blur(8px)" }}
@@ -861,42 +889,56 @@ function WelcomeIntro({
 }
 
 function AskAboutLine({ welcome, topics = [] }: { welcome?: string | null; topics?: string[] }) {
-    const topicKey = topics.join("|")
-    const items = useMemo(() => resolveAskTopics(welcome, topics), [welcome, topicKey])
-    const [index, setIndex] = useState(0)
-    const [typed, setTyped] = useState("")
-    const [deleting, setDeleting] = useState(false)
-    const [reduce, setReduce] = useState(false)
+    // NO useMemo, deliberately. resolveAskTopics maps and filters at most five short strings, so
+    // recomputing it per render costs less than caching it correctly - and the previous cache was
+    // NOT correct. Its key was `topics.join("|")`, which is not injective: ["a|b"] and ["a","b"]
+    // both join to "a|b", while resolveAskTopics treats them differently (it cleans each entry
+    // without splitting on "|"). So when the parent re-rendered with one shape after the other the
+    // memo handed back the previous, wrong topic list and kept handing it back forever.
+    const items = resolveAskTopics(welcome, topics)
+    const count = items.length
+
+    // The typewriter is driven by PRIMITIVES (`current`, `count`) and never by the array's identity.
+    // That is what makes the memo unnecessary rather than merely replaced: a parent passing a fresh
+    // `topics` array literal on every render still yields an equal current/count pair, so the
+    // animation is not restarted. Putting `topics` itself in a dependency array - the other obvious
+    // repair - is exactly what would restart it.
+    const [phase, setPhase] = useState({ index: 0, len: 0, deleting: false })
+    const index = phase.index < count ? phase.index : 0
+    const current = items[index] ?? ""
+
+    // matchMedia is an external store, so it is subscribed to rather than copied into state by a
+    // mount effect. The old version read `.matches` once with an empty dependency array and never
+    // subscribed, so turning Reduce Motion ON while the page was open did nothing at all: the
+    // animation kept running for a user who had just asked it to stop.
+    const reduce = useReducedMotionPreference()
 
     useEffect(() => {
-        setReduce(window.matchMedia("(prefers-reduced-motion: reduce)").matches)
-    }, [])
-
-    useEffect(() => {
-        if (!items.length) return
-        if (reduce) {
-            setTyped(items[0])
-            return
-        }
-        const current = items[index] || items[0]
-        if (!deleting && typed === current) {
-            if (items.length < 2) return
-            const hold = window.setTimeout(() => setDeleting(true), 1600)
+        if (reduce || count === 0) return
+        if (!phase.deleting && phase.len >= current.length) {
+            if (count < 2) return
+            const hold = window.setTimeout(() => setPhase((p) => ({ ...p, deleting: true })), 1600)
             return () => window.clearTimeout(hold)
         }
-        if (deleting && typed.length === 0) {
-            setDeleting(false)
-            setIndex((i) => (i + 1) % items.length)
-            return
-        }
-        const speed = deleting ? 26 : typed.length === 0 ? 70 : 38
+        const speed = phase.deleting ? 26 : phase.len === 0 ? 70 : 38
         const tick = window.setTimeout(() => {
-            setTyped((prev) => deleting ? prev.slice(0, -1) : current.slice(0, prev.length + 1))
+            // The whole transition happens in the timer callback, including the instant
+            // "finished deleting, move to the next topic" step that the previous version performed
+            // synchronously in the effect body. Nothing here calls setState during the effect.
+            setPhase((p) => {
+                if (!p.deleting) return { ...p, len: p.len + 1 }
+                if (p.len <= 1) return { index: (p.index + 1) % count, len: 0, deleting: false }
+                return { ...p, len: p.len - 1 }
+            })
         }, speed)
         return () => window.clearTimeout(tick)
-    }, [items, index, typed, deleting, reduce])
+    }, [reduce, count, current, phase])
 
-    if (!items.length) return null
+    if (!count) return null
+
+    // Derived, not state. Under Reduce Motion the topic is simply shown whole; there is no
+    // "set it once from an effect" step, so there is no frame in which it is missing.
+    const typed = reduce ? current : current.slice(0, Math.min(phase.len, current.length))
 
     return (
         <motion.p
@@ -906,7 +948,7 @@ function AskAboutLine({ welcome, topics = [] }: { welcome?: string | null; topic
         >
             <span>Ask me about </span>
             <span className="text-profile-text">{typed}</span>
-            {!reduce && items.length > 0 ? (
+            {!reduce && count > 0 ? (
                 <motion.span
                     aria-hidden
                     className="ml-0.5 inline-block h-[0.85em] w-[1.5px] translate-y-[0.1em] bg-current align-baseline"

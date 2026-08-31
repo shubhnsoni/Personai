@@ -40,6 +40,12 @@ export default defineConfig({
         environment: "jsdom",
         include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
         setupFiles: ["./tests/setup.ts"],
+        // These files deliberately replace process-wide browser primitives (matchMedia, fetch,
+        // fake timers) and import several large Next server/client graphs. Running files in
+        // parallel made the importability guard intermittently spend its whole 5s budget waiting
+        // on transforms from unrelated files; the same import completes in ~1.2s in isolation.
+        // Serial files keep both the global stubs and the bounded import timeout deterministic.
+        fileParallelism: false,
         // Every test in this suite drives fake timers and global stubs. Restoring them between
         // tests keeps one file's matchMedia stub from leaking into the next.
         restoreMocks: true,
