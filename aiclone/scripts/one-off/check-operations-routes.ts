@@ -32,6 +32,13 @@ import { OperationsApiService } from "../../src/lib/operations/http"
 import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
+import {
+    classifyRouteModule,
+    describeMethods,
+    exportsMethod,
+    exportsNoStateChangingMethod,
+    frameworkDerivesSafeMethods,
+} from "../lib/http-method-classifier"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
@@ -118,11 +125,38 @@ async function main() {
     }
 
     // ---- structural: the route module exports a read verb and nothing else -----
-    const routeSrc = readFileSync(join(APP_ROOT, "src/app/api/platform/operations/today/route.ts"), "utf8")
+    /**
+     * MIGRATED TO THE CANONICAL CLASSIFIER, and this site was the weakest of the seven.
+     *
+     * It was `/export async function GET\(/` and `!/export async function (POST|PATCH|PUT|DELETE)\(/`. Both
+     * halves are blind to two declaration styles this repository already uses, and MEASURED over its 154
+     * api route files the narrow GET pattern misses 28 GET-exporting files and the narrow write pattern
+     * misses 21 files that really do export a state-changing verb. This surface's own route happens to use
+     * `export async function GET`, so the old pattern was right about THIS file by luck rather than by
+     * construction - a refactor to `export const GET = ...` would have turned the GET half red and the write
+     * half blind on the same day.
+     *
+     * It also polices the same operations surface as check-operations-runtime.ts while being strictly
+     * weaker than it, and it never mentioned HEAD or OPTIONS. Both gaps are closed here: the classifier is
+     * shared with that harness, so the two cannot drift, and the safe-method fact is now recorded rather
+     * than left unstated.
+     */
+    const routePath = join(APP_ROOT, "src/app/api/platform/operations/today/route.ts")
+    const routeSrc = readFileSync(routePath, "utf8")
+    const routeMethods = classifyRouteModule(routePath, routeSrc)
     checkInvertible(
-        "the operations route exports GET and no write verb",
-        /export async function GET\(/.test(routeSrc) && !/export async function (POST|PATCH|PUT|DELETE)\(/.test(routeSrc),
-        "GET only",
+        "the operations route exports GET and no state-changing verb - in ANY declaration style, including the two the old narrow pattern could not see",
+        exportsMethod(routeMethods, "GET") && exportsNoStateChangingMethod(routeMethods),
+        `methods=[${describeMethods(routeMethods)}] styles=[${routeMethods.exports.map((e) => `${e.method}:${e.style}`).join(" ")}]`,
+    )
+    // NOT a prohibition. HEAD and OPTIONS are SAFE methods under RFC 9110 section 9.2.1 and exporting
+    // either would be legal. This records the precondition that makes next@16.3.3 derive HEAD from this GET
+    // and answer OPTIONS itself - the same fact check-operations-runtime.ts records, now from the same
+    // classifier so the two harnesses cannot come to disagree about one route module.
+    checkInvertible(
+        "MEASURED: the operations route leaves HEAD and OPTIONS to the framework, which derives HEAD from this GET handler and answers OPTIONS itself",
+        frameworkDerivesSafeMethods(routeMethods),
+        `safe-method handlers exported: [${routeMethods.safeMethodHandlers.join(",") || "none"}]`,
     )
     check("the operations route is dynamic and runs on node", /force-dynamic/.test(routeSrc) && /runtime = "nodejs"/.test(routeSrc))
 

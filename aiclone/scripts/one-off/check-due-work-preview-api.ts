@@ -91,6 +91,13 @@ import { PersistenceError, type PersistenceErrorCode } from "../../src/lib/persi
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
 import {
+    classifyRouteModule,
+    describeMethods,
+    exportsMethod,
+    exportsNoStateChangingMethod,
+    frameworkDerivesSafeMethods,
+} from "../lib/http-method-classifier"
+import {
     createWriteDetector,
     classifyModelCall,
     classifyRawCall,
@@ -178,44 +185,42 @@ function refusal(called: Called): string {
 }
 
 /**
- * THE HANDLER-EXPORT GATE, widened after audit and then SPLIT after a second one.
+ * THE HANDLER-EXPORT GATE, now DELEGATED to scripts/lib/http-method-classifier.ts.
+ *
+ * The full argument moved with it, because six harnesses were each carrying a copy of part of it. What
+ * remains here is why THIS surface needed it and what the classifier is relied on to do.
  *
  * The first version of this gate asserted `!/export async function (POST|PATCH|PUT|DELETE)\(/`, which is
  * evadable without any cleverness at all: this repository's own src/app/api already declares handler
- * exports three different ways. Measured over its 156 route.ts files: `export async function VERB` 95
- * times, `export function VERB` 17 times and `export const VERB` 4 times, for POST/PUT/PATCH/DELETE. A
- * write verb added to the due-work route in either of the two latter styles - both of them already house
- * style here - would have passed the old gate untouched.
+ * exports three different ways. Re-measured with the AST over its 154 api route files:
+ * `export async function VERB` 95 times, `export function VERB` 17 times and `export const VERB` 4 times,
+ * for POST/PUT/PATCH/DELETE. A write verb added to the due-work route in either of the two latter styles -
+ * both of them already house style here - would have passed the old gate untouched. The GET side had the
+ * mirror problem: 26 route files write `export function GET`, so `export async function GET\(` would have
+ * gone red on a legal refactor of this one, and a gate that fails spuriously gets deleted rather than fixed.
  *
- * So the ban matches all three declaration styles. The GET side accepts the non-async form too, and that
- * is not hypothetical either: 26 route files in this repo write `export function GET`, so the old
- * `export async function GET\(` pattern would have gone red on a legal refactor of this one - and a gate
- * that fails spuriously gets deleted by the next person rather than fixed.
+ * THE SPLIT IS PRESERVED IN THE CLASSIFIER'S VOCABULARY, which is what stops it being un-made by accident.
+ * A previous round put HEAD and OPTIONS in with the four write verbs and called the whole set
+ * `WRITE_VERB_EXPORT`. Under RFC 9110 section 9.2.1 HEAD and OPTIONS are SAFE methods - neither is a
+ * request to change anything - so a set named for write verbs that contained two safe methods was a lie in
+ * the code, and the assertion built on it would have rejected a perfectly legal RFC-compliant HEAD export.
+ * It was never FAILING, because nothing in src/ exports either; it was wrong and latent, and it was
+ * propping up a real behavioural defect in the service (see the HEAD block in the runtime section). The two
+ * concepts are now two functions with two different meanings and no shared set to merge them back into:
  *
- * THE SPLIT, WHICH IS THE POINT OF THIS ROUND. The widened form put HEAD and OPTIONS in with the four
- * write verbs and called the whole set `WRITE_VERB_EXPORT`. Under RFC 9110 HEAD and OPTIONS are SAFE
- * methods - neither is a request to change anything - so a constant named for write verbs that contained
- * two safe methods was a lie in the code, and the assertion built on it would have rejected a perfectly
- * legal RFC-compliant HEAD export. Nothing in src/ exports HEAD or OPTIONS today, so it was never
- * FAILING; it was wrong and latent, and it was propping up a real behavioural defect in the service (see
- * the HEAD block in the runtime section).
+ *   exportsNoStateChangingMethod  the four unsafe verbs. Their ABSENCE is the no-write guarantee, and that
+ *                                 is the only claim this file may draw from an export scan.
+ *   frameworkDerivesSafeMethods   GET exported, HEAD and OPTIONS not. NOT a claim about writes. It is the
+ *                                 PRECONDITION for the framework's auto-implementation: exporting GET and
+ *                                 not HEAD is exactly what makes next@16.3.3 serve HEAD by invoking GET,
+ *                                 and exporting no OPTIONS is what makes it answer OPTIONS itself. So it
+ *                                 establishes a derivation and forbids nothing.
  *
- * The two concepts now have two names and two different meanings:
- *
- *   STATE_CHANGING_VERB_EXPORT  the four unsafe verbs. Their ABSENCE is the no-write guarantee, and that
- *                               is the only claim this file may draw from an export scan.
- *   SAFE_METHOD_HANDLER_EXPORT  HEAD and OPTIONS. Their absence is NOT a guarantee about writes. It is
- *                               the PRECONDITION for the framework's auto-implementation: exporting GET
- *                               and not HEAD is exactly what makes next@16.3.3 serve HEAD by invoking
- *                               GET, and exporting no OPTIONS is what makes it answer OPTIONS itself.
- *                               So this pattern is read to establish a derivation, not to forbid a verb.
- *
- * Neither pattern carries the `g` flag - a shared /g/ regex keeps `lastIndex` between `.test` calls and
- * would start answering false on alternate uses.
+ * TWO GAINS OVER THE REGEX PAIR IT REPLACES. It sees an aliased re-export (`export { handler as POST }`) -
+ * a working POST handler that was a false negative for all seven of the old patterns, which is the one
+ * direction that loses the guarantee silently. And it reads a parse rather than text, so this surface's own
+ * prose naming the verbs it refuses can no longer be counted as a violation of them.
  */
-const STATE_CHANGING_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/
-const SAFE_METHOD_HANDLER_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:HEAD|OPTIONS)\b/
-const GET_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+GET\b/
 
 /**
  * Source with comments removed, so a prohibition written in prose is not mistaken for the thing it
@@ -323,7 +328,9 @@ async function main() {
     }
 
     // ---- structural: the surface cannot act, by construction -------------------
-    const routeSrc = readFileSync(join(APP_ROOT, "src/app/api/platform/operations/due-work/route.ts"), "utf8")
+    const routePath = join(APP_ROOT, "src/app/api/platform/operations/due-work/route.ts")
+    const routeSrc = readFileSync(routePath, "utf8")
+    const routeMethods = classifyRouteModule(routePath, routeSrc)
     const httpSrc = readFileSync(join(APP_ROOT, "src/lib/operations/due-work-http.ts"), "utf8")
     const runtimeSrc = readFileSync(join(APP_ROOT, "src/lib/operations/due-work-runtime.ts"), "utf8")
     const httpExec = executableLines(httpSrc)
@@ -332,9 +339,9 @@ async function main() {
     const allExec = `${httpExec}\n${runtimeExec}\n${routeExec}`
 
     checkInvertible(
-        "the due-work route exports GET and no POST, PUT, PATCH or DELETE - in ANY of the three export styles this repo uses",
-        GET_EXPORT.test(routeExec) && !STATE_CHANGING_VERB_EXPORT.test(routeExec),
-        "no state-changing verb, checked against `export [async] function|const VERB`",
+        "the due-work route exports GET and no POST, PUT, PATCH or DELETE - in ANY declaration style, including the aliased re-export no regex could see",
+        exportsMethod(routeMethods, "GET") && exportsNoStateChangingMethod(routeMethods),
+        `methods=[${describeMethods(routeMethods)}] styles=[${routeMethods.exports.map((e) => `${e.method}:${e.style}`).join(" ")}]`,
     )
     // NOT a prohibition, and it must not be read as one: HEAD and OPTIONS are safe methods and exporting
     // either would be legal. This records the PRECONDITION that makes the framework derivation below
@@ -343,8 +350,8 @@ async function main() {
     // longer exists.
     checkInvertible(
         "MEASURED: the route exports GET and neither HEAD nor OPTIONS, which is the precondition for next@16.3.3 deriving both of them itself",
-        GET_EXPORT.test(routeExec) && !SAFE_METHOD_HANDLER_EXPORT.test(routeExec),
-        "GET exported; HEAD/OPTIONS left to the framework",
+        frameworkDerivesSafeMethods(routeMethods),
+        `safe-method handlers exported: [${routeMethods.safeMethodHandlers.join(",") || "none"}]`,
     )
     check("the due-work route is dynamic and runs on node", /force-dynamic/.test(routeExec) && /runtime = "nodejs"/.test(routeExec))
 

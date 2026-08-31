@@ -38,6 +38,7 @@ import {
     correspondingBlueprintId,
     suggestedAddons,
 } from "../../src/lib/onboarding-needs"
+import { classifyRouteModule, exportsNoStateChangingMethod } from "../lib/http-method-classifier"
 
 const INVERT = process.env.INVERT_ASSERTION === "1"
 const APP_ROOT = join(__dirname, "../..")
@@ -166,10 +167,26 @@ function routeFiles(dir: string): string[] {
     }
     return out
 }
+/**
+ * MIGRATED TO THE CANONICAL CLASSIFIER, and this site had the WIDEST regex of the seven - it was the only
+ * one that also matched `let` and `var`. That breadth is preserved (the classifier recognises both, plus
+ * the aliased re-export that no old pattern could match at all), and two things are gained.
+ *
+ * IT NO LONGER CONFLATES PROSE WITH CODE, which mattered more here than anywhere else. This detector runs
+ * over EVERY api route file, and its own `concernsBlueprints` test is satisfied by the word "blueprint"
+ * appearing anywhere in the source - including in a comment. So a route file whose comments said both
+ * "blueprint" and "no POST is exported here" would have been reported as an installation candidate on the
+ * strength of two comments. A `ts.SourceFile` cannot see into a comment or a string, so the write half of
+ * the test is now structural. `concernsBlueprints` deliberately still reads raw text: it is a RELEVANCE
+ * filter, and a file that only mentions blueprints in prose is still a file a reviewer should look at.
+ *
+ * MEASURED: over the 154 api route files the migration changes no verdict - asserted file by file in
+ * check-http-method-classifier.ts, which reproduces this exact pattern as a historical artifact and
+ * compares it against the classifier on every one of them.
+ */
 function exportsBlueprintWriteRoute(filePath: string, source: string): boolean {
     const concernsBlueprints = /(?:^|[\\/])blueprints?(?:[\\/]|$)/i.test(filePath) || /\bblueprint\b/i.test(source)
-    const exportsWriteMethod = /\bexport\s+(?:(?:async\s+)?function|const|let|var)\s+(?:POST|PUT|PATCH|DELETE)\b/.test(source)
-    return concernsBlueprints && exportsWriteMethod
+    return concernsBlueprints && !exportsNoStateChangingMethod(classifyRouteModule(filePath, source))
 }
 
 const syntheticInstallRoute = "export async function POST() { return Response.json({ installed: true }) }"

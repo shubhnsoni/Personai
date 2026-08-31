@@ -34,6 +34,7 @@ import { InstallContext } from "../../src/lib/business-os/install-shared"
 import { BlueprintPreviewService } from "../../src/lib/business-os/preview"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
+import { classifyRouteModule, describeMethods, exportsMethod, exportsNoStateChangingMethod } from "../lib/http-method-classifier"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
@@ -133,10 +134,9 @@ async function main() {
         join(APP_ROOT, "src/app/api/platform/workspaces/[workspaceId]/blueprint/route.ts"),
         "utf8",
     )
-    const planRoute = readFileSync(
-        join(APP_ROOT, "src/app/api/platform/workspaces/[workspaceId]/blueprint/plan/route.ts"),
-        "utf8",
-    )
+    const planRoutePath = join(APP_ROOT, "src/app/api/platform/workspaces/[workspaceId]/blueprint/plan/route.ts")
+    const planRoute = readFileSync(planRoutePath, "utf8")
+    const planRouteMethods = classifyRouteModule(planRoutePath, planRoute)
     for (const verb of ["GET", "POST", "DELETE"]) {
         check(
             `the blueprint route exports ${verb}`,
@@ -149,11 +149,18 @@ async function main() {
         !/export\s+async\s+function\s+(PUT|PATCH)\b/.test(writeRoute),
         "no PUT, no PATCH",
     )
+    /**
+     * MIGRATED TO THE CANONICAL CLASSIFIER. This was `/export\s+async\s+function\s+GET\b/` and
+     * `!/export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/` - async-only, so blind to the
+     * `export function VERB` and `export const VERB` styles this repository already uses in 17 and 4
+     * state-changing declarations respectively, and blind to an aliased re-export entirely. On a harness
+     * whose whole subject is which blueprint routes can INSTALL, a write verb it cannot see is the exact
+     * failure that matters.
+     */
     checkInvertible(
         "the plan route is GET-only, so previewing an install cannot write",
-        /export\s+async\s+function\s+GET\b/.test(planRoute) &&
-            !/export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/.test(planRoute),
-        "GET only",
+        exportsMethod(planRouteMethods, "GET") && exportsNoStateChangingMethod(planRouteMethods),
+        `methods=[${describeMethods(planRouteMethods)}] styles=[${planRouteMethods.exports.map((e) => `${e.method}:${e.style}`).join(" ")}]`,
     )
 
     const prisma = new PrismaClient()
