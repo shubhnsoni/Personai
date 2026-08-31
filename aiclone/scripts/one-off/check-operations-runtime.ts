@@ -86,6 +86,13 @@ import { OperationsApiService } from "../../src/lib/operations/http"
 import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
+import {
+    classifyRouteModule,
+    describeMethods,
+    exportsMethod,
+    exportsNoStateChangingMethod,
+    frameworkDerivesSafeMethods,
+} from "../lib/http-method-classifier"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
@@ -129,41 +136,40 @@ const engineCode = engineSrc
     .join("\n")
 
 /**
- * THE HANDLER-EXPORT GATE, widened after audit and then SPLIT. Shares its reasoning with
- * check-due-work-preview-api.ts, where the split is argued at length.
+ * THE HANDLER-EXPORT GATE, now DELEGATED to the one canonical classifier in
+ * scripts/lib/http-method-classifier.ts. Shares that classifier with check-due-work-preview-api.ts,
+ * check-operations-routes.ts, check-blueprint-preview.ts, check-blueprint-install-routes.ts and
+ * check-onboarding-blueprint-coverage.ts, which between them used to carry seven separate patterns that
+ * disagreed on three axes.
  *
- * The previous form was `!/export async function (POST|PATCH|PUT|DELETE)\(/`. That misses two declaration
- * styles this repository already uses for handler exports. Measured over its 156 route.ts files:
+ * WHAT THIS SITE USED TO BE, kept because the reasoning still applies and is now enforced in one place.
+ * The original form was `!/export async function (POST|PATCH|PUT|DELETE)\(/`, which misses two declaration
+ * styles this repository already uses. Re-measured with the AST over its 154 api route files:
  * `export async function VERB` 95 times, `export function VERB` 17 times, `export const VERB` 4 times, for
- * POST/PUT/PATCH/DELETE. So a write verb added in either of the two latter styles passed the gate
- * untouched. Both styles are house style here, so this was not a theoretical hole.
+ * POST/PUT/PATCH/DELETE - the same three figures the regex version cited, now derived from a parse. So a
+ * write verb added in either of the two latter styles passed the original gate untouched.
  *
- * THE WIDENING THEN OVERSHOT, and this round corrects it. It folded HEAD and OPTIONS into the same
- * alternation and named the result `WRITE_VERB_EXPORT`. Under RFC 9110 those two are SAFE methods; a
- * constant named for write verbs that contains them is a lie in the code, and the assertion built on it
- * would have gone red on a legal, RFC-compliant HEAD export. Measured: nothing under src/ exports HEAD or
- * OPTIONS today, so this was latent rather than failing. The two ideas are now two constants:
+ * THE WIDENING THEN OVERSHOT, and the correction is preserved in the classifier's own vocabulary. The
+ * widened regex folded HEAD and OPTIONS into the same alternation and named the result
+ * `WRITE_VERB_EXPORT`. Under RFC 9110 section 9.2.1 those two are SAFE methods; a set named for write
+ * verbs that contains them is a lie in the code, and the assertion built on it would have gone red on a
+ * legal, RFC-compliant HEAD export. The classifier keeps the two ideas apart by name and cannot merge
+ * them silently:
  *
- *   STATE_CHANGING_VERB_EXPORT  POST, PUT, PATCH, DELETE. Their absence IS the no-write guarantee.
- *   SAFE_METHOD_HANDLER_EXPORT  HEAD, OPTIONS. Their absence guarantees nothing about writes; it is the
- *                               precondition for next@16.3.3 deriving HEAD from GET and answering OPTIONS
- *                               itself, which is a fact worth recording and not a prohibition.
+ *   exportsNoStateChangingMethod  POST, PUT, PATCH, DELETE. Their absence IS the no-write guarantee.
+ *   frameworkDerivesSafeMethods   GET exported, HEAD and OPTIONS not. Guarantees nothing about writes; it
+ *                                 is the precondition for next@16.3.3 deriving HEAD from GET and answering
+ *                                 OPTIONS itself, which is a fact worth recording and not a prohibition.
  *
- * The GET side accepts the non-async form for the same reason as before, and 26 route files here already
- * use it: a gate that fails on a legal refactor gets deleted rather than fixed. Applied to
- * comment-stripped source, because a route file's own comments name the verbs they forbid and this repo
- * has mistaken a prohibition for a violation five times.
- *
- * No `g` flag: a shared /g/ regex keeps `lastIndex` between `.test` calls and answers false on alternate uses.
+ * TWO THINGS THE REGEX COULD NOT DO, AND THIS NOW DOES. It cannot see an aliased re-export
+ * (`export { handler as POST }`), which is a working POST handler and a false negative for all seven old
+ * patterns - the one direction that costs the guarantee silently. And the hand-rolled comment strip this
+ * site used to apply is gone: a `ts.SourceFile` cannot see into a comment or a string at all, so a route
+ * file's own prose naming the verbs it forbids can no longer be read as a violation. This repo had
+ * mistaken a prohibition for a violation five times before that became structural.
  */
-const STATE_CHANGING_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/
-const SAFE_METHOD_HANDLER_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:HEAD|OPTIONS)\b/
-const GET_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+GET\b/
-const routeCode = routeSrc
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .split("\n")
-    .map((line) => line.replace(/(^|[^:])\/\/.*$/, "$1"))
-    .join("\n")
+const routePath = join(APP_ROOT, "src/app/api/platform/operations/today/route.ts")
+const routeMethods = classifyRouteModule(routePath, routeSrc)
 
 const WRITE_CALLS = [".create(", ".createMany(", ".update(", ".updateMany(", ".delete(", ".deleteMany(", ".upsert("]
 const foundWrites = WRITE_CALLS.filter((needle) => engineCode.includes(needle))
@@ -182,17 +188,17 @@ check(
     /today\(request: Request\)/.test(httpSrc) && !/(create|update|delete|patch|post)\s*\(/i.test(httpSrc.replace(/\/\*[\s\S]*?\*\//g, "")),
 )
 check(
-    "the operations route exports GET and no POST, PUT, PATCH or DELETE - in ANY of the three export styles this repo uses",
-    GET_EXPORT.test(routeCode) && !STATE_CHANGING_VERB_EXPORT.test(routeCode),
-    "no state-changing verb, checked against `export [async] function|const VERB`",
+    "the operations route exports GET and no POST, PUT, PATCH or DELETE - in ANY declaration style, including the aliased re-export no regex could see",
+    exportsMethod(routeMethods, "GET") && exportsNoStateChangingMethod(routeMethods),
+    `methods=[${describeMethods(routeMethods)}] styles=[${routeMethods.exports.map((e) => `${e.method}:${e.style}`).join(" ")}]`,
 )
 // NOT a prohibition. HEAD and OPTIONS are safe methods and exporting either would be legal; this records
 // the precondition that makes next@16.3.3 derive HEAD from GET and answer OPTIONS itself, which is what
 // the behavioural block below then measures against the real service.
 check(
     "MEASURED: the operations route exports GET and neither HEAD nor OPTIONS, so the framework derives both - HEAD by invoking this GET handler, OPTIONS as its own 204 with Allow",
-    GET_EXPORT.test(routeCode) && !SAFE_METHOD_HANDLER_EXPORT.test(routeCode),
-    "GET exported; HEAD/OPTIONS left to the framework",
+    frameworkDerivesSafeMethods(routeMethods),
+    `safe-method handlers exported: [${routeMethods.safeMethodHandlers.join(",") || "none"}]`,
 )
 
 // ---------------------------------------------------------------------------
@@ -951,44 +957,57 @@ async function main() {
                 // served by invoking THIS handler with method "HEAD", and answers OPTIONS itself with 204
                 // and `Allow: GET, HEAD, OPTIONS` without reaching a handler at all.
                 //
-                // WHAT THAT MEANS HERE, AND IT IS NOT THE SAME ANSWER AS FOR DUE-WORK. `OperationsApiService`
-                // has NO method guard: `today` never looks at `request.method`. So:
+                // THE GAP THIS BLOCK USED TO DECLARE IS NOW CLOSED, and the assertions below are the
+                // reason the declaration was worth writing. It read:
                 //
-                //   HEAD     is answered exactly as GET, which is what RFC 9110 9.3.2 asks for. The
-                //            response object it returns still carries content; over HTTP the transport
-                //            suppresses a HEAD body, so an HTTP caller sees the correct thing. A direct
-                //            caller of the service object does not, and that difference is real.
-                //   OPTIONS  never reaches `today` over HTTP - the framework answers it. A DIRECT caller
-                //            gets the summary instead of a method directory, because nothing here refuses.
-                //   POST     is refused by the framework with its own bare 405. `today` itself does not
-                //            refuse it: called directly with a POST Request it answers 200 with data. The
-                //            surface's read-only guarantee therefore rests ENTIRELY on the route module's
-                //            exports, which is precisely the weakness due-work-http.ts's own header
-                //            describes and guards against with `requireAllowedMethod`.
+                //   "MEASURED AND DECLARED AS A GAP: `today` has no method guard at all, so called
+                //    DIRECTLY it answers OPTIONS and even POST with 200 and data. ... recorded, not fixed"
                 //
-                // RECORDED, NOT FIXED. src/lib/operations/http.ts is outside this package's owned paths, so
-                // adding the guard there is not this package's change to make. Asserting the measured truth
-                // is: it declares the gap, and it goes red the day someone closes or widens it, instead of
-                // this file continuing to imply a GET-only surface that the framework never delivered.
+                // and it asserted `opsOptions === 200 && opsPost === 200`. That was true when written:
+                // `today` never read `request.method`, and `operationsApi` is an exported singleton, so the
+                // surface's read-only guarantee rested entirely on one route module's export list. The
+                // declaration named the gap, said why it was not that package's change to make - http.ts
+                // was outside its owned paths - and was built to GO RED the day someone closed it.
+                //
+                // It went red. `requireAllowedMethod` now exists in src/lib/operations/http.ts, so the
+                // measured facts have changed and this records the new ones rather than the old:
+                //
+                //   HEAD     runs the whole GET path including authorization, then has its content removed
+                //            per RFC 9110 9.3.2. Status and headers are preserved on the failure paths too.
+                //   OPTIONS  answers 204 with `Allow`, which is byte-identical to what the framework
+                //            already answered over HTTP - so an HTTP caller sees no change at all.
+                //   POST     is refused by the SERVICE with 405 and `Allow`, not merely by the framework.
+                //
+                // KEPT DELIBERATELY SHALLOW HERE. This harness exercises the ENGINE; the boundary is
+                // check-operations-routes.ts's subject, and that is where the non-enumeration and
+                // zero-side-effect proofs for the guard live. What is asserted here is only that this
+                // harness's own picture of the surface's method behaviour is still accurate, because that
+                // picture is what the export scan above would otherwise be silently misread as.
                 // =============================================================================
                 identity.current = ids.userA
                 const opsApi = new OperationsApiService(service)
                 const opsUrl = `http://ops.test/api/platform/operations?workspaceId=${ids.wsA}`
-                const opsStatus = async (method: string) =>
-                    (await opsApi.today(new Request(opsUrl, { method }))).status
-                const opsGet = await opsStatus("GET")
-                const opsHead = await opsStatus("HEAD")
-                const opsOptions = await opsStatus("OPTIONS")
-                const opsPost = await opsStatus("POST")
+                const opsCall = async (method: string) => {
+                    const response = await opsApi.today(new Request(opsUrl, { method }))
+                    return { status: response.status, bodyBytes: (await response.text()).length, allow: response.headers.get("allow") }
+                }
+                const opsGet = await opsCall("GET")
+                const opsHead = await opsCall("HEAD")
+                const opsOptions = await opsCall("OPTIONS")
+                const opsPost = await opsCall("POST")
                 checkInvertible(
-                    "MEASURED: HEAD on the operations surface is answered exactly as GET - the framework routes it to this handler and nothing here refuses it, which is what RFC 9110 9.3.2 requires",
-                    opsGet === 200 && opsHead === 200,
-                    `GET=${opsGet} HEAD=${opsHead}`,
+                    "MEASURED: HEAD on the operations surface runs the same authorized path as GET and answers the same status with NO content - RFC 9110 9.3.2, and now true for a direct caller of the singleton and not only over the transport",
+                    opsGet.status === 200 && opsHead.status === 200 && opsGet.bodyBytes > 0 && opsHead.bodyBytes === 0,
+                    `GET=${opsGet.status}/${opsGet.bodyBytes}b HEAD=${opsHead.status}/${opsHead.bodyBytes}b`,
                 )
                 checkInvertible(
-                    "MEASURED AND DECLARED AS A GAP: `today` has no method guard at all, so called DIRECTLY it answers OPTIONS and even POST with 200 and data. Over HTTP the framework refuses POST and answers OPTIONS itself, so nothing is exposed today - but this surface's read-only guarantee rests only on the route module's exports. src/lib/operations/http.ts is outside this package's owned paths; recorded, not fixed",
-                    opsOptions === 200 && opsPost === 200,
-                    `direct OPTIONS=${opsOptions} direct POST=${opsPost} (framework: OPTIONS=204 with Allow, POST=405 with no Allow)`,
+                    "MEASURED: THE DECLARED GAP IS CLOSED - `today` now guards its own method, so a direct OPTIONS is 204 with Allow and a direct POST is 405 with Allow, instead of both answering 200 with a full workspace summary",
+                    opsOptions.status === 204 &&
+                        opsOptions.bodyBytes === 0 &&
+                        opsOptions.allow === "GET, HEAD, OPTIONS" &&
+                        opsPost.status === 405 &&
+                        opsPost.allow === "GET, HEAD, OPTIONS",
+                    `direct OPTIONS=${opsOptions.status} allow=[${opsOptions.allow ?? "none"}] direct POST=${opsPost.status} allow=[${opsPost.allow ?? "none"}]`,
                 )
                 identity.current = ids.userB
 

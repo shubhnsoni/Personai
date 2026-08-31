@@ -49,6 +49,7 @@ import { CORRESPONDING_BLUEPRINT } from "../../src/lib/onboarding-needs"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
+import { classifyRouteModule, describeMethods, exportsMethod, exportsNoStateChangingMethod } from "../lib/http-method-classifier"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
@@ -104,11 +105,12 @@ const httpSrc = readFileSync(join(APP_ROOT, "src/lib/business-os/preview-http.ts
 const sharedSrc = readFileSync(join(APP_ROOT, "src/lib/business-os/preview-shared.ts"), "utf8")
 const runtimeSrc = readFileSync(join(APP_ROOT, "src/lib/business-os/preview-runtime.ts"), "utf8")
 const typesSrc = readFileSync(join(APP_ROOT, "src/lib/business-os/preview-types.ts"), "utf8")
-const listRouteSrc = readFileSync(join(APP_ROOT, "src/app/api/platform/blueprints/route.ts"), "utf8")
-const previewRouteSrc = readFileSync(
-    join(APP_ROOT, "src/app/api/platform/blueprints/[blueprintId]/preview/route.ts"),
-    "utf8",
-)
+const listRoutePath = join(APP_ROOT, "src/app/api/platform/blueprints/route.ts")
+const previewRoutePath = join(APP_ROOT, "src/app/api/platform/blueprints/[blueprintId]/preview/route.ts")
+const listRouteSrc = readFileSync(listRoutePath, "utf8")
+const previewRouteSrc = readFileSync(previewRoutePath, "utf8")
+const listRouteMethods = classifyRouteModule(listRoutePath, listRouteSrc)
+const previewRouteMethods = classifyRouteModule(previewRoutePath, previewRouteSrc)
 
 function executableOnly(source: string): string {
     return source
@@ -138,12 +140,25 @@ checkInvertible(
     !/\$executeRaw|\$queryRaw|\$transaction|fetch\(/.test(resolverCode),
     "none present",
 )
+/**
+ * MIGRATED TO THE CANONICAL CLASSIFIER. This was the narrower of the two sites in this file and it was
+ * the strictest of the seven: `/export async function GET\(/` plus
+ * `!/export async function (POST|PATCH|PUT|DELETE)\(/`, which requires the paren immediately after the
+ * verb and so cannot see `export function GET`, `export const GET`, a multiline parameter list, or an
+ * aliased re-export. Measured over this repo's 154 api route files that narrow GET pattern is blind to 28
+ * GET-exporting files and the narrow write pattern to 21 files that really do export a state-changing verb.
+ *
+ * Both of these routes happen to use `export async function`, so the old pattern was right about them by
+ * luck. The verdict is unchanged - asserted file by file in check-http-method-classifier.ts - and it is now
+ * right by construction.
+ */
 check(
-    "both preview routes export GET and no write verb",
-    /export async function GET\(/.test(listRouteSrc) &&
-        /export async function GET\(/.test(previewRouteSrc) &&
-        !/export async function (POST|PATCH|PUT|DELETE)\(/.test(listRouteSrc) &&
-        !/export async function (POST|PATCH|PUT|DELETE)\(/.test(previewRouteSrc),
+    "both preview routes export GET and no state-changing verb, in ANY declaration style",
+    exportsMethod(listRouteMethods, "GET") &&
+        exportsMethod(previewRouteMethods, "GET") &&
+        exportsNoStateChangingMethod(listRouteMethods) &&
+        exportsNoStateChangingMethod(previewRouteMethods),
+    `list=[${describeMethods(listRouteMethods)}] preview=[${describeMethods(previewRouteMethods)}]`,
 )
 check(
     "the preview context asks only for profile.read, so no write permission path exists",
@@ -155,8 +170,13 @@ check(
 // /api/platform/blueprints needs only workspace membership. Onboarding happens BEFORE anyone opts into
 // the owner console, so merging the two would either lock preview out of onboarding or quietly widen
 // what the businessOs surface implies. Pinned here so a future de-duplication has to argue with it.
-const businessOsListSrc = readFileSync(join(APP_ROOT, "src/app/api/business-os/blueprints/route.ts"), "utf8")
-const platformListSrc = readFileSync(join(APP_ROOT, "src/app/api/platform/blueprints/route.ts"), "utf8")
+const businessOsListPath = join(APP_ROOT, "src/app/api/business-os/blueprints/route.ts")
+const businessOsListSrc = readFileSync(businessOsListPath, "utf8")
+const businessOsListMethods = classifyRouteModule(businessOsListPath, businessOsListSrc)
+// `platformListSrc` was a SECOND read of the same file `listRouteSrc` already holds, and the second site
+// below re-tested it with a different pattern than the site above used. That is exactly the drift this
+// wave removes, so the duplicate read is gone and both sites now consult one classification of one file.
+const platformListSrc = listRouteSrc
 checkInvertible(
     "MEASURED: the two blueprint listing surfaces authorize differently, so neither is a duplicate of the other",
     /requireBusinessOsAccess/.test(businessOsListSrc) && !/requireBusinessOsAccess/.test(platformListSrc),
@@ -164,8 +184,8 @@ checkInvertible(
 )
 check(
     "both blueprint listing surfaces are GET-only, so neither is an install path",
-    !/\bexport\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/.test(businessOsListSrc)
-        && !/\bexport\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/.test(platformListSrc),
+    exportsNoStateChangingMethod(businessOsListMethods) && exportsNoStateChangingMethod(listRouteMethods),
+    `business-os=[${describeMethods(businessOsListMethods)}] platform=[${describeMethods(listRouteMethods)}]`,
 )
 const PROVIDER_FORMS = ["nodemailer", "resend", "stripe", "twilio", "setInterval", "setTimeout", "cron", "enqueue"]
 const allPreviewCode = `${resolverCode}\n${httpSrc}\n${sharedSrc}\n${runtimeSrc}\n${listRouteSrc}\n${previewRouteSrc}`
