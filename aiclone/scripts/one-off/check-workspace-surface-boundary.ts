@@ -513,10 +513,9 @@ async function main() {
                     const allowances = observedAllowances(closure)
                     const httpAdmitted = roleResponses
                         .filter(({ response }) => response.status === 200)
-                        .map(({ role }) => String(role))
+                        .map(({ role }) => role)
                     const boundaryAdmitted = ROLE_PRIVILEGE_LADDER
                         .filter((role) => (allowances.get(role) ?? []).includes("profile.read"))
-                        .map((role) => String(role))
                     check(
                         "5e. the HTTP layer neither widens nor narrows the boundary's profile.read column",
                         roleResponses.length === KNOWN_ROLES.length &&
