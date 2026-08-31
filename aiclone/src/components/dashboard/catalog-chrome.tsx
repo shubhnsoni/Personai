@@ -1,22 +1,82 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 import { LayoutGrid, List, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 export type CatalogView = "grid" | "list"
 
-export function useCatalogView(key: string, fallback: CatalogView = "grid") {
-    const [view, setView] = useState<CatalogView>(fallback)
-    useEffect(() => {
-        const saved = localStorage.getItem(key)
-        if (saved === "grid" || saved === "list") setView(saved)
-    }, [key])
-    const setViewPersist = (next: CatalogView) => {
-        setView(next)
-        localStorage.setItem(key, next)
+function isCatalogView(value: unknown): value is CatalogView {
+    return value === "grid" || value === "list"
+}
+
+/**
+ * The persisted catalog view is a browser-only store mirrored into React. It is modelled as an
+ * external store rather than as state seeded by an effect, because the effect form has to call
+ * setState during mount (react-hooks/set-state-in-effect) and the obvious alternative - reading
+ * localStorage in render or in a useState initializer - throws on the server and desynchronises
+ * the first client paint from the server markup. useSyncExternalStore keeps the read out of
+ * render on the server via getServerSnapshot while still applying the stored value once the
+ * client takes over.
+ *
+ * `memory` is the in-memory source of truth so that toggling always repaints even when
+ * persistence is unavailable (private browsing, quota exceeded), which is what the previous
+ * setView-then-write ordering guaranteed. It is only ever populated from a real browser read or
+ * an explicit write, and getServerSnapshot never consults it, so one request cannot leak a view
+ * preference into another on a shared server process.
+ *
+ * Covered by scripts/one-off/check-react-hook-behaviour.ts, which pins the server contract:
+ * fallback-only markup, byte-identical across renders, and zero localStorage reads during render.
+ */
+const memory = new Map<string, CatalogView>()
+const listeners = new Set<() => void>()
+
+function browserStorage(): Storage | null {
+    try {
+        return typeof localStorage === "undefined" ? null : localStorage
+    } catch {
+        return null
     }
+}
+
+/** Same-tab notification. A localStorage write does not fire `storage` in the writing tab. */
+export function subscribeCatalogView(onStoreChange: () => void) {
+    listeners.add(onStoreChange)
+    return () => {
+        listeners.delete(onStoreChange)
+    }
+}
+
+export function readCatalogView(key: string, fallback: CatalogView): CatalogView {
+    const remembered = memory.get(key)
+    if (remembered) return remembered
+    let saved: string | null = null
+    try {
+        saved = browserStorage()?.getItem(key) ?? null
+    } catch {
+        saved = null
+    }
+    if (!isCatalogView(saved)) return fallback
+    memory.set(key, saved)
+    return saved
+}
+
+export function writeCatalogView(key: string, next: CatalogView) {
+    memory.set(key, next)
+    try {
+        browserStorage()?.setItem(key, next)
+    } catch {
+        /* persistence is best-effort; the in-memory value still drives the UI */
+    }
+    for (const listener of listeners) listener()
+}
+
+export function useCatalogView(key: string, fallback: CatalogView = "grid") {
+    const getSnapshot = useCallback(() => readCatalogView(key, fallback), [key, fallback])
+    const getServerSnapshot = useCallback(() => fallback, [fallback])
+    const view = useSyncExternalStore(subscribeCatalogView, getSnapshot, getServerSnapshot)
+    const setViewPersist = useCallback((next: CatalogView) => writeCatalogView(key, next), [key])
     return [view, setViewPersist] as const
 }
 
