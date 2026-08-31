@@ -168,6 +168,87 @@ function tagOf(line) {
   return match ? match[0] : null;
 }
 
+// ---------------------------------------------------------------------------
+// Falsifiability-scanner plumbing (appended; nothing above is changed).
+//
+// check-assertion-vacuity.ts is TypeScript run through ts-node, so it cannot be
+// `require`d in-process the way lib/corroborate.js is. It is spawned instead,
+// exactly as run-gates.js spawns it, and the cases assert on its stdout.
+//
+// The mirrored lists below are the point of wiring this up here at all. They are
+// a SECOND, independent statement of what the classes are and which fixture
+// belongs to which one: deleting a fixture from the harness, or renaming a class,
+// now fails HERE as well - and this file is not the file being changed when
+// someone edits a detector.
+// ---------------------------------------------------------------------------
+
+const VACUITY_HARNESS = "scripts/one-off/check-assertion-vacuity.ts";
+/** One real harness, so the corpus scan is cheap. The fixtures and proofs run regardless. */
+const VACUITY_SCOPE = "scripts/one-off/check-order-stream.ts";
+
+const VACUITY_KEYS = [
+  "ALIAS_IDENTITY",
+  "UNREACHED_INITIALISER",
+  "EMPTY_REPLAY",
+  "MIRRORED_DERIVATION",
+  "DOMINATED_CONJUNCT",
+  "EVERY_DOMINANCE",
+];
+
+/** Positive fixture per class: the shape that MUST be flagged, and the class it must be flagged as. */
+const VACUITY_POSITIVES = [
+  { key: "ALIAS_IDENTITY", name: "alias-identity-chain", expect: "VACUOUS_ALIAS_IDENTITY" },
+  { key: "ALIAS_IDENTITY", name: "alias-identity-destructured", expect: "VACUOUS_ALIAS_IDENTITY" },
+  { key: "ALIAS_IDENTITY", name: "alias-identity-pure-function-same-receiver", expect: "VACUOUS_ALIAS_IDENTITY" },
+  { key: "UNREACHED_INITIALISER", name: "unreached-initialiser-never-written", expect: "VACUOUS_UNREACHED_INITIALISER" },
+  { key: "UNREACHED_INITIALISER", name: "unreached-initialiser-dead-guard", expect: "VACUOUS_UNREACHED_INITIALISER" },
+  { key: "EMPTY_REPLAY", name: "empty-replay-accumulator", expect: "VACUOUS_EMPTY_REPLAY" },
+  { key: "MIRRORED_DERIVATION", name: "mirrored-derivation-imported-constant", expect: "VACUOUS_MIRRORED_DERIVATION" },
+  { key: "MIRRORED_DERIVATION", name: "mirrored-derivation-copied-production-constant", expect: "VACUOUS_MIRRORED_DERIVATION" },
+  { key: "DOMINATED_CONJUNCT", name: "dominated-conjunct-duplicate", expect: "VACUOUS_DOMINATED_CONJUNCT" },
+  { key: "DOMINATED_CONJUNCT", name: "dominated-conjunct-entailed-bound", expect: "VACUOUS_DOMINATED_CONJUNCT" },
+  { key: "DOMINATED_CONJUNCT", name: "dominated-conjunct-disjunction-forced-by-a-sibling", expect: "VACUOUS_DOMINATED_CONJUNCT" },
+  { key: "EVERY_DOMINANCE", name: "every-pin-under-or", expect: "UNGUARDED_EVERY" },
+  { key: "EVERY_DOMINANCE", name: "every-pin-inside-the-callback", expect: "UNGUARDED_EVERY" },
+];
+
+const VACUITY_PROOF_COUNT = VACUITY_POSITIVES.length;
+
+/** Safe near-miss per class: structurally similar, genuinely falsifiable, must NOT be flagged. */
+const VACUITY_NEAR_MISSES = [
+  "live-two-evaluations-reached-through-aliases",
+  "live-pure-function-over-two-receivers",
+  "live-boolean-set-false-under-a-reachable-guard",
+  "live-every-over-a-length-preserving-view",
+  "live-replay-with-the-ledger-pinned",
+  "live-expectation-independent-of-the-production-constant",
+  "live-mirrored-derivation-over-an-observed-root",
+  "live-two-independent-bounds-on-one-subject",
+  "live-repeated-conjunct-around-an-effect",
+];
+
+/** Spawn the vacuity scanner the way run-gates.js does, shaped like runDriver's result. */
+function runVacuity(extraArgs = []) {
+  const tsNodeBin = path.join(APP_DIR, "node_modules", "ts-node", "dist", "bin.js");
+  const result = spawnSync(
+    process.execPath,
+    [tsNodeBin, "-r", "tsconfig-paths/register", VACUITY_HARNESS, "--quiet", "--file", VACUITY_SCOPE, ...extraArgs],
+    {
+      cwd: APP_DIR,
+      encoding: "utf8",
+      shell: false,
+      env: { ...process.env, TS_NODE_PROJECT: "scripts/tsconfig.checks.json" },
+      maxBuffer: 64 * 1024 * 1024,
+    },
+  );
+  return {
+    exitCode: result.status,
+    stdout: String(result.stdout || ""),
+    stderr: String(result.stderr || ""),
+    summary: null,
+  };
+}
+
 /** Tags of the lines redact() rewrites, so the rewritten set can be pinned exactly. */
 function rewrittenTags(text) {
   return text
@@ -1373,6 +1454,90 @@ const CASES = [
       );
     },
   },
+
+  // ---- falsifiability classes (appended; nothing above is renumbered) -----------------------
+  //
+  // WHAT THESE ARE FOR. The evidence layer proves a harness reported a positive assertion count, and
+  // source corroboration proves that count is backed by an executable assertion callsite. Neither
+  // proves the asserted condition COULD HAVE FAILED - a harness can satisfy both while asserting
+  // something structurally always true. check-assertion-vacuity.ts closes that with six classes of
+  // non-constant-but-unfalsifiable condition, and the cases below pin, from OUTSIDE that harness:
+  //   - every positive fixture is caught, with the class it is supposed to be caught as;
+  //   - every SAFE NEAR-MISS - the same shape, genuinely falsifiable - is NOT caught;
+  //   - each class is LOAD-BEARING: disable it and its own positive fixtures stop being flagged;
+  //   - the mutation switch cannot buy a green run, and refuses a key it does not know.
+  //
+  // They spawn the scanner through ts-node with `--file` scoping, so each run costs ~2.5s instead of
+  // scanning all 79 harnesses: the fixtures and the mutation proofs run on every invocation regardless
+  // of how much corpus is in scope, so the scoping changes the cost and not what is proven.
+  {
+    name: "vacuity-falsifiability-positive-fixtures-are-all-caught",
+    why: "each of the six falsifiability classes has a positive fixture that MUST be flagged, and must be flagged AS THAT CLASS - a fixture caught by a neighbouring class would leave the class itself unproven",
+    run: () => runVacuity(),
+    expectExit: 0,
+    assert: (r) =>
+      VACUITY_POSITIVES.every((f) => new RegExp(`PASS self-test ${f.name}: ${f.expect} at fixture line \\d+`, "u").test(r.stdout)),
+  },
+  {
+    name: "vacuity-near-miss-controls-are-not-flagged",
+    why: "the load-bearing half: for each class a structurally similar but GENUINELY FALSIFIABLE fixture must not be flagged, because a detector that also flags these would report the strongest assertions in this tree as defects",
+    run: () => runVacuity(),
+    expectExit: 0,
+    assert: (r) =>
+      VACUITY_NEAR_MISSES.every((name) => r.stdout.includes(`PASS self-test ${name}: live control not flagged`)),
+  },
+  {
+    name: "vacuity-mutation-proofs-run-on-every-invocation",
+    why: "the proofs that each class is load-bearing are not opt-in: a plain run must execute one per (detector, positive fixture) and cover every key in the switch",
+    run: () => runVacuity(),
+    expectExit: 0,
+    assert: (r) => {
+      const proofs = r.stdout.split(/\r?\n/).filter((l) => l.startsWith("PASS mutation-proof "));
+      const keys = new Set(proofs.map((l) => l.slice("PASS mutation-proof ".length).split("/")[0]));
+      return (
+        proofs.length === VACUITY_PROOF_COUNT &&
+        VACUITY_KEYS.every((key) => keys.has(key)) &&
+        // Each proof asserts the class VANISHES with its detector off, and that the detector is put back.
+        proofs.every((l) => l.includes("GONE with it disabled") && l.includes("detector restored"))
+      );
+    },
+  },
+  {
+    name: "vacuity-mutation-switch-refuses-an-unknown-key",
+    why: "a typo in --mutate-disable must be refused by name rather than silently disabling nothing, which would make a mutation run indistinguishable from a normal one",
+    run: () => runVacuity(["--mutate-disable=NOT_A_DETECTOR"]),
+    expectExit: 1,
+    assert: (r) =>
+      /REFUSING TO RUN: --mutate-disable was given "NOT_A_DETECTOR"/u.test(r.stderr + r.stdout) &&
+      VACUITY_KEYS.every((key) => (r.stderr + r.stdout).includes(key)) &&
+      // It refuses BEFORE scanning: no corpus line, no fixture line, no evidence line.
+      !(r.stderr + r.stdout).includes("GATE-EVIDENCE"),
+  },
+  ...VACUITY_KEYS.map((key) => ({
+    name: `vacuity-MUTATION-${key}-is-load-bearing`,
+    why: `MUTATION PROOF from outside the harness that ${key} is load-bearing: with it disabled its own positive fixtures stop being flagged, the recorded invariant count DROPS, and the run is marked VOID and forced to exit 1 so a mutation can never be read as a passing gate`,
+    run: () => runVacuity([`--mutate-disable=${key}`]),
+    expectExit: 1,
+    assert: (r) => {
+      const fixtures = VACUITY_POSITIVES.filter((f) => f.key === key);
+      const ratio = /(\d+)\/(\d+) invariants passed/u.exec(r.stdout);
+      // A failing self-test prints on STDERR and the summary lines on STDOUT, so the fixture-level
+      // claims are read from both streams and the count and banner from the one that carries them.
+      const out = `${r.stdout}\n${r.stderr}`;
+      return (
+        fixtures.length > 0 &&
+        // Every positive fixture for THIS key goes unflagged, named individually.
+        fixtures.every((f) => out.includes(`FAIL self-test ${f.name}: expected ${f.expect}`)) &&
+        // No OTHER key's fixtures broke, so the switch disables exactly one detector.
+        VACUITY_POSITIVES.filter((f) => f.key !== key).every((f) => !out.includes(`FAIL self-test ${f.name}:`)) &&
+        // The in-process proof for a globally disabled key is skipped rather than falsely failed.
+        fixtures.every((f) => r.stdout.includes(`SKIP mutation-proof ${key}/${f.name}`)) &&
+        // The mutation LOWERS the evidence count - it cannot be hidden behind an unchanged number.
+        ratio !== null && Number(ratio[1]) < Number(ratio[2]) &&
+        r.stdout.includes("MUTATION RUN - THIS RUN IS VOID")
+      );
+    },
+  })),
 ];
 
 function hasFinding(r, kind) {
@@ -1385,8 +1550,9 @@ function main() {
 
   for (const c of CASES) {
     const args = c.lazyArgs ? c.lazyArgs() : c.args;
-    // `probe` cases assert on the scanner in-process; everything else spawns the driver.
-    const r = c.probe ? runProbe(c.probe) : runDriver(args, c.env || {});
+    // `probe` cases assert on the scanner in-process; `run` cases spawn something other than the
+    // driver (the vacuity scanner, through ts-node); everything else spawns the driver.
+    const r = c.run ? c.run() : c.probe ? runProbe(c.probe) : runDriver(args, c.env || {});
     const exitOk = r.exitCode === c.expectExit;
     let assertOk = false;
     let assertError = null;
