@@ -30,8 +30,24 @@ type CounterSnapshot = {
     updatedAt: Date
 }
 
+/**
+ * ASSERTION EVIDENCE. Counted INSIDE the real assertion helper so the gate's number and the
+ * verdict come from the same call. What is counted is the assertion CALLS — legal/illegal
+ * transitions, concurrent contiguous numbering, authoritative totals and modifier arithmetic,
+ * mixed-profile rejection — not the behaviours enumerated, the fixtures loaded, or the rows
+ * written. `assert` stays a throwing recorder: every call increments `assertionsRun`; only a
+ * passing call reaches `assertionsPassed`, so a failing assertion LOWERS the passed count and
+ * exits non-zero. The total is never hard-coded; `expectThrow` and the catalog-consistency
+ * asserts inside `modifierTotal` all route their verdict through this one helper, so each is
+ * counted once, as many times as it actually executes.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function assert(condition: unknown, message: string): asserts condition {
+    assertionsRun += 1
     if (!condition) throw new Error(message)
+    assertionsPassed += 1
 }
 
 function databaseName() {
@@ -428,7 +444,16 @@ async function main() {
     console.log(JSON.stringify({ ...report, cleanup: { ordersRemoved: true, tableRemoved: true, countersRestored: true } }, null, 2))
 }
 
-main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error))
-    process.exitCode = 1
-})
+main()
+    .catch((error) => {
+        console.error(error instanceof Error ? error.message : String(error))
+        process.exitCode = 1
+    })
+    .finally(() => {
+        // Machine-readable assertion evidence for scripts/gates/run-gates.js, emitted after the
+        // report and after main()'s own cleanup+disconnect, on both the pass and fail paths. The
+        // GATE-EVIDENCE line must be whole and name this file exactly, else the driver reports
+        // EVIDENCE_IDENTITY_MISMATCH.
+        console.log(`GATE-EVIDENCE harness=check-restaurant-phase0-behavior.ts assertions=${assertionsPassed}`)
+        console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+    })

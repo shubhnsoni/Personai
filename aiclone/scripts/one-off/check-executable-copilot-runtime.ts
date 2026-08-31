@@ -5,8 +5,23 @@ import {
   type CopilotAction,
 } from "@/lib/copilot/execution"
 
+/**
+ * ASSERTION EVIDENCE. Counted INSIDE the real assertion helper, so the number the gate
+ * reads is produced by the same call that decides the verdict. `assert` is (and stays) a
+ * throwing recorder: every call increments `assertionsRun`; only a call whose condition
+ * held reaches `assertionsPassed`. A failing assertion therefore LOWERS the passed count
+ * and, being uncaught, sets a non-zero exit. The total is never hard-coded. `expectRuntimeError`
+ * routes its single verdict through `assert`, so each is counted once, not double-counted;
+ * counting inside the helper also means the assertion inside a retried action is counted each
+ * time it actually runs rather than once per source line.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function assert(condition: unknown, message: string): asserts condition {
+  assertionsRun += 1
   if (!condition) throw new Error(message)
+  assertionsPassed += 1
 }
 
 async function expectRuntimeError(
@@ -162,7 +177,16 @@ async function main() {
   console.log("evidence: approval-before-action, append-only audit, retry idempotency, failed-run recovery, tenant isolation, falsifiability hook")
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : "executable runtime harness failed")
-  process.exitCode = 1
-})
+main()
+  .catch((error) => {
+    console.error(error instanceof Error ? error.message : "executable runtime harness failed")
+    process.exitCode = 1
+  })
+  .finally(() => {
+    // Machine-readable assertion evidence for scripts/gates/run-gates.js. Emitted after the
+    // report on both the pass and fail paths, so a failing assertion still reports its LOWERED
+    // count. The GATE-EVIDENCE line must be whole and name this file exactly, else the driver
+    // reports EVIDENCE_IDENTITY_MISMATCH.
+    console.log(`GATE-EVIDENCE harness=check-executable-copilot-runtime.ts assertions=${assertionsPassed}`)
+    console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+  })
