@@ -991,7 +991,7 @@ const CASES = [
   },
   {
     name: "evidence-real-manifest-allowlist-is-honest",
-    why: "the committed allowlist is exactly 13 exactly-named, reasoned, on-disk harnesses out of 74 executed — the number root will check",
+    why: "the committed allowlist is exactly 13 exactly-named, reasoned, on-disk harnesses out of 75 executed — the number root will check",
     args: ["--integrity-only"],
     expectExit: 0,
     assert: (r) => {
@@ -1003,9 +1003,12 @@ const CASES = [
         ev.required === true &&
         ev.allowlist.actualSize === 13 &&
         ev.allowlist.declaredSize === 13 &&
-        runnable === 74 &&
-        // Honest arithmetic: 74 runnable = 61 enforced + 13 allowlisted.
-        runnable - ev.allowlist.actualSize === 61 &&
+        runnable === 75 &&
+        // Honest arithmetic: 75 runnable = 62 enforced + 13 allowlisted. The 75th is
+        // check-vertical-pack-candidates.ts, registered enforced rather than
+        // allowlisted because it emits its own identity-bearing GATE-EVIDENCE line
+        // with a count taken from its assertion helper.
+        runnable - ev.allowlist.actualSize === 62 &&
         ev.allowlist.files.length === new Set(ev.allowlist.files).size &&
         ev.allowlist.entries.every(
           (e) =>

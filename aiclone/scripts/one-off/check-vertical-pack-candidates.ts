@@ -45,8 +45,28 @@ const INVERT = process.env.INVERT_ASSERTION === "1"
 const report: Record<string, unknown> = {}
 const failures: string[] = []
 
+/**
+ * ASSERTION EVIDENCE. Counted inside the real helper, so the number the gate reads
+ * is produced by the same call that decides the verdict - there is no separate
+ * tally that could drift from, or be maintained independently of, the checks.
+ *
+ * Deliberately not a literal anywhere: a hard-coded total would keep printing a
+ * healthy-looking count after someone deleted half the assertions, which is the
+ * exact failure the evidence contract exists to catch. Every assertion that runs
+ * increments `assertionsRun`; only one whose condition held increments
+ * `assertionsPassed`. So a failing assertion necessarily LOWERS the passed count
+ * and, through `failures`, sets a non-zero exit.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function check(name: string, condition: unknown, detail?: string) {
-  if (!condition) failures.push(detail ? `${name}: ${detail}` : name)
+  assertionsRun += 1
+  if (condition) {
+    assertionsPassed += 1
+    return
+  }
+  failures.push(detail ? `${name}: ${detail}` : name)
 }
 
 function checkInvertible(name: string, condition: unknown, detail?: string) {
@@ -967,10 +987,105 @@ report.negativeTests = {
   notificationCaught: caughtNotification.length === 1,
   executionClaimsCaught: caughtExecutionClaims.length,
 }
+// ---------------------------------------------------------------------------
+// HOME-SERVICES ALIAS CONSTRAINT - executable, not prose.
+//
+// home-services-v1 composes the IDENTICAL engine and capability set as the ACTIVE
+// field-service-v1. The candidate's own integration notes say so, and say something
+// sharper: its vertical string "home-services" does not collide with the registered
+// "field-service", so the one-active-blueprint-per-vertical rule "would not itself
+// block registration - which is why the overlap needs stating in prose rather than
+// being left to a uniqueness check that would pass."
+//
+// Prose does not survive a refactor. This block turns the integration decision into
+// a checked invariant: WHILE the composition is identical, home-services-v1 must
+// stay unregistered AND must name field-service-v1 as its fold/alias target. Anyone
+// registering it as a second active blueprint on an identical composition fails the
+// harness instead of discovering the duplication in production.
+//
+// The constraint is deliberately CONDITIONAL on the overlap. If the composition
+// genuinely diverges later, the alias argument no longer applies and the implication
+// is vacuously satisfied - so this cannot block legitimate differentiation.
+// ---------------------------------------------------------------------------
+
+function engineFingerprint(blueprint: BusinessBlueprint): string {
+  return [...blueprint.engines]
+    .map(
+      (engine) =>
+        `${engine.engineId}:${[...engine.capabilities].sort().join("+")}:${engine.required ? "required" : "optional"}`,
+    )
+    .sort()
+    .join(" | ")
+}
+
+const homeServicesCandidate = getVerticalPackCandidate("home-services-v1")
+const fieldServiceBlueprint = getBusinessBlueprint("field-service-v1")
+
+check(
+  "both sides of the alias constraint resolve: the home-services candidate and the active field-service blueprint",
+  homeServicesCandidate !== undefined && fieldServiceBlueprint !== undefined,
+  `candidate=${homeServicesCandidate !== undefined} blueprint=${fieldServiceBlueprint !== undefined}`,
+)
+
+const homeFingerprint = homeServicesCandidate ? engineFingerprint(homeServicesCandidate.blueprint) : ""
+const fieldFingerprint = fieldServiceBlueprint ? engineFingerprint(fieldServiceBlueprint) : ""
+const compositionIdentical = homeFingerprint !== "" && homeFingerprint === fieldFingerprint
+
+const registeredBlueprintIds = listBusinessBlueprints().map((blueprint) => blueprint.id)
+const homeServicesRegistered = registeredBlueprintIds.includes("home-services-v1")
+
+const namesFoldTarget = (homeServicesCandidate?.integrationNotes ?? []).some(
+  (note) => /field-service-v1/u.test(note) && /\b(fold|alias|terminology|overlap)\b/iu.test(note),
+)
+
+checkInvertible(
+  "home-services-v1 is not a registered blueprint",
+  !homeServicesRegistered,
+  `registeredIds=[${registeredBlueprintIds.join(",")}]`,
+)
+
+checkInvertible(
+  "WHILE home-services-v1 composes the identical engine set as field-service-v1 it stays unregistered and names field-service-v1 as its fold/alias target",
+  !compositionIdentical || (!homeServicesRegistered && namesFoldTarget),
+  `identical=${compositionIdentical} registered=${homeServicesRegistered} namesFoldTarget=${namesFoldTarget}`,
+)
+
+check(
+  "MEASURED: the home-services/field-service overlap is still exact, so the alias constraint above is the binding one - if this fails the compositions have diverged, the alias argument no longer applies, and this pin should be updated deliberately",
+  compositionIdentical,
+  `home=[${homeFingerprint}] field=[${fieldFingerprint}]`,
+)
+
+report.homeServicesAliasConstraint = {
+  homeFingerprint,
+  fieldFingerprint,
+  compositionIdentical,
+  registered: homeServicesRegistered,
+  namesFoldTarget,
+  decision:
+    "Unregistered draft candidate. Treated as a future onboarding/terminology alias or fold candidate for field-service-v1. Not registered as a second active blueprint while the engine and capability composition is identical.",
+}
+
 report.promotionEvidence = promotionEvidence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
 report.failureCount = failures.length
 report.failures = failures
+report.assertionsRun = assertionsRun
+report.assertionsPassed = assertionsPassed
 
 console.log(JSON.stringify(report, null, 2))
+
+// Machine-readable assertion evidence for scripts/gates/run-gates.js.
+//
+// The identity-bearing GATE-EVIDENCE line must be the WHOLE line to be read, and
+// its harness id must match this file's name exactly or the driver reports
+// EVIDENCE_IDENTITY_MISMATCH. Both numbers come from the counters incremented
+// inside check() above, so they cannot claim more than actually ran.
+//
+// The driver prefers explicit identity-bearing evidence over the heuristic ratio
+// form, so printing both is safe: the GATE-EVIDENCE line is authoritative and the
+// ratio line stays human-readable in the log.
+console.log(`GATE-EVIDENCE harness=check-vertical-pack-candidates.ts assertions=${assertionsPassed}`)
+console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+
 if (failures.length > 0) process.exitCode = 1
