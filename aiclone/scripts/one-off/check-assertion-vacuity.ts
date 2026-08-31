@@ -71,6 +71,11 @@ type Classification =
     | "VACUOUS_SELF_COMPARISON"
     | "VACUOUS_DERIVED_EXPECTATION"
     | "UNGUARDED_EVERY"
+    | "VACUOUS_ALIAS_IDENTITY"
+    | "VACUOUS_UNREACHED_INITIALISER"
+    | "VACUOUS_EMPTY_REPLAY"
+    | "VACUOUS_MIRRORED_DERIVATION"
+    | "VACUOUS_DOMINATED_CONJUNCT"
     | "INTENTIONAL_FIXTURE_SELF_CHECK"
     | "UNRESOLVED"
     | "LIVE"
@@ -128,7 +133,60 @@ const VACUOUS: readonly Classification[] = [
     "VACUOUS_SELF_COMPARISON",
     "VACUOUS_DERIVED_EXPECTATION",
     "UNGUARDED_EVERY",
+    "VACUOUS_ALIAS_IDENTITY",
+    "VACUOUS_UNREACHED_INITIALISER",
+    "VACUOUS_EMPTY_REPLAY",
+    "VACUOUS_MIRRORED_DERIVATION",
+    "VACUOUS_DOMINATED_CONJUNCT",
 ]
+
+/**
+ * MUTATION SWITCH. Each key names ONE detector - the five classes added by the falsifiability wave,
+ * plus the dominance rule inside `detectUnguardedEvery` - and disabling a key makes exactly that
+ * detector return nothing.
+ *
+ * WHY A SWITCH IS SAFE HERE AND WHY IT CANNOT BE A BYPASS. A detector nobody can turn off is a
+ * detector nobody can PROVE is load-bearing: "the fixture is flagged" is equally true of a fixture
+ * flagged by some OTHER class, or by a coincidence of precedence. So `runMutationProofs` turns each key
+ * off, re-scans that key's own positive fixture, and requires the finding to DISAPPEAR - then restores
+ * it. Those proofs run on every invocation and are recorded through `recordSelfCheck`, so they gate.
+ *
+ * The switch can never buy a green run. `--mutate-disable=<KEY>` marks the whole run VOID and forces a
+ * non-zero exit whatever the findings are (see the entry section), and the in-process proofs restore
+ * every key in a `finally`. There is no environment variable and no config file: a mutation must be
+ * asked for on the command line, and asking for one is the same as asking for exit 1.
+ */
+const MUTABLE_DETECTORS = [
+    "ALIAS_IDENTITY",
+    "UNREACHED_INITIALISER",
+    "EMPTY_REPLAY",
+    "MIRRORED_DERIVATION",
+    "DOMINATED_CONJUNCT",
+    "EVERY_DOMINANCE",
+] as const
+
+type MutableDetector = (typeof MUTABLE_DETECTORS)[number]
+
+const disabledDetectors = new Set<MutableDetector>()
+
+function detectorEnabled(key: MutableDetector): boolean {
+    return !disabledDetectors.has(key)
+}
+
+/** Run `body` with `key` disabled, restoring the PRIOR state however `body` ends. */
+function withDetectorDisabled<T>(key: MutableDetector, body: () => T): T {
+    // Restoring the prior state rather than unconditionally deleting matters for exactly one caller:
+    // a `--mutate-disable=<KEY>` run, where the key is ALREADY off for the whole process. An
+    // unconditional delete there would silently switch the detector back on halfway through the run
+    // the operator asked to be a mutation, which is the one thing a mutation switch must never do.
+    const wasDisabled = disabledDetectors.has(key)
+    disabledDetectors.add(key)
+    try {
+        return body()
+    } finally {
+        if (!wasDisabled) disabledDetectors.delete(key)
+    }
+}
 
 /**
  * Helper names with the argument index that carries the condition. This is a FALLBACK ONLY: the real
@@ -161,6 +219,21 @@ const BUILTIN_ROOTS = new Set([
 
 /** Words that, in an assertion name or its leading comment, are evidence of a deliberate fixture check. */
 const FIXTURE_EVIDENCE = /\b(?:fixture|deliberate(?:ly)?|on purpose|by construction|sanity|self-test|selftest|control|controlled|precondition|smoke|tautolog\w*|placeholder|scaffold)\b/iu
+
+/**
+ * What the FALSIFIABILITY layer deliberately does not decide. Same principle as `COVERAGE_LIMITS`: a
+ * hole that is declared can be argued about, and a hole that is silent gets mistaken for a clean
+ * result. Every item here is a case where the analysis could not PROVE unfalsifiability, so the shape
+ * is either reported UNRESOLVED or not reported at all - never counted as a defect.
+ */
+const FALSIFIABILITY_LIMITS: readonly string[] = [
+    "a boolean whose assignment IS reachable but is never actually taken on the data this suite happens to produce: `let ok = true; for (...) if (bad) ok = false` is treated as FALSIFIABLE, because deciding otherwise needs the runtime. Only two forms are proven - the binding is never written anywhere in the file, or every guard on every assignment folds to a constant false with this file's own compile-time constants substituted",
+    "a replay loop whose trip count cannot be read off its head - a `while`, a `do`, or a `for` whose condition is not a length comparison: reported UNRESOLVED rather than counted, because whether zero iterations is reachable is a runtime question",
+    "a replay accumulator that is ALSO a plain `=`-assigned conditional variable: the conditional-init detector answers first by design, so the shape is reported in that class instead (check-retainer-runtime.ts:495 is the instance)",
+    "emptiness of a collection built only from imported bindings: decided in another module, so both the every-receiver and the replay-iterable forms are reported UNRESOLVED",
+    "conjunct domination beyond one subject compared against constants: `a.length > 0 && b.length > 0` where an invariant elsewhere ties `a` and `b` is not reasoned about, and a conjunct separated from its dominator by anything with a possible effect is left alone",
+    "alias identity through a nested destructuring pattern, a rest element, a computed key that is not a constant, or a name bound twice in one file: each drops the alias rather than resolve it to the wrong binding",
+]
 
 function lineOf(source: ts.SourceFile, node: ts.Node): number {
     return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
@@ -1010,6 +1083,703 @@ function excludedMiddle(source: ts.SourceFile, node: ts.Expression): string | nu
 }
 
 // ---------------------------------------------------------------------------------------------
+// falsifiability analysis: aliasing, frozen roots, local purity, loop accumulators, dominance
+//
+// Everything in this section answers one question the six original detectors never asked: could this
+// condition have taken the value FALSE at all? A condition can be non-constant, read real observed
+// values, pass every purity and provenance test above, and still be true on every run that reaches it,
+// because the two things it compares are THE SAME THING reached by two routes, or because the code that
+// would have falsified it cannot execute. These are the structural routes to that.
+// ---------------------------------------------------------------------------------------------
+
+/** `const { a } = obj`, `const { a: b } = obj`, `const [x, y] = pair`. Nested patterns are not followed. */
+type DestructuredAlias = Readonly<{
+    source: ts.Expression
+    /** Property name for an object pattern, element index for an array pattern. */
+    property: string | number
+    sourceText: string
+}>
+
+/**
+ * Destructured bindings, kept OUT of `definitions` on purpose.
+ *
+ * `buildDefinitions` only records `ts.isIdentifier(node.name)` declarations, so `const { total } = row`
+ * leaves `total` a bare root: `canonical` cannot inline it and `observationRoots` treats it as its own
+ * observation. Adding it to `definitions` would need a synthesised property-access node, which has no
+ * source position, and `canonical`/`normalize` both call `getText`. So the alias is recorded separately
+ * and read only by the detectors written for it, which keeps the blast radius on the six original
+ * classes at exactly zero.
+ */
+function buildDestructuredAliases(source: ts.SourceFile): Map<string, DestructuredAlias> {
+    const found: Array<readonly [string, DestructuredAlias]> = []
+    walk(source, (node) => {
+        if (!ts.isVariableDeclaration(node) || !node.initializer) return
+        const initializer = node.initializer
+        const sourceText = normalize(source, initializer)
+        if (ts.isObjectBindingPattern(node.name)) {
+            for (const element of node.name.elements) {
+                if (!ts.isIdentifier(element.name) || element.dotDotDotToken) continue
+                const property = element.propertyName && ts.isIdentifier(element.propertyName)
+                    ? element.propertyName.text
+                    : element.name.text
+                found.push([element.name.text, { source: initializer, property, sourceText }])
+            }
+            return
+        }
+        if (ts.isArrayBindingPattern(node.name)) {
+            node.name.elements.forEach((element, index) => {
+                if (ts.isOmittedExpression(element)) return
+                if (!ts.isIdentifier(element.name) || element.dotDotDotToken) return
+                found.push([element.name.text, { source: initializer, property: index, sourceText }])
+            })
+        }
+    })
+    const seen = new Map<string, number>()
+    for (const [name] of found) seen.set(name, (seen.get(name) ?? 0) + 1)
+    const aliases = new Map<string, DestructuredAlias>()
+    for (const [name, alias] of found) {
+        // A name bound twice cannot be resolved without full scope analysis; drop it rather than
+        // resolve it to the wrong binding. Same rule `buildDefinitions` applies.
+        if ((seen.get(name) ?? 0) > 1) continue
+        aliases.set(name, alias)
+    }
+    return aliases
+}
+
+/** The identifier a reference chain is rooted at: `a.b[c].d()` is rooted at `a`. */
+function rootIdentifier(node: ts.Expression): string | null {
+    let current = unwrap(node)
+    for (let depth = 0; depth < 12; depth += 1) {
+        if (ts.isIdentifier(current)) return current.text
+        if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
+            current = unwrap(current.expression)
+            continue
+        }
+        if (ts.isCallExpression(current)) {
+            current = unwrap(current.expression)
+            continue
+        }
+        return null
+    }
+    return null
+}
+
+/**
+ * Methods that change their receiver in place.
+ *
+ * `sort` and `reverse` are in `PURE_METHODS` and are NOT pure: both mutate. That set is used by the
+ * existing self-comparison detector and changing it would move existing verdicts, so it is left alone
+ * and the mutation is recorded here instead, where it decides whether a binding is frozen.
+ */
+const MUTATING_METHODS = new Set([
+    "push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill", "copyWithin",
+    "set", "delete", "add", "clear", "assign", "defineProperty", "setPrototypeOf",
+])
+
+/** Every name this file writes to, directly or through a property, an increment or a mutator call. */
+function mutatedNames(source: ts.SourceFile): Set<string> {
+    const mutated = new Set<string>()
+    const note = (expression: ts.Expression | undefined): void => {
+        if (!expression) return
+        const root = rootIdentifier(expression)
+        if (root) mutated.add(root)
+    }
+    walk(source, (node) => {
+        if (ts.isBinaryExpression(node) && ASSIGNMENT_OPERATORS.has(node.operatorToken.kind)) note(node.left)
+        if (
+            (ts.isPostfixUnaryExpression(node) || ts.isPrefixUnaryExpression(node))
+            && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+        ) note(node.operand)
+        if (ts.isDeleteExpression(node)) note(node.expression)
+        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+            if (MUTATING_METHODS.has(node.expression.name.text)) note(node.expression.expression)
+        }
+    })
+    return mutated
+}
+
+/**
+ * Imported bindings this file cannot have changed, so reading one twice yields the same value.
+ *
+ * This is the whole difference between the two shapes the mirrored-derivation detector must tell apart.
+ * `JSON.stringify(PERMISSION_KEYS)` written twice compares an imported production constant with itself
+ * and can never fail. `table.rows.join(",")` written twice compares two OBSERVATIONS of a mutable
+ * system taken at different times and is the strongest kind of assertion in this tree. Both canonicalise
+ * to the same text and both are "pure"; only the provenance of the root separates them, so only an
+ * import that this file never touches is ever treated as frozen.
+ *
+ * Handing a name to a function that is not provably pure counts as mutating it: the callee could hold a
+ * reference and change it. That is conservative in the safe direction - it can only ever REMOVE a
+ * finding.
+ */
+function buildFrozenRoots(source: ts.SourceFile, imported: ReadonlySet<string>, pureLocals: ReadonlySet<string>): Set<string> {
+    const mutated = mutatedNames(source)
+    walk(source, (node) => {
+        if (!ts.isCallExpression(node)) return
+        const callee = node.expression
+        const pure = ts.isPropertyAccessExpression(callee)
+            ? PURE_METHODS.has(callee.name.text)
+            : ts.isIdentifier(callee) && (PURE_FUNCTIONS.has(callee.text) || pureLocals.has(callee.text))
+        if (pure) return
+        for (const argument of node.arguments) {
+            const root = rootIdentifier(argument)
+            if (root) mutated.add(root)
+        }
+    })
+    return new Set([...imported].filter((name) => !mutated.has(name)))
+}
+
+/**
+ * Locally declared functions provably side-effect free AND deterministic, computed to a fixed point.
+ *
+ * `isPure`/`deeplyPure` treat every call to a locally declared function as impure, which is right as a
+ * default and is why `const a = summarise(rows); const b = summarise(rows); check(a === b)` is invisible
+ * to every existing detector: the two sides canonicalise to the same text, but purity cannot be
+ * established, so the self-comparison detector returns nothing at all. Proving the callee pure closes
+ * that hole, and proving it is the only honest way to close it.
+ *
+ * A body qualifies when it contains no `await`, no `new`, no `delete`, no `yield`, writes nothing it did
+ * not declare itself, calls nothing but a known-pure builtin or another function already proven pure,
+ * and READS no free binding that this file assigns anywhere. The last condition is the one that keeps
+ * a memoising or counting helper out: `(xs) => \`${xs.length}:${calls}\`` reads a mutable counter and is
+ * therefore not a function whose two applications must agree.
+ */
+function buildPureLocals(source: ts.SourceFile): Set<string> {
+    const candidates = new Map<string, FunctionLike>()
+    walk(source, (node) => {
+        const candidate = asFunctionLike(node)
+        if (candidate && candidate.body) candidates.set(candidate.name, candidate)
+    })
+    const mutated = mutatedNames(source)
+    const pure = new Set<string>()
+    for (let round = 0; round < 8; round += 1) {
+        let grew = false
+        for (const [name, candidate] of candidates) {
+            if (pure.has(name)) continue
+            if (!functionBodyIsPure(candidate, pure, mutated)) continue
+            pure.add(name)
+            grew = true
+        }
+        if (!grew) break
+    }
+    return pure
+}
+
+function functionBodyIsPure(
+    candidate: FunctionLike,
+    pure: ReadonlySet<string>,
+    mutated: ReadonlySet<string>,
+): boolean {
+    const body = candidate.body
+    if (!body) return false
+    const owned = new Set<string>()
+    for (const parameter of candidate.parameters) {
+        if (ts.isIdentifier(parameter.name)) owned.add(parameter.name.text)
+    }
+    walk(body, (node) => {
+        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) owned.add(node.name.text)
+        if (ts.isParameter(node) && ts.isIdentifier(node.name)) owned.add(node.name.text)
+        if (ts.isBindingElement(node) && ts.isIdentifier(node.name)) owned.add(node.name.text)
+    })
+    let ok = true
+    walk(body, (node) => {
+        if (!ok) return
+        if (ts.isAwaitExpression(node) || ts.isNewExpression(node) || ts.isYieldExpression(node) || ts.isDeleteExpression(node)) {
+            ok = false
+            return
+        }
+        if (ts.isBinaryExpression(node) && ASSIGNMENT_OPERATORS.has(node.operatorToken.kind)) {
+            const root = rootIdentifier(node.left)
+            if (!root || !owned.has(root)) ok = false
+            return
+        }
+        if (
+            (ts.isPostfixUnaryExpression(node) || ts.isPrefixUnaryExpression(node))
+            && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+        ) {
+            const root = rootIdentifier(node.operand)
+            if (!root || !owned.has(root)) ok = false
+            return
+        }
+        if (ts.isCallExpression(node)) {
+            if (ts.isPropertyAccessExpression(node.expression)) {
+                if (!PURE_METHODS.has(node.expression.name.text)) ok = false
+                return
+            }
+            if (ts.isIdentifier(node.expression)) {
+                const callee = node.expression.text
+                if (!PURE_FUNCTIONS.has(callee) && !pure.has(callee) && callee !== candidate.name) ok = false
+                return
+            }
+            ok = false
+            return
+        }
+        if (!ts.isIdentifier(node)) return
+        const parent = node.parent
+        if (parent && ts.isPropertyAccessExpression(parent) && parent.name === node) return
+        if (parent && ts.isPropertyAssignment(parent) && parent.name === node) return
+        if (owned.has(node.text) || BUILTIN_ROOTS.has(node.text)) return
+        // A free binding that something in this file writes to makes two applications of this
+        // function able to disagree, which is exactly what the detector must not assume away.
+        if (mutated.has(node.text)) ok = false
+    })
+    return ok
+}
+
+/** `impureNode`, but a call to a function proven pure by `buildPureLocals` no longer counts. */
+function impureNodeWith(candidate: ts.Node, pureLocals: ReadonlySet<string>): boolean {
+    if (
+        ts.isCallExpression(candidate)
+        && ts.isIdentifier(candidate.expression)
+        && pureLocals.has(candidate.expression.text)
+    ) return false
+    return impureNode(candidate)
+}
+
+/** `deeplyPure`, extended with the locally proven pure functions. */
+function deeplyPureWith(
+    context: Context,
+    node: ts.Node,
+    depth = 0,
+    visiting: ReadonlySet<string> = new Set(),
+): boolean {
+    if (depth > 6) return false
+    let pure = true
+    walk(node, (candidate) => {
+        if (!pure) return
+        if (impureNodeWith(candidate, context.pureLocals)) {
+            pure = false
+            return
+        }
+        if (!ts.isIdentifier(candidate)) return
+        const parent = candidate.parent
+        if (parent && ts.isPropertyAccessExpression(parent) && parent.name === candidate) return
+        if (parent && ts.isPropertyAssignment(parent) && parent.name === candidate) return
+        if (visiting.has(candidate.text)) return
+        const definition = context.definitions.get(candidate.text)
+        if (!definition || !definition.stable || !definition.initializer) return
+        const next = new Set(visiting)
+        next.add(candidate.text)
+        if (!deeplyPureWith(context, definition.initializer, depth + 1, next)) pure = false
+    })
+    return pure
+}
+
+/**
+ * WHERE a value was produced, following alias-only steps.
+ *
+ * The point of a `key` rather than a text is that two names reaching the SAME key denote ONE
+ * evaluation, and one evaluation compared with itself cannot differ - no purity argument, no
+ * immutability argument, nothing left to assume. `const a = x; const b = x; check(a === b)` where `x`
+ * is a stable binding is unfalsifiable for that reason and for no other. Two names reaching two
+ * DIFFERENT keys are two evaluations, which is the honest shape (`const before = read(); const after =
+ * read()`), and this function is what keeps those two apart.
+ */
+type Identity = Readonly<{ key: string; site: ts.Node; via: readonly string[] }>
+
+function identityOf(context: Context, node: ts.Expression, depth = 0): Identity | null {
+    if (depth > 8) return null
+    const target = unwrap(node)
+    if (ts.isIdentifier(target)) {
+        const alias = context.destructured.get(target.text)
+        if (alias) {
+            const inner = propertyIdentity(context, alias.source, alias.property, depth + 1)
+            if (!inner) return null
+            return {
+                ...inner,
+                via: [`\`${target.text}\` destructured from \`${oneLine(alias.sourceText, 60)}\``, ...inner.via],
+            }
+        }
+        const definition = context.definitions.get(target.text)
+        if (!definition || !definition.stable) return null
+        if (!definition.initializer) return { key: `binding:${target.text}`, site: target, via: [] }
+        const step = `\`${target.text}\` = \`${oneLine(textOf(context.source, definition.initializer), 60)}\``
+        const inner = identityOf(context, definition.initializer, depth + 1)
+        if (inner) return { ...inner, via: [step, ...inner.via] }
+        return {
+            key: `site:${definition.initializer.getStart(context.source)}`,
+            site: definition.initializer,
+            via: [step],
+        }
+    }
+    if (ts.isPropertyAccessExpression(target)) {
+        return propertyIdentity(context, target.expression, target.name.text, depth + 1)
+    }
+    if (ts.isElementAccessExpression(target)) {
+        const index = fold(target.argumentExpression, new Map())
+        if (typeof index !== "number") return null
+        return propertyIdentity(context, target.expression, index, depth + 1)
+    }
+    return null
+}
+
+/** The identity of one property of an object/array literal this file builds. */
+function propertyIdentity(
+    context: Context,
+    receiver: ts.Expression,
+    property: string | number,
+    depth: number,
+): Identity | null {
+    if (depth > 8) return null
+    const resolved = resolveToExpression(context, receiver, depth)
+    if (!resolved) return null
+    if (ts.isObjectLiteralExpression(resolved) && typeof property === "string") {
+        for (const member of resolved.properties) {
+            if (ts.isPropertyAssignment(member) && ts.isIdentifier(member.name) && member.name.text === property) {
+                return identityOf(context, member.initializer, depth + 1) ?? {
+                    key: `site:${member.initializer.getStart(context.source)}`,
+                    site: member.initializer,
+                    via: [],
+                }
+            }
+            if (ts.isShorthandPropertyAssignment(member) && member.name.text === property) {
+                return identityOf(context, member.name, depth + 1)
+            }
+        }
+        return null
+    }
+    if (ts.isArrayLiteralExpression(resolved) && typeof property === "number") {
+        const element = resolved.elements[property]
+        if (!element || ts.isSpreadElement(element)) return null
+        return identityOf(context, element, depth + 1) ?? {
+            key: `site:${element.getStart(context.source)}`,
+            site: element,
+            via: [],
+        }
+    }
+    return null
+}
+
+/**
+ * Nothing that executes between two evaluation sites could have changed what the second one reads.
+ *
+ * This is the condition that stops the mirrored-derivation detector from calling a real before/after
+ * measurement vacuous. Two reads of a frozen import with an unproven call between them might genuinely
+ * differ - the call is exactly the thing under test - so the finding is only made when the gap between
+ * the two sites contains no assignment, no `await`, and no call this scanner cannot prove pure.
+ */
+function noInterveningEffect(context: Context, left: ts.Node, right: ts.Node): boolean {
+    const leftFirst = left.getStart(context.source) <= right.getStart(context.source)
+    const first = leftFirst ? left : right
+    const second = leftFirst ? right : left
+    const from = first.getEnd()
+    const to = second.getStart(context.source)
+    if (to <= from) return true
+    let clean = true
+    walk(context.source, (node) => {
+        if (!clean) return
+        if (node.getStart(context.source) < from || node.getEnd() > to) return
+        if (impureNodeWith(node, context.pureLocals)) clean = false
+    })
+    return clean
+}
+
+/** A binding accumulated inside a loop, with the collection whose emptiness decides the iteration count. */
+type LoopAccumulator = Readonly<{
+    loop: ts.Node
+    /** The iterated collection, or null when the loop's trip count cannot be read off its head. */
+    iterable: ts.Expression | null
+    line: number
+    /** A write to the binding OUTSIDE every loop: the value moves whatever the collection holds. */
+    escapes: boolean
+}>
+
+/** Loop-ish nodes, plus the `forEach` callback shape, with the collection each iterates. */
+function loopIterable(node: ts.Node): { loop: ts.Node; iterable: ts.Expression | null } | null {
+    if (ts.isForOfStatement(node) || ts.isForInStatement(node)) return { loop: node, iterable: node.expression }
+    if (ts.isWhileStatement(node) || ts.isDoStatement(node)) return { loop: node, iterable: null }
+    if (ts.isForStatement(node)) {
+        // `for (let i = 0; i < rows.length; i += 1)` is a loop over `rows` as far as emptiness goes.
+        const condition = node.condition ? unwrap(node.condition) : null
+        if (
+            condition
+            && ts.isBinaryExpression(condition)
+            && (condition.operatorToken.kind === ts.SyntaxKind.LessThanToken
+                || condition.operatorToken.kind === ts.SyntaxKind.LessThanEqualsToken)
+            && isLengthAccess(condition.right)
+        ) {
+            return { loop: node, iterable: (unwrap(condition.right) as ts.PropertyAccessExpression).expression }
+        }
+        return { loop: node, iterable: null }
+    }
+    if (
+        ts.isCallExpression(node)
+        && ts.isPropertyAccessExpression(node.expression)
+        && (node.expression.name.text === "forEach" || node.expression.name.text === "map")
+    ) return { loop: node, iterable: node.expression.expression }
+    return null
+}
+
+/**
+ * Bindings written only inside a loop body, with the collection that decides whether the body runs.
+ *
+ * The replay shape this exists for: `let running = 0; for (const row of rows) running += row.delta`
+ * followed by an assertion about `running`. On an empty `rows` the loop never runs, `running` is still
+ * its initialiser, and the assertion compares initial values - it reports that a replay reproduced every
+ * stored balance without replaying one. The OUTERMOST enclosing loop is recorded, because that is the
+ * one whose emptiness decides whether anything happens at all.
+ */
+function buildLoopAccumulators(source: ts.SourceFile): Map<string, LoopAccumulator> {
+    const writes = new Map<string, ts.Node[]>()
+    const note = (expression: ts.Expression, node: ts.Node): void => {
+        const target = unwrap(expression)
+        if (!ts.isIdentifier(target)) return
+        const list = writes.get(target.text) ?? []
+        list.push(node)
+        writes.set(target.text, list)
+    }
+    walk(source, (node) => {
+        if (ts.isBinaryExpression(node) && ASSIGNMENT_OPERATORS.has(node.operatorToken.kind)) note(node.left, node)
+        if (
+            (ts.isPostfixUnaryExpression(node) || ts.isPrefixUnaryExpression(node))
+            && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+        ) note(node.operand, node)
+    })
+    const accumulators = new Map<string, LoopAccumulator>()
+    for (const [name, nodes] of writes) {
+        let outermost: { loop: ts.Node; iterable: ts.Expression | null } | null = null
+        let escapes = false
+        for (const node of nodes) {
+            let enclosing: { loop: ts.Node; iterable: ts.Expression | null } | null = null
+            for (let current: ts.Node | undefined = node.parent; current && !ts.isSourceFile(current); current = current.parent) {
+                const candidate = loopIterable(current)
+                if (candidate) enclosing = candidate
+            }
+            if (!enclosing) {
+                escapes = true
+                continue
+            }
+            if (!outermost) outermost = enclosing
+        }
+        if (!outermost) continue
+        accumulators.set(name, {
+            loop: outermost.loop,
+            iterable: outermost.iterable,
+            line: lineOf(source, outermost.loop),
+            escapes,
+        })
+    }
+    return accumulators
+}
+
+// ---- dominance: which conditions must hold for an assertion to PASS -------------------------
+
+/**
+ * The expressions that must be true for `assertion` to pass, at the granularity a length pin can be
+ * read off: the top-level conjuncts of its own condition, and the conjuncts of every enclosing `if`.
+ *
+ * WHY THIS REPLACED A WALK. `hasNonEmptyGuard` searched the whole condition for a pin ANYWHERE in it,
+ * which accepts three positions that do not protect anything. A pin under `||` (`rows.length > 0 ||
+ * rows.every(p)`) does not: on an empty collection the first disjunct is false, the second is true, and
+ * the assertion passes. A pin inside the `every` callback does not: it runs per element, and on zero
+ * elements it never runs. A pin inside any other nested function does not: nothing calls it. Requiring
+ * the pin to BE a conjunct - not merely to appear inside one - removes all three at once, and is why
+ * `&&` order does not matter: both operands of `&&` must hold for the assertion to pass, so a pin in
+ * either position protects it.
+ */
+function pinScopes(condition: ts.Expression, assertion: ts.CallExpression): ts.Expression[] {
+    const scopes: ts.Expression[] = [...conjuncts(condition)]
+    for (const guard of guardsOf(assertion)) {
+        // A synthesised `!expr` from an else-branch has no source position; `normalize` would throw.
+        if (guard.pos < 0) continue
+        scopes.push(...conjuncts(guard))
+    }
+    return scopes.filter((scope) => scope.pos >= 0)
+}
+
+/** Transformations that cannot change a collection's length, so a pin on the source carries. */
+const LENGTH_PRESERVING_METHODS = new Set(["map", "sort", "reverse"])
+
+/**
+ * Texts denoting a collection whose length is the same as `receiver`'s.
+ *
+ * `const view = rows.map(f)` gives `view` exactly `rows.length` elements, so `rows.length > 0 &&
+ * view.every(p)` is a guarded assertion, and reporting it would be a false positive of exactly the kind
+ * that gets a scanner switched off. `filter`, and `slice` with arguments, are deliberately NOT here:
+ * they can empty a non-empty collection, so a pin on their source does not carry - which is what keeps
+ * `items.slice(items.length - undated.length).every(...)` and `levels.slice(1).every(...)` reported.
+ */
+function receiverEquivalents(context: Context, receiver: ts.Expression): Set<string> {
+    const keys = new Set<string>()
+    let current = unwrap(receiver)
+    for (let depth = 0; depth < 8; depth += 1) {
+        keys.add(normalize(context.source, current))
+        if (ts.isIdentifier(current)) {
+            const definition = context.definitions.get(current.text)
+            if (!definition || !definition.stable || !definition.initializer) break
+            current = unwrap(definition.initializer)
+            continue
+        }
+        if (ts.isArrayLiteralExpression(current) && current.elements.length === 1) {
+            const only = current.elements[0]
+            if (!ts.isSpreadElement(only)) break
+            current = unwrap(only.expression)
+            continue
+        }
+        if (!ts.isCallExpression(current) || !ts.isPropertyAccessExpression(current.expression)) break
+        const method = current.expression.name.text
+        const preserving = LENGTH_PRESERVING_METHODS.has(method)
+            || ((method === "slice" || method === "concat" || method === "flat") && current.arguments.length === 0)
+        if (!preserving) break
+        const next = unwrap(current.expression.expression)
+        // `Object.values(x)` and friends are not a transformation OF `Object`.
+        if (ts.isIdentifier(next) && BUILTIN_ROOTS.has(next.text)) break
+        current = next
+    }
+    return keys
+}
+
+/** Does this expression, on its own, force one of `receivers` to hold at least one element? */
+function pinsNonEmpty(context: Context, pin: ts.Expression, receivers: ReadonlySet<string>): boolean {
+    const target = unwrap(pin)
+    // `unwrap` BOTH the `.length` node and the collection it reads. `receiverEquivalents` walks an
+    // unwrapped chain, so a pin written `(installation.history as Array<T>).length > 0` has to lose its
+    // parentheses and its `as` clause before its text can meet `installation.history`. Without this the
+    // pin and the receiver are the same expression spelled two ways, and a guarded assertion three
+    // lines from a real one gets reported - which is precisely the false positive that discredits a
+    // scanner. MEASURED: check-blueprint-install-routes.ts:262 is guarded by exactly that spelling.
+    const matches = (side: ts.Expression): boolean =>
+        isLengthAccess(side)
+        && receivers.has(normalize(context.source, unwrap((unwrap(side) as ts.PropertyAccessExpression).expression)))
+    // `rows.length && rows.every(p)`: a bare length in boolean position is a pin.
+    if (matches(target)) return true
+    if (!ts.isBinaryExpression(target)) return false
+    const kind = target.operatorToken.kind
+    const left = unwrap(target.left)
+    const right = unwrap(target.right)
+    const leftValue = fold(left, new Map())
+    const rightValue = fold(right, new Map())
+    if (matches(left) && typeof rightValue === "number") {
+        if (kind === ts.SyntaxKind.GreaterThanToken && rightValue >= 0) return true
+        if (kind === ts.SyntaxKind.GreaterThanEqualsToken && rightValue >= 1) return true
+        if (
+            (kind === ts.SyntaxKind.EqualsEqualsEqualsToken || kind === ts.SyntaxKind.EqualsEqualsToken)
+            && rightValue >= 1
+        ) return true
+        if (
+            (kind === ts.SyntaxKind.ExclamationEqualsEqualsToken || kind === ts.SyntaxKind.ExclamationEqualsToken)
+            && rightValue === 0
+        ) return true
+    }
+    if (matches(right) && typeof leftValue === "number") {
+        if (kind === ts.SyntaxKind.LessThanToken && leftValue >= 0) return true
+        if (kind === ts.SyntaxKind.LessThanEqualsToken && leftValue >= 1) return true
+        if (
+            (kind === ts.SyntaxKind.EqualsEqualsEqualsToken || kind === ts.SyntaxKind.EqualsEqualsToken)
+            && leftValue >= 1
+        ) return true
+        if (
+            (kind === ts.SyntaxKind.ExclamationEqualsEqualsToken || kind === ts.SyntaxKind.ExclamationEqualsToken)
+            && leftValue === 0
+        ) return true
+    }
+    return false
+}
+
+/** Is the collection this loop iterates pinned non-empty by the assertion that reads its accumulator? */
+function iterablePinned(
+    context: Context,
+    iterable: ts.Expression,
+    whole: ts.Expression,
+    assertion: ts.CallExpression,
+): boolean {
+    if (provablyNonEmpty(context, iterable)) return true
+    const receivers = receiverEquivalents(context, iterable)
+    return pinScopes(whole, assertion).some((pin) => pinsNonEmpty(context, pin, receivers))
+}
+
+// ---- the decidable comparison fragment, for conjunct domination -----------------------------
+
+const COMPARISON_KINDS = new Set([
+    ts.SyntaxKind.EqualsEqualsEqualsToken,
+    ts.SyntaxKind.EqualsEqualsToken,
+    ts.SyntaxKind.ExclamationEqualsEqualsToken,
+    ts.SyntaxKind.ExclamationEqualsToken,
+    ts.SyntaxKind.LessThanToken,
+    ts.SyntaxKind.GreaterThanToken,
+    ts.SyntaxKind.LessThanEqualsToken,
+    ts.SyntaxKind.GreaterThanEqualsToken,
+])
+
+/** `<subject> <op> <constant>`, normalised so the subject is always on the left. */
+type Bound = Readonly<{ subject: string; kind: ts.SyntaxKind; value: Constant; text: string }>
+
+function mirrorComparison(kind: ts.SyntaxKind): ts.SyntaxKind {
+    if (kind === ts.SyntaxKind.LessThanToken) return ts.SyntaxKind.GreaterThanToken
+    if (kind === ts.SyntaxKind.GreaterThanToken) return ts.SyntaxKind.LessThanToken
+    if (kind === ts.SyntaxKind.LessThanEqualsToken) return ts.SyntaxKind.GreaterThanEqualsToken
+    if (kind === ts.SyntaxKind.GreaterThanEqualsToken) return ts.SyntaxKind.LessThanEqualsToken
+    return kind
+}
+
+function asBound(context: Context, expression: ts.Expression): Bound | null {
+    const target = unwrap(expression)
+    if (!ts.isBinaryExpression(target)) return null
+    const kind = target.operatorToken.kind
+    if (!COMPARISON_KINDS.has(kind)) return null
+    const leftValue = fold(target.left, new Map())
+    const rightValue = fold(target.right, new Map())
+    const text = oneLine(textOf(context.source, target), 70)
+    if (rightValue !== undefined && leftValue === undefined) {
+        return { subject: normalize(context.source, target.left), kind, value: rightValue, text }
+    }
+    if (leftValue !== undefined && rightValue === undefined) {
+        return { subject: normalize(context.source, target.right), kind: mirrorComparison(kind), value: leftValue, text }
+    }
+    return null
+}
+
+function boundHolds(bound: Bound, value: Constant): boolean {
+    switch (bound.kind) {
+        case ts.SyntaxKind.EqualsEqualsEqualsToken: return value === bound.value
+        case ts.SyntaxKind.EqualsEqualsToken: return value === bound.value
+        case ts.SyntaxKind.ExclamationEqualsEqualsToken: return value !== bound.value
+        case ts.SyntaxKind.ExclamationEqualsToken: return value !== bound.value
+        case ts.SyntaxKind.LessThanToken: return (value as number) < (bound.value as number)
+        case ts.SyntaxKind.GreaterThanToken: return (value as number) > (bound.value as number)
+        case ts.SyntaxKind.LessThanEqualsToken: return (value as number) <= (bound.value as number)
+        case ts.SyntaxKind.GreaterThanEqualsToken: return (value as number) >= (bound.value as number)
+        default: return false
+    }
+}
+
+/**
+ * Does `premise` force `claim` to be true, over the same subject?
+ *
+ * Decided by exhaustion over a SUFFICIENT sample rather than by a table of operator pairs, because a
+ * table is where an unsound row hides. For one variable compared against constants, the critical points
+ * are the constants themselves, a point either side of each, a midpoint either side (so `x > 0` is not
+ * mistaken for `x >= 1` when the subject is not an integer), and the two extremes. A claim that holds at
+ * every sampled point where the premise holds, with at least one such point, is entailed.
+ */
+function boundEntails(premise: Bound, claim: Bound): boolean {
+    if (premise.subject !== claim.subject) return false
+    const numeric = typeof premise.value === "number" && typeof claim.value === "number"
+    if (!numeric) {
+        // Only equality reasoning is sound for non-numbers here.
+        const ordered = new Set([
+            ts.SyntaxKind.LessThanToken, ts.SyntaxKind.GreaterThanToken,
+            ts.SyntaxKind.LessThanEqualsToken, ts.SyntaxKind.GreaterThanEqualsToken,
+        ])
+        if (ordered.has(premise.kind) || ordered.has(claim.kind)) return false
+    }
+    const candidates: Constant[] = numeric
+        ? [premise.value as number, claim.value as number].flatMap((value) => [
+            value - 1, value - 0.5, value, value + 0.5, value + 1,
+        ]).concat([-1e9, 1e9])
+        : [premise.value, claim.value, "\u0000neither-of-the-two"]
+    let witnesses = 0
+    for (const candidate of candidates) {
+        if (!boundHolds(premise, candidate)) continue
+        witnesses += 1
+        if (!boundHolds(claim, candidate)) return false
+    }
+    return witnesses > 0
+}
+
+
+
+// ---------------------------------------------------------------------------------------------
 // class detectors
 // ---------------------------------------------------------------------------------------------
 
@@ -1023,6 +1793,14 @@ type Context = Readonly<{
     assertions: readonly ts.CallExpression[]
     helpers: ReadonlyMap<string, number>
     imported: ReadonlySet<string>
+    /** `const { a } = obj` / `const [x] = pair` bindings, which `definitions` deliberately does not hold. */
+    destructured: ReadonlyMap<string, DestructuredAlias>
+    /** Imported bindings this file never mutates: reading one twice gives the same value. */
+    frozen: ReadonlySet<string>
+    /** Locally declared functions provable side-effect free, so two applications agree. */
+    pureLocals: ReadonlySet<string>
+    /** Bindings accumulated inside a loop, with the iterable whose emptiness decides the count. */
+    accumulators: ReadonlyMap<string, LoopAccumulator>
 }>
 
 /** Class: the condition, or this conjunct of it, folds to a constant true. */
@@ -1328,7 +2106,23 @@ function detectConditionalInit(context: Context, conjunct: ts.Expression, siblin
     return null
 }
 
-/** Class: `arr.every(...)` with nothing establishing that `arr` is non-empty. `[].every` is true. */
+/**
+ * Class: `arr.every(...)` with nothing establishing that `arr` is non-empty. `[].every` is true.
+ *
+ * The DOMINANCE RULE (mutation key `EVERY_DOMINANCE`) decides what counts as "establishing". With it
+ * enabled a pin must BE a conjunct of this assertion's own condition or of an enclosing `if`, and it
+ * may name any collection of provably the same length as the receiver (`pinScopes`, `pinsNonEmpty`,
+ * `receiverEquivalents`). With it disabled the detector falls back to the original walk, which accepted
+ * a pin ANYWHERE inside the condition. That fallback accepts three positions that protect nothing:
+ *   - under `||`: on an empty collection `rows.length > 0 || rows.every(p)` has a false first disjunct
+ *     and a true second one, so the assertion passes;
+ *   - inside the `every` callback: it runs per element, so on zero elements it never runs at all;
+ *   - inside any other nested function: nothing calls it.
+ * It also REFUSES a pin that is sound - one on `rows` protecting `rows.map(f).every(p)`, where `map`
+ * cannot change the length - which is a false positive of exactly the kind that gets a scanner switched
+ * off. The strict rule is therefore both less and more permissive than the walk, in the safe direction
+ * each time, and the difference is proven by two fixtures rather than argued here.
+ */
 function detectUnguardedEvery(
     context: Context,
     conjunct: ts.Expression,
@@ -1353,8 +2147,12 @@ function detectUnguardedEvery(
         // `if` that encloses it. A `length > 0` inside a DIFFERENT assertion does not: this assertion,
         // taken on its own, still cannot fail. Root fixed exactly that shape in fd3d8fc, where a
         // sibling assertion three lines up carried the guard and two others did not.
-        const own: ts.Node[] = [whole, ...guardsOf(assertion)]
-        if (own.some((scope) => hasNonEmptyGuard(context, scope, receiverText, assertion))) continue
+        if (detectorEnabled("EVERY_DOMINANCE")) {
+            if (iterablePinned(context, receiver, whole, assertion)) continue
+        } else {
+            const own: ts.Node[] = [whole, ...guardsOf(assertion)]
+            if (own.some((scope) => hasNonEmptyGuard(context, scope, receiverText, assertion))) continue
+        }
 
         // A receiver whose emptiness is decided in ANOTHER module is a different situation from a
         // collection this harness just observed. `[].every(...)` is still true, but a module-level
@@ -1422,6 +2220,447 @@ function hasNonEmptyGuard(context: Context, scope: ts.Node, receiverText: string
 }
 
 // ---------------------------------------------------------------------------------------------
+// the falsifiability detectors: non-constant conditions that are structurally always true
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Non-builtin roots a derivation reads, WITHOUT descending into a function already proven pure.
+ *
+ * `observationRoots` inlines every stable binding, so `canonicalise(PERMISSION_KEYS)` yields the
+ * parameters of `canonicalise` as roots and the frozen-root test can never be satisfied. A proven-pure
+ * function's own parameters are not observations of anything - they are bound from the argument list,
+ * which is walked separately - so the function is recorded as a root and its body is not entered.
+ */
+function derivationRoots(
+    context: Context,
+    node: ts.Node,
+    depth = 0,
+    visiting: ReadonlySet<string> = new Set(),
+): Set<string> {
+    const roots = new Set<string>()
+    if (depth > 6) return roots
+    walk(node, (candidate) => {
+        if (!ts.isIdentifier(candidate)) return
+        const parent = candidate.parent
+        if (parent && ts.isPropertyAccessExpression(parent) && parent.name === candidate) return
+        if (parent && ts.isPropertyAssignment(parent) && parent.name === candidate) return
+        const name = candidate.text
+        if (BUILTIN_ROOTS.has(name) || visiting.has(name)) return
+        if (context.pureLocals.has(name)) {
+            roots.add(name)
+            return
+        }
+        const definition = context.definitions.get(name)
+        if (definition && definition.stable && definition.initializer) {
+            const next = new Set(visiting)
+            next.add(name)
+            for (const inner of derivationRoots(context, definition.initializer, depth + 1, next)) roots.add(inner)
+            return
+        }
+        roots.add(name)
+    })
+    return roots
+}
+
+function isPureCallable(context: Context, name: string): boolean {
+    return PURE_FUNCTIONS.has(name) || context.pureLocals.has(name)
+}
+
+/**
+ * Remove the parentheses `canonical` adds around an INLINED binding when what it inlined needs none.
+ *
+ * `canonical` wraps every inlined initialiser in parentheses to preserve precedence, which is right in
+ * general and wrong for the only shape that matters here: an alias of a name.
+ * `const EXPECTED = PERMISSION_KEYS` makes `JSON.stringify(EXPECTED)` canonicalise to
+ * `JSON.stringify((PERMISSION_KEYS))`, which is not textually equal to `JSON.stringify(PERMISSION_KEYS)`
+ * - so the copied-constant form of the mirrored-derivation class was invisible for a reason that has
+ * nothing to do with the code being asserted about.
+ *
+ * Only parentheses whose ENTIRE content is an identifier or a dotted member chain are removed. Such an
+ * expression has no operator in it, so it binds tighter than anything around it and the parentheses
+ * were never carrying meaning. Anything with an operator, a call, an index or a literal in it keeps
+ * them, so `((a+b))*c` is untouched. Used ONLY by the mirrored-derivation detector, so no existing
+ * verdict can move.
+ */
+function collapseAliasParens(text: string): string {
+    let out = text
+    for (let round = 0; round < 6; round += 1) {
+        const next = out.replace(/\(([A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*)\)/gu, "$1")
+        if (next === out) return out
+        out = next
+    }
+    return out
+}
+
+/**
+ * The same pure operation applied to the same value, written two ways.
+ *
+ * A method callee additionally requires the RECEIVER to be alias-identical, not merely spelled the same
+ * way. That single condition is what keeps `table.rows.join(",") === table.rows.join(",")` out: the two
+ * receivers are two reads of a property of an observed object, neither has an identity, and two reads of
+ * a mutable system are the honest shape this scanner must never call a defect.
+ */
+function samePureApplication(context: Context, left: ts.CallExpression, right: ts.CallExpression): string | null {
+    const leftCallee = left.expression
+    const rightCallee = right.expression
+    let calleeNote: string
+    if (ts.isIdentifier(leftCallee) && ts.isIdentifier(rightCallee)) {
+        if (leftCallee.text !== rightCallee.text || !isPureCallable(context, leftCallee.text)) return null
+        calleeNote = `\`${leftCallee.text}\`, which this file declares and which is provably side-effect free`
+    } else if (ts.isPropertyAccessExpression(leftCallee) && ts.isPropertyAccessExpression(rightCallee)) {
+        if (leftCallee.name.text !== rightCallee.name.text || !PURE_METHODS.has(leftCallee.name.text)) return null
+        const leftReceiver = identityOf(context, leftCallee.expression)
+        const rightReceiver = identityOf(context, rightCallee.expression)
+        if (!leftReceiver || !rightReceiver || leftReceiver.key !== rightReceiver.key) return null
+        calleeNote = `\`.${leftCallee.name.text}()\` over one receiver reached by two routes`
+    } else {
+        return null
+    }
+    if (left.arguments.length !== right.arguments.length) return null
+    for (let index = 0; index < left.arguments.length; index += 1) {
+        const leftIdentity = identityOf(context, left.arguments[index])
+        const rightIdentity = identityOf(context, right.arguments[index])
+        if (leftIdentity && rightIdentity && leftIdentity.key === rightIdentity.key) continue
+        const leftValue = fold(left.arguments[index], new Map())
+        const rightValue = fold(right.arguments[index], new Map())
+        if (leftValue !== undefined && leftValue === rightValue) continue
+        return null
+    }
+    return calleeNote
+}
+
+/**
+ * CLASS: IDENTICAL VALUES REACHED THROUGH ALIASES.
+ *
+ * `const a = x; const b = x; check(a === b)`. This repository has already paid for one: two names both
+ * resolving to `JSON.stringify(PERMISSION_KEYS)`, compared against each other.
+ *
+ * Two forms, and the first needs no assumptions at all. Form A: both operands resolve, through alias
+ * steps only - a `const` initialiser, a destructured property, an element of an object or array literal
+ * this file builds - to ONE evaluation. The value was computed once; comparing it with itself cannot
+ * fail, whatever the value is and however mutable the thing it came from. Form B: the two operands are
+ * the same pure operation applied to alias-identical inputs, so the two evaluations must agree.
+ *
+ * WHAT KEEPS THIS OFF HONEST CODE. An alias chain that bottoms out at two DIFFERENT evaluation sites is
+ * two evaluations, and two evaluations are not flagged by this class at all. `const before = read();
+ * const after = read(); const a = before; const b = after; check(a === b)` resolves to two sites and
+ * stays live, which is the whole point: it is a real measurement that the value did not move.
+ */
+function detectAliasIdentity(context: Context, conjunct: ts.Expression): Verdict {
+    if (!detectorEnabled("ALIAS_IDENTITY")) return null
+    const target = unwrap(conjunct)
+    if (!ts.isBinaryExpression(target)) return null
+    const kind = target.operatorToken.kind
+    const always = ALWAYS_TRUE_WHEN_IDENTICAL.has(kind)
+    const never = NEVER_TRUE_WHEN_IDENTICAL.has(kind)
+    if (!always && !never) return null
+    const leftText = oneLine(textOf(context.source, target.left), 70)
+    const rightText = oneLine(textOf(context.source, target.right), 70)
+
+    const left = identityOf(context, target.left)
+    const right = identityOf(context, target.right)
+    if (left && right && left.key === right.key && normalize(context.source, target.left) !== normalize(context.source, target.right)) {
+        const route = [...new Set([...left.via, ...right.via])].map((step) => oneLine(step, 80))
+        const where = left.site.pos >= 0
+            ? `the value produced at line ${lineOf(context.source, left.site)} (\`${oneLine(textOf(context.source, left.site), 60)}\`)`
+            : "one binding"
+        const evidence = `\`${leftText}\` and \`${rightText}\` are two names for ONE evaluation - ${where} - reached through ${route.length} alias step(s): ${route.join(" ; ") || "a direct alias"}. Nothing is evaluated twice, so this needs no purity or immutability argument: the comparison is a value against itself.`
+        if (never) {
+            return {
+                classification: "UNRESOLVED",
+                evidence: `${evidence} The operator is FALSE for identical operands, so this can never PASS - the opposite defect, outside the vacuity classes.`,
+            }
+        }
+        return { classification: "VACUOUS_ALIAS_IDENTITY", evidence }
+    }
+
+    const leftCall = resolveToExpression(context, target.left)
+    const rightCall = resolveToExpression(context, target.right)
+    if (!leftCall || !rightCall || !ts.isCallExpression(leftCall) || !ts.isCallExpression(rightCall)) return null
+    const applied = samePureApplication(context, leftCall, rightCall)
+    if (!applied) return null
+    const evidence = `\`${leftText}\` and \`${rightText}\` are the SAME pure operation - ${applied} - applied to inputs that are alias-identical, so the two evaluations cannot disagree. A defect in the code under test moves both sides together, which is what makes the comparison unable to fail rather than merely likely to pass.`
+    if (never) {
+        return {
+            classification: "UNRESOLVED",
+            evidence: `${evidence} The operator is FALSE for identical operands, so this can never PASS - the opposite defect, outside the vacuity classes.`,
+        }
+    }
+    return { classification: "VACUOUS_ALIAS_IDENTITY", evidence }
+}
+
+/**
+ * CLASS: EXPECTED AND ACTUAL DERIVED FROM THE SAME SOURCE.
+ *
+ * `expected = f(x); actual = f(x)`, where the comparison cannot distinguish a defect because a defect
+ * changes both sides. The subtle version is the one worth the code: `f` declared in this file, so every
+ * existing purity test calls it impure and the self-comparison detector therefore says NOTHING - it
+ * cannot reach a verdict at all, so the shape is not even reported today.
+ *
+ * THREE conditions, and dropping any one of them fabricates a defect out of an honest assertion:
+ *   1. the two sides canonicalise to the same derivation text;
+ *   2. that derivation is side-effect free, INCLUDING the locally declared functions in it, proven by
+ *      `buildPureLocals` rather than assumed;
+ *   3. every root of the derivation is a FROZEN import - a production constant this file never touches -
+ *      or one of those proven-pure functions. This is the condition that separates the class from the
+ *      strongest assertion in the tree. `table.rows.join(",")` written twice canonicalises identically
+ *      and is pure, and it is a real before/after measurement of a mutable system; its root is an
+ *      observation, not an imported constant, so it is NOT this class and stays UNRESOLVED.
+ * Plus: nothing between the two evaluations may be able to change what the second one reads, or the
+ * comparison is a genuine test of whatever sits in the gap.
+ */
+function detectMirroredDerivation(context: Context, conjunct: ts.Expression): Verdict {
+    if (!detectorEnabled("MIRRORED_DERIVATION")) return null
+    const target = unwrap(conjunct)
+    if (!ts.isBinaryExpression(target)) return null
+    const kind = target.operatorToken.kind
+    const always = ALWAYS_TRUE_WHEN_IDENTICAL.has(kind)
+    const never = NEVER_TRUE_WHEN_IDENTICAL.has(kind)
+    if (!always && !never) return null
+    const shared = collapseAliasParens(canonical(context.source, target.left, context.definitions))
+    if (shared !== collapseAliasParens(canonical(context.source, target.right, context.definitions))) return null
+    if (!deeplyPureWith(context, target.left) || !deeplyPureWith(context, target.right)) return null
+    const roots = new Set([
+        ...derivationRoots(context, target.left),
+        ...derivationRoots(context, target.right),
+    ])
+    if (roots.size === 0) return null
+    const observed = [...roots].filter((root) => !context.frozen.has(root) && !context.pureLocals.has(root))
+    if (observed.length > 0) return null
+    const leftSite = resolveToExpression(context, target.left) ?? unwrap(target.left)
+    const rightSite = resolveToExpression(context, target.right) ?? unwrap(target.right)
+    if (!noInterveningEffect(context, leftSite, rightSite)) return null
+    const imports = [...roots].filter((root) => context.frozen.has(root))
+    const evidence = `Both sides are the same derivation (\`${oneLine(shared, 90)}\`) over the same source: every root it reads is an imported constant this file never mutates (\`${imports.join(", ") || "none"}\`)${context.pureLocals.size > 0 ? `, through function(s) this file declares and that are provably side-effect free` : ""}, and nothing between the two evaluations can change what the second one reads. The expected side is therefore computed FROM the same thing as the actual side, so no defect in the code under test can make them differ.`
+    if (never) {
+        return {
+            classification: "UNRESOLVED",
+            evidence: `${evidence} The operator is FALSE for identical operands, so this can never PASS - the opposite defect, outside the vacuity classes.`,
+        }
+    }
+    return { classification: "VACUOUS_MIRRORED_DERIVATION", evidence }
+}
+
+/**
+ * CLASS: A BOOLEAN INITIALISED TO A PASSING VALUE WHOSE ASSIGNMENT IS NEVER REACHED.
+ *
+ * `let ok = true; for (...) if (bad) ok = false; check(ok)` is genuinely falsifiable and is NOT this
+ * class - it is the shape most likely to produce a false positive, so only two provable forms count:
+ *   (a) the binding is never written AT ALL, anywhere in the file - not by `=`, not by `+=`, not by
+ *       `++` - so the conjunct is a constant wearing a name. `fold` cannot see this on its own: it has
+ *       no environment, so `check("ready", READY)` with `const READY = true` folds to `undefined` and
+ *       every existing detector passes it by.
+ *   (b) every assignment to it is guarded by a condition that folds to a constant FALSE, so no
+ *       assignment is reachable on any run.
+ * The conjunct must additionally be TRUE once the initialiser is substituted. A constant that makes the
+ * conjunct FALSE is the opposite defect and is left to the existing literal detector.
+ *
+ * `check-retainer-runtime.ts:495` is the shape this must not touch: `mismatch` is initialised to "" and
+ * assigned under a data-dependent guard, which is reachable, so neither form applies and the existing
+ * conditional-init detector keeps reporting it UNRESOLVED with its own reasoning.
+ */
+/**
+ * Names this file proves constant: `const`-like, never written, and with a foldable initialiser.
+ *
+ * `fold` has no environment of its own, so `const READY = true; check("ready", READY)` folds to
+ * `undefined` and every detector passes it by. This is the environment that closes that, and it is
+ * sound for one reason: every entry is a binding this file NEVER writes - not by `=`, not by `+=`, not
+ * by `++` (`stable`) - whose initialiser is already a literal. Substituting one is substituting a
+ * compile-time constant, not guessing a runtime value.
+ *
+ * Cached against the `definitions` map it was derived from, so the callsite-substitution pass - which
+ * hands the chain an EXTENDED definitions map - gets its own environment rather than a stale one.
+ */
+const CONSTANT_ENVIRONMENTS = new WeakMap<object, Map<string, Constant>>()
+
+function constantEnvironment(definitions: ReadonlyMap<string, Definition>): Map<string, Constant> {
+    const cached = CONSTANT_ENVIRONMENTS.get(definitions)
+    if (cached) return cached
+    const environment = new Map<string, Constant>()
+    for (const [name, definition] of definitions) {
+        if (!definition.stable || definition.assignments.length > 0 || !definition.initializer) continue
+        const value = fold(definition.initializer, new Map())
+        if (value === undefined) continue
+        environment.set(name, value)
+    }
+    CONSTANT_ENVIRONMENTS.set(definitions, environment)
+    return environment
+}
+
+function detectUnreachedInitialiser(context: Context, conjunct: ts.Expression): Verdict {
+    if (!detectorEnabled("UNREACHED_INITIALISER")) return null
+    const constants = constantEnvironment(context.definitions)
+    const names = new Set<string>()
+    walk(conjunct, (candidate) => {
+        if (ts.isIdentifier(candidate)) names.add(candidate.text)
+    })
+    for (const name of names) {
+        const definition = context.definitions.get(name)
+        if (!definition || !definition.initializer) continue
+        const initial = fold(definition.initializer, new Map())
+        if (initial === undefined) continue
+        const environment = new Map<string, Constant>(constants)
+        environment.set(name, initial)
+        const withInitial = fold(conjunct, environment)
+        if (withInitial === undefined || !withInitial) continue
+        const declaredAt = lineOf(context.source, definition.initializer)
+        if (definition.stable && definition.assignments.length === 0) {
+            return {
+                classification: "VACUOUS_UNREACHED_INITIALISER",
+                evidence: `\`${name}\` is initialised to ${JSON.stringify(initial)} at line ${declaredAt} and is never written anywhere in this file - no assignment, no compound assignment, no increment - so with that value substituted this conjunct is \`${oneLine(textOf(context.source, conjunct))}\` = true on every run. It is a constant wearing a name, and the code under test cannot make it false.`,
+            }
+        }
+        if (definition.assignments.length === 0) continue
+        const blocked = definition.assignments.map((assignment) =>
+            guardsOf(assignment).find((guard) => guard.pos >= 0 && fold(guard, constants) === false) ?? null)
+        if (blocked.every((guard) => guard !== null)) {
+            const first = blocked[0] as ts.Expression
+            return {
+                classification: "VACUOUS_UNREACHED_INITIALISER",
+                evidence: `\`${name}\` is initialised to ${JSON.stringify(initial)} at line ${declaredAt}, and every one of its ${definition.assignments.length} assignment(s) sits under a guard that folds to a constant false (\`${oneLine(textOf(context.source, first), 70)}\`, with this file's own compile-time constants substituted), so no assignment is reachable on any run. The binding keeps its initialiser and this conjunct is true whatever the code under test does.`,
+            }
+        }
+    }
+    return null
+}
+
+/**
+ * CLASS: A REPLAY LOOP THAT CAN EXECUTE ZERO TIMES.
+ *
+ * `let running = 0; for (const row of rows) running += row.delta; check("replay reproduces every
+ * balance", running === expected)`. On an empty `rows` the body never runs, the accumulator still holds
+ * its initialiser, and the assertion compares initial values - it reports that a replay reproduced every
+ * stored balance without replaying one.
+ *
+ * A pin carries the class away entirely: `ledger.length === 6 && mismatch === "" && running === total`
+ * cannot pass on an empty ledger, so it is live, and that is exactly how `check-retainer-runtime.ts:495`
+ * was hardened. The pin has to be a CONJUNCT of the assertion's own condition or of an enclosing `if`
+ * (see `pinScopes`); a pin under `||`, or inside the loop body, does not stop the assertion passing on
+ * zero iterations.
+ *
+ * Also live, and deliberately: an accumulator written anywhere OUTSIDE the loop (`escapes`), because
+ * then it moves whatever the collection holds.
+ */
+function detectEmptyReplay(
+    context: Context,
+    conjunct: ts.Expression,
+    whole: ts.Expression,
+    assertion: ts.CallExpression,
+): Verdict {
+    if (!detectorEnabled("EMPTY_REPLAY")) return null
+    const names = new Set<string>()
+    walk(conjunct, (candidate) => {
+        if (ts.isIdentifier(candidate)) names.add(candidate.text)
+    })
+    for (const name of names) {
+        const accumulator = context.accumulators.get(name)
+        if (!accumulator || accumulator.escapes) continue
+        const definition = context.definitions.get(name)
+        if (!definition || !definition.initializer) continue
+        const initial = fold(definition.initializer, new Map())
+        if (initial === undefined) continue
+        const withInitial = fold(conjunct, new Map<string, Constant>([[name, initial]]))
+        if (withInitial === undefined || !withInitial) continue
+        if (!accumulator.iterable) {
+            return {
+                classification: "UNRESOLVED",
+                evidence: `\`${name}\` is initialised to ${JSON.stringify(initial)} and is only written inside the loop at line ${accumulator.line}, and with the initialiser this conjunct is TRUE - so a run in which the loop body never executes passes this assertion without replaying anything. Not counted: the loop's trip count cannot be read off its head (it is a \`while\` or a \`for\` whose condition this scanner does not model), so whether zero iterations is reachable needs the runtime. Worth a human read.`,
+            }
+        }
+        if (iterablePinned(context, accumulator.iterable, whole, assertion)) continue
+        const iterableText = oneLine(textOf(context.source, accumulator.iterable), 70)
+        const roots = observationRoots(context.source, accumulator.iterable, context.definitions)
+        const imported = [...roots].filter((root) => context.imported.has(root))
+        if (imported.length > 0 && roots.size === imported.length) {
+            return {
+                classification: "UNRESOLVED",
+                evidence: `\`${name}\` is initialised to ${JSON.stringify(initial)}, is written only inside the loop over \`${iterableText}\` at line ${accumulator.line}, and with the initialiser this conjunct is TRUE - so zero iterations passes the assertion. Not counted: the iterated collection is built only from imported binding(s) (\`${imported.join(", ")}\`), so whether it can be empty is decided in another module rather than by anything this run observes.`,
+            }
+        }
+        return {
+            classification: "VACUOUS_EMPTY_REPLAY",
+            evidence: `\`${name}\` is initialised to ${JSON.stringify(initial)} and is written ONLY inside the loop over \`${iterableText}\` at line ${accumulator.line}. Nothing in this assertion's own condition, and no enclosing \`if\`, pins \`${iterableText}\` to at least one element, so on an empty collection the loop body never runs, \`${name}\` still holds its initialiser, and this conjunct is \`${oneLine(textOf(context.source, conjunct))}\` = true. The assertion then reports a successful replay of nothing - including when the code under test silently produced no rows at all.`,
+        }
+    }
+    return null
+}
+
+/**
+ * CLASS: A CONJUNCT WHOSE MUTATION CANNOT AFFECT THE VERDICT.
+ *
+ * A conjunct that its siblings already force true contributes nothing: change it, weaken it, or delete
+ * it, and every run that passed still passes. That is the mutation-testing definition of a condition
+ * that measures nothing, and it is reachable on source text in three decidable forms - a duplicate
+ * conjunct; a conjunct that is a disjunction one of whose disjuncts is a sibling conjunct, so the whole
+ * conjunct is forced true; and entailment between two comparisons of the same subject against constants,
+ * decided by exhaustion over a sufficient sample rather than by an operator table.
+ *
+ * Mutual entailment - two ways of writing one bound - flags only the LATER conjunct, so one redundancy
+ * produces one finding rather than two.
+ */
+function detectDominatedConjunct(
+    context: Context,
+    conjunct: ts.Expression,
+    siblings: readonly ts.Expression[],
+): Verdict {
+    if (!detectorEnabled("DOMINATED_CONJUNCT")) return null
+    if (siblings.length < 2) return null
+    const index = siblings.indexOf(conjunct)
+    if (index < 0) return null
+    const self = normalize(context.source, conjunct)
+    const selfText = oneLine(textOf(context.source, conjunct), 70)
+
+    // `&&` evaluates left to right, so a conjunct between the two being compared runs BETWEEN them.
+    // If anything in that gap can have an effect - a call this scanner cannot prove pure, an
+    // assignment, an `await` - then the two readings of the "same" subject are two readings of a
+    // system that moved, and neither dominates the other. `a.length > 0 && drain() && a.length === 3`
+    // is a real assertion about `drain`, and must not be reported.
+    const undisturbed = (other: ts.Expression): boolean => noInterveningEffect(context, conjunct, other)
+
+    for (let earlier = 0; earlier < index; earlier += 1) {
+        if (normalize(context.source, siblings[earlier]) !== self) continue
+        if (!undisturbed(siblings[earlier])) continue
+        return {
+            classification: "VACUOUS_DOMINATED_CONJUNCT",
+            evidence: `\`${selfText}\` is a duplicate of the conjunct at line ${lineOf(context.source, siblings[earlier])} of the same condition. The two are joined by \`&&\`, so this copy cannot change the verdict: any run in which it is false is a run the first copy already failed. Mutating it changes nothing, which is the definition of a condition that measures nothing.`,
+        }
+    }
+
+    const parts = disjuncts(conjunct)
+    if (parts.length > 1) {
+        for (const part of parts) {
+            const partText = normalize(context.source, part)
+            const sibling = siblings.find(
+                (candidate) => candidate !== conjunct && normalize(context.source, candidate) === partText,
+            )
+            if (!sibling || !undisturbed(sibling)) continue
+            return {
+                classification: "VACUOUS_DOMINATED_CONJUNCT",
+                evidence: `\`${selfText}\` is a disjunction one of whose branches, \`${oneLine(textOf(context.source, part), 60)}\`, is a SIBLING conjunct of the same condition (line ${lineOf(context.source, sibling)}). The sibling must be true for the assertion to pass, and a true branch makes the whole disjunction true, so this conjunct cannot be false on any passing run whatever the other branch does.`,
+            }
+        }
+    }
+
+    const claim = asBound(context, conjunct)
+    if (!claim) return null
+    for (const sibling of siblings) {
+        if (sibling === conjunct) continue
+        if (normalize(context.source, sibling) === self) continue
+        const premise = asBound(context, sibling)
+        if (!premise) continue
+        if (!boundEntails(premise, claim)) continue
+        if (!undisturbed(sibling)) continue
+        // Two spellings of one bound: report the later, so one redundancy is one finding.
+        if (boundEntails(claim, premise) && siblings.indexOf(sibling) > index) continue
+        return {
+            classification: "VACUOUS_DOMINATED_CONJUNCT",
+            evidence: `\`${premise.text}\` is a conjunct of this same condition and already forces \`${claim.text}\`: over the subject \`${oneLine(claim.subject, 50)}\` every value satisfying the first satisfies the second. So this conjunct is true on every run where the assertion passes, and mutating it - loosening the bound, or deleting it - cannot turn a green run red.`,
+        }
+    }
+    return null
+}
+
+// ---------------------------------------------------------------------------------------------
 // the detector chain, in precedence order
 // ---------------------------------------------------------------------------------------------
 
@@ -1431,6 +2670,33 @@ function hasNonEmptyGuard(context: Context, scope: ts.Node, receiverText: string
  * They must not diverge. Every soundness argument in this file, and every self-test fixture that
  * proves one, is an argument about this chain; a second copy for the callsite pass would be a second
  * thing to trust. The pass changes only the `definitions` it hands in.
+ *
+ * PRECEDENCE IS LOAD-BEARING, and each of the five falsifiability detectors sits where it does for a
+ * stated reason rather than by arrival order. The chain returns the FIRST non-null verdict, so a
+ * detector placed after one that already says something about the same shape can never speak.
+ *
+ *   `detectAliasIdentity` and `detectMirroredDerivation` run BEFORE `detectSelfComparison` because its
+ *   tier 3 answers exactly the shape they PROVE. Two names inlining to one text is reported UNRESOLVED
+ *   by tier 3 - "worth a human read" - and that verdict is non-null, so it would silence the proof.
+ *   The repository's real instance (two names both resolving to `JSON.stringify(PERMISSION_KEYS)`) is
+ *   in that tier today, and moving it from a suspicion to a proof is the point of the class.
+ *
+ *   `detectUnreachedInitialiser` runs BEFORE `detectConditionalInit` for the same reason in the other
+ *   direction: a `let` whose every assignment sits under a constant-false guard is reported UNRESOLVED
+ *   by the conditional-init detector, and the unreached-initialiser argument is a proof of the same
+ *   shape. It cannot steal a conditional-init finding: form (a) requires ZERO assignments, and form (b)
+ *   requires every guard to FOLD to false, which is strictly stronger than "guarded".
+ *
+ *   `detectEmptyReplay` runs AFTER `detectConditionalInit`, deliberately giving up a little reach to
+ *   keep a promise. `check-retainer-runtime.ts:495` is a `=`-assigned loop variable that both detectors
+ *   can see, and it is a REPORTED finding with a justification on the record; running the replay
+ *   detector first would restate it in a different class. An accumulator updated with `+=` or `++` -
+ *   the shape the class exists for - is not in `definitions.assignments` at all, so conditional-init
+ *   says nothing about it and the ordering costs the class nothing there.
+ *
+ *   `detectDominatedConjunct` runs LAST because it is the only detector whose subject is the conjunct's
+ *   RELATIONSHIP to its siblings rather than the conjunct itself. Anything an earlier detector can
+ *   prove about the conjunct on its own is more actionable than "a sibling already forces it".
  */
 function classifyConjunct(
     context: Context,
@@ -1441,10 +2707,15 @@ function classifyConjunct(
 ): Verdict {
     return detectLiteral(context, conjunct, assertion)
         ?? detectTautology(context, conjunct)
+        ?? detectAliasIdentity(context, conjunct)
+        ?? detectMirroredDerivation(context, conjunct)
         ?? detectSelfComparison(context, conjunct)
         ?? detectDerivedExpectation(context, conjunct)
+        ?? detectUnreachedInitialiser(context, conjunct)
         ?? detectConditionalInit(context, conjunct, siblings)
+        ?? detectEmptyReplay(context, conjunct, whole, assertion)
         ?? detectUnguardedEvery(context, conjunct, whole, assertion)
+        ?? detectDominatedConjunct(context, conjunct, siblings)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1746,7 +3017,24 @@ function scan(file: string, text: string): ScanResult {
         assertions.push(node)
     })
 
-    const context: Context = { file, source, definitions, facts, assertions, helpers, imported: importedNames(source) }
+    // The data-flow layers the falsifiability detectors read. Order matters in one place only:
+    // `frozen` asks which calls could have handed a binding away, and a call to a function proven pure
+    // does not count, so `pureLocals` has to exist first.
+    const imported = importedNames(source)
+    const pureLocals = buildPureLocals(source)
+    const context: Context = {
+        file,
+        source,
+        definitions,
+        facts,
+        assertions,
+        helpers,
+        imported,
+        destructured: buildDestructuredAliases(source),
+        frozen: buildFrozenRoots(source, imported, pureLocals),
+        pureLocals,
+        accumulators: buildLoopAccumulators(source),
+    }
     const findings: Finding[] = []
 
     for (const assertion of assertions) {
@@ -2015,6 +3303,177 @@ const VACUOUS_FIXTURES: readonly Fixture[] = [
             "assertThat(true, `a variant can be renamed: ${observedTitle}`)",
         ].join("\n"),
     },
+
+    // ---- the falsifiability classes: NON-CONSTANT conditions that are structurally always true ----
+    // Each of the six has a positive fixture here and a SAFE NEAR-MISS in LIVE_CONTROLS - structurally
+    // the same shape, genuinely falsifiable - so "it catches the class" and "it does not catch the
+    // honest form of the class" are both proven rather than argued. The near-miss is the load-bearing
+    // half: a detector with only a positive fixture is indistinguishable from one that flags the shape.
+
+    // CLASS 1: identical values reached through aliases. Three routes, because the alias step is where
+    // the proof lives and each route is a different step.
+    {
+        name: "alias-identity-chain",
+        expect: "VACUOUS_ALIAS_IDENTITY",
+        body: [
+            "declare const observed: { rows: readonly string[] }",
+            "// ONE evaluation, two names. `expectedRows` and `actualRows` are the same read of the same",
+            "// object, so the comparison is a value against itself whatever the value is.",
+            "const snapshot = observed.rows",
+            "const expectedRows = snapshot",
+            "const actualRows = snapshot",
+            "check('the rows came back as stored', actualRows === expectedRows, String(actualRows.length))",
+        ].join("\n"),
+    },
+    {
+        name: "alias-identity-destructured",
+        expect: "VACUOUS_ALIAS_IDENTITY",
+        body: [
+            "declare const observed: { rows: readonly string[] }",
+            "// The destructured route. `buildDefinitions` cannot see `taken` at all - it records only",
+            "// `ts.isIdentifier(node.name)` declarations - so without the destructuring layer this",
+            "// comparison is invisible to every detector.",
+            "const captured = { taken: observed.rows, at: 0 }",
+            "const { taken } = captured",
+            "check('the rows came back as stored', taken === captured.taken, String(taken.length))",
+        ].join("\n"),
+    },
+    {
+        name: "alias-identity-pure-function-same-receiver",
+        expect: "VACUOUS_ALIAS_IDENTITY",
+        body: [
+            "declare const observed: { rows: readonly string[] }",
+            "// The same pure operation applied to inputs that are alias-identical: two evaluations, but",
+            "// of one function over one value, so they cannot disagree. `digest` is declared HERE, which",
+            "// is why no existing detector reaches this: `isPure` calls every local function impure.",
+            "const digest = (xs: readonly string[]) => xs.join('|')",
+            "const snapshot = observed.rows",
+            "const alsoSnapshot = snapshot",
+            "check('the digest is stable', digest(snapshot) === digest(alsoSnapshot), digest(snapshot))",
+        ].join("\n"),
+    },
+
+    // CLASS 2: a boolean initialised to a PASSING value whose assignment cannot be reached.
+    {
+        name: "unreached-initialiser-never-written",
+        expect: "VACUOUS_UNREACHED_INITIALISER",
+        body: [
+            "declare const observedTitle: string",
+            "// A constant wearing a name. `fold` has no environment, so this folds to `undefined` and the",
+            "// literal detector says nothing about it.",
+            "const renameAccepted = true",
+            "check('a variant can be renamed', renameAccepted, observedTitle)",
+        ].join("\n"),
+    },
+    {
+        name: "unreached-initialiser-dead-guard",
+        expect: "VACUOUS_UNREACHED_INITIALISER",
+        body: [
+            "declare const rows: ReadonlyArray<{ stale: boolean }>",
+            "// The debug flag left switched off. `ok` LOOKS falsifiable - there is an assignment, and it",
+            "// is in a loop over observed data - but the only guard that reaches it is a compile-time",
+            "// false, so no run can execute the assignment and `ok` keeps its passing initialiser.",
+            "const STRICT_STALENESS = false",
+            "let ok = true",
+            "for (const row of rows) { if (STRICT_STALENESS && row.stale) { ok = false } }",
+            "check('no stale row came back', ok, String(rows.length))",
+        ].join("\n"),
+    },
+
+    // CLASS 3: `[].every(...)` where the pin is in a position that does not protect the assertion.
+    {
+        name: "every-pin-under-or",
+        expect: "UNGUARDED_EVERY",
+        body: [
+            "declare const items: Array<{ at: string | null }>",
+            "// The pin is real, and it protects nothing: on an empty collection the first disjunct is",
+            "// false, `[].every(...)` is true, and the assertion passes.",
+            "check('every item date is an ISO string or null', items.length > 0 || items.every((i) => i.at === null || typeof i.at === 'string'))",
+        ].join("\n"),
+    },
+    {
+        name: "every-pin-inside-the-callback",
+        expect: "UNGUARDED_EVERY",
+        body: [
+            "declare const rows: readonly number[]",
+            "// The pin is INSIDE the predicate, so it runs once per element - which on zero elements is",
+            "// never. The assertion still passes on an empty collection.",
+            "check('every row is positive', rows.every((r) => rows.length > 0 && r > 0), String(rows.length))",
+        ].join("\n"),
+    },
+
+    // CLASS 4: a replay loop that can execute zero times, so the assertion compares initial values.
+    {
+        name: "empty-replay-accumulator",
+        expect: "VACUOUS_EMPTY_REPLAY",
+        body: [
+            "declare const ledger: ReadonlyArray<{ delta: number }>",
+            "// On an empty ledger the body never runs, `running` is still 0, and the assertion reports a",
+            "// successful replay of nothing - including when the code under test produced no rows at all.",
+            "let running = 0",
+            "for (const row of ledger) { running += row.delta }",
+            "check('replaying every delta nets back to zero', running === 0, String(running))",
+        ].join("\n"),
+    },
+
+    // CLASS 5: expected and actual derived from the SAME source.
+    {
+        name: "mirrored-derivation-imported-constant",
+        expect: "VACUOUS_MIRRORED_DERIVATION",
+        body: [
+            "import { PERMISSION_KEYS } from '@/lib/permissions'",
+            "// The real instance this repository has already paid for: two names both resolving to",
+            "// `JSON.stringify(PERMISSION_KEYS)`, compared against each other. A defect in the production",
+            "// constant moves BOTH sides, so the comparison cannot fail.",
+            "const expectedDigest = JSON.stringify(PERMISSION_KEYS)",
+            "const actualDigest = JSON.stringify(PERMISSION_KEYS)",
+            "check('the permission keys are the ones the UI ships', actualDigest === expectedDigest, actualDigest)",
+        ].join("\n"),
+    },
+    {
+        name: "mirrored-derivation-copied-production-constant",
+        expect: "VACUOUS_MIRRORED_DERIVATION",
+        body: [
+            "import { PERMISSION_KEYS } from '@/lib/permissions'",
+            "// The expected side is a COPY of the production constant rather than an independent",
+            "// statement of what the keys should be, so it is the same source wearing a second name.",
+            "const EXPECTED_KEYS = PERMISSION_KEYS",
+            "check('the permission keys are the ones the UI ships', JSON.stringify(PERMISSION_KEYS) === JSON.stringify(EXPECTED_KEYS), 'keys')",
+        ].join("\n"),
+    },
+
+    // CLASS 6: a conjunct whose mutation cannot affect the verdict.
+    {
+        name: "dominated-conjunct-duplicate",
+        expect: "VACUOUS_DOMINATED_CONJUNCT",
+        body: [
+            "declare const refused: { ok: boolean; message: string }",
+            "// MEASURED in this tree: check-appointment-authz.ts:245 is exactly this, character for",
+            "// character - the same conjunct twice, joined by `&&`.",
+            "check('a slot outside published hours is refused', !refused.ok && !refused.ok && /outside/iu.test(refused.message), refused.message)",
+        ].join("\n"),
+    },
+    {
+        name: "dominated-conjunct-entailed-bound",
+        expect: "VACUOUS_DOMINATED_CONJUNCT",
+        body: [
+            "declare const posted: { status: number }",
+            "// MEASURED in this tree: check-due-work-preview-api.ts:603. `=== 405` already forces",
+            "// `!== 200`, so deleting or loosening the second conjunct cannot turn a green run red.",
+            "check('the service refuses a POST', posted.status !== 200 && posted.status === 405, String(posted.status))",
+        ].join("\n"),
+    },
+    {
+        name: "dominated-conjunct-disjunction-forced-by-a-sibling",
+        expect: "VACUOUS_DOMINATED_CONJUNCT",
+        body: [
+            "declare const settled: boolean",
+            "declare const timedOut: boolean",
+            "// The sibling must be true for the assertion to pass, and a true branch makes the whole",
+            "// disjunction true, so the disjunction measures nothing whatever `timedOut` does.",
+            "check('the read settled, or at least did something', settled && (settled || timedOut), String(settled))",
+        ].join("\n"),
+    },
 ]
 
 /**
@@ -2257,6 +3716,118 @@ const LIVE_CONTROLS: readonly Fixture[] = [
             "check('no stale row came back', rows.length > 0 && staleSeen === 0, String(staleSeen))",
         ].join("\n"),
     },
+
+    // ---- the SAFE NEAR-MISSES: one per falsifiability class -------------------------------------
+    // Each is structurally the fixture above it and genuinely falsifiable. These are the fixtures that
+    // decide whether the classes are usable: a detector that also flags these is a detector that would
+    // report the strongest assertions in this tree as defects, and would be switched off within a week.
+
+    // CLASS 1 near-miss: TWO evaluations, aliased. The alias steps are identical to the positive; what
+    // differs is that the chain bottoms out at two different sites, which is a real measurement that
+    // the value did not move.
+    {
+        name: "live-two-evaluations-reached-through-aliases",
+        expect: "LIVE",
+        body: [
+            "declare function readRows(): readonly string[]",
+            "const before = readRows()",
+            "const after = readRows()",
+            "const expectedRows = before",
+            "const actualRows = after",
+            "check('the rows did not move while the preview ran', actualRows === expectedRows, String(actualRows.length))",
+        ].join("\n"),
+    },
+    // CLASS 1 near-miss: the same pure function applied to two DIFFERENT receivers.
+    {
+        name: "live-pure-function-over-two-receivers",
+        expect: "LIVE",
+        body: [
+            "declare function readRows(): readonly string[]",
+            "const digest = (xs: readonly string[]) => xs.join('|')",
+            "const before = readRows()",
+            "const after = readRows()",
+            "check('the digest did not move while the preview ran', digest(before) === digest(after), digest(after))",
+        ].join("\n"),
+    },
+    // CLASS 2 near-miss: the shape root named explicitly as falsifiable. `ok` starts true and is set
+    // false under a DATA-DEPENDENT guard that a stale row reaches, so a stale row turns the run red.
+    {
+        name: "live-boolean-set-false-under-a-reachable-guard",
+        expect: "LIVE",
+        body: [
+            "declare const rows: ReadonlyArray<{ stale: boolean }>",
+            "let ok = true",
+            "for (const row of rows) { if (row.stale) { ok = false } }",
+            "check('no stale row came back', ok, String(rows.length))",
+        ].join("\n"),
+    },
+    // CLASS 3 near-miss: the pin is on the SOURCE of a length-preserving transformation, so it does
+    // carry to the receiver. Reporting this would be the false positive that discredits the class.
+    {
+        name: "live-every-over-a-length-preserving-view",
+        expect: "LIVE",
+        body: [
+            "declare const rows: ReadonlyArray<{ id: string }>",
+            "const view = rows.map((r) => r.id)",
+            "check('every id came back non-empty', rows.length > 0 && view.every((id) => id.length > 0), String(view.length))",
+        ].join("\n"),
+    },
+    // CLASS 4 near-miss: the same replay loop with the collection pinned in the same condition, which
+    // is exactly how check-retainer-runtime.ts:495 was hardened.
+    {
+        name: "live-replay-with-the-ledger-pinned",
+        expect: "LIVE",
+        body: [
+            "declare const ledger: ReadonlyArray<{ delta: number }>",
+            "let running = 0",
+            "for (const row of ledger) { running += row.delta }",
+            "check('the ledger replayed and the deltas net back to zero', ledger.length > 0 && running === 0, String(running))",
+        ].join("\n"),
+    },
+    // CLASS 5 near-miss: the expected side is an INDEPENDENT statement of what the keys should be, so a
+    // defect in the production constant moves one side only.
+    {
+        name: "live-expectation-independent-of-the-production-constant",
+        expect: "LIVE",
+        body: [
+            "import { PERMISSION_KEYS } from '@/lib/permissions'",
+            "check('the permission keys are exactly the four the UI ships', JSON.stringify(PERMISSION_KEYS) === JSON.stringify(['billing', 'members', 'settings', 'workspace']), 'keys')",
+        ].join("\n"),
+    },
+    // CLASS 5 near-miss: the same derivation twice through a PROVEN-PURE local function, over a root
+    // that is an OBSERVATION rather than a frozen import. Identical canonical text, identical purity;
+    // only the provenance of the root differs, and that is the whole condition.
+    {
+        name: "live-mirrored-derivation-over-an-observed-root",
+        expect: "LIVE",
+        body: [
+            "declare const observed: { rows: readonly string[] }",
+            "const digest = (xs: readonly string[]) => xs.join('|')",
+            "const before = digest(observed.rows)",
+            "const after = digest(observed.rows)",
+            "check('the preview wrote nothing', before === after, after)",
+        ].join("\n"),
+    },
+    // CLASS 6 near-miss: two bounds on one subject where NEITHER forces the other, so both measure.
+    {
+        name: "live-two-independent-bounds-on-one-subject",
+        expect: "LIVE",
+        body: [
+            "declare const posted: { status: number }",
+            "check('the refusal is a 4xx and is not a 404', posted.status >= 400 && posted.status !== 404, String(posted.status))",
+        ].join("\n"),
+    },
+    // CLASS 6 near-miss: a conjunct repeated around something that can MOVE the subject. The two
+    // readings are two measurements, and the one in between is the thing under test.
+    {
+        name: "live-repeated-conjunct-around-an-effect",
+        expect: "LIVE",
+        body: [
+            "declare function drain(): number",
+            "declare const queue: { length: number }",
+            "check('the queue drains and refills', queue.length > 0 && drain() === 0 && queue.length > 0, String(queue.length))",
+        ].join("\n"),
+    },
 ]
 
 function fixtureSource(fixture: Fixture): string {
@@ -2267,6 +3838,83 @@ function fixtureNamed(name: string): Fixture {
     const found = VACUOUS_FIXTURES.find((fixture) => fixture.name === name)
     if (!found) throw new Error(`no fixture named ${name}`)
     return found
+}
+
+/**
+ * MUTATION PROOFS. One per (detector, positive fixture): with the detector ON the fixture is flagged
+ * with that class, and with the detector OFF the class DISAPPEARS from the same fixture.
+ *
+ * WHY THE SECOND HALF IS THE WHOLE POINT. "The fixture is flagged" is equally true of a fixture flagged
+ * by some other class, or by an accident of precedence - and the six detectors here sit in a chain where
+ * five of them could plausibly answer for another's shape. Turning one off and watching only ITS class
+ * vanish is the only evidence that the detector is why the fixture is caught. Nothing is written to
+ * disk and no mutation survives the call: `withDetectorDisabled` restores the prior state in a
+ * `finally`, and the restoration is itself asserted after every proof.
+ *
+ * `EVERY_DOMINANCE` is proven the same way but reads differently: disabling it does not remove a
+ * detector, it reverts the pin rule to the original walk, under which a pin under `||` or inside the
+ * `every` callback is accepted. So its two fixtures stop being flagged when it is off - which is a
+ * statement about the OLD rule, recorded here as a fixture rather than in a comment.
+ */
+const MUTATION_PROOFS: ReadonlyArray<Readonly<{ key: MutableDetector; fixture: string; expect: Classification }>> = [
+    { key: "ALIAS_IDENTITY", fixture: "alias-identity-chain", expect: "VACUOUS_ALIAS_IDENTITY" },
+    { key: "ALIAS_IDENTITY", fixture: "alias-identity-destructured", expect: "VACUOUS_ALIAS_IDENTITY" },
+    { key: "ALIAS_IDENTITY", fixture: "alias-identity-pure-function-same-receiver", expect: "VACUOUS_ALIAS_IDENTITY" },
+    { key: "UNREACHED_INITIALISER", fixture: "unreached-initialiser-never-written", expect: "VACUOUS_UNREACHED_INITIALISER" },
+    { key: "UNREACHED_INITIALISER", fixture: "unreached-initialiser-dead-guard", expect: "VACUOUS_UNREACHED_INITIALISER" },
+    { key: "EMPTY_REPLAY", fixture: "empty-replay-accumulator", expect: "VACUOUS_EMPTY_REPLAY" },
+    { key: "MIRRORED_DERIVATION", fixture: "mirrored-derivation-imported-constant", expect: "VACUOUS_MIRRORED_DERIVATION" },
+    { key: "MIRRORED_DERIVATION", fixture: "mirrored-derivation-copied-production-constant", expect: "VACUOUS_MIRRORED_DERIVATION" },
+    { key: "DOMINATED_CONJUNCT", fixture: "dominated-conjunct-duplicate", expect: "VACUOUS_DOMINATED_CONJUNCT" },
+    { key: "DOMINATED_CONJUNCT", fixture: "dominated-conjunct-entailed-bound", expect: "VACUOUS_DOMINATED_CONJUNCT" },
+    { key: "DOMINATED_CONJUNCT", fixture: "dominated-conjunct-disjunction-forced-by-a-sibling", expect: "VACUOUS_DOMINATED_CONJUNCT" },
+    { key: "EVERY_DOMINANCE", fixture: "every-pin-under-or", expect: "UNGUARDED_EVERY" },
+    { key: "EVERY_DOMINANCE", fixture: "every-pin-inside-the-callback", expect: "UNGUARDED_EVERY" },
+]
+
+function runMutationProofs(): boolean {
+    let ok = true
+    // Every mutable key must be exercised, or a detector could be added to the switch and never proven.
+    const covered = new Set(MUTATION_PROOFS.map((proof) => proof.key))
+    const uncovered = MUTABLE_DETECTORS.filter((key) => !covered.has(key))
+    if (!recordSelfCheck(uncovered.length === 0)) {
+        console.error(`FAIL mutation-proof coverage: no proof for ${uncovered.join(", ")}, so those detectors are not shown to be load-bearing`)
+        ok = false
+    }
+    for (const proof of MUTATION_PROOFS) {
+        const fixture = fixtureNamed(proof.fixture)
+        const source = fixtureSource(fixture)
+        if (disabledDetectors.has(proof.key)) {
+            console.log(`SKIP mutation-proof ${proof.key}/${proof.fixture}: the key is disabled for the whole run by --mutate-disable, and THIS RUN IS VOID`)
+            continue
+        }
+        const normal = scan(`mutation-normal-${proof.fixture}.ts`, source)
+        const before = normal.findings.filter((finding) => finding.classification === proof.expect)
+        if (!recordSelfCheck(before.length > 0)) {
+            console.error(`FAIL mutation-proof ${proof.key}/${proof.fixture}: ${proof.expect} is not reported with the detector ENABLED, so there is nothing to prove load-bearing`)
+            ok = false
+            continue
+        }
+        const mutated = withDetectorDisabled(proof.key, () => scan(`mutation-disabled-${proof.fixture}.ts`, source))
+        const after = mutated.findings.filter((finding) => finding.classification === proof.expect)
+        if (!recordSelfCheck(after.length === 0)) {
+            console.error(
+                `FAIL mutation-proof ${proof.key}/${proof.fixture}: ${proof.expect} is STILL reported with the detector disabled (${after.length} finding(s)), so the fixture is caught by something other than ${proof.key} and the class is not proven load-bearing`,
+            )
+            ok = false
+            continue
+        }
+        if (!recordSelfCheck(detectorEnabled(proof.key))) {
+            console.error(`FAIL mutation-proof ${proof.key}/${proof.fixture}: the detector was not restored after the mutation`)
+            ok = false
+            continue
+        }
+        const survivors = mutated.findings.map((finding) => finding.classification)
+        console.log(
+            `PASS mutation-proof ${proof.key}/${proof.fixture}: ${proof.expect} at fixture line ${before[0].line} with the detector enabled, GONE with it disabled (what remains: ${survivors.join(", ") || "nothing"}), detector restored`,
+        )
+    }
+    return ok
 }
 
 /** The synthetic defect used by --prove-failure, so a clean tree can still be shown to exit 1. */
@@ -2434,6 +4082,8 @@ function runSelfTest(): boolean {
         console.log("PASS self-test coverage-reject: a condition-building wrapper was correctly NOT registered as a helper")
     }
 
+    if (!runMutationProofs()) ok = false
+
     for (const fixture of INVENTORY_FIXTURES) {
         const found = reconcile(fixture.declared, fixture.onDisk)
         if (fixture.expect === null) {
@@ -2559,6 +4209,35 @@ for (let index = 0; index < argv.length; index += 1) {
     }
 }
 
+/**
+ * `--mutate-disable=<KEY>` turns ONE detector off for the whole run, and makes the run VOID.
+ *
+ * This exists so a human can reproduce, from the command line, the mutation proofs that run in-process
+ * on every invocation - and it is deliberately built so it can never be a way to get a green run. The
+ * flag forces a non-zero exit whatever the findings are, prints a banner on every line of output that
+ * summarises the run, and is refused for a key that is not in the switch (a typo silently disabling
+ * nothing would be worse than an error). There is no environment variable and no config file: asking
+ * for a mutation is the same as asking for exit 1.
+ */
+const mutationRequests = argv
+    .filter((argument) => argument.startsWith("--mutate-disable="))
+    .map((argument) => argument.slice("--mutate-disable=".length))
+const unknownMutations = mutationRequests.filter(
+    (key) => !(MUTABLE_DETECTORS as readonly string[]).includes(key),
+)
+if (unknownMutations.length > 0) {
+    console.error(
+        `REFUSING TO RUN: --mutate-disable was given ${unknownMutations.map((key) => `"${key}"`).join(", ")}, which name no detector. Valid keys: ${MUTABLE_DETECTORS.join(", ")}.`,
+    )
+    process.exit(1)
+}
+for (const key of mutationRequests) disabledDetectors.add(key as MutableDetector)
+if (mutationRequests.length > 0) {
+    console.log(
+        `MUTATION RUN - THIS RUN IS VOID. Detector(s) disabled: ${mutationRequests.join(", ")}. Every finding below is what the scanner reports WITHOUT them, and the exit code is forced non-zero so a mutation can never be mistaken for a passing gate.`,
+    )
+}
+
 const missing = explicit.filter((path) => !existsSync(path))
 const declaredInventory = explicit.length > 0
     ? { files: [] as readonly string[], integrity: [] as IntegrityFinding[], source: "--file (explicit; inventory reconciliation skipped)" }
@@ -2634,6 +4313,9 @@ for (const result of exhausted) {
     )
 }
 console.log(`  NOT followed: ${COVERAGE_LIMITS.map((item, index) => `(${index + 1}) ${item}`).join(" ")}`)
+console.log(
+    `  NOT DECIDED by the falsifiability classes: ${FALSIFIABILITY_LIMITS.map((item, index) => `(${index + 1}) ${item}`).join(" ")}`,
+)
 const perClass = VACUOUS.map(
     (classification) => `${classification}=${findings.filter((finding) => finding.classification === classification).length}`,
 ).join("; ")
@@ -2653,6 +4335,15 @@ console.log(`REAL vacuous assertions (cannot fail): ${defects.length}.`)
  * one - and this repository has already shipped "a control wired to nothing" once. They are printed
  * with a count so the debt is visible and cannot quietly grow.
  *
+ * THE FIVE FALSIFIABILITY CLASSES DO NOT GATE EITHER, ON ARRIVAL, for exactly that precedent and for
+ * one more reason: they are new, and a class that turns the tree red the day it lands is a class
+ * someone deletes rather than a defect someone fixes. They ARE counted as defects, printed
+ * individually with their evidence, and each is proven load-bearing by a mutation on every run, so the
+ * debt is visible and measured. MEASURED at arrival: 2 VACUOUS_DOMINATED_CONJUNCT
+ * (check-appointment-authz.ts:245, a conjunct written twice; check-due-work-preview-api.ts:603, where
+ * `=== 405` already forces `!== 200`) and 0 of the other four. Promoting a class into GATING is the
+ * integration owner's call, not this file's, and the right moment is when its count is 0.
+ *
  * THE COUNT MOVES, AND THAT IS THE POINT. It was 47 when this scanner landed; 8 at Q2-A, after the
  * intervening work cleared most of them and Q1's `check-operations-runtime.ts` rewrite added five new
  * ones. Every surviving case is triaged INDIVIDUALLY in the Q2-A report - three long-standing and five
@@ -2670,8 +4361,9 @@ const GATING: readonly Finding["classification"][] = [
 ]
 const gatingDefects = defects.filter((finding) => GATING.includes(finding.classification))
 const reportedOnly = defects.filter((finding) => !GATING.includes(finding.classification))
+const reportedOnlyClasses = [...new Set(reportedOnly.map((finding) => finding.classification))].sort()
 console.log(
-    `Gating classes: ${gatingDefects.length} defect(s). Reported-only (UNGUARDED_EVERY, pre-existing debt): ${reportedOnly.length}.`,
+    `Gating classes: ${gatingDefects.length} defect(s). Reported-only (counted, printed with evidence, but not gating on arrival - see the comment above): ${reportedOnly.length}${reportedOnlyClasses.length > 0 ? ` (${reportedOnlyClasses.join(", ")})` : ""}.`,
 )
 
 // This scanner's OWN gating invariants (its controlled fixtures + inventory reconciliation) now run on
@@ -2689,6 +4381,13 @@ console.log(`Inventory integrity findings: ${declaredInventory.integrity.length}
 // invariants, never the vacuity findings it reports about other files.
 console.log(`GATE-EVIDENCE harness=check-assertion-vacuity.ts assertions=${assertionsPassed}`)
 console.log(`${assertionsPassed}/${assertionsRun} invariants passed`)
+
+if (mutationRequests.length > 0) {
+    console.log(
+        `MUTATION RUN - THIS RUN IS VOID: ${mutationRequests.join(", ")} was disabled, so the counts above are not a measurement of this tree and the exit code below is forced to 1.`,
+    )
+    process.exitCode = 1
+}
 
 if (gatingDefects.length > 0 || !selfTestOk || missing.length > 0 || declaredInventory.integrity.length > 0 || exhausted.length > 0) {
     process.exitCode = 1
