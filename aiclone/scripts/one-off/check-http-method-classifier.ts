@@ -204,6 +204,7 @@ checkInvertible(
     "MEASURED: an aliased re-export of a POST handler is a FALSE NEGATIVE for every one of the seven old patterns, and the canonical classifier catches it - the hole that mattered",
     !WIDEST_OLD_STATE_CHANGING.test(ALIASED_WRITE_REEXPORT) &&
         aliasedClassified.stateChanging.join(",") === "POST" &&
+        aliasedClassified.exports.length === 1 &&
         aliasedClassified.exports.every((entry) => entry.style === "re-export"),
     `old regex sees no write verb; canonical classifier sees [${aliasedClassified.stateChanging.join(",")}] as ${aliasedClassified.exports.map((e) => e.style).join(",")}`,
 )
@@ -225,6 +226,7 @@ check(
     STATE_CHANGING_METHODS.join(",") === "POST,PUT,PATCH,DELETE" &&
         SAFE_METHODS.join(",") === "GET,HEAD,OPTIONS" &&
         SAFE_METHOD_HANDLERS.join(",") === "HEAD,OPTIONS" &&
+        STATE_CHANGING_METHODS.length === 4 &&
         STATE_CHANGING_METHODS.every((m) => !SAFE_METHODS.includes(m)),
     `state-changing=[${STATE_CHANGING_METHODS.join(",")}] safe=[${SAFE_METHODS.join(",")}]`,
 )
@@ -276,7 +278,8 @@ checkInvertible(
 // load-bearing, and it is asserted so the claim stops being made the day it stops being true.
 checkInvertible(
     "MEASURED: no route file in the corpus exports HEAD or OPTIONS, so the framework derives both on every route that exports GET",
-    SAFE_METHOD_HANDLERS.every((verb) => tally[verb].asyncFunction + tally[verb].plainFunction + tally[verb].constDecl === 0),
+    SAFE_METHOD_HANDLERS.length === 2 &&
+        SAFE_METHOD_HANDLERS.every((verb) => tally[verb].asyncFunction + tally[verb].plainFunction + tally[verb].constDecl === 0),
     `HEAD=${JSON.stringify(tally.HEAD)} OPTIONS=${JSON.stringify(tally.OPTIONS)}`,
 )
 

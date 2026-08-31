@@ -891,6 +891,8 @@ const promotionEvidence = candidates.map((candidate) => {
 checkInvertible(
   "every candidate is held non-active by declaration, not by the validator refusing it",
   promotionEvidence.every((entry) => entry.wouldValidateIfActivated) &&
+    promotionEvidence.length === 6 &&
+    candidates.length === 6 &&
     candidates.every((candidate) => candidate.blueprint.status === "draft"),
   JSON.stringify(promotionEvidence),
 )

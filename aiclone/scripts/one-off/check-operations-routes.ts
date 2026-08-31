@@ -346,13 +346,15 @@ async function main() {
                 }
                 checkInvertible(
                     "MEASURED: every state-changing method is refused 405 METHOD_NOT_ALLOWED by the SERVICE, not merely by the route module's export list",
-                    spyRefusals.every((r) => r.status === 405 && errCode(r) === "METHOD_NOT_ALLOWED"),
-                    spyRefusals.map((r, i) => `${refusedMethods[i]}=${r.status}/${errCode(r)}`).join(" "),
+                    spyRefusals.length === 4 &&
+                        spyRefusals.every((r) => r.status === 405 && errCode(r) === "METHOD_NOT_ALLOWED"),
+                    `probed=${spyRefusals.length} ` + spyRefusals.map((r, i) => `${refusedMethods[i]}=${r.status}/${errCode(r)}`).join(" "),
                 )
                 checkInvertible(
                     "MEASURED: a refused method carries Allow: GET, HEAD, OPTIONS - the byte-identical string next@16.3.3 puts on its own auto-implemented OPTIONS for this route",
-                    spyRefusals.every((r) => r.headers.allow === "GET, HEAD, OPTIONS"),
-                    spyRefusals.map((r, i) => `${refusedMethods[i]}:[${r.headers.allow ?? "NO ALLOW HEADER"}]`).join(" "),
+                    spyRefusals.length === 4 &&
+                        spyRefusals.every((r) => r.headers.allow === "GET, HEAD, OPTIONS"),
+                    `probed=${spyRefusals.length} ` + spyRefusals.map((r, i) => `${refusedMethods[i]}:[${r.headers.allow ?? "NO ALLOW HEADER"}]`).join(" "),
                 )
                 // THE ZERO-SIDE-EFFECT PROOF. Not "no row changed" - "no query was possible".
                 checkInvertible(
