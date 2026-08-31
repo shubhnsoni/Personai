@@ -98,16 +98,23 @@ check("has section-level <h3> headings (stat cards + card titles)", /<h3[ >]/.te
 check("has blueprint-level <h4> headings", /<h4[ >]/.test(populated))
 
 const headingSequence = [...populated.matchAll(/<h([1-6])[ >]/g)].map((m) => Number(m[1]))
-let orderOk = true
+// Collected as the actual violations rather than accumulated into a boolean flag. A flag that
+// starts `true` and is only ever assigned inside a conditional is true both when the order is
+// sound and when there are no headings at all to order, so it cannot distinguish the two. The
+// list makes the violation itself the evidence, and the length pin below makes "no headings
+// were found" a loud failure instead of a silent pass.
+const skippedHeadingLevels: string[] = []
 let maxSeen = 0
 for (const level of headingSequence) {
-    if (level > maxSeen + 1 && maxSeen !== 0) orderOk = false
+    if (level > maxSeen + 1 && maxSeen !== 0) skippedHeadingLevels.push(`h${maxSeen} -> h${level}`)
     maxSeen = Math.max(maxSeen, level)
 }
 check(
     "heading levels never skip a level (e.g. h2 straight to h4)",
-    orderOk,
-    `sequence was ${headingSequence.join(",")}`,
+    headingSequence.length > 0 && skippedHeadingLevels.length === 0,
+    headingSequence.length === 0
+        ? "no headings were found at all, so heading order proves nothing"
+        : `sequence was ${headingSequence.join(",")}; skips: ${skippedHeadingLevels.join(", ") || "none"}`,
 )
 
 // Decorative icons next to card titles must be aria-hidden so screen readers
@@ -859,20 +866,25 @@ check(
     "MEASURED: the panel says outright that inspection, parts and completion notes are not built, rather than leaving an owner hunting",
     /Inspection, parts and completion notes are not built yet/.test(fieldJobsSrc),
 )
+// Hoisted out of the assertion below and counted first. The claim is "every mention of routing
+// is copy saying there isn't one", and `[].every(...)` is true - so if the panel ever stopped
+// mentioning routing at all (for instance because the honest disclosure copy was deleted) the
+// assertion would pass while proving the opposite of what it says. Two lines mention it today:
+// the file's own doc comment and the assignment disclosure beside the control.
+const routeMentions = fieldJobsSrc.split("\n").filter((line) => /route/i.test(line))
+check(
+    "the panel mentions routing on exactly the two lines whose copy denies it, so the sweep below is not vacuous",
+    routeMentions.length === 2,
+    `${routeMentions.length} line(s) mention route, expected 2 (the doc comment and the assignment disclosure)`,
+)
 check(
     "the panel wires no map library and no route or ETA field - every mention of either is in copy saying there isn't one",
     !/mapbox|googlemaps|google-maps|leaflet|@react-google-maps/i.test(fieldJobsSrc) &&
         !/\betaMinutes\b|\beta:\s|\betaAt\b/i.test(fieldJobsSrc) &&
         !/routeOrder|optimi[sz]eRoute|travelMinutes|distanceMeters/i.test(fieldJobsSrc) &&
-        fieldJobsSrc
-            .split("\n")
-            .filter((line) => /route/i.test(line))
-            .every((line) => /no route is planned/i.test(line)),
-    fieldJobsSrc
-        .split("\n")
-        .filter((line) => /route/i.test(line))
-        .map((line) => line.trim().slice(0, 40))
-        .join(" | "),
+        routeMentions.length > 0 &&
+        routeMentions.every((line) => /no route is planned/i.test(line)),
+    routeMentions.map((line) => line.trim().slice(0, 40)).join(" | ") || "no line mentions route at all",
 )
 check(
     "the panel explains why an undated job cannot be dispatched instead of just disabling the button",
