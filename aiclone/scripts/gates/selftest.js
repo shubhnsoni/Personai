@@ -1007,12 +1007,12 @@ const CASES = [
         ev.required === true &&
         ev.allowlist.actualSize === 0 &&
         ev.allowlist.declaredSize === 0 &&
-        runnable === 76 &&
-        // Honest arithmetic: 76 runnable = 76 enforced + 0 allowlisted. T1 groups A, B and C
+        runnable === 79 &&
+        // Honest arithmetic: 79 runnable = 79 enforced + 0 allowlisted. T1 groups A, B and C
         // migrated the four meta/contract harnesses (assertion-vacuity,
         // migrated all 13 formerly-allowlisted harnesses to emit their own dynamically
         // counted evidence, so the allowlist reached zero and enforced reached runnable.
-        runnable - ev.allowlist.actualSize === 76 &&
+        runnable - ev.allowlist.actualSize === 79 &&
         ev.allowlist.files.length === new Set(ev.allowlist.files).size &&
         // The allowlist is empty, so there are no entries to shape-check here; that is
         // stated as an explicit equality rather than left to `entries.every` passing
@@ -1263,7 +1263,7 @@ const CASES = [
   },
   {
     name: "corroboration-real-corpus-has-no-zero-scoring-harness",
-    why: "the enforcement must not break the 77 production harnesses: every one of them, measured here without running the sweep, has executable assertion callsites and none is refused",
+    why: "the enforcement must not break the 80 production harnesses: every one of them, measured here without running the sweep, has executable assertion callsites and none is refused",
     probe: () => {
       const dir = path.join(APP_DIR, "scripts", "one-off");
       const files = fs.readdirSync(dir).filter((n) => /^check-.*\.ts$/u.test(n)).sort();
@@ -1281,7 +1281,7 @@ const CASES = [
     },
     expectExit: 0,
     assert: (r) =>
-      r.probe.files === 77 &&
+      r.probe.files === 80 &&
       r.probe.zero.length === 0 &&
       r.probe.refused.length === 0 &&
       r.probe.unparseable.length === 0 &&

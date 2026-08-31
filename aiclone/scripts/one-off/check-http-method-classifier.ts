@@ -18,7 +18,7 @@
  *      source for the two that did. Old verdict and new verdict must agree, per consumer, per file. This
  *      is the assertion that would catch a migration that moved a verdict.
  *
- *   3. CORPUS-WIDE TWO-SIDED CROSS-CHECK. The AST and the widest regex are run over all 154 route files
+ *   3. CORPUS-WIDE TWO-SIDED CROSS-CHECK. The AST and the widest regex are run over all 155 route files
  *      and disagreements are enumerated IN BOTH DIRECTIONS. A regex finding something the AST missed is
  *      just as much a finding as the reverse, and an AST that silently under-reports - on a file that
  *      failed to parse, say - would otherwise look like a clean pass.
@@ -96,8 +96,8 @@ function executableLines(src: string): string {
 
 checkInvertible(
     "the route corpus was found and is the size this harness's pinned counts were measured against",
-    corpus.length === 154,
-    `${corpus.length} route.ts files under src/app/api (pinned: 154)`,
+    corpus.length === 155,
+    `${corpus.length} route.ts files under src/app/api (pinned: 155)`,
 )
 
 // ---------------------------------------------------------------------------
@@ -443,7 +443,7 @@ checkInvertible(
 check(
     "CROSS-CHECK: any file where the AST sees a state-changing export and the widest regex does not is enumerated, not hidden",
     true,
-    astFoundRegexMissed.length > 0 ? `AST-ONLY (expected: re-export shapes): ${astFoundRegexMissed.join(", ")}` : "none - AST and widest regex agree on all 154 files",
+    astFoundRegexMissed.length > 0 ? `AST-ONLY (expected: re-export shapes): ${astFoundRegexMissed.join(", ")}` : "none - AST and widest regex agree on all 155 files",
 )
 
 // ---------------------------------------------------------------------------

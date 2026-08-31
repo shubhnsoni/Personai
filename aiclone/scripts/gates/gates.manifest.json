@@ -10,8 +10,8 @@
     "databaseName": "personalink_phase0_rehearsal_20260826_210704"
   },
   "expected": {
-    "harnessesOnDisk": 77,
-    "executedChecks": 76,
+    "harnessesOnDisk": 80,
+    "executedChecks": 79,
     "declaredSkips": 1,
     "note": "Derived from the declared inventory below (75 entries, 1 declared skip), not from any prior run. The driver reports what it measured; if a run disagrees with these numbers it raises EXECUTED_COUNT_DRIFT. Investigate the difference — do not edit this block to make a run agree with it."
   },
@@ -94,6 +94,7 @@
     },
     { "file": "check-ownership-foundation.ts", "package": "foundation", "run": true },
     { "file": "check-persisted-adapters.ts", "package": "persistence", "run": true },
+    { "file": "check-react-hook-behaviour.ts", "package": "ui", "run": true },
     { "file": "check-reservation-authz.ts", "package": "reservation", "run": true },
     { "file": "check-reservation-routes.ts", "package": "reservation", "run": true },
     { "file": "check-reservation-schema-invariants.ts", "package": "reservation", "run": true },
@@ -107,6 +108,8 @@
     { "file": "check-tenancy-contracts.ts", "package": "tenancy", "run": true },
     { "file": "check-tenant-isolation.ts", "package": "tenancy", "run": true },
     { "file": "check-upload-security.ts", "package": "security", "run": true },
+    { "file": "check-vertical-candidate-catalog.ts", "package": "blueprint", "run": true },
+    { "file": "check-vertical-candidate-routes.ts", "package": "blueprint", "run": true },
     { "file": "check-vertical-pack-candidates.ts", "package": "blueprint", "run": true },
     { "file": "check-workspace-surface-boundary.ts", "package": "workspace", "run": true },
     { "file": "check-workspace-surface-contract.ts", "package": "workspace", "run": true },

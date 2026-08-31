@@ -1,11 +1,18 @@
 /**
  * CANDIDATE vertical packs - the unregistered set.
  *
- * THIS MODULE IS NOT WIRED INTO THE PRODUCT. `../blueprints.ts` does not import it, so
+ * THIS MODULE IS READ-ONLY AND REGISTERS NOTHING. `../blueprints.ts` does not import it, so
  * `listBusinessBlueprints()` and `getBusinessBlueprint()` cannot reach a candidate, no onboarding role
  * maps to one, and neither preview nor install can resolve one. That is the point: a candidate is a
  * described recombination of engines that already exist, held where it can be reviewed without being
  * installable.
+ *
+ * It IS now read by two owner-facing read-only surfaces, both behind the Business OS guard: the
+ * `/api/business-os/vertical-candidates` route and the dashboard Vertical Candidate Catalog page. Both
+ * serialise descriptors for evaluation only - neither can register, install or activate a candidate, and
+ * harnesses assert that no candidate id ever appears in `listBusinessBlueprints()`. The earlier wording
+ * here said this module was "not wired into the product", which stopped being true when those surfaces
+ * landed; being readable and being installable are different claims, and only the second is still false.
  *
  * Each candidate IS validated here at module load, exactly as `blueprints.ts` validates the registry, so
  * a malformed candidate fails at import rather than at review time. Validation uses the REAL

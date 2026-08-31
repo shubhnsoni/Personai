@@ -158,6 +158,10 @@ const routePaths = handlerFiles.map((file) => file.slice(file.indexOf("/api/busi
 const expectedRoutes = [
     "/api/business-os/blueprints/[blueprintId]/route.ts",
     "/api/business-os/blueprints/route.ts",
+    // T3-A: the read-only Vertical Candidate Catalog API. GET-only, guarded by
+    // requireBusinessOsAccess like its siblings, and it registers nothing - the six
+    // candidates it serialises stay unregistered and uninstallable.
+    "/api/business-os/vertical-candidates/route.ts",
 ].sort()
 check(
     "exactly the expected route handlers exist",
