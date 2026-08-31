@@ -25,7 +25,7 @@ import type {
 import type { OwnerGatedFunction, VerticalPackCandidate } from "@/lib/business-os/vertical-packs"
 
 /**
- * VERTICAL CANDIDATE CATALOG - a READ-ONLY evaluation surface for the six UNREGISTERED
+ * VERTICAL CANDIDATE CATALOG - a READ-ONLY evaluation surface for the two remaining UNREGISTERED
  * vertical pack candidates.
  *
  * WHAT THIS COMPONENT IS ALLOWED TO DO: describe a candidate. That is all.
@@ -704,7 +704,7 @@ function CandidateCard({
 
 const PAGE_TITLE = "Vertical candidate catalog"
 const PAGE_DESCRIPTION =
-    "Six unregistered vertical packs, described for evaluation only. Nothing on this page is installed, active, or installable from here."
+    "Two unregistered vertical packs remain for evaluation. Nothing on this page is installed, active, or installable from here."
 
 export function VerticalCandidateCatalog({ state }: { state: VerticalCandidateCatalogState }) {
     if (state.kind === "loading") {
