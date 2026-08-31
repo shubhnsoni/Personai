@@ -53,7 +53,13 @@ export type OperationsSummaryView = Readonly<{
     covers: readonly string[]
     /** What it is not, with the reason. Rendered, never hidden. */
     doesNotCover: Readonly<Record<string, string>>
-    /** True when the covered domains do not all share one tenant boundary. */
+    /**
+     * True when the domains that actually returned something were NOT all read on one tenant boundary,
+     * so this `total` adds a profile-wide figure to a workspace-wide one and reconciles against neither
+     * screen on its own. False when the whole answer sits on one boundary, and false when there is no
+     * answer. Measured per response by the server, so it varies with the data - it is not a statement
+     * about which domains the view covers, which is reported per domain as `DomainSummaryView.scope`.
+     */
     mixedScope: boolean
 }>
 

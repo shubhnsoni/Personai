@@ -120,17 +120,22 @@ export type DueWorkPreview = Readonly<{
     /** Stated absences with reasons, so silence is not read as "nothing there". */
     doesNotCover: Readonly<Record<string, string>>
     /**
-     * True when the DECLARED COVERAGE LIST spans more than one tenant boundary.
+     * True when the figures in THIS plan do not all share one tenant boundary.
      *
-     * A property of that list, not a measurement of your records: it is derived from the frozen
-     * OPERATIONS_DOMAIN_SCOPE map in engine.ts, which always holds both "profile" and "workspace", so it
-     * is true for every workspace and every dataset including an empty one. Read `scopeNotice` for what
-     * the items in THIS plan actually span.
+     * A measurement, not a property of the coverage list: engine.ts derives it from the boundaries the
+     * domains that actually contributed were read on, so it is false when this plan's whole answer sits
+     * on one boundary, false when the plan is empty, and true only when the total really does combine a
+     * profile-wide figure with a workspace-wide one. It varies with your records.
+     *
+     * It was previously derived from the frozen OPERATIONS_DOMAIN_SCOPE map and was therefore true for
+     * every workspace and every dataset. What that value said - that this view's DECLARED coverage spans
+     * two boundaries - is reported per domain by the operations summary instead.
      */
     mixedScope: boolean
     /**
      * What the items in THIS plan span, in a sentence. Derived from the boundaries the plan's own items
-     * were read on, so unlike `mixedScope` it varies with the data.
+     * were read on, and unlike `mixedScope` it distinguishes an empty plan - which spans nothing - from
+     * one whose items share a boundary.
      */
     scopeNotice: string
     empty: boolean
@@ -293,7 +298,7 @@ export const DUE_WORK_PREVIEW_LIMITATIONS: readonly string[] = Object.freeze([
     "Nothing runs on its own. There is no timer, interval, cron or background worker behind this surface - it produced this plan because somebody asked for it, and it produces another only when somebody asks again.",
     "The ordering is a proposal. Overdue work precedes dated work precedes undated work, and every item carries the reason for its position, but nothing here knows your priorities.",
     "Coverage is inherited from the operations view and is not everything. Read covers and doesNotCover before treating the total as a total.",
-    "Where covered domains do not share one tenant boundary, comparing positions across them compares two different populations. scopeNotice reports what the items in this plan span; mixedScope is a property of the declared coverage list rather than of your records.",
+    "Where covered domains do not share one tenant boundary, comparing positions across them compares two different populations. mixedScope reports whether the domains that actually contributed to THIS plan span more than one boundary, and scopeNotice says the same thing in a sentence; the boundary each domain is read on is declared per domain by the operations summary.",
 ])
 
 /** Serialises a pure plan into the boundary shape. Dates become ISO strings; nothing is recomputed. */
@@ -304,6 +309,8 @@ export function toDueWorkPreview(plan: DueWorkPlan): DueWorkPreview {
         workspaceId: plan.workspaceId,
         covers: Object.freeze([...plan.covers]),
         doesNotCover: Object.freeze({ ...plan.doesNotCover }),
+        // Copied, not recomputed. The plan carries the summary's measurement and this boundary does not
+        // get a second opinion about it.
         mixedScope: plan.mixedScope,
         scopeNotice: plan.scopeNotice,
         empty: plan.empty,

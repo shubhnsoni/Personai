@@ -238,6 +238,11 @@ function planFixture(workspaceId: string, items: DueWorkPreview["items"]): DueWo
         workspaceId,
         covers: ["fieldJobs", "inventory", "reservations"],
         doesNotCover: DOES_NOT_COVER,
+        // False, and now a value the producer can actually emit. Under the old constant-true derivation no
+        // engine-produced plan could carry `false` here, so this fixture was counterfactual; it is now
+        // exactly what the engine reports for a plan whose items were all read on one boundary, which is
+        // what SCOPE_NOTICE below says about it. The two agree on purpose - a fixture whose flag and whose
+        // sentence contradicted each other would let the panel render an impossible combination.
         mixedScope: false,
         scopeNotice: SCOPE_NOTICE,
         empty: items.length === 0,
@@ -919,6 +924,22 @@ async function main() {
         )
 
         // ---- the scope notice: the arm that could not be reached, reached by DATA ---------------------
+        //
+        // THE MIXED-SCOPE ASSERTIONS BELOW WERE A COUNTEREXAMPLE AND ARE NOW A POSITIVE CLAIM.
+        //
+        // The previous form asserted `enginePlan.mixedScope === true && engineMixedPlan.mixedScope === true`
+        // - mixedScope true for BOTH plans, including the one whose items span a single boundary - and its
+        // name recorded that as proof the field could not describe a dataset. It was right about the code as
+        // it stood: engine.ts derived the field from the frozen OPERATIONS_DOMAIN_SCOPE map, which always
+        // holds both boundaries, so it was true for every workspace and every dataset including an empty one.
+        //
+        // That defect is fixed at the producer, so the counterexample is obsolete: left as it was it would
+        // fail, and if it somehow kept passing it would be re-freezing the defect. It is REPLACED by the
+        // claim its own name said could not be made - single-boundary rows yield false, genuinely mixed rows
+        // yield true - across the three real engine-produced plans this section already builds, plus an
+        // independent recomputation from each plan's items so the response cannot pass by agreeing with
+        // itself. Nothing the old assertion covered is lost: the notices-differ clause is kept inside the
+        // first assertion.
         const boundariesOf = (preview: DueWorkPreview) =>
             [...new Set(preview.items.map((entry) => OPERATIONS_DOMAIN_SCOPE[entry.domain]))].sort().join(",")
         const noticeArms = [engineEmptyPlan.scopeNotice, enginePlan.scopeNotice, engineMixedPlan.scopeNotice]
@@ -938,11 +959,21 @@ async function main() {
             `items span [${boundariesOf(engineMixedPlan)}]`,
         )
         checkInvertible(
-            "COUNTEREXAMPLE: mixedScope is true for BOTH plans, including the one whose items span a single boundary - so the notice now carries a fact the field cannot, and the field was left alone",
-            enginePlan.mixedScope === true &&
+            "SINGLE BOUNDARY YIELDS FALSE, GENUINELY MIXED YIELDS TRUE: two real engine-produced plans disagree about mixedScope because their rows disagree about boundaries - the assertion the old counterexample recorded as impossible",
+            enginePlan.mixedScope === false &&
                 engineMixedPlan.mixedScope === true &&
+                engineEmptyPlan.mixedScope === false &&
                 enginePlan.scopeNotice !== engineMixedPlan.scopeNotice,
-            `mixedScope=${String(enginePlan.mixedScope)}/${String(engineMixedPlan.mixedScope)} while notices differ=${String(enginePlan.scopeNotice !== engineMixedPlan.scopeNotice)}`,
+            `mixedScope single-boundary=${String(enginePlan.mixedScope)} mixed=${String(engineMixedPlan.mixedScope)} empty=${String(engineEmptyPlan.mixedScope)} while notices differ=${String(enginePlan.scopeNotice !== engineMixedPlan.scopeNotice)}`,
+        )
+        checkInvertible(
+            "MEASURED: mixedScope agrees with the boundaries the plan's own items were read on, recomputed here from the items and the frozen scope map rather than read off the response, on all three plans",
+            [enginePlan, engineMixedPlan, engineEmptyPlan].every(
+                (plan) => plan.mixedScope === (boundariesOf(plan).split(",").filter((part) => part !== "").length > 1),
+            ),
+            [enginePlan, engineMixedPlan, engineEmptyPlan]
+                .map((plan) => `[${boundariesOf(plan)}]->${String(plan.mixedScope)}`)
+                .join(" "),
         )
         checkInvertible(
             "the empty plan claims no boundary at all, because it has no positions to compare",
