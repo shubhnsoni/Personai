@@ -125,21 +125,30 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
     const [selectedService, setSelectedService] = useState<string | null>(null)
     const [checkoutItem, setCheckoutItem] = useState<CheckoutItem | null>(null)
     const [tipOpen, setTipOpen] = useState(false)
-    const [showSuccessNotification, setShowSuccessNotification] = useState(false)
+    // Derived, not state: whether the checkout succeeded is a fact about the URL, so it is read
+    // during render rather than mirrored into state by an effect. Only the user's dismissal is
+    // state, because only that is not derivable from the URL.
+    //
+    // Two things this fixes. The effect version committed one frame WITHOUT the banner and then a
+    // second one with it, so the first thing a user saw after paying was the state in which nothing
+    // had happened. And because src/app/[slug]/page.tsx is `force-dynamic`, the server sees
+    // ?checkout=success too and its HTML contains the banner - so that first bannerless client
+    // frame was a hydration mismatch, not merely a flash. (A statically prerendered route would
+    // have the opposite constraint, which is why this is safe HERE specifically.)
+    const [successDismissed, setSuccessDismissed] = useState(false)
     const [introStage, setIntroStage] = useState<"hi" | "type" | "orb" | "ready">("hi")
     const searchParams = useSearchParams()
+    const checkoutSucceeded = searchParams.get('checkout') === 'success'
+    const showSuccessNotification = checkoutSucceeded && !successDismissed
 
     useEffect(() => {
-        const checkoutStatus = searchParams.get('checkout')
-        if (checkoutStatus === 'success') {
-            setShowSuccessNotification(true)
-            const timer = setTimeout(() => {
-                setShowSuccessNotification(false)
-                window.history.replaceState({}, '', `/${profile.slug}`)
-            }, 5000)
-            return () => clearTimeout(timer)
-        }
-    }, [searchParams, profile.slug])
+        if (!checkoutSucceeded) return
+        const timer = setTimeout(() => {
+            setSuccessDismissed(true)
+            window.history.replaceState({}, '', `/${profile.slug}`)
+        }, 5000)
+        return () => clearTimeout(timer)
+    }, [checkoutSucceeded, profile.slug])
 
     const handleShowContent = (type: Exclude<ContentType, null>) => {
         setActiveContent(type)
@@ -193,7 +202,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                             </p>
                         </div>
                         <button
-                            onClick={() => setShowSuccessNotification(false)}
+                            onClick={() => setSuccessDismissed(true)}
                             className="ml-2 p-1 hover:bg-green-500/50 rounded transition-colors"
                         >
                             <X className="w-4 h-4" />
