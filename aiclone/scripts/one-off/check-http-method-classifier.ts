@@ -12,7 +12,7 @@
  *      none of these - measured, see below - so a claim about them has to be demonstrated rather than
  *      inferred from a corpus that cannot exercise it.
  *
- *   2. PER-CONSUMER EQUIVALENCE, on the exact files each consumer actually reads. Every one of the seven
+ *   2. PER-CONSUMER EQUIVALENCE, on the exact files each consumer actually reads. Every one of the eight
  *      old patterns is reproduced here VERBATIM, as a historical artifact, and run against the same input
  *      it received before - raw source for the five sites that never stripped comments, comment-stripped
  *      source for the two that did. Old verdict and new verdict must agree, per consumer, per file. This
@@ -137,7 +137,7 @@ for (const [label, template, provenance] of POSITIVE_SHAPES) {
  * NEGATIVE SHAPES - the whole reason this is an AST and not a regex.
  *
  * Every one of these makes a raw-source regex answer "a handler is exported here" when none is. Five of
- * the seven old sites tested raw source, and the first shape below is the exact comment style this
+ * the eight old sites tested raw source, and the first shape below is the exact comment style this
  * repository uses to document a prohibition - which it has mistaken for a violation five times by its own
  * count.
  */
@@ -188,8 +188,8 @@ checkInvertible(
  * FALSE NEGATIVE, AND THIS IS THE SERIOUS DIRECTION.
  *
  * `export { handler as POST }` is a working POST handler - the framework dispatches on the EXPORTED name -
- * and not one of the seven old patterns contains an alternative that can match an export clause. So a
- * write verb added to any guarded route in that shape would have passed every single one of the seven
+ * and not one of the eight old patterns contains an alternative that can match an export clause. So a
+ * write verb added to any guarded route in that shape would have passed every single one of the eight
  * gates as "no state-changing verb exported". A false positive costs a red gate somebody investigates; a
  * false negative costs the guarantee silently, which is why this is asserted separately from the shapes
  * above rather than being folded into one count.
@@ -201,7 +201,7 @@ checkInvertible(
 const ALIASED_WRITE_REEXPORT = "const handler = async () => Response.json({})\nexport { handler as POST }"
 const aliasedClassified = classifyRouteModule("synthetic/alias/route.ts", ALIASED_WRITE_REEXPORT)
 checkInvertible(
-    "MEASURED: an aliased re-export of a POST handler is a FALSE NEGATIVE for every one of the seven old patterns, and the canonical classifier catches it - the hole that mattered",
+    "MEASURED: an aliased re-export of a POST handler is a FALSE NEGATIVE for every one of the eight old patterns, and the canonical classifier catches it - the hole that mattered",
     !WIDEST_OLD_STATE_CHANGING.test(ALIASED_WRITE_REEXPORT) &&
         aliasedClassified.stateChanging.join(",") === "POST" &&
         aliasedClassified.exports.length === 1 &&
@@ -287,7 +287,7 @@ checkInvertible(
 // 3. Per-consumer equivalence, against the files each consumer really reads
 // ---------------------------------------------------------------------------
 /**
- * The seven old sites, reproduced verbatim. `stripped` records whether that site fed itself
+ * The eight old sites (across seven harnesses - check-blueprint-preview.ts holds two), reproduced verbatim. `stripped` records whether that site fed itself
  * comment-stripped source, because feeding a site the wrong input would prove equivalence with something
  * that never ran.
  *
