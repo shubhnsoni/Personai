@@ -1,0 +1,15 @@
+{
+  "manifestVersion": 1,
+  "description": "Self-test: check-scanner-leak.js prints a fabricated Clerk secret key and a passwordless DSN. The run must stay GREEN (the harness passes) while neither the key material nor the DSN userinfo appears in the log the driver wrote or in either summary — the driver's own redaction path must handle the shapes the scanner knows about, not just the ones it knew about before.",
+  "harnessDir": "scripts/gates/fixtures/scanner-secrets",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "gates_scanner_fixture_scratch"
+  },
+  "harnesses": [
+    { "file": "check-scanner-leak.js", "package": "fixture", "run": true }
+  ]
+}

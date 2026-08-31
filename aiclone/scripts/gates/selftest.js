@@ -24,11 +24,14 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
+const SCANNER = require("./lib/redact");
+
 const GATES_DIR = __dirname;
 const APP_DIR = path.resolve(GATES_DIR, "..", "..");
 const DRIVER = path.join(GATES_DIR, "run-gates.js");
 const REAL_MANIFEST = path.join(GATES_DIR, "gates.manifest.json");
 const FIXTURE_MANIFESTS = path.join(GATES_DIR, "fixtures", "selftest", "manifests");
+const SCANNER_FIXTURES = path.join(GATES_DIR, "fixtures", "scanner-secrets");
 const TMP_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "personai-gates-selftest-"));
 
 function runDriver(args, env = {}) {
@@ -66,6 +69,56 @@ function realManifestVariant(name, mutate) {
 
 const fixture = (name) =>
   `--manifest=${path.relative(APP_DIR, path.join(FIXTURE_MANIFESTS, name)).split(path.sep).join("/")}`;
+
+// ---------------------------------------------------------------------------
+// Credential-scanner cases (appended; nothing above is renumbered).
+//
+// These assert on what the scanner RETURNS — which finding kind fired, what the
+// redacted sample contains, that the iteration terminates — and no driver
+// invocation can show any of that: summary.secretScan reports only counts, and
+// every artefact the driver writes has already been redacted before it is
+// scanned. So they run in-process through `probe` instead of spawning
+// run-gates.js. The last case in the group DOES spawn the driver, and proves the
+// new shapes are wired into the real write path rather than merely callable.
+// ---------------------------------------------------------------------------
+
+const scannerManifest = (name) =>
+  `--manifest=${path.relative(APP_DIR, path.join(SCANNER_FIXTURES, name)).split(path.sep).join("/")}`;
+
+const readScannerFixture = (name) => fs.readFileSync(path.join(SCANNER_FIXTURES, name), "utf8");
+
+/** Every fabricated secret value that appears in scanner-leaky-output.txt. */
+const FIXTURE_SECRET_MATERIAL = [
+  "4f8FIXTUREb7Lm9Kd3Tz6",
+  "9Zx1FIXTUREb5Kq7Ws2Ed",
+  "whsec_7Hj9FIXTUREn3Op5Qr7St",
+  "re_9Fk2FIXTUREp6Qr8St0Uv",
+  "Zq9-fixture-pw",
+  "pw%40rd-fixture",
+  "hunter2",
+  "svc_reader",
+  "gateuser",
+];
+
+/** Sorted, deduped finding kinds for the one fixture line carrying `tag`. */
+function kindsForTag(text, tag) {
+  const line = text.split(/\r?\n/).find((l) => l.includes(tag));
+  if (line === undefined) throw new Error(`no fixture line carries ${tag}`);
+  return [...new Set(SCANNER.scanForLeaks(line).map((f) => f.pattern))].sort();
+}
+
+function sameKinds(actual, expected) {
+  return Array.isArray(actual) && actual.length === expected.length && actual.every((k, i) => k === expected[i]);
+}
+
+/** Run an in-process scanner probe, shaped like runDriver's result. */
+function runProbe(probe) {
+  try {
+    return { exitCode: 0, stdout: "", stderr: "", summary: null, probe: probe() };
+  } catch (error) {
+    return { exitCode: 1, stdout: "", stderr: `probe threw: ${error.message}`, summary: null, probe: null };
+  }
+}
 
 const CASES = [
   {
@@ -266,6 +319,250 @@ const CASES = [
       r.summary.counts.declaredSkips === 1 &&
       r.summary.gateEstablished === false,
   },
+
+  // ---- credential scanner: breadth -----------------------------------------
+  {
+    name: "scanner-clerk-key-assignment-forms",
+    why: "CLERK_SECRET_KEY=sk_live_… is caught as KEY=v, KEY=\"v\", KEY='v', KEY = v, KEY:  v and export KEY=v",
+    probe: () => {
+      const text = readScannerFixture("scanner-leaky-output.txt");
+      const tags = ["[form:plain]", "[form:quoted]", "[form:single]", "[form:spaced]", "[form:colon]", "[form:export]"];
+      return tags.map((tag) => ({ tag, kinds: kindsForTag(text, tag) }));
+    },
+    expectExit: 0,
+    assert: (r) =>
+      r.probe.length === 6 &&
+      r.probe.every((row) => sameKinds(row.kinds, ["SECRET_ASSIGNMENT", "SECRET_KEY_SHAPE"])),
+  },
+  {
+    name: "scanner-bare-sk-key-shape",
+    why: "the sk_live_/sk_test_ shape is caught in prose too, with no assignment around it",
+    probe: () => kindsForTag(readScannerFixture("scanner-leaky-output.txt"), "[key:bare]"),
+    expectExit: 0,
+    assert: (r) => sameKinds(r.probe, ["SECRET_KEY_SHAPE"]),
+  },
+  {
+    name: "scanner-passwordless-dsn",
+    why: "postgres://user@host:5432/db carries no password and is still a real account on a real server",
+    probe: () => kindsForTag(readScannerFixture("scanner-leaky-output.txt"), "[dsn:userinfo-only]"),
+    expectExit: 0,
+    assert: (r) => sameKinds(r.probe, ["DSN_USERINFO_NO_PASSWORD"]),
+  },
+  {
+    name: "scanner-percent-encoded-dsn",
+    why: "an encoded ':' hides the password separator from a literal split; an encoded '@' hides the host",
+    probe: () => {
+      const text = readScannerFixture("scanner-leaky-output.txt");
+      return {
+        encodedColon: kindsForTag(text, "[dsn:encoded-colon]"),
+        encodedAt: kindsForTag(text, "[dsn:encoded-at]"),
+        plain: kindsForTag(text, "[dsn:plain-secret]"),
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      sameKinds(r.probe.encodedColon, ["DSN_ENCODED_PASSWORD"]) &&
+      sameKinds(r.probe.encodedAt, ["DSN_WITH_PASSWORD"]) &&
+      sameKinds(r.probe.plain, ["DSN_WITH_PASSWORD"]),
+  },
+  {
+    name: "scanner-password-keyword-forms",
+    why: "the pre-existing password/pgpassword/pwd vocabulary still fires on all three separator forms",
+    probe: () => {
+      const text = readScannerFixture("scanner-leaky-output.txt");
+      return ["[kv:env]", "[kv:spaced]", "[kv:colon]"].map((tag) => ({ tag, kinds: kindsForTag(text, tag) }));
+    },
+    expectExit: 0,
+    assert: (r) => r.probe.length === 3 && r.probe.every((row) => sameKinds(row.kinds, ["PASSWORD_KV"])),
+  },
+  {
+    name: "scanner-secret-named-assignments",
+    why: "a key name carrying secret/token/api_key is enough, whatever vendor prefix the value has",
+    probe: () => {
+      const text = readScannerFixture("scanner-leaky-output.txt");
+      return ["[kv:webhook]", "[kv:apikey]"].map((tag) => ({ tag, kinds: kindsForTag(text, tag) }));
+    },
+    expectExit: 0,
+    assert: (r) => r.probe.length === 2 && r.probe.every((row) => sameKinds(row.kinds, ["SECRET_ASSIGNMENT"])),
+  },
+  {
+    name: "scanner-env-secret-key-is-critical",
+    why: "a Clerk key that is really in the environment is a critical leak, not a shape, and is still never quoted",
+    probe: () => {
+      // Assembled rather than written out: a committed file carrying a full
+      // sk_live_-shaped literal is what trips vendor push protection.
+      const key = `sk_${"live"}_7Lm9FIXTUREd3Tz6Rw1Yv`;
+      const literals = SCANNER.collectSecretLiterals({ CLERK_SECRET_KEY: key });
+      const findings = SCANNER.scanForLeaks(`[app] using CLERK_SECRET_KEY=${key}`, { secretLiterals: literals });
+      return {
+        collected: literals.length,
+        kinds: [...new Set(findings.map((f) => f.pattern))].sort(),
+        severities: [...new Set(findings.map((f) => f.severity))].sort(),
+        quoted: JSON.stringify(findings).includes("7Lm9FIXTUREd3Tz6Rw1Yv"),
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      r.probe.collected === 1 &&
+      r.probe.kinds.includes("SECRET_LITERAL") &&
+      r.probe.severities.includes("critical") &&
+      r.probe.quoted === false,
+  },
+
+  // ---- credential scanner: no value leakage, no false positives ------------
+  {
+    name: "scanner-never-emits-the-secret-value",
+    why: "a finding that quotes the credential is worse than no finding, so no secret may appear anywhere in the output",
+    probe: () => {
+      const text = readScannerFixture("scanner-leaky-output.txt");
+      const findings = SCANNER.scanForLeaks(text, { label: "leaky-fixture" });
+      const serialised = JSON.stringify(findings);
+      const redacted = SCANNER.redact(text, []);
+      return {
+        findingCount: findings.length,
+        checked: FIXTURE_SECRET_MATERIAL.length,
+        leaked: FIXTURE_SECRET_MATERIAL.filter((s) => serialised.includes(s) || redacted.includes(s)),
+      };
+    },
+    expectExit: 0,
+    assert: (r) => r.probe.findingCount === 22 && r.probe.checked === 9 && r.probe.leaked.length === 0,
+  },
+  {
+    name: "scanner-safe-fixture-does-not-fire",
+    why: "a doc placeholder, an example DSN whose password is the word password, a base64 blob, a comment about the scanner and publishable keys are not findings",
+    probe: () => {
+      const text = readScannerFixture("scanner-safe-output.txt");
+      const redacted = SCANNER.redact(text, []);
+      return {
+        findings: SCANNER.scanForLeaks(text, { label: "safe-fixture" }).map((f) => `${f.pattern}@line${f.line}`),
+        publishableKeySurvives: redacted.includes("pk_live_4f8FIXTUREb7Lm9Kd3Tz6"),
+        base64Survives: redacted.includes("dGhpcyBpcyBub3QgYSBrZXksIGp1c3QgYmFzZTY0IHRleHQ="),
+        digestSurvives: redacted.includes("9f2c1b7d4e6a8c0f2b4d6e8a0c2e4f6a8b0d2f4e6a8c0e2f4b6d8a0c2e4f6b8d"),
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      r.probe.findings.length === 0 &&
+      r.probe.publishableKeySurvives === true &&
+      r.probe.base64Survives === true &&
+      r.probe.digestSurvives === true,
+  },
+  {
+    name: "scanner-redaction-is-a-scan-fixed-point",
+    why: "redacted text must be stable under redaction and silent under the scan, or a summary would report its own samples",
+    probe: () =>
+      ["scanner-leaky-output.txt", "scanner-safe-output.txt"].map((name) => {
+        const once = SCANNER.redact(readScannerFixture(name), []);
+        return {
+          name,
+          idempotent: once === SCANNER.redact(once, []),
+          findingsAfterRedaction: SCANNER.scanForLeaks(once, {}).length,
+        };
+      }),
+    expectExit: 0,
+    assert: (r) =>
+      r.probe.length === 2 && r.probe.every((row) => row.idempotent === true && row.findingsAfterRedaction === 0),
+  },
+
+  // ---- credential scanner: termination -------------------------------------
+  {
+    name: "scanner-patterns-cannot-match-empty",
+    why: "the empty-match guard is live, which is what makes the historical spin impossible by construction instead of by a loop counter",
+    probe: () => {
+      const iterated = Object.entries(SCANNER.ITERATED_PATTERNS).map(([name, pattern]) => ({
+        name,
+        canMatchEmpty: SCANNER.patternCanMatchEmpty(pattern),
+      }));
+      const rejected = [];
+      for (const bad of [/x*/g, /(?:)/g, /(?<=a)b?/g]) {
+        try {
+          SCANNER.assertPatternsCannotMatchEmpty({ bad });
+        } catch {
+          rejected.push(String(bad));
+        }
+      }
+      return {
+        iterated,
+        rejected,
+        realSetAccepted: SCANNER.assertPatternsCannotMatchEmpty(SCANNER.ITERATED_PATTERNS),
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      r.probe.iterated.length === 4 &&
+      r.probe.iterated.every((p) => p.canMatchEmpty === false) &&
+      r.probe.rejected.length === 3 &&
+      r.probe.realSetAccepted === true,
+  },
+  {
+    name: "scanner-empty-match-iteration-terminates",
+    why: "the historical hang was a /g regex whose index never advanced; the iteration step must terminate even when handed a pattern that CAN match empty",
+    probe: () => {
+      const spanStartedAt = Date.now();
+      const spans = [...SCANNER.matchSpans("aaaa", /x*/g)];
+      const spanMs = Date.now() - spanStartedAt;
+      // 200 credential spans on ONE line. Each finding calls redact() to build its
+      // sample, and redact() running over the scanned line is exactly what used to
+      // rewind the scan into an unbounded loop.
+      const pathological = `${"postgres://u:p@h ".repeat(200)}password=x secret=Yq3Lm8Kd2Tz6Rw1`;
+      const scanStartedAt = Date.now();
+      const findings = SCANNER.scanForLeaks(pathological, {});
+      return {
+        spans: spans.length,
+        emptySpans: spans.filter((s) => s[0].length === 0).length,
+        spanMs,
+        findings: findings.length,
+        scanMs: Date.now() - scanStartedAt,
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      r.probe.spans === 5 &&
+      r.probe.emptySpans === 5 &&
+      r.probe.findings === 202 &&
+      r.probe.spanMs < 1000 &&
+      r.probe.scanMs < 10000,
+  },
+  {
+    name: "scanner-has-no-hand-written-match-loop",
+    why: "the termination argument rests on there being no manual iteration left to get wrong, so the absence is asserted rather than described",
+    probe: () => {
+      const source = fs.readFileSync(path.join(GATES_DIR, "lib", "redact.js"), "utf8");
+      const codeLines = source.split(/\r?\n/).filter((line) => {
+        const trimmed = line.trim();
+        return trimmed !== "" && !trimmed.startsWith("*") && !trimmed.startsWith("//") && !trimmed.startsWith("/*");
+      });
+      return {
+        codeLines: codeLines.length,
+        offenders: codeLines.filter((line) => /\blastIndex\b/.test(line) || /\bwhile\s*\(/.test(line)),
+      };
+    },
+    expectExit: 0,
+    assert: (r) => r.probe.codeLines > 50 && r.probe.offenders.length === 0,
+  },
+
+  // ---- credential scanner: end to end through the driver -------------------
+  {
+    name: "scanner-e2e-driver-redacts-new-shapes",
+    why: "a harness printing a Clerk key and a passwordless DSN stays green while neither reaches the log or either summary",
+    args: [scannerManifest("scanner-e2e.json")],
+    expectExit: 0,
+    assert: (r) => {
+      const rec = r.summary && r.summary.harnesses.find((h) => h.file === "check-scanner-leak.js");
+      if (!rec || rec.exitCode !== 0) return false;
+      const log = fs.readFileSync(rec.logPath, "utf8");
+      const summaryJson = fs.readFileSync(path.join(r.outDir, "latest.json"), "utf8");
+      const summaryMd = fs.readFileSync(path.join(r.outDir, "latest.md"), "utf8");
+      const material = ["4f8FIXTUREb7Lm9Kd3Tz6", "svc_reader"];
+      return (
+        r.summary.verdict === "PASS" &&
+        r.summary.secretScan.passed === true &&
+        log.includes("sk_live_<redacted>") &&
+        log.includes("postgres://<redacted>@<redacted>/appdb") &&
+        material.every((s) => !log.includes(s) && !summaryJson.includes(s) && !summaryMd.includes(s))
+      );
+    },
+  },
 ];
 
 function hasFinding(r, kind) {
@@ -278,7 +575,8 @@ function main() {
 
   for (const c of CASES) {
     const args = c.lazyArgs ? c.lazyArgs() : c.args;
-    const r = runDriver(args, c.env || {});
+    // `probe` cases assert on the scanner in-process; everything else spawns the driver.
+    const r = c.probe ? runProbe(c.probe) : runDriver(args, c.env || {});
     const exitOk = r.exitCode === c.expectExit;
     let assertOk = false;
     let assertError = null;
