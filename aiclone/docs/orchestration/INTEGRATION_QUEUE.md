@@ -1623,3 +1623,57 @@ shapes in 6ms.
 | `check-order-stream` leg 1 | that harness + the manifest | **Owed, recommended.** Leg 1 makes no HTTP and no DB call and could run today at sub-second cost; the HTTP legs need a dev server and should stay skipped. |
 | P1-009 lint | repo-wide | Still a refusal. 43 findings remain a documented product-judgement backlog. |
 | G2 / P1-007 | providers / live cutover | Still **owner-gated**. Unchanged. |
+
+
+
+## Accepted - R-wave: the gate began asking whether assertions ran, and an audit priced that answer
+
+Start `6e3979c`, end `a494b1b`. Nine packages dispatched, nine reported, **nine accepted, none
+rejected, none reverted**. Every package was developed in its own git worktree on its own branch and
+integrated only after root re-ran the complete sweep in the primary tree.
+
+| # | Package | Commits | Merge | What it closed |
+|---|---------|---------|-------|----------------|
+| A | Residue and sequence evidence scoping | `f75acdc`, `4a92975`, `e445407`, `4e20fe6` | `12f9247` | Four harnesses stopped proving residue by global before/after row counts; write-detector sequence attribution became execution-scoped |
+| B | Credential scanner breadth and termination | `58d07cc`, `541b097` | `8152348` | `sk_live_`/`sk_test_`, passwordless and percent-encoded DSNs, six assignment forms; termination made structural; self-test 21→35 |
+| C | Exit-integrity fixed point | `62bc141`, `868d3d1` | `634c7ff` | Two capped loops that truncated order-dependently replaced by a monotone worklist with an unreachable, loud residual budget |
+| D | mixedScope atomic correction | `51087f9` | `7741bd9` | Producer, four consumers and four harnesses in one commit; the counterexample assertions that pinned the defect were replaced, not deleted |
+| F | Vacuity debt, four harnesses | `50d7d11` | `284217b` | 6 findings resolved, 2 justified; included the `?? []` empty fallback in check-capability-contract |
+| E | Assertion-evidence contract | `32138c0`, `ee6b79c` | `3c4dce4` | 61/74 harnesses enforced with zero harness edits; 13 named rejection kinds; 13-entry exact-filename allowlist; self-test 35→53 |
+| G | HEAD semantics + deferred vacuity | `695b948`, `bcafb08` | `0b39cb9` | HEAD honoured instead of refused; write-verb constants split honestly; the 11 findings deferred from wave 2 |
+| I | Lint slices | `f18e2f7`, `b62dd3c`, `b6d7d9d`, `507a444` | `bddff80` | 5 of 14 lint errors fixed and proven; 9 declined with reasons |
+| H | Adversarial audit + driver repair | `6c325f5`, `17237c8` | `a2897ba` | Broke the evidence contract; repaired a `requiresDatabase:false` crash that wrote no summary at all |
+| root | Scanner false-positive repair | `a494b1b` | — | A short `PGPASSWORD` made the driver flag its own summary critical and corrupt it mid-word; green was unreachable |
+
+### Measured at the close
+
+Sweep 74 executed / 74 passed / **FAILED 0** / 1 declared skip / 0 timeouts / 0 integrity findings.
+Self-test **55/55**. Assertion evidence ENFORCED: 61 of 74 carried evidence, 3634 assertions counted,
+0 unevidenced, allowlist exactly 13. Credential scan clean over 77 artefacts. Prisma validate and
+generate 0. TypeScript 0. Repository lint **38 problems (9 errors, 29 warnings)**, down from 43 (14
+errors, 29 warnings). `npm audit --omit=dev` 0. Production build compiled successfully in 57s. An
+isolated clean worktree reproduced identical counts with `worktreeClean: true, dirtyPathCount: 0`.
+Vacuity debt **11 → 2** UNGUARDED_EVERY and **19 → 11** UNRESOLVED.
+
+### Next in queue - this table supersedes every earlier one
+
+Ordered by value, and each item states the evidence it starts from so the next run does not re-derive it.
+
+| Priority | Item | Why, and what is already measured |
+|---|---|---|
+| 1 | **Corroborate self-reported assertion counts** | The evidence contract is a cooperative protocol: three harnesses asserting nothing printed evidence and got `verdict PASS` with 104153 assertions counted. All 3634 counted assertions rest on trust. Already measured for you: all **75** production harnesses score non-zero on a source-side assertion signal, and all **5** self-test fixture harnesses score **zero** - which is precisely why the cheap version was not shipped. Either give the fixtures real assertion machinery, or corroborate against `check-harness-exit-integrity`'s static callsite count (order 3361) rather than a source regex. |
+| 2 | **Widen the credential vocabulary** | `DB_PW=` and `pw:` are in neither vocabulary and pass through unreported. Bounded, database-free, self-test provable. |
+| 3 | **Unify the five HTTP method classifiers** | `check-operations-routes.ts` matches only `export async function`, missing **26** route files using `export function GET` and **5** using `export const <VERB>`, and never mentions HEAD/OPTIONS. It polices the same operations surface as `check-operations-runtime.ts` but strictly more weakly. Latent today: 0 of 156 routes export HEAD. |
+| 4 | **Guard the `OperationsApiService.today` surface** | Measured: a direct singleton caller gets 200 + data for OPTIONS and for POST. Nothing is exposed over HTTP (the framework refuses POST and answers OPTIONS itself) and no write occurs, so the read-only guarantee currently rests entirely on that route module's exports. |
+| 5 | **Partial assertion under-count is silent** | Exit-integrity escalates only when the recognised count is exactly zero, so losing *some* assertions to a callback or computed key is invisible. A sweep of all 12 helper names found 1 hit and it was a doc string, so the tree is unaffected by style rather than by enforcement. |
+| 6 | **Remaining vacuity debt: 2 UNGUARDED_EVERY, 11 UNRESOLVED** | Each retains exact file, line, classification and justification. One of the two UNGUARDED_EVERY is a justified subset argument; the other is inside the declared-skip harness. |
+| 7 | **9 remaining lint errors** | All React-hooks rules in UI components with no harness proving their runtime behaviour. Three share one root cause - state seeded from a browser-only source (`localStorage`, `sessionStorage`, `matchMedia`) in an SSR'd client component, which cannot move into render without a hydration mismatch. Declining these was the correct call and stays correct until there is a UI behaviour test. |
+| 8 | **`mixedScope` coercion caveat** | The `count > 0` filter is JavaScript coercion, so a string count would defeat it. The guarantee is compile-time only. |
+| 9 | **Worktree portability** | 10 absolute paths are baked into `latest.json`; untracked `aiclone/.env` is required to run anything. Cosmetic for correctness, real for reproducibility claims. |
+
+### Owner-gated, untouched by this run
+
+Real reminders, payments and provider messages; the live personalink cutover; push, PR, deployment and
+tunnel; deletion or modification of the six frozen KiroCrew evidence worktrees; secrets and external
+side effects. `check-order-stream` stays `run: false` - measurement showed no leg is free of both an
+HTTP origin and the database, correcting the Q-wave's claim that leg 1 needed neither.

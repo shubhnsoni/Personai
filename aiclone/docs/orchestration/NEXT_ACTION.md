@@ -468,3 +468,132 @@ Live `personalink` read-only. Only `personalink_phase0_rehearsal_20260826_210704
 it must be left fully applied or fully rolled back - never mid-rehearsal. Origin unchanged. Frozen
 worktrees and attachments untouched. `P1_014_ACTION_INVENTORY.md` unchanged. No destructive Git
 operation. Preserve unrelated user changes.
+
+
+
+---
+
+# R-wave close - this section supersedes everything above it
+
+Measured at `a494b1b` on `recovered/aug20-wt-pr-32`. Origin unchanged at `4b386d1d`.
+
+## Step 0 - measure, do not assume (unchanged, and it paid for itself twice this run)
+
+```powershell
+cd "C:\Users\shubh\Desktop\Projects\personal projects\personai"
+git rev-parse HEAD                       # expect a494b1b8ec878fc90cd90ed8600ed63761441c90
+git rev-parse origin/recovered/aug20-wt-pr-32   # expect 4b386d1d0c5c3ff0b5bf6b6957fce1f032087827
+git status --porcelain                   # expect exactly two untracked preservation paths
+git worktree list                        # expect six frozen KiroCrew worktrees, all at ea69595
+node aiclone/scripts/gates/run-gates.js  # expect 74 executed, 74 passed, FAILED 0, 1 declared skip
+node aiclone/scripts/gates/selftest.js   # expect 55/55
+```
+
+Two things this run learned the hard way, both worth inheriting:
+
+- **`grep_search` silently returns nothing in this environment.** Every query looks like a clean
+  "no matches", which reads as evidence of absence and is not. `git grep` works. An early conclusion
+  that HEAD appeared nowhere in the tree was a tooling artefact, not a fact.
+- **`aiclone/.env` points `DATABASE_URL` at the protected live `personalink`.** The gate driver
+  rewrites the database *name* to the disposable rehearsal database before spawning each harness, so a
+  harness run directly is refused by `scripts/lib/disposable-db.ts`. To run one harness outside the
+  driver, reproduce the rewrite by replacing only the DSN's final path segment with
+  `personalink_phase0_rehearsal_20260826_210704`. Never point anything at `personalink`.
+
+## Measured gates at `a494b1b`
+
+| Gate | Result |
+|---|---|
+| `run-gates.js` | 74 executed, 74 passed, **FAILED 0**, 1 declared skip, 0 timeouts, 0 integrity findings, verdict PASS |
+| `selftest.js` | **55/55** (21/21 at the start of the run) |
+| Assertion evidence | ENFORCED - 61/74 carried evidence, 3634 assertions counted, 0 unevidenced, allowlist exactly 13 |
+| Credential scan | clean, 77 artefacts, 0 critical |
+| Prisma validate / generate | 0 / 0 |
+| TypeScript | 0 |
+| Repository lint | **38 problems (9 errors, 29 warnings)** - was 43 (14 errors, 29 warnings) |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| Production build | Compiled successfully in 57s |
+| Isolated clean worktree | identical counts, `worktreeClean: true`, `dirtyPathCount: 0` |
+| Vacuity debt | UNGUARDED_EVERY **11 → 2**, UNRESOLVED **19 → 11** |
+
+## The one thing you must not misread
+
+The gate now reports "3634 assertions counted". **That number is self-reported and forgeable.** The
+adversarial package built three harnesses that assert nothing, printed well-formed evidence lines, and
+obtained `verdict PASS; gate ESTABLISHED` with 104153 assertions counted and exit 0 - the largest
+fabricated number arriving through the identity-bearing form documented as strongest. The contract reads
+the harness's own stdout, so it measures willingness to print a number.
+
+It is still a real gain: an emptied or decayed harness must now *also* be edited to lie, where silence
+used to be enough. It bounds accident and decay, not deception. Do not quote the assertion total as
+proof, and do not let it be quoted at you.
+
+## Step 1 - the next package, in order
+
+1. **Corroborate the assertion counts** (highest value, and the direct answer to the finding above).
+   Do not repeat the cheap attempt: root already measured that all **75** production harnesses score
+   non-zero on a source-side assertion signal while all **5** self-test fixture harnesses
+   (`check-alpha`, `check-beta`, `check-leaky`, `check-red`, `check-silent`) score **zero**, because they
+   are minimal stubs. A driver-side signal therefore cannot be proven without either giving those
+   fixtures real assertion machinery or exempting them - and exempting them ships a control nothing
+   tests. The better target is `check-harness-exit-integrity`'s AST-based static callsite count (order
+   3361): have it emit a per-harness map and have the driver reject a harness whose static count is zero
+   while its self-reported count is positive. Note the two counts legitimately differ in magnitude, since
+   one loop executes one callsite many times, so only the zero-versus-positive contradiction is sound.
+2. **Widen the credential vocabulary** - `DB_PW=` and `pw:` pass through unreported. Database-free,
+   self-test provable, bounded.
+3. **Unify the five HTTP method classifiers.** `check-operations-routes.ts` matches only
+   `export async function`, missing **26** route files that use `export function GET` and **5** that use
+   `export const <VERB>`, and never mentions HEAD or OPTIONS - so it polices the same operations surface
+   as `check-operations-runtime.ts` but strictly more weakly. Latent: 0 of 156 routes export HEAD today.
+4. **Guard `OperationsApiService.today`.** Measured: a direct singleton caller gets 200 + data for
+   OPTIONS and POST. Nothing is exposed over HTTP and no write occurs, so the read-only guarantee rests
+   entirely on that route module's exports - which is a guarantee about a file, not about the service.
+5. **Close the partial-under-count blind spot** in exit-integrity: escalation fires only when the
+   recognised assertion count is exactly zero, so losing *some* assertions is silent.
+6. **Remaining vacuity debt** - 2 UNGUARDED_EVERY, 11 UNRESOLVED, each with exact file, line,
+   classification and justification.
+
+## Do not spend a run on
+
+The 9 remaining lint errors are all React-hooks rules in UI components, and this repository has no test
+proving those components' runtime behaviour. Three share one root cause: state seeded from a
+browser-only source (`localStorage`, `sessionStorage`, `matchMedia`) inside an SSR'd client component,
+which cannot be computed during render without throwing on the server or a visible hydration mismatch.
+They were examined individually and declined with reasons; that remains correct until a UI behaviour
+test exists. Fixing them blind trades a lint number for a silently broken picker, chat or QR card.
+
+`check-order-stream` stays `run: false`. The earlier claim that leg 1 needs neither an HTTP origin nor a
+database was **wrong** and is corrected in `TASKS.json`: `main()` is linear, `scratchDatabaseName()` and
+`new PrismaClient()` both run unconditionally before leg 1, there is no leg selector, and legs 3, 5 and 6
+read and write Prisma directly. A truthful declared skip is worth more than a harness that fails on its
+precondition instead of on the code under test.
+
+## Orchestration notes for the next run
+
+`orchestrate_subagent` accepts **no model parameter** - it selects a named agent role. Per-stage model
+pinning is therefore unavailable through it, and any plan that assigns different models to different
+stages cannot be honoured that way. Record stages as observed/uncontrolled Claude-family and make no
+requested-model claim. `spawn_run` remains hollow.
+
+What made nine of nine stages report this run, after two produced nothing in the Q-wave: each worker was
+confined to its **own git worktree on its own branch**, and a report file was declared mandatory with
+"no report means the package is discarded". A stage that dies now costs its own branch and nothing else,
+instead of leaving unexplained edits in the primary tree.
+
+The real limit on concurrency is not worker slots - it is the single shared rehearsal database. Every
+harness inherits `requiresDatabase: true`, so two packages running residue harnesses at once corrupt
+each other's proofs. Compose each wave with at most one database-heavy package, and run no sweep while a
+database worker is live.
+
+Finally: check path-disjointness by measurement, not by plan. This run's plan asserted three packages
+were disjoint when 6 of 11 vacuity findings sat in two files another package had to own.
+
+## Preservation invariants (verified at close)
+
+Origin unchanged at `4b386d1d`. All six frozen KiroCrew evidence worktrees still at `ea69595`, never
+checked out, modified or removed. `.codex-remote-attachments/` and
+`aiclone/docs/orchestration/P1_014_ACTION_INVENTORY.md` remain the only untracked paths. Live
+personalink untouched - and positively evidenced, because a direct harness run was *refused* by the
+disposable-database guard during this run. No Prisma or migration work beyond read-only validate and
+generate. Nothing pushed; no PR, deployment or tunnel.

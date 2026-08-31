@@ -4504,3 +4504,148 @@ four waves, three parallel `orchestrate_subagent` stages per wave.
     reproduced it independently, and the detector's own token sweep had the same bug - harmlessly, since
     a looser pattern finding nothing is a stronger result, but it was not what the sweep claimed to do
     and a shorter token would have made the collisions real.
+
+
+
+# R-wave - "green" started meaning assertions ran, and then an audit measured how much that is worth
+
+Start `6e3979c`, end `a494b1b`, 30 commits, origin untouched at `4b386d1d`. Nine worker packages in
+three waves of three, each in its own git worktree on its own branch, each integrated only after root
+re-ran the entire sweep. Every acceptance gate green at the close: sweep 74 executed / 74 passed /
+FAILED 0 / 1 declared skip, self-test 55/55, Prisma validate and generate 0, TypeScript 0, repository
+lint 38 (down from 43), `npm audit --omit=dev` 0, production build 0, and an isolated clean worktree
+producing byte-identical counts.
+
+### The result worth reading first is a negative one
+
+The wave's headline deliverable was an assertion-evidence contract: a harness may no longer count as
+green merely because it exited 0, it has to yield machine-readable evidence carrying an identity and a
+positive assertion count. That landed, with 13 named rejection kinds, 61 of 74 harnesses enforced
+through parsers for evidence the harnesses already printed, and a 13-entry allowlist of exact
+filenames where globs and regexes are refused outright.
+
+Then the adversarial package attacked it and **broke it**. Three harnesses that assert nothing - no
+imports, no comparisons, no subject under test - printed well-formed evidence lines and obtained
+`verdict PASS; gate ESTABLISHED` with 104153 assertions counted, exit 0. The largest fabricated number
+came through the identity-bearing form that the design documented as its strongest. The parser reads
+the harness's own stdout, so the contract measures a harness's willingness to print a number.
+
+That is recorded here in the plainest available terms because the number it produces is quotable and
+would otherwise be quoted as proof: **all 3634 counted assertions rest on trust.** What the contract
+genuinely buys is narrower and still worth having - an emptied or decayed harness must now *also* be
+edited to lie, where silence used to be sufficient. It bounds accident and decay. It does not bound
+deception.
+
+There is also a second, unreconciled count in the tree: `check-harness-exit-integrity` measures
+*static* assertion callsites (order 3361) while the gate counts *runtime* assertions (3634). They
+legitimately differ, because one loop executes one callsite many times - but nothing asserts any
+relationship between them, so neither corroborates the other.
+
+### The corroboration control that was designed, measured, and deliberately not shipped
+
+The sound fix is to check the self-reported count against something the harness does not control. Root
+prototyped the cheap version - an independent source-side signal computed inside the driver - and
+measured it before wiring it in. Two measurements decided the outcome:
+
+- all **75** production harnesses score non-zero, so a control firing only on a zero signal could not
+  false-positive on the current suite;
+- all **five** existing self-test fixture harnesses score **zero**, because they are deliberately
+  minimal stubs.
+
+Wiring it in would therefore have failed the very fixtures that prove the evidence contract. The only
+ways round that were to exempt the fixture directory - shipping a control that nothing tests, which is
+the exact theatre this run exists to remove - or to rewrite another package's proof fixtures in the
+last hour. Both were declined and the gate was left green with a bounded, truthful claim.
+
+Worth recording for the next attempt: an earlier version of that same probe carried a regex bug that
+scored 68 of 75 harnesses zero, because the pattern required a character *before* the keyword and so
+consumed the leading `c` of `check`. Measuring first is the only reason it never reached the driver.
+
+### What was actually closed
+
+Residue evidence in four harnesses stopped comparing **global** table totals. The hole that mattered
+was never the noisy one: a leaked row of ours plus an unrelated concurrent delete is a delta of zero,
+so the old assertion reported success while real residue remained. Each of the four now asks how many
+rows *this execution* owns and asserts zero, and the cancellation path is demonstrated closed - the
+mutation leaves the global total exactly on baseline while the scoped assertion fails naming the table.
+One subtlety earned its comment: the movement and reservation scopes use a literal id list rather than
+a subquery, because teardown deletes the parent rows and a subquery would come back empty and pass by
+having no scope left to look in.
+
+`mixedScope` stopped being constant-true. It had been `scopes.size > 1` over the frozen full domain
+list, which always holds both boundaries, so it described the declared coverage list rather than the
+operation. Producer, all four consumers and four harnesses moved in one commit - necessarily, because
+several harness assertions *pinned* the constant-true behaviour on purpose and would otherwise have
+re-frozen the defect.
+
+HEAD and OPTIONS stopped being classified as write verbs, which was a lie in a constant's name and
+would have rejected a legitimate RFC 9110 export. Measuring the installed `next@16.3.3` rather than
+assuming turned up the real defect underneath: for a route exporting GET and neither HEAD nor OPTIONS
+the framework assigns `methods.HEAD = handlers.GET` and answers OPTIONS 204 with
+`Allow: GET, HEAD, OPTIONS`, while the service was refusing HEAD with 405 and advertising `Allow: GET`
+on the same URL.
+
+The exit-integrity fixed point stopped depending on a cap. Its two capped loops did not merely risk
+non-termination - they truncated **order-dependently**, collapsing a chain in one pass when it happened
+to be declared in dependency order and cutting it off otherwise, which is why two genuine frozen
+verdicts were being reported as healthy. It is now a monotone worklist over a pre-computed finite
+domain, with a residual budget that is strictly greater than the maximum possible iteration count and
+escalates loudly if it is ever reached.
+
+Vacuity debt fell from 11 UNGUARDED_EVERY / 19 UNRESOLVED to **2 / 11**, with the scanner never
+edited, no threshold lowered, no ignore added and no assertion deleted. The two remaining
+UNGUARDED_EVERY are a justified subset argument and one finding inside the single declared-skip
+harness.
+
+### A false positive that would have made green unreachable
+
+The widened credential scanner accepted any environment value of four characters or more as a bare
+substring literal and then hunted for it anywhere in an artefact. With a `PGPASSWORD` of `post` the
+driver reported `SECRET_LITERAL/critical` against **its own summary** and rewrote the database name
+mid-word - `postgres_rehearsal_20260826` became `<redacted>gres_rehearsal_20260826`; `true` did the same
+to `trueDepth`. On such a machine the gate could never pass, and the corrupted text actively misled
+whoever read the failure. Found by the audit, reproduced independently before being fixed, and closed
+in `a494b1b` with a guard that asserts both directions - a fix that only silenced the false positive
+would have been indistinguishable from deleting the detector.
+
+### Orchestration, and the one thing that changed the failure mode
+
+Nine stages dispatched, **nine reported**. The Q-wave's actual failure mode was not that stages died -
+it was that a dying stage left half-finished edits in the primary tree with no report explaining them.
+Two changes removed that: every worker was confined to its own worktree on its own branch, and a report
+file was declared mandatory with "no report means the package is discarded". A stage that dies now
+costs its own branch and nothing else.
+
+The binding constraint on concurrency was never worker slots. Every harness inherits
+`requiresDatabase: true` against one shared rehearsal database, so two packages running residue
+harnesses concurrently would corrupt each other's proofs. Each wave was composed with at most one
+database-heavy package, and root ran no sweep while a database worker was live.
+
+The plan's premise that the method, mixedScope and vacuity packages were path-disjoint was **false**:
+6 of the 11 UNGUARDED_EVERY findings live in the two files the mixedScope package had to own. The
+overlap was serialised and the deferred six were picked up a wave later, once their owner had merged.
+
+**Model truth.** No requested-model claim is made for any stage. `orchestrate_subagent` selects a named
+agent role and takes no model parameter, so per-stage pinning is unavailable through it; every stage is
+recorded as observed/uncontrolled Claude-family, and root ran as Claude Opus 5. The plan's three-way
+split across `gpt-5.6-sol`, `gpt-5.6-terra` and `claude-sonnet-5` was not achieved, and was not
+attempted through a mechanism that cannot honour it.
+
+### Positive evidence that the live-database guard is load-bearing
+
+`aiclone/.env` points `DATABASE_URL` at the protected live database `personalink`; the driver rewrites
+the database *name* to the disposable rehearsal database before spawning each harness. Running a
+harness directly, outside the driver, therefore gets no rewrite - and it was refused: *"Refusing to run
+a schema command: personalink is a protected live database and is never a valid schema target."* That
+refusal was observed live in this run, which is stronger evidence than any assertion about the guard.
+Workers were given a wrapper reproducing the driver's rewrite by exact string surgery on the DSN path
+segment, so no credential was ever copied or printed.
+
+### One correction to this document's own history
+
+The Q-wave record stated that `check-order-stream` leg 1 "makes no HTTP and no DB call and could run
+today at sub-second cost". That was wrong, and it has been corrected in place in `TASKS.json`. `main()`
+is linear and two unconditional statements precede leg 1: `scratchDatabaseName()` reads `DATABASE_URL`
+and throws when it is unset, then `new PrismaClient()` is constructed. There is no leg selector, and
+legs 3, 5 and 6 read and write Prisma directly, so an in-process HTTP harness alone would still not
+make it runnable. No leg is free of both an origin and the database; `run: false` is correct and stays.
