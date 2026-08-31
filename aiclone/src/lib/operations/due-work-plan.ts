@@ -23,8 +23,9 @@ export type DueWorkPlan = Readonly<{
     covers: readonly OperationsDomain[]
     doesNotCover: Readonly<Record<string, string>>
     /**
-     * Carried through from the summary. True when the DECLARED COVERAGE LIST spans more than one tenant
-     * boundary - a static property of that list, not a measurement of the supplied rows.
+     * Carried through from the summary, which measures it. True when the domains that actually
+     * contributed to that summary were read on more than one tenant boundary; false when they share one
+     * and false when there were none. `scopeNotice` is the sentence form of the same fact.
      */
     mixedScope: boolean
     /** What the boundaries of THIS proposal's own items are, in a sentence. Varies with the items. */
@@ -80,26 +81,21 @@ export function planDueWork(summary: OperationsSummary): DueWorkPlan {
     // re-derived here, so this function still adds no judgement of its own. What it does add is the
     // restriction to the domains that actually contributed an item.
     //
-    // WHY THAT RESTRICTION IS THE WHOLE POINT. `summary.mixedScope` is computed in engine.ts as
-    // `scopes.size > 1` over the frozen OPERATIONS_DOMAIN_SCOPE map, which always holds both "profile"
-    // and "workspace" - caseMilestones is the workspace-scoped one - so it is true for every workspace,
-    // every profile and every dataset including an empty one. `summary.domains` is no better on its own:
-    // it lists all nine declared domains with their declared scope whether or not any of them returned a
-    // row. Both are therefore facts about the DECLARED COVERAGE LIST, and neither can say anything about
-    // the records in front of the owner.
+    // WHY THIS IS DERIVED HERE AT ALL, NOW THAT `mixedScope` MEANS SOMETHING. `summary.mixedScope` used
+    // to be `scopes.size > 1` over the frozen OPERATIONS_DOMAIN_SCOPE map in engine.ts, which always
+    // holds both "profile" and "workspace", so it was true for every workspace, every profile and every
+    // dataset including an empty one. Branching the notice on it left the non-mixed arm UNREACHABLE and
+    // asserted "this proposal combines attention from different tenant boundaries" to every owner,
+    // including one whose items all came from profile-scoped domains, for whom it was simply false. That
+    // is fixed at the producer: `deriveMixedScope` in engine.ts now measures the boundaries the
+    // contributing domains were read on, so the field varies with the data and both arms are reachable.
     //
-    // The notice below used to branch on `summary.mixedScope`, which had two consequences. The
-    // non-mixed arm was UNREACHABLE - constant-true input, so no workspace and no dataset could take it,
-    // and check-operations-runtime.ts carries a live counterexample proving the field cannot describe a
-    // dataset. And the arm that DID run asserted "this proposal combines attention from different tenant
-    // boundaries" to every owner, including one whose items all came from profile-scoped domains, for
-    // whom it was simply false. A constant dressed as an observation is the same defect class as copy
-    // that claims work was arranged when nothing acted: the reader cannot tell it is not a measurement.
-    //
-    // Deriving it from the items makes both arms reachable from real data and makes each sentence true
-    // when it appears. `mixedScope` itself is NOT redefined - it is carried through untouched, because
-    // two harnesses this package does not own pin it true end to end, and its declared-coverage meaning
-    // is now stated on the field in ./due-work-preview-types.ts rather than left to be guessed.
+    // The notice is still computed from THIS proposal's items rather than read off the flag, for two
+    // reasons that survive the fix. It needs three arms, not two - an empty proposal has no positions to
+    // compare and must say that rather than pick either boundary sentence - and it must stay defensive
+    // about a summary it did not produce: this function takes any `OperationsSummary`, so it cannot
+    // assume the flag it was handed was derived from the items it was handed. Where the summary is
+    // self-consistent the two agree by construction, which is the state a harness pins.
     //
     // A domain the summary declared no boundary for lands in the set as `undefined`. It is kept as its
     // own member rather than dropped, so an unrecognised domain can only push this toward the cautious
@@ -115,8 +111,10 @@ export function planDueWork(summary: OperationsSummary): DueWorkPlan {
         workspaceId: summary.workspaceId,
         covers: Object.freeze([...summary.covers]),
         doesNotCover: Object.freeze({ ...summary.doesNotCover }),
-        // Carried through unchanged. It reports that the DECLARED COVERAGE spans two tenant boundaries,
-        // which is a static property of that list; `scopeNotice` is what reports this proposal's items.
+        // Carried through unchanged. The summary MEASURED it from the domains that contributed to it, so
+        // it now reports whether this proposal's own figures span more than one tenant boundary;
+        // `scopeNotice` is the sentence form of the same fact, computed from the items for the reasons
+        // above.
         mixedScope: summary.mixedScope,
         scopeNotice: empty
             ? "This proposal has no items, so there are no positions to compare across tenant boundaries."

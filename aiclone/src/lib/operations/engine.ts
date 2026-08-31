@@ -132,15 +132,57 @@ export type OperationsSummary = Readonly<{
     /** Stated absences, so a caller does not read silence as "nothing there". */
     doesNotCover: Readonly<Record<string, string>>
     /**
-     * True when the covered domains do NOT all share one tenant boundary. A caller that renders a
-     * single total should say so when this is true.
+     * True when THIS response's own figures do NOT all share one tenant boundary. A caller that renders
+     * a single total must say so when this is true, because the total then adds up two populations.
      *
-     * CONSTANT-TRUE TODAY. It is derived from the frozen OPERATIONS_DOMAIN_SCOPE map rather than from the
-     * rows that were read, so it is a static property of this view's declared coverage and not an
-     * observation about any workspace's data. See the computation in `summary` below.
+     * A MEASUREMENT OF THIS RESPONSE, not a property of the declared coverage list. It is derived from
+     * the boundaries the domains that actually returned something were read on - see `deriveMixedScope`
+     * - so it is false for a workspace whose whole answer sits on one boundary, false for an empty
+     * answer, and true only when the total really does span more than one. It varies with the data,
+     * with the workspace and with the horizon, and two requests can legitimately disagree about it.
+     *
+     * It was previously derived from the frozen OPERATIONS_DOMAIN_SCOPE map, which always holds both
+     * boundaries, so it was constant-true for every workspace and every dataset including an empty one -
+     * a constant dressed as an observation, which is the one thing a caller cannot detect. What that
+     * old value said - that this view's DECLARED coverage spans two boundaries - is still available and
+     * still reported, per domain, as `DomainSummary.scope`.
      */
     mixedScope: boolean
 }>
+
+/**
+ * THE TENANT BOUNDARIES ONE RESPONSE ACTUALLY SPANS, measured from that response's own figures.
+ *
+ * A domain contributes its boundary only when it returned something. That restriction is the whole of
+ * the correction: the previous derivation mapped over OPERATIONS_DOMAINS and read the frozen
+ * OPERATIONS_DOMAIN_SCOPE map, which by construction holds both "profile" and "workspace"
+ * (caseMilestones is the workspace-scoped one), so its answer was true for every workspace, every
+ * profile, every horizon and every dataset - an empty one included. It described the list of domains
+ * this file declares, and a caller had no way to tell that from a measurement.
+ *
+ * `count > 0` is the right test rather than a per-item scan because `DomainSummary.count` IS the number
+ * of items this response carries for that domain - it is computed from the same array - so the two agree
+ * by construction, and the summary keeps one definition of "this domain contributed".
+ *
+ * The three answers it can now give, all reachable from data:
+ *
+ *   EMPTY ANSWER -> false. Nothing was returned, so nothing spans anything. A caller rendering "0" has
+ *   no two populations to warn about, and saying it had would be the same false claim in a new place.
+ *
+ *   ONE BOUNDARY -> false. An owner with no case milestones has a profile-wide total and nothing else;
+ *   an owner whose only waiting work IS case milestones has a workspace-wide total and nothing else.
+ *   Both are single populations, and both were previously reported as mixed.
+ *
+ *   MORE THAN ONE -> true. The total adds a profile-wide figure to a workspace-wide one, so it
+ *   reconciles against neither screen on its own, and the caller must say so.
+ *
+ * It takes the summaries rather than reading anything, so it is a pure function of one response and can
+ * be asserted directly by a harness without a database.
+ */
+export function deriveMixedScope(domains: readonly DomainSummary[]): boolean {
+    const represented = new Set(domains.filter((entry) => entry.count > 0).map((entry) => entry.scope))
+    return represented.size > 1
+}
 
 const DEFAULT_HORIZON_HOURS = 24
 const MAX_HORIZON_HOURS = 24 * 14
@@ -232,21 +274,21 @@ export class OperationsService {
             })
         })
 
-        // STATIC PROPERTY OF THE DECLARED COVERAGE LIST, NOT AN OBSERVATION ABOUT THE DATA.
+        // MEASURED FROM THIS RESPONSE'S OWN FIGURES, NOT FROM THE DECLARED COVERAGE LIST.
         //
-        // This reads OPERATIONS_DOMAIN_SCOPE, which is frozen at module load and always contains both
-        // "profile" and "workspace" - caseMilestones is the workspace-scoped one. So the `scopes.size > 1`
-        // below is true for every workspace, every profile and every dataset, including an empty one. It
-        // is a fact about the list of domains this file declares, computed from a constant, and it carries
-        // no information about the records that were actually read. Nothing derived from it should be
-        // presented to an owner as something observed in their data.
+        // `deriveMixedScope` reads the domains that actually returned something and reports whether their
+        // boundaries differ. So this is false for a workspace whose whole answer sits on one boundary,
+        // false for an empty answer, and true only when the total really does add a profile-wide figure to
+        // a workspace-wide one. It varies with the data and with the horizon, which is what makes it
+        // reportable to an owner as something observed.
         //
-        // It is computed rather than hardcoded true because it must follow the coverage list: the day a
-        // domain is added or removed the answer has to change with it, and a literal would not. A caller
-        // rendering one total across these domains still has to say that the total spans two boundaries,
-        // which is what this supports. Read it as "this view's declared coverage spans two tenant
-        // boundaries", never as "your data spans two tenant boundaries".
-        const scopes = new Set(OPERATIONS_DOMAINS.map((domain) => OPERATIONS_DOMAIN_SCOPE[domain]))
+        // IT USED TO BE `new Set(OPERATIONS_DOMAINS.map((domain) => OPERATIONS_DOMAIN_SCOPE[domain])).size > 1`.
+        // That mapped the FROZEN coverage map, which always holds both boundaries, so it was constant-true
+        // for every workspace and every dataset - a fact about this file's declared coverage, not about the
+        // records read, and indistinguishable from a measurement to anybody consuming it. The declared-
+        // coverage fact is not lost: it is reported per domain as `DomainSummary.scope`, which is where a
+        // caller that wants to explain how the view is assembled should read it.
+        const mixedScope = deriveMixedScope(domains)
 
         return Object.freeze({
             asOf,
@@ -259,7 +301,7 @@ export class OperationsService {
             totalOverdue: items.filter((item) => item.overdue).length,
             covers: OPERATIONS_DOMAINS,
             doesNotCover: UNCOVERED_DOMAINS,
-            mixedScope: scopes.size > 1,
+            mixedScope,
         })
     }
 

@@ -939,38 +939,39 @@ async function main() {
                     "the response declares what it covers and what it does not",
                     a.covers.length === OPERATIONS_DOMAINS.length && Object.keys(a.doesNotCover).length > 0,
                 )
-                // The mixed-boundary fact must be reported for what it is, and what it is turns out to be
-                // narrower than its name suggests. See the three assertions below.
+                // The mixed-boundary fact must be reported for what it is, and what it is is a
+                // measurement of the response. See the three assertions below.
                 const boundariesWithItems = (s: OperationsSummary) =>
                     [...new Set(s.items.map((i) => OPERATIONS_DOMAIN_SCOPE[i.domain]))].sort().join(",")
                 const declaredBoundaries = [...new Set(Object.values(OPERATIONS_DOMAIN_SCOPE))].sort()
                 const aBoundaries = boundariesWithItems(a)
                 const bBoundaries = boundariesWithItems(b)
                 /**
-                 * WHAT THIS USED TO ASSERT, AND WHY THAT WAS NOT AN ASSERTION.
+                 * WHAT THIS USED TO ASSERT, IN TWO STAGES, AND WHY BOTH ARE NOW OBSOLETE.
                  *
-                 * The previous form was `a.mixedScope === true && a.domains.some(workspace) &&
-                 * a.domains.some(profile)`, named "the response reports that its total spans more than one
-                 * tenant boundary". Every clause of it is constant.
+                 * STAGE ONE was `a.mixedScope === true && a.domains.some(workspace) && a.domains.some(profile)`,
+                 * named "the response reports that its total spans more than one tenant boundary". Every
+                 * clause was constant: `mixedScope` was `scopes.size > 1` over the FROZEN
+                 * OPERATIONS_DOMAIN_SCOPE map, and `a.domains` lists all nine declared domains with their
+                 * declared scope whether or not any returned a row. It restated the response's own constants
+                 * back to itself and could not have failed for any data.
                  *
-                 * `mixedScope` is computed at engine.ts as `scopes.size > 1` over the FROZEN
-                 * OPERATIONS_DOMAIN_SCOPE map, which always contains both "profile" and "workspace", so it
-                 * is true for every workspace, every profile and every dataset including an empty one. And
-                 * `a.domains` always lists all nine declared domains with their declared scope whether or
-                 * not any of them returned a row, so both `.some` clauses are constant too. The assertion
-                 * therefore restated the response's own constants back to itself: it could not have failed
-                 * for any data, and it would not have noticed if the field were wrong.
+                 * STAGE TWO replaced it with a MEASUREMENT, a COUNTEREXAMPLE - tenant B's rows span exactly
+                 * one boundary while `mixedScope` still reported true - and a pin on `a.mixedScope ===
+                 * (declaredBoundaries.length > 1)`. Those were right about the code as it stood: the field
+                 * genuinely could not describe a dataset, and the counterexample documented it.
                  *
-                 * It is replaced, not deleted, by three assertions that can each fail. The first MEASURES
-                 * what the returned rows actually span. The second is a live counterexample proving the
-                 * field cannot report that measurement. The third pins the narrow truth the field does
-                 * carry, recomputed here from the frozen map instead of read off the response - and it
-                 * keeps the original conjunction inside it, so nothing the old form checked is lost.
+                 * THE DEFECT THEY DOCUMENTED IS FIXED. `deriveMixedScope` in engine.ts now reads the domains
+                 * that actually returned something, so the field measures the response. A counterexample to a
+                 * defect that no longer exists would either fail or, worse, pass and re-freeze the defect, so
+                 * it is REPLACED - not deleted - by the positive assertion its own comment said could not be
+                 * made: single-boundary data yields false, genuinely mixed data yields true, on two tenants
+                 * of the same fixture. The measurement leg is kept unchanged, and the declared-coverage
+                 * conjunction the stage-one form checked is kept too, now asserted as what it always was - a
+                 * fact about `domains[].scope` - instead of being tied to `mixedScope`.
                  *
-                 * The field is NOT changed here. `mixedScope` is consumed by due-work-plan.ts, by the
-                 * operations panel and by another harness that pins it true end to end; redefining it is an
-                 * integration decision with an owner, and this stage owns neither those files nor that
-                 * call. It is reported instead.
+                 * Both legs are recomputed here from the returned items and the frozen map rather than read
+                 * off the response, so the response cannot satisfy them by agreeing with itself.
                  */
                 checkInvertible(
                     "MEASURED: tenant A's returned items really do span two tenant boundaries - derived from the items returned and each domain's boundary, not read off the response",
@@ -980,17 +981,26 @@ async function main() {
                     `A items span [${aBoundaries}]: workspace via caseMilestones, profile via fieldJobs`,
                 )
                 checkInvertible(
-                    "COUNTEREXAMPLE: tenant B's rows span exactly ONE boundary while mixedScope still reports true, so the field describes the declared coverage list and cannot describe a dataset",
-                    bBoundaries === "profile" && b.mixedScope === true,
-                    `B items span [${bBoundaries}] yet mixedScope=${String(b.mixedScope)} - constant-true by construction`,
+                    "SINGLE BOUNDARY YIELDS FALSE: tenant B's rows span exactly ONE boundary and mixedScope reports false for it - the assertion the old counterexample proved could not be made",
+                    bBoundaries === "profile" && b.mixedScope === false,
+                    `B items span [${bBoundaries}] and mixedScope=${String(b.mixedScope)} - measured from the domains that returned rows, not from the coverage list`,
                 )
                 checkInvertible(
-                    "mixedScope equals what the frozen coverage map forces, recomputed here independently - the narrow truth this field can carry, and all of it",
-                    a.mixedScope === (declaredBoundaries.length > 1) &&
-                        b.mixedScope === (declaredBoundaries.length > 1) &&
+                    "MEASURED BOTH WAYS: mixedScope equals whether the returned items span more than one boundary, for the mixed tenant AND the single-boundary tenant, recomputed here from the items and the frozen scope map",
+                    a.mixedScope === (aBoundaries.split(",").length > 1) &&
+                        b.mixedScope === (bBoundaries.split(",").length > 1) &&
+                        a.mixedScope === true &&
+                        b.mixedScope === false,
+                    `A spans [${aBoundaries}] -> mixedScope=${String(a.mixedScope)}; B spans [${bBoundaries}] -> mixedScope=${String(b.mixedScope)}; two tenants of one fixture disagree, so the field is not a constant`,
+                )
+                checkInvertible(
+                    "the DECLARED coverage still reports both boundaries per domain, which is where that fact belongs now that mixedScope no longer carries it",
+                    declaredBoundaries.length > 1 &&
                         a.domains.some((d) => d.scope === "workspace") &&
-                        a.domains.some((d) => d.scope === "profile"),
-                    `frozen map boundaries=[${declaredBoundaries.join(",")}] so mixedScope is ${String(declaredBoundaries.length > 1)} for every workspace and every dataset`,
+                        a.domains.some((d) => d.scope === "profile") &&
+                        b.domains.some((d) => d.scope === "workspace") &&
+                        b.domains.some((d) => d.scope === "profile"),
+                    `frozen map boundaries=[${declaredBoundaries.join(",")}] declared per domain on both tenants, including tenant B whose rows span only [${bBoundaries}]`,
                 )
                 check(
                     "the response reports the workspace it authorised, which workspace-scoped domains were read on",

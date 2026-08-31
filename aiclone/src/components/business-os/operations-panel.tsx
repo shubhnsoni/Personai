@@ -238,42 +238,58 @@ export function OperationsPanel({ workspaceId }: { workspaceId: string }) {
                         {/*
                           * Most domains are profile-scoped; case milestones are workspace-scoped
                           * because CaseProject carries workspaceId. For an owner with more than one
-                          * workspace those are different sets, so a single total spans two boundaries.
-                          * Saying so turns a number that would not reconcile against another screen
-                          * into a fact the owner can act on.
+                          * workspace those are different sets, so a single total can span two
+                          * boundaries. Saying so turns a number that would not reconcile against
+                          * another screen into a fact the owner can act on.
                           */}
                         {/*
-                          * THIS SENTENCE IS ABOUT THE COVERAGE LIST, NOT ABOUT THIS OWNER'S DATA, AND IT
-                          * USED TO CLAIM OTHERWISE.
+                          * TWO SENTENCES, AND THEY ARE DELIBERATELY DIFFERENT KINDS OF CLAIM.
                           *
-                          * It read `summary.mixedScope ? <p>This total spans two boundaries…</p> : null`.
-                          * `mixedScope` is `scopes.size > 1` over the FROZEN OPERATIONS_DOMAIN_SCOPE map,
-                          * which always holds both "profile" and "workspace", so it is true for every
-                          * owner, every workspace and every dataset including an empty one. The `: null`
-                          * arm was unreachable and the sentence was shown unconditionally.
+                          * The first is unconditional and is about HOW THIS VIEW IS ASSEMBLED. It is true
+                          * for every owner and every dataset, it is what makes the per-item "this
+                          * workspace only" marker legible, and it is needed even when the current total
+                          * happens to sit on one boundary - otherwise an owner cannot tell that the
+                          * marker means anything.
                           *
-                          * For an owner with no case milestones, nothing in the total is workspace-scoped.
-                          * For an owner whose profile owns one workspace, the two boundaries are the same
-                          * set. In both cases "This total spans two boundaries" is a measurement claim
-                          * about their data that is false, and the owner cannot tell it is not a
-                          * measurement - which is the same defect class this domain fixed one file over,
-                          * where copy implied work had been arranged when nothing acted.
+                          * The second is conditional and is a MEASUREMENT OF THIS OWNER'S TOTAL. The
+                          * branch on `summary.mixedScope` is back, and it is now legitimate, which it was
+                          * not before. `mixedScope` used to be `scopes.size > 1` over the frozen
+                          * OPERATIONS_DOMAIN_SCOPE map, so it was true for every owner, every workspace
+                          * and every dataset including an empty one: the `: null` arm was unreachable and
+                          * the sentence was shown unconditionally to owners for whom it was false. The
+                          * producer now measures the boundaries the domains that actually returned
+                          * something were read on, so both arms are reached by real data - an owner with
+                          * no case milestones takes the null arm, and one with case milestones AND
+                          * profile-scoped work takes the sentence.
                           *
-                          * So the branch is gone and the sentence now says what is actually true and
-                          * always true: a fact about how the VIEW is assembled. The per-item "this
-                          * workspace only" marker is what tells an owner which of their own items are
-                          * workspace-scoped, and that marker is derived from real data.
+                          * WHY THE FALSE ARM STAYS SILENT, having re-evaluated it rather than restored the
+                          * old shape by default. This sentence is a WARNING: its whole content is "this
+                          * one number adds two populations together, so do not reconcile it against a
+                          * screen that shows one of them". When the total sits on one boundary there is
+                          * nothing to reconcile against and nothing to warn about, and the honest
+                          * negative - "your total does not mix boundaries" - is a sentence no owner has an
+                          * action for. Rendering it anyway would put a permanent notice on the panel, and
+                          * a notice that is always there is a notice nobody reads, which would cost the
+                          * true case its force. The disclosure that this view CAN mix boundaries is not
+                          * withheld by that silence: it is the unconditional sentence above, which is
+                          * exactly why that sentence is kept rather than replaced by this branch.
                           *
-                          * A notice derived from the domains that actually contributed items is the
-                          * better answer and exists already for the due-work plan, as `scopeNotice` in
-                          * due-work-plan.ts. Bringing that here needs a panel-harness assertion to go
-                          * with it and is recorded as owed work rather than guessed at now.
+                          * An empty total takes the null arm too, and that is correct rather than
+                          * incidental: zero items span no boundary, so there is no combination to declare.
                           */}
                         <p className="mt-2 text-xs text-muted-foreground">
                             This view is assembled from domains read on two different boundaries: most cover your whole
                             profile, while items marked <span className="font-medium">this workspace only</span> cover
                             just the selected workspace. The marker on each item says which it is.
                         </p>
+
+                        {summary.mixedScope ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                                Right now your total spans both of them: it adds items read across your whole profile to
+                                items read on this workspace only, so it does not reconcile against a screen that shows
+                                just one of the two.
+                            </p>
+                        ) : null}
 
                         {summary.total === 0 ? (
                             <div className="mt-3">

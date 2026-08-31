@@ -66,7 +66,8 @@ import {
     REQUIRED_PREVIEW_WORDS,
     toDueWorkPreview,
 } from "../../src/lib/operations/due-work-preview-types"
-import { OPERATIONS_DOMAIN_SCOPE, OperationsService } from "../../src/lib/operations/engine"
+import { deriveMixedScope, OPERATIONS_DOMAIN_SCOPE, OperationsService } from "../../src/lib/operations/engine"
+import type { OperationsDomain } from "../../src/lib/operations/engine"
 import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistenceError, type PersistenceErrorCode } from "../../src/lib/persistence/errors"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
@@ -787,20 +788,44 @@ async function main() {
                         Object.keys((data.doesNotCover ?? {}) as Record<string, string>).length > 0,
                     `covers=${(data.covers as string[] | undefined)?.length ?? 0} doesNotCover=${Object.keys((data.doesNotCover ?? {}) as Record<string, string>).length}`,
                 )
-                // mixedScope is CONSTANT-TRUE, and this assertion says only that, on purpose.
+                // mixedScope is a MEASUREMENT, and this fixture is the single-boundary half of it.
                 //
-                // engine.ts computes it over the frozen OPERATIONS_DOMAIN_SCOPE map, which always holds both
-                // "profile" and "workspace", so `scopes.size > 1` is true for every workspace and every
-                // dataset - including one with no rows in it. It is therefore a property of the declared
-                // coverage list, not a measurement of this fixture's data, and the name below says so. An
-                // assertion phrased as "the response reports that its total spans more than one tenant
-                // boundary" would claim to have observed something about the data that was never observed;
-                // that phrasing exists in check-operations-runtime.ts and is left alone here rather than
-                // copied. This pins the current truth and no more than the current truth.
+                // It used to be constant-true: engine.ts computed it over the frozen OPERATIONS_DOMAIN_SCOPE
+                // map, which always holds both "profile" and "workspace", so `scopes.size > 1` was true for
+                // every workspace and every dataset including an empty one. The assertion here said exactly
+                // that and no more, on purpose, and its comment recorded that a data claim could not be made.
+                //
+                // `deriveMixedScope` now reads the domains that actually returned rows, so the claim CAN be
+                // made and is made below. This seed gives tenant A field jobs and nothing workspace-scoped -
+                // there is no CaseProject and no CaseMilestone in it - so every item in this plan was read on
+                // the profile boundary and the honest answer is FALSE. Under the old derivation this arm was
+                // unreachable; asserting it is what stops the constant coming back.
+                //
+                // The false is then shown to be a measurement rather than a new constant: the same derivation,
+                // handed the same domain list with the workspace-scoped domain credited a row, answers true.
+                // That is a counterfactual INPUT to a pure function, not a change to the engine, and it is
+                // what makes the false above discriminating. The real mixed dataset is proven elsewhere -
+                // check-operations-runtime.ts over real rows and check-due-work-panel.ts over a seeded engine.
+                const previewItems = (data.items ?? []) as Array<Record<string, unknown>>
+                const previewBoundaries = [
+                    ...new Set(previewItems.map((entry) => OPERATIONS_DOMAIN_SCOPE[String(entry.domain) as OperationsDomain])),
+                ]
+                    .sort()
+                    .join(",")
+                const creditedWorkspaceRow = summaryOnce.domains.map((entry) =>
+                    entry.scope === "workspace" ? { ...entry, count: entry.count + 1 } : entry,
+                )
                 checkInvertible(
-                    "mixedScope is true because the DECLARED COVERAGE LIST spans two tenant boundaries - a static property of that list, not a measurement of this fixture's data",
-                    data.mixedScope === true,
-                    `mixedScope=${String(data.mixedScope)}; boundaries in the frozen coverage map=[${[...new Set(Object.values(OPERATIONS_DOMAIN_SCOPE))].sort().join(",")}] so this is constant-true for every workspace and every dataset`,
+                    "SINGLE BOUNDARY YIELDS FALSE: every item in this plan was read on the profile boundary - recomputed from the emitted items and the frozen scope map - and mixedScope reports false, the arm the old constant-true derivation could not reach",
+                    previewItems.length > 0 && previewBoundaries === "profile" && data.mixedScope === false,
+                    `${previewItems.length} emitted items span [${previewBoundaries}] and mixedScope=${String(data.mixedScope)}`,
+                )
+                checkInvertible(
+                    "MEASURED: the emitted mixedScope is what the producer's own derivation says about this summary, and that derivation answers TRUE when a workspace-scoped domain is credited a row - so the false above discriminates instead of being a new constant",
+                    data.mixedScope === deriveMixedScope(summaryOnce.domains) &&
+                        deriveMixedScope(summaryOnce.domains) === false &&
+                        deriveMixedScope(creditedWorkspaceRow) === true,
+                    `emitted=${String(data.mixedScope)} derived=${String(deriveMixedScope(summaryOnce.domains))} counterfactual-with-workspace-row=${String(deriveMixedScope(creditedWorkspaceRow))}`,
                 )
 
                 // ---- 400 -------------------------------------------------------

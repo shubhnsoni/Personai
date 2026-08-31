@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { deriveMixedScope } from "../../src/lib/operations/engine"
 import type { AttentionItem, OperationsSummary } from "../../src/lib/operations/engine"
 import { planDueWork } from "../../src/lib/operations/due-work-plan"
 
@@ -67,6 +68,11 @@ const summary: OperationsSummary = Object.freeze({
     doesNotCover: Object.freeze({
         durableTasks: "Durable task processing belongs to its owning domain and is not part of this proposal.",
     }),
+    // True, and asserted below to be what the producer's own derivation says about the domain list above:
+    // caseMilestones contributed a row on the workspace boundary while appointments and returns contributed
+    // rows on the profile boundary, so this summary's figures really do span two boundaries. The fixture is
+    // pinned against `deriveMixedScope` rather than typed by hand alone, so it cannot drift into stating
+    // something the engine would never emit.
     mixedScope: true,
 })
 
@@ -127,6 +133,11 @@ const emptySummary: OperationsSummary = Object.freeze({
     items: Object.freeze([]),
     total: 0,
     totalOverdue: 0,
+    // Every domain still declared, every count zero: nothing was returned, so nothing spans anything. This
+    // is what the producer emits for an empty answer, and it is asserted against `deriveMixedScope` below
+    // rather than merely typed here. It used to be inherited as `true` from the fixture above, which is what
+    // the old constant-true derivation forced - an empty response that claimed to span two boundaries.
+    mixedScope: false,
 })
 const empty = planDueWork(emptySummary)
 checkInvertible(
@@ -134,10 +145,70 @@ checkInvertible(
     empty.empty && empty.items.length === 0 && empty.explanation.includes("No attention items were present"),
     empty.explanation,
 )
+/**
+ * THE SECOND SCOPE FIXTURE: every item on ONE boundary, with the workspace-scoped domain still DECLARED.
+ *
+ * This is the case the old derivation got wrong, so it is the case worth a fixture. `caseMilestones` is
+ * present in the domain list with its workspace boundary and a count of 0 - declared, and contributed
+ * nothing. A derivation over the declared list answers "two boundaries" here; a derivation over what the
+ * response actually carries answers "one", which is the truth an owner can act on.
+ */
+const singleBoundarySummary: OperationsSummary = Object.freeze({
+    ...summary,
+    domains: Object.freeze([
+        Object.freeze({ domain: "appointments", count: 1, overdue: 0, scope: "profile" }),
+        Object.freeze({ domain: "returns", count: 1, overdue: 0, scope: "profile" }),
+        Object.freeze({ domain: "caseMilestones", count: 0, overdue: 0, scope: "workspace" }),
+    ]),
+    items: Object.freeze([upcoming, undated]),
+    total: 2,
+    totalOverdue: 0,
+    mixedScope: false,
+})
+const singleBoundary = planDueWork(singleBoundarySummary)
+
+/**
+ * WHAT THIS PAIR REPLACES.
+ *
+ * There was one assertion here - "mixed scope is surfaced rather than smoothed over", asserting
+ * `first.mixedScope === true` together with the mixed notice. It passed for the wrong reason: `mixedScope`
+ * was constant-true out of engine.ts, derived from the frozen OPERATIONS_DOMAIN_SCOPE map rather than from
+ * anything read, so the `true` half of it would have held for an all-profile fixture and for an empty one
+ * too. A single-value assertion over a constant cannot fail, and this harness had no fixture that could
+ * have exposed that.
+ *
+ * It is replaced by the pair the old shape could not express: genuinely mixed figures yield true, figures
+ * that share one boundary yield false. Each leg pins the producer's derivation against the fixture as well
+ * as the plan's carry-through, so a fixture that stated something the engine could never emit fails here
+ * rather than passing quietly.
+ */
 checkInvertible(
-    "mixed scope is surfaced rather than smoothed over",
-    first.mixedScope === true && first.scopeNotice.includes("different tenant boundaries"),
-    first.scopeNotice,
+    "GENUINELY MIXED YIELDS TRUE: a summary whose items really do span two boundaries reports mixedScope true, agreeing with the producer's own derivation, and takes the mixed notice",
+    first.mixedScope === true &&
+        deriveMixedScope(summary.domains) === true &&
+        first.scopeNotice.includes("different tenant boundaries"),
+    `mixedScope=${String(first.mixedScope)} derived=${String(deriveMixedScope(summary.domains))} notice=${first.scopeNotice}`,
+)
+checkInvertible(
+    "SINGLE BOUNDARY YIELDS FALSE: a summary whose items all sit on one boundary reports mixedScope false even though the workspace-scoped domain is still DECLARED with a zero count, and takes the one-boundary notice",
+    singleBoundary.mixedScope === false &&
+        deriveMixedScope(singleBoundarySummary.domains) === false &&
+        singleBoundarySummary.domains.some((entry) => entry.scope === "workspace" && entry.count === 0) &&
+        singleBoundary.scopeNotice.includes("read on one tenant boundary"),
+    `mixedScope=${String(singleBoundary.mixedScope)} derived=${String(deriveMixedScope(singleBoundarySummary.domains))} notice=${singleBoundary.scopeNotice}`,
+)
+checkInvertible(
+    "the proposal carries the summary's measurement through rather than forming a second opinion about it",
+    first.mixedScope === summary.mixedScope && singleBoundary.mixedScope === singleBoundarySummary.mixedScope,
+    `mixed ${String(summary.mixedScope)}->${String(first.mixedScope)}, single ${String(singleBoundarySummary.mixedScope)}->${String(singleBoundary.mixedScope)}`,
+)
+checkInvertible(
+    "an empty proposal claims no boundary at all rather than picking one",
+    empty.mixedScope === false &&
+        deriveMixedScope(emptySummary.domains) === false &&
+        emptySummary.domains.length > 0 &&
+        empty.scopeNotice.includes("no items"),
+    `mixedScope=${String(empty.mixedScope)} over ${emptySummary.domains.length} declared domains with zero counts; notice=${empty.scopeNotice}`,
 )
 checkInvertible(
     "declared coverage and exclusions are carried through unchanged",
