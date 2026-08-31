@@ -362,6 +362,17 @@ const OLD_SITES: readonly OldSite[] = Object.freeze([
         getPattern: /export async function GET\(/,
         writePattern: /export async function (POST|PATCH|PUT|DELETE)\(/,
     },
+    // Migrated in this phase (T2-A): check-workspace-surface-boundary.ts assertion 11, whose old inline
+    // regexes ran over executableSource()-STRIPPED source. Both patterns are reproduced verbatim so this
+    // file proves the migration moved no verdict on the one route that assertion reads.
+    {
+        consumer: "check-workspace-surface-boundary.ts",
+        site: "assertion 11 - the route exports GET and no write verb (inline GET/write regex, was lines 327-335)",
+        targets: ["src/app/api/platform/workspaces/[workspaceId]/surfaces/route.ts"],
+        stripped: true,
+        getPattern: /export\s+async\s+function\s+GET\b/,
+        writePattern: /export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/,
+    },
 ])
 
 for (const site of OLD_SITES) {
