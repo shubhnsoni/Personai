@@ -56,6 +56,11 @@ const { loadManifest, reconcile, applyFilter } = require("./lib/inventory");
 const { resolveDatabaseTarget, DatabaseTargetError } = require("./lib/db-target");
 const { collectSecretLiterals, redact, scanForLeaks } = require("./lib/redact");
 const { writeSummaries, fmtMs } = require("./lib/report");
+const {
+  CORROBORATION_SCHEMA,
+  CORROBORATION_FINDING_KINDS,
+  evaluateCorroboration,
+} = require("./lib/corroborate");
 
 const DRIVER_VERSION = "1.1.0";
 const MAX_CAPTURED_BYTES = 16 * 1024 * 1024;
@@ -98,6 +103,44 @@ const EXIT = { OK: 0, HARNESS_FAILED: 1, INTEGRITY: 2, PARTIAL: 3 };
 //
 // Every rejection is a distinct named finding, because "evidence check failed" tells a
 // reader nothing about what to fix. See EVIDENCE_FINDING_KINDS.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// THE SOURCE-SIDE CORROBORATION LAYER (an ADDITIONAL condition, not a replacement)
+// ---------------------------------------------------------------------------
+//
+// The contract above reads a NUMBER out of a harness's output. Two measurements show what that does
+// and does not buy:
+//
+//   1. An adversarial audit wrote three harnesses with no imports, no comparisons and no subject
+//      under test. They printed well-formed evidence lines and obtained `verdict PASS; gate
+//      ESTABLISHED` with 104153 assertions counted, exit 0. The biggest fabricated number came
+//      through GATE-EVIDENCE, the form documented above as strongest, because identity-bearing
+//      evidence is still SELF-reported.
+//   2. Neutering the assertion helper inside check-vertical-pack-candidates.ts collapsed its
+//      reported count from 447 to 14 and it STILL EXITED 0. The count stayed honest. Nothing noticed
+//      that 433 assertions had stopped running.
+//
+// So the evidence contract measures willingness to print a number. The corroboration layer in
+// lib/corroborate.js adds a second signal derived from somewhere else entirely: the harness's own
+// source, parsed with the TypeScript compiler API, must contain at least one EXECUTABLE assertion
+// callsite. Comments, string literals and console output produce no callsite, which is the whole
+// reason it is a parser and not a regex — see that file's header.
+//
+// THREE PROPERTIES ARE LOAD BEARING.
+//   - Runtime evidence stays REQUIRED. Corroboration only ever judges a harness that ALREADY
+//     produced a positive count, so it can never become the reason an unevidenced harness passes.
+//   - The runtime and static counts are NOT required to match. A loop runs one callsite many times;
+//     a branch not taken runs it zero. Equality is not a property of correct code, so only the
+//     zero-versus-positive contradiction is asserted.
+//   - Allowlisted harnesses are not judged, because they emit no positive runtime count to
+//     corroborate. This adds NO new exemption: the allowlist stays at 13 and is not consulted for
+//     anything else.
+//
+// It can be disabled ONLY through GATES_SELFTEST_FAULT=disable-corroboration, which stamps the run
+// void and makes `gateEstablished` false. That is the mutation switch used to prove the layer is
+// load bearing; it is deliberately not a manifest field, because a manifest field would be a
+// permanent bypass with a reasonable-looking name.
 // ---------------------------------------------------------------------------
 
 const EVIDENCE_SCHEMA = "personai.gates.evidence/1";
@@ -858,6 +901,11 @@ function usage() {
     "count the driver can read (see EVIDENCE_* findings). Harnesses that emit none are named",
     "exactly, one by one, in the manifest's evidence.allowlist with a reason; nothing else is exempt.",
     "",
+    "Source-side corroboration: a positive runtime count must ALSO be supported by at least one",
+    "executable assertion callsite in the harness's own source, found with the TypeScript compiler",
+    "API so comments, string literals and console output cannot count (see CORROBORATION_* findings).",
+    "The runtime and static counts are NOT required to match - a loop runs one callsite many times.",
+    "",
     "Exit codes: 0 green/clean, 1 harness failure, 2 inventory or safety failure, 3 unaccepted partial.",
   ].join("\n");
 }
@@ -1361,7 +1409,31 @@ async function main() {
     record.evidence = evidenceByHarness.get(record.file) || null;
   }
 
-  const integrityFindings = [...inventoryFindings, ...resultFindings, ...evidenceResult.findings];
+  // ---- source-side corroboration ------------------------------------------
+  // Second, independently derived signal. Only harnesses that already produced a POSITIVE runtime
+  // count are judged, so this cannot substitute for the evidence contract — it can only refuse a
+  // number the harness's own source does not support.
+  const corroborationEnabled = evidenceExecuted && fault !== "disable-corroboration";
+  if (evidenceExecuted && !corroborationEnabled) {
+    say(`  !! selftest: source-side corroboration DISABLED by GATES_SELFTEST_FAULT — this run is void`);
+  }
+  const corroborationResult = evaluateCorroboration({
+    evidenceRecords: evidenceResult.block.records,
+    harnessDirAbs,
+    allowlisted: new Set(manifest.evidence.allowlist.map((entry) => entry.file)),
+    enabled: corroborationEnabled,
+  });
+  const corroborationByHarness = new Map(corroborationResult.block.records.map((r) => [r.harness, r]));
+  for (const record of records) {
+    record.corroboration = corroborationByHarness.get(record.file) || null;
+  }
+
+  const integrityFindings = [
+    ...inventoryFindings,
+    ...resultFindings,
+    ...evidenceResult.findings,
+    ...corroborationResult.findings,
+  ];
   if (needDatabase && dbError) {
     integrityFindings.push({ kind: "DATABASE_TARGET_REFUSED", detail: dbError });
   }
@@ -1468,6 +1540,7 @@ async function main() {
     },
     expected: manifest.expected,
     evidence: evidenceResult.block,
+    corroboration: corroborationResult.block,
     declaredSkips: declaredSkips.map((e) => ({ file: e.file, package: e.package, skip: e.skip })),
     integrityFindings,
     harnesses: [
@@ -1602,6 +1675,17 @@ async function main() {
         `${ev.allowlist.redundant.map((r) => `${r.file} (${r.form}, ${r.assertions})`).join(", ")}\n`,
     );
   }
+  // The second signal, printed on every run next to the first, so a reader can see at a glance that
+  // the assertion counts were checked against source and not merely read off the logs.
+  const co = summary.corroboration;
+  const corroborationOffReason = fault === "disable-corroboration"
+    ? "DISABLED by a self-test fault — THIS RUN IS VOID"
+    : "not evaluated (nothing was executed)";
+  process.stdout.write(
+    `source corroboration: ${co.enabled ? "ENFORCED" : corroborationOffReason}` +
+      `${co.enabled ? ` — ${co.counts.corroborated}/${co.counts.judged} evidenced harness(es) have executable assertion ` +
+        `callsites in source, ${co.counts.contradicted} contradicted, ${co.counts.refused} refused` : ""}\n`,
+  );
   process.stdout.write(`credential scan: ${scan.passed ? "clean" : "LEAK"} (${scan.filesScanned} artefacts, ${scan.criticalCount} critical)\n`);
   process.stdout.write(`verdict ${summary.verdict}; gate ${summary.gateEstablished ? "ESTABLISHED" : `NOT established — ${summary.gateNotEstablishedReason}`}\n`);
   process.stdout.write(`json  ${rel(finalPaths.jsonPath)}\nmd    ${rel(finalPaths.mdPath)}\nlatest ${rel(path.join(opts.outRoot, "latest.json"))}, ${rel(path.join(opts.outRoot, "latest.md"))}\n`);
@@ -1645,6 +1729,12 @@ function applySelfTestFault(fault, records, say) {
   } else if (fault === "leak") {
     say(`  !! selftest: emitting a synthetic connection string to prove the leak assertion fires`);
     say(`  postgresql://gateuser:sup3rs3cr3t@127.0.0.1:5432/${"synthetic_target"}`);
+  } else if (fault === "disable-corroboration") {
+    // Handled where the corroboration layer is evaluated, before this point; named here so it is
+    // not reported as an unknown fault. The MUTATION PROOF: with this set, a harness that prints an
+    // evidence line while asserting nothing in source goes green again, which is what shows the
+    // corroboration layer is load bearing rather than decorative.
+    say(`  !! selftest: source-side corroboration was disabled for this run`);
   } else {
     say(`  !! selftest: unknown fault ${JSON.stringify(fault)} — ignored, but this run is still void`);
   }
@@ -1660,6 +1750,8 @@ module.exports = {
   EVIDENCE_LINE_FORMS,
   EVIDENCE_JSON_COUNT_KEYS,
   ALLOWLIST_FORBIDDEN_CHARS,
+  CORROBORATION_SCHEMA,
+  CORROBORATION_FINDING_KINDS,
   extractLastJsonObject,
   parseEvidenceFromLog,
   validateEvidence,

@@ -83,6 +83,10 @@ function buildMarkdown(summary) {
     L.push(`| harnesses on the evidence allowlist | ${summary.evidence.counts.allowlisted} |`);
     L.push(`| assertions counted | ${summary.evidence.counts.totalAssertions} |`);
   }
+  if (summary.corroboration) {
+    L.push(`| assertion counts corroborated by source | ${summary.corroboration.counts.corroborated} |`);
+    L.push(`| assertion counts contradicted by source | ${summary.corroboration.counts.contradicted} |`);
+  }
   L.push("");
   L.push(`**TOTAL ${summary.counts.executed} checks, FAILED ${summary.counts.failed}**`);
   L.push("");
@@ -191,6 +195,51 @@ function buildMarkdown(summary) {
       for (const r of ev.records) {
         L.push(
           `| \`${r.harness}\` | ${r.assertions} | \`${r.form}\` | ${r.identitySource} | \`${String(r.raw).replace(/\|/g, "\\|")}\` |`,
+        );
+      }
+      L.push("");
+    }
+  }
+
+  if (summary.corroboration) {
+    const co = summary.corroboration;
+    L.push("## Source-side corroboration");
+    L.push("");
+    L.push(
+      "The contract above reads a NUMBER out of harness output, so on its own it measures a harness's " +
+        "willingness to print one. Measured: three harnesses with no imports, no comparisons and no " +
+        "subject under test printed well-formed evidence and obtained `gate ESTABLISHED` with 104153 " +
+        "assertions counted; and neutering the assertion helper inside `check-vertical-pack-candidates.ts` " +
+        "dropped its reported count from 447 to 14 while it still exited 0. So a positive runtime count " +
+        "must ALSO be supported by at least one EXECUTABLE assertion callsite in the harness's own source, " +
+        "found with the TypeScript compiler API — comments, string literals and console output produce no " +
+        "callsite, which is why this is a parser and not a regex.",
+    );
+    L.push("");
+    L.push(
+      "The runtime and static counts are **not** required to match. A loop runs one callsite many times " +
+        "and an untaken branch runs it zero times, so equality is not a property of correct code; only the " +
+        "zero-versus-positive contradiction is enforced.",
+    );
+    L.push("");
+    L.push(
+      `- Enforced this run: **${co.enabled ? "yes" : "no — nothing was executed, or the layer was disabled by a self-test fault, in which case the run is void"}**`,
+    );
+    L.push(
+      `- Evidenced harnesses judged: ${co.counts.judged}; corroborated: **${co.counts.corroborated}**; ` +
+        `contradicted: **${co.counts.contradicted}**; refused as unscannable: **${co.counts.refused}**`,
+    );
+    L.push("");
+    if (co.records.length > 0) {
+      L.push("### Runtime count against source signal, per harness");
+      L.push("");
+      L.push("| harness | runtime assertions | static callsites | helper calls | inline guards | discovered helpers | refused |");
+      L.push("|---|--:|--:|--:|--:|---|---|");
+      for (const r of co.records) {
+        L.push(
+          `| \`${r.harness}\` | ${r.runtimeAssertions} | ${r.staticSignal} | ${r.helperCallsites} | ` +
+            `${r.inlineGuards} | ${r.helpers.length === 0 ? "—" : r.helpers.map((h) => `\`${h}\``).join(", ")} | ` +
+            `${r.refused.length === 0 ? "no" : `**${r.refused.join(", ")}**`} |`,
         );
       }
       L.push("");
