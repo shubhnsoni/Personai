@@ -291,8 +291,8 @@ async function main() {
                     )
                     check(
                         "7. resolving surfaces neither changes nor returns an RBAC permission",
-                        permissionsBefore === permissionsAfter && !returnsPermission && !/"permissions?"\s*:/.test(serializedResults),
-                        `catalogUnchanged=${permissionsBefore === permissionsAfter} returnedPermission=${returnsPermission}`,
+                        PERMISSION_KEYS.length === 18 && permissionsBefore === permissionsAfter && !returnsPermission && !/"permissions?"\s*:/.test(serializedResults),
+                        `catalogUnchanged=${permissionsBefore === permissionsAfter} keys=${PERMISSION_KEYS.length} returnedPermission=${returnsPermission}`,
                     )
 
                     const profilesAfter = await profileBytes(tx, [ids.profileA, ids.profileB])

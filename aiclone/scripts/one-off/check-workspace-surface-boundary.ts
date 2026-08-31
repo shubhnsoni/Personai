@@ -364,11 +364,11 @@ async function main() {
                     )
                     check(
                         "5. install/read keeps PERMISSION_KEYS byte-identical and returns no role or permission field",
-                        permissionsBefore === permissionsAfter &&
+                        PERMISSION_KEYS.length === 18 && permissionsBefore === permissionsAfter &&
                             !permissionValueReturned &&
                             roleResponses.length > 0 &&
                             roleResponses.every(({ response }) => !hasForbiddenResponseField(response.body)),
-                        `catalogSame=${permissionsBefore === permissionsAfter} permissionValueReturned=${permissionValueReturned}`,
+                        `keys=${PERMISSION_KEYS.length} catalogSame=${permissionsBefore === permissionsAfter} permissionValueReturned=${permissionValueReturned}`,
                     )
                     check(
                         "6. businessOs never appears in any installation-derived role response",

@@ -488,8 +488,12 @@ async function main() {
         }
         checkInvertible(
             "replaying every delta reproduces every stored after-balance, and the final one matches the period",
-            mismatch === "" && running === afterParallel,
-            mismatch || `replay=${running} period=${afterParallel}`,
+            // The row-count pin belongs in THIS condition, not only in the sibling
+            // assertion below it. On an empty ledger the loop never runs, so `mismatch`
+            // stays "" and `running` stays 0 - and if the period also read 0 this would
+            // report that replay reproduces every balance without replaying one.
+            ledger.length === 6 && mismatch === "" && running === afterParallel,
+            mismatch || `rows=${ledger.length} replay=${running} period=${afterParallel}`,
         )
         checkInvertible("the ledger has a row per accepted draw and no more", ledger.length === 6, `rows=${ledger.length}`)
 

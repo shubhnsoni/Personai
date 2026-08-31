@@ -238,10 +238,15 @@ async function main() {
         const statusesInIndex = INSPECTION_STATUSES.filter((s) => new RegExp(`'${s}'`).test(indexDef))
         checkInvertible(
             "OPEN_INSPECTION_STATUSES matches the partial unique index the database actually enforces",
-            idxRows.length === 1 &&
+            // The length pin is inside THIS condition on purpose. Without it, an empty
+            // OPEN_INSPECTION_STATUSES satisfies both the equality (0 === 0) and the
+            // .every (vacuously true on an empty receiver), so the assertion would
+            // report that engine and index agree while comparing nothing at all.
+            OPEN_INSPECTION_STATUSES.length === 3 &&
+                idxRows.length === 1 &&
                 statusesInIndex.length === OPEN_INSPECTION_STATUSES.length &&
                 OPEN_INSPECTION_STATUSES.every((s) => statusesInIndex.includes(s)),
-            `index lists [${statusesInIndex.join(",")}] engine lists [${OPEN_INSPECTION_STATUSES.join(",")}]`,
+            `index lists [${statusesInIndex.join(",")}] engine lists [${OPEN_INSPECTION_STATUSES.join(",")}] open=${OPEN_INSPECTION_STATUSES.length}`,
         )
 
         // ---- seed two tenants ----------------------------------------------
