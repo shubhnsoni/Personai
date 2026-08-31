@@ -116,7 +116,17 @@ checkInvertible(
     return capability?.maturity === "available" && capability.evidence !== "none"
   })(),
 )
-checkInvertible("all registry blueprints validate", listBusinessBlueprints().every((blueprint) => validateBusinessBlueprint(blueprint).ok))
+// Counted before it is swept. `[].every(...)` is true, so a registry that failed to load - or
+// one whose loader silently returned nothing - would make "all registry blueprints validate"
+// pass without validating anything. The exact count is pinned so a blueprint appearing or
+// disappearing is a decision someone has to make here rather than a number that drifts.
+const registryBlueprints = listBusinessBlueprints()
+checkInvertible(
+  "the registry actually yields blueprints, so the validation sweep below cannot pass by iterating nothing",
+  registryBlueprints.length === 9,
+  `${registryBlueprints.length} blueprint(s): ${registryBlueprints.map((blueprint) => blueprint.id).join(", ")}`,
+)
+checkInvertible("all registry blueprints validate", registryBlueprints.length > 0 && registryBlueprints.every((blueprint) => validateBusinessBlueprint(blueprint).ok))
 
 // Negative test: an active blueprint may not REQUIRE a capability whose maturity is
 // planned. The descriptor is synthetic by construction so this remains meaningful after
@@ -402,9 +412,19 @@ checkInvertible(
   falseBacklog.length === 0,
   falseBacklog.join("; ") || "none",
 )
+// The exemption list is a claim in both directions: it must not quietly GROW, and it must not
+// quietly go stale either. `exemptedBacklog.every(...)` alone cannot tell those apart from an
+// empty list, because `[].every(...)` is true - so the count is pinned first. One entry today:
+// restaurant-venue-v2 listing commerce:inventory as planned after it became available.
+checkInvertible(
+  "the stale backlog is exactly the one historical entry this harness knows about, so it can neither grow nor go stale unnoticed",
+  exemptedBacklog.length === 1,
+  exemptedBacklog.join("; ") || "none",
+)
 checkInvertible(
   "every stale backlog entry belongs to a deprecated blueprint, and to one this harness already knows about",
-  exemptedBacklog.every((entry) => HISTORICAL_BACKLOG_EXEMPTIONS.some((id) => entry.startsWith(`${id} `))),
+  exemptedBacklog.length > 0 &&
+    exemptedBacklog.every((entry) => HISTORICAL_BACKLOG_EXEMPTIONS.some((id) => entry.startsWith(`${id} `))),
   exemptedBacklog.join("; ") || "none",
 )
 
@@ -442,12 +462,27 @@ checkInvertible(
   (retailActivation?.issues ?? []).length === 0,
   (retailActivation?.issues ?? []).map((i) => i.message).join(" | ").slice(0, 200),
 )
+// Read WITHOUT a `?? []` fallback, deliberately. The fallback that used to sit inline in the
+// assertion below turned an absent blueprint or an absent first engine composition into an empty
+// array, and `[].every(...)` is true - so the harness reported "every capability retail requires
+// is available with an evidence file that exists" while looking at nothing at all. Absent data
+// must fail here instead. The six are catalog, orders, inventory, variants, fulfilment, returns.
+const retailRequired = retail?.engines[0]?.capabilities
+checkInvertible(
+  "retail's required capability list was actually read, and is the expected six",
+  retailRequired !== undefined && retailRequired.length === 6,
+  retailRequired === undefined
+    ? "NO CAPABILITY LIST READ: retail blueprint or its first engine composition is absent"
+    : `${retailRequired.length}: ${retailRequired.join(", ")}`,
+)
 checkInvertible(
   "every capability retail requires is available with an evidence file that exists",
-  (retail?.engines[0]?.capabilities ?? []).every((capabilityId) => {
-    const capability = businessEngineDescriptors.commerce.capabilities.find((c) => c.id === capabilityId)
-    return capability?.maturity === "available" && existsSync(join(APP_ROOT, capability.evidence))
-  }),
+  retailRequired !== undefined &&
+    retailRequired.length > 0 &&
+    retailRequired.every((capabilityId) => {
+      const capability = businessEngineDescriptors.commerce.capabilities.find((c) => c.id === capabilityId)
+      return capability?.maturity === "available" && existsSync(join(APP_ROOT, capability.evidence))
+    }),
 )
 
 // Required by the wave brief: activation must fail when ANY ONE required capability is
@@ -455,9 +490,13 @@ checkInvertible(
 // re-running the real validator, rather than by constructing a fake registry — a fake one
 // would only prove that the fake is wired up. Each downgrade is reverted immediately and
 // the revert is verified at the end, so this test cannot leak state into later assertions.
-const retailRequired = retail?.engines[0]?.capabilities ?? []
+//
+// The `?? []` below narrows for iteration only; an empty loop is not silent, because the
+// "covered all six required retail capabilities in both directions" assertion pins
+// downgradeEvidence at exactly 12 cases.
+const retailRequiredNarrowed = retailRequired ?? []
 const downgradeEvidence: Array<{ capability: string; downgradedTo: string; rejected: boolean; named: boolean }> = []
-for (const capabilityId of retailRequired) {
+for (const capabilityId of retailRequiredNarrowed) {
   const capability = businessEngineDescriptors.commerce.capabilities.find((c) => c.id === capabilityId)
   if (!capability || retail === null) continue
   for (const downgradedTo of ["partial", "planned"] as const) {

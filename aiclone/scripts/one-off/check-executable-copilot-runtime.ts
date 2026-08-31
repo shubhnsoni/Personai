@@ -80,7 +80,14 @@ async function main() {
   const completedAudit = await service.listAudit(tenantA, gated.run.id)
   assert(completedAudit.some((event) => event.eventType === "approval.granted"), "Approval grant did not append an audit event.")
   assert(completedAudit.some((event) => event.eventType === "tool_call.completed"), "Action completion did not append an audit event.")
-  assert(completedAudit.every((event, index) => event.sequence === index + 1), "Audit sequence is not contiguous and monotonic per run.")
+  // The contiguity claim below is an `every`, and `[].every(...)` is true, so without a length
+  // pinned first it would pass on an audit trail the repository never wrote - the exact failure
+  // that assertion exists to catch. 15 is the number of events one gated run appends: workflow
+  // created, the approval gate's state changes, approval requested and granted, the agent, step
+  // and tool-call records, and the completing state changes. A trail that shrinks or grows now
+  // fails here instead of being silently accepted as "contiguous".
+  assert(completedAudit.length === 15, `A gated run appended ${completedAudit.length} audit events, expected 15.`)
+  assert(completedAudit.length > 0 && completedAudit.every((event, index) => event.sequence === index + 1), "Audit sequence is not contiguous and monotonic per run.")
 
   const replayedExecution = await service.execute(tenantA, gatedExecution, protectedAction)
   assert(replayedExecution.replayed, "A completed action retry was not replayed.")
