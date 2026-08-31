@@ -82,6 +82,7 @@ import {
     type OperationsSummary,
     UNCOVERED_DOMAINS,
 } from "../../src/lib/operations/engine"
+import { OperationsApiService } from "../../src/lib/operations/http"
 import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
@@ -128,23 +129,35 @@ const engineCode = engineSrc
     .join("\n")
 
 /**
- * THE GET-ONLY GATE, widened after audit. Shares its reasoning with check-due-work-preview-api.ts.
+ * THE HANDLER-EXPORT GATE, widened after audit and then SPLIT. Shares its reasoning with
+ * check-due-work-preview-api.ts, where the split is argued at length.
  *
  * The previous form was `!/export async function (POST|PATCH|PUT|DELETE)\(/`. That misses two declaration
  * styles this repository already uses for handler exports. Measured over its 156 route.ts files:
  * `export async function VERB` 95 times, `export function VERB` 17 times, `export const VERB` 4 times, for
  * POST/PUT/PATCH/DELETE. So a write verb added in either of the two latter styles passed the gate
- * untouched, and it covered neither HEAD nor OPTIONS. Both styles are house style here, so this was not a
- * theoretical hole.
+ * untouched. Both styles are house style here, so this was not a theoretical hole.
  *
- * The GET side accepts the non-async form for the same reason, and 26 route files here already use it: a
- * gate that fails on a legal refactor gets deleted rather than fixed. Applied to comment-stripped source,
- * because a route file's own comments name the verbs they forbid and this repo has mistaken a prohibition
- * for a violation five times.
+ * THE WIDENING THEN OVERSHOT, and this round corrects it. It folded HEAD and OPTIONS into the same
+ * alternation and named the result `WRITE_VERB_EXPORT`. Under RFC 9110 those two are SAFE methods; a
+ * constant named for write verbs that contains them is a lie in the code, and the assertion built on it
+ * would have gone red on a legal, RFC-compliant HEAD export. Measured: nothing under src/ exports HEAD or
+ * OPTIONS today, so this was latent rather than failing. The two ideas are now two constants:
+ *
+ *   STATE_CHANGING_VERB_EXPORT  POST, PUT, PATCH, DELETE. Their absence IS the no-write guarantee.
+ *   SAFE_METHOD_HANDLER_EXPORT  HEAD, OPTIONS. Their absence guarantees nothing about writes; it is the
+ *                               precondition for next@16.3.3 deriving HEAD from GET and answering OPTIONS
+ *                               itself, which is a fact worth recording and not a prohibition.
+ *
+ * The GET side accepts the non-async form for the same reason as before, and 26 route files here already
+ * use it: a gate that fails on a legal refactor gets deleted rather than fixed. Applied to
+ * comment-stripped source, because a route file's own comments name the verbs they forbid and this repo
+ * has mistaken a prohibition for a violation five times.
  *
  * No `g` flag: a shared /g/ regex keeps `lastIndex` between `.test` calls and answers false on alternate uses.
  */
-const WRITE_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/
+const STATE_CHANGING_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/
+const SAFE_METHOD_HANDLER_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:HEAD|OPTIONS)\b/
 const GET_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+GET\b/
 const routeCode = routeSrc
     .replace(/\/\*[\s\S]*?\*\//g, " ")
@@ -169,9 +182,17 @@ check(
     /today\(request: Request\)/.test(httpSrc) && !/(create|update|delete|patch|post)\s*\(/i.test(httpSrc.replace(/\/\*[\s\S]*?\*\//g, "")),
 )
 check(
-    "the operations route exports GET and no POST, PUT, PATCH, DELETE, HEAD or OPTIONS - in ANY of the three export styles this repo uses",
-    GET_EXPORT.test(routeCode) && !WRITE_VERB_EXPORT.test(routeCode),
-    "GET only, checked against `export [async] function|const VERB`",
+    "the operations route exports GET and no POST, PUT, PATCH or DELETE - in ANY of the three export styles this repo uses",
+    GET_EXPORT.test(routeCode) && !STATE_CHANGING_VERB_EXPORT.test(routeCode),
+    "no state-changing verb, checked against `export [async] function|const VERB`",
+)
+// NOT a prohibition. HEAD and OPTIONS are safe methods and exporting either would be legal; this records
+// the precondition that makes next@16.3.3 derive HEAD from GET and answer OPTIONS itself, which is what
+// the behavioural block below then measures against the real service.
+check(
+    "MEASURED: the operations route exports GET and neither HEAD nor OPTIONS, so the framework derives both - HEAD by invoking this GET handler, OPTIONS as its own 204 with Allow",
+    GET_EXPORT.test(routeCode) && !SAFE_METHOD_HANDLER_EXPORT.test(routeCode),
+    "GET exported; HEAD/OPTIONS left to the framework",
 )
 
 // ---------------------------------------------------------------------------
@@ -904,6 +925,56 @@ async function main() {
                 const a = await service.summary(ids.wsA)
                 identity.current = ids.userB
                 const b = await service.summary(ids.wsB)
+
+                // =============================================================================
+                // THE OPERATIONS SURFACE'S METHOD BEHAVIOUR, MEASURED RATHER THAN ASSUMED.
+                //
+                // The export scan above says the route exports GET and neither HEAD nor OPTIONS. It is
+                // tempting to read that as "this route answers only GET". It does not. next@16.3.3's
+                // auto-implement-methods.js assigns `methods.HEAD = handlers.GET`, so a HEAD request is
+                // served by invoking THIS handler with method "HEAD", and answers OPTIONS itself with 204
+                // and `Allow: GET, HEAD, OPTIONS` without reaching a handler at all.
+                //
+                // WHAT THAT MEANS HERE, AND IT IS NOT THE SAME ANSWER AS FOR DUE-WORK. `OperationsApiService`
+                // has NO method guard: `today` never looks at `request.method`. So:
+                //
+                //   HEAD     is answered exactly as GET, which is what RFC 9110 9.3.2 asks for. The
+                //            response object it returns still carries content; over HTTP the transport
+                //            suppresses a HEAD body, so an HTTP caller sees the correct thing. A direct
+                //            caller of the service object does not, and that difference is real.
+                //   OPTIONS  never reaches `today` over HTTP - the framework answers it. A DIRECT caller
+                //            gets the summary instead of a method directory, because nothing here refuses.
+                //   POST     is refused by the framework with its own bare 405. `today` itself does not
+                //            refuse it: called directly with a POST Request it answers 200 with data. The
+                //            surface's read-only guarantee therefore rests ENTIRELY on the route module's
+                //            exports, which is precisely the weakness due-work-http.ts's own header
+                //            describes and guards against with `requireAllowedMethod`.
+                //
+                // RECORDED, NOT FIXED. src/lib/operations/http.ts is outside this package's owned paths, so
+                // adding the guard there is not this package's change to make. Asserting the measured truth
+                // is: it declares the gap, and it goes red the day someone closes or widens it, instead of
+                // this file continuing to imply a GET-only surface that the framework never delivered.
+                // =============================================================================
+                identity.current = ids.userA
+                const opsApi = new OperationsApiService(service)
+                const opsUrl = `http://ops.test/api/platform/operations?workspaceId=${ids.wsA}`
+                const opsStatus = async (method: string) =>
+                    (await opsApi.today(new Request(opsUrl, { method }))).status
+                const opsGet = await opsStatus("GET")
+                const opsHead = await opsStatus("HEAD")
+                const opsOptions = await opsStatus("OPTIONS")
+                const opsPost = await opsStatus("POST")
+                checkInvertible(
+                    "MEASURED: HEAD on the operations surface is answered exactly as GET - the framework routes it to this handler and nothing here refuses it, which is what RFC 9110 9.3.2 requires",
+                    opsGet === 200 && opsHead === 200,
+                    `GET=${opsGet} HEAD=${opsHead}`,
+                )
+                checkInvertible(
+                    "MEASURED AND DECLARED AS A GAP: `today` has no method guard at all, so called DIRECTLY it answers OPTIONS and even POST with 200 and data. Over HTTP the framework refuses POST and answers OPTIONS itself, so nothing is exposed today - but this surface's read-only guarantee rests only on the route module's exports. src/lib/operations/http.ts is outside this package's owned paths; recorded, not fixed",
+                    opsOptions === 200 && opsPost === 200,
+                    `direct OPTIONS=${opsOptions} direct POST=${opsPost} (framework: OPTIONS=204 with Allow, POST=405 with no Allow)`,
+                )
+                identity.current = ids.userB
 
                 const aIds = a.items.map((i) => i.id)
                 const bIds = b.items.map((i) => i.id)

@@ -91,7 +91,20 @@ const POPULATED_MARK = "Overdue callout at 1 Example Street"
 const MUTANT_LOADING = "MUTANT-WAITING"
 const MUTANT_PLAN_PREFIX = "MUTANT-PLAN-FOR-"
 
-const WRITE_VERBS: readonly string[] = Object.freeze(["POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
+/**
+ * THE FOUR UNSAFE METHODS. Named for what they are, which this constant previously was not.
+ *
+ * It read `["POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]` under the name WRITE_VERBS. Under
+ * RFC 9110 HEAD and OPTIONS are SAFE methods - neither asks for anything to change - so a list named for
+ * write verbs that contained them was wrong in the code, and the assertion that reads it would have
+ * reported a panel issuing a legitimate HEAD as having used a write verb.
+ *
+ * Dropping the two loses no coverage here, and that is checkable rather than asserted: the assertion
+ * immediately above the one that uses this list already pins EVERY recorded call to `method === "GET"`
+ * exactly, which is strictly stronger than "not one of these six". This list's job is the separate one of
+ * checking the claim against a named vocabulary rather than by eye.
+ */
+const STATE_CHANGING_VERBS: readonly string[] = Object.freeze(["POST", "PUT", "PATCH", "DELETE"])
 
 type Deferred<T> = Readonly<{ promise: Promise<T>; resolve(value: T): void; reject(cause: unknown): void }>
 
@@ -1372,8 +1385,8 @@ async function main() {
             `methods: ${[...new Set(panelCalls.map((call) => call.method))].join(",")}`,
         )
         checkInvertible(
-            "MEASURED: no recorded request uses a write verb, checked against the verb list rather than by eye",
-            !panelCalls.some((call) => WRITE_VERBS.includes(call.method.toUpperCase())),
+            "MEASURED: no recorded request uses a state-changing verb, checked against the verb list rather than by eye",
+            !panelCalls.some((call) => STATE_CHANGING_VERBS.includes(call.method.toUpperCase())),
             `${panelCalls.length} call(s)`,
         )
         checkInvertible(

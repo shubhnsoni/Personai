@@ -56,6 +56,24 @@ import { join } from "node:path"
 import { inspect } from "node:util"
 
 import { PrismaClient } from "@prisma/client"
+/**
+ * THE FRAMEWORK'S OWN METHOD DERIVATION, IMPORTED RATHER THAN REPLICATED.
+ *
+ * This is a deep import into next@16.3.3's internals and that is deliberate. The question this harness
+ * has to answer is "what does the framework ACTUALLY do with a HEAD or an OPTIONS request to a route that
+ * exports only GET", and there are three ways to answer it: assume, replicate the algorithm here, or run
+ * the framework's own code. The first is how the defect this round fixes got in - the service refused HEAD
+ * on the stated grounds that "the route module exports no HEAD handler", which is true and does not imply
+ * what it was taken to imply. The second is a copy that can drift from the thing it models, which is the
+ * failure mode this whole repository is built to avoid.
+ *
+ * So the real function is called with a handler map shaped like the real route module's exports, and the
+ * HEAD and OPTIONS behaviour asserted below is produced by next's code and not by this file's opinion of
+ * it. The cost is that a future next upgrade which moves or renames this module breaks the IMPORT. That
+ * is the correct failure: it goes red at the one place that says "re-measure HEAD and OPTIONS", rather
+ * than staying green while describing a framework that no longer behaves that way.
+ */
+import { autoImplementMethods } from "next/dist/server/route-modules/app-route/helpers/auto-implement-methods"
 
 import { failure, success } from "../../src/lib/fieldjobs/http"
 import { DueWorkApiService } from "../../src/lib/operations/due-work-http"
@@ -86,6 +104,23 @@ const INVERT = process.env.INVERT_ASSERTION === "1"
 const RUN = `dwp_${Date.now()}_${Math.floor(Math.random() * 1e6)}`
 const APP_ROOT = join(__dirname, "../..")
 const BASE = "http://duework.test/api/platform/operations/due-work"
+
+/**
+ * THE METHOD SET THIS SURFACE HONOURS, PINNED AS A LITERAL, ON PURPOSE.
+ *
+ * Reading it out of the service's own constant would make the header assertions self-agreeing: the
+ * surface would be asserted to advertise whatever it advertises. So the expected value is written here as
+ * a string, and it is separately asserted to be BYTE-IDENTICAL to the value next@16.3.3's own
+ * auto-implementation generates for this route. Three independent statements have to agree - this
+ * literal, the service, and the framework - and any one of them moving alone goes red.
+ *
+ * The order is the framework's: it builds its own list with `.sort()`, so "GET, HEAD, OPTIONS" is not a
+ * house style choice here but the thing the framework will actually send.
+ */
+const EXPECTED_ALLOW = "GET, HEAD, OPTIONS"
+
+/** Only the part of the framework's derived handler table this harness calls. */
+type DerivedMethods = Readonly<Record<string, (request: Request) => Promise<Response> | Response>>
 
 const results: Array<{ name: string; pass: boolean; detail: string }> = []
 function check(name: string, pass: boolean, detail = "") {
@@ -143,24 +178,43 @@ function refusal(called: Called): string {
 }
 
 /**
- * THE GET-ONLY GATE, widened after audit.
+ * THE HANDLER-EXPORT GATE, widened after audit and then SPLIT after a second one.
  *
  * The first version of this gate asserted `!/export async function (POST|PATCH|PUT|DELETE)\(/`, which is
  * evadable without any cleverness at all: this repository's own src/app/api already declares handler
  * exports three different ways. Measured over its 156 route.ts files: `export async function VERB` 95
  * times, `export function VERB` 17 times and `export const VERB` 4 times, for POST/PUT/PATCH/DELETE. A
  * write verb added to the due-work route in either of the two latter styles - both of them already house
- * style here - would have passed the old gate untouched. HEAD and OPTIONS were not covered at all.
+ * style here - would have passed the old gate untouched.
  *
- * So the ban matches all three declaration styles across six verbs. The GET side accepts the non-async
- * form too, and that is not hypothetical either: 26 route files in this repo write `export function GET`,
- * so the old `export async function GET\(` pattern would have gone red on a legal refactor of this one -
- * and a gate that fails spuriously gets deleted by the next person rather than fixed.
+ * So the ban matches all three declaration styles. The GET side accepts the non-async form too, and that
+ * is not hypothetical either: 26 route files in this repo write `export function GET`, so the old
+ * `export async function GET\(` pattern would have gone red on a legal refactor of this one - and a gate
+ * that fails spuriously gets deleted by the next person rather than fixed.
+ *
+ * THE SPLIT, WHICH IS THE POINT OF THIS ROUND. The widened form put HEAD and OPTIONS in with the four
+ * write verbs and called the whole set `WRITE_VERB_EXPORT`. Under RFC 9110 HEAD and OPTIONS are SAFE
+ * methods - neither is a request to change anything - so a constant named for write verbs that contained
+ * two safe methods was a lie in the code, and the assertion built on it would have rejected a perfectly
+ * legal RFC-compliant HEAD export. Nothing in src/ exports HEAD or OPTIONS today, so it was never
+ * FAILING; it was wrong and latent, and it was propping up a real behavioural defect in the service (see
+ * the HEAD block in the runtime section).
+ *
+ * The two concepts now have two names and two different meanings:
+ *
+ *   STATE_CHANGING_VERB_EXPORT  the four unsafe verbs. Their ABSENCE is the no-write guarantee, and that
+ *                               is the only claim this file may draw from an export scan.
+ *   SAFE_METHOD_HANDLER_EXPORT  HEAD and OPTIONS. Their absence is NOT a guarantee about writes. It is
+ *                               the PRECONDITION for the framework's auto-implementation: exporting GET
+ *                               and not HEAD is exactly what makes next@16.3.3 serve HEAD by invoking
+ *                               GET, and exporting no OPTIONS is what makes it answer OPTIONS itself.
+ *                               So this pattern is read to establish a derivation, not to forbid a verb.
  *
  * Neither pattern carries the `g` flag - a shared /g/ regex keeps `lastIndex` between `.test` calls and
  * would start answering false on alternate uses.
  */
-const WRITE_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/
+const STATE_CHANGING_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/
+const SAFE_METHOD_HANDLER_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:HEAD|OPTIONS)\b/
 const GET_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+GET\b/
 
 /**
@@ -278,9 +332,19 @@ async function main() {
     const allExec = `${httpExec}\n${runtimeExec}\n${routeExec}`
 
     checkInvertible(
-        "the due-work route exports GET and no POST, PUT, PATCH, DELETE, HEAD or OPTIONS - in ANY of the three export styles this repo uses",
-        GET_EXPORT.test(routeExec) && !WRITE_VERB_EXPORT.test(routeExec),
-        "GET only, checked against `export [async] function|const VERB`",
+        "the due-work route exports GET and no POST, PUT, PATCH or DELETE - in ANY of the three export styles this repo uses",
+        GET_EXPORT.test(routeExec) && !STATE_CHANGING_VERB_EXPORT.test(routeExec),
+        "no state-changing verb, checked against `export [async] function|const VERB`",
+    )
+    // NOT a prohibition, and it must not be read as one: HEAD and OPTIONS are safe methods and exporting
+    // either would be legal. This records the PRECONDITION that makes the framework derivation below
+    // apply - GET exported, HEAD and OPTIONS not - so that if someone does export one, the derivation
+    // assertions stop describing this route and go red instead of quietly describing a route that no
+    // longer exists.
+    checkInvertible(
+        "MEASURED: the route exports GET and neither HEAD nor OPTIONS, which is the precondition for next@16.3.3 deriving both of them itself",
+        GET_EXPORT.test(routeExec) && !SAFE_METHOD_HANDLER_EXPORT.test(routeExec),
+        "GET exported; HEAD/OPTIONS left to the framework",
     )
     check("the due-work route is dynamic and runs on node", /force-dynamic/.test(routeExec) && /runtime = "nodejs"/.test(routeExec))
 
@@ -528,7 +592,7 @@ async function main() {
                     api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: "POST" })),
                 )
                 checkInvertible(
-                    "MEASURED: the SERVICE itself refuses a POST Request, so the GET guarantee does not depend on the route module's exports",
+                    "MEASURED: the SERVICE itself refuses a POST Request, so the no-write guarantee does not depend on the route module's exports",
                     posted.status !== 200 && posted.status === 405 && errCode(posted) === "METHOD_NOT_ALLOWED",
                     `GET on this URL=${ok.status}, POST=${posted.status} code=${errCode(posted)}`,
                 )
@@ -546,7 +610,7 @@ async function main() {
                 // alone was already achievable, and neither alone was the fix.
                 checkInvertible(
                     "MEASURED: the 405 carries an Allow header, so the refusal tells the caller what to use instead",
-                    posted.headers.allow === "GET",
+                    posted.headers.allow === EXPECTED_ALLOW,
                     `allow=${JSON.stringify(posted.headers.allow ?? null)} headers=[${Object.keys(posted.headers).sort().join(",")}]`,
                 )
                 // The header must not be able to disagree with the check that produced the refusal. Both
@@ -560,24 +624,161 @@ async function main() {
                         ),
                     `header=${JSON.stringify(posted.headers.allow ?? null)} body=${JSON.stringify((posted.body.error as { details?: { allow?: unknown } } | undefined)?.details?.allow ?? null)}`,
                 )
-                // Allow must name only methods the surface HONOURS. Listing HEAD would be the easy,
-                // plausible error - it is a read verb on a read-only surface - and it would be a lie,
-                // because requireReadMethod refuses it. So the claim is checked against behaviour.
-                const headed = await call(api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: "HEAD" })))
+                // =============================================================================
+                // THE FOUR METHOD CLASSES, EACH MEASURED THROUGH THE FRAMEWORK AND THE SERVICE.
+                //
+                // WHAT WAS HERE BEFORE, AND WHY IT WAS WRONG. One assertion, reading:
+                //   "every method named in Allow is actually accepted, and HEAD - which is refused - is
+                //    NOT named", headed.status === 405 && !/HEAD/i.test(allow) && ok.status === 200
+                // It passed. It was also asserting an RFC violation into place. RFC 9110 section 9.1:
+                // "all general-purpose servers MUST support the methods GET and HEAD", and section 9.3.2
+                // makes HEAD "identical to GET except that the server MUST NOT send content". This surface
+                // answered 200 to GET and 405 to HEAD on the same URL, and the harness held that steady.
+                //
+                // It was also in direct contradiction with the framework, which is the part that made it a
+                // defect rather than a preference. Measured from next@16.3.3's own
+                // auto-implement-methods.js, for a route exporting GET and neither HEAD nor OPTIONS:
+                //   * `methods.HEAD = handlers.GET` - HEAD is served BY THIS SERVICE, with method "HEAD".
+                //     The framework never refused it; the service did, so a caller was told "405, use GET"
+                //     about a method the framework had already routed to a working handler.
+                //   * OPTIONS is answered 204 with `Allow: GET, HEAD, OPTIONS` WITHOUT reaching a handler.
+                //     So the resource advertised three methods over HTTP while this service advertised one
+                //     and refused two of them. Two live, contradictory answers to "what may I send?".
+                // The departure was not documented as a departure either - the service's comment argued
+                // HEAD was absent BECAUSE the guard refused it, which is circular.
+                //
+                // So: HEAD and OPTIONS are honoured, POST/PUT/PATCH/DELETE are refused, and each class is
+                // measured on BOTH paths - through the framework's real derivation and against the service
+                // directly - because the whole reason this file exists is that the two can disagree.
+                // =============================================================================
+                const routeExports = { GET: (req: Request) => api.preview(req) }
+                const derived = autoImplementMethods(
+                    routeExports as unknown as Parameters<typeof autoImplementMethods>[0],
+                ) as unknown as DerivedMethods
+
+                // ---- GET -----------------------------------------------------------------
+                // Through the framework as well as directly, so "the framework routes GET to this service"
+                // is measured rather than assumed - it is the premise every HEAD assertion below rests on.
+                const frameworkGet = await call(Promise.resolve(derived.GET(get(`${BASE}?workspaceId=${ids.wsA}`))))
+                // Identical APART FROM THE CLOCK, which is the strongest true statement available: `asOf`
+                // is a fresh reading per request, so two responses minutes or milliseconds apart must
+                // differ there and comparing raw bytes would assert a falsehood. Everything else - the
+                // envelope, the items, their order, the coverage, the limitations - is compared byte for
+                // byte with the clock reading masked, and the mask is anchored to the field name so it
+                // cannot quietly swallow anything else.
+                const withoutClock = (raw: string) => raw.replace(/"asOf":"[^"]*"/g, '"asOf":"<clock>"')
                 checkInvertible(
-                    "MEASURED: every method named in Allow is actually accepted, and HEAD - which is refused - is NOT named",
-                    headed.status === 405 && !/HEAD/i.test(posted.headers.allow ?? "") && ok.status === 200,
-                    `HEAD=${headed.status}, allow=${JSON.stringify(posted.headers.allow ?? null)}, GET=${ok.status}`,
+                    "MEASURED: GET is 200 through the framework's derived handler table and through the service directly, and the two bodies agree byte for byte once the per-request clock reading is masked",
+                    frameworkGet.status === 200 &&
+                        ok.status === 200 &&
+                        withoutClock(frameworkGet.raw) === withoutClock(ok.raw) &&
+                        withoutClock(ok.raw) !== ok.raw,
+                    `framework=${frameworkGet.status} direct=${ok.status} identical-modulo-clock=${String(withoutClock(frameworkGet.raw) === withoutClock(ok.raw))}`,
                 )
-                // A 405 is the ONLY status that gets the header. If `failure` had been changed to attach it
-                // generally, or the surface had grown a habit of passing headers, every refusal would start
-                // advertising an unrelated method set - so the absence is asserted on a 200 and on a 400.
                 checkInvertible(
-                    "MEASURED: no Allow header leaks onto responses that are not method refusals",
-                    ok.headers.allow === undefined,
+                    "MEASURED: no Allow header leaks onto a 200 - Allow belongs to a method refusal and to OPTIONS, and nowhere else",
+                    ok.headers.allow === undefined && frameworkGet.headers.allow === undefined,
                     `200 headers=[${Object.keys(ok.headers).sort().join(",")}]`,
                 )
-                // A write verb must be refused before any parameter is read, or a POST with no
+                const noWorkspaceGet = await call(api.preview(get(BASE)))
+                checkInvertible(
+                    "MEASURED: no Allow header leaks onto a 400 either, so `failure` did not start attaching it generally",
+                    noWorkspaceGet.status === 400 && noWorkspaceGet.headers.allow === undefined,
+                    `400 status=${noWorkspaceGet.status} headers=[${Object.keys(noWorkspaceGet.headers).sort().join(",")}]`,
+                )
+
+                // ---- HEAD ----------------------------------------------------------------
+                // The framework's HEAD is not a handler of its own: it IS the GET entry, by assignment.
+                // Asserted by reference identity, because that is the fact that makes the service - not the
+                // framework - responsible for what a HEAD request gets back.
+                checkInvertible(
+                    "MEASURED: next@16.3.3 serves HEAD by invoking the GET handler itself - the derived HEAD entry is the SAME function object as GET, so a HEAD request reaches this service with method HEAD",
+                    derived.HEAD === derived.GET && derived.GET === routeExports.GET,
+                    `HEAD===GET: ${String(derived.HEAD === derived.GET)}; GET is the exported handler: ${String(derived.GET === routeExports.GET)}`,
+                )
+                const headed = await call(api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: "HEAD" })))
+                const frameworkHead = await call(
+                    Promise.resolve(derived.HEAD(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: "HEAD" }))),
+                )
+                checkInvertible(
+                    "MEASURED: HEAD is 200 with NO CONTENT - RFC 9110 9.3.2 - and it is 200 on both paths, so the framework and the service no longer disagree about whether this resource has a HEAD",
+                    headed.status === 200 && frameworkHead.status === 200 && headed.raw === "" && frameworkHead.raw === "",
+                    `direct=${headed.status} raw=${JSON.stringify(headed.raw)}; framework=${frameworkHead.status} raw=${JSON.stringify(frameworkHead.raw)}`,
+                )
+                checkInvertible(
+                    "MEASURED: HEAD sends the same headers GET would have sent, and a Content-Length equal to the BYTE length of the content GET returned - so a HEAD caller learns the size without fetching it",
+                    headed.headers["content-type"] === ok.headers["content-type"] &&
+                        headed.headers["content-length"] === String(new TextEncoder().encode(ok.raw).length) &&
+                        new TextEncoder().encode(ok.raw).length > 0,
+                    `HEAD content-length=${JSON.stringify(headed.headers["content-length"] ?? null)} GET bytes=${new TextEncoder().encode(ok.raw).length} content-type match=${String(headed.headers["content-type"] === ok.headers["content-type"])}`,
+                )
+                // HEAD RUNS THE WHOLE GET PATH INCLUDING AUTHORIZATION, which is the half of RFC 9110
+                // 9.3.2 that a "HEAD is cheap, skip the work" shortcut would break. A HEAD that
+                // short-circuited before `operations.summary` would answer 200 to an unauthenticated
+                // caller and turn this surface into a membership oracle, so the refusal statuses are
+                // asserted, not just the success one. No authorization POLICY is changed here - these are
+                // the same 401 and 403 GET has always produced, now proven to apply to HEAD as well.
+                identity.current = null
+                const anonHead = await call(
+                    api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: "HEAD" })),
+                )
+                identity.current = ids.userB
+                const foreignHead = await call(
+                    api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: "HEAD" })),
+                )
+                identity.current = ids.userA
+                checkInvertible(
+                    "MEASURED: HEAD is authorized exactly as GET is - signed out is 401 and a non-member is 403, both with no content - so supporting HEAD did not open an unauthenticated read",
+                    anonHead.status === 401 &&
+                        anonHead.status === anon.status &&
+                        foreignHead.status === 403 &&
+                        anonHead.raw === "" &&
+                        foreignHead.raw === "",
+                    `anon HEAD=${anonHead.status} (anon GET=${anon.status}), foreign HEAD=${foreignHead.status}, bodies empty=${String(anonHead.raw === "" && foreignHead.raw === "")}`,
+                )
+
+                // ---- OPTIONS -------------------------------------------------------------
+                // The framework answers this one without reaching a handler, so the service's answer only
+                // matters to a direct caller of the singleton - and it is exactly the framework's answer,
+                // which is what makes the two paths agree instead of merely coexisting.
+                const frameworkOptions = await call(
+                    Promise.resolve(derived.OPTIONS(new Request(BASE, { method: "OPTIONS" }))),
+                )
+                const optioned = await call(api.preview(new Request(BASE, { method: "OPTIONS" })))
+                checkInvertible(
+                    "MEASURED: OPTIONS is 204 with Allow and no content, and the SERVICE's answer is byte-identical to the one next@16.3.3 generates for this route - status and header both",
+                    frameworkOptions.status === 204 &&
+                        optioned.status === frameworkOptions.status &&
+                        optioned.headers.allow === frameworkOptions.headers.allow &&
+                        optioned.raw === "" &&
+                        frameworkOptions.raw === "",
+                    `framework=${frameworkOptions.status} allow=${JSON.stringify(frameworkOptions.headers.allow ?? null)}; service=${optioned.status} allow=${JSON.stringify(optioned.headers.allow ?? null)}`,
+                )
+                checkInvertible(
+                    "MEASURED: that agreed Allow value is the pinned literal, so all three statements - this harness, the service and the framework - name the same method set rather than agreeing with each other about an arbitrary one",
+                    frameworkOptions.headers.allow === EXPECTED_ALLOW &&
+                        optioned.headers.allow === EXPECTED_ALLOW &&
+                        posted.headers.allow === EXPECTED_ALLOW,
+                    `expected=${EXPECTED_ALLOW}; framework OPTIONS=${JSON.stringify(frameworkOptions.headers.allow ?? null)}; service OPTIONS=${JSON.stringify(optioned.headers.allow ?? null)}; 405=${JSON.stringify(posted.headers.allow ?? null)}`,
+                )
+                // EVERY METHOD NAMED IN Allow IS ACTUALLY ACCEPTED. This is the assertion the old HEAD
+                // check was trying to be, and it now has three methods to check instead of one - which is
+                // the only reason the old version could pass while advertising a set of size one.
+                const advertised = EXPECTED_ALLOW.split(", ")
+                const advertisedStatuses: Array<{ method: string; status: number }> = []
+                for (const method of advertised) {
+                    const answered = await call(api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method })))
+                    advertisedStatuses.push({ method, status: answered.status })
+                }
+                checkInvertible(
+                    "MEASURED: every one of the three methods Allow names is actually honoured - none of them answers 405 - so the header is not advertising something this surface refuses",
+                    advertisedStatuses.length === 3 &&
+                        advertisedStatuses.every((entry) => entry.status !== 405 && entry.status < 300),
+                    advertisedStatuses.map((entry) => `${entry.method}=${entry.status}`).join(" "),
+                )
+
+                // ---- a real write verb ---------------------------------------------------
+                // A state-changing verb must be refused before any parameter is read, or a POST with no
                 // workspaceId is reported as a missing parameter and the method problem is never named.
                 const postedBare = await call(api.preview(new Request(BASE, { method: "POST" })))
                 checkInvertible(
@@ -589,11 +790,30 @@ async function main() {
                 for (const verb of ["PUT", "PATCH", "DELETE"] as const) {
                     const other = await call(api.preview(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: verb })))
                     checkInvertible(
-                        `MEASURED: the service refuses ${verb} too, so the guarantee is about "not GET" rather than about POST alone`,
-                        other.status === 405 && errCode(other) === "METHOD_NOT_ALLOWED" && other.headers.allow === "GET",
+                        `MEASURED: the service refuses ${verb} too, so the guarantee is about the UNSAFE methods rather than about POST alone`,
+                        other.status === 405 &&
+                            errCode(other) === "METHOD_NOT_ALLOWED" &&
+                            other.headers.allow === EXPECTED_ALLOW,
                         `status=${other.status} code=${errCode(other)} allow=${JSON.stringify(other.headers.allow ?? null)}`,
                     )
                 }
+                // THE FRAMEWORK'S REFUSAL IS WEAKER THAN THE SERVICE'S, and that asymmetry is measured
+                // rather than glossed. next's own 405 for an unimplemented method is `new Response(null,
+                // { status: 405 })` with NO Allow header at all, so a POST that never reaches a handler is
+                // told less than one that does. It is the framework's behaviour and not this route's
+                // policy - there is nothing to fix here - but it IS the reason the service-level guard
+                // earns its place: it is the only path on which a refused caller is told what to send.
+                const frameworkPost = await call(
+                    Promise.resolve(derived.POST(new Request(`${BASE}?workspaceId=${ids.wsA}`, { method: "POST" }))),
+                )
+                checkInvertible(
+                    "MEASURED: the framework refuses POST itself with a bare 405 carrying no Allow, while the service's own 405 carries the full set - so the service-level guard is what makes a refusal actionable",
+                    frameworkPost.status === 405 &&
+                        frameworkPost.headers.allow === undefined &&
+                        posted.status === 405 &&
+                        posted.headers.allow === EXPECTED_ALLOW,
+                    `framework POST=${frameworkPost.status} allow=${JSON.stringify(frameworkPost.headers.allow ?? null)}; service POST=${posted.status} allow=${JSON.stringify(posted.headers.allow ?? null)}`,
+                )
                 const data = (ok.body.data ?? {}) as Record<string, unknown>
                 const items = (data.items ?? []) as Array<Record<string, unknown>>
 
