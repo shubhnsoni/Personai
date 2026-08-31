@@ -11,8 +11,24 @@ import { listBusinessBlueprints, listBusinessEngines } from "../../src/lib/busin
 const report: Record<string, unknown> = {}
 const failures: string[] = []
 
+/**
+ * ASSERTION EVIDENCE. Counted inside the real helper, so the number the gate reads is
+ * produced by the same call that decides the verdict. These count assertion CALLS - each
+ * loop iteration over a blueprint or engine that calls check is one - never the rendered
+ * byte length (populatedBytes) nor the number of blueprints/engines rendered. Not a literal:
+ * neuter the helper and the count collapses; fail one assertion and `assertionsPassed` drops
+ * below `assertionsRun` while `failures` sets a non-zero exit.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function check(name: string, condition: unknown, detail?: string) {
-    if (!condition) failures.push(detail ? `${name}: ${detail}` : name)
+    assertionsRun += 1
+    if (!condition) {
+        failures.push(detail ? `${name}: ${detail}` : name)
+        return
+    }
+    assertionsPassed += 1
 }
 
 const blueprints = listBusinessBlueprints()
@@ -98,6 +114,16 @@ report.rendered = {
 }
 report.result = failures.length === 0 ? "PASS" : "FAIL"
 report.failures = failures
+report.assertionsRun = assertionsRun
+report.assertionsPassed = assertionsPassed
 
 console.log(JSON.stringify(report, null, 2))
+
+// Machine-readable assertion evidence for scripts/gates/run-gates.js. Both numbers come
+// from the counters incremented inside check() above, so they cannot claim more than
+// actually ran. The GATE-EVIDENCE line must be the WHOLE line and name this file exactly,
+// or the driver reports EVIDENCE_IDENTITY_MISMATCH.
+console.log(`GATE-EVIDENCE harness=check-business-os-render.ts assertions=${assertionsPassed}`)
+console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+
 if (failures.length > 0) process.exitCode = 1

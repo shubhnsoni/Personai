@@ -31,7 +31,20 @@ type MiddlewareHandler = (request: MiddlewareRequest) => Promise<Response | unde
 const results: Recorded[] = []
 const invert = process.env.INVERT_ASSERTION === "1"
 
+/**
+ * ASSERTION EVIDENCE. Counted inside the real recorder - the same push that decides the
+ * PASS/FAIL verdict - so the number cannot drift from the checks. These count the assertion
+ * CALLS (the HTTP-boundary checks), never the number of requests issued: several checks
+ * assert over a single response, and the matcher/port checks issue no request at all. Not a
+ * literal: neuter the recorder and the count collapses to zero; fail one check and
+ * `assertionsPassed` drops below `assertionsRun` while `failures` sets a non-zero exit.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function check(name: string, condition: boolean): void {
+  assertionsRun += 1
+  if (condition) assertionsPassed += 1
   results.push({ name, passed: condition })
 }
 
@@ -239,8 +252,18 @@ async function main(): Promise<void> {
     result: failures.length === 0 ? "PASS" : "FAIL",
     inversion: invert,
     portCleared: true,
+    assertionsRun,
+    assertionsPassed,
     failures,
   }, null, 2))
+
+  // Machine-readable assertion evidence for scripts/gates/run-gates.js. Both numbers come
+  // from the counters incremented inside check() above, so they cannot claim more than
+  // actually ran. The GATE-EVIDENCE line must be the WHOLE line and name this file exactly,
+  // or the driver reports EVIDENCE_IDENTITY_MISMATCH.
+  console.log(`GATE-EVIDENCE harness=check-auth-http-regressions.ts assertions=${assertionsPassed}`)
+  console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+
   if (failures.length > 0) process.exitCode = 1
 }
 
