@@ -1706,3 +1706,33 @@ findings PKG-N was meant to take are unchanged and still first in line:
 stale run directory the driver does not scan, where a harness printed a truncated test DSN inside its
 own `PASS` label. Current artefacts are clean, but a harness printing a bare `user:pass@host:5432/db`
 fragment in an assertion label will now be flagged.
+
+
+## Accepted - S-wave phase S0: the auxiliary vertical packs
+
+| Item | Outcome | Commits | Merge |
+|---|---|---|---|
+| Auxiliary vertical-pack candidates + harness | **ACCEPTED** (cherry-picked, not merged from the parked branch) | `f29c985` (= aux `4d6dcd5`) | `48f3605` |
+| Harness adapted to the assertion-evidence contract, registered in the manifest, home-services alias constraint made executable | **ACCEPTED** (root) | `b10a017` | `48f3605` |
+
+Measured in the primary tree **and** an isolated clean worktree at the same SHA: 76 on disk, 76 in
+manifest, 75 runnable, **75 executed / 75 passed / 0 failed**, 1 declared skip, 0 integrity findings.
+Assertion evidence ENFORCED 62/75, 4086 assertions, 0 unevidenced, allowlist unchanged at 13.
+Self-test 57/57. TypeScript 0. Targeted ESLint 0. Repository lint 38 (unchanged). `npm audit --omit=dev`
+0. Prisma validate/generate 0 with no schema diff. Production build compiled.
+
+**Registered/active blueprints added: NONE.** All six vertical packs are unregistered, non-visible
+candidates. `registered: false` is a pinned literal, nothing imports the package except its own
+harness, and the harness asserts `blueprints.ts` does not reference it.
+
+### Queue delta
+
+- **Item 1 (corroborate assertion counts) is now sharper, not closed.** S0 produced the cleanest
+  demonstration yet: neutering the harness's assertion helper collapsed its count from 447 to 14 and
+  **still exited 0**. The count stayed honest; nothing noticed 433 assertions had stopped running.
+- **New, from the S0 environment work:** any isolated verification worktree needs `aiclone/.env` as a
+  *file* - `check-auth-http-regressions.ts` opens it directly, so exporting `DATABASE_URL` is not
+  enough. And a 503 `DEPENDENCY_UNAVAILABLE` in this suite is usually connection exhaustion from
+  back-to-back sweeps, not a defect; re-run before investigating.
+- **Do not remove a worktree whose `node_modules` is a junction**, and prefer a real `npm ci` per
+  worktree - S0 used an independent install and verified `IsReparsePoint=False`.

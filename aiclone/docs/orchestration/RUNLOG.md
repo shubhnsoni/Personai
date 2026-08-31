@@ -4701,3 +4701,82 @@ printed a truncated test DSN inside its own `PASS` label. The current run's 76 a
 the driver reports 0 critical, 0 shape, 0 fatal. But a harness that prints a bare
 `user:pass@host:5432/db` fragment in an assertion label will now be flagged, and that is the shape to
 watch.
+
+
+
+# S-wave phase S0 - six candidate verticals in source, nothing registered, and one prose warning made executable
+
+`81c9806` → `48f3605`. The parked auxiliary commit `4d6dcd5` was cherry-picked into a fresh worktree
+built from exactly `81c9806` with an **independent `npm ci`** - `node_modules` verified as a real
+directory rather than a junction. The auxiliary branch was never rewritten and still points at
+`4d6dcd5`. No worktree was removed at any point.
+
+Result in both the primary tree and an isolated clean worktree at the same SHA: **76 harnesses on
+disk, 76 in the manifest, 75 runnable, 75 executed, 75 passed, 0 failed, 1 declared skip, 0 integrity
+findings**, credential scan clean over 78 artefacts, self-test 57/57, TypeScript 0, targeted ESLint 0,
+repository lint unchanged at 38, `npm audit --omit=dev` 0, Prisma validate/generate 0 with no schema
+diff, production build compiled. The isolated run reported `worktreeClean: true, dirtyPathCount: 0`.
+
+### The harness had to earn its place
+
+It counted nothing: `check()` only accumulated failures, so it printed a JSON report with no
+assertion count at all. Counting now happens **inside the real helper**, so the number the gate reads
+is produced by the same call that decides the verdict, and no total is a literal anywhere - a
+hard-coded count would keep printing a healthy number after someone deleted half the assertions,
+which is precisely the failure the evidence contract exists to catch. It emits an identity-bearing
+`GATE-EVIDENCE harness=check-vertical-pack-candidates.ts assertions=<n>` plus a human-readable ratio
+line, both from the same counters.
+
+Four mutations, and the fourth is the one to read:
+
+- normal 451/451 exit 0; `INVERT_ASSERTION=1` → **14/451 exit 1**, so the count *falls* and therefore
+  tracks real conditions; restored 451/451 exit 0.
+- falsifying one expected candidate id → 445/447 exit 1: a failing assertion lowers the count *and*
+  fails the run.
+- neutering the assertion helper → the count collapses from **447 to 14** and **still exits 0**. The
+  count stayed honest, but nothing noticed that 433 assertions had stopped running.
+
+That last measurement is the corroboration gap stated in one line, and it is what S1-A targets.
+
+### Registered, not allowlisted
+
+One manifest entry in alphabetical position; `expected.harnessesOnDisk` 75 → 76 and
+`expected.executedChecks` 74 → 75, with `declaredSkips` unchanged at 1. It is deliberately **not** on
+the evidence allowlist, which stays at exactly 13. The self-test guard that pins production inventory
+moved with it - runnable 74 → 75, enforced 61 → 62 - because a guard left un-updated is worse than no
+guard.
+
+### home-services: a prose warning became a checked invariant
+
+`home-services-v1` composes the **identical** engine and capability fingerprint as the active
+`field-service-v1`: `commerce:inventory:optional | fieldJobs:dispatch+inspection+intake:required`.
+The candidate's own notes already said so, and said something sharper - its vertical string
+`home-services` does not collide with the registered `field-service`, so the
+one-active-blueprint-per-vertical rule *would not block registration*, "which is why the overlap needs
+stating in prose rather than being left to a uniqueness check that would pass."
+
+Prose does not survive a refactor. While the fingerprints are identical, `home-services-v1` must now
+stay unregistered **and** name `field-service-v1` as its fold/alias target, or the harness fails.
+The constraint is conditional on the overlap, so genuine differentiation later satisfies it vacuously
+instead of being blocked. Proven: pretending it is registered → 449/451 exit 1; breaking the fold-note
+requirement → 450/451 exit 1; restored → 451/451 exit 0.
+
+**All six packs remain unregistered, non-visible candidates** - measured, not assumed. Nothing under
+`src/` or `scripts/` imports the package except its own harness, the harness asserts `blueprints.ts`
+does not reference it and the business-os barrel does not re-export it, and `registered: false` is a
+pinned literal so claiming registration is a compile error. They are not live products, not persisted
+installations, and not available onboarding choices.
+
+### Two environmental findings worth inheriting
+
+A fresh worktree has no `aiclone/.env`, and supplying `DATABASE_URL` through the environment is **not
+sufficient**: `check-auth-http-regressions.ts` opens `aiclone/.env` as a *file* and died with ENOENT,
+failing the first S0 sweep at 74/75. Any isolated verification worktree needs the file present. It was
+supplied as a hard link - not a junction - and it is gitignored, so the tree stays clean.
+
+The first primary sweep after the merge then failed a *different* harness,
+`check-operations-routes.ts`, with five `status=503 code=DEPENDENCY_UNAVAILABLE` assertions: database
+connection exhaustion from two 75-harness sweeps back to back. Re-running that harness alone gave
+26/26 exit 0 and the full re-run was clean, so it was transient. Its residue assertion passed
+throughout, so nothing was left in the database. Worth knowing before reading a 503 here as a code
+failure.
