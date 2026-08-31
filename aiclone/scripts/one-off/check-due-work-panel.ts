@@ -91,7 +91,20 @@ const POPULATED_MARK = "Overdue callout at 1 Example Street"
 const MUTANT_LOADING = "MUTANT-WAITING"
 const MUTANT_PLAN_PREFIX = "MUTANT-PLAN-FOR-"
 
-const WRITE_VERBS: readonly string[] = Object.freeze(["POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
+/**
+ * THE FOUR UNSAFE METHODS. Named for what they are, which this constant previously was not.
+ *
+ * It read `["POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]` under the name WRITE_VERBS. Under
+ * RFC 9110 HEAD and OPTIONS are SAFE methods - neither asks for anything to change - so a list named for
+ * write verbs that contained them was wrong in the code, and the assertion that reads it would have
+ * reported a panel issuing a legitimate HEAD as having used a write verb.
+ *
+ * Dropping the two loses no coverage here, and that is checkable rather than asserted: the assertion
+ * immediately above the one that uses this list already pins EVERY recorded call to `method === "GET"`
+ * exactly, which is strictly stronger than "not one of these six". This list's job is the separate one of
+ * checking the claim against a named vocabulary rather than by eye.
+ */
+const STATE_CHANGING_VERBS: readonly string[] = Object.freeze(["POST", "PUT", "PATCH", "DELETE"])
 
 type Deferred<T> = Readonly<{ promise: Promise<T>; resolve(value: T): void; reject(cause: unknown): void }>
 
@@ -1126,9 +1139,16 @@ async function main() {
                 Object.values(DOES_NOT_COVER).every((reason) => emptyText.includes(reason)) &&
                 emptyText.includes(domainLabel("fieldJobs")),
         )
+        // THE COUNT IS PART OF THE CLAIM. `[].every(...)` is true, so without the length pin this passes
+        // when the limitation list is empty - and an empty list is exactly the failure this assertion
+        // exists to catch, because "the empty state renders every limitation" and "the empty state renders
+        // nothing" would then be the same green. DUE_WORK_PREVIEW_LIMITATIONS is imported, so its emptiness
+        // is decided in another module and nothing this run observes would notice. Five is the count
+        // due-work-preview-types.ts declares.
         checkInvertible(
-            "MEASURED: an empty plan still renders every limitation from the response body",
-            DUE_WORK_PREVIEW_LIMITATIONS.every((limitation) => emptyText.includes(limitation)),
+            "MEASURED: an empty plan still renders every one of the FIVE limitations from the response body",
+            DUE_WORK_PREVIEW_LIMITATIONS.length === 5 &&
+                DUE_WORK_PREVIEW_LIMITATIONS.every((limitation) => emptyText.includes(limitation)),
         )
         checkInvertible(
             "an empty plan still names the clock reading it was computed against",
@@ -1372,8 +1392,8 @@ async function main() {
             `methods: ${[...new Set(panelCalls.map((call) => call.method))].join(",")}`,
         )
         checkInvertible(
-            "MEASURED: no recorded request uses a write verb, checked against the verb list rather than by eye",
-            !panelCalls.some((call) => WRITE_VERBS.includes(call.method.toUpperCase())),
+            "MEASURED: no recorded request uses a state-changing verb, checked against the verb list rather than by eye",
+            !panelCalls.some((call) => STATE_CHANGING_VERBS.includes(call.method.toUpperCase())),
             `${panelCalls.length} call(s)`,
         )
         checkInvertible(

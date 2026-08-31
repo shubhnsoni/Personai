@@ -7,15 +7,24 @@
  * execution, and a wording rule. Those promises are asserted against THIS file by name, and a reviewer
  * asking "what is allowed to happen when a preview is requested?" should have one small file to read.
  *
- * There is exactly ONE method and it is a GET, and that is structural rather than a policy. A POST here
+ * There is exactly ONE handler and it is a read, and that is structural rather than a policy. A POST here
  * would be the first step from "preview" to "trigger": the handler would exist, and the next change
- * would give it something to do. So no write verb is exported, and the harness asserts the absence.
+ * would give it something to do. So no STATE-CHANGING verb is exported, and the harness asserts the absence.
+ *
+ * "NO STATE-CHANGING VERB" IS NOT THE SAME CLAIM AS "GET ONLY", AND THIS FILE USED TO CONFLATE THEM.
+ * RFC 9110 sorts methods into SAFE and unsafe, and GET, HEAD and OPTIONS are all safe: none of them is a
+ * request to change anything. The four that are unsafe here - POST, PUT, PATCH, DELETE - are the ones
+ * whose absence carries the guarantee. HEAD and OPTIONS carry no such meaning, and treating them as
+ * write verbs cost this surface its RFC compliance for a whole round: HEAD was refused with 405 while
+ * GET answered 200 on the same URL, which RFC 9110 section 9.1 forbids outright ("all general-purpose
+ * servers MUST support the methods GET and HEAD"), and the `Allow` header advertised a method set the
+ * FRAMEWORK did not agree with. See THE METHOD POLICY below for the measurement that settled it.
  *
  * THAT ARGUMENT IS ABOUT THE ROUTE MODULE, AND THE ROUTE MODULE IS NOT THE ONLY CALLER. `dueWorkApi` is an
  * exported singleton; anything that imports it can call `.preview` from a handler of any verb, and the
  * paragraph above would still be a true statement about the route file while the guarantee had gone. So
- * `preview` also refuses a non-GET request itself, with 405 and an `Allow` header - see
- * `requireReadMethod` below.
+ * `preview` also refuses a state-changing request itself, with 405 and an `Allow` header - see
+ * `requireAllowedMethod` below.
  *
  * This file COMPOSES and does not decide. Authorization, the horizon bounds and the clock all belong to
  * `OperationsService.summary`; the ordering and its explanations all belong to `planDueWork`; the
@@ -47,31 +56,56 @@ function optIntParam(request: Request, name: string): number | null {
 }
 
 /**
- * THE PERMITTED METHOD SET, in ONE place, because the refusal and the `Allow` header must not drift.
+ * THE METHOD POLICY, IN ONE PLACE, BECAUSE THE REFUSAL, THE `Allow` HEADER AND THE FRAMEWORK MUST AGREE.
  *
  * On a 405, `Allow` is not decoration - it is the half of the answer that tells the caller what to do
  * instead. Written as its own separate string literal it could come to disagree with the check that
  * produced the refusal, and a header naming a method the surface actually refuses is worse than no
  * header: it sends the caller to a second failure. So the check below and the header both read this.
  *
- * It is exactly GET, and HEAD is deliberately absent even though HEAD would be defensible on a
- * read-only surface. The route module exports no HEAD handler and `requireReadMethod` refuses it, so
- * listing it here would be a claim this surface does not honour.
+ * WHAT WAS HERE BEFORE, AND WHY IT WAS WRONG. This was `["GET"]`, with a comment arguing that HEAD was
+ * "deliberately absent" because "the route module exports no HEAD handler and the guard refuses it, so
+ * listing it here would be a claim this surface does not honour". That argument is circular - HEAD was
+ * not allowed because we refused it - and its premise is false. MEASURED against the installed
+ * framework's own source, next@16.3.3
+ * `next/dist/server/route-modules/app-route/helpers/auto-implement-methods.js`:
+ *
+ *   HEAD     when a route exports GET and not HEAD, the framework assigns `methods.HEAD = handlers.GET`.
+ *            The GET handler IS invoked, with `request.method === "HEAD"`, so the request reaches THIS
+ *            file and this list decides the answer. The framework does not refuse it; we did.
+ *   OPTIONS  when a route exports no OPTIONS, the framework answers 204 with
+ *            `Allow: [...'OPTIONS', ...implemented, +HEAD if GET].sort().join(", ")`, which for this
+ *            route is exactly `GET, HEAD, OPTIONS`.
+ *
+ * So the resource already advertised three methods over HTTP while this file advertised one and refused
+ * two of them. Both statements were live at once and they contradicted each other. That is fixed by
+ * honouring the safe methods rather than by narrowing the advertisement: RFC 9110 section 9.1 requires
+ * GET and HEAD of any general-purpose server, so narrowing was never available.
+ *
+ * SORTED, NOT MERELY JOINED. The framework builds its list with `.sort()`, and the harness asserts this
+ * string is BYTE-IDENTICAL to the one the framework generates for this route. Sorting here means that
+ * agreement cannot be broken by someone reordering the array below.
  */
-const ALLOWED_METHODS: readonly string[] = Object.freeze(["GET"])
-const ALLOW_HEADER_VALUE = ALLOWED_METHODS.join(", ")
+const PLAN_READ_METHODS: readonly string[] = Object.freeze(["GET", "HEAD"])
+const ALLOWED_METHODS: readonly string[] = Object.freeze([...PLAN_READ_METHODS, "OPTIONS"])
+const ALLOW_HEADER_VALUE = [...ALLOWED_METHODS].sort().join(", ")
 const METHOD_REFUSAL_HEADERS: Readonly<Record<string, string>> = Object.freeze({ Allow: ALLOW_HEADER_VALUE })
 
 /**
- * THE READ-ONLY GUARANTEE, ENFORCED HERE AND NOT ONLY IN THE ROUTE FILE.
+ * THE NO-WRITE GUARANTEE, ENFORCED HERE AND NOT ONLY IN THE ROUTE FILE.
  *
  * The header above argues that this surface cannot be written to because the route module exports no
- * write verb. That argument is true of ONE file. `dueWorkApi` is an exported singleton, so any future
- * module - a second route, a server action, an internal caller - can import it and call `.preview(req)`
- * from a POST handler and get a working write-verb endpoint. The structural argument would still read as
- * true in this file while the property it protects had quietly gone. So the method is checked where the
- * work happens, and the check runs BEFORE the parameter reads, so a POST is refused as a method problem
- * rather than reported as a missing workspaceId.
+ * state-changing verb. That argument is true of ONE file. `dueWorkApi` is an exported singleton, so any
+ * future module - a second route, a server action, an internal caller - can import it and call
+ * `.preview(req)` from a POST handler and get a working write-verb endpoint. The structural argument would
+ * still read as true in this file while the property it protects had quietly gone. So the method is
+ * checked where the work happens, and the check runs BEFORE the parameter reads, so a POST is refused as
+ * a method problem rather than reported as a missing workspaceId.
+ *
+ * WHAT IT REFUSES IS NOW EXACTLY THE UNSAFE SET. POST, PUT, PATCH and DELETE are refused; GET, HEAD and
+ * OPTIONS are answered. That is not a relaxation of the guarantee - nothing here writes on any of the
+ * three, `planDueWork` and `toDueWorkPreview` are pure, and OPTIONS does not reach the engine at all -
+ * it is the guarantee stated about the methods it was always actually about.
  *
  * 405, WHICH REPLACES A DOCUMENTED COMPROMISE. This refused with 400 and carried a comment explaining
  * that 405 was the correct answer but was unreachable: `PersistenceErrorCode` had no METHOD_NOT_ALLOWED
@@ -86,15 +120,58 @@ const METHOD_REFUSAL_HEADERS: Readonly<Record<string, string>> = Object.freeze({
  * status cannot be used to enumerate real ids. Putting an unrelated meaning behind that status would
  * blunt an assertion that is doing real work.
  */
-function requireReadMethod(request: Request): void {
-    const method = request.method.toUpperCase()
+function requireAllowedMethod(method: string): void {
     if (!ALLOWED_METHODS.includes(method)) {
         throw new PersistenceError(
             "METHOD_NOT_ALLOWED",
-            "The due-work plan is read with GET. This surface accepts no other method, because a plan is a read and nothing here acts.",
+            "The due-work plan is read with GET (or HEAD). This surface changes nothing, so it accepts no state-changing method.",
             { method, allow: ALLOW_HEADER_VALUE },
         )
     }
+}
+
+/**
+ * OPTIONS: the method set, and nothing else. 204 with `Allow`, which is what the framework already
+ * answers on this route and is therefore the only answer that does not contradict it.
+ *
+ * IT DOES NOT REACH THE ENGINE AND IT DOES NOT AUTHENTICATE, AND THAT IS NOT A POLICY CHANGE. The
+ * framework's auto-implemented OPTIONS is installed ahead of every handler, so this route has always
+ * answered OPTIONS over HTTP without authenticating, with exactly this status and exactly this header.
+ * Matching it here changes what a DIRECT caller of the singleton sees (405 + Allow, previously) and
+ * changes nothing at all about what an HTTP caller sees. What is disclosed is the method list - a fact
+ * about the route module, already public in the 405's own `Allow` header, and not workspace data.
+ *
+ * HEAD is the opposite case and is deliberately NOT handled here: it runs the whole GET path, including
+ * authorization, and answers 401 and 403 exactly as GET does. Short-circuiting it would have turned an
+ * unauthenticated HEAD into a 200 and made this surface a membership oracle.
+ */
+function methodDirectory(): Response {
+    return new Response(null, { status: 204, headers: { ...METHOD_REFUSAL_HEADERS } })
+}
+
+/**
+ * HEAD: the GET response with its content removed, per RFC 9110 section 9.3.2 - "identical to GET except
+ * that the server MUST NOT send content in the response".
+ *
+ * DONE HERE RATHER THAN LEFT TO THE TRANSPORT, and that is the whole point of the file. Node's HTTP layer
+ * does suppress the body of a response to a HEAD request, so over HTTP the bytes would not have gone out
+ * either way. But `preview` is reached by a caller of the exported singleton as well as by the route, and
+ * such a caller gets the `Response` object itself - so a body left attached is a body that caller reads.
+ * This file's whole design premise is that a guarantee which only holds on the route path is not a
+ * guarantee, and "no content on HEAD" is a guarantee.
+ *
+ * THE STATUS AND EVERY HEADER ARE PRESERVED, including on the failure paths: a HEAD with no workspaceId
+ * is 400 with no content, a HEAD from a non-member is 403 with no content. `Content-Length` is set to the
+ * byte length the GET content WOULD have had, which RFC 9110 section 8.6 permits and which is the one
+ * fact a HEAD caller usually wants. It is a byte count taken with TextEncoder, not `String.length`, so a
+ * non-ASCII label cannot make it a lie.
+ */
+async function withoutContentForHead(method: string, response: Response): Promise<Response> {
+    if (method !== "HEAD") return response
+    const content = await response.text()
+    const headers = new Headers(response.headers)
+    headers.set("Content-Length", String(new TextEncoder().encode(content).length))
+    return new Response(null, { status: response.status, statusText: response.statusText, headers })
 }
 
 /**
@@ -431,17 +508,25 @@ export class DueWorkApiService {
      * Explicitly invoked. One request produces one plan and nothing else happens - no row is written,
      * not even a record that the preview was requested, because that would make this a write path.
      *
-     * GET ONLY, checked here rather than inferred from the route module's exports. See
-     * `requireReadMethod` for why the refusal is a 405 carrying `Allow`, in the shared envelope.
+     * THE THREE SAFE METHODS, checked here rather than inferred from the route module's exports. GET
+     * answers the plan; HEAD answers the same status and headers with no content; OPTIONS answers the
+     * method set. POST, PUT, PATCH and DELETE are refused with 405 and `Allow` - see
+     * `requireAllowedMethod` for why that is the honest line to draw, and for the framework measurement
+     * that made the previous GET-only line untenable.
+     *
+     * `method` is read ONCE, before the chain, because the HEAD content-stripping step at the end has to
+     * apply to the failure path too and re-reading it inside two closures is how those two drift.
      *
      * The 503 message names THIS surface. Reusing the envelope helper is correct; inheriting the other
      * surface's fallback text is not, because an owner reading "Operations are temporarily unavailable"
      * on a due-work request cannot tell which of the two is actually down.
      */
     preview(request: Request): Promise<Response> {
+        const method = request.method.toUpperCase()
         return Promise.resolve()
             .then(async () => {
-                requireReadMethod(request)
+                requireAllowedMethod(method)
+                if (method === "OPTIONS") return methodDirectory()
                 const summary = await this.operations.summary(param(request, "workspaceId"), {
                     horizonHours: optIntParam(request, "horizonHours"),
                 })
@@ -452,5 +537,6 @@ export class DueWorkApiService {
                 logUnexpectedFailure(error)
                 return failure(error, "The due-work plan is temporarily unavailable", methodRefusalHeaders(error))
             })
+            .then((response) => withoutContentForHead(method, response))
     }
 }

@@ -121,9 +121,16 @@ checkInvertible(
     overduePosition >= 0 && upcomingPosition >= 0 && overduePosition < upcomingPosition,
     `overdue index=${overduePosition} upcoming index=${upcomingPosition}`,
 )
+// THE ITEM COUNT IS THE PREMISE. `[].every(...)` is true, so without the pin this passes when the plan
+// proposes nothing - which is the one case where "every position explains its ordering rule" is worst:
+// there would be no positions and no explanations, and the harness would say the explanations were fine.
+// `first` comes from the imported `planDueWork`, so nothing this run observes would catch it. Three is the
+// fixture's item count (upcoming, undated, overdue), pinned as a literal so that changing the fixture
+// forces a look at the assertion whose meaning depends on it.
 checkInvertible(
-    "every proposed position explains its ordering rule",
-    first.items.every((item) => item.orderingReason.length > 60 && item.orderingReason.includes("source order")),
+    "every one of the three proposed positions explains its ordering rule",
+    first.items.length === 3 &&
+        first.items.every((item) => item.orderingReason.length > 60 && item.orderingReason.includes("source order")),
     first.items.map((item) => `${item.band}:${item.orderingReason}`).join(" | "),
 )
 

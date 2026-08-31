@@ -82,6 +82,7 @@ import {
     type OperationsSummary,
     UNCOVERED_DOMAINS,
 } from "../../src/lib/operations/engine"
+import { OperationsApiService } from "../../src/lib/operations/http"
 import { OperationsContext } from "../../src/lib/operations/shared"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
@@ -128,23 +129,35 @@ const engineCode = engineSrc
     .join("\n")
 
 /**
- * THE GET-ONLY GATE, widened after audit. Shares its reasoning with check-due-work-preview-api.ts.
+ * THE HANDLER-EXPORT GATE, widened after audit and then SPLIT. Shares its reasoning with
+ * check-due-work-preview-api.ts, where the split is argued at length.
  *
  * The previous form was `!/export async function (POST|PATCH|PUT|DELETE)\(/`. That misses two declaration
  * styles this repository already uses for handler exports. Measured over its 156 route.ts files:
  * `export async function VERB` 95 times, `export function VERB` 17 times, `export const VERB` 4 times, for
  * POST/PUT/PATCH/DELETE. So a write verb added in either of the two latter styles passed the gate
- * untouched, and it covered neither HEAD nor OPTIONS. Both styles are house style here, so this was not a
- * theoretical hole.
+ * untouched. Both styles are house style here, so this was not a theoretical hole.
  *
- * The GET side accepts the non-async form for the same reason, and 26 route files here already use it: a
- * gate that fails on a legal refactor gets deleted rather than fixed. Applied to comment-stripped source,
- * because a route file's own comments name the verbs they forbid and this repo has mistaken a prohibition
- * for a violation five times.
+ * THE WIDENING THEN OVERSHOT, and this round corrects it. It folded HEAD and OPTIONS into the same
+ * alternation and named the result `WRITE_VERB_EXPORT`. Under RFC 9110 those two are SAFE methods; a
+ * constant named for write verbs that contains them is a lie in the code, and the assertion built on it
+ * would have gone red on a legal, RFC-compliant HEAD export. Measured: nothing under src/ exports HEAD or
+ * OPTIONS today, so this was latent rather than failing. The two ideas are now two constants:
+ *
+ *   STATE_CHANGING_VERB_EXPORT  POST, PUT, PATCH, DELETE. Their absence IS the no-write guarantee.
+ *   SAFE_METHOD_HANDLER_EXPORT  HEAD, OPTIONS. Their absence guarantees nothing about writes; it is the
+ *                               precondition for next@16.3.3 deriving HEAD from GET and answering OPTIONS
+ *                               itself, which is a fact worth recording and not a prohibition.
+ *
+ * The GET side accepts the non-async form for the same reason as before, and 26 route files here already
+ * use it: a gate that fails on a legal refactor gets deleted rather than fixed. Applied to
+ * comment-stripped source, because a route file's own comments name the verbs they forbid and this repo
+ * has mistaken a prohibition for a violation five times.
  *
  * No `g` flag: a shared /g/ regex keeps `lastIndex` between `.test` calls and answers false on alternate uses.
  */
-const WRITE_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/
+const STATE_CHANGING_VERB_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/
+const SAFE_METHOD_HANDLER_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+(?:HEAD|OPTIONS)\b/
 const GET_EXPORT = /export\s+(?:async\s+)?(?:function|const)\s+GET\b/
 const routeCode = routeSrc
     .replace(/\/\*[\s\S]*?\*\//g, " ")
@@ -169,9 +182,17 @@ check(
     /today\(request: Request\)/.test(httpSrc) && !/(create|update|delete|patch|post)\s*\(/i.test(httpSrc.replace(/\/\*[\s\S]*?\*\//g, "")),
 )
 check(
-    "the operations route exports GET and no POST, PUT, PATCH, DELETE, HEAD or OPTIONS - in ANY of the three export styles this repo uses",
-    GET_EXPORT.test(routeCode) && !WRITE_VERB_EXPORT.test(routeCode),
-    "GET only, checked against `export [async] function|const VERB`",
+    "the operations route exports GET and no POST, PUT, PATCH or DELETE - in ANY of the three export styles this repo uses",
+    GET_EXPORT.test(routeCode) && !STATE_CHANGING_VERB_EXPORT.test(routeCode),
+    "no state-changing verb, checked against `export [async] function|const VERB`",
+)
+// NOT a prohibition. HEAD and OPTIONS are safe methods and exporting either would be legal; this records
+// the precondition that makes next@16.3.3 derive HEAD from GET and answer OPTIONS itself, which is what
+// the behavioural block below then measures against the real service.
+check(
+    "MEASURED: the operations route exports GET and neither HEAD nor OPTIONS, so the framework derives both - HEAD by invoking this GET handler, OPTIONS as its own 204 with Allow",
+    GET_EXPORT.test(routeCode) && !SAFE_METHOD_HANDLER_EXPORT.test(routeCode),
+    "GET exported; HEAD/OPTIONS left to the framework",
 )
 
 // ---------------------------------------------------------------------------
@@ -194,9 +215,17 @@ checkInvertible(
 )
 // The scope difference is the kind of thing that silently makes a total unreconcilable, so it must be
 // reported rather than merely known.
+//
+// THE LENGTH PIN IS PART OF THE ASSERTION, not decoration. `[].every(...)` is true, so without it this
+// conjunct passes on an empty domain list - which is the state in which "every domain declares its
+// boundary" is most misleading, because no domain would be declaring anything. `OPERATIONS_DOMAINS` is
+// imported, so its emptiness is decided in another module and nothing this run observes would notice.
+// Nine is the count engine.ts declares; a tenth domain must come here and say which boundary it is read
+// on, which is the whole point of the assertion.
 checkInvertible(
-    "every domain declares which tenant boundary it was read on",
-    OPERATIONS_DOMAINS.every((domain) => OPERATIONS_DOMAIN_SCOPE[domain] === "profile" || OPERATIONS_DOMAIN_SCOPE[domain] === "workspace"),
+    "every domain declares which tenant boundary it was read on, and all NINE of them are present to declare it",
+    OPERATIONS_DOMAINS.length === 9 &&
+        OPERATIONS_DOMAINS.every((domain) => OPERATIONS_DOMAIN_SCOPE[domain] === "profile" || OPERATIONS_DOMAIN_SCOPE[domain] === "workspace"),
     Object.entries(OPERATIONS_DOMAIN_SCOPE)
         .map(([d, s]) => `${d}:${s}`)
         .join(" "),
@@ -477,15 +506,23 @@ check(
     `${literalTagged.length + constantTagged.length} tags for ${uniqueTagged.length} domains`,
 )
 // An unexplained absence reads as an oversight and gets "fixed" badly by the next person.
+//
+// THE GUARD WAS ON THE WRONG COLLECTION. It read `Object.keys(...).length > 0` while the `.every` ran over
+// `Object.values(...)`, so the two were different expressions and the values list was unguarded: an empty
+// UNCOVERED_DOMAINS satisfied "every reason is long enough" by having no reasons. The pin is now on the
+// collection actually iterated, and it pins the COUNT - six, being durableTasks plus the five entries
+// COHORT_NEEDS_ACTION_NOT_COVERED spreads in - so removing a declared gap has to be done deliberately here
+// rather than by deleting an entry and leaving this green.
 check(
-    "domains deliberately not covered are listed with a reason rather than omitted",
-    Object.keys(UNCOVERED_DOMAINS).length > 0 &&
+    "all SIX domains deliberately not covered are listed with a reason rather than omitted",
+    Object.values(UNCOVERED_DOMAINS).length === 6 &&
         Object.values(UNCOVERED_DOMAINS).every((reason) => typeof reason === "string" && reason.length > 40),
     Object.keys(UNCOVERED_DOMAINS).join(", "),
 )
 check(
-    "no domain is both covered and listed as uncovered",
-    Object.keys(UNCOVERED_DOMAINS).every((key) => !(OPERATIONS_DOMAINS as readonly string[]).includes(key)),
+    "no domain is both covered and listed as uncovered, over all six uncovered names",
+    Object.keys(UNCOVERED_DOMAINS).length === 6 &&
+        Object.keys(UNCOVERED_DOMAINS).every((key) => !(OPERATIONS_DOMAINS as readonly string[]).includes(key)),
 )
 
 // ---------------------------------------------------------------------------
@@ -905,6 +942,56 @@ async function main() {
                 identity.current = ids.userB
                 const b = await service.summary(ids.wsB)
 
+                // =============================================================================
+                // THE OPERATIONS SURFACE'S METHOD BEHAVIOUR, MEASURED RATHER THAN ASSUMED.
+                //
+                // The export scan above says the route exports GET and neither HEAD nor OPTIONS. It is
+                // tempting to read that as "this route answers only GET". It does not. next@16.3.3's
+                // auto-implement-methods.js assigns `methods.HEAD = handlers.GET`, so a HEAD request is
+                // served by invoking THIS handler with method "HEAD", and answers OPTIONS itself with 204
+                // and `Allow: GET, HEAD, OPTIONS` without reaching a handler at all.
+                //
+                // WHAT THAT MEANS HERE, AND IT IS NOT THE SAME ANSWER AS FOR DUE-WORK. `OperationsApiService`
+                // has NO method guard: `today` never looks at `request.method`. So:
+                //
+                //   HEAD     is answered exactly as GET, which is what RFC 9110 9.3.2 asks for. The
+                //            response object it returns still carries content; over HTTP the transport
+                //            suppresses a HEAD body, so an HTTP caller sees the correct thing. A direct
+                //            caller of the service object does not, and that difference is real.
+                //   OPTIONS  never reaches `today` over HTTP - the framework answers it. A DIRECT caller
+                //            gets the summary instead of a method directory, because nothing here refuses.
+                //   POST     is refused by the framework with its own bare 405. `today` itself does not
+                //            refuse it: called directly with a POST Request it answers 200 with data. The
+                //            surface's read-only guarantee therefore rests ENTIRELY on the route module's
+                //            exports, which is precisely the weakness due-work-http.ts's own header
+                //            describes and guards against with `requireAllowedMethod`.
+                //
+                // RECORDED, NOT FIXED. src/lib/operations/http.ts is outside this package's owned paths, so
+                // adding the guard there is not this package's change to make. Asserting the measured truth
+                // is: it declares the gap, and it goes red the day someone closes or widens it, instead of
+                // this file continuing to imply a GET-only surface that the framework never delivered.
+                // =============================================================================
+                identity.current = ids.userA
+                const opsApi = new OperationsApiService(service)
+                const opsUrl = `http://ops.test/api/platform/operations?workspaceId=${ids.wsA}`
+                const opsStatus = async (method: string) =>
+                    (await opsApi.today(new Request(opsUrl, { method }))).status
+                const opsGet = await opsStatus("GET")
+                const opsHead = await opsStatus("HEAD")
+                const opsOptions = await opsStatus("OPTIONS")
+                const opsPost = await opsStatus("POST")
+                checkInvertible(
+                    "MEASURED: HEAD on the operations surface is answered exactly as GET - the framework routes it to this handler and nothing here refuses it, which is what RFC 9110 9.3.2 requires",
+                    opsGet === 200 && opsHead === 200,
+                    `GET=${opsGet} HEAD=${opsHead}`,
+                )
+                checkInvertible(
+                    "MEASURED AND DECLARED AS A GAP: `today` has no method guard at all, so called DIRECTLY it answers OPTIONS and even POST with 200 and data. Over HTTP the framework refuses POST and answers OPTIONS itself, so nothing is exposed today - but this surface's read-only guarantee rests only on the route module's exports. src/lib/operations/http.ts is outside this package's owned paths; recorded, not fixed",
+                    opsOptions === 200 && opsPost === 200,
+                    `direct OPTIONS=${opsOptions} direct POST=${opsPost} (framework: OPTIONS=204 with Allow, POST=405 with no Allow)`,
+                )
+                identity.current = ids.userB
+
                 const aIds = a.items.map((i) => i.id)
                 const bIds = b.items.map((i) => i.id)
 
@@ -1051,15 +1138,24 @@ async function main() {
                  * harmful rather than merely cheaper.
                  */
                 const reservationIds = idsIn(a, "reservations")
+                // THE EXCLUSION SET'S SIZE IS THE ASSERTION'S PREMISE. "The later-dated rows are absent" is
+                // evidence only if later-dated rows exist: `[].every(...)` is true, so an empty
+                // `reservationsLater` would satisfy this while proving nothing about what the cap dropped.
+                // Two is what the fixture seeds (`group("res", 101, 2)`), pinned as a literal here so that
+                // changing the fixture forces a look at the assertion whose meaning depends on it.
                 checkInvertible(
-                    "the reservation cap drops LATER work, never earlier work - 22 rows share the earliest startAt and the cap is full of them",
-                    reservationIds.length === CAP && ids.tie.reservationsLater.every((id) => !reservationIds.includes(id)),
+                    "the reservation cap drops LATER work, never earlier work - 22 rows share the earliest startAt and the cap is full of them, and the 2 later-dated rows really exist to be dropped",
+                    reservationIds.length === CAP &&
+                        ids.tie.reservationsLater.length === 2 &&
+                        ids.tie.reservationsLater.every((id) => !reservationIds.includes(id)),
                     `returned ${reservationIds.length} of ${RES_TIED + ids.tie.reservationsLater.length} candidates; the ${ids.tie.reservationsLater.length} later-dated rows are absent`,
                 )
                 const inventoryIds = idsIn(a, "inventory")
                 checkInvertible(
-                    "the inventory cap drops the BEST-STOCKED candidates first; with 24 rows tied at onHand 0 and a cap of 20 the cut falls INSIDE that level, so four stockouts are dropped and the label must not claim otherwise",
-                    inventoryIds.length === CAP && ids.tie.inventoryHigher.every((id) => !inventoryIds.includes(id)),
+                    "the inventory cap drops the BEST-STOCKED candidates first; with 24 rows tied at onHand 0 and a cap of 20 the cut falls INSIDE that level, so four stockouts are dropped and the label must not claim otherwise - and the 3 better-stocked rows really exist to be dropped",
+                    inventoryIds.length === CAP &&
+                        ids.tie.inventoryHigher.length === 3 &&
+                        ids.tie.inventoryHigher.every((id) => !inventoryIds.includes(id)),
                     `returned ${inventoryIds.length}; the ${ids.tie.inventoryHigher.length} rows at onHand 4 are absent while stockouts fill the cap`,
                 )
                 checkInvertible(
@@ -1110,9 +1206,19 @@ async function main() {
                  * that regression is invisible on A's data and is why this second shape exists.
                  */
                 const bInventory = idsIn(b, "inventory")
+                // ALL THREE GROUPS ARE SIZE-PINNED, for the same reason and against three different failure
+                // modes. An empty `nonCandidatesLowerStock` would satisfy "the lower-stock non-candidates are
+                // excluded" by having none to exclude - which is exactly the fixture shape this probe was
+                // built to avoid, since tenant A is already blind to that regression. An empty
+                // `candidatesUrgent` or `candidatesLessUrgent` would satisfy "every real candidate is
+                // reported" by there being no candidates, i.e. by the engine returning nothing at all. The
+                // counts are the fixture's: 4, 3 and 3 from `seedInventoryProbe`.
                 checkInvertible(
-                    "a row holding LESS stock than a reported candidate is still excluded when it sits above its OWN reorder point, so the bound compares two columns and not one column against the cap",
-                    ids.probeB.nonCandidatesLowerStock.every((id) => !bInventory.includes(id)) &&
+                    "a row holding LESS stock than a reported candidate is still excluded when it sits above its OWN reorder point, so the bound compares two columns and not one column against the cap - over a probe that really holds 4 such rows and 6 real candidates",
+                    ids.probeB.nonCandidatesLowerStock.length === 4 &&
+                        ids.probeB.candidatesUrgent.length === 3 &&
+                        ids.probeB.candidatesLessUrgent.length === 3 &&
+                        ids.probeB.nonCandidatesLowerStock.every((id) => !bInventory.includes(id)) &&
                         ids.probeB.candidatesUrgent.every((id) => bInventory.includes(id)) &&
                         ids.probeB.candidatesLessUrgent.every((id) => bInventory.includes(id)),
                     `${ids.probeB.nonCandidatesLowerStock.length} lower-stock non-candidates excluded; all ${ids.probeB.candidatesUrgent.length + ids.probeB.candidatesLessUrgent.length} real candidates reported`,
