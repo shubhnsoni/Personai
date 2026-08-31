@@ -13,9 +13,22 @@ import type {
     WorkspaceSurfaceResolverPort,
 } from "../../src/lib/business-os/workspace-surface-types"
 import { WorkspaceSurfaceResolver } from "../../src/lib/business-os/workspace-surfaces"
+import { PersistenceError } from "../../src/lib/persistence/errors"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
+import {
+    BOUNDARY_CLOSURE_DIGEST,
+    boundaryClosureDigest,
+    canonicalBoundaryClosure,
+    catalogueUniverse,
+    leastPrivilegeViolations,
+    observeBoundaryClosure,
+    observedAllowances,
+    observedUniverse,
+    ROLE_PRIVILEGE_LADDER,
+    type BoundaryProbe,
+} from "../../src/lib/tenancy/boundary"
 import { ROLE_PERMISSION_MATRIX } from "../../src/lib/tenancy/permissions"
-import { KNOWN_ROLES, PERMISSION_KEYS, type KnownRole } from "../../src/lib/tenancy/types"
+import { KNOWN_ROLES, PERMISSION_KEYS, type KnownRole, type PermissionKey } from "../../src/lib/tenancy/types"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
@@ -24,6 +37,15 @@ const RUN = `s2b_surface_${process.pid}_${Date.now()}_${Math.floor(Math.random()
 const BLUEPRINT_ID = "field-service-v1"
 const APP_ROOT = join(__dirname, "..", "..")
 const FAKE_DSN = "postgresql://surface_user:s2b-pa55word@surface-db.internal.example:5432/personalink?sslmode=require"
+
+/**
+ * A permission key that is deliberately NOT in the catalogue, used to prove the boundary does not
+ * let a caller discover which keys exist. Asserted absent rather than assumed absent.
+ */
+const ABSENT_PERMISSION = "s1b.absent.permission"
+
+/** Evidence printed once at the end, so the digest assertion's preimage is never taken on trust. */
+const closureEvidence: string[] = []
 
 class Rollback extends Error {}
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]
@@ -150,6 +172,69 @@ function exactSet(left: readonly string[], right: readonly string[]): boolean {
     return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort())
 }
 
+// ---------------------------------------------------------------------------------------------
+// observing the authorization boundary
+//
+// `PersistedTenancy.requireAccess` is the one place a role is turned into an admit-or-refuse verdict
+// for a named permission. Nothing about that verdict is a re-read of `PERMISSION_KEYS`: it comes back
+// out of a live call that hit the rehearsal database, matched a real Membership row, and either
+// returned a PlatformAccess or threw. That verdict is what crosses the boundary, and it is what the
+// closure below is built from.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Did the boundary ADMIT this permission for the currently-signed-in identity?
+ *
+ * A refusal counts as "not admitted" only when it is the boundary's own FORBIDDEN refusal. Anything
+ * else - a crash, a driver error, an UNAUTHORIZED because the identity was not set - is rethrown, so a
+ * broken run can never be silently recorded as a well-behaved denial.
+ */
+async function admits(tenancy: PersistedTenancy, workspaceId: string, permission: string): Promise<boolean> {
+    try {
+        await tenancy.requireAccess(workspaceId, permission as PermissionKey)
+        return true
+    } catch (error) {
+        if (error instanceof PersistenceError && error.code === "FORBIDDEN") return false
+        throw error
+    }
+}
+
+/** The refusal exactly as a caller would see it, or the marker for "there was no refusal". */
+async function refusalFor(tenancy: PersistedTenancy, workspaceId: string, permission: string): Promise<string> {
+    try {
+        await tenancy.requireAccess(workspaceId, permission as PermissionKey)
+        return "ADMITTED"
+    } catch (error) {
+        if (error instanceof PersistenceError) return JSON.stringify({ code: error.code, message: error.message })
+        return JSON.stringify({ code: "NOT_A_PERSISTENCE_ERROR", message: String((error as Error).message).slice(0, 200) })
+    }
+}
+
+/**
+ * A refusal with the caller's OWN input edited out.
+ *
+ * Echoing back the permission a caller just asked for tells that caller nothing it did not already
+ * know. What would leak is any OTHER difference between the refusal for a real-but-ungranted key and
+ * the refusal for a key that does not exist, so the echo is normalised away and the remainder is
+ * required to be identical.
+ */
+function withoutEchoedInput(refusal: string, echoed: string): string {
+    return refusal.split(echoed).join("<input>")
+}
+
+/** 5 roles x 18 permissions of live boundary decisions, taken through real seeded Membership rows. */
+function boundaryProbe(
+    tenancy: PersistedTenancy,
+    identity: ControlledIdentity,
+    workspaceId: string,
+    clerkByRole: Readonly<Record<KnownRole, string>>,
+): BoundaryProbe {
+    return async (role, permission) => {
+        identity.current = clerkByRole[role]
+        return admits(tenancy, workspaceId, permission)
+    }
+}
+
 async function residueCount(prisma: PrismaClient): Promise<number> {
     const rows = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
         `select (` +
@@ -258,7 +343,10 @@ async function main() {
             throw new Error(`ABORT: connected to ${String(current[0]?.database)}`)
         }
 
-        const permissionsBefore = JSON.stringify(PERMISSION_KEYS)
+        // NOTE: there is deliberately no `permissionsBefore = JSON.stringify(PERMISSION_KEYS)` here.
+        // A before/after pair of reads of a frozen module constant is `x === x` and cannot fail; see
+        // src/lib/tenancy/boundary.ts. The catalogue is proven not to have moved by OBSERVING what the
+        // authorization boundary admits and refuses, in checks 5b through 5g below.
         try {
             await prisma.$transaction(
                 async (tx) => {
@@ -358,18 +446,135 @@ async function main() {
                     )
 
                     const allRoleBodies = roleResponses.map(({ response }) => response.raw).join("\n")
-                    const permissionsAfter = JSON.stringify(PERMISSION_KEYS)
                     const permissionValueReturned = PERMISSION_KEYS.some((permission) =>
                         roleResponses.some(({ response }) => response.raw.includes(JSON.stringify(permission))),
                     )
                     check(
-                        "5. install/read keeps PERMISSION_KEYS byte-identical and returns no role or permission field",
-                        PERMISSION_KEYS.length === 18 && permissionsBefore === permissionsAfter &&
-                            !permissionValueReturned &&
+                        "5a. SERIALISATION boundary: no permission value and no role or permission field crosses it",
+                        !permissionValueReturned &&
                             roleResponses.length > 0 &&
                             roleResponses.every(({ response }) => !hasForbiddenResponseField(response.body)),
-                        `keys=${PERMISSION_KEYS.length} catalogSame=${permissionsBefore === permissionsAfter} permissionValueReturned=${permissionValueReturned}`,
+                        `roles=${roleResponses.length} permissionValueReturned=${permissionValueReturned}`,
                     )
+
+                    // ---- 5b-5g. AUTHORIZATION boundary: what the catalogue actually decides -------
+                    // This block replaces an assertion that compared JSON.stringify(PERMISSION_KEYS)
+                    // against itself. PERMISSION_KEYS is a frozen import, so both operands were the
+                    // same immutable value read twice in one process and the comparison could not take
+                    // the value false on any run - it never touched the boundary it claimed to police.
+                    //
+                    // What is measured instead: 5 roles x 18 permissions of LIVE decisions, each one a
+                    // requireAccess call that hit the rehearsal database, matched a real Membership
+                    // row, and either returned a PlatformAccess or threw FORBIDDEN. The closure those
+                    // decisions describe is the value that crosses the boundary.
+                    const closure = await observeBoundaryClosure(
+                        boundaryProbe(tenancy, identity, ids.workspace, ids.clerkByRole),
+                    )
+                    const observedDigest = boundaryClosureDigest(closure)
+                    const canonicalText = canonicalBoundaryClosure(closure)
+                    closureEvidence.push(
+                        `BOUNDARY_CLOSURE_DECISIONS=${closure.length}`,
+                        `BOUNDARY_CLOSURE_DIGEST_OBSERVED=${observedDigest}`,
+                        `BOUNDARY_CLOSURE_DIGEST_PINNED=${BOUNDARY_CLOSURE_DIGEST}`,
+                        "BOUNDARY_CLOSURE_CANONICAL_OBSERVED:",
+                        canonicalText,
+                    )
+                    check(
+                        "5b. the closure the boundary ACTUALLY enforces fingerprints to the reviewed pin",
+                        closure.length === KNOWN_ROLES.length * PERMISSION_KEYS.length &&
+                            observedDigest === BOUNDARY_CLOSURE_DIGEST,
+                        `decisions=${closure.length} observed=${observedDigest} pinned=${BOUNDARY_CLOSURE_DIGEST}`,
+                    )
+
+                    // The pin on its own invites the lazy repair - re-hash until green. These are the
+                    // policy statements that a re-pinned hash still has to survive.
+                    const policyViolations = leastPrivilegeViolations(closure)
+                    check(
+                        "5c. the OBSERVED closure satisfies the least-privilege ladder, so a re-pinned digest cannot hide a widening",
+                        policyViolations.length === 0,
+                        policyViolations.length === 0
+                            ? `ladder=${ROLE_PRIVILEGE_LADDER.join("<")} clean over ${closure.length} live decisions`
+                            : policyViolations.join(" | "),
+                    )
+
+                    // Expectation derived from the production constant; actual observed at runtime.
+                    const reachable = observedUniverse(closure)
+                    const catalogue = catalogueUniverse()
+                    const unreachable = catalogue.filter((permission) => !reachable.includes(permission))
+                    check(
+                        "5d. every permission in the catalogue is reachable through the boundary by at least one role",
+                        catalogue.length > 0 && exactSet(reachable, catalogue) && unreachable.length === 0,
+                        `catalogue=${catalogue.length} reachable=${reachable.length} unreachable=[${unreachable.join(",") || "none"}]`,
+                    )
+
+                    // 4b compares HTTP status against ROLE_PERMISSION_MATRIX, which is the table under
+                    // test: widen the table and both sides move together. This is the anchored version -
+                    // the HTTP column is compared against the closure that 5b pinned to a literal.
+                    const allowances = observedAllowances(closure)
+                    const httpAdmitted = roleResponses
+                        .filter(({ response }) => response.status === 200)
+                        .map(({ role }) => role)
+                    const boundaryAdmitted = ROLE_PRIVILEGE_LADDER
+                        .filter((role) => (allowances.get(role) ?? []).includes("profile.read"))
+                    check(
+                        "5e. the HTTP layer neither widens nor narrows the boundary's profile.read column",
+                        roleResponses.length === KNOWN_ROLES.length &&
+                            boundaryAdmitted.length > 0 &&
+                            exactSet(httpAdmitted, boundaryAdmitted) &&
+                            roleResponses.length > 0 &&
+                            roleResponses.every(({ response }) => response.status === 200 || response.status === 403),
+                        `http200=[${httpAdmitted.join(",")}] boundaryAdmits=[${boundaryAdmitted.join(",")}]`,
+                    )
+
+                    // ---- 5f. no permission-catalogue enumeration, inside the tenant ---------------
+                    identity.current = ids.clerkByRole.VIEWER
+                    const ungrantedRefusal = await refusalFor(tenancy, ids.workspace, "workspace.delete")
+                    const absentRefusal = await refusalFor(tenancy, ids.workspace, ABSENT_PERMISSION)
+                    const absentIsAbsent = !(PERMISSION_KEYS as readonly string[]).includes(ABSENT_PERMISSION)
+                    check(
+                        "5f. a member cannot tell a real-but-ungranted permission from one that does not exist",
+                        absentIsAbsent &&
+                            ungrantedRefusal !== "ADMITTED" &&
+                            absentRefusal !== "ADMITTED" &&
+                            ungrantedRefusal.includes('"code":"FORBIDDEN"') &&
+                            withoutEchoedInput(ungrantedRefusal, "workspace.delete") ===
+                                withoutEchoedInput(absentRefusal, ABSENT_PERMISSION),
+                        `ungranted=${ungrantedRefusal} absent=${absentRefusal} absentIsAbsent=${absentIsAbsent}`,
+                    )
+
+                    // ---- 5g. no workspace OR permission enumeration, across tenants ---------------
+                    // Six refusals: a foreign-but-real workspace and one that does not exist, each
+                    // probed with a permission the actor holds in its OWN workspace, one only OWNER
+                    // ever holds, and one that is not in the catalogue at all. All six must be the same
+                    // bytes, which also pins the ORDER of the two checks: membership is settled before
+                    // any permission is consulted, so no permission-shaped question can be answered
+                    // about a workspace the caller is not in.
+                    identity.current = ids.foreignClerk
+                    const probedKeys = ["workspace.read", "workspace.delete", ABSENT_PERMISSION]
+                    const crossTenantRefusals: string[] = []
+                    for (const target of [ids.workspace, id("also_does_not_exist")]) {
+                        for (const permission of probedKeys) {
+                            crossTenantRefusals.push(await refusalFor(tenancy, target, permission))
+                        }
+                    }
+                    const distinctRefusals = [...new Set(crossTenantRefusals)]
+                    const leakedKeys = probedKeys.filter((permission) =>
+                        distinctRefusals.some((refusal) => refusal.includes(permission)),
+                    )
+                    const leakedIds = [ids.workspace, id("also_does_not_exist")].filter((target) =>
+                        distinctRefusals.some((refusal) => refusal.includes(target)),
+                    )
+                    check(
+                        "5g. across tenants, existence of a workspace OR of a permission is not observable",
+                        probedKeys.length === 3 &&
+                            crossTenantRefusals.length === 6 &&
+                            distinctRefusals.length === 1 &&
+                            distinctRefusals[0].includes('"code":"FORBIDDEN"') &&
+                            leakedKeys.length === 0 &&
+                            leakedIds.length === 0,
+                        `refusals=${crossTenantRefusals.length} distinct=${distinctRefusals.length} value=${distinctRefusals[0]} leakedKeys=[${leakedKeys.join(",") || "none"}] leakedIds=${leakedIds.length}`,
+                    )
+
                     check(
                         "6. businessOs never appears in any installation-derived role response",
                         !allRoleBodies.includes("businessOs") &&
@@ -418,6 +623,7 @@ async function main() {
     console.log("")
     console.log(`RUN_PREFIX=${RUN}`)
     console.log(`ROLE_MATRIX=${KNOWN_ROLES.map((role) => `${role}:${ROLE_PERMISSION_MATRIX[role].includes("profile.read") ? "allow" : "deny"}`).join(",")}`)
+    for (const line of closureEvidence) console.log(line)
     console.log(`SUMMARY mode=${INVERT ? "inverted" : "normal"} passed=${results.length - failed.length} failed=${failed.length}`)
     if (failed.length > 0) process.exitCode = 1
 }
