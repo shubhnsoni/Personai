@@ -1780,3 +1780,54 @@ Real reminders/payments/provider messages; live personalink cutover; push, PR, d
 the six frozen KiroCrew worktrees; secrets and external side effects. `check-order-stream` stays
 `run: false`. **All six vertical packs remain unregistered, non-visible candidates** - no blueprint
 became active in S0, S1 or S2.
+
+
+## Accepted - T-wave: allowlist to zero, candidates visible, one proven hook fix
+
+| Phase | Package | Outcome | Branch |
+|---|---|---|---|
+| T1-A | Evidence for the 4 meta/contract harnesses | **ACCEPTED** (13 → 9) | `codex/t1a-meta` |
+| T1-B | Evidence for the 5 business-os/auth harnesses | **ACCEPTED** (9 → 4) | `codex/t1b-bizos` |
+| T1-C | Evidence for the 4 copilot/restaurant harnesses | **ACCEPTED** (4 → **0**) | `codex/t1c-copilot` |
+| T2-A | Seventh HTTP classifier site migrated | **ACCEPTED** | `codex/t2a-classifier` |
+| T2-B | Sanitizing failure logger into operations boundary | **ACCEPTED** | `codex/t2b-logger` |
+| T3-A | Protected read-only Vertical Candidate API | **ACCEPTED** | `codex/t3a-api` |
+| T3-B | Read-only Vertical Candidate Catalog UI | **ACCEPTED** | `codex/t3b-ui` |
+| T4 | React-hook: 1 fixed with a test, 8 refused | **ACCEPTED** | `codex/t4-reacthooks` |
+
+8 dispatched, 8 reported, 8 accepted, 0 rejected, 0 reverted. Root additionally registered the three new
+harnesses and reconciled two pinned counts plus two stale documentation claims (`724d4d1`).
+
+Measured at `724d4d1`, primary and isolated clean worktree identical: 80 on disk / 80 manifest / 79
+runnable / **79 executed / 79 passed / 0 failed** / 1 declared skip / 0 integrity findings. Assertion
+evidence **ENFORCED 79/79, allowlist 0 (declared 0)**, 5883 assertions, 0 unevidenced. Source
+corroboration **ENFORCED 79/79**, 0 contradicted, 0 refused. Self-test 68/68. TypeScript 0. Lint **37 (8
+errors, 29 warnings)** — down from 38. `npm audit --omit=dev` 0. Prisma validate/generate 0, no schema
+diff. Build compiled.
+
+### Queue delta
+
+- **The allowlist item is CLOSED at zero.** The allowlist *mechanism* remains, with its entry-shape,
+  missing-file, forbidden-pattern and size-drift rules still enforced and proven on fixtures, so any
+  future exemption must still be exact, reasoned and declared. Nothing is currently exempt.
+- **The seventh classifier site is CLOSED.** All 8 `OLD_SITES` entries across 7 harnesses now agree with
+  the canonical AST classifier.
+- **The operations failure-logger gap is CLOSED.**
+- **Candidate visibility is DONE; activation remains deliberately absent** — see the truthfulness section
+  above. No blueprint became active.
+
+### Now top of the queue
+
+| Priority | Item | Why |
+|---|---|---|
+| 1 | **Falsifiability corroboration** | A *non-constant* always-true condition still satisfies both the evidence and corroboration layers. Corroboration deliberately does not judge falsifiability — that is the vacuity scanner's remit. This is the last structural gap in the "green means something" chain. |
+| 2 | **8 remaining React-hook errors** | Each has an exact recorded reason. Three are unreachable under server render; the rest need jsdom plus an event library or fake timers. **Adding a UI test runner is the unblocking step** and is a dependency change, so it is owner-gated. |
+| 3 | **Vacuity: 2 UNGUARDED_EVERY + 2 UNRESOLVED** | All four justified with exact file/line/reason. Re-measure after any new harness lands — the T-wave added three. |
+| 4 | **`operations/http.ts` sanitizing logger adoption elsewhere** | T2-B scoped the shared module to `operations/` deliberately rather than claiming platform-wide adoption for five other surfaces without their own leak proofs. Extending it is safe, incremental work. |
+
+### Owner-gated, untouched
+
+Real reminders/payments/provider messages; live personalink cutover; push, PR, deployment, tunnel; the
+six frozen KiroCrew worktrees; secrets and external side effects; **active registration of the six
+candidate vertical packs**. `check-order-stream` stays `run: false`. Adding a UI test framework is a
+dependency change and therefore owner-gated.

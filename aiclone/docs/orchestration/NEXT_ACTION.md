@@ -747,3 +747,59 @@ refused.** Credential scan clean (79 artefacts). TypeScript 0. Repository lint 3
   `prisma generate` (npm ci does not run it). Supply `.env` as a hard link, never a junction.
 - Read a 503 `DEPENDENCY_UNAVAILABLE` in the suite as a code failure before re-running - it is usually
   connection exhaustion from concurrent or back-to-back sweeps.
+
+
+
+## T-wave close - measured at 724d4d1
+
+Sweep 80 on disk / 80 manifest / 79 runnable / **79 executed / 79 passed / FAILED 0** / 1 declared skip /
+0 integrity findings, in the primary tree and an isolated clean worktree at the same SHA. Self-test
+**68/68**. Assertion evidence **ENFORCED 79/79, allowlist 0**, 5883 assertions, 0 unevidenced. Source
+corroboration **ENFORCED 79/79**, 0 contradicted, 0 refused. TypeScript 0. Lint **37 (8 errors, 29
+warnings)**. `npm audit --omit=dev` 0. Prisma validate/generate 0, no schema diff. Build compiled.
+
+### What is now true that was not before
+
+- **Nothing is exempt from the evidence contract.** The allowlist went 13 → 0. Every runnable harness
+  counts its own assertions inside the helper that decides its verdict, emits an identity-bearing
+  `GATE-EVIDENCE` line, and has that count corroborated against an executable assertion callsite in its
+  own source. The allowlist mechanism still exists and its rules are still proven on fixtures — there is
+  simply nothing using it.
+- **The six vertical candidates are visible and still not installable.** A protected GET-only API and an
+  owner-facing catalog page, both behind the Business OS guard. Verified independently: zero candidate ids
+  in `listBusinessBlueprints()`, every candidate `registered === false`, and the truth flags are pinned
+  literals so flipping one is a compile error.
+- **The operations HTTP boundary sanitizes its failure logs**, proven against planted credentials, DSNs,
+  query strings and tokens, with a byte-identical response and a logger whose own failure cannot break the
+  response path.
+
+### Next, in order
+
+1. **Falsifiability corroboration.** A non-constant always-true condition still satisfies both the
+   evidence and corroboration layers. Corroboration proves an assertion callsite *executed*; it does not
+   prove the condition *could have failed*. That is the vacuity scanner's remit and is the last structural
+   gap in the chain. Start from `check-assertion-vacuity.ts`, not from the driver.
+2. **The 8 refused React-hook errors are BLOCKED on tooling, not on effort.** Each has an exact reason
+   recorded. Three are unreachable under server render (a Radix Sheet portal emits 0 bytes; ChatInterface
+   stalls before the memo mounts; profile-view cannot be imported without a Prisma client). The rest need
+   jsdom plus an event library or fake timers. **Adding a UI test runner is a dependency change and is
+   owner-gated** — ask before attempting, and do not "fix" these without a failing-before test.
+3. **Re-measure vacuity.** 2 UNGUARDED_EVERY + 2 UNRESOLVED, all four justified with exact file/line/
+   reason. The T-wave added three harnesses, so re-run the scanner rather than trusting these numbers.
+4. **Extend the sanitizing logger** beyond `operations/`. T2-B deliberately scoped it there rather than
+   claiming platform-wide adoption for five other surfaces without their own leak proofs.
+
+### Do not
+
+- Register any vertical pack as an active blueprint. `home-services-v1` is guarded by an executable alias
+  constraint: while its engine fingerprint matches `field-service-v1` it must stay unregistered and name
+  that blueprint as its fold target.
+- Add a UI test framework without asking — it is a dependency change.
+- Trust the shared `todo_list` tool for coordination between concurrent workers. Three T-wave workers
+  independently reported it leaking state across sessions; it is advisory only and affected nothing, and
+  they were right to fall back to git as ground truth.
+- Give a fresh worktree only `npm ci`. It also needs `prisma generate`, or `tsc` will report hundreds of
+  phantom errors — that happened to a T-wave worker and cost it a real measurement. And it needs
+  `aiclone/.env` as a *file* (some harnesses open it directly), hard-linked, never a junction, never
+  edited.
+- Remove a worktree whose `node_modules` is a junction. No worktree was removed in this run at all.

@@ -4870,3 +4870,105 @@ forcing `refusedMethods` empty (35/37 exit 1, both pins named; restored 37/37). 
 reason. The 13-entry evidence allowlist was left unchanged: it is genuinely un-migrated, and S1-A's
 corroboration layer is the safer place to earn a reduction than a rushed migration at the end of a long
 run. The nine React-hook lint errors were deliberately not touched.
+
+
+
+# T-wave - the evidence allowlist reaches zero, and the candidates become honestly visible
+
+`36390d8` → `724d4d1`. Eight worker packages over three dispatch rounds, each in its own worktree with an
+**independent `npm ci`** (no dependency junction anywhere, and no worktree removed at any point). All
+eight reported and all eight were accepted.
+
+Final state, primary and an isolated clean worktree at the same SHA, identical: **80 on disk, 80 in the
+manifest, 79 runnable, 79 executed, 79 passed, 0 failed, 1 declared skip, 0 integrity findings**;
+assertion evidence **ENFORCED 79/79 with allowlist 0** and 5883 assertions counted; source corroboration
+**ENFORCED 79/79, 0 contradicted, 0 refused**; self-test 68/68; credential scan clean; TypeScript 0;
+repository lint **37 (down from 38)**; `npm audit --omit=dev` 0; Prisma validate/generate 0 with no schema
+diff; production build compiled.
+
+### T1 - nothing is exempt any more
+
+Thirteen harnesses were allowlisted because they emitted no machine-readable count. All thirteen now
+count their own assertions **inside the helper that decides the verdict**, emit an identity-bearing
+`GATE-EVIDENCE` line plus a ratio line from the same counters, and no total is a literal anywhere. The
+allowlist came down in three integrated steps - 13 → 9 → 4 → 0 - each step removing only the exact files
+that group had proved, with a full sweep in between.
+
+The interesting part was the two static scanners. `check-assertion-vacuity` and
+`check-harness-exit-integrity` spend their lives counting things *about other files*, and the tempting
+number was right there. Counting discovered findings as assertions would have inflated the enforced total
+with a figure that means something else, so each counts only its **own gating invariants** - 60 and 35 -
+and leaves its corpus conclusions untouched. That distinction is the whole difference between a contract
+and a decoration.
+
+One weakening had to be caught rather than shipped: with the allowlist empty, the production guard's
+`entries.every(...)` became vacuous, because `every()` over zero elements is true. An explicit
+`entries.length === 0` now sits beside it, and the entry-shape, missing-file, forbidden-pattern and
+size-drift rules remain enforced and proven on dedicated fixtures. The mechanism still exists and still
+bites; there is simply nothing claiming it.
+
+### T2 - the seventh classifier site, and a boundary that logged nothing
+
+The seventh HTTP method-classifier site moved onto the canonical AST classifier, verdict-neutral because
+its target route exports only `export async function GET`. `OLD_SITES` now holds 8 entries across 7
+harnesses. The worker declined to touch the narrative counts because some live inside an assertion *name*
+string and flagged them instead - correct caution; root verified nothing external reads that string and
+corrected every stale "seven" to "eight".
+
+The operations HTTP boundary had been catching dependency failures and logging **nothing** through any
+sanitizer, while its due-work sibling carried a substantial one. That logger is now a shared module, and
+thirteen `console.error`-capture assertions prove credentials, DSNs, query strings and tokens are
+redacted, that safe classification survives, that unauthorized/forbidden/not-found stay non-enumerating
+in *both* the log and the response, that the 503 body is byte-identical with and without logging, and
+that the logger's own failure cannot break the response path. Defeating the authority redaction makes it
+leak and fail; removing the swallow makes it fail.
+
+### T3 - visible, and still not installable
+
+Six candidate verticals are now readable through a protected GET-only API and an owner-facing catalog
+page. Both sit behind the Business OS guard as the first statement, both reuse the shared response
+envelope, and the API's NOT_FOUND deliberately does not echo the id so two unknown ids are
+indistinguishable.
+
+**Nothing became registered.** Verified independently of the harnesses: 9 registered blueprints, 6
+candidates, zero candidate ids in `listBusinessBlueprints()`, every candidate `registered === false`.
+That is enforced rather than promised - `registered`/`installed`/`active`/`installableThroughThisApi` are
+pinned literal `false`, so flipping one is a *compile* error, and the catalog is a server component with
+no client bundle and zero `button`/`form`/`input`/`anchor` elements, so no affordance exists that could
+mutate anything.
+
+Two truth markers are conditional on purpose. `home-services-v1` is labelled an alias/fold candidate for
+`field-service-v1` only *while* their engine fingerprints match, so genuine divergence later drops the
+marker instead of lying - both packages proved that against a deliberately diverged fixture.
+`clinic-practice-v1`'s non-clinical boundary is a first-class field rendered above the engine list, with
+its **position** asserted so it cannot be buried, and `salon-spa-v1` must not receive it. Messages,
+deposits, payments and providers resolve through a closed union with no `available` member.
+
+### T4 - one fix, eight refusals, and why that is the honest answer
+
+The toolchain decided this phase before any code was read: there is **no** UI test runner and no testing
+library here, and none could be added. The only executable mechanism is `renderToStaticMarkup`, which the
+repository already uses - it protects SSR-class behaviour and cannot protect interaction.
+
+So one error was fixed with a test that fails before and passes after: `catalog-chrome` seeded state from
+`localStorage` in an effect and was remodelled onto `useSyncExternalStore` whose `getServerSnapshot`
+never consults the cache. The naive lint-satisfying alternative was *measured* emitting `list` on the
+server where the correct value is `grid` - the exact hydration mismatch the rule exists to prevent.
+
+Eight were refused with exact reasons and no `eslint-disable` anywhere, and three of those reasons could
+not have been reached by reading the source: the component never gets to the flagged branch under server
+render. A Radix Sheet portal emits **0 bytes**, `ChatInterface` stalls before the memoized line is
+mounted, and `profile-view` cannot even be imported without a generated Prisma client. Lint went 38 → 37
+with warnings unchanged, so nothing was traded from error to warning.
+
+### Two notes for whoever runs the next wave
+
+Three workers independently reported that the shared `todo_list` tool leaked state between concurrent
+sessions - one saw a sibling's file list. It is advisory only and affected no file, commit or gate, and
+they correctly fell back to git as ground truth. Do not use it for coordination between concurrent
+workers.
+
+A worker reported `tsc` at 254 errors and, to its credit, proved its own change added none by diffing the
+error sets. The cause was root's own setup omission: that worktree never had `prisma generate` run. In the
+primary tree TypeScript is 0. A fresh worktree needs both a real `npm ci` **and** `prisma generate` before
+its type numbers mean anything.
