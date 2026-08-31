@@ -643,3 +643,57 @@ stayed clean at its integrated HEAD. Confining every worker to its own worktree 
 what made that true, and it was verified after the failure rather than assumed. Keep doing it. Also keep
 the mandatory-report rule: the failed stage's baseline stub was still enough to tell root what it had
 and had not measured, which is why its work could be judged rather than guessed at.
+
+
+## Round-5 addendum - a tautology found where a size pin was expected
+
+Measured at `6538a0a`. Sweep 74/74 FAILED 0. Self-test 57/57. Lint 38 (9 errors, 29 warnings).
+TypeScript 0. `npm audit --omit=dev` 0. Vacuity debt now **2 UNGUARDED_EVERY and 4 UNRESOLVED**.
+
+Root took the four findings the dead stage never reached. One closed cleanly; the investigation of the
+other three is the useful part.
+
+### The named defect: two assertions that cannot fail
+
+`check-workspace-surface-boundary.ts` and `check-workspace-surface-contract.ts` both claim that
+install/read and surface resolution keep `PERMISSION_KEYS` byte-identical, by comparing
+`permissionsBefore` with `permissionsAfter`. The scanner resolves **both** names, through
+side-effect-free bindings only, to the same expression text: `JSON.stringify(PERMISSION_KEYS)`.
+`PERMISSION_KEYS` is a frozen module constant, so the comparison re-reads the same immutable import
+and **can never fail**. The stated purpose - proving the boundary does not mutate the permission
+catalogue - is not tested by those assertions at all.
+
+Both files now pin `PERMISSION_KEYS.length === 18` and report the count. **That is not a fix for the
+tautology and is not offered as one.** It buys exactly one thing: an emptied catalogue turns the run
+red instead of making the surrounding conjuncts vacuous.
+
+**The real fix, for whoever takes it:** compare what actually *crossed the boundary* - the catalogue as
+the API returned it, or a snapshot taken from the response payload - against the expected value. It
+cannot be done by stringifying the same import twice. Until then these two assertions are decoration
+on a real harness, and the scanner's UNRESOLVED on them is correct rather than noise.
+
+### The other two
+
+`check-fieldjob-inspection-runtime.ts` is **closed**: `OPEN_INSPECTION_STATUSES` is pinned at its three
+statuses inside the assertion's own condition, because an empty table satisfied both the length
+equality (`0 === 0`) and the `.every` at once.
+
+`check-retainer-runtime.ts` is **hardened but still reported**. It now pins `ledger.length === 6` inside
+the replay assertion's own condition rather than only in the sibling assertion below it - on an empty
+ledger the loop never runs, `mismatch` stays `""` and `running` stays `0`, so a period that also read 0
+would report that replay reproduces every balance without replaying one. The scanner's remaining
+objection is a different suspicion - `mismatch` is initialised to `""` and every assignment to it is
+conditional - which no size pin can settle.
+
+### An operational hazard worth inheriting
+
+Root deleted the primary `aiclone/node_modules` during cleanup by running `git worktree remove --force`
+on worktrees that contained a **junction** to it: the recursive delete followed the junction into the
+real directory. No repository content was lost - `node_modules` is not tracked - and HEAD, every commit
+and `package-lock.json` were verified intact before anything else was done; `npm ci` restored the tree
+from the lockfile without modifying it, and `npm audit --omit=dev` is 0 again.
+
+The lesson is specific and cheap to apply: **a junction-linked shared `node_modules` inside a git
+worktree must not be removed with `git worktree remove --force`.** Delete or rename the junction first,
+then remove the worktree. The isolation technique itself is still the right one - it is what kept two
+failed stages from touching the primary tree - it just needs that one extra step at teardown.
