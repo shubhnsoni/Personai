@@ -30,6 +30,12 @@ import {
 import { ROLE_PERMISSION_MATRIX } from "../../src/lib/tenancy/permissions"
 import { KNOWN_ROLES, PERMISSION_KEYS, type KnownRole, type PermissionKey } from "../../src/lib/tenancy/types"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
+import {
+    classifyRouteModule,
+    describeMethods,
+    exportsMethod,
+    exportsNoStateChangingMethod,
+} from "../lib/http-method-classifier"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
@@ -158,14 +164,6 @@ function hasForbiddenResponseField(value: unknown): boolean {
     return Object.entries(value as Record<string, unknown>).some(
         ([key, nested]) => /^(role|roles|permission|permissions|grant|grants|authorization)$/.test(key) || hasForbiddenResponseField(nested),
     )
-}
-
-function executableSource(source: string): string {
-    return source
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .split(/\r?\n/)
-        .map((line) => line.replace(/\/\/.*$/, ""))
-        .join("\n")
 }
 
 function exactSet(left: readonly string[], right: readonly string[]): boolean {
@@ -324,14 +322,18 @@ async function main() {
         throw new Error(`ABORT: expected ${AUTHORIZED_TARGET}, got ${String(databaseName)}`)
     }
 
-    const routeSource = executableSource(
-        readFileSync(join(APP_ROOT, "src/app/api/platform/workspaces/[workspaceId]/surfaces/route.ts"), "utf8"),
-    )
+    // Delegated to the one canonical AST classifier in scripts/lib/http-method-classifier.ts, the same
+    // way check-operations-runtime.ts and the other migrated consumers call it. The assertion still means
+    // "this route exports GET and no STATE-CHANGING verb". HEAD and OPTIONS are SAFE methods (RFC 9110
+    // section 9.2.1) and are deliberately NOT counted as write verbs by exportsNoStateChangingMethod. The
+    // AST reads RAW source, so the old comment strip is gone: a ts.SourceFile cannot read a verb named
+    // inside a comment or a string, which is the class of false positive that used to force it.
+    const surfaceRoutePath = join(APP_ROOT, "src/app/api/platform/workspaces/[workspaceId]/surfaces/route.ts")
+    const surfaceRouteMethods = classifyRouteModule(surfaceRoutePath, readFileSync(surfaceRoutePath, "utf8"))
     check(
         "11. the route exports GET and no write verb",
-        /export\s+async\s+function\s+GET\b/.test(routeSource) &&
-            !/export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/.test(routeSource),
-        "GET only on executable lines",
+        exportsMethod(surfaceRouteMethods, "GET") && exportsNoStateChangingMethod(surfaceRouteMethods),
+        `methods=[${describeMethods(surfaceRouteMethods)}] styles=[${surfaceRouteMethods.exports.map((e) => `${e.method}:${e.style}`).join(" ")}]`,
     )
 
     await unavailableHarness()
