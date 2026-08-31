@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: the evidence allowlist exempts check-ghost.js, which does not exist on disk. A stale exemption is worse than none - it makes the unenforced count look larger than it is and hides which harness it was ever meant to cover. The driver must exit 2 with EVIDENCE_ALLOWLIST_ENTRY_MISSING_ON_DISK, and it must do so in --integrity-only mode too, so a 20-minute sweep is not how you find out.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/good",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "evidence": {
+    "required": true,
+    "allowlistDeclaredSize": 1,
+    "allowlist": [
+      {
+        "file": "check-ghost.js",
+        "reason": "Deliberately names a harness that is not on disk, to prove the driver reconciles the allowlist against the working tree.",
+        "temporary": true,
+        "migrationPending": "Nothing: this entry is the defect under test.",
+        "declaredBy": "Q4-E driver self-test"
+      }
+    ]
+  },
+  "harnesses": [
+    { "file": "check-gamma.js", "package": "evidence", "run": true },
+    { "file": "check-json.js", "package": "evidence", "run": true },
+    { "file": "check-jsonlist.js", "package": "evidence", "run": true },
+    { "file": "check-ratio.js", "package": "evidence", "run": true },
+    { "file": "check-summaryline.js", "package": "evidence", "run": true }
+  ]
+}

@@ -78,6 +78,11 @@ function buildMarkdown(summary) {
   L.push(`| **FAILED** | **${summary.counts.failed}** |`);
   L.push(`| timed out | ${summary.counts.timedOut} |`);
   L.push(`| integrity findings | ${summary.integrityFindings.length} |`);
+  if (summary.evidence) {
+    L.push(`| harnesses carrying assertion evidence | ${summary.evidence.counts.evidenced} |`);
+    L.push(`| harnesses on the evidence allowlist | ${summary.evidence.counts.allowlisted} |`);
+    L.push(`| assertions counted | ${summary.evidence.counts.totalAssertions} |`);
+  }
   L.push("");
   L.push(`**TOTAL ${summary.counts.executed} checks, FAILED ${summary.counts.failed}**`);
   L.push("");
@@ -125,6 +130,71 @@ function buildMarkdown(summary) {
       }
     }
     L.push("");
+  }
+
+  if (summary.evidence) {
+    const ev = summary.evidence;
+    L.push("## Assertion-evidence contract");
+    L.push("");
+    L.push(
+      "A harness counts as passed only if it yielded machine-readable evidence carrying a harness " +
+        "identity and a POSITIVE assertion count. Exit 0 on its own does not distinguish a harness that " +
+        "proved sixty invariants from one that asserted nothing.",
+    );
+    L.push("");
+    L.push(`- Enforced this run: **${ev.enforced ? "yes" : "no — nothing was executed"}**`);
+    L.push(`- Evidence run id: \`${ev.runId}\``);
+    L.push(
+      `- Passed harnesses: ${ev.counts.passedHarnesses}; carrying evidence: **${ev.counts.evidenced}**; ` +
+        `allowlisted: ${ev.counts.allowlisted}; unevidenced and not allowlisted: **${ev.counts.unevidenced}**`,
+    );
+    L.push(`- Assertions counted across the sweep: **${ev.counts.totalAssertions}**`);
+    if (Object.keys(ev.formCounts).length > 0) {
+      L.push(
+        `- Evidence forms seen: ${Object.entries(ev.formCounts).map(([form, n]) => `\`${form}\` ×${n}`).join(", ")}`,
+      );
+    }
+    L.push("");
+    L.push(
+      `### Temporary allowlist — ${ev.allowlist.actualSize} of the executed harnesses are NOT evidence-enforced`,
+    );
+    L.push("");
+    L.push(
+      "This list is printed in full on every run. Its size is the honest measure of what this gate does " +
+        "not check. Entries name exact filenames — no wildcards, globs or patterns are accepted — and the " +
+        "manifest must declare the size, so an entry cannot be added without a visible edit.",
+    );
+    L.push("");
+    L.push(`- declared size: ${ev.allowlist.declaredSize === null ? "none" : ev.allowlist.declaredSize}, real size: ${ev.allowlist.actualSize}`);
+    L.push("");
+    if (ev.allowlist.entries.length > 0) {
+      L.push("| harness | temporary | reason | migration pending | declared by |");
+      L.push("|---|---|---|---|---|");
+      for (const e of ev.allowlist.entries) {
+        const cell = (v) => String(v ?? "").replace(/\|/g, "\\|");
+        L.push(`| \`${cell(e.file)}\` | ${e.temporary === true ? "yes" : "**NO**"} | ${cell(e.reason)} | ${cell(e.migrationPending)} | ${cell(e.declaredBy)} |`);
+      }
+      L.push("");
+    }
+    if (ev.allowlist.redundant.length > 0) {
+      L.push(
+        "**Redundant allowlist entries** (these harnesses did emit evidence, so the entries should be " +
+          `deleted): ${ev.allowlist.redundant.map((r) => `\`${r.file}\` (${r.form}, ${r.assertions})`).join(", ")}`,
+      );
+      L.push("");
+    }
+    if (ev.records.length > 0) {
+      L.push("### Evidence per harness");
+      L.push("");
+      L.push("| harness | assertions | form | identity | evidence |");
+      L.push("|---|--:|---|---|---|");
+      for (const r of ev.records) {
+        L.push(
+          `| \`${r.harness}\` | ${r.assertions} | \`${r.form}\` | ${r.identitySource} | \`${String(r.raw).replace(/\|/g, "\\|")}\` |`,
+        );
+      }
+      L.push("");
+    }
   }
 
   const failures = summary.harnesses.filter((h) => h.status === "failed");

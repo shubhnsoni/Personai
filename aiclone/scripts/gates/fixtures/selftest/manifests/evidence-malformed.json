@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: check-malformed.js prints an evidence line whose count is the literal string \"undefined\" - the shape of a template variable that was never interpolated. Unreadable evidence must be rejected rather than coerced; a NaN treated as truthy or as zero is how a broken counter becomes a green result. The driver must exit 2 with EVIDENCE_MALFORMED.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/malformed",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [{ "file": "check-malformed.js", "package": "evidence", "run": true }]
+}

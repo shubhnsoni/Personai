@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: the allowlist holds one entry while allowlistDeclaredSize says 5. The declared size is what makes silent growth impossible - adding an exemption cannot be a one-line edit that nobody notices, because the number has to move with it. The driver must exit 2 with EVIDENCE_ALLOWLIST_SIZE_DRIFT. The entry also names a harness that DOES emit evidence, so this manifest additionally exercises the redundant-entry report.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/good",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "evidence": {
+    "required": true,
+    "allowlistDeclaredSize": 5,
+    "allowlist": [
+      {
+        "file": "check-gamma.js",
+        "reason": "Deliberately disagrees with the declared size, and deliberately names a harness that does emit evidence so the redundant-entry report is exercised too.",
+        "temporary": true,
+        "migrationPending": "Nothing: this entry is the defect under test.",
+        "declaredBy": "Q4-E driver self-test"
+      }
+    ]
+  },
+  "harnesses": [
+    { "file": "check-gamma.js", "package": "evidence", "run": true },
+    { "file": "check-json.js", "package": "evidence", "run": true },
+    { "file": "check-jsonlist.js", "package": "evidence", "run": true },
+    { "file": "check-ratio.js", "package": "evidence", "run": true },
+    { "file": "check-summaryline.js", "package": "evidence", "run": true }
+  ]
+}

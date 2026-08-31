@@ -1,0 +1,16 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: check-twin-a.js claims itself honestly and check-twin-b.js claims check-twin-a.js. Two harnesses in one run assert the same identity, so one set of assertions would be counted under a name that does not belong to it. The driver must exit 2 with EVIDENCE_DUPLICATE_ID.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/twins",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [
+    { "file": "check-twin-a.js", "package": "evidence", "run": true },
+    { "file": "check-twin-b.js", "package": "evidence", "run": true }
+  ]
+}

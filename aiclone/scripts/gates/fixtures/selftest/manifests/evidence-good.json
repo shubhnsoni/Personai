@@ -1,0 +1,20 @@
+{
+  "manifestVersion": 1,
+  "description": "Assertion-evidence baseline: five harnesses, one per evidence form the parser recognises (explicit GATE-EVIDENCE line, N/M ratio, JSON report with a numeric count, JSON report with a list of assertion names, SUMMARY passed=/failed= line). All five must pass with a positive count and no allowlist entry, which is what proves the parser recognises the shapes the real harnesses already print rather than only the one the fixtures use.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/good",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "expected": { "executedChecks": 5, "declaredSkips": 0, "harnessesOnDisk": 5 },
+  "harnesses": [
+    { "file": "check-gamma.js", "package": "evidence", "run": true },
+    { "file": "check-json.js", "package": "evidence", "run": true },
+    { "file": "check-jsonlist.js", "package": "evidence", "run": true },
+    { "file": "check-ratio.js", "package": "evidence", "run": true },
+    { "file": "check-summaryline.js", "package": "evidence", "run": true }
+  ]
+}

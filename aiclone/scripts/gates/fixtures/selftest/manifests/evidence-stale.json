@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: check-stale.js leaves behind a well-formed evidence sidecar naming itself with a healthy positive count, but stamped with another run's id and back-dated - exactly what an evidence file surviving from an earlier sweep looks like. It ALSO prints perfectly good log evidence, so this proves the driver refuses the stale file rather than quietly falling back to the evidence it prefers. The driver must exit 2 with EVIDENCE_STALE.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/stale",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [{ "file": "check-stale.js", "package": "evidence", "run": true }]
+}

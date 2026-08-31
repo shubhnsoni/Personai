@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: check-claims.js prints \"4/6 assertions passed\" and still exits 0. A harness cannot be green while its own evidence reports two failures - that is the oldest way a red result reads as green, a missing process.exitCode assignment. The driver must exit 2 with EVIDENCE_CLAIMS_FAILURES.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/claims",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [{ "file": "check-claims.js", "package": "evidence", "run": true }]
+}

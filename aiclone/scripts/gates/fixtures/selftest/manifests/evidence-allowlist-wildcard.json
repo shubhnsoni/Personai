@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: the evidence allowlist entry is the pattern \"check-*.js\" rather than an exact filename. One pattern entry would exempt every harness in the directory - including ones added later - while the allowlist's length still read as 1, so the number that is supposed to measure what the gate does not check would become a floor instead. The driver must exit 2 with EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/good",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "evidence": {
+    "required": true,
+    "allowlistDeclaredSize": 1,
+    "allowlist": [
+      {
+        "file": "check-*.js",
+        "reason": "Deliberately a glob, to prove the driver refuses patterns and accepts only exact harness filenames.",
+        "temporary": true,
+        "migrationPending": "Nothing: this entry is the defect under test.",
+        "declaredBy": "Q4-E driver self-test"
+      }
+    ]
+  },
+  "harnesses": [
+    { "file": "check-gamma.js", "package": "evidence", "run": true },
+    { "file": "check-json.js", "package": "evidence", "run": true },
+    { "file": "check-jsonlist.js", "package": "evidence", "run": true },
+    { "file": "check-ratio.js", "package": "evidence", "run": true },
+    { "file": "check-summaryline.js", "package": "evidence", "run": true }
+  ]
+}

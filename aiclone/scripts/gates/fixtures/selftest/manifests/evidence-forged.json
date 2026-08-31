@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: check-forged.js prints a genuine, well-formed, positive count that names a DIFFERENT harness. Nothing but the identity check can catch this - the number is real. The driver must exit 2 with EVIDENCE_IDENTITY_MISMATCH.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/forged",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [{ "file": "check-forged.js", "package": "evidence", "run": true }]
+}

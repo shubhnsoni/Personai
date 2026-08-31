@@ -57,6 +57,11 @@ function loadManifest(manifestPath) {
       (typeof parsed.expected === "object" && parsed.expected !== null),
     "expected, when present, must be an object",
   );
+  req(
+    parsed.evidence === undefined ||
+      (typeof parsed.evidence === "object" && parsed.evidence !== null && !Array.isArray(parsed.evidence)),
+    "evidence, when present, must be an object",
+  );
 
   if (problems.length > 0) {
     throw new ManifestError(`Manifest is malformed (${manifestPath}):\n  - ${problems.join("\n  - ")}`);
@@ -151,6 +156,7 @@ function loadManifest(manifestPath) {
     databaseName: typeof defaults.databaseName === "string" ? defaults.databaseName : "",
     requiresDatabase: defaults.requiresDatabase !== false,
     expected: parsed.expected && typeof parsed.expected === "object" ? parsed.expected : null,
+    evidence: normaliseEvidence(parsed, manifestPath),
     harnesses: harnesses.filter(Boolean),
   };
 }
@@ -299,6 +305,69 @@ function applyFilter(entries, { packages, filterPattern }) {
     selected,
     runnableCount: runnable.length,
     filtered: selected.length !== runnable.length,
+  };
+}
+
+/**
+ * Normalise the manifest's assertion-evidence contract block.
+ *
+ * ONLY STRUCTURE IS ENFORCED HERE. Whether an allowlist entry carries a real reason, names a
+ * file that exists, contains a wildcard, or agrees with the declared size are all SEMANTIC
+ * questions, and each one is a separately named driver finding so a reader of a failed run is
+ * told which rule was broken. If those were thrown from here they would collapse into one
+ * ManifestError and no summary would be written at all.
+ *
+ * The default when a manifest has no `evidence` block is required:true with an EMPTY allowlist.
+ * Opt-in enforcement would mean every manifest that forgets the block is silently exempt, which
+ * is the failure mode this whole contract exists to remove.
+ */
+function normaliseEvidence(parsed, manifestPath) {
+  const raw = parsed.evidence;
+  if (raw === undefined) {
+    return { required: true, contract: "", allowlistDeclaredSize: null, allowlist: [], declared: false };
+  }
+
+  const problems = [];
+  if (raw.required !== undefined && typeof raw.required !== "boolean") {
+    problems.push("evidence.required must be a boolean when present");
+  }
+  if (
+    raw.allowlistDeclaredSize !== undefined &&
+    (!Number.isInteger(raw.allowlistDeclaredSize) || raw.allowlistDeclaredSize < 0)
+  ) {
+    problems.push("evidence.allowlistDeclaredSize must be a non-negative integer when present");
+  }
+  const rawAllowlist = raw.allowlist === undefined ? [] : raw.allowlist;
+  if (!Array.isArray(rawAllowlist)) {
+    problems.push("evidence.allowlist must be an array when present");
+  } else {
+    rawAllowlist.forEach((entry, index) => {
+      if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+        problems.push(`evidence.allowlist[${index}] must be an object`);
+        return;
+      }
+      if (typeof entry.file !== "string" || entry.file.trim() === "") {
+        problems.push(`evidence.allowlist[${index}].file must be a non-empty string`);
+      }
+    });
+  }
+
+  if (problems.length > 0) {
+    throw new ManifestError(`Manifest evidence block is malformed (${manifestPath}):\n  - ${problems.join("\n  - ")}`);
+  }
+
+  return {
+    required: raw.required !== false,
+    contract: typeof raw.contract === "string" ? raw.contract : "",
+    allowlistDeclaredSize: Number.isInteger(raw.allowlistDeclaredSize) ? raw.allowlistDeclaredSize : null,
+    allowlist: (Array.isArray(rawAllowlist) ? rawAllowlist : []).map((entry) => ({
+      file: entry.file,
+      reason: entry.reason,
+      temporary: entry.temporary,
+      migrationPending: entry.migrationPending,
+      declaredBy: entry.declaredBy,
+    })),
+    declared: true,
   };
 }
 

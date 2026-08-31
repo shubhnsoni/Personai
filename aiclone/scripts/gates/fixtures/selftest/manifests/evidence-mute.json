@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "description": "THE HEADLINE DEFECT: check-mute.js exits 0, writes a non-empty log, leaks nothing and duplicates nothing - it simply never asserts anything and never prints a count. Every guard that existed before the assertion-evidence contract passes it. The driver must exit 2 with EVIDENCE_MISSING, because a silent success is not evidence of anything.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/mute",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [{ "file": "check-mute.js", "package": "evidence", "run": true }]
+}
