@@ -1,8 +1,8 @@
-import { CANDIDATE_STATUS } from "./types"
-import type { VerticalPackCandidate } from "./types"
+import { REGISTERED_STATUS } from "./types"
+import type { RegisteredVerticalPack } from "./types"
 
 /**
- * Salon and spa - CANDIDATE, not registered.
+ * Salon and spa - active, registered, and mapped from onboarding.
  *
  * WHY THE APPOINTMENTS ENGINE FITS: a salon's core record is a bookable service performed by a named
  * person in a capacity window, which is exactly `appointments:services` + `appointments:availability`.
@@ -19,11 +19,11 @@ import type { VerticalPackCandidate } from "./types"
  * (`catalog`, `orders`, `inventory` are all available), but a salon that only sells services is still a
  * salon. Optional is the truthful strength.
  */
-export const salonSpaV1: VerticalPackCandidate = {
+export const salonSpaV1: RegisteredVerticalPack = {
   blueprint: {
     id: "salon-spa-v1",
     version: "1.0.0",
-    status: CANDIDATE_STATUS,
+    status: REGISTERED_STATUS,
     name: "Salon and spa",
     vertical: "salon-spa",
     summary:
@@ -102,8 +102,8 @@ export const salonSpaV1: VerticalPackCandidate = {
       "Which retail products are close to running out?",
     ],
   },
-  readiness: "candidate-not-registered",
-  registered: false,
+  readiness: "active-registered",
+  registered: true,
   proposedTerminology: {
     calendar: "appointment book",
     customer: "client",
@@ -111,11 +111,11 @@ export const salonSpaV1: VerticalPackCandidate = {
     service: "treatment",
   },
   terminologyNote:
-    "Proposed only. BusinessBlueprint declares no terminology in this product; preview.ts resolves it from the onboarding role and tags it source: \"role-derived\". No role points at this candidate, so none of these labels resolves anywhere today.",
+    "Role-derived. Preview resolves these labels from the SALON_SPA onboarding role and tags them source: \"role-derived\".",
   intendedSurfaces: ["home", "profile", "inbox", "services", "calendar", "shop", "sales"],
   onboarding: {
     proposedRoleKey: "SALON_SPA",
-    correspondsToExistingRole: false,
+    correspondsToExistingRole: true,
     steps: [
       "List the treatments offered, each with a duration.",
       "Name the stylists and the hours each actually works.",
@@ -186,7 +186,7 @@ export const salonSpaV1: VerticalPackCandidate = {
   ],
   integrationNotes: [
     "Composes only appointments and commerce, both of which already have live blueprints, so it adds no engine and no migration.",
-    "Its vertical string 'salon-spa' is claimed by no registered blueprint, so registering it later would not collide with the one-active-blueprint-per-vertical rule.",
-    "Registering it would require an onboarding role, because with no role the intended surfaces and proposed terminology resolve to nothing.",
+    "Its vertical string 'salon-spa' is unique in the active registry.",
+    "The SALON_SPA onboarding role resolves its intended surfaces and terminology without installing reminders or deposits.",
   ],
 }

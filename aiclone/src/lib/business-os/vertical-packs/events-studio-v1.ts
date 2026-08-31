@@ -1,8 +1,8 @@
-import { CANDIDATE_STATUS } from "./types"
-import type { VerticalPackCandidate } from "./types"
+import { REGISTERED_STATUS } from "./types"
+import type { RegisteredVerticalPack } from "./types"
 
 /**
- * Events and wedding studio - CANDIDATE, not registered.
+ * Events and wedding studio - active, registered, and mapped from onboarding.
  *
  * WHY THE CASES ENGINE FITS: an event is a dated project with a brief, milestones, sign-offs and a
  * final deliverable, which is `casesProjects` almost exactly. The two capabilities that make it fit
@@ -21,11 +21,11 @@ import type { VerticalPackCandidate } from "./types"
  * exists in any engine, so they are named in `unsupported` rather than left to be inferred from the
  * word "events".
  */
-export const eventsStudioV1: VerticalPackCandidate = {
+export const eventsStudioV1: RegisteredVerticalPack = {
   blueprint: {
     id: "events-studio-v1",
     version: "1.0.0",
-    status: CANDIDATE_STATUS,
+    status: REGISTERED_STATUS,
     name: "Events and wedding studio",
     vertical: "events-studio",
     summary:
@@ -105,8 +105,8 @@ export const eventsStudioV1: VerticalPackCandidate = {
       "Which milestones are waiting on my sign-off?",
     ],
   },
-  readiness: "candidate-not-registered",
-  registered: false,
+  readiness: "active-registered",
+  registered: true,
   proposedTerminology: {
     calendar: "event schedule",
     case: "event",
@@ -114,11 +114,11 @@ export const eventsStudioV1: VerticalPackCandidate = {
     milestone: "planning stage",
   },
   terminologyNote:
-    "Proposed only. BusinessBlueprint declares no terminology in this product; preview.ts resolves it from the onboarding role and tags it source: \"role-derived\". No role points at this candidate, so none of these labels resolves anywhere today.",
+    "Role-derived. Preview resolves these labels from the EVENTS_STUDIO onboarding role and tags them source: \"role-derived\".",
   intendedSurfaces: ["home", "profile", "inbox", "leads", "services", "calendar", "events", "sales"],
   onboarding: {
     proposedRoleKey: "EVENTS_STUDIO",
-    correspondsToExistingRole: false,
+    correspondsToExistingRole: true,
     steps: [
       "List the event types offered and the planning stages each goes through.",
       "List the documents a client must supply before an event is treated as confirmed.",
@@ -195,7 +195,7 @@ export const eventsStudioV1: VerticalPackCandidate = {
   ],
   integrationNotes: [
     "Composes casesProjects, venueOrders and appointments, all of which already back live blueprints, so it adds no engine and no migration.",
-    "Its vertical string 'events-studio' is claimed by no registered blueprint.",
+    "Its vertical string 'events-studio' is unique in the active registry and maps from the EVENTS_STUDIO onboarding role.",
     "The `events` surface already exists in the Surface union, so the intended surface set needs no new member.",
   ],
 }

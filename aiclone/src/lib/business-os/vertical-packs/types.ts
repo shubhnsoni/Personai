@@ -1,9 +1,9 @@
 /**
- * CANDIDATE vertical pack contract.
+ * Vertical pack contracts: unregistered candidates and reviewed active registrations.
  *
- * WHAT THIS IS: a declarative, UNREGISTERED description of a vertical the product could support,
- * expressed against the REAL engine and capability registry in `../engines.ts` and validated by the
- * REAL contract in `../validation.ts`.
+ * Both states are declarative compositions over the REAL engine and capability registry. Promotion
+ * changes four pinned facts together: blueprint status, readiness, registration, and onboarding
+ * correspondence. It never creates an engine, provider, table, or migration.
  *
  * WHAT THIS IS NOT, and each of these is load-bearing rather than decorative:
  *
@@ -43,6 +43,7 @@ import type { BusinessBlueprint } from "../types"
  * state is self-describing at every use site and a second state cannot be introduced by accident.
  */
 export type CandidateReadiness = "candidate-not-registered"
+export type RegisteredReadiness = "active-registered"
 
 /**
  * How an external dependency behaves today.
@@ -88,6 +89,14 @@ export type OnboardingConfiguration = Readonly<{
   requiredOwnerDecisions: readonly string[]
 }>
 
+/** Onboarding configuration after a reviewed pack has a real RoleTemplate and registry mapping. */
+export type RegisteredOnboardingConfiguration = Readonly<{
+  proposedRoleKey: string
+  correspondsToExistingRole: true
+  steps: readonly string[]
+  requiredOwnerDecisions: readonly string[]
+}>
+
 /**
  * Owner workflow configuration.
  *
@@ -114,13 +123,7 @@ export type DailyOpportunity = Readonly<{
   readsFrom: readonly string[]
 }>
 
-/** One unregistered candidate vertical. */
-export type VerticalPackCandidate = Readonly<{
-  /** The real contract, held at the most conservative non-active status. */
-  blueprint: BusinessBlueprint
-  readiness: CandidateReadiness
-  /** Pinned literal `false`, so registration cannot be claimed without a type error. */
-  registered: false
+type VerticalPackMetadata = Readonly<{
   proposedTerminology: Readonly<Record<string, string>>
   /** Restates, per candidate, that terminology is not blueprint-declared in this product. */
   terminologyNote: string
@@ -130,7 +133,6 @@ export type VerticalPackCandidate = Readonly<{
    * explicit per-profile opt-in and `install-types.ts` asserts `businessOsExcluded` on every install.
    */
   intendedSurfaces: readonly Surface[]
-  onboarding: OnboardingConfiguration
   ownerWorkflow: OwnerWorkflowConfiguration
   dailyOpportunities: readonly DailyOpportunity[]
   unsupported: readonly UnsupportedFunction[]
@@ -138,6 +140,22 @@ export type VerticalPackCandidate = Readonly<{
   /** Considerations the integration owner needs, including overlaps with existing live blueprints. */
   integrationNotes: readonly string[]
 }>
+
+/** One unregistered candidate vertical. */
+export type VerticalPackCandidate = Readonly<{
+  blueprint: BusinessBlueprint & Readonly<{ status: "draft" }>
+  readiness: CandidateReadiness
+  registered: false
+  onboarding: OnboardingConfiguration
+}> & VerticalPackMetadata
+
+/** One reviewed vertical pack active in the registry and mapped from onboarding. */
+export type RegisteredVerticalPack = Readonly<{
+  blueprint: BusinessBlueprint & Readonly<{ status: "active" }>
+  readiness: RegisteredReadiness
+  registered: true
+  onboarding: RegisteredOnboardingConfiguration
+}> & VerticalPackMetadata
 
 /**
  * The status every candidate must hold.
@@ -147,6 +165,7 @@ export type VerticalPackCandidate = Readonly<{
  * and then retired - both would be false of a candidate that has never left this package.
  */
 export const CANDIDATE_STATUS = "draft" as const
+export const REGISTERED_STATUS = "active" as const
 
 /** Action kinds a candidate may declare. `sendNotification` is excluded; see the file header. */
 export const CANDIDATE_ALLOWED_ACTION_KINDS = Object.freeze([

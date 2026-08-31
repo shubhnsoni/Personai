@@ -498,9 +498,10 @@ async function main() {
 
     checkInvertible("cohort attention declares profile scope", COHORT_NEEDS_ACTION_SCOPE === "profile")
     checkInvertible("cohort attention emits the consumer-ready domain", COHORT_NEEDS_ACTION_DOMAIN === "cohortTasks")
+    const notCoveredReasons = Object.values(COHORT_NEEDS_ACTION_NOT_COVERED)
     checkInvertible(
         "not-covered concerns are explicit and reasoned",
-        Object.keys(COHORT_NEEDS_ACTION_NOT_COVERED).length >= 4 && Object.values(COHORT_NEEDS_ACTION_NOT_COVERED).every((reason) => reason.length > 60),
+        notCoveredReasons.length >= 4 && notCoveredReasons.every((reason) => reason.length > 60),
     )
 
     const forbidden = ["fetch(", "nodemailer", "resend", "stripe", "twilio", "scheduler", "mailer", "setinterval", "settimeout", "enqueue", "publish("]
@@ -636,9 +637,12 @@ async function main() {
                 new Set(items.map((entry) => entry.id)).size === items.length,
                 `${new Set(items.map((entry) => entry.id)).size} distinct ids over ${items.length} items`,
             )
+            const undatedTail = items.slice(items.length - undated.length)
             checkInvertible(
                 "undated work sorts after every dated item - the case the old infinity arithmetic reached through NaN",
-                undated.length > 0 && items.slice(items.length - undated.length).every((entry) => entry.at === null),
+                undatedTail.length === undated.length &&
+                    undatedTail.length > 0 &&
+                    undatedTail.every((entry) => entry.at === null),
                 `the last ${undated.length} of ${items.length} items are exactly the undated ones`,
             )
             const atTie = items.filter((entry) => entry.at !== null && entry.at.getTime() === TIE_AT.getTime()).map((entry) => entry.id)

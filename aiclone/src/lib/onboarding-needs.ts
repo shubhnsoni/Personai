@@ -1,6 +1,8 @@
 import type { FieldPack, Surface } from "@/lib/surfaces"
 
-export type NeedId = "sell" | "dine" | "time" | "teach" | "ca" | "hire" | "show" | "leads" | "page" | "field"
+export type NeedId =
+    | "sell" | "dine" | "time" | "teach" | "ca" | "hire" | "show" | "leads" | "page" | "field"
+    | "salon" | "eventStudio" | "estate" | "recruit"
 
 export type RoleTemplate =
     | "SHOP"
@@ -12,6 +14,10 @@ export type RoleTemplate =
     | "DESIGNER"
     | "CREATOR"
     | "FIELD_SERVICE"
+    | "SALON_SPA"
+    | "EVENTS_STUDIO"
+    | "REAL_ESTATE_BROKERAGE"
+    | "RECRUITMENT_AGENCY"
     | "CUSTOM"
 
 export type Goal =
@@ -47,6 +53,10 @@ export const NEEDS: Need[] = [
     // scheduled visit, and Goal is switched on in several places - inventing an eighth value to say
     // the same thing would have meant an unhandled case in each of them.
     { id: "field", role: "FIELD_SERVICE", goal: "TAKE_APPOINTMENTS", title: "Field service", blurb: "I send people out to jobs on site.", folk: "field teams", headline: "Request a visit", next: "/dashboard/services" },
+    { id: "salon", role: "SALON_SPA", goal: "TAKE_APPOINTMENTS", title: "Salon or spa", blurb: "I book treatments with named staff.", folk: "salons and spas", headline: "Book a treatment", next: "/dashboard/services" },
+    { id: "eventStudio", role: "EVENTS_STUDIO", goal: "COLLECT_LEADS", title: "Events studio", blurb: "I plan and deliver client events.", folk: "event studios", headline: "Plan your event", next: "/dashboard/events" },
+    { id: "estate", role: "REAL_ESTATE_BROKERAGE", goal: "COLLECT_LEADS", title: "Real-estate brokerage", blurb: "I manage mandates, viewings, and deal stages.", folk: "brokerages", headline: "Discuss a property", next: "/dashboard/leads" },
+    { id: "recruit", role: "RECRUITMENT_AGENCY", goal: "COLLECT_LEADS", title: "Recruitment agency", blurb: "I run vacancies from brief to placement.", folk: "recruiters", headline: "Share a hiring brief", next: "/dashboard/leads" },
     { id: "page", role: "CUSTOM", goal: "BOOK_CALL", title: "Something else", blurb: "I'll pick what I need next.", folk: "you", headline: "Let's talk", next: "/dashboard" },
 ]
 
@@ -95,6 +105,10 @@ const ROLE_ADDONS: Record<string, AddonId[]> = {
     // ServiceOffering, and a visit is scheduled. There is no field-service-only addon because there
     // is no field-service-only surface - that is the point of the shared engine.
     FIELD_SERVICE: ["leads", "services", "calendar"],
+    SALON_SPA: ["services", "calendar", "shop"],
+    EVENTS_STUDIO: ["leads", "services", "calendar", "events", "portfolio"],
+    REAL_ESTATE_BROKERAGE: ["leads", "services", "calendar", "portfolio"],
+    RECRUITMENT_AGENCY: ["leads", "services", "calendar"],
     CUSTOM: [],
 }
 
@@ -163,6 +177,10 @@ export const CORRESPONDING_BLUEPRINT: Readonly<Partial<Record<RoleTemplate, stri
     CA: "ca-practice-v1",
     COACH: "coaching-studio-v2",
     FIELD_SERVICE: "field-service-v1",
+    SALON_SPA: "salon-spa-v1",
+    EVENTS_STUDIO: "events-studio-v1",
+    REAL_ESTATE_BROKERAGE: "real-estate-brokerage-v1",
+    RECRUITMENT_AGENCY: "recruitment-agency-v1",
 })
 
 /** Roles that intentionally correspond to no blueprint, stated so the absence is not a gap. */

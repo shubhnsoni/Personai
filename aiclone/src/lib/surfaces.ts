@@ -83,6 +83,26 @@ const KIT: Record<string, { surfaces: Surface[]; packs: FieldPack[] }> = {
         surfaces: [...CORE, "leads"],
         packs: ["portfolio"],
     },
+    FIELD_SERVICE: {
+        surfaces: [...CORE, "leads", "services", "calendar", "sales"],
+        packs: [],
+    },
+    SALON_SPA: {
+        surfaces: [...CORE, "services", "calendar", "shop", "sales"],
+        packs: ["shopPhysical"],
+    },
+    EVENTS_STUDIO: {
+        surfaces: [...CORE, "leads", "services", "calendar", "events", "sales"],
+        packs: ["portfolio"],
+    },
+    REAL_ESTATE_BROKERAGE: {
+        surfaces: [...CORE, "leads", "services", "calendar", "sales"],
+        packs: ["portfolio"],
+    },
+    RECRUITMENT_AGENCY: {
+        surfaces: [...CORE, "leads", "services", "calendar", "sales"],
+        packs: [],
+    },
     CUSTOM: {
         surfaces: ALL_SURFACES,
         packs: ALL_PACKS,

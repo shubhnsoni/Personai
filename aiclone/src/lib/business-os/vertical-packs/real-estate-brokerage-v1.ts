@@ -1,8 +1,8 @@
-import { CANDIDATE_STATUS } from "./types"
-import type { VerticalPackCandidate } from "./types"
+import { REGISTERED_STATUS } from "./types"
+import type { RegisteredVerticalPack } from "./types"
 
 /**
- * Real-estate brokerage - CANDIDATE, not registered.
+ * Real-estate brokerage - active, registered, and mapped from onboarding.
  *
  * WHY THE CASES ENGINE FITS: a deal is a long-running matter with a qualified party, a document pack
  * that must be collected before anything can complete, staged progress and a fee at the end. That is
@@ -20,11 +20,11 @@ import type { VerticalPackCandidate } from "./types"
  * address is text. Those assumptions are named in `unsupported` so the pack cannot be read as offering
  * them.
  */
-export const realEstateBrokerageV1: VerticalPackCandidate = {
+export const realEstateBrokerageV1: RegisteredVerticalPack = {
   blueprint: {
     id: "real-estate-brokerage-v1",
     version: "1.0.0",
-    status: CANDIDATE_STATUS,
+    status: REGISTERED_STATUS,
     name: "Real-estate brokerage",
     vertical: "real-estate-brokerage",
     summary:
@@ -102,8 +102,8 @@ export const realEstateBrokerageV1: VerticalPackCandidate = {
       "Which completed deals have no fee record yet?",
     ],
   },
-  readiness: "candidate-not-registered",
-  registered: false,
+  readiness: "active-registered",
+  registered: true,
   proposedTerminology: {
     calendar: "viewing schedule",
     case: "deal",
@@ -111,11 +111,11 @@ export const realEstateBrokerageV1: VerticalPackCandidate = {
     milestone: "deal stage",
   },
   terminologyNote:
-    "Proposed only. BusinessBlueprint declares no terminology in this product; preview.ts resolves it from the onboarding role and tags it source: \"role-derived\". No role points at this candidate, so none of these labels resolves anywhere today.",
+    "Role-derived. Preview resolves these labels from the REAL_ESTATE_BROKERAGE onboarding role and tags them source: \"role-derived\".",
   intendedSurfaces: ["home", "profile", "inbox", "leads", "services", "calendar", "sales"],
   onboarding: {
     proposedRoleKey: "REAL_ESTATE_BROKERAGE",
-    correspondsToExistingRole: false,
+    correspondsToExistingRole: true,
     steps: [
       "List the deal types handled and the stages each passes through.",
       "List the documents required before a deal can complete, per deal type.",
@@ -201,7 +201,7 @@ export const realEstateBrokerageV1: VerticalPackCandidate = {
   ],
   integrationNotes: [
     "Composes casesProjects and appointments only, both of which already back live blueprints, so it adds no engine and no migration.",
-    "Its vertical string 'real-estate-brokerage' is claimed by no registered blueprint.",
+    "Its vertical string 'real-estate-brokerage' is unique in the active registry and maps from the REAL_ESTATE_BROKERAGE onboarding role.",
     "It is the pack whose name most invites an assumed integration (portals, maps, signatures); the unsupported list is the substance of the pack, not an appendix to it.",
   ],
 }

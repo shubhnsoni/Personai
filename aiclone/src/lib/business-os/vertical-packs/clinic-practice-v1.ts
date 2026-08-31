@@ -231,7 +231,7 @@ export const clinicPracticeV1: VerticalPackCandidate = {
     },
   ],
   integrationNotes: [
-    "Composes exactly one engine (appointments) with three available capabilities. It adds no engine, no table and no migration, and it is the narrowest of the six candidates by design.",
+    "Composes exactly one engine (appointments) with three available capabilities. It adds no engine, no table and no migration, and remains deliberately unregistered and non-clinical.",
     "Its vertical string 'clinic-practice' is claimed by no registered blueprint. Note the registered ca-practice-v1 is an ACCOUNTING practice and is unrelated despite the similar name.",
     "The non-clinical boundary is currently prose plus harness assertions. If this were ever registered, that boundary would need to be enforceable rather than asserted - most obviously by constraining any document capability before composing one.",
     "install-types.ts already names ClinicConfig in FORBIDDEN_TABLES. This pack respects that: it is declarative configuration over a shared engine, and it adds no vertical-specific storage of any kind.",

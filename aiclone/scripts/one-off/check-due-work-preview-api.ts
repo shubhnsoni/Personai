@@ -600,7 +600,7 @@ async function main() {
                 )
                 checkInvertible(
                     "MEASURED: the SERVICE itself refuses a POST Request, so the no-write guarantee does not depend on the route module's exports",
-                    posted.status !== 200 && posted.status === 405 && errCode(posted) === "METHOD_NOT_ALLOWED",
+                    posted.status === 405 && errCode(posted) === "METHOD_NOT_ALLOWED",
                     `GET on this URL=${ok.status}, POST=${posted.status} code=${errCode(posted)}`,
                 )
                 checkInvertible(

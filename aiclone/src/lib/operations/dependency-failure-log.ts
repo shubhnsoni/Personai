@@ -1,19 +1,45 @@
 /**
- * THE SANITIZING DEPENDENCY-FAILURE LOGGER FOR THE OPERATIONS HTTP BOUNDARIES.
+ * THE SANITIZING DEPENDENCY-FAILURE LOGGER FOR THE PLATFORM'S HTTP BOUNDARIES.
  *
  * Extracted verbatim from `due-work-http.ts`, where it grew up, and moved here so the OTHER operations
- * boundary can share it rather than re-inventing it. Two surfaces answer 503 DEPENDENCY_UNAVAILABLE when
- * their dependency falls over - `operations/http.ts` (the daily "what needs attention" view) and
- * `operations/due-work-http.ts` (the ordered preview) - and both need the same thing on the failure
- * path: a server-side trace that is USEFUL to an operator and yet cannot carry a secret.
+ * boundary could share it rather than re-inventing it. Eleven surfaces now answer 503
+ * DEPENDENCY_UNAVAILABLE when their dependency falls over, and every one of them needs the same thing on
+ * the failure path: a server-side trace that is USEFUL to an operator and yet cannot carry a secret.
  *
- * WHY IT LIVES IN `operations/` RATHER THAN A PLATFORM-WIDE `http/`. Its only two callers are the two
- * operations boundaries; its scope labels (`[operations/today]`, `[operations/due-work]`), its message
- * and its whole reason for existing are operations-domain concerns. A top-level `http/` module would
- * advertise a platform-wide logging utility that the five other surfaces (business-os install/preview/
- * workspace-surface, field jobs, cases) ought to adopt - a broader claim than this change makes, and one
- * that would invite the next person to wire it in without the leak proofs those surfaces would each need.
- * Scoped to where it is proven: next to its callers, inside the boundary the operations harnesses guard.
+ * WHY IT STILL LIVES IN `operations/`, AND WHAT CHANGED. This header used to argue for the narrow home:
+ * "its only two callers are the two operations boundaries ... A top-level `http/` module would advertise a
+ * platform-wide logging utility that the five other surfaces (business-os install/preview/workspace-
+ * surface, field jobs, cases) ought to adopt - a broader claim than this change makes, and one that would
+ * invite the next person to wire it in without the leak proofs those surfaces would each need."
+ *
+ * Those surfaces have now been wired in WITH the leak proofs, so the objection has been discharged rather
+ * than waived - see `scripts/one-off/check-failure-log-sanitization.ts`, which proves, per boundary, that
+ * the response is byte-identical with and without the logger, that no planted secret survives at any depth
+ * of the cause chain, that an authorization refusal is still not logged, and that a mutation to either the
+ * redaction rules or the internal swallow turns the harness red. What did NOT change is the file's path:
+ * moving it would rewrite eleven import lines and every reference in this program's records for a naming
+ * preference, and the module has no dependency on `operations/` (it imports `PersistenceError` and nothing
+ * else), so nothing about the location constrains who may call it. The one thing eleven callers DID require
+ * is that the scope label stop being a convention and become a checked shape - see `safeScope`.
+ *
+ * THE CALLERS, EACH A SINGLE CENTRAL FAILURE FUNNEL IN ITS BOUNDARY FILE:
+ *   `[operations/today]`                  operations/http.ts
+ *   `[operations/due-work]`               operations/due-work-http.ts
+ *   `[fieldjobs]`                         fieldjobs/http.ts
+ *   `[cases]`                             cases/http.ts
+ *   `[cohorts]`                           cohorts/http.ts
+ *   `[commerce]`                          commerce/http.ts
+ *   `[inventory]`                         inventory/http.ts
+ *   `[appointments]`                      appointments/http.ts
+ *   `[business-os/install]`               business-os/install-http.ts
+ *   `[business-os/preview]`               business-os/preview-http.ts
+ *   `[business-os/workspace-surface]`     business-os/workspace-surface-http.ts
+ *
+ * Every one of those boundaries answers a non-`PersistenceError` with 503 DEPENDENCY_UNAVAILABLE, which is
+ * what makes `MESSAGE_BODY` below true at all eleven call sites rather than at two. A surface that answered
+ * 500, or that returned an envelope of a different shape, would need the message parameterised before it
+ * could adopt this, and the route-level provider integrations that do exactly that were deliberately left
+ * alone rather than made to carry a log line that misdescribes their own response.
  *
  * Nothing here reaches the client. `failure(...)` already produces the leak-free 503; this is the SERVER
  * log that sits beside it. The two halves are independent: logging is a side channel and must never
@@ -97,10 +123,33 @@ const LINE_COLUMN_TAIL = /((?::\d+){0,2})([)\]]*)$/
  * THE `=` IS REQUIRED, OR A QUOTE BEFORE A `:`. `\btoken\s*:` also matches frame text - a path segment
  * ending in one of these words followed by its line number - and collapsing that would cost the position.
  * Every keyword DSN form uses `=`; the quoted-colon branch covers a serialised `"password":"..."`.
+ *
+ * `authorization` WAS ADDED WHEN THE LEAK PROOFS WERE WIDENED FROM TWO BOUNDARIES TO ELEVEN, and it is
+ * held to the same `=`-or-quoted-colon requirement as every other keyword, so `at authorization (file:...)`
+ * is untouched and only a serialised header pair is collapsed. It buys the `"authorization":"Bearer ..."`
+ * shape that a serialised provider request carries.
  */
 const SECRET_KEYWORD_PAIR =
-    /\b(?:password|passwd|pwd|pgpassword|secret|token|apikey|api_key|accesskey|access_key|auth_token|credential)(?:\s*["']?\s*=|["']\s*:)\s*["']?[^\s"',;&)}\]]*/gi
+    /\b(?:password|passwd|pwd|pgpassword|secret|token|apikey|api_key|accesskey|access_key|auth_token|authorization|credential)(?:\s*["']?\s*=|["']\s*:)\s*["']?[^\s"',;&)}\]]*/gi
 const DRIVER_USERINFO = /[^\s:@/(),;'"]+:[^\s:@/(),;'"]+@(?:tcp|unix)\([^)\s]*\)/gi
+
+/**
+ * THE RFC 6750 BEARER FORM, which is the one credential shape that had no keyword to hang off.
+ *
+ * MEASURED against the rules above before it was added: `Bearer sk_live_abc123...` inside a frame matched
+ * NONE of them. It is not a URI, so the authority rule does not see it; there is no `=` and no quoted `:`,
+ * so the keyword rule does not see it either - `authorization` in `Authorization: Bearer x` is followed by a
+ * BARE colon, which that rule deliberately refuses because a bare `keyword:` is also what a path segment
+ * followed by a line number looks like. So a token in that form would have been logged verbatim. It is the
+ * shape an SDK most often puts in front of a credential, and it is now its own rule.
+ *
+ * NARROW ON PURPOSE, so it cannot eat a function name. The token must be 8+ characters drawn from the
+ * base64url/JWT alphabet and must follow the literal word with whitespace, so `at bearer (file:...)` does
+ * not match - `(` is outside the class and the quantifier needs eight characters - and neither does
+ * `at bearerToken (...)`, which has no whitespace. A frame's `(file:line:col)` sits after the match either
+ * way, so the position this log exists to report survives.
+ */
+const BEARER_CREDENTIAL = /\bbearer\s+[A-Za-z0-9._~+/-]{8,}=*/gi
 
 /**
  * Defence in depth over the allowlisted fields, NARROWED so that it stops destroying the evidence.
@@ -130,6 +179,42 @@ function redact(text: string): string {
         })
         .replace(DRIVER_USERINFO, "<redacted-authority>")
         .replace(SECRET_KEYWORD_PAIR, "<redacted-credential>")
+        .replace(BEARER_CREDENTIAL, "<redacted-credential>")
+}
+
+/**
+ * THE SCOPE LABEL, NOW A CHECKED SHAPE RATHER THAN A CONVENTION - because there are eleven callers.
+ *
+ * `scope` is the only caller-supplied text that reaches the log, and with two call sites the argument for
+ * trusting it was inspection: both were fixed literals, neither was derived from a request, and both were
+ * in the same directory as this file. That argument does not scale. Eleven call sites across seven
+ * directories is a rule nobody enforces, and the failure mode is silent and specific: the FIRST caller to
+ * write `logDependencyFailure(\`[cases/${caseId}]\`, error)` - which reads like an improvement, because a
+ * per-case tag would be more useful to grep - reopens the exact defect the rest of this module exists to
+ * close, and reopens it in the one field that is printed outside the JSON payload where no `frames` clip
+ * or redactor pass applies to it.
+ *
+ * So the shape is checked, and it is checked the same way everything else here is: an ALLOWLIST of what a
+ * surface tag can look like, not a scan for what a secret looks like. Bracketed, lowercase, segmented by
+ * `/` or `-`, length-capped. Every character class that could carry a payload is absent by construction -
+ * no `:`, `@`, `=`, `?`, `.`, `%`, quote, brace or whitespace - so a DSN, a URL, a token, a key=value pair,
+ * an interpolated id and a JSON fragment are all structurally unable to pass, and a caller cannot smuggle
+ * one through by formatting it differently.
+ *
+ * A NON-CONFORMING SCOPE BECOMES `[unknown-scope]` RATHER THAN BEING DROPPED. Dropping it would produce a
+ * line whose surface cannot be identified, which is a log an operator cannot act on; substituting a fixed
+ * marker keeps the line greppable and makes the mistake visible in the place most likely to be read.
+ *
+ * `.test` on a non-global pattern, so it holds no `lastIndex` between calls - the same care the redactor's
+ * comment records, for the same reason.
+ */
+const SAFE_SCOPE = /^\[[a-z][a-z0-9]*(?:[/-][a-z0-9]+)*\]$/
+const MAX_SCOPE_CHARS = 48
+const UNKNOWN_SCOPE = "[unknown-scope]"
+
+function safeScope(scope: unknown): string {
+    if (typeof scope !== "string" || scope.length > MAX_SCOPE_CHARS) return UNKNOWN_SCOPE
+    return SAFE_SCOPE.test(scope) ? scope : UNKNOWN_SCOPE
 }
 
 /** The constructor name, bounded to an identifier so a hostile or exotic name cannot become the log line. */
@@ -263,9 +348,11 @@ const MESSAGE_BODY =
 /**
  * Log ONE safe line for an operations dependency failure, then let the caller answer 503.
  *
- * `scope` is the surface tag an operator greps for - `[operations/today]`, `[operations/due-work]`. It is
- * the ONLY caller-supplied text that reaches the log, and it is a fixed literal at each call site, never
- * a value derived from a request, so it cannot itself be a smuggling channel.
+ * `scope` is the surface tag an operator greps for - `[operations/today]`, `[fieldjobs]`, `[cases]`. It is
+ * the ONLY caller-supplied text that reaches the log, and it is passed through `safeScope` rather than
+ * trusted: eleven call sites is too many for "it is a fixed literal at each one" to be a guarantee, so the
+ * shape is checked and a non-conforming label becomes `[unknown-scope]`. All eleven current labels conform,
+ * so the check is invisible to every existing caller and changes not one byte of what they log.
  *
  * ONLY THE UNEXPECTED PATH IS LOGGED. A `PersistenceError` is a deliberate, client-caused refusal - a
  * missing workspaceId, a bad horizon, a wrong method, a failed authorization - and logging those as
@@ -287,7 +374,7 @@ export function logDependencyFailure(scope: string, error: unknown): void {
                 ? String((error as { message: string }).message).length
                 : 0
         console.error(
-            `${scope} ${MESSAGE_BODY}`,
+            `${safeScope(scope)} ${MESSAGE_BODY}`,
             JSON.stringify({
                 kind: errorKind(error),
                 code: safeCode(error),

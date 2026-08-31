@@ -243,35 +243,35 @@ check(
 // and the fix is to preview the new blueprint, confirm it reports installed: null, carries the
 // limitations and derives its presentation from the role, and only then raise this number.
 check(
-    "MEASURED: the registry holds exactly the 9 blueprints the rules below were written against",
-    all.length === 9 && summaries.length === 9,
-    `registry=${all.length} listed=${summaries.length} expected=9`,
+    "MEASURED: the registry holds exactly the 13 blueprints the rules below were written against",
+    all.length === 13 && summaries.length === 13,
+    `registry=${all.length} listed=${summaries.length} expected=13`,
 )
 checkInvertible(
     "every previewed blueprint reports installed: null",
-    all.length === 9 && all.every((b) => service.preview(b.id)?.installed === null),
+    all.length === 13 && all.every((b) => service.preview(b.id)?.installed === null),
     `checked ${all.length}`,
 )
 checkInvertible(
-    "every previewed blueprint carries the limitations, including that installation does not exist",
-    all.length === 9 && all.every((b) => {
+    "every previewed blueprint explains that registry preview does not read workspace installation state",
+    all.length === 13 && all.every((b) => {
         const p = service.preview(b.id)
         return (
             p !== null &&
             p.limitations.length > 0 &&
-            p.limitations.some((l) => /Installation does not exist yet/.test(l))
+            p.limitations.some((l) => /does not read a workspace's installed-blueprint record/.test(l))
         )
     }),
     `checked ${all.length}`,
 )
 checkInvertible(
     "every presentation block is tagged role-derived, so it cannot be read as blueprint-declared",
-    all.length === 9 && all.every((b) => service.preview(b.id)?.presentation.source === "role-derived"),
+    all.length === 13 && all.every((b) => service.preview(b.id)?.presentation.source === "role-derived"),
     `${all.length} role-derived`,
 )
 checkInvertible(
     "MEASURED: the owner console surface is never granted by a blueprint choice",
-    all.length === 9 && all.every((b) => {
+    all.length === 13 && all.every((b) => {
         const p = service.preview(b.id)
         return p !== null && p.presentation.businessOsRequiresOptIn === true && !p.presentation.surfaces.includes("businessOs")
     }),

@@ -79,11 +79,7 @@ function checkInvertible(name: string, condition: unknown, detail?: string) {
 // ---------------------------------------------------------------------------
 
 const EXPECTED_CANDIDATE_IDS = [
-  "salon-spa-v1",
-  "events-studio-v1",
-  "real-estate-brokerage-v1",
   "home-services-v1",
-  "recruitment-agency-v1",
   "clinic-practice-v1",
 ] as const
 
@@ -112,13 +108,13 @@ const candidates = listVerticalPackCandidates()
 // 1. Six unique candidate ids.
 // ---------------------------------------------------------------------------
 
-checkInvertible("exactly six candidates are declared", candidates.length === 6, `${candidates.length}`)
+checkInvertible("exactly two candidates remain unregistered", candidates.length === 2, `${candidates.length}`)
 
 const candidateIds = candidates.map((candidate) => candidate.blueprint.id)
 const uniqueCandidateIds = new Set(candidateIds)
 checkInvertible("candidate ids are unique", uniqueCandidateIds.size === candidateIds.length, candidateIds.join(", "))
 checkInvertible(
-  "the candidate id set is exactly the expected six",
+  "the candidate id set is exactly the expected two",
   EXPECTED_CANDIDATE_IDS.every((id) => uniqueCandidateIds.has(id)) && uniqueCandidateIds.size === EXPECTED_CANDIDATE_IDS.length,
   candidateIds.join(", "),
 )
@@ -146,7 +142,10 @@ for (const id of candidateIds) {
 // behavioural check alone would pass if blueprints.ts imported the candidates and merely failed to push
 // them, which is one edit away from shipping them.
 const blueprintsSource = readFileSync(join(APP_ROOT, "src/lib/business-os/blueprints.ts"), "utf8")
-checkInvertible("blueprints.ts does not reference the vertical-packs package", !/vertical-packs/.test(blueprintsSource))
+checkInvertible(
+  "blueprints.ts imports only the reviewed registered pack list, not the candidate list",
+  /listRegisteredVerticalPacks/.test(blueprintsSource) && !/listVerticalPackCandidates/.test(blueprintsSource),
+)
 for (const id of candidateIds) {
   checkInvertible(`blueprints.ts does not mention ${id}`, !blueprintsSource.includes(id))
 }
@@ -158,8 +157,8 @@ checkInvertible(
 
 // The registry itself must be untouched by this work.
 checkInvertible(
-  "the registry still contains exactly the pre-existing nine blueprints",
-  listBusinessBlueprints().length === 9,
+  "the registry contains the nine established blueprints plus four promoted packs",
+  listBusinessBlueprints().length === 13,
   `${listBusinessBlueprints().length}`,
 )
 
@@ -183,7 +182,6 @@ for (const candidate of candidates) {
 
 checkInvertible("the shared candidate status constant is draft", CANDIDATE_STATUS === "draft")
 for (const candidate of candidates) {
-  checkInvertible(`${candidate.blueprint.id} is not active`, candidate.blueprint.status !== "active")
   checkInvertible(
     `${candidate.blueprint.id} is draft, the most conservative non-active status`,
     candidate.blueprint.status === "draft",
@@ -192,7 +190,6 @@ for (const candidate of candidates) {
   checkInvertible(`${candidate.blueprint.id} declares readiness candidate-not-registered`, candidate.readiness === "candidate-not-registered")
   checkInvertible(`${candidate.blueprint.id} declares registered false`, candidate.registered === false)
   // `deprecated` would claim it was once live; `proposed` would claim it had been put forward.
-  checkInvertible(`${candidate.blueprint.id} is not marked deprecated`, candidate.blueprint.status !== "deprecated")
 }
 
 // ---------------------------------------------------------------------------
@@ -885,14 +882,13 @@ const promotionEvidence = candidates.map((candidate) => {
   const promoted = validateBusinessBlueprint({ ...candidate.blueprint, status: "active" })
   return { id: candidate.blueprint.id, wouldValidateIfActivated: promoted.ok, issues: promoted.issues.length }
 })
-// None of the six requires a partial capability (checked above), so all six would validate if activated.
-// That is exactly why status must be draft by declaration rather than by accident of the validator: the
-// contract does not stop a candidate being activated, so the pack has to.
+// Neither remaining candidate requires a partial capability, so both would validate if activated. That
+// is why their draft status must be deliberate rather than an accidental validator failure.
 checkInvertible(
   "every candidate is held non-active by declaration, not by the validator refusing it",
   promotionEvidence.every((entry) => entry.wouldValidateIfActivated) &&
-    promotionEvidence.length === 6 &&
-    candidates.length === 6 &&
+    promotionEvidence.length === 2 &&
+    candidates.length === 2 &&
     candidates.every((candidate) => candidate.blueprint.status === "draft"),
   JSON.stringify(promotionEvidence),
 )
@@ -921,7 +917,7 @@ check("the execution-claim fixture really contains both claim shapes", execution
 // (i) A candidate that WAS registered must be detectable. Simulated against the real registry set.
 checkInvertible(
   "a candidate id appearing in the registry would be detected",
-  !registryIds.has("salon-spa-v1") && registryIds.has("restaurant-venue-v3"),
+  !registryIds.has("home-services-v1") && registryIds.has("salon-spa-v1"),
 )
 check("the registry non-vacuity anchor still exists", getBusinessBlueprint("restaurant-venue-v3") !== null)
 

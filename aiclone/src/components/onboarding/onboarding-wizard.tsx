@@ -52,6 +52,10 @@ const NEED_ICON: Record<NeedId, typeof Store> = {
     show: FolderKanban,
     leads: Gift,
     field: Wrench,
+    salon: Sparkles,
+    eventStudio: Ticket,
+    estate: Store,
+    recruit: Briefcase,
     page: Sparkles,
 }
 

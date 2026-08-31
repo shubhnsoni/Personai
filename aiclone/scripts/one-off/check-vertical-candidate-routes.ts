@@ -2,7 +2,7 @@
  * check-vertical-candidate-routes.ts
  *
  * Executable contract for /api/business-os/vertical-candidates - the PROTECTED, READ-ONLY surface over
- * the six UNREGISTERED vertical pack candidates.
+ * the two vertical packs that remain UNREGISTERED after the reviewed promotion wave.
  *
  * WHAT THIS HARNESS EXISTS TO FALSIFY. A read-only API over something the repository guarantees is not
  * installable has exactly four ways to become a defect, and each one is asserted here rather than
@@ -83,11 +83,7 @@ const BASE = "https://app.test/api/business-os/vertical-candidates"
 const FAKE_DSN = "postgresql://bizos_user:sup3rs3cret@db.internal.example:5432/personalink?sslmode=require"
 
 const EXPECTED_CANDIDATE_IDS = [
-    "salon-spa-v1",
-    "events-studio-v1",
-    "real-estate-brokerage-v1",
     "home-services-v1",
-    "recruitment-agency-v1",
     "clinic-practice-v1",
 ] as const
 
@@ -480,8 +476,8 @@ async function main(): Promise<void> {
     const listData = dataOf(listed.body)
     const views = (listData.candidates ?? []) as VerticalCandidateView[]
 
-    checkInvertible("the payload carries all six candidates", views.length === 6, `${views.length}`)
-    checkInvertible("the payload reports the total", listData.total === 6, String(listData.total))
+    checkInvertible("the payload carries both remaining candidates", views.length === 2, `${views.length}`)
+    checkInvertible("the payload reports the total", listData.total === 2, String(listData.total))
     checkInvertible("the payload declares itself read-only", listData.readOnly === true, String(listData.readOnly))
     checkInvertible("the payload declares nothing installable", listData.installable === false, String(listData.installable))
     checkInvertible(
@@ -490,7 +486,7 @@ async function main(): Promise<void> {
         String(listData.registeredInRegistry),
     )
     checkInvertible(
-        "the payload ids are exactly the expected six",
+        "the payload ids are exactly the expected two",
         JSON.stringify(views.map((view) => view.id).sort()) === JSON.stringify([...EXPECTED_CANDIDATE_IDS].sort()),
         views.map((view) => view.id).join(","),
     )
@@ -530,7 +526,8 @@ async function main(): Promise<void> {
         checkInvertible(`${view.id} carries no executed workflow`, view.workflows.executed === false)
         checkInvertible(
             `${view.id} declares its workflow definitions as unexecuted`,
-            view.workflows.definitions.every((workflow) => workflow.executed === false),
+            view.workflows.definitions.length > 0 &&
+                view.workflows.definitions.every((workflow) => workflow.executed === false),
         )
         checkInvertible(
             `${view.id} marks proposed terminology and intended surfaces as unresolved`,
@@ -598,7 +595,7 @@ async function main(): Promise<void> {
     }
     checkInvertible(
         "no id returned by this surface appears in the blueprint registry",
-        views.every((view) => !registryIdsBefore.includes(view.id)),
+        views.length > 0 && views.every((view) => !registryIdsBefore.includes(view.id)),
         registryIdsBefore.join(","),
     )
 
@@ -825,9 +822,9 @@ async function main(): Promise<void> {
         candidatesWithClinicalBoundary.join(","),
     )
     check(
-        "MEASURED: salon-spa-v1 uses 'treatment' affirmatively as a service noun and still gets no clinical boundary, so the detector is not matching on the word alone",
-        JSON.stringify(getVerticalPackCandidate("salon-spa-v1")?.proposedTerminology ?? {}).includes("treatment") &&
-            !candidatesWithClinicalBoundary.includes("salon-spa-v1"),
+        "MEASURED: home-services-v1 remains non-clinical and receives no clinical boundary",
+        getVerticalPackCandidate("home-services-v1") !== null &&
+            !candidatesWithClinicalBoundary.includes("home-services-v1"),
     )
 
     report.clinicBoundary = {
