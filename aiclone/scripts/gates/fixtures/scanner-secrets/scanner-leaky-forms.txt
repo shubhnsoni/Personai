@@ -1,0 +1,32 @@
+[fixture:forms] Second-generation credential forms: the abbreviations and the schemeless
+[fixture:forms] DSNs an adversarial audit walked straight past. EVERY line below must produce
+[fixture:forms] a finding, and no line may survive redaction with any fragment of its value.
+[fixture:forms] Every value here is FABRICATED and matches nothing real. The fixture exists so
+[fixture:forms] scripts/gates/selftest.js can prove the scanner fires rather than assert it.
+[fixture:forms] Each line carries a [tag] the self-test anchors its expectation on.
+[abbr:plain] DB_PW=S3cr3tPassw0rd99
+[abbr:quoted] DB_PW="S3cr3tPassw0rd99"
+[abbr:single] DB_PW='S3cr3tPassw0rd99'
+[abbr:spaced] DB_PW = S3cr3tPassw0rd99
+[abbr:colon] DB_PW:  S3cr3tPassw0rd99
+[abbr:export] export DB_PW=S3cr3tPassw0rd99
+[abbr:bare-pw] pw: S3cr3tPassw0rd99
+[abbr:bare-pass] pass: S3cr3tPassw0rd99
+[abbr:db-pass] DB_PASS=S3cr3tPassw0rd99
+[abbr:mysql-pwd] MYSQL_PWD=S3cr3tPassw0rd99
+[abbr:dotted] db.pass=S3cr3tPassw0rd99
+[abbr:multi-segment] AIC_DB_PW=S3cr3tPassw0rd99
+[dsn:mysql] mysql://root:S3cr3tPassw0rd99@db.internal:3306/appdb
+[dsn:mongodb-srv] mongodb+srv://svc:S3cr3tPassw0rd99@cluster0.example.net/appdb
+[dsn:redis] redis://default:S3cr3tPassw0rd99@cache.internal:6379/0
+[dsn:amqps] amqps://svc:S3cr3tPassw0rd99@broker.internal:5671/vhost
+[dsn:pct-password] mysql://root:p%40ss%3AS3cr3t99@db.internal:3306/appdb
+[dsn:tcp] root:S3cr3tPassw0rd99@tcp(127.0.0.1:3306)/appdb?parseTime=true
+[dsn:unix] root:S3cr3tPassw0rd99@unix(/var/run/mysqld.sock)/appdb
+[dsn:bare-postgres-port] svc_writer:S3cr3tPassw0rd99@db.internal:5432/appdb
+[dsn:bare-mysql-port] root:S3cr3tPassw0rd99@127.0.0.1:3306
+[kw:libpq] host=db.internal port=5432 user=svc password=S3cr3tPassw0rd99 dbname=appdb
+[kw:libpq-quoted] host=db.internal user=svc password='S3cr3t Passw0rd 99' dbname=appdb
+[jdbc:userinfo] jdbc:postgresql://svc:S3cr3tPassw0rd99@db.internal:5432/appdb
+[jdbc:query] jdbc:mysql://db.internal:3306/appdb?user=root&password=S3cr3tPassw0rd99
+[jdbc:semicolon] jdbc:sqlserver://db.internal:1433;user=sa;password=S3cr3tPassw0rd99

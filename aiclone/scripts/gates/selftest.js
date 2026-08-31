@@ -125,6 +125,54 @@ function runProbe(probe) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Second-generation credential-form cases (appended; nothing above is changed,
+// renumbered or deleted — the counts the earlier cases pin, 22 findings on the
+// original leaky fixture, 202 on the pathological line and 4 entries in
+// ITERATED_PATTERNS, all still hold and are re-proved by this run).
+//
+// WHAT THESE ARE FOR. An adversarial audit fed the scanner `DB_PW=…` and `pw: …`
+// and both passed through COMPLETELY UNREPORTED AND UNREDACTED, because the
+// abbreviations real configuration uses were in neither the keyword vocabulary
+// nor SECRET_ENV_NAMES. The same survey then found three more shapes with no
+// scheme for URI_USERINFO_ANY to anchor on. Each case below pins one form: the
+// fixture line proving it fires, and — in the same probe or its sibling — the
+// realistic near-miss proving it does not over-fire.
+// ---------------------------------------------------------------------------
+
+const LEAKY_FORMS = "scanner-leaky-forms.txt";
+const SAFE_FORMS = "scanner-safe-forms.txt";
+
+/**
+ * Every fabricated value in scanner-leaky-forms.txt, plus the fragments a
+ * half-finished redaction would leave behind. "S3cr3t" and "Passw0rd" are listed
+ * separately on purpose: the quoted-value defect this package closed leaked
+ * exactly that way, as `password='<redacted> Passw0rd 99'`.
+ */
+const FORM_SECRET_MATERIAL = [
+  "S3cr3tPassw0rd99",
+  "S3cr3t Passw0rd 99",
+  "p%40ss%3AS3cr3t99",
+  "S3cr3t",
+  "Passw0rd",
+  "0rd 99",
+];
+
+/** The [tag] a fixture line opens with, or null for an untagged line. */
+function tagOf(line) {
+  const match = /^\[[^\]]+\]/.exec(line);
+  return match ? match[0] : null;
+}
+
+/** Tags of the lines redact() rewrites, so the rewritten set can be pinned exactly. */
+function rewrittenTags(text) {
+  return text
+    .split(/\r?\n/)
+    .filter((line) => line !== "" && SCANNER.redact(line, []) !== line)
+    .map((line) => tagOf(line))
+    .sort();
+}
+
 const CASES = [
   {
     name: "baseline-green",
@@ -510,6 +558,76 @@ const CASES = [
       r.probe.publishableKeySurvives === true &&
       r.probe.base64Survives === true &&
       r.probe.digestSurvives === true,
+  },
+  {
+    name: "scanner-second-generation-forms-all-fire",
+    why: "every abbreviation and schemeless DSN an adversarial audit walked past must now produce a finding, and none may survive redaction",
+    probe: () => {
+      const text = readScannerFixture(LEAKY_FORMS);
+      const findings = SCANNER.scanForLeaks(text, { label: "leaky-forms-fixture" });
+      const serialised = JSON.stringify(findings);
+      const redacted = SCANNER.redact(text, []);
+
+      // A credential line that produces NO finding is the failure this case
+      // exists to catch, so it is reported by tag rather than as a bare count.
+      const byLine = new Map();
+      for (const f of findings) byLine.set(f.line, (byLine.get(f.line) || 0) + 1);
+      const silent = text
+        .split(/\r?\n/)
+        .map((line, i) => ({ tag: tagOf(line), n: byLine.get(i + 1) || 0, line }))
+        .filter((e) => e.tag !== null && !e.tag.startsWith("[fixture:") && e.n === 0)
+        .map((e) => e.tag);
+
+      return {
+        findingCount: findings.length,
+        silent,
+        patterns: [...new Set(findings.map((f) => f.pattern))].sort(),
+        leaked: FORM_SECRET_MATERIAL.filter((s) => serialised.includes(s) || redacted.includes(s)),
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      // Not one tagged credential line may pass unreported.
+      r.probe.silent.length === 0 &&
+      r.probe.findingCount === 27 &&
+      // All five forms have to be exercised, or a pattern could rot unnoticed.
+      r.probe.patterns.join(",") ===
+        "DSN_BARE_USERINFO,DSN_TCP_PASSWORD,DSN_WITH_PASSWORD,PASSWORD_KV,PASSWORD_KV_QUOTED" &&
+      // And the whole point: no fragment of any value escapes, in findings or output.
+      r.probe.leaked.length === 0,
+  },
+  {
+    name: "scanner-second-generation-near-misses-stay-untouched",
+    why: "widening the vocabulary must not start reporting prose, code, paths, remotes, digests or the driver's own summary lines",
+    probe: () => {
+      const text = readScannerFixture(SAFE_FORMS);
+      const findings = SCANNER.scanForLeaks(text, { label: "safe-forms-fixture" });
+      const redacted = SCANNER.redact(text, []);
+      return {
+        findings: findings.map((f) => `${f.pattern}@line${f.line}`),
+        // Exactly which lines redaction rewrites, pinned by tag. Only the two
+        // documentation DSNs are credential-SHAPED enough to be over-approximated.
+        rewritten: rewrittenTags(text),
+        // The regression that made green unreachable once: a short password
+        // turned the driver's own summary into a critical finding and corrupted
+        // it mid-word. These two lines are that exact shape.
+        summaryLineIntact: redacted.includes("SUMMARY mode=normal passed=41 failed=0"),
+        driverSummaryIntact: redacted.includes('database: "postgres_rehearsal_20260826" host: localhost trueDepth: 3'),
+        // A word merely ENDING in a keyword is not a credential key.
+        wordEndingsIntact: redacted.includes("bypass=true encompass=false compass=north surpass=1"),
+        npmScopeIntact: redacted.includes("node_modules/@babel/preset-env and @scope/pkg@1.2.3"),
+        gitRemoteIntact: redacted.includes("git@github.com:org/repo.git"),
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      r.probe.findings.length === 0 &&
+      r.probe.rewritten.join(" ") === "[safe:doc-bare] [safe:doc-tcp]" &&
+      r.probe.summaryLineIntact === true &&
+      r.probe.driverSummaryIntact === true &&
+      r.probe.wordEndingsIntact === true &&
+      r.probe.npmScopeIntact === true &&
+      r.probe.gitRemoteIntact === true,
   },
   {
     name: "scanner-redaction-is-a-scan-fixed-point",

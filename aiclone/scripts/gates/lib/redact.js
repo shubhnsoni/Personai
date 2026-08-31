@@ -41,9 +41,10 @@
  * loop counter anywhere in this file, and none is needed.
  *
  *   T1. NO ITERATED PATTERN CAN MATCH THE EMPTY STRING. Every regex in
- *       ITERATED_PATTERNS has a mandatory literal core ("://" + "@", or a
- *       keyword + "=" / ":", or the "sk_live_" / "sk_test_" prefix), so its
- *       shortest possible match is several characters long, never zero.
+ *       ALL_ITERATED_PATTERNS has a mandatory literal core ("://" + "@", or a
+ *       keyword + "=" / ":", or the "sk_live_" / "sk_test_" prefix, or "@tcp(" /
+ *       "@unix(", or a "user:password@host:" followed by a known database port),
+ *       so its shortest possible match is several characters long, never zero.
  *       assertPatternsCannotMatchEmpty() proves that at MODULE LOAD: this file
  *       refuses to load if a future edit introduces an empty-matchable pattern,
  *       so the bad state cannot reach a gate run at all.
@@ -205,9 +206,113 @@ const DATABASE_SCHEMES = new Set([
 /**
  * libpq / JDBC style key=value secrets. Covers KEY=v, KEY="v", KEY='v',
  * KEY = v, KEY:  v and `export KEY=v` (the \b matches after the space).
- * Shortest possible match "pwd=" — four characters, never empty (T1).
+ *
+ * VOCABULARY. The long spellings were here from the start, and an adversarial
+ * audit then walked straight past both of these:
+ *     DB_PW=S3cr3tPassw0rd99
+ *     pw: S3cr3tPassw0rd99
+ * unreported AND unredacted, because the abbreviations real configuration
+ * actually uses appeared in neither this vocabulary nor SECRET_ENV_NAMES. The key
+ * is now
+ *     [optional dotted / underscored prefix] + password|passwd|pwd|pw|pass
+ * which admits DB_PW, DB_PASS, AIC_DB_PW, MYSQL_PWD, db.pass and redis-pass.
+ * PGPASSWORD is spelled out separately: "PG" is glued to "PASSWORD" with no
+ * separator for the prefix branch to split on.
+ *
+ * THE PREFIX MUST END IN `_`, `.` OR `-`, AND THAT IS LOAD-BEARING. An
+ * unrestricted prefix promotes every word ENDING in a keyword to a credential
+ * key — `bypass=true`, `compass=north`, `encompass=false` all match
+ * `<anything>pass=<value>` — and a PASSWORD_KV finding is FATAL inside a
+ * driver-authored summary. Prose never writes `by_pass=`, so demanding the
+ * separator is what separates a configuration key from an English word.
+ *
+ * There is no suffix allowance, for the same reason. It is also why `passed=41`,
+ * which the driver's own SUMMARY lines carry, cannot match: after `pass` the
+ * pattern demands `=` or `:` and finds `e`.
+ *
+ * Shortest possible match "pw=" — three characters, never empty (T1).
  */
-const PASSWORD_KV = /\b(password|passwd|pwd|pgpassword)\s*["']?\s*[=:]\s*["']?([^\s"',;&)}\]]*)/gi;
+const PASSWORD_KV =
+  /\b((?:[A-Za-z0-9_.-]{0,40}[_.-])?(?:password|passwd|pwd|pw|pass)|pgpassword)\s*["']?\s*[=:]\s*["']?([^\s"',;&)}\]]*)/gi;
+
+/**
+ * The two abbreviations that are also ordinary words in prose and code, WHEN THEY
+ * CARRY NO QUALIFYING PREFIX. These are measured collisions, every one of them
+ * real text from a tree on this machine rather than an imagined risk:
+ *     let pass = true;                    pass: true
+ *     // First pass: group messages       // Second pass: reconstruct the list
+ *     debug("pw:android")                 debug("pw:adb:runCommand")
+ * A two-to-four letter abbreviation is too weak an anchor to overrule that, so a
+ * value under a BARE `pw` / `pass` must carry a digit before it is reported or
+ * rewritten (isReportablePasswordValue). Every other spelling — `pwd`, `passwd`,
+ * `password`, `pgpassword`, and ANY prefixed form such as `DB_PW` — keeps the
+ * original no-floor behaviour, because none of those occurs in prose.
+ *
+ * What that gives up: an all-letter password written after a bare `pw:` or
+ * `pass:`. It is still caught in every other context that identifies it as a
+ * credential — a prefixed key, a longer keyword, a DSN userinfo, a quoted value —
+ * so the loss is narrow, and it is a far better trade than a scanner that goes
+ * red on `let pass = true;`.
+ */
+const BARE_SHORT_PASSWORD_KEYS = new Set(["pw", "pass"]);
+
+/**
+ * A quoted credential whose value CONTAINS WHITESPACE — the one assignment form
+ * PASSWORD_KV structurally cannot finish. Its value class stops at the first
+ * space, so `password='S3cr3t Passw0rd 99'` was rewritten to
+ * `password='<redacted> Passw0rd 99'`: two thirds of the credential survived in
+ * the log, and the finding's own sample carried it. libpq's keyword connection
+ * string (`host=… user=… password='…'`) is exactly where that spelling lives.
+ *
+ * The value is captured as a plain bounded class up to the closing quote, and the
+ * "contains whitespace" test is applied in JS instead of in the pattern: a regex
+ * of the form `[^"]*[ \t][^"]*` backtracks quadratically on a long unterminated
+ * quote, and a scanner that a log line can make slow is a scanner that hangs a
+ * gate. A quoted value with no whitespace is left to PASSWORD_KV, which already
+ * covers it, so the two never both fire on the same span.
+ *
+ * Shortest possible match `pw=" "` — six characters, never empty (T1).
+ */
+const QUOTED_PASSWORD_KV =
+  /\b((?:[A-Za-z0-9_.-]{0,40}[_.-])?(?:password|passwd|pwd|pw|pass)|pgpassword)\s*[=:]\s*(?:"([^"\r\n]{1,200})"|'([^'\r\n]{1,200})')/gi;
+
+/**
+ * Go's database/sql DSN — `user:password@tcp(host:port)/dbname`, and its
+ * `@unix(/var/run/mysqld.sock)` sibling. There is no `://` anywhere in it, so
+ * URI_USERINFO_ANY never saw it and the entire credential passed through
+ * unreported and unredacted.
+ *
+ * The anchor is the literal `@tcp(` / `@unix(`, never punctuation alone: that is
+ * what keeps this pattern off `node_modules/@scope/pkg`, off
+ * `git@github.com:org/repo.git` and off a mail address, none of which is followed
+ * by a host-function call.
+ *
+ * Shortest possible match "a:b@tcp()" — nine characters, never empty (T1).
+ */
+const GO_TCP_DSN =
+  /(?<![A-Za-z0-9_.\-:/@])([A-Za-z0-9_.+-]{1,64}):([^\s:@/\\"']{1,200})@(tcp|unix)\(([^\s()]{0,255})\)/g;
+
+/**
+ * A bare `user:password@host:PORT` with no scheme at all, admitted ONLY when the
+ * port is a well-known database port. psql/mysql invocations, docker-compose
+ * environment blocks and copy-pasted connection details all take this shape, and
+ * none of them carries a scheme for URI_USERINFO_ANY to anchor on.
+ *
+ * WHY THE PORT LIST EXISTS. The general form of this — a bare `\S+:\S+@` match —
+ * is DELIBERATELY REFUSED in this file and stays refused: it eats
+ * `node_modules/@scope/…` paths, `git@host:path` remotes and mail addresses, and
+ * it is anchored on nothing but punctuation. A known database port is a real
+ * literal, so every finding this raises still has a reason it can name.
+ *
+ * The lookbehind keeps the pattern off a span a scheme already owns: in
+ * `postgresql://gateuser:hunter2@127.0.0.1:5432/db` the userinfo is preceded by
+ * `/`, so URI_USERINFO_ANY reports it once and this does not report it twice.
+ * `(?![0-9])` rather than `\b` after the port stops `:54321` being read as 5432.
+ *
+ * Shortest possible match "a:b@c:6379" — ten characters, never empty (T1).
+ */
+const BARE_USERINFO_DB_PORT =
+  /(?<![A-Za-z0-9_.\-:/@])([A-Za-z0-9_.+-]{1,64}):([^\s:@/\\"']{1,200})@([A-Za-z0-9_.-]{1,255}):(5432|5433|3306|3307|1433|27017|6379|8123|9000)(?![0-9])/g;
 
 /**
  * Assignment whose KEY NAME carries a secret word, for the same six assignment
@@ -273,6 +378,27 @@ const ITERATED_PATTERNS = {
 };
 
 /**
+ * Patterns added when the credential-form survey closed the schemeless and
+ * quoted-value gaps. They are iterated by scanForLeaks exactly like the four
+ * above and are under exactly the same T1 obligation — the assertion below runs
+ * over the UNION, so a pattern here that could match empty stops this file from
+ * loading just the same.
+ *
+ * They live in a second object for one reason, and it is a boring one: the SIZE
+ * of ITERATED_PATTERNS is itself pinned by a self-test case, and widening the
+ * scanner must not force an edit to a guard whose meaning did not change. A
+ * further case pins the size of the union, so neither set can grow unobserved.
+ */
+const ITERATED_PATTERNS_EXTENDED = {
+  QUOTED_PASSWORD_KV,
+  GO_TCP_DSN,
+  BARE_USERINFO_DB_PORT,
+};
+
+/** The real obligation: every pattern this module iterates, in one object. */
+const ALL_ITERATED_PATTERNS = { ...ITERATED_PATTERNS, ...ITERATED_PATTERNS_EXTENDED };
+
+/**
  * Inputs used to hunt for a zero-length match at a position other than 0, which
  * `test("")` alone cannot find (a pattern can be non-empty at the start of the
  * subject and still match empty later — /(?<=a)b?/ does).
@@ -298,6 +424,27 @@ const EMPTY_MATCH_PROBES = [
   "sk_test_x",
   "%3A",
   "postgres://user@host",
+  // Probes for the schemeless / quoted forms. Each one is a truncation of a real
+  // shape, so a future edit that makes any of these patterns optional-only is
+  // caught at module load rather than in a gate run.
+  "pw",
+  "pw=",
+  "pw:1",
+  "pass=",
+  "_pass=",
+  "DB_PW=",
+  "pw=''",
+  "pw=' '",
+  "pw=\"\"",
+  "tcp()",
+  "@tcp(",
+  "a:b@tcp()",
+  "a:b@unix(/x)",
+  ":@",
+  "a:b@c:",
+  "a:b@c:5432",
+  "a:b@c:54321",
+  "postgres://user:pw@host:5432/db",
   "postgres://user:pw@host/db password=x secret=yyyyyyyyyyyy sk_live_" + "A1b2C3d4E5f6G7h8I9j0",
 ];
 
@@ -353,7 +500,7 @@ function assertPatternsCannotMatchEmpty(patterns) {
   return true;
 }
 
-assertPatternsCannotMatchEmpty(ITERATED_PATTERNS);
+assertPatternsCannotMatchEmpty(ALL_ITERATED_PATTERNS);
 assertPatternsCannotMatchEmpty({ USERINFO_PASSWORD });
 
 function isPlaceholder(value) {
@@ -417,6 +564,47 @@ function isSecretishValue(value, minLength = 1) {
   if (isPlaceholder(text)) return false;
   if (looksLikeDocumentation(text)) return false;
   return true;
+}
+
+/**
+ * Report/rewrite decision for a PASSWORD_KV span.
+ *
+ * BOTH CHANNELS ASK THIS ONE QUESTION, ON PURPOSE. The usual asymmetry —
+ * redact() over-approximates, scanForLeaks() under-approximates — is safe for a
+ * tutorial DSN, whose rewriting costs a reader nothing. It is NOT safe here: a
+ * redact() that fired on `pass = true` would rewrite a log it was asked to make
+ * readable into `pass = <redacted>`, which is the mid-word corruption class this
+ * file already had to fix once for short bare literals. So the digit condition on
+ * the bare abbreviations is a property of the SPAN, and both channels read it the
+ * same way.
+ *
+ * @param {string} key the matched key name, exactly as written in the text
+ * @param {string} value the matched value
+ */
+function isReportablePasswordValue(key, value) {
+  if (!isSecretishValue(value)) return false;
+  if (!BARE_SHORT_PASSWORD_KEYS.has(String(key ?? "").toLowerCase())) return true;
+  return /[0-9]/u.test(String(value ?? ""));
+}
+
+/**
+ * Report/rewrite decision for a QUOTED_PASSWORD_KV span.
+ *
+ * A value with no whitespace belongs to PASSWORD_KV, which already covers it, so
+ * this returns false for it and the two patterns never double-report. The
+ * whitespace is then normalised to `_` before the value is judged, which is what
+ * lets the existing documentation vocabulary recognise `"your password here"`
+ * for what it is — isProse() cannot see past a space on its own.
+ */
+function isReportableQuotedPassword(key, value) {
+  const text = String(value ?? "");
+  if (!/\s/u.test(text)) return false;
+  return isReportablePasswordValue(key, text.replace(/\s+/gu, "_"));
+}
+
+/** The value group of a QUOTED_PASSWORD_KV match: double-quoted, else single. */
+function quotedPasswordValue(match) {
+  return match[2] === undefined ? match[3] : match[2];
 }
 
 /**
@@ -538,13 +726,42 @@ function redact(text, secretLiterals = []) {
     return `${scheme}://${REDACTED}@${REDACTED}`;
   });
 
+  // After URI_USERINFO_ANY, so a span a scheme already owns is gone before the
+  // schemeless patterns look at it. Both replacements drop `<redacted>` where a
+  // `user:password@` used to be, and neither pattern can match `<redacted>@…`
+  // (its user class has no `<`, and no colon survives before the `@`), so both
+  // stay idempotent. Both rewrite unconditionally, exactly as URI_USERINFO_ANY
+  // does: a documentation DSN is rewritten too, because nothing innocent is
+  // shaped like `user:pw@tcp(…)` or `user:pw@host:5432` and a reader loses
+  // nothing. The reporting side is the one that under-approximates.
+  out = out.replace(GO_TCP_DSN, (match, user, password, hostKind) => `${REDACTED}@${hostKind}(${REDACTED})`);
+
+  out = out.replace(
+    BARE_USERINFO_DB_PORT,
+    (match, user, password, host, port) => `${REDACTED}@${REDACTED}:${port}`,
+  );
+
   // The key TYPE is kept and the material is not: a reader needs to know a live
   // Clerk key leaked rather than a test one, and "sk_live_<redacted>" cannot be
   // re-matched by SK_KEY_SHAPE, so this stays idempotent.
   out = out.replace(SK_KEY_SHAPE, (match, kind) => `sk_${kind}_${REDACTED}`);
 
+  // Before PASSWORD_KV, so a whitespace-bearing quoted value is replaced whole
+  // rather than up to its first space. The result carries no whitespace inside the
+  // quotes, so this pattern cannot match its own output.
+  out = out.replace(QUOTED_PASSWORD_KV, (match, key, doubleQuoted, singleQuoted) => {
+    const value = doubleQuoted === undefined ? singleQuoted : doubleQuoted;
+    if (!isReportableQuotedPassword(key, value)) return match;
+    return match.slice(0, match.length - value.length - 1) + REDACTED + match.slice(match.length - 1);
+  });
+
   out = out.replace(PASSWORD_KV, (match, key, value) => {
     if (value === "" || PLACEHOLDERS.has(String(value).toLowerCase())) return match;
+    // The same question the scan asks. A bare `pw` / `pass` whose value is prose
+    // is left alone here too: rewriting `pass = true` to `pass = <redacted>`
+    // corrupts innocent output, which is the defect class this file exists to
+    // avoid, and it would put the two channels into open disagreement.
+    if (!isReportablePasswordValue(key, value)) return match;
     return match.slice(0, match.length - value.length) + REDACTED;
   });
 
@@ -572,7 +789,11 @@ function redact(text, secretLiterals = []) {
  *   DSN_WITH_PASSWORD         scheme://user:password@…
  *   DSN_ENCODED_PASSWORD      scheme://user%3Apassword@… — separator percent-encoded
  *   DSN_USERINFO_NO_PASSWORD  scheme://user@… on a database scheme
- *   PASSWORD_KV               password/passwd/pwd/pgpassword assignment
+ *   DSN_TCP_PASSWORD          user:password@tcp(host:port)/db — Go's schemeless DSN
+ *   DSN_BARE_USERINFO         user:password@host:5432 — no scheme, known database port
+ *   PASSWORD_KV               password/passwd/pwd/pw/pass/pgpassword assignment,
+ *                             with or without a DB_/MYSQL_-style prefix
+ *   PASSWORD_KV_QUOTED        the same, quoted, with whitespace inside the value
  *   SECRET_ASSIGNMENT         a key name containing secret / token / api_key / …
  *   SECRET_KEY_SHAPE          sk_live_… / sk_test_… key material
  */
@@ -610,7 +831,23 @@ function scanForLeaks(text, { secretLiterals = [], label = "input" } = {}) {
 
     for (const match of matchSpans(line, PASSWORD_KV)) {
       // No length floor: the key names the field, so any real value is a leak.
-      if (isSecretishValue(match[2])) push("PASSWORD_KV", "shape");
+      // The one condition is on a BARE `pw` / `pass`, whose collisions with prose
+      // and code are real and measured — see BARE_SHORT_PASSWORD_KEYS.
+      if (isReportablePasswordValue(match[1], match[2])) push("PASSWORD_KV", "shape");
+    }
+
+    for (const match of matchSpans(line, QUOTED_PASSWORD_KV)) {
+      if (isReportableQuotedPassword(match[1], quotedPasswordValue(match))) push("PASSWORD_KV_QUOTED", "shape");
+    }
+
+    for (const match of matchSpans(line, GO_TCP_DSN)) {
+      // Judge the password, so `user:password@tcp(host:port)/dbname` — the line
+      // every Go driver README opens with — is documentation, not a finding.
+      if (isSecretishValue(match[2])) push("DSN_TCP_PASSWORD", "shape");
+    }
+
+    for (const match of matchSpans(line, BARE_USERINFO_DB_PORT)) {
+      if (isSecretishValue(match[2])) push("DSN_BARE_USERINFO", "shape");
     }
 
     for (const match of matchSpans(line, SECRET_ASSIGNMENT)) {
@@ -631,8 +868,13 @@ module.exports = {
   REDACTED,
   DATABASE_SCHEMES,
   ITERATED_PATTERNS,
+  ITERATED_PATTERNS_EXTENDED,
+  ALL_ITERATED_PATTERNS,
+  BARE_SHORT_PASSWORD_KEYS,
   assertPatternsCannotMatchEmpty,
   collectSecretLiterals,
+  isReportablePasswordValue,
+  isReportableQuotedPassword,
   isSecretishValue,
   looksLikeDocumentation,
   matchSpans,

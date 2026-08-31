@@ -1,0 +1,37 @@
+[safe:forms] Near-misses for the second-generation forms. NOTHING here may produce a finding
+[safe:forms] of any kind. Redaction is held to the narrower rule this module already documents:
+[safe:forms] it over-approximates on a credential-SHAPED span (the two [safe:doc-...] DSN lines
+[safe:forms] below are rewritten whole, exactly as the existing [safe:doc-dsn] line is), but it
+[safe:forms] must leave prose, code, paths, remotes, digests and driver summary text BYTE-
+[safe:forms] IDENTICAL: a scanner that rewrites those corrupts the log someone is reading to
+[safe:forms] find out why a gate failed, which is how `postgres_rehearsal` once became
+[safe:forms] `<redacted>gres_rehearsal`. The self-test pins the rewritten set to exactly those
+[safe:forms] two lines, so a widening that starts touching prose is caught.
+[safe:forms] Most lines below are real text copied from working trees on this machine rather
+[safe:forms] than imagined risks: prose, a debug namespace, a loop variable, a path, a remote.
+[safe:prose-password] the password policy requires at least 12 characters and one digit
+[safe:prose-pass] // First pass: group messages by tool use ID
+[safe:prose-pass-2] // Second pass: reconstruct the message list in the correct order
+[safe:code-pass] let pass = true;
+[safe:yaml-pass] pass: true
+[safe:pw-namespace] debug("pw:android")("Stopping the old driver")
+[safe:pw-namespace-2] debug("pw:adb:runCommand")(command, serial)
+[safe:word-endings] bypass=true encompass=false compass=north surpass=1
+[safe:doc-abbr] DB_PW=your_password_here
+[safe:doc-abbr-placeholder] pw: <your-password>
+[safe:doc-abbr-repeated] DB_PASS=xxxxxxxx
+[safe:doc-tcp] the Go DSN format is user:password@tcp(host:port)/dbname
+[safe:doc-bare] the psql shorthand is user:password@host:5432/dbname
+[safe:windows-path] artefacts: C:\Users\dev\AppData\Local\Temp\personai-gates-selftest-u7Rqn9
+[safe:npm-scope] resolved node_modules/@babel/preset-env and @scope/pkg@1.2.3
+[safe:git-remote] fetched from git@github.com:org/repo.git
+[safe:digest] "manifestSha256": "9f2c1b7d4e6a8c0f2b4d6e8a0c2e4f6a8b0d2f4e6a8c0e2f4b6d8a0c2e4f6b8d"
+[safe:summary-line] SUMMARY mode=normal passed=41 failed=0
+[safe:driver-summary] database: "postgres_rehearsal_20260826" host: localhost trueDepth: 3
+[safe:pgpassfile] PGPASSFILE=/home/svc/.pgpass
+[safe:non-db-port] deploy:preview@host:8080 is a preview slot, not a database
+[safe:longer-port] svc:handle@db.internal:54321 is not port 5432
+[safe:email-port] ops@example.com:5432 in the runbook contact list
+[safe:jdbc-no-userinfo] jdbc:postgresql://db.internal:5432/appdb names a host and no account
+[safe:redacted-tcp] <redacted>@tcp(<redacted>)/appdb
+[safe:redacted-bare] <redacted>@<redacted>:5432/appdb
