@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Check, Copy, Download, Share2 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
@@ -18,21 +18,20 @@ export function QrCard({
     compact?: boolean
 }) {
     const [src, setSrc] = useState<string | null>(null)
-    const [look, setLook] = useState<QrStyle | null>(null)
+    const [pickedLook, setPickedLook] = useState<QrStyle | null>(null)
     const [copied, setCopied] = useState(false)
     const { resolvedTheme } = useTheme()
-    const picked = useRef(false)
+
+    // Derived, not state: an explicit user pick wins, otherwise the look follows the resolved
+    // theme. This replaces the effect that synchronised `look` to resolvedTheme together with the
+    // `picked` ref that made that sync one-shot.
+    const look: QrStyle | null = pickedLook ?? (resolvedTheme ? (resolvedTheme === "light" ? "ink" : "cyan") : null)
 
     // Derived, not state: the url only ever depended on `slug` and the browser origin, and it is
     // never rendered into markup (only read by the draw effect and the copy/share handlers), so
     // computing it during render cannot produce a hydration mismatch.
     const origin = typeof window !== "undefined" ? window.location.origin : ""
     const url = `${origin}/${slug}?ref=qr`
-
-    useEffect(() => {
-        if (picked.current || !resolvedTheme) return
-        setLook(resolvedTheme === "light" ? "ink" : "cyan")
-    }, [resolvedTheme])
 
     useEffect(() => {
         if (!url || !look) return
@@ -98,10 +97,7 @@ export function QrCard({
                         <button
                             key={item.id}
                             type="button"
-                            onClick={() => {
-                                picked.current = true
-                                setLook(item.id)
-                            }}
+                            onClick={() => setPickedLook(item.id)}
                             className={cn(
                                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px]",
                                 look === item.id
