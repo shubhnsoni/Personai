@@ -21,8 +21,25 @@ import { listBusinessBlueprints, listBusinessEngines } from "../../src/lib/busin
 const report: Record<string, unknown> = {}
 const failures: string[] = []
 
+/**
+ * ASSERTION EVIDENCE. Counted inside the real helper - which the late `checkInvertible`
+ * in the S6-A section also routes through - so the number the gate reads is produced by the
+ * same call that decides the verdict. These count assertion CALLS (each iteration of a loop
+ * that calls check is one), never the number of rendered DOM nodes, lucide icons, routes,
+ * component source files read, or rendered bytes. Not a literal: neuter the helper and the
+ * count collapses; fail one assertion and `assertionsPassed` drops below `assertionsRun`
+ * while `failures` sets a non-zero exit.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function check(name: string, condition: unknown, detail?: string) {
-    if (!condition) failures.push(detail ? `${name}: ${detail}` : name)
+    assertionsRun += 1
+    if (!condition) {
+        failures.push(detail ? `${name}: ${detail}` : name)
+        return
+    }
+    assertionsPassed += 1
 }
 
 const blueprints = listBusinessBlueprints()
@@ -1895,5 +1912,15 @@ report.headingSequence = headingSequence
 report.result = failures.length === 0 ? "PASS" : "FAIL"
 report.failures = failures
 report.s6aSectionFailures = s6aFailureCount
+report.assertionsRun = assertionsRun
+report.assertionsPassed = assertionsPassed
 console.log(JSON.stringify(report, null, 2))
+
+// Machine-readable assertion evidence for scripts/gates/run-gates.js. Both numbers come
+// from the counters incremented inside check() above, so they cannot claim more than
+// actually ran. The GATE-EVIDENCE line must be the WHOLE line and name this file exactly,
+// or the driver reports EVIDENCE_IDENTITY_MISMATCH.
+console.log(`GATE-EVIDENCE harness=check-business-os-a11y.ts assertions=${assertionsPassed}`)
+console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+
 if (failures.length > 0) process.exitCode = 1

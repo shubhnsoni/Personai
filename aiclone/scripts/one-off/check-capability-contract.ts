@@ -26,8 +26,24 @@ const failures: string[] = []
  */
 const INVERT = process.env.INVERT_ASSERTION === "1"
 
+/**
+ * ASSERTION EVIDENCE. Counted inside the real `check`, which `checkInvertible` also
+ * routes through, so every contract assertion - and only assertions - increments the
+ * counters. The number is the count of assertion CALLS (each loop iteration that calls
+ * check is one), never the number of blueprints, engines or capabilities discovered.
+ * Not a literal anywhere: neuter the helper and the count collapses; fail one assertion
+ * and `assertionsPassed` drops below `assertionsRun` while `failures` sets a non-zero exit.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function check(name: string, condition: unknown, detail?: string) {
-  if (!condition) failures.push(detail ? `${name}: ${detail}` : name)
+  assertionsRun += 1
+  if (!condition) {
+    failures.push(detail ? `${name}: ${detail}` : name)
+    return
+  }
+  assertionsPassed += 1
 }
 
 function checkInvertible(name: string, condition: unknown, detail?: string) {
@@ -608,6 +624,16 @@ report.waveE = {
 }
 report.result = failures.length === 0 ? "PASS" : "FAIL"
 report.failures = failures
+report.assertionsRun = assertionsRun
+report.assertionsPassed = assertionsPassed
 
 console.log(JSON.stringify(report, null, 2))
+
+// Machine-readable assertion evidence for scripts/gates/run-gates.js. Both numbers
+// come from the counters incremented inside check() above, so they cannot claim more
+// than actually ran. The GATE-EVIDENCE line must be the WHOLE line and name this file
+// exactly, or the driver reports EVIDENCE_IDENTITY_MISMATCH.
+console.log(`GATE-EVIDENCE harness=check-capability-contract.ts assertions=${assertionsPassed}`)
+console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+
 if (failures.length > 0) process.exitCode = 1

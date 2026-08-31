@@ -28,9 +28,26 @@ import { MAX_BLUEPRINT_LIMIT, parseBlueprintId, parseLimit } from "../../src/lib
 const report: Record<string, unknown> = {}
 const failures: string[] = []
 
+/**
+ * ASSERTION EVIDENCE. Counted inside the real helper, so the number the gate reads
+ * is produced by the same call that decides the verdict - there is no separate tally
+ * that could drift from the checks. Deliberately not a literal: a hard-coded total
+ * would keep printing a healthy count after someone deleted half the assertions.
+ * Every call increments `assertionsRun`; only a call whose condition held increments
+ * `assertionsPassed`, so a failing assertion necessarily LOWERS the passed count and,
+ * through `failures`, sets a non-zero exit. The boolean return is preserved unchanged.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function check(name: string, condition: unknown, detail?: string) {
-    if (!condition) failures.push(detail ? `${name}: ${detail}` : name)
-    return Boolean(condition)
+    assertionsRun += 1
+    if (!condition) {
+        failures.push(detail ? `${name}: ${detail}` : name)
+        return false
+    }
+    assertionsPassed += 1
+    return true
 }
 
 function walk(dir: string): string[] {
@@ -279,6 +296,16 @@ report.negativeValidation = {
 
 report.result = failures.length === 0 ? "PASS" : "FAIL"
 report.failures = failures
+report.assertionsRun = assertionsRun
+report.assertionsPassed = assertionsPassed
 
 console.log(JSON.stringify(report, null, 2))
+
+// Machine-readable assertion evidence for scripts/gates/run-gates.js. Both numbers
+// come from the counters incremented inside check() above, so they cannot claim more
+// than actually ran. The GATE-EVIDENCE line must be the WHOLE line and name this file
+// exactly, or the driver reports EVIDENCE_IDENTITY_MISMATCH.
+console.log(`GATE-EVIDENCE harness=check-business-os-surface.ts assertions=${assertionsPassed}`)
+console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+
 if (failures.length > 0) process.exitCode = 1
