@@ -68,6 +68,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 // The compiler API. Resolved from the app's own node_modules like every other dependency here.
+//
+// Required at module load, NOT lazily behind a try/catch. A missing `typescript` would crash the
+// driver loudly, and that is the correct behaviour: every one of the 76 harnesses runs under ts-node,
+// which needs the same package, so a tree without it cannot run the sweep at all. Adding a diagnosed
+// "parser unavailable" finding for that state would mean shipping a code path in a control that no
+// test can reach, and untested code in a control is the thing this whole package exists to remove.
 const ts = require("typescript");
 
 /** Schema tag for the corroboration block added to the driver's summary. */
