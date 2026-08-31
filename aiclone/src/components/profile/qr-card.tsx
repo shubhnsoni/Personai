@@ -20,14 +20,14 @@ export function QrCard({
     const [src, setSrc] = useState<string | null>(null)
     const [look, setLook] = useState<QrStyle | null>(null)
     const [copied, setCopied] = useState(false)
-    const [url, setUrl] = useState("")
     const { resolvedTheme } = useTheme()
     const picked = useRef(false)
 
-    useEffect(() => {
-        const origin = typeof window !== "undefined" ? window.location.origin : ""
-        setUrl(`${origin}/${slug}?ref=qr`)
-    }, [slug])
+    // Derived, not state: the url only ever depended on `slug` and the browser origin, and it is
+    // never rendered into markup (only read by the draw effect and the copy/share handlers), so
+    // computing it during render cannot produce a hydration mismatch.
+    const origin = typeof window !== "undefined" ? window.location.origin : ""
+    const url = `${origin}/${slug}?ref=qr`
 
     useEffect(() => {
         if (picked.current || !resolvedTheme) return
