@@ -18,44 +18,9 @@
   "evidence": {
     "required": true,
     "contract": "A harness counts as passed only if it yields machine-readable evidence carrying a harness identity and a POSITIVE assertion count. Exit 0 alone cannot distinguish a harness that proved sixty invariants from one that asserted nothing, which is exactly the hole this closes. The driver reads evidence the harnesses ALREADY print — '58/58 assertions passed', '39/39 invariants passed', '46/46 installation route assertions passed', a JSON report carrying \"assertions\": 41 or \"assertions\": [ ... ], a 'SUMMARY ... passed=41 failed=0' line — so enforcement needed no harness edits. Missing, malformed, zero, negative, duplicate, forged and stale evidence each fail the run under their own named EVIDENCE_* finding.",
-    "allowlistDeclaredSize": 9,
+    "allowlistDeclaredSize": 4,
     "allowlistNote": "THE SIZE OF THIS LIST IS THE HONEST MEASURE OF WHAT THIS GATE DOES NOT CHECK. 13 of the 74 executed harnesses are exempt; the other 61 are enforced. Entries are EXACT filenames — the driver refuses any entry containing a wildcard, glob, regex or path metacharacter (EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN), because one pattern would silently cover harnesses added later and the count would stop being a measurement. The driver also fails if an entry names a file that is not on disk, if an entry lacks a concrete reason or the temporary/migrationPending markers, and if this declared size disagrees with the real length — so the list cannot grow without a visible, reviewable edit. Every entry is printed on the console and in both summaries on every run.",
     "allowlist": [
-        {
-          "file": "check-auth-http-regressions.ts",
-          "reason": "Prints one JSON report whose keys are result, inversion, portCleared and failures. There is no assertion or check count anywhere in its output, so exit 0 is currently its only evidence.",
-          "temporary": true,
-          "migrationPending": "Add \"assertions\": results.length to the report object it already builds; it tracks per-result records internally.",
-          "declaredBy": "Q4-E, assertion-evidence contract"
-        },
-        {
-          "file": "check-business-os-a11y.ts",
-          "reason": "Prints one JSON report whose keys are rendered, headingSequence, result and failures. It carries render byte counts but no count of the accessibility assertions it made.",
-          "temporary": true,
-          "migrationPending": "Add \"assertions\": <count> to the report; its check() helper already pushes into a failures array and could count calls.",
-          "declaredBy": "Q4-E, assertion-evidence contract"
-        },
-        {
-          "file": "check-business-os-render.ts",
-          "reason": "Prints one JSON report whose keys are rendered, result and failures. rendered carries markup byte counts, which are not assertion counts.",
-          "temporary": true,
-          "migrationPending": "Add \"assertions\": <count> to the report object.",
-          "declaredBy": "Q4-E, assertion-evidence contract"
-        },
-        {
-          "file": "check-business-os-surface.ts",
-          "reason": "Prints one JSON report whose keys are authorization, routing, registry, files, paramParsing, negativeValidation, result and failures. Each is a structured sub-report; none is an assertion count.",
-          "temporary": true,
-          "migrationPending": "Add \"assertions\": <count> to the report object.",
-          "declaredBy": "Q4-E, assertion-evidence contract"
-        },
-        {
-          "file": "check-capability-contract.ts",
-          "reason": "Prints one JSON report whose keys are granularCapabilities, restaurantBlueprint, negativeTest, retailActivation, waveE, result and failures. No assertion count is emitted.",
-          "temporary": true,
-          "migrationPending": "Add \"assertions\": <count> to the report object.",
-          "declaredBy": "Q4-E, assertion-evidence contract"
-        },
         {
           "file": "check-copilot-runtime.ts",
           "reason": "Its entire success output is the single line 'copilot runtime contract checks passed' — no number at all. Its log is one of the smallest in the sweep, which is precisely the shape that made 'exited 0' worthless as evidence.",
