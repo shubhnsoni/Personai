@@ -1,0 +1,27 @@
+// FIXTURE - input to check-harness-exit-integrity.ts, never compiled, linted or executed.
+// See ../exit-integrity-convergence/alias-cycle.ts.txt for why the extension is .ts.txt.
+//
+// WHAT THIS PROVES: that the scanner's DECLARED blind spot fails loudly too.
+//
+// `verify` is a real assertion helper - condition parameter, records into `failures`. But every
+// call to it is mediated by a VALUE: once through an array index, once through a computed string
+// key. Neither shape is a direct identifier call nor a member call matched on its method name, so
+// resolution cannot reach either callsite. This is NOT_FOLLOWED item (1), and it is a real hole in
+// the scanner, not in the harness under test.
+//
+// The required behaviour is that the hole is never mistaken for a clean result. This file yields
+// ZERO recognised assertion calls, which the harness escalates to the gating integrity finding
+// NO_ASSERTION_RECOGNISED - "its silence is not evidence" - rather than printing a green
+// FINAL_VERDICT for the exit decision below. The frozen verdict here is genuinely invisible to the
+// scanner; what must never happen is the scanner claiming to have judged it.
+
+const failures: string[] = []
+function verify(_name: string, condition: boolean) { if (!condition) failures.push(_name) }
+
+const table = [verify]
+const registry: Record<string, (name: string, condition: boolean) => void> = { verify }
+const key = 'ver' + 'ify'
+
+table[0]('before', true)
+process.exitCode = failures.length === 0 ? 0 : 1
+registry[key]('late assertion reached only through a computed key', false)

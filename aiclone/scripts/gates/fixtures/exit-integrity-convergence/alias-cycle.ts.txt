@@ -1,0 +1,38 @@
+// FIXTURE - input to check-harness-exit-integrity.ts, never compiled, linted or executed.
+//
+// Extension is .ts.txt on purpose: the content is TypeScript SOURCE TEXT handed to the scanner's
+// parser, not a module. `const ok5 = ok4` below is declared before `ok4` exists, which is a
+// deliberate temporal-dead-zone error - it would not compile and is not meant to. Keeping the
+// file out of tsc's and eslint's reach is what lets the fixture stay adversarial.
+//
+// WHAT THIS PROVES
+//
+// (1) CONVERGENCE over a cycle. `cyclicA`/`cyclicB` are a mutually-recursive alias pair. A resolver
+//     that re-scans "until nothing changed" without a seen-set can oscillate between them; a
+//     monotone worklist never enqueues either, because neither is reachable from a real helper.
+//
+// (2) The old BOUNDED implementation had a real hole. Alias resolution ran at most 4 passes over
+//     the AST, and `names` mutated during each pass, so a chain declared in FORWARD order resolved
+//     in a single pass while the same chain in REVERSE order needed one pass per link. The chain
+//     below is five links in reverse order: pass 1 registers ok1, pass 2 ok2, pass 3 ok3, pass 4
+//     ok4, and the loop ends. `ok5` was never registered, so `ok5(...)` was not recognised as an
+//     assertion at all, so the frozen verdict at the bottom of this file was reported CLEAN.
+//     The cap was not a policy - it was an order-dependent silent truncation.
+
+const failures: string[] = []
+function check(_name: string, condition: boolean) { if (!condition) failures.push(_name) }
+
+// (1) the oscillation trap: reachable from nothing, so it must contribute nothing and must not spin.
+const cyclicA = cyclicB
+const cyclicB = cyclicA
+
+// (2) five alias links, declared in reverse dependency order.
+const ok5 = ok4
+const ok4 = ok3
+const ok3 = ok2
+const ok2 = ok1
+const ok1 = check
+
+ok5('before', true)
+process.exitCode = failures.length === 0 ? 0 : 1
+ok5('late assertion five alias links above the real helper', false)

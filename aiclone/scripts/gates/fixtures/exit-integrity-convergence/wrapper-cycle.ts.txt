@@ -1,0 +1,34 @@
+// FIXTURE - input to check-harness-exit-integrity.ts, never compiled, linted or executed.
+// See alias-cycle.ts.txt for why the extension is .ts.txt.
+//
+// WHAT THIS PROVES
+//
+// (1) CONVERGENCE over a REACHABLE cycle. `ping` calls `pong`, `pong` calls `ping`, and `pong` also
+//     calls the real helper - so unlike an alias cycle this one IS reachable, and a naive worklist
+//     without a seen-set would enqueue ping and pong alternately forever. A monotone worklist
+//     registers each exactly once and drains: pong at nesting depth 1, ping at depth 2.
+//
+// (2) The old two-pass wrapper cap had the same order-dependent hole as the alias cap. `names` grew
+//     DURING each pass, so a wrapper chain declared in forward order resolved in one pass, while
+//     the reverse-order chain below needed one pass per link. Two passes registered lvl1 and lvl2
+//     only; lvl3 and lvl4 were never registered, so `lvl4(...)` after the exit decision was not
+//     recognised as an assertion and the frozen verdict was reported CLEAN. The printed "depth"
+//     was the PASS INDEX, not a nesting depth, which is why every wrapper in the real tree printed
+//     "depth 1" regardless of how deep it actually sat.
+
+const failures: string[] = []
+function check(_name: string, condition: boolean) { if (!condition) failures.push(_name) }
+
+// (1) a wrapper cycle that loops back on itself, with one member touching the real helper.
+function ping(name: string, value: number) { pong(name, value + 1) }
+function pong(name: string, value: number) { if (value > 3) check(name, false); else ping(name, value) }
+
+// (2) four wrapper links, declared in reverse dependency order.
+function lvl4(name: string) { lvl3(name) }
+function lvl3(name: string) { lvl2(name) }
+function lvl2(name: string) { lvl1(name) }
+function lvl1(name: string) { check(name, false) }
+
+ping('before, through the cycle', 0)
+process.exitCode = failures.length === 0 ? 0 : 1
+lvl4('late assertion four wrappers above the real helper')

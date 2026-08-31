@@ -26,10 +26,28 @@
  *     local functions that each emit exactly one assertion - was invisible. A call to one of them
  *     sitting after an exit decision was not counted as an assertion at all.
  *
- * SO: the helper set is now DISCOVERED FROM SOURCE, per file, and aliases and single-level local
- * wrappers are followed. What can and cannot be followed is printed on every run - see
- * `FOLLOWED` / `NOT_FOLLOWED` below - because an unfollowed wrapper is a silent hole, and a silent
- * hole in a control is worse than a declared one.
+ * SO: the helper set is now DISCOVERED FROM SOURCE, per file, and aliases and local wrappers are
+ * followed. What can and cannot be followed is printed on every run - see `FOLLOWED` /
+ * `NOT_FOLLOWED` below - because an unfollowed wrapper is a silent hole, and a silent hole in a
+ * control is worse than a declared one.
+ *
+ * WHAT THIS FILE HAD TO FIX ABOUT ITSELF, SECOND TIME
+ *
+ * That coverage layer reached its fixed point by RE-SCANNING under an iteration cap: aliases got at
+ * most 4 passes, wrappers at most 2. Both caps were arbitrary, and worse, both were order-dependent,
+ * because each pass mutated the name set while it scanned. A chain declared in dependency order
+ * collapsed in one pass; the same chain declared in reverse needed one pass per link and was cut off
+ * mid-way, SILENTLY. Every call through a name lost that way stopped being counted as an assertion,
+ * and an uncounted assertion after an exit decision is precisely the defect this scanner exists to
+ * find - reported as a clean harness. The printed "depth N" was the pass index, not a nesting depth,
+ * which is why every wrapper in this tree printed "depth 1" however deep it actually sat.
+ *
+ * Resolution is now a monotone worklist over a finite domain (`resolveHelpers`): a name is enqueued
+ * only if it has never been seen, so each is enqueued at most once and the queue provably drains.
+ * Termination is a property of the construction, not of a constant, so there is no cap to tune and
+ * no order for it to depend on. The residual step budget is defence in depth only, is unreachable by
+ * the argument written at `resolveHelpers`, and if it ever fired it would report the helper set as
+ * INCOMPLETE and fail the run rather than return a quietly truncated set.
  *
  * INVENTORY. The file list comes from `scripts/gates/gates.manifest.json`, the same declared
  * inventory `scripts/gates/run-gates.js` uses, reconciled against the directory on every run. A
@@ -127,14 +145,14 @@ const ASSIGNMENT_OPERATORS: ReadonlySet<ts.SyntaxKind> = new Set([
 const FOLLOWED: readonly string[] = [
     "a helper DECLARED in the harness with a condition-shaped parameter that records a verdict (throw, .push, or any assignment/increment of a verdict-shaped name)",
     "a helper declared in ANY other harness, applied to a file that does not declare that name itself",
-    "a direct identifier alias, `const ok = checkInvertible`, transitively up to 4 links",
-    "a local wrapper with at least one parameter whose body calls a helper, to a nesting depth of 2 wrappers",
+    "a direct identifier alias, `const ok = checkInvertible`, to the full transitive closure - alias chains are resolved to a fixed point with no iteration cap, in any declaration order",
+    "a local wrapper with at least one parameter whose body calls a helper, to ANY nesting depth, including wrappers of aliases and aliases of wrappers; the reported depth is the true minimum distance from a real helper",
     "a member call, `suite.check(...)`, matched on the method name",
 ]
 
 const NOT_FOLLOWED: readonly string[] = [
     "a helper reached only through a value: passed as a callback, stored in an object or array, or selected by index or computed key",
-    "a wrapper more than 2 levels above a real helper",
+    "a wrapper or alias cycle that never touches a real helper - `function a(x) { b(x) } function b(x) { a(x) }`, or `const a = b; const b = a` - is reached from nothing and so contributes nothing. That is exclusion for want of evidence, not truncation: the resolver converges over such a cycle rather than oscillating in it, and nothing that WAS reached is ever dropped",
     "a zero-argument function that asserts - `main()`, `unavailableHarness()` - deliberately, because it is a driver or a whole-harness fallback, not a per-case assertion, and counting its call as one assertion would understate it rather than overstate it",
     "a helper imported from another module: `import` bindings are not resolved, so a shared helper file would be invisible (none exists in this tree today - every harness declares its own)",
     "re-export or namespace indirection of any kind",
@@ -260,7 +278,171 @@ type Effective = Readonly<{
     inherited: readonly string[]
     /** Locally declared names that share a name with a helper elsewhere but record nothing here. */
     overridden: readonly string[]
+    /** Greatest wrapper nesting depth actually reached, measured from the nearest real helper. */
+    deepest: number
+    /**
+     * Non-null ONLY if resolution stopped before the worklist drained, which cannot happen with the
+     * default budget (see `resolveHelpers`). A non-null value is escalated by the caller to a gating
+     * integrity finding: a partially resolved helper set silently under-counts assertions, and an
+     * under-counted assertion is exactly the frozen verdict this scanner exists to catch.
+     */
+    unresolved: string | null
 }>
+
+// ---------------------------------------------------------------------------------------------
+// coverage resolution: a monotone worklist over a finite domain
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The coverage graph, built ONCE per file from the AST.
+ *
+ * Both edge maps are keyed by the name that must ALREADY be a helper for the edge to fire, which
+ * turns "which names are helpers" from a re-scan-until-stable loop into plain reachability:
+ *
+ *   aliasTargets:    `const ok = check`                     -> edge check -> ok
+ *   wrapperCallers:  `function refusesBy(..) { check(..) }`  -> edge check -> refusesBy
+ *
+ * `domain` is every name an edge can ever ADD. It is fixed before resolution starts and is what the
+ * termination argument in `resolveHelpers` rests on.
+ */
+type CoverageGraph = Readonly<{
+    aliasTargets: ReadonlyMap<string, readonly string[]>
+    wrapperCallers: ReadonlyMap<string, readonly string[]>
+    domain: ReadonlySet<string>
+}>
+
+function pushEdge(edges: Map<string, string[]>, from: string, to: string): void {
+    const existing = edges.get(from)
+    if (existing) existing.push(to)
+    else edges.set(from, [to])
+}
+
+function coverageGraph(source: ts.SourceFile, functions: readonly FunctionLike[]): CoverageGraph {
+    const aliasTargets = new Map<string, string[]>()
+    const wrapperCallers = new Map<string, string[]>()
+    const domain = new Set<string>()
+
+    walk(source, (node) => {
+        if (
+            ts.isVariableDeclaration(node)
+            && ts.isIdentifier(node.name)
+            && node.initializer
+            && ts.isIdentifier(node.initializer)
+        ) {
+            pushEdge(aliasTargets, node.initializer.text, node.name.text)
+            domain.add(node.name.text)
+        }
+    })
+
+    for (const candidate of functions) {
+        if (!candidate.body) continue
+        // A zero-argument asserting function is a driver (`main`), not a per-case helper.
+        if (candidate.parameters.length === 0) continue
+        const callees = new Set<string>()
+        walk(candidate.body, (node) => {
+            if (!ts.isCallExpression(node)) return
+            if (ts.isIdentifier(node.expression)) callees.add(node.expression.text)
+            else if (ts.isPropertyAccessExpression(node.expression)) callees.add(node.expression.name.text)
+        })
+        for (const callee of callees) pushEdge(wrapperCallers, callee, candidate.name)
+        domain.add(candidate.name)
+    }
+
+    return { aliasTargets, wrapperCallers, domain }
+}
+
+type Resolution = Readonly<{
+    names: Set<string>
+    aliases: readonly string[]
+    wrappers: readonly string[]
+    deepest: number
+    unresolved: string | null
+}>
+
+/**
+ * Resolve the helper set to its FIXED POINT with a monotone worklist. Replaces two bounded passes -
+ * "aliases, at most 4 passes" and "wrappers, at most 2 passes" - that this file used to run.
+ *
+ * WHY THE OLD FORM WAS WRONG, not merely inelegant. Each old pass re-scanned every candidate while
+ * MUTATING the name set, so a chain declared in dependency order collapsed in a single pass while
+ * the same chain declared in reverse order needed one pass per link. The caps therefore truncated
+ * on DECLARATION ORDER, silently: `const ok5 = ok4 ... const ok1 = check` lost `ok5`, a five-deep
+ * reverse wrapper chain lost its top two links, and every call through the lost name stopped
+ * counting as an assertion. In a scanner whose whole job is to notice assertions that do not reach
+ * the exit code, an uncounted assertion is a missed defect reported as a clean harness. The printed
+ * "depth N" was the pass index rather than a nesting depth, which is why every wrapper in the real
+ * tree printed "depth 1" no matter how deep it actually sat.
+ *
+ * TERMINATION, BY CONSTRUCTION - no cap required:
+ *   1. `names` starts as `seeds` and only ever grows; nothing is removed.
+ *   2. A name is pushed onto `queue` only in the same step that inserts it into `names`, and only
+ *      when `names` did not already contain it. So every name is enqueued AT MOST ONCE.
+ *   3. Every name an edge can add is a member of `graph.domain`, which is fixed before the loop.
+ *   4. Therefore `queue.length <= seeds.size + domain.size` for the whole run, a bound computed
+ *      before the first iteration.
+ *   5. `head` increases by exactly 1 per iteration and the loop runs only while `head <
+ *      queue.length`. By (4) it performs at most `seeds.size + domain.size` iterations and the
+ *      queue drains. The domain is finite, so the fixed point is reached in finite time.
+ *
+ * `budget` is defence in depth, NOT the termination argument, and by (5) it is UNREACHABLE at its
+ * default of `seeds.size + domain.size + 1`: the loop cannot execute more than
+ * `seeds.size + domain.size` iterations, which is strictly less than the budget. It exists because
+ * "this cannot happen" is only worth stating if the alarm behind it is wired - so if the invariant
+ * above is ever broken by a later edit, this reports INCOMPLETE resolution and the caller turns
+ * that into a gating failure. It never silently returns a truncated set. `--self-test` starves the
+ * budget deliberately to prove that path executes.
+ *
+ * BFS order is load-bearing for the report, not for the result: reaching a name for the first time
+ * along a shortest path means the recorded wrapper depth is the TRUE minimum nesting distance from a
+ * real helper. The final `names` set is the same under any traversal order, because it is the
+ * reachable set of a fixed graph.
+ */
+function resolveHelpers(graph: CoverageGraph, seeds: ReadonlySet<string>, budget?: number): Resolution {
+    const names = new Set(seeds)
+    const depths = new Map<string, number>()
+    for (const seed of seeds) depths.set(seed, 0)
+
+    const queue = [...seeds]
+    const stepBudget = budget ?? seeds.size + graph.domain.size + 1
+    const aliases: string[] = []
+    const wrappers: string[] = []
+    let head = 0
+    let steps = 0
+    let deepest = 0
+    let unresolved: string | null = null
+
+    while (head < queue.length) {
+        steps += 1
+        if (steps > stepBudget) {
+            unresolved = `helper resolution stopped after ${stepBudget} worklist step(s) with ${queue.length - head} name(s) still queued; the helper set is INCOMPLETE and any assertion reached only through an unresolved name was not counted`
+            break
+        }
+        const current = queue[head]
+        head += 1
+        const currentDepth = depths.get(current) ?? 0
+
+        // An alias is the same function under another name, so it sits at the SAME nesting depth.
+        for (const alias of graph.aliasTargets.get(current) ?? []) {
+            if (names.has(alias)) continue
+            names.add(alias)
+            depths.set(alias, currentDepth)
+            aliases.push(`${alias} = ${current}`)
+            queue.push(alias)
+        }
+
+        for (const wrapper of graph.wrapperCallers.get(current) ?? []) {
+            if (names.has(wrapper)) continue
+            const depth = currentDepth + 1
+            names.add(wrapper)
+            depths.set(wrapper, depth)
+            wrappers.push(`${wrapper} (depth ${depth})`)
+            queue.push(wrapper)
+            if (depth > deepest) deepest = depth
+        }
+    }
+
+    return { names, aliases, wrappers, deepest, unresolved }
+}
 
 /**
  * The effective assertion-name set for ONE file.
@@ -268,9 +450,16 @@ type Effective = Readonly<{
  * Per-file declarations win. A name declared in this file and found not to record a verdict is NOT
  * inherited from elsewhere - that is exactly the `refuses` case, and it is the whole reason a global
  * hardcoded set could not be right.
+ *
+ * `budget` is for `--self-test` only; production callers omit it and get the unreachable default.
  */
-function effectiveNames(source: ts.SourceFile, discovery: Discovery, elsewhere: ReadonlySet<string>): Effective {
-    const names = new Set(discovery.base)
+function effectiveNames(
+    source: ts.SourceFile,
+    discovery: Discovery,
+    elsewhere: ReadonlySet<string>,
+    budget?: number,
+): Effective {
+    const seeds = new Set(discovery.base)
     const inherited: string[] = []
     const overridden: string[] = []
     for (const name of elsewhere) {
@@ -278,52 +467,20 @@ function effectiveNames(source: ts.SourceFile, discovery: Discovery, elsewhere: 
             if (!discovery.base.has(name)) overridden.push(name)
             continue
         }
-        names.add(name)
+        seeds.add(name)
         inherited.push(name)
     }
 
-    // direct aliases, transitively, bounded
-    const aliases: string[] = []
-    for (let pass = 0; pass < 4; pass += 1) {
-        let grew = false
-        walk(source, (node) => {
-            if (
-                ts.isVariableDeclaration(node)
-                && ts.isIdentifier(node.name)
-                && node.initializer
-                && ts.isIdentifier(node.initializer)
-                && names.has(node.initializer.text)
-                && !names.has(node.name.text)
-            ) {
-                names.add(node.name.text)
-                aliases.push(`${node.name.text} = ${node.initializer.text}`)
-                grew = true
-            }
-        })
-        if (!grew) break
+    const resolved = resolveHelpers(coverageGraph(source, discovery.functions), seeds, budget)
+    return {
+        names: resolved.names,
+        aliases: resolved.aliases,
+        wrappers: resolved.wrappers,
+        inherited,
+        overridden,
+        deepest: resolved.deepest,
+        unresolved: resolved.unresolved,
     }
-
-    // single-level local wrappers, then wrappers of wrappers, capped at depth 2
-    const wrappers: string[] = []
-    for (let depth = 0; depth < 2; depth += 1) {
-        let grew = false
-        for (const candidate of discovery.functions) {
-            if (names.has(candidate.name) || !candidate.body) continue
-            // A zero-argument asserting function is a driver (`main`), not a per-case helper.
-            if (candidate.parameters.length === 0) continue
-            const calls = contains(candidate.body, (node) =>
-                ts.isCallExpression(node)
-                && ((ts.isIdentifier(node.expression) && names.has(node.expression.text))
-                    || (ts.isPropertyAccessExpression(node.expression) && names.has(node.expression.name.text))))
-            if (!calls) continue
-            names.add(candidate.name)
-            wrappers.push(`${candidate.name} (depth ${depth + 1})`)
-            grew = true
-        }
-        if (!grew) break
-    }
-
-    return { names, aliases, wrappers, inherited, overridden }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -397,10 +554,10 @@ type ScanResult = Readonly<{
     helperNames: readonly string[]
 }>
 
-function analyze(file: string, text: string, elsewhere: ReadonlySet<string>): ScanResult {
+function analyze(file: string, text: string, elsewhere: ReadonlySet<string>, budget?: number): ScanResult {
     const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true)
     const discovery = discoverBase(source)
-    const effective = effectiveNames(source, discovery, elsewhere)
+    const effective = effectiveNames(source, discovery, elsewhere, budget)
     const names = effective.names
 
     const assertions: ts.Node[] = []
@@ -692,14 +849,18 @@ const FIXTURES: readonly Fixture[] = [
     },
     {
         name: "wrapper-depth-2",
-        covers: "WRAPPER following (depth 2): a wrapper of a wrapper, the declared limit of what is followed",
+        covers: "WRAPPER following (depth 2): a wrapper of a wrapper, declared ABOVE the wrapper it wraps, so resolution cannot depend on a lucky declaration order",
         expect: "REAL_DEFECT",
         source: [
             "const failures: string[] = []",
             "function check(_name: string, condition: boolean) { if (!condition) failures.push(_name) }",
-            "// `refusesByCode` is declared BEFORE the wrapper it wraps, on purpose: on the first pass",
-            "// `refusesBy` is not yet a known helper, so only the second pass can register this one. That",
-            "// makes the fixture actually depend on depth 2 rather than on a lucky declaration order.",
+            "// `refusesByCode` is declared BEFORE the wrapper it wraps, on purpose. Under the old",
+            "// bounded passes `refusesBy` was not yet a known helper when this line was first scanned,",
+            "// so only a SECOND pass could register it - which is exactly the order dependence that",
+            "// made the 2-pass cap a silent truncation. The worklist reaches it from the helper instead",
+            "// of scanning towards it, so declaration order no longer decides what is covered. Depth 2",
+            "// is no longer a limit either; see the exit-integrity-convergence fixtures for chains that",
+            "// go deeper.",
             "function refusesByCode(name: string, code: string) { refusesBy(name, new RegExp(code, 'u'), 'x') }",
             "function refusesBy(name: string, pattern: RegExp, raw: string) { check(name, pattern.test(raw)) }",
             "refusesByCode('before', 'x')",
@@ -751,6 +912,118 @@ const FIXTURES: readonly Fixture[] = [
 
 /** The one used by --prove-failure, so a clean tree can still be shown to exit 1. */
 const PROVE_FAILURE_FIXTURE = FIXTURES[0]
+
+const ADVERSARIAL_ROOT = join(__dirname, "..", "gates", "fixtures")
+
+/**
+ * Adversarial fixtures for the coverage FIXED POINT, held on disk under
+ * `scripts/gates/fixtures/exit-integrity-*` rather than inline in this file.
+ *
+ * On disk rather than inline for one reason: they are deliberately NON-COMPILING TypeScript.
+ * `const ok5 = ok4` is declared before `ok4` exists, because declaration order is exactly what the
+ * old bounded passes were sensitive to, and a chain in reverse order is the only way to show it. A
+ * `.ts.txt` file can carry that text without putting it in front of tsc or eslint. The scanner is
+ * handed a synthetic `*.ts` filename so the parser still reads the text as TypeScript.
+ *
+ * A declared fixture whose file is missing or unreadable is a self-test FAILURE, never a skip: a
+ * control that quietly stops running is the precise failure mode this scanner exists to prevent.
+ */
+type AdversarialFixture = Readonly<{
+    name: string
+    directory: string
+    file: string
+    covers: string
+    expect: Classification | "NO_FINDING"
+    /**
+     * Worklist step budget. Omitted means the production default, which is unreachable by the
+     * argument at `resolveHelpers`. A value here deliberately STARVES resolution, which is the only
+     * way to execute the alarm behind an unreachable guard.
+     */
+    budget?: number
+    /** Whether resolution is REQUIRED to report itself incomplete. */
+    expectUnresolved: boolean
+    /** Recognised assertion calls, asserted only where the exact number is the point. */
+    expectAssertionCount?: number
+}>
+
+const ADVERSARIAL_FIXTURES: readonly AdversarialFixture[] = [
+    {
+        name: "alias-cycle-converges",
+        directory: "exit-integrity-convergence",
+        file: "alias-cycle.ts.txt",
+        covers: "CONVERGENCE: a mutually-recursive alias pair the resolver must not oscillate in, plus a five-link alias chain in reverse declaration order that the old 4-pass cap silently truncated",
+        expect: "REAL_DEFECT",
+        expectUnresolved: false,
+    },
+    {
+        name: "wrapper-cycle-converges",
+        directory: "exit-integrity-convergence",
+        file: "wrapper-cycle.ts.txt",
+        covers: "CONVERGENCE: a REACHABLE wrapper cycle (ping <-> pong, pong calls the helper) that a worklist without a seen-set would enqueue forever, plus a four-link wrapper chain in reverse order that the old 2-pass cap silently truncated",
+        expect: "REAL_DEFECT",
+        expectUnresolved: false,
+    },
+    {
+        name: "resolution-complete-at-default-budget",
+        directory: "exit-integrity-loud-failure",
+        file: "starved-resolution.ts.txt",
+        covers: "CONTROL for the leg below: with the production budget the same file resolves fully, reports resolution COMPLETE, and finds the frozen verdict",
+        expect: "REAL_DEFECT",
+        expectUnresolved: false,
+    },
+    {
+        name: "starved-resolution-is-loud",
+        directory: "exit-integrity-loud-failure",
+        file: "starved-resolution.ts.txt",
+        covers: "LOUD FAILURE: resolution starved to one step must report itself INCOMPLETE rather than return a truncated helper set. Note the finding set goes EMPTY when it is starved - that silence is exactly why an incomplete resolution has to be gating",
+        expect: "NO_FINDING",
+        budget: 1,
+        expectUnresolved: true,
+    },
+    {
+        name: "value-mediated-helper-is-loud",
+        directory: "exit-integrity-loud-failure",
+        file: "value-mediated-helper.ts.txt",
+        covers: "LOUD FAILURE: a real helper reached only through an array index and a computed key (NOT_FOLLOWED item 1) yields 0 recognised assertions, which must escalate to the gating NO_ASSERTION_RECOGNISED instead of a green verdict",
+        expect: "NO_FINDING",
+        expectUnresolved: false,
+        expectAssertionCount: 0,
+    },
+]
+
+/**
+ * The pure per-file coverage escalation, separated from the scan for the same reason `reconcile` is:
+ * so `--self-test` can prove the loud paths actually fire on a synthetic input rather than assert it
+ * in a comment. Returns gating findings and declared, non-gating notes.
+ */
+function coverageVerdict(
+    file: string,
+    assertionCount: number,
+    unresolved: string | null,
+): Readonly<{ gating: IntegrityFinding[]; notes: IntegrityFinding[] }> {
+    const gating: IntegrityFinding[] = []
+    const notes: IntegrityFinding[] = []
+
+    if (unresolved) {
+        gating.push({
+            kind: "HELPER_RESOLUTION_INCOMPLETE",
+            detail: `${file}: ${unresolved}. This voids the scan of this file rather than reducing it: an assertion reached only through an unresolved name is not counted, and an uncounted assertion after an exit decision is the defect this scanner exists to find. The step budget is unreachable by construction, so reaching it means the worklist invariant in resolveHelpers has been broken by an edit.`,
+        })
+    }
+
+    if (assertionCount === 0) {
+        const reason = NO_HELPER_BY_DESIGN.get(file)
+        if (reason) notes.push({ kind: "NO_ASSERTION_RECOGNISED_BY_DESIGN", detail: `${file}: ${reason}` })
+        else {
+            gating.push({
+                kind: "NO_ASSERTION_RECOGNISED",
+                detail: `${file} yielded 0 recognised assertion calls with the derived helper set. Its exit integrity cannot be judged, so its silence is not evidence, and it is not on the declared NO_HELPER_BY_DESIGN list. Either the harness asserts through a shape discovery does not recognise - which is a hole in THIS file - or it genuinely asserts nothing.`,
+            })
+        }
+    }
+
+    return { gating, notes }
+}
 
 /** Inventory fixtures: synthetic manifest/disk pairs, one per reconciliation finding kind. */
 const INVENTORY_FIXTURES: ReadonlyArray<Readonly<{
@@ -847,6 +1120,104 @@ function runSelfTest(elsewhere: ReadonlySet<string>): boolean {
             ok = false
         }
     }
+
+    if (!runAdversarialSelfTest(elsewhere)) ok = false
+    return ok
+}
+
+/**
+ * The fixed-point legs. Kept separate because they assert on HOW the helper set was resolved -
+ * whether it converged, and whether an incomplete resolution announced itself - not only on which
+ * classification came out.
+ */
+function runAdversarialSelfTest(elsewhere: ReadonlySet<string>): boolean {
+    let ok = true
+    for (const fixture of ADVERSARIAL_FIXTURES) {
+        const path = join(ADVERSARIAL_ROOT, fixture.directory, fixture.file)
+        if (!existsSync(path)) {
+            console.error(
+                `FAIL self-test ${fixture.name}: fixture ${fixture.directory}/${fixture.file} is declared but missing from disk. A declared control that cannot run is a failure, not a skip.`,
+            )
+            ok = false
+            continue
+        }
+        let text: string
+        try {
+            text = readFileSync(path, "utf8")
+        } catch (error) {
+            console.error(
+                `FAIL self-test ${fixture.name}: fixture ${fixture.directory}/${fixture.file} could not be read: ${error instanceof Error ? error.message : String(error)}`,
+            )
+            ok = false
+            continue
+        }
+
+        // A synthetic .ts name: the file is .ts.txt on disk so tooling leaves it alone, but the
+        // parser must still read it as TypeScript.
+        const result = analyze(`fixture-${fixture.name}.ts`, text, elsewhere, fixture.budget)
+        const unresolved = result.effective.unresolved
+        const budgetNote = fixture.budget === undefined ? "production budget" : `starved budget ${fixture.budget}`
+
+        if (fixture.expectUnresolved !== (unresolved !== null)) {
+            console.error(
+                fixture.expectUnresolved
+                    ? `FAIL self-test ${fixture.name}: resolution was starved (${budgetNote}) but reported itself COMPLETE. An incomplete helper set that does not announce itself is a silent truncation.`
+                    : `FAIL self-test ${fixture.name}: resolution reported itself incomplete at the ${budgetNote}, which should be unreachable: ${unresolved}`,
+            )
+            ok = false
+            continue
+        }
+
+        if (fixture.expectAssertionCount !== undefined && result.assertionCount !== fixture.expectAssertionCount) {
+            console.error(
+                `FAIL self-test ${fixture.name}: expected ${fixture.expectAssertionCount} recognised assertion call(s), saw ${result.assertionCount}`,
+            )
+            ok = false
+            continue
+        }
+
+        // An unjudgeable fixture must escalate, and the escalation itself is asserted here rather
+        // than trusted: the gating kinds are what make silence loud.
+        if (fixture.expectAssertionCount === 0 || fixture.expectUnresolved) {
+            const escalation = coverageVerdict(`fixture-${fixture.name}.ts`, result.assertionCount, unresolved)
+            const expectedKind = fixture.expectUnresolved ? "HELPER_RESOLUTION_INCOMPLETE" : "NO_ASSERTION_RECOGNISED"
+            if (!escalation.gating.some((finding) => finding.kind === expectedKind)) {
+                console.error(
+                    `FAIL self-test ${fixture.name}: expected the gating ${expectedKind}, saw ${escalation.gating.map((finding) => finding.kind).join(", ") || "nothing"}`,
+                )
+                ok = false
+                continue
+            }
+            console.log(
+                `PASS self-test ${fixture.name}: gating ${expectedKind} raised at the ${budgetNote} (${fixture.covers})`,
+            )
+            continue
+        }
+
+        const interesting = result.findings.filter((finding) => finding.classification !== "FINAL_VERDICT")
+        if (fixture.expect === "NO_FINDING") {
+            if (interesting.length > 0) {
+                console.error(
+                    `FAIL self-test ${fixture.name}: expected no finding, saw ${interesting.map((finding) => `${finding.classification}@${finding.line}`).join(", ")}`,
+                )
+                ok = false
+                continue
+            }
+            console.log(`PASS self-test ${fixture.name}: nothing flagged, as required (${fixture.covers})`)
+            continue
+        }
+
+        const hit = result.findings.find((finding) => finding.classification === fixture.expect)
+        if (!hit) {
+            const saw = result.findings.map((finding) => `${finding.classification}@${finding.line}`).join(", ") || "nothing"
+            console.error(`FAIL self-test ${fixture.name}: expected ${fixture.expect}, saw ${saw}`)
+            ok = false
+            continue
+        }
+        console.log(
+            `PASS self-test ${fixture.name}: ${fixture.expect} at fixture line ${hit.line}, assertions-after=${hit.assertionsAfter}, resolution complete to depth ${result.effective.deepest} (${fixture.covers})`,
+        )
+    }
     return ok
 }
 
@@ -901,25 +1272,15 @@ for (const [name, reason] of CLASSIFIED_ABSENT) {
 
 // A harness for which NO assertion helper could be found is a silent coverage hole: it would be
 // reported as clean because nothing in it was recognised as an assertion at all. The set of such
-// harnesses is declared above; a CHANGE to that set is what fails, not its non-emptiness.
+// harnesses is declared above; a CHANGE to that set is what fails, not its non-emptiness. Resolution
+// that stopped short is escalated by the same path, for the same reason.
 const unjudgeable: string[] = []
+const coverageNotes: IntegrityFinding[] = []
 for (let index = 0; index < files.length; index += 1) {
     if (results[index].assertionCount === 0) unjudgeable.push(files[index])
-}
-const coverageNotes: IntegrityFinding[] = []
-for (const file of unjudgeable) {
-    const reason = NO_HELPER_BY_DESIGN.get(file)
-    if (reason) {
-        coverageNotes.push({
-            kind: "NO_ASSERTION_RECOGNISED_BY_DESIGN",
-            detail: `${file}: ${reason}`,
-        })
-        continue
-    }
-    integrity.push({
-        kind: "NO_ASSERTION_RECOGNISED",
-        detail: `${file} yielded 0 recognised assertion calls with the derived helper set. Its exit integrity cannot be judged, so its silence is not evidence, and it is not on the declared NO_HELPER_BY_DESIGN list. Either the harness asserts through a shape discovery does not recognise - which is a hole in THIS file - or it genuinely asserts nothing.`,
-    })
+    const verdict = coverageVerdict(files[index], results[index].assertionCount, results[index].effective.unresolved)
+    coverageNotes.push(...verdict.notes)
+    integrity.push(...verdict.gating)
 }
 for (const [file, reason] of NO_HELPER_BY_DESIGN) {
     if (!files.includes(file)) continue
@@ -962,6 +1323,9 @@ console.log(`Assertion calls recognised: ${results.reduce((sum, result) => sum +
 console.log(`Aliases followed: ${aliasNotes.length > 0 ? aliasNotes.join("; ") : "none present in this tree"}.`)
 console.log(
     `Wrappers followed: ${wrapperNotes.size > 0 ? [...wrapperNotes].sort().map(([name, count]) => `${name} x${count} file(s)`).join("; ") : "none"}.`,
+)
+console.log(
+    `Helper resolution: monotone worklist to a fixed point, no iteration cap; deepest wrapper nesting reached ${Math.max(0, ...results.map((result) => result.effective.deepest))}; files with resolution reported INCOMPLETE: ${results.filter((result) => result.effective.unresolved !== null).length} (gating).`,
 )
 for (const [name, reason] of CLASSIFIED_AMBIGUOUS) {
     const where = overridden.get(name) ?? []

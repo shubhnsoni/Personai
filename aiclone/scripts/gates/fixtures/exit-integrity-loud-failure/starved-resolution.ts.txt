@@ -1,0 +1,30 @@
+// FIXTURE - input to check-harness-exit-integrity.ts, never compiled, linted or executed.
+// See ../exit-integrity-convergence/alias-cycle.ts.txt for why the extension is .ts.txt.
+//
+// WHAT THIS PROVES: that incomplete resolution is LOUD, not silent.
+//
+// Helper resolution now runs as a monotone worklist whose termination is guaranteed by
+// construction, so its defence-in-depth step budget (seeds + domain + 1) is provably unreachable.
+// "Provably unreachable" is worth nothing if the alarm behind it was never wired, so the self-test
+// runs THIS fixture twice:
+//
+//   default budget  -> resolution completes, w1/w2/w3 are registered, and the frozen verdict below
+//                      is reported as a REAL_DEFECT.
+//   budget of 1     -> resolution is deliberately starved. The worklist must NOT return a quietly
+//                      truncated helper set. It must report that resolution is incomplete, and the
+//                      harness must escalate that to a GATING integrity finding
+//                      (HELPER_RESOLUTION_INCOMPLETE) and exit non-zero.
+//
+// The old implementation had no such path: when its 4-pass / 2-pass caps ran out it simply stopped,
+// returned whatever it had, and the harness reported the scanned tree as clean.
+
+const failures: string[] = []
+function check(_name: string, condition: boolean) { if (!condition) failures.push(_name) }
+
+function w1(name: string) { check(name, false) }
+function w2(name: string) { w1(name) }
+function w3(name: string) { w2(name) }
+
+w3('before')
+process.exitCode = failures.length === 0 ? 0 : 1
+w3('late assertion three wrappers above the real helper')
