@@ -16,8 +16,19 @@ import { WORKSPACE_SURFACE_INVARIANTS } from "../../src/lib/business-os/workspac
 import { WorkspaceSurfaceResolver } from "../../src/lib/business-os/workspace-surfaces"
 import { PersistenceError } from "../../src/lib/persistence/errors"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
+import {
+    BOUNDARY_CLOSURE_DIGEST,
+    boundaryClosureDigest,
+    canonicalBoundaryClosure,
+    catalogueUniverse,
+    leastPrivilegeViolations,
+    observeBoundaryClosure,
+    observedUniverse,
+    ROLE_PRIVILEGE_LADDER,
+    type BoundaryProbe,
+} from "../../src/lib/tenancy/boundary"
 import { hasPermission } from "../../src/lib/tenancy/permissions"
-import { KNOWN_ROLES, PERMISSION_KEYS } from "../../src/lib/tenancy/types"
+import { KNOWN_ROLES, PERMISSION_KEYS, type KnownRole, type PermissionKey } from "../../src/lib/tenancy/types"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
@@ -26,6 +37,12 @@ const RUN = `ws_surface_${Date.now()}_${Math.floor(Math.random() * 1e6)}`
 const FIELD_BLUEPRINT = "field-service-v1"
 const RESTAURANT_BLUEPRINT = "restaurant-venue-v3"
 const LEGACY_CONFIG = '{"extras":{"surfaces":["businessOs"],"packs":[],"addons":[]}}'
+
+/** Deliberately not a catalogue key. Asserted absent rather than assumed absent. */
+const ABSENT_PERMISSION = "s1b.absent.permission"
+
+/** Printed once at the end, so the digest assertion's preimage is never taken on trust. */
+const closureEvidence: string[] = []
 
 class Rollback extends Error {}
 class SeedFailure extends Error {}
@@ -53,6 +70,12 @@ type FixtureIds = Readonly<{
     userBClerk: string
     profileA: string
     profileB: string
+    /**
+     * One real Membership row on Workspace B per role, so this harness can interrogate the whole
+     * authorization boundary rather than only the two roles the surface fixtures happen to need.
+     * A total Record, so tsc refuses a new role that is not given a fixture.
+     */
+    clerkByRole: Readonly<Record<KnownRole, string>>
 }>
 
 async function seed(tx: Tx): Promise<FixtureIds> {
@@ -65,10 +88,20 @@ async function seed(tx: Tx): Promise<FixtureIds> {
         }
     }
 
+    // Workspace B already carries user_b as OWNER and user_a as VIEWER; these are the rest of the
+    // ladder, so all five roles are backed by a row that Prisma and the enum both accept.
+    const ladderExtras = ROLE_PRIVILEGE_LADDER.filter((role) => role !== "OWNER" && role !== "VIEWER")
+    const extraUser = (role: KnownRole) => id(`user_${role.toLowerCase()}`)
+
     await execute(
         `insert into "User" ("id","clerkId","email","updatedAt") values ` +
             `('${id("user_a")}','clerk_${id("user_a")}','${id("user_a")}@example.test',CURRENT_TIMESTAMP),` +
-            `('${id("user_b")}','clerk_${id("user_b")}','${id("user_b")}@example.test',CURRENT_TIMESTAMP)`,
+            `('${id("user_b")}','clerk_${id("user_b")}','${id("user_b")}@example.test',CURRENT_TIMESTAMP),` +
+            ladderExtras
+                .map((role) =>
+                    `('${extraUser(role)}','clerk_${extraUser(role)}','${extraUser(role)}@example.test',CURRENT_TIMESTAMP)`,
+                )
+                .join(","),
     )
     await execute(
         `insert into "Profile" ("id","userId","slug","displayName","roleTemplate","personalityConfig","updatedAt") values ` +
@@ -84,8 +117,21 @@ async function seed(tx: Tx): Promise<FixtureIds> {
         `insert into "Membership" ("id","workspaceId","userId","role","updatedAt") values ` +
             `('${id("membership_a_owner")}','${id("workspace_a")}','${id("user_a")}','OWNER',CURRENT_TIMESTAMP),` +
             `('${id("membership_b_owner")}','${id("workspace_b")}','${id("user_b")}','OWNER',CURRENT_TIMESTAMP),` +
-            `('${id("membership_b_viewer")}','${id("workspace_b")}','${id("user_a")}','VIEWER',CURRENT_TIMESTAMP)`,
+            `('${id("membership_b_viewer")}','${id("workspace_b")}','${id("user_a")}','VIEWER',CURRENT_TIMESTAMP),` +
+            ladderExtras
+                .map((role) =>
+                    `('${id(`membership_b_${role.toLowerCase()}`)}','${id("workspace_b")}','${extraUser(role)}','${role}',CURRENT_TIMESTAMP)`,
+                )
+                .join(","),
     )
+
+    const clerkByRole: Record<KnownRole, string> = {
+        OWNER: `clerk_${id("user_b")}`,
+        ADMIN: `clerk_${extraUser("ADMIN")}`,
+        MANAGER: `clerk_${extraUser("MANAGER")}`,
+        STAFF: `clerk_${extraUser("STAFF")}`,
+        VIEWER: `clerk_${id("user_a")}`,
+    }
 
     return Object.freeze({
         workspaceA: id("workspace_a"),
@@ -94,6 +140,7 @@ async function seed(tx: Tx): Promise<FixtureIds> {
         userBClerk: `clerk_${id("user_b")}`,
         profileA: id("profile_a"),
         profileB: id("profile_b"),
+        clerkByRole: Object.freeze(clerkByRole),
     })
 }
 
@@ -121,6 +168,55 @@ async function captureRefusal(action: () => Promise<unknown>): Promise<string> {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// observing the authorization boundary
+//
+// `PersistedTenancy.requireAccess` is where a role becomes an admit-or-refuse verdict for a named
+// permission. The verdict comes back out of a live call that matched a real Membership row in the
+// rehearsal database; it is not a re-read of the `PERMISSION_KEYS` import, which is what the assertion
+// this block replaces was doing. See src/lib/tenancy/boundary.ts.
+// ---------------------------------------------------------------------------------------------
+
+/** Only the boundary's own FORBIDDEN counts as a refusal; anything else is rethrown, never recorded. */
+async function admits(tenancy: PersistedTenancy, workspaceId: string, permission: string): Promise<boolean> {
+    try {
+        await tenancy.requireAccess(workspaceId, permission as PermissionKey)
+        return true
+    } catch (error) {
+        if (error instanceof PersistenceError && error.code === "FORBIDDEN") return false
+        throw error
+    }
+}
+
+async function refusalFor(tenancy: PersistedTenancy, workspaceId: string, permission: string): Promise<string> {
+    try {
+        await tenancy.requireAccess(workspaceId, permission as PermissionKey)
+        return "ADMITTED"
+    } catch (error) {
+        return refusalOf(error)
+    }
+}
+
+/**
+ * A refusal with the caller's OWN input edited out. Echoing back the key a caller just asked for tells
+ * it nothing new; any OTHER difference between "real but ungranted" and "does not exist" would.
+ */
+function withoutEchoedInput(refusal: string, echoed: string): string {
+    return refusal.split(echoed).join("<input>")
+}
+
+function boundaryProbe(
+    tenancy: PersistedTenancy,
+    identity: ControlledIdentity,
+    workspaceId: string,
+    clerkByRole: Readonly<Record<KnownRole, string>>,
+): BoundaryProbe {
+    return async (role, permission) => {
+        identity.current = clerkByRole[role]
+        return admits(tenancy, workspaceId, permission)
+    }
+}
+
 async function profileBytes(tx: Tx, profileIds: readonly string[]): Promise<readonly string[]> {
     const rows = await tx.$queryRawUnsafe<Array<{ id: string; config: string | null }>>(
         `select "id", "personalityConfig"::text as config from "Profile" ` +
@@ -132,6 +228,9 @@ async function profileBytes(tx: Tx, profileIds: readonly string[]): Promise<read
 async function residueCount(prisma: PrismaClient): Promise<number> {
     const rows = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
         `select (` +
+            `(select count(*) from "User" where "id" like '${RUN}%') + ` +
+            `(select count(*) from "Profile" where "id" like '${RUN}%') + ` +
+            `(select count(*) from "Membership" where "id" like '${RUN}%') + ` +
             `(select count(*) from "Workspace" where "id" like '${RUN}%') + ` +
             `(select count(*) from "BlueprintInstallation" where "workspaceId" like '${RUN}%') + ` +
             `(select count(*) from "BlueprintInstallationEvent" where "workspaceId" like '${RUN}%')` +
@@ -158,7 +257,9 @@ async function main() {
             throw new Error(`ABORT: connected to ${String(current[0]?.database)}`)
         }
 
-        const permissionsBefore = JSON.stringify(PERMISSION_KEYS)
+        // NOTE: there is deliberately no `permissionsBefore = JSON.stringify(PERMISSION_KEYS)` here.
+        // Comparing that against the same expression after the transaction is `x === x` on a frozen
+        // import. Checks 7b-7f below observe the boundary instead.
         try {
             await prisma.$transaction(
                 async (tx) => {
@@ -284,16 +385,114 @@ async function main() {
                         `${foreign} | ${missing}`,
                     )
 
-                    const permissionsAfter = JSON.stringify(PERMISSION_KEYS)
                     const serializedResults = JSON.stringify([workspaceA, workspaceB, legacy, afterRemoval, afterUpgrade])
                     const returnsPermission = (PERMISSION_KEYS as readonly string[]).some((permission) =>
                         serializedResults.includes(permission),
                     )
                     check(
-                        "7. resolving surfaces neither changes nor returns an RBAC permission",
-                        PERMISSION_KEYS.length === 18 && permissionsBefore === permissionsAfter && !returnsPermission && !/"permissions?"\s*:/.test(serializedResults),
-                        `catalogUnchanged=${permissionsBefore === permissionsAfter} keys=${PERMISSION_KEYS.length} returnedPermission=${returnsPermission}`,
+                        "7a. SERIALISATION boundary: resolving surfaces returns no RBAC permission",
+                        !returnsPermission && !/"permissions?"\s*:/.test(serializedResults),
+                        `returnedPermission=${returnsPermission} bytes=${serializedResults.length}`,
                     )
+
+                    // ---- 7b-7f. AUTHORIZATION boundary: what the catalogue actually decides -------
+                    // What was here compared JSON.stringify(PERMISSION_KEYS) taken before the
+                    // transaction against the same expression taken after it. PERMISSION_KEYS is a
+                    // frozen import, so both operands were one immutable value read twice in a single
+                    // process: `x === x`, unfalsifiable, and it never touched the boundary whose
+                    // behaviour it was named after.
+                    //
+                    // This harness now observes the boundary itself, through ITS OWN fixtures - five
+                    // Membership rows on Workspace B, seeded by raw SQL - and pins the result to the
+                    // same reviewed digest that check-workspace-surface-boundary.ts pins. Two
+                    // independent fixtures, one expectation.
+                    const closure = await observeBoundaryClosure(
+                        boundaryProbe(tenancy, identity, ids.workspaceB, ids.clerkByRole),
+                    )
+                    const observedDigest = boundaryClosureDigest(closure)
+                    closureEvidence.push(
+                        `BOUNDARY_CLOSURE_DECISIONS=${closure.length}`,
+                        `BOUNDARY_CLOSURE_DIGEST_OBSERVED=${observedDigest}`,
+                        `BOUNDARY_CLOSURE_DIGEST_PINNED=${BOUNDARY_CLOSURE_DIGEST}`,
+                        "BOUNDARY_CLOSURE_CANONICAL_OBSERVED:",
+                        canonicalBoundaryClosure(closure),
+                    )
+                    check(
+                        "7b. the closure the boundary ACTUALLY enforces fingerprints to the reviewed pin",
+                        closure.length === KNOWN_ROLES.length * PERMISSION_KEYS.length &&
+                            observedDigest === BOUNDARY_CLOSURE_DIGEST,
+                        `decisions=${closure.length} observed=${observedDigest} pinned=${BOUNDARY_CLOSURE_DIGEST}`,
+                    )
+
+                    const policyViolations = leastPrivilegeViolations(closure)
+                    check(
+                        "7c. the OBSERVED closure satisfies the least-privilege ladder, so a re-pinned digest cannot hide a widening",
+                        policyViolations.length === 0,
+                        policyViolations.length === 0
+                            ? `ladder=${ROLE_PRIVILEGE_LADDER.join("<")} clean over ${closure.length} live decisions`
+                            : policyViolations.join(" | "),
+                    )
+
+                    const reachable = observedUniverse(closure)
+                    const catalogue = catalogueUniverse()
+                    const unreachable = catalogue.filter((permission) => !reachable.includes(permission))
+                    check(
+                        "7d. every permission in the catalogue is reachable through the boundary by at least one role",
+                        catalogue.length > 0 && sameSet(reachable, catalogue) && unreachable.length === 0,
+                        `catalogue=${catalogue.length} reachable=${reachable.length} unreachable=[${unreachable.join(",") || "none"}]`,
+                    )
+
+                    // ---- 7e. no permission-catalogue enumeration, inside the tenant ---------------
+                    identity.current = ids.clerkByRole.VIEWER
+                    const ungrantedRefusal = await refusalFor(tenancy, ids.workspaceB, "workspace.delete")
+                    const absentRefusal = await refusalFor(tenancy, ids.workspaceB, ABSENT_PERMISSION)
+                    const absentIsAbsent = !(PERMISSION_KEYS as readonly string[]).includes(ABSENT_PERMISSION)
+                    check(
+                        "7e. a member cannot tell a real-but-ungranted permission from one that does not exist",
+                        absentIsAbsent &&
+                            ungrantedRefusal !== "ADMITTED" &&
+                            absentRefusal !== "ADMITTED" &&
+                            ungrantedRefusal.includes('"code":"FORBIDDEN"') &&
+                            withoutEchoedInput(ungrantedRefusal, "workspace.delete") ===
+                                withoutEchoedInput(absentRefusal, ABSENT_PERMISSION),
+                        `ungranted=${ungrantedRefusal} absent=${absentRefusal} absentIsAbsent=${absentIsAbsent}`,
+                    )
+
+                    // ---- 7f. no workspace OR permission enumeration, across tenants ---------------
+                    // Workspace A is real but foreign to user B; the other id is absent. Probed with a
+                    // permission user B holds in its own workspace, one only an OWNER ever holds, and
+                    // one that is not a catalogue key at all. All six refusals must be the same bytes,
+                    // which also pins the ORDER of the two checks inside requireAccess: membership is
+                    // settled before any permission is consulted.
+                    identity.current = ids.userBClerk
+                    const probedKeys = ["workspace.read", "workspace.delete", ABSENT_PERMISSION]
+                    const probedTargets = [ids.workspaceA, `${RUN}_absent_workspace`]
+                    const crossTenantRefusals: string[] = []
+                    for (const target of probedTargets) {
+                        for (const permission of probedKeys) {
+                            crossTenantRefusals.push(await refusalFor(tenancy, target, permission))
+                        }
+                    }
+                    const distinctRefusals = [...new Set(crossTenantRefusals)]
+                    const leakedKeys = probedKeys.filter((permission) =>
+                        distinctRefusals.some((refusal) => refusal.includes(permission)),
+                    )
+                    const leakedIds = probedTargets.filter((target) =>
+                        distinctRefusals.some((refusal) => refusal.includes(target)),
+                    )
+                    check(
+                        "7f. across tenants, existence of a workspace OR of a permission is not observable",
+                        probedKeys.length === 3 &&
+                            crossTenantRefusals.length === 6 &&
+                            distinctRefusals.length === 1 &&
+                            distinctRefusals[0].includes('"code":"FORBIDDEN"') &&
+                            leakedKeys.length === 0 &&
+                            leakedIds.length === 0,
+                        `refusals=${crossTenantRefusals.length} distinct=${distinctRefusals.length} value=${distinctRefusals[0]} leakedKeys=[${leakedKeys.join(",") || "none"}] leakedIds=${leakedIds.length}`,
+                    )
+
+                    // The remaining checks read Workspace B as its owner.
+                    identity.current = ids.userBClerk
 
                     const profilesAfter = await profileBytes(tx, [ids.profileA, ids.profileB])
                     check(
@@ -432,6 +631,7 @@ async function main() {
         console.log(`${evaluation.pass ? "PASS" : "FAIL"} ${evaluation.property} :: ${evaluation.detail}`)
     }
     const failed = evaluations.filter((evaluation) => !evaluation.pass)
+    for (const line of closureEvidence) console.log(line)
     console.log(
         `SUMMARY mode=${INVERT ? "inverted" : "normal"} passed=${evaluations.length - failed.length} failed=${failed.length}`,
     )
