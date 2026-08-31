@@ -28,8 +28,22 @@ export function TimeSlotPicker({
 }: TimeSlotPickerProps) {
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
-    const [bookedSlots, setBookedSlots] = useState<string[]>([])
-    const [loading, setLoading] = useState(false)
+    // One piece of state for "the answer we have", tagged with the request it answers. `loading`
+    // and `bookedSlots` are derived from it rather than being separate state set from the effect
+    // body. Two things follow, and both are behaviours a test pins:
+    //  - There is no cascading render. The old code called setLoading(true) synchronously inside
+    //    the effect, so picking a second date committed one frame in which selectedDate was
+    //    already the new date while bookedSlots still held the PREVIOUS date's answer - the user
+    //    saw the new date's slots filtered by the old date's bookings, i.e. wrong availability
+    //    presented as fact.
+    //  - A late or out-of-order response cannot poison a different date. The answer is only used
+    //    when its tag matches the request currently on screen.
+    const [answer, setAnswer] = useState<{
+        date: string
+        profileId: string
+        serviceId: string
+        slots: string[]
+    } | null>(null)
 
     // Generate next 14 days
     const dates = Array.from({ length: 14 }, (_, i) => {
@@ -68,16 +82,26 @@ export function TimeSlotPicker({
         return slots
     }
 
-    // Fetch booked slots when date changes
+    // Fetch booked slots when date changes. setState happens only in the promise callbacks, never
+    // synchronously in the effect body, so there is no cascading render.
     useEffect(() => {
         if (!selectedDate) return
-        setLoading(true)
+        let cancelled = false
+        const tag = { date: selectedDate, profileId, serviceId }
         fetch(`/api/bookings/slots?profileId=${profileId}&serviceId=${serviceId}&date=${selectedDate}`)
             .then(r => r.json())
-            .then(data => setBookedSlots(data.bookedSlots || []))
-            .catch(() => setBookedSlots([]))
-            .finally(() => setLoading(false))
+            .then(data => { if (!cancelled) setAnswer({ ...tag, slots: data.bookedSlots || [] }) })
+            .catch(() => { if (!cancelled) setAnswer({ ...tag, slots: [] }) })
+        return () => { cancelled = true }
     }, [selectedDate, profileId, serviceId])
+
+    const answered =
+        answer !== null &&
+        answer.date === selectedDate &&
+        answer.profileId === profileId &&
+        answer.serviceId === serviceId
+    const loading = selectedDate !== null && !answered
+    const bookedSlots = answered ? answer.slots : []
 
     const selectedDateObj = selectedDate ? new Date(selectedDate) : null
     const slots = selectedDateObj ? getSlotsForDate(selectedDateObj) : []
