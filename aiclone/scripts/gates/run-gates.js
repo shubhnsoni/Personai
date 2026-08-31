@@ -49,6 +49,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
+const crypto = require("node:crypto");
 const { spawn, spawnSync } = require("node:child_process");
 
 const { loadManifest, reconcile, applyFilter } = require("./lib/inventory");
@@ -56,10 +57,669 @@ const { resolveDatabaseTarget, DatabaseTargetError } = require("./lib/db-target"
 const { collectSecretLiterals, redact, scanForLeaks } = require("./lib/redact");
 const { writeSummaries, fmtMs } = require("./lib/report");
 
-const DRIVER_VERSION = "1.0.0";
+const DRIVER_VERSION = "1.1.0";
 const MAX_CAPTURED_BYTES = 16 * 1024 * 1024;
 
 const EXIT = { OK: 0, HARNESS_FAILED: 1, INTEGRITY: 2, PARTIAL: 3 };
+
+// ---------------------------------------------------------------------------
+// THE ASSERTION-EVIDENCE CONTRACT
+// ---------------------------------------------------------------------------
+//
+// Before this block existed, a harness "passed" because it exited 0. A harness that
+// asserted sixty invariants and a harness that asserted nothing were indistinguishable
+// in the summary, so "74 checks, FAILED 0" could in principle have been produced by 74
+// empty files. The exit code was the whole of the evidence.
+//
+// THE CONTRACT. Every harness that the driver counts as passed must yield an evidence
+// record carrying (a) a harness IDENTITY and (b) a POSITIVE integer assertion count.
+// A harness with no such record is a failure, not a pass, unless it is named — exactly,
+// by filename — on the manifest's temporary allowlist.
+//
+// WHY A PARSER RATHER THAN A HARNESS CHANGE. Most harnesses in this repository already
+// print their evidence, in a handful of stable shapes ("58/58 assertions passed",
+// "39/39 invariants passed", a JSON report carrying "assertions": 41, a
+// "SUMMARY ... passed=41 failed=0" line). Recognising what is already there enforces the
+// contract on the majority of the sweep today without editing a single harness — and a
+// harness edit made to satisfy a checker is a harness edit nobody reviewed for meaning.
+//
+// TWO CHANNELS, DELIBERATELY ORDERED.
+//   1. SIDECAR (authoritative, forward-looking): a harness may write
+//      <evidenceDir>/<harness>.evidence.json = { schema, runId, harness, assertions }.
+//      The runId is a per-run nonce the driver hands the child in GATES_RUN_ID, so a
+//      sidecar left behind by an earlier run cannot be mistaken for this run's proof.
+//      No harness writes one yet; the channel exists because it is the only one where
+//      staleness is a real threat, and a control for a threat you cannot demonstrate is
+//      a control nobody can trust.
+//   2. LOG (what actually carries the weight today): the recognisers below.
+//
+// A stale or mismatched sidecar is FATAL even when the log evidence is perfect. Silently
+// preferring the good evidence is how forged evidence gets absorbed.
+//
+// Every rejection is a distinct named finding, because "evidence check failed" tells a
+// reader nothing about what to fix. See EVIDENCE_FINDING_KINDS.
+// ---------------------------------------------------------------------------
+
+const EVIDENCE_SCHEMA = "personai.gates.evidence/1";
+const EVIDENCE_SUMMARY_SCHEMA = "personai.gates.evidence-summary/1";
+
+/** Every rejection reason, so the set is enumerable from the code and from the summary. */
+const EVIDENCE_FINDING_KINDS = Object.freeze({
+  EVIDENCE_MISSING: "no assertion evidence was produced and the harness is not on the allowlist",
+  EVIDENCE_MALFORMED: "evidence was produced but is not usable (unparseable, wrong type, or a ratio whose passed count exceeds its total)",
+  EVIDENCE_ZERO_ASSERTIONS: "the evidence reports zero assertions, so nothing was proven",
+  EVIDENCE_NEGATIVE_ASSERTIONS: "the evidence reports a negative assertion count",
+  EVIDENCE_CLAIMS_FAILURES: "the evidence reports failed assertions while the harness exited 0",
+  EVIDENCE_DUPLICATE_ID: "two harnesses produced evidence claiming the same harness identity",
+  EVIDENCE_IDENTITY_MISMATCH: "the evidence names a harness other than the one that produced it",
+  EVIDENCE_STALE: "the evidence was not produced by this run (wrong run id, or written before the harness started)",
+  EVIDENCE_ORPHAN_SIDECAR: "an evidence file exists for a harness this run did not execute",
+  EVIDENCE_ALLOWLIST_ENTRY_MISSING_ON_DISK: "an allowlisted harness filename does not exist on disk",
+  EVIDENCE_ALLOWLIST_ENTRY_INVALID: "an allowlist entry lacks a concrete reason or is not marked temporary/migration-pending",
+  EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN: "an allowlist entry is a wildcard, glob or regex rather than an exact filename",
+  EVIDENCE_ALLOWLIST_SIZE_DRIFT: "the allowlist's real size disagrees with the size the manifest declares",
+});
+
+/**
+ * A wildcard, glob, regex or path metacharacter in an allowlist entry.
+ *
+ * The allowlist's SIZE is the honest count of harnesses this gate does not enforce. One
+ * pattern entry would destroy that number: it could silently cover harnesses added later,
+ * so the count would stop being a measurement and become a floor.
+ */
+const ALLOWLIST_FORBIDDEN_CHARS = /[*?[\]{}()|+^$\\/\s]/u;
+
+/**
+ * JSON report keys that carry an assertion count, in precedence order.
+ * A number is the count; an array is a list of assertion names, so its length is the count.
+ */
+const EVIDENCE_JSON_COUNT_KEYS = Object.freeze([
+  "assertions",
+  "assertionCount",
+  "assertionsPassed",
+  "invariants",
+  "checks",
+]);
+
+/**
+ * Log-line evidence forms, tried in this order per line.
+ *
+ * `ratio-passed` MUST precede `count-passed` so "2/2 invariants passed" is read as 2 of 2
+ * rather than as the bare number 2 — otherwise a harness reporting "56/58" would look green.
+ */
+const EVIDENCE_LINE_FORMS = Object.freeze([
+  {
+    // GATE-EVIDENCE harness=check-foo.ts assertions=58
+    // The only form that carries identity, so the only one a harness can forge with.
+    name: "gate-evidence-line",
+    explicit: true,
+    pattern: /^\s*GATE-EVIDENCE\s+harness=(\S+)\s+assertions=(\S+)\s*$/u,
+    read: (m) => ({ claimedId: m[1], rawCount: m[2] }),
+  },
+  {
+    // 58/58 assertions passed | 39/39 invariants passed | 46/46 installation route assertions passed
+    name: "ratio-passed",
+    pattern: /(-?\d+)\s*\/\s*(-?\d+)([^\n]{0,60}?)\s(?:assertions?|invariants?|checks?)\s+passed\b/iu,
+    read: (m) => ({ rawCount: m[1], rawTotal: m[2] }),
+  },
+  {
+    // 3 assertions passed | 1 assertion passed
+    name: "count-passed",
+    pattern: /(?:^|[^\d/])(-?\d+)\s+(?:assertions?|invariants?|checks?)\s+passed\b/iu,
+    read: (m) => ({ rawCount: m[1] }),
+  },
+  {
+    // SUMMARY mode=normal passed=41 failed=0
+    name: "summary-passed-failed",
+    pattern: /\bSUMMARY\b[^\n]*?\bpassed=(-?\d+)\b[^\n]*?\bfailed=(-?\d+)\b/iu,
+    read: (m) => ({ rawCount: m[1], rawFailed: m[2] }),
+  },
+]);
+
+/**
+ * Find the last top-level JSON object printed in a log.
+ *
+ * JSON.stringify(value, null, 2) — which is what every JSON-reporting harness here uses —
+ * puts the opening brace alone on its own line and the closing brace alone on the last, and
+ * nests inner objects after their key ("a": {). So a line that trims to exactly "{" is a
+ * top-level open, which is what makes this parse rather than a brace-counting guess. Text
+ * printed after the JSON (check-foundation-contracts.ts prints a sign-off line) is skipped
+ * because the search runs backwards from the end.
+ */
+function extractLastJsonObject(text) {
+  const lines = text.split(/\r?\n/);
+  for (let end = lines.length - 1; end >= 0; end -= 1) {
+    if (lines[end].trim() !== "}") continue;
+    for (let start = end - 1; start >= 0; start -= 1) {
+      if (lines[start].trim() !== "{") continue;
+      let value;
+      try {
+        value = JSON.parse(lines.slice(start, end + 1).join("\n"));
+      } catch {
+        continue; // not balanced from here; keep widening
+      }
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return { value, startLine: start + 1, endLine: end + 1 };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse assertion evidence out of one harness's captured log.
+ * Returns null when the log carries none, which is the case the contract exists to catch.
+ */
+function parseEvidenceFromLog(text) {
+  const lines = String(text == null ? "" : text).split(/\r?\n/);
+  let explicit = null;
+  let heuristic = null;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    for (const form of EVIDENCE_LINE_FORMS) {
+      const m = form.pattern.exec(line);
+      if (!m) continue;
+      const candidate = {
+        form: form.name,
+        source: "log",
+        line: i + 1,
+        raw: line.trim().replace(/\s+/gu, " ").slice(0, 200),
+        ...form.read(m),
+      };
+      // Explicit, identity-bearing evidence always wins; among the heuristic forms the
+      // last one in the log wins, because that is where a harness prints its summary.
+      if (form.explicit) {
+        if (explicit === null) explicit = candidate;
+      } else {
+        heuristic = candidate;
+      }
+      break; // one form per line: ratio before count, so the ratio is not read as a bare count
+    }
+  }
+
+  if (explicit) return explicit;
+  if (heuristic) return heuristic;
+
+  const json = extractLastJsonObject(text);
+  if (!json) return null;
+  for (const key of EVIDENCE_JSON_COUNT_KEYS) {
+    if (!(key in json.value)) continue;
+    const raw = json.value[key];
+    if (typeof raw === "number") {
+      return {
+        form: "json-report-count",
+        source: "log",
+        line: json.endLine,
+        raw: `${key}: ${raw}`,
+        rawCount: raw,
+      };
+    }
+    if (Array.isArray(raw)) {
+      return {
+        form: "json-report-list",
+        source: "log",
+        line: json.endLine,
+        raw: `${key}: [${raw.length} entr${raw.length === 1 ? "y" : "ies"}]`,
+        rawCount: raw.length,
+      };
+    }
+  }
+  return null;
+}
+
+function toInteger(raw) {
+  if (typeof raw === "number") return Number.isInteger(raw) ? raw : null;
+  if (typeof raw !== "string") return null;
+  return /^-?\d+$/u.test(raw.trim()) ? Number(raw.trim()) : null;
+}
+
+function sidecarPathFor(evidenceDir, harnessFile) {
+  return path.join(evidenceDir, `${harnessFile}.evidence.json`);
+}
+
+/**
+ * Read and validate one harness's sidecar evidence file, if it wrote one.
+ * Returns { evidence } on success or { findings } on rejection — never both.
+ */
+function readSidecar(record, { evidenceDir, runId }) {
+  const sidecar = sidecarPathFor(evidenceDir, record.file);
+  let stat;
+  try {
+    stat = fs.statSync(sidecar);
+  } catch {
+    return null; // no sidecar: the log channel decides
+  }
+  const rel = path.relative(APP_DIR, sidecar).split(path.sep).join("/");
+
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(sidecar, "utf8"));
+  } catch (error) {
+    return {
+      findings: [
+        {
+          kind: "EVIDENCE_MALFORMED",
+          harness: record.file,
+          detail: `${record.file} wrote ${rel} but it is not valid JSON (${error.message}). Unreadable evidence is not evidence.`,
+        },
+      ],
+    };
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return {
+      findings: [
+        { kind: "EVIDENCE_MALFORMED", harness: record.file, detail: `${rel} is not a JSON object.` },
+      ],
+    };
+  }
+  if (parsed.runId !== runId) {
+    return {
+      findings: [
+        {
+          kind: "EVIDENCE_STALE",
+          harness: record.file,
+          detail:
+            `${rel} carries runId ${JSON.stringify(String(parsed.runId ?? null))} but this run is ${runId}. ` +
+            "Evidence left over from an earlier run proves nothing about this one, so it is rejected rather " +
+            "than ignored — ignoring it is how stale proof gets absorbed into a green result.",
+        },
+      ],
+    };
+  }
+  // Second, independent staleness test: a file copied forward can carry the right runId.
+  const startedAtMs = Date.parse(record.startedAt);
+  if (Number.isFinite(startedAtMs) && stat.mtimeMs + 1000 < startedAtMs) {
+    return {
+      findings: [
+        {
+          kind: "EVIDENCE_STALE",
+          harness: record.file,
+          detail:
+            `${rel} was last written at ${new Date(stat.mtimeMs).toISOString()}, before ${record.file} started ` +
+            `at ${record.startedAt}. It cannot be this execution's evidence.`,
+        },
+      ],
+    };
+  }
+  if (parsed.schema !== undefined && parsed.schema !== EVIDENCE_SCHEMA) {
+    return {
+      findings: [
+        {
+          kind: "EVIDENCE_MALFORMED",
+          harness: record.file,
+          detail: `${rel} declares schema ${JSON.stringify(String(parsed.schema))}; expected ${EVIDENCE_SCHEMA}.`,
+        },
+      ],
+    };
+  }
+  return {
+    evidence: {
+      form: "sidecar-json",
+      source: "sidecar",
+      sidecarRelativePath: rel,
+      line: null,
+      raw: `${String(parsed.harness)} / ${String(parsed.assertions)}`,
+      claimedId: typeof parsed.harness === "string" ? parsed.harness : undefined,
+      rawCount: parsed.assertions,
+    },
+  };
+}
+
+/**
+ * Turn a raw parse into a validated evidence record, or into named findings.
+ */
+function validateEvidence(record, candidate) {
+  const findings = [];
+  const count = toInteger(candidate.rawCount);
+
+  if (count === null) {
+    findings.push({
+      kind: "EVIDENCE_MALFORMED",
+      harness: record.file,
+      detail:
+        `${record.file} produced ${candidate.form} evidence whose assertion count ` +
+        `${JSON.stringify(String(candidate.rawCount))} is not an integer. Raw: ${JSON.stringify(candidate.raw)}.`,
+    });
+    return { evidence: null, findings };
+  }
+
+  if (candidate.rawTotal !== undefined) {
+    const total = toInteger(candidate.rawTotal);
+    if (total === null) {
+      findings.push({
+        kind: "EVIDENCE_MALFORMED",
+        harness: record.file,
+        detail: `${record.file} produced a ratio whose total ${JSON.stringify(String(candidate.rawTotal))} is not an integer.`,
+      });
+      return { evidence: null, findings };
+    }
+    if (count > total) {
+      findings.push({
+        kind: "EVIDENCE_MALFORMED",
+        harness: record.file,
+        detail: `${record.file} claims ${count} of ${total} assertions passed. A passed count above the total is not a measurement.`,
+      });
+      return { evidence: null, findings };
+    }
+    if (count < total) {
+      findings.push({
+        kind: "EVIDENCE_CLAIMS_FAILURES",
+        harness: record.file,
+        detail:
+          `${record.file} exited 0 while reporting ${count} of ${total} assertions passed, so ${total - count} ` +
+          "failed. A harness cannot be green and report failures at the same time.",
+      });
+      return { evidence: null, findings };
+    }
+  }
+
+  const failed = candidate.rawFailed === undefined ? null : toInteger(candidate.rawFailed);
+  if (failed !== null && failed > 0) {
+    findings.push({
+      kind: "EVIDENCE_CLAIMS_FAILURES",
+      harness: record.file,
+      detail: `${record.file} exited 0 while its summary line reports failed=${failed}.`,
+    });
+    return { evidence: null, findings };
+  }
+
+  if (count < 0) {
+    findings.push({
+      kind: "EVIDENCE_NEGATIVE_ASSERTIONS",
+      harness: record.file,
+      detail: `${record.file} reports ${count} assertions. A negative count is a bug in the harness's own bookkeeping.`,
+    });
+    return { evidence: null, findings };
+  }
+  if (count === 0) {
+    findings.push({
+      kind: "EVIDENCE_ZERO_ASSERTIONS",
+      harness: record.file,
+      detail:
+        `${record.file} exited 0 having asserted nothing (${candidate.form} evidence reports 0 assertions). ` +
+        "An empty check is indistinguishable from a deleted one, so it cannot count as a pass.",
+    });
+    return { evidence: null, findings };
+  }
+
+  if (candidate.claimedId !== undefined && candidate.claimedId !== record.file) {
+    findings.push({
+      kind: "EVIDENCE_IDENTITY_MISMATCH",
+      harness: record.file,
+      detail:
+        `${record.file} produced evidence naming ${JSON.stringify(String(candidate.claimedId))}. Evidence that ` +
+        "identifies a different harness is forged or copied, and either way it does not prove anything about " +
+        "the harness that emitted it.",
+    });
+    return { evidence: null, findings };
+  }
+
+  return {
+    evidence: {
+      harness: record.file,
+      claimedId: candidate.claimedId ?? record.file,
+      identitySource: candidate.claimedId === undefined ? "attributed-by-driver" : "declared-by-harness",
+      assertions: count,
+      total: candidate.rawTotal === undefined ? null : toInteger(candidate.rawTotal),
+      form: candidate.form,
+      source: candidate.source,
+      logLine: candidate.line,
+      sidecarRelativePath: candidate.sidecarRelativePath ?? null,
+      raw: candidate.raw,
+    },
+    findings,
+  };
+}
+
+/** Allowlist validation: shape, exactness, existence and declared size. */
+function verifyAllowlist(evidenceConfig, onDisk) {
+  const findings = [];
+  const seen = new Set();
+
+  evidenceConfig.allowlist.forEach((entry, index) => {
+    const where = `evidence.allowlist[${index}]`;
+    if (ALLOWLIST_FORBIDDEN_CHARS.test(entry.file)) {
+      findings.push({
+        kind: "EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN",
+        harness: entry.file,
+        detail:
+          `${where}.file ${JSON.stringify(entry.file)} contains a wildcard, regex or path metacharacter. ` +
+          "The allowlist must name EXACT filenames: its length is the honest count of harnesses this gate " +
+          "does not enforce, and a pattern would silently cover harnesses added later.",
+      });
+      return;
+    }
+    if (seen.has(entry.file)) {
+      findings.push({
+        kind: "EVIDENCE_ALLOWLIST_ENTRY_INVALID",
+        harness: entry.file,
+        detail: `${where}.file ${entry.file} is listed twice, which overstates the allowlist's real coverage.`,
+      });
+      return;
+    }
+    seen.add(entry.file);
+
+    const missing = [];
+    if (typeof entry.reason !== "string" || entry.reason.trim().length < 20) {
+      missing.push("reason (a concrete sentence of at least 20 characters saying what the harness emits instead)");
+    }
+    if (entry.temporary !== true) missing.push("temporary: true");
+    if (typeof entry.migrationPending !== "string" || entry.migrationPending.trim() === "") {
+      missing.push("migrationPending (what has to happen for the entry to go away)");
+    }
+    if (typeof entry.declaredBy !== "string" || entry.declaredBy.trim() === "") missing.push("declaredBy");
+    if (missing.length > 0) {
+      findings.push({
+        kind: "EVIDENCE_ALLOWLIST_ENTRY_INVALID",
+        harness: entry.file,
+        detail:
+          `${where} is missing: ${missing.join("; ")}. An unenforced harness must carry its own justification, ` +
+          "or the allowlist becomes a permanent exemption nobody remembers agreeing to.",
+      });
+    }
+    if (!onDisk.includes(entry.file)) {
+      findings.push({
+        kind: "EVIDENCE_ALLOWLIST_ENTRY_MISSING_ON_DISK",
+        harness: entry.file,
+        detail:
+          `${where}.file ${entry.file} is allowlisted but does not exist on disk. A stale exemption is worse ` +
+          "than none: it makes the unenforced count look larger than it is and hides which harness it covered.",
+      });
+    }
+  });
+
+  const declared = evidenceConfig.allowlistDeclaredSize;
+  const actual = evidenceConfig.allowlist.length;
+  if (declared === null && actual > 0) {
+    findings.push({
+      kind: "EVIDENCE_ALLOWLIST_SIZE_DRIFT",
+      detail:
+        `The manifest allowlists ${actual} harness(es) but declares no evidence.allowlistDeclaredSize. ` +
+        "The size must be declared so that adding an entry is a visible, reviewable edit rather than a silent one.",
+    });
+  } else if (declared !== null && declared !== actual) {
+    findings.push({
+      kind: "EVIDENCE_ALLOWLIST_SIZE_DRIFT",
+      detail:
+        `evidence.allowlistDeclaredSize is ${declared} but the allowlist holds ${actual} entr${actual === 1 ? "y" : "ies"}. ` +
+        "Investigate the difference — an allowlist that can grow without the declared number moving can grow silently.",
+    });
+  }
+
+  return findings;
+}
+
+/**
+ * The whole contract, evaluated over one run.
+ * Returns { block, findings }; `block` is added to the summary as a NEW field and no
+ * existing field name changes.
+ */
+function evaluateEvidence({ records, manifest, onDisk, evidenceDir, runId, executed }) {
+  const evidenceConfig = manifest.evidence;
+  const findings = verifyAllowlist(evidenceConfig, onDisk);
+  const allowlistFiles = evidenceConfig.allowlist.map((e) => e.file);
+  const allowlisted = new Set(allowlistFiles);
+
+  const records2 = [];
+  const redundant = [];
+  const unevidenced = [];
+  const formCounts = {};
+
+  if (executed) {
+    // PASS 1 — gather one candidate per passed harness, and reject what cannot be read at all.
+    const candidates = [];
+    for (const record of records) {
+      if (record.status !== "passed") continue; // a red harness already fails; evidence is about green
+
+      const sidecar = readSidecar(record, { evidenceDir, runId });
+      if (sidecar && sidecar.findings) {
+        findings.push(...sidecar.findings);
+        continue;
+      }
+      const candidate = sidecar ? sidecar.evidence : parseEvidenceFromLog(readLogText(record.logPath));
+
+      if (!candidate) {
+        if (allowlisted.has(record.file)) continue;
+        unevidenced.push(record.file);
+        findings.push({
+          kind: "EVIDENCE_MISSING",
+          harness: record.file,
+          detail:
+            `${record.file} exited 0 without emitting any assertion evidence. Exit 0 on its own does not ` +
+            "distinguish a harness that proved sixty invariants from one that asserted nothing, so it is not " +
+            "accepted as a pass. Emit a final line such as \"12/12 assertions passed\", or a " +
+            `"${EVIDENCE_SCHEMA}" sidecar, or add an exact, reasoned, temporary entry to evidence.allowlist.`,
+        });
+        continue;
+      }
+      candidates.push({ record, candidate, claimedId: candidate.claimedId ?? record.file });
+    }
+
+    // PASS 2 — identity collisions, BEFORE anything else is judged.
+    //
+    // This is deliberately its own pass. Checked inside the per-harness validation it would be
+    // unreachable for the case that matters: a harness claiming another harness's id is also an
+    // identity mismatch, so an early return there would report the mismatch and never notice
+    // that two harnesses had claimed one identity.
+    const claimants = new Map();
+    for (const entry of candidates) {
+      if (!claimants.has(entry.claimedId)) claimants.set(entry.claimedId, []);
+      claimants.get(entry.claimedId).push(entry.record.file);
+    }
+    const collided = new Set();
+    for (const [claimedId, files] of claimants) {
+      if (files.length < 2) continue;
+      for (const file of files) collided.add(file);
+      findings.push({
+        kind: "EVIDENCE_DUPLICATE_ID",
+        harness: files.join(" == "),
+        detail:
+          `${files.length} harnesses produced evidence claiming the identity ${JSON.stringify(claimedId)}: ` +
+          `${files.join(", ")}. Two harnesses cannot be the same harness, so at least one set of assertions ` +
+          "is being counted under a name that does not belong to it. Neither claim is accepted.",
+      });
+    }
+
+    // PASS 3 — validate what is left.
+    for (const { record, candidate } of candidates) {
+      if (collided.has(record.file)) continue;
+
+      const validated = validateEvidence(record, candidate);
+      findings.push(...validated.findings);
+      if (!validated.evidence) continue;
+
+      const evidence = validated.evidence;
+      if (allowlisted.has(record.file)) {
+        redundant.push({ file: record.file, form: evidence.form, assertions: evidence.assertions });
+      }
+      formCounts[evidence.form] = (formCounts[evidence.form] || 0) + 1;
+      records2.push(evidence);
+    }
+
+    // Anything in the evidence directory that no executed harness claims is left over.
+    for (const orphan of listOrphanSidecars(evidenceDir, records)) {
+      findings.push({
+        kind: "EVIDENCE_ORPHAN_SIDECAR",
+        harness: orphan.harness,
+        detail:
+          `${orphan.relativePath} claims to be evidence for ${orphan.harness}, which this run did not execute. ` +
+          "An evidence file with no matching execution is a leftover from an earlier run and must not sit next " +
+          "to this run's artefacts where a reader would take it for current.",
+      });
+    }
+  }
+
+  const totalAssertions = records2.reduce((sum, e) => sum + e.assertions, 0);
+
+  return {
+    findings,
+    block: {
+      schema: EVIDENCE_SUMMARY_SCHEMA,
+      required: evidenceConfig.required,
+      enforced: executed && evidenceConfig.required,
+      runId,
+      evidenceDir: path.relative(APP_DIR, evidenceDir).split(path.sep).join("/"),
+      contract:
+        "Every harness counted as passed must yield machine-readable evidence carrying a harness identity and " +
+        "a positive assertion count. Missing, malformed, duplicate, zero/negative, forged and stale evidence " +
+        "each fail the run under their own named finding.",
+      rejectionKinds: EVIDENCE_FINDING_KINDS,
+      recognisedForms: EVIDENCE_LINE_FORMS.map((f) => f.name).concat(["json-report-count", "json-report-list", "sidecar-json"]),
+      counts: {
+        passedHarnesses: records.filter((r) => r.status === "passed").length,
+        evidenced: records2.length,
+        allowlisted: allowlistFiles.length,
+        allowlistedAndExecuted: records
+          .filter((r) => r.status === "passed" && allowlisted.has(r.file) && !redundant.some((x) => x.file === r.file))
+          .length,
+        unevidenced: unevidenced.length,
+        totalAssertions,
+        findings: findings.length,
+      },
+      formCounts,
+      allowlist: {
+        declaredSize: evidenceConfig.allowlistDeclaredSize,
+        actualSize: allowlistFiles.length,
+        files: allowlistFiles,
+        entries: evidenceConfig.allowlist,
+        redundant,
+      },
+      unevidenced,
+      records: records2,
+    },
+  };
+}
+
+function readLogText(logPath) {
+  try {
+    return fs.readFileSync(logPath, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function listOrphanSidecars(evidenceDir, records) {
+  let names = [];
+  try {
+    names = fs.readdirSync(evidenceDir, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name);
+  } catch {
+    return [];
+  }
+  const executedFiles = new Set(records.map((r) => r.file));
+  const orphans = [];
+  for (const name of names) {
+    if (!name.endsWith(".evidence.json")) continue;
+    const harness = name.slice(0, -".evidence.json".length);
+    if (executedFiles.has(harness)) continue;
+    orphans.push({
+      harness,
+      relativePath: path.relative(APP_DIR, path.join(evidenceDir, name)).split(path.sep).join("/"),
+    });
+  }
+  return orphans;
+}
 
 // ---------------------------------------------------------------------------
 // Location. Everything is derived from this file's own position on disk.
@@ -100,6 +760,7 @@ function parseArgs(argv) {
     timeoutMs: null,
     manifestPath: path.join(GATES_DIR, "gates.manifest.json"),
     outRoot: path.join(GATES_DIR, "artifacts"),
+    evidenceDir: null,
     help: false,
   };
   const unknown = [];
@@ -162,6 +823,7 @@ function parseArgs(argv) {
   // driver at a throwaway manifest without editing the committed one.
   if (process.env.GATES_MANIFEST) opts.manifestPath = path.resolve(APP_DIR, process.env.GATES_MANIFEST);
   if (process.env.GATES_OUT_DIR) opts.outRoot = path.resolve(APP_DIR, process.env.GATES_OUT_DIR);
+  if (process.env.GATES_EVIDENCE_DIR) opts.evidenceDir = path.resolve(APP_DIR, process.env.GATES_EVIDENCE_DIR);
 
   return { opts, unknown };
 }
@@ -187,8 +849,14 @@ function usage() {
     "  GATES_DATABASE_NAME                 override the disposable target database name",
     "  GATES_ALLOW_UNRECOGNISED_DATABASE=1 permit a target whose name does not look disposable",
     "  GATES_MANIFEST / GATES_OUT_DIR      same as the flags above",
+    "  GATES_EVIDENCE_DIR                  where harness evidence sidecars are read from and written to",
+    "                                      (default <out-dir>/run-<stamp>/evidence)",
     "  GATES_SELFTEST_FAULT=<fault>        deliberately corrupt the driver's own bookkeeping",
     "                                      to prove a guard fires. Any faulted run is voided.",
+    "",
+    "Assertion-evidence contract: every harness counted as passed must emit a positive assertion",
+    "count the driver can read (see EVIDENCE_* findings). Harnesses that emit none are named",
+    "exactly, one by one, in the manifest's evidence.allowlist with a reason; nothing else is exempt.",
     "",
     "Exit codes: 0 green/clean, 1 harness failure, 2 inventory or safety failure, 3 unaccepted partial.",
   ].join("\n");
@@ -287,7 +955,7 @@ function runHarness(entry, { runner, childEnv, timeoutMs, logPath, secretLiteral
 
     const child = spawn(cmd.file, cmd.args, {
       cwd: APP_DIR,
-      env: { ...childEnv, ...cmd.env },
+      env: { ...childEnv, ...cmd.env, GATES_HARNESS_ID: entry.file },
       stdio: ["ignore", "pipe", "pipe"],
       shell: false,
       windowsHide: true,
@@ -549,6 +1217,10 @@ async function main() {
   const stamp = new Date(startedAtMs).toISOString().replace(/[:.]/g, "-").replace(/Z$/, "");
   const runDir = path.join(opts.outRoot, `run-${stamp}`);
   const logDir = path.join(runDir, "logs");
+  // Per-run nonce. This is what makes stale evidence detectable: a sidecar carrying any other
+  // value was not produced by this execution, whatever its timestamp says.
+  const runId = `run-${stamp}-${crypto.randomBytes(6).toString("hex")}`;
+  const evidenceDir = opts.evidenceDir || path.join(runDir, "evidence");
 
   const repo = repoFacts();
   const manifest = loadManifest(opts.manifestPath);
@@ -609,9 +1281,19 @@ async function main() {
   const executionBlocked = inventoryFindings.length > 0 || (needDatabase && dbError !== null);
 
   if (!opts.list && !opts.integrityOnly && !executionBlocked) {
-    const childEnv = { ...process.env, DATABASE_URL: dbTarget.effectiveUrl };
+    fs.mkdirSync(evidenceDir, { recursive: true });
+    const childEnv = {
+      ...process.env,
+      DATABASE_URL: dbTarget.effectiveUrl,
+      // The evidence channel. A harness may write <GATES_EVIDENCE_DIR>/<its own filename>.evidence.json
+      // stamped with GATES_RUN_ID; anything carrying another run's id is rejected as stale.
+      GATES_RUN_ID: runId,
+      GATES_EVIDENCE_DIR: evidenceDir,
+      GATES_EVIDENCE_SCHEMA: EVIDENCE_SCHEMA,
+    };
     say("");
     say(`running ${selected.length} harness(es) serially, timeout ${fmtMs(opts.timeoutMs || manifest.defaultTimeoutMs)} each`);
+    say(`  evidence run id ${runId}`);
     say("");
 
     for (let i = 0; i < selected.length; i += 1) {
@@ -644,7 +1326,25 @@ async function main() {
     ? []
     : verifyResults(selected, records);
 
-  const integrityFindings = [...inventoryFindings, ...resultFindings];
+  // ---- assertion-evidence contract ----------------------------------------
+  // Runs even in --list / --integrity-only mode, because the allowlist's shape, exactness,
+  // on-disk existence and declared size are all checkable without executing anything, and a
+  // 20-minute sweep should not be how you discover the allowlist names a deleted file.
+  const evidenceExecuted = !opts.list && !opts.integrityOnly && !executionBlocked && manifest.evidence.required;
+  const evidenceResult = evaluateEvidence({
+    records,
+    manifest,
+    onDisk,
+    evidenceDir,
+    runId,
+    executed: evidenceExecuted,
+  });
+  const evidenceByHarness = new Map(evidenceResult.block.records.map((e) => [e.harness, e]));
+  for (const record of records) {
+    record.evidence = evidenceByHarness.get(record.file) || null;
+  }
+
+  const integrityFindings = [...inventoryFindings, ...resultFindings, ...evidenceResult.findings];
   if (needDatabase && dbError) {
     integrityFindings.push({ kind: "DATABASE_TARGET_REFUSED", detail: dbError });
   }
@@ -750,6 +1450,7 @@ async function main() {
       timedOut,
     },
     expected: manifest.expected,
+    evidence: evidenceResult.block,
     declaredSkips: declaredSkips.map((e) => ({ file: e.file, package: e.package, skip: e.skip })),
     integrityFindings,
     harnesses: [
@@ -865,6 +1566,25 @@ async function main() {
   process.stdout.write(
     `SKIPPED (declared): ${declaredSkips.length}${declaredSkips.length ? ` -> ${declaredSkips.map((s) => s.file).join(", ")}` : ""}\n`,
   );
+  const ev = summary.evidence;
+  process.stdout.write(
+    `assertion evidence: ${ev.enforced ? "ENFORCED" : "not evaluated (nothing was executed)"}` +
+      `${ev.enforced ? ` — ${ev.counts.evidenced}/${ev.counts.passedHarnesses} passed harness(es) carried evidence, ` +
+        `${ev.counts.totalAssertions} assertions counted, ${ev.counts.unevidenced} unevidenced` : ""}\n`,
+  );
+  // Printed in full, every run: an allowlist whose contents are not on the console can grow
+  // without anyone noticing, and its size is the honest measure of what this gate does NOT check.
+  process.stdout.write(
+    `evidence allowlist: ${ev.allowlist.actualSize} entr${ev.allowlist.actualSize === 1 ? "y" : "ies"} ` +
+      `(declared ${ev.allowlist.declaredSize === null ? "none" : ev.allowlist.declaredSize})` +
+      `${ev.allowlist.actualSize ? ` -> ${ev.allowlist.files.join(", ")}` : ""}\n`,
+  );
+  if (ev.allowlist.redundant.length > 0) {
+    process.stdout.write(
+      `evidence allowlist REDUNDANT (these emit evidence after all; delete the entries): ` +
+        `${ev.allowlist.redundant.map((r) => `${r.file} (${r.form}, ${r.assertions})`).join(", ")}\n`,
+    );
+  }
   process.stdout.write(`credential scan: ${scan.passed ? "clean" : "LEAK"} (${scan.filesScanned} artefacts, ${scan.criticalCount} critical)\n`);
   process.stdout.write(`verdict ${summary.verdict}; gate ${summary.gateEstablished ? "ESTABLISHED" : `NOT established — ${summary.gateNotEstablishedReason}`}\n`);
   process.stdout.write(`json  ${rel(finalPaths.jsonPath)}\nmd    ${rel(finalPaths.mdPath)}\nlatest ${rel(path.join(opts.outRoot, "latest.json"))}, ${rel(path.join(opts.outRoot, "latest.md"))}\n`);
@@ -913,11 +1633,31 @@ function applySelfTestFault(fault, records, say) {
   }
 }
 
-main()
-  .then((code) => process.exit(code))
-  .catch((error) => {
-    const literals = collectSecretLiterals(process.env);
-    // Failure path is redacted too: a stack trace can carry a DSN in an argument.
-    process.stderr.write(`${redact(String(error && error.stack ? error.stack : error), literals)}\n`);
-    process.exit(EXIT.INTEGRITY);
-  });
+// Exported so the self-test can probe the evidence parser directly, against the exact
+// output shapes the real harnesses print. Nothing else requires this file.
+module.exports = {
+  DRIVER_VERSION,
+  EVIDENCE_SCHEMA,
+  EVIDENCE_SUMMARY_SCHEMA,
+  EVIDENCE_FINDING_KINDS,
+  EVIDENCE_LINE_FORMS,
+  EVIDENCE_JSON_COUNT_KEYS,
+  ALLOWLIST_FORBIDDEN_CHARS,
+  extractLastJsonObject,
+  parseEvidenceFromLog,
+  validateEvidence,
+  verifyAllowlist,
+  toInteger,
+};
+
+// Guarded so `require()`ing this file for the parser does not launch a sweep.
+if (require.main === module) {
+  main()
+    .then((code) => process.exit(code))
+    .catch((error) => {
+      const literals = collectSecretLiterals(process.env);
+      // Failure path is redacted too: a stack trace can carry a DSN in an argument.
+      process.stderr.write(`${redact(String(error && error.stack ? error.stack : error), literals)}\n`);
+      process.exit(EXIT.INTEGRITY);
+    });
+}

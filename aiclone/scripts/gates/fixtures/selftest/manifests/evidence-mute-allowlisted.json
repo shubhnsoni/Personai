@@ -1,0 +1,26 @@
+{
+  "manifestVersion": 1,
+  "description": "The same silent harness as evidence-mute.json, this time named EXACTLY on the evidence allowlist with a concrete reason and the temporary/migrationPending markers. The run must go green, and the summary must report the allowlist's size and full contents - that reporting is the whole reason the allowlist cannot grow quietly.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/mute",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "evidence": {
+    "required": true,
+    "allowlistDeclaredSize": 1,
+    "allowlist": [
+      {
+        "file": "check-mute.js",
+        "reason": "Fixture that deliberately emits no assertion count, standing in for the real harnesses whose entire output is a JSON report with no count key.",
+        "temporary": true,
+        "migrationPending": "Nothing: this fixture must stay silent, because it is the control that proves silence is caught.",
+        "declaredBy": "Q4-E driver self-test"
+      }
+    ]
+  },
+  "harnesses": [{ "file": "check-mute.js", "package": "evidence", "run": true }]
+}

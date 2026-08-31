@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: check-negative.js reports assertions=-3. A negative count means the harness's own bookkeeping is broken, so nothing it says about passing can be relied on. The driver must exit 2 with EVIDENCE_NEGATIVE_ASSERTIONS - a distinct kind from the zero case, so the finding names which of the two happened.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/negative",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [{ "file": "check-negative.js", "package": "evidence", "run": true }]
+}

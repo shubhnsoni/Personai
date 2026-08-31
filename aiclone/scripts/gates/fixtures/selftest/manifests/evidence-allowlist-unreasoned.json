@@ -1,0 +1,24 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: an allowlist entry with no reason, no temporary marker and no migrationPending - the shape an exemption takes when someone adds a filename to make a red run green. An unenforced harness must carry its own justification or the allowlist becomes a permanent exemption nobody remembers agreeing to. The driver must exit 2 with EVIDENCE_ALLOWLIST_ENTRY_INVALID.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/good",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "evidence": {
+    "required": true,
+    "allowlistDeclaredSize": 1,
+    "allowlist": [{ "file": "check-ratio.js" }]
+  },
+  "harnesses": [
+    { "file": "check-gamma.js", "package": "evidence", "run": true },
+    { "file": "check-json.js", "package": "evidence", "run": true },
+    { "file": "check-jsonlist.js", "package": "evidence", "run": true },
+    { "file": "check-ratio.js", "package": "evidence", "run": true },
+    { "file": "check-summaryline.js", "package": "evidence", "run": true }
+  ]
+}

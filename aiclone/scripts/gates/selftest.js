@@ -25,6 +25,11 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const SCANNER = require("./lib/redact");
+// The driver is required (not spawned) for the evidence-parser probes: the parser must be
+// asserted against the exact output shapes the real check-*.ts harnesses print, and no
+// spawned run can show which recogniser fired or what it read. run-gates.js guards its own
+// main() behind require.main === module, so this require does not launch a sweep.
+const EVIDENCE = require("./run-gates");
 
 const GATES_DIR = __dirname;
 const APP_DIR = path.resolve(GATES_DIR, "..", "..");
@@ -560,6 +565,301 @@ const CASES = [
         log.includes("sk_live_<redacted>") &&
         log.includes("postgres://<redacted>@<redacted>/appdb") &&
         material.every((s) => !log.includes(s) && !summaryJson.includes(s) && !summaryMd.includes(s))
+      );
+    },
+  },
+
+  // ---- assertion-evidence contract (appended; nothing above is renumbered) --
+  //
+  // WHAT THESE ARE FOR. Before them, "passed" meant "exited 0". A harness that asserted
+  // nothing and a harness that proved sixty invariants produced the same record, so the
+  // headline "74 checks, FAILED 0" rested entirely on 74 exit codes. The cases below pin the
+  // contract down defect by defect: each one is a harness that the PREVIOUS guards all pass -
+  // real exit 0, non-empty log, no duplicate, no leak - and which must still fail.
+  {
+    name: "evidence-every-recognised-form-passes",
+    why: "all five evidence forms the parser recognises are accepted with a positive count and no allowlist entry",
+    args: [fixture("evidence-good.json")],
+    expectExit: 0,
+    assert: (r) => {
+      const ev = r.summary && r.summary.evidence;
+      if (!ev) return false;
+      const byHarness = new Map(ev.records.map((x) => [x.harness, x]));
+      const expected = [
+        ["check-gamma.js", "gate-evidence-line", 4, "declared-by-harness"],
+        ["check-ratio.js", "ratio-passed", 6, "attributed-by-driver"],
+        ["check-json.js", "json-report-count", 12, "attributed-by-driver"],
+        ["check-jsonlist.js", "json-report-list", 3, "attributed-by-driver"],
+        ["check-summaryline.js", "summary-passed-failed", 41, "attributed-by-driver"],
+      ];
+      return (
+        r.summary.verdict === "PASS" &&
+        r.summary.gateEstablished === true &&
+        ev.enforced === true &&
+        ev.counts.evidenced === 5 &&
+        ev.counts.unevidenced === 0 &&
+        ev.counts.allowlisted === 0 &&
+        ev.counts.totalAssertions === 66 &&
+        expected.every(([file, form, assertions, identity]) => {
+          const rec = byHarness.get(file);
+          return rec && rec.form === form && rec.assertions === assertions && rec.identitySource === identity;
+        })
+      );
+    },
+  },
+  {
+    name: "evidence-missing-fails-silent-success",
+    why: "THE HEADLINE CASE: a harness that exits 0, logs output and asserts nothing must fail, because exit 0 is not evidence",
+    args: [fixture("evidence-mute.json")],
+    expectExit: 2,
+    assert: (r) =>
+      hasFinding(r, "EVIDENCE_MISSING") &&
+      r.summary.verdict === "INTEGRITY-FAILURE" &&
+      r.summary.gateEstablished === false &&
+      // Every pre-existing guard passes this harness: it really did exit 0 and really did log.
+      r.summary.counts.failed === 0 &&
+      r.summary.harnesses[0].exitCode === 0 &&
+      r.summary.harnesses[0].logBytes > 0 &&
+      r.summary.evidence.unevidenced.includes("check-mute.js"),
+  },
+  {
+    name: "evidence-zero-assertions-fails",
+    why: "\"0/0 assertions passed\" is an empty check wearing the shape of a pass",
+    args: [fixture("evidence-zero.json")],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "EVIDENCE_ZERO_ASSERTIONS") && r.summary.evidence.counts.evidenced === 0,
+  },
+  {
+    name: "evidence-negative-assertions-fails",
+    why: "a negative count means the harness's own bookkeeping is broken, and is reported distinctly from zero",
+    args: [fixture("evidence-negative.json")],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "EVIDENCE_NEGATIVE_ASSERTIONS") && !hasFinding(r, "EVIDENCE_ZERO_ASSERTIONS"),
+  },
+  {
+    name: "evidence-forged-identity-fails",
+    why: "a real positive count that names a different harness is borrowed proof, and only the identity check can catch it",
+    args: [fixture("evidence-forged.json")],
+    expectExit: 2,
+    assert: (r) =>
+      hasFinding(r, "EVIDENCE_IDENTITY_MISMATCH") &&
+      r.summary.integrityFindings.some((f) => f.detail.includes("check-somewhere-else.js")),
+  },
+  {
+    name: "evidence-duplicate-id-fails",
+    why: "two harnesses claiming the same identity means one set of assertions is counted under a name that is not its own",
+    args: [fixture("evidence-twins.json")],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "EVIDENCE_DUPLICATE_ID") && r.summary.counts.failed === 0,
+  },
+  {
+    name: "evidence-stale-sidecar-fails",
+    why: "a sidecar from an earlier run is rejected even though the same harness printed perfect log evidence",
+    args: [fixture("evidence-stale.json")],
+    expectExit: 2,
+    assert: (r) =>
+      hasFinding(r, "EVIDENCE_STALE") &&
+      // The point of the case: good log evidence existed and was NOT quietly used instead.
+      r.summary.evidence.counts.evidenced === 0 &&
+      r.summary.harnesses[0].exitCode === 0,
+  },
+  {
+    name: "evidence-orphan-sidecar-fails",
+    why: "an evidence file for a harness this run never executed is a leftover and must not sit beside this run's artefacts",
+    lazyArgs: () => [fixture("evidence-good.json")],
+    env: (() => {
+      const dir = fs.mkdtempSync(path.join(TMP_ROOT, "orphan-evidence-"));
+      fs.writeFileSync(
+        path.join(dir, "check-ghost.js.evidence.json"),
+        `${JSON.stringify({ schema: "personai.gates.evidence/1", runId: "run-from-an-earlier-sweep", harness: "check-ghost.js", assertions: 99 }, null, 2)}\n`,
+        "utf8",
+      );
+      return { GATES_EVIDENCE_DIR: dir };
+    })(),
+    expectExit: 2,
+    assert: (r) =>
+      hasFinding(r, "EVIDENCE_ORPHAN_SIDECAR") &&
+      r.summary.integrityFindings.some((f) => f.kind === "EVIDENCE_ORPHAN_SIDECAR" && f.harness === "check-ghost.js"),
+  },
+  {
+    name: "evidence-malformed-fails",
+    why: "an evidence line whose count is the string \"undefined\" is rejected rather than coerced to NaN or zero",
+    args: [fixture("evidence-malformed.json")],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "EVIDENCE_MALFORMED"),
+  },
+  {
+    name: "evidence-claiming-failures-while-green-fails",
+    why: "\"4/6 assertions passed\" with exit 0 is a harness that forgot to set its exit code",
+    args: [fixture("evidence-claims.json")],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "EVIDENCE_CLAIMS_FAILURES") && r.summary.counts.failed === 0,
+  },
+  {
+    name: "evidence-allowlist-admits-one-named-harness",
+    why: "an exactly-named, reasoned, temporary allowlist entry lets the silent harness pass, and the allowlist is reported in full",
+    args: [fixture("evidence-mute-allowlisted.json")],
+    expectExit: 0,
+    assert: (r) => {
+      const ev = r.summary && r.summary.evidence;
+      const md = fs.readFileSync(path.join(r.outDir, "latest.md"), "utf8");
+      return (
+        r.summary.verdict === "PASS" &&
+        ev.counts.evidenced === 0 &&
+        ev.counts.unevidenced === 0 &&
+        ev.allowlist.actualSize === 1 &&
+        ev.allowlist.declaredSize === 1 &&
+        ev.allowlist.files.join(",") === "check-mute.js" &&
+        ev.allowlist.entries[0].temporary === true &&
+        // Size AND contents must reach the human-readable summary, or the list can grow unseen.
+        md.includes("1 of the executed harnesses are NOT evidence-enforced") &&
+        md.includes("check-mute.js") &&
+        r.stdout.includes("evidence allowlist: 1 entry (declared 1) -> check-mute.js")
+      );
+    },
+  },
+  {
+    name: "evidence-allowlist-ghost-entry-fails",
+    why: "an allowlisted filename that is not on disk overstates the unenforced count and hides what it covered",
+    args: [fixture("evidence-allowlist-ghost.json"), "--integrity-only"],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "EVIDENCE_ALLOWLIST_ENTRY_MISSING_ON_DISK") && r.summary.counts.executed === 0,
+  },
+  {
+    name: "evidence-allowlist-wildcard-refused",
+    why: "a glob entry would exempt harnesses added later while the declared size still read 1, so patterns are refused outright",
+    args: [fixture("evidence-allowlist-wildcard.json")],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN"),
+  },
+  {
+    name: "evidence-allowlist-size-drift-fails",
+    why: "the allowlist cannot grow silently: its real length must match the size the manifest declares",
+    args: [fixture("evidence-allowlist-size-drift.json")],
+    expectExit: 2,
+    assert: (r) =>
+      hasFinding(r, "EVIDENCE_ALLOWLIST_SIZE_DRIFT") &&
+      // The same manifest allowlists a harness that does emit evidence, so the redundant
+      // report fires too — an exemption that is no longer needed should be deleted.
+      r.summary.evidence.allowlist.redundant.some((x) => x.file === "check-gamma.js"),
+  },
+  {
+    name: "evidence-allowlist-unreasoned-entry-fails",
+    why: "an entry with no reason and no temporary marker is how an exemption becomes permanent by omission",
+    args: [fixture("evidence-allowlist-unreasoned.json")],
+    expectExit: 2,
+    assert: (r) => hasFinding(r, "EVIDENCE_ALLOWLIST_ENTRY_INVALID"),
+  },
+  {
+    name: "evidence-parser-reads-the-real-harness-forms",
+    why: "the parser is asserted against the exact lines the real check-*.ts harnesses print, not only against fixture lines",
+    probe: () => {
+      // Every string here is a form that exists in scripts/one-off/ today.
+      const cases = [
+        ["58/58 assertions passed", "ratio-passed", 58],
+        ["43/43 assertions passed", "ratio-passed", 43],
+        ["39/39 invariants passed", "ratio-passed", 39],
+        ["46/46 installation route assertions passed", "ratio-passed", 46],
+        ["57/57 installation runtime assertions passed", "ratio-passed", 57],
+        ["53/53 blueprint preview assertions passed", "ratio-passed", 53],
+        ["75/75 assertions passed", "ratio-passed", 75],
+        ["12/12 due-work planning assertions passed", "ratio-passed", 12],
+        ["[fixture:alpha] 3 assertions passed", "count-passed", 3],
+        ["1 assertion passed", "count-passed", 1],
+        ["SUMMARY mode=normal passed=41 failed=0", "summary-passed-failed", 41],
+        ["GATE-EVIDENCE harness=check-x.ts assertions=7", "gate-evidence-line", 7],
+      ];
+      const parsed = cases.map(([line, form, count]) => {
+        const got = EVIDENCE.parseEvidenceFromLog(`preamble\n${line}\n`);
+        return { line, wantForm: form, wantCount: count, gotForm: got && got.form, gotCount: got && Number(got.rawCount) };
+      });
+      const jsonNumeric = EVIDENCE.parseEvidenceFromLog(
+        `${JSON.stringify({ result: "PASS", assertions: 41, failures: [] }, null, 2)}\n`,
+      );
+      const jsonList = EVIDENCE.parseEvidenceFromLog(
+        `${JSON.stringify({ result: "PASS", assertions: ["a", "b", "c", "d", "e"] }, null, 2)}\n`,
+      );
+      const jsonChecksKey = EVIDENCE.parseEvidenceFromLog(
+        `${JSON.stringify({ result: "PASS", checks: 17, failures: [] }, null, 2)}\n`,
+      );
+      // The shapes that must NOT be read as evidence, because they are not assertion counts.
+      const notEvidence = [
+        '{\n  "result": "PASS",\n  "failures": []\n}',
+        "copilot runtime contract checks passed",
+        "All foundation contract checks passed.",
+        "Assertion calls examined: 3412.",
+        '{\n  "database": "x",\n  "lines": 3,\n  "events": 4\n}',
+        "",
+      ].map((text) => EVIDENCE.parseEvidenceFromLog(text));
+      return {
+        parsed,
+        mismatches: parsed.filter((p) => p.gotForm !== p.wantForm || p.gotCount !== p.wantCount),
+        jsonNumeric: jsonNumeric && { form: jsonNumeric.form, count: jsonNumeric.rawCount },
+        jsonList: jsonList && { form: jsonList.form, count: jsonList.rawCount },
+        jsonChecksKey: jsonChecksKey && { form: jsonChecksKey.form, count: jsonChecksKey.rawCount },
+        falsePositives: notEvidence.filter((x) => x !== null).length,
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      r.probe.parsed.length === 12 &&
+      r.probe.mismatches.length === 0 &&
+      r.probe.jsonNumeric.form === "json-report-count" &&
+      r.probe.jsonNumeric.count === 41 &&
+      r.probe.jsonList.form === "json-report-list" &&
+      r.probe.jsonList.count === 5 &&
+      r.probe.jsonChecksKey.form === "json-report-count" &&
+      r.probe.jsonChecksKey.count === 17 &&
+      r.probe.falsePositives === 0,
+  },
+  {
+    name: "evidence-real-manifest-allowlist-is-honest",
+    why: "the committed allowlist is exactly 13 exactly-named, reasoned, on-disk harnesses out of 74 executed — the number root will check",
+    args: ["--integrity-only"],
+    expectExit: 0,
+    assert: (r) => {
+      const ev = r.summary && r.summary.evidence;
+      if (!ev) return false;
+      const runnable = r.summary.counts.runnable;
+      return (
+        r.summary.integrityFindings.length === 0 &&
+        ev.required === true &&
+        ev.allowlist.actualSize === 13 &&
+        ev.allowlist.declaredSize === 13 &&
+        runnable === 74 &&
+        // Honest arithmetic: 74 runnable = 61 enforced + 13 allowlisted.
+        runnable - ev.allowlist.actualSize === 61 &&
+        ev.allowlist.files.length === new Set(ev.allowlist.files).size &&
+        ev.allowlist.entries.every(
+          (e) =>
+            e.temporary === true &&
+            typeof e.reason === "string" &&
+            e.reason.trim().length >= 20 &&
+            typeof e.migrationPending === "string" &&
+            e.migrationPending.trim() !== "" &&
+            !EVIDENCE.ALLOWLIST_FORBIDDEN_CHARS.test(e.file),
+        )
+      );
+    },
+  },
+  {
+    name: "evidence-block-is-additive-to-the-summary-schema",
+    why: "the fields other workers and root read must be untouched; the evidence block is a new sibling, not a rename",
+    args: [fixture("evidence-good.json")],
+    expectExit: 0,
+    assert: (r) => {
+      const s = r.summary;
+      const required = ["counts", "harnesses", "secretScan", "verdict", "exitCode", "gateEstablished", "integrityFindings"];
+      const countKeys = ["onDisk", "manifestEntries", "runnable", "declaredSkips", "selected", "executed", "passed", "failed", "timedOut"];
+      return (
+        required.every((k) => k in s) &&
+        countKeys.every((k) => typeof s.counts[k] === "number") &&
+        s.schema === "personai.gates.summary/1" &&
+        typeof s.evidence === "object" &&
+        s.evidence.schema === "personai.gates.evidence-summary/1" &&
+        // Per-harness evidence is an added field on the existing records, not a replacement.
+        s.harnesses.every((h) => "file" in h && "status" in h && "exitCode" in h) &&
+        s.harnesses.filter((h) => h.status === "passed").every((h) => h.evidence && h.evidence.assertions > 0)
       );
     },
   },

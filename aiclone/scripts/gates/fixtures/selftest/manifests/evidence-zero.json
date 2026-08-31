@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "description": "Defect: check-zero.js prints \"0/0 assertions passed\" and exits 0. The evidence is well formed and honest; the count is zero, so nothing was proven. The driver must exit 2 with EVIDENCE_ZERO_ASSERTIONS.",
+  "harnessDir": "scripts/gates/fixtures/selftest/evidence/zero",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "harnesses": [{ "file": "check-zero.js", "package": "evidence", "run": true }]
+}

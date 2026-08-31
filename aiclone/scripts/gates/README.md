@@ -28,9 +28,10 @@ destroyed the project's primary gate. This directory replaces that pair.
 | Path | Role |
 |---|---|
 | `run-gates.js` | the driver |
-| `gates.manifest.json` | the declared inventory: every harness, its package, and every skip with its reason |
+| `gates.manifest.json` | the declared inventory: every harness, its package, every skip with its reason, and the assertion-evidence allowlist |
 | `selftest.js` | proves the driver goes non-zero when it should |
 | `fixtures/selftest/**` | deliberately broken fixture manifests and harnesses used by `selftest.js` |
+| `fixtures/selftest/evidence/**` | one fixture harness per assertion-evidence defect (silent, zero, negative, forged, stale, duplicate, malformed) plus one per recognised evidence form |
 | `artifacts/` | run output (gitignored — see `.gitignore` here) |
 
 ## Output
@@ -38,11 +39,14 @@ destroyed the project's primary gate. This directory replaces that pair.
 Each run writes `artifacts/run-<timestamp>/`:
 
 - `summary.json` — machine-readable. Per harness: the exact argv, cwd, start and
-  end timestamp, duration, and the real exit code. Plus counts, verdict,
-  integrity findings and the credential-scan result.
+  end timestamp, duration, the real exit code, and the assertion evidence it
+  produced. Plus counts, verdict, integrity findings, the credential-scan result
+  and an `evidence` block carrying the run's assertion total, which evidence form
+  each harness used, and the allowlist in full.
 - `summary.md` — the same thing for a human, including the full per-harness
-  inventory table and every declared skip with its reason.
+  inventory table, every declared skip with its reason, and the allowlist table.
 - `logs/<harness>.log` — that harness's complete output, redacted.
+- `evidence/` — any evidence sidecars harnesses wrote for this run.
 
 `artifacts/latest.json` and `artifacts/latest.md` are copies of the most recent
 run, for scripts and links that want a stable path.
@@ -75,6 +79,68 @@ exits 2 rather than quietly producing a smaller or larger sweep when:
 
 There is currently exactly one skip, `check-order-stream.ts`, and its reason,
 its precondition and the command to run it by hand are all in the manifest.
+
+## Green means assertions actually ran
+
+Exiting 0 is not evidence. A harness that silently asserts nothing exits 0 in
+exactly the same way as one that proves sixty invariants, so for as long as
+"passed" meant "exit code 0", the headline **74 checks, FAILED 0** rested on 74
+exit codes and nothing else.
+
+**The contract.** Every harness the driver counts as passed must yield
+machine-readable evidence carrying a harness **identity** and a **positive**
+assertion count. Anything else is a failure with its own named finding:
+
+| finding | what it caught |
+|---|---|
+| `EVIDENCE_MISSING` | exited 0, logged output, asserted nothing, and is not allowlisted |
+| `EVIDENCE_MALFORMED` | evidence shaped right but unreadable — `assertions=undefined`, unparseable sidecar, `9/6` |
+| `EVIDENCE_ZERO_ASSERTIONS` | `0/0 assertions passed` — an empty check wearing the shape of a pass |
+| `EVIDENCE_NEGATIVE_ASSERTIONS` | a negative count, so the harness's own bookkeeping is broken |
+| `EVIDENCE_CLAIMS_FAILURES` | `4/6 assertions passed` **and** exit 0 — a missing `process.exitCode` |
+| `EVIDENCE_DUPLICATE_ID` | two harnesses claimed one identity, so one proof is filed under the wrong name |
+| `EVIDENCE_IDENTITY_MISMATCH` | the evidence names a different harness: borrowed or copy-pasted proof |
+| `EVIDENCE_STALE` | a sidecar carrying another run's id, or written before the harness started |
+| `EVIDENCE_ORPHAN_SIDECAR` | an evidence file for a harness this run never executed |
+| `EVIDENCE_ALLOWLIST_ENTRY_MISSING_ON_DISK` | an exemption for a file that no longer exists |
+| `EVIDENCE_ALLOWLIST_ENTRY_INVALID` | an exemption with no reason or no `temporary`/`migrationPending` marker |
+| `EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN` | an exemption written as a glob or regex instead of an exact filename |
+| `EVIDENCE_ALLOWLIST_SIZE_DRIFT` | the allowlist's real length disagrees with the size the manifest declares |
+
+**No harness was edited to make this work.** Most harnesses already print their
+evidence, and the driver reads what is there:
+
+| form | example line |
+|---|---|
+| `ratio-passed` | `58/58 assertions passed`, `39/39 invariants passed`, `46/46 installation route assertions passed` |
+| `count-passed` | `3 assertions passed`, `1 assertion passed` |
+| `summary-passed-failed` | `SUMMARY mode=normal passed=41 failed=0` |
+| `json-report-count` | a `JSON.stringify(report, null, 2)` block carrying `"assertions": 41` (or `assertionCount`, `assertionsPassed`, `invariants`, `checks`) |
+| `json-report-list` | the same block carrying `"assertions": [ "…", "…" ]` — the list length is the count |
+| `gate-evidence-line` | `GATE-EVIDENCE harness=check-foo.ts assertions=58` — the only form that carries identity, so the only one forgery can be detected in |
+| `sidecar-json` | `<evidenceDir>/<harness>.evidence.json` = `{ schema, runId, harness, assertions }` |
+
+The sidecar channel is forward-looking: the driver hands every harness
+`GATES_RUN_ID`, `GATES_EVIDENCE_DIR` and `GATES_HARNESS_ID`, and a harness that
+writes a sidecar gets the strongest form of evidence — identity and count both
+declared, and staleness detectable against the per-run nonce. No harness writes
+one yet. A stale or mismatched sidecar is **fatal even when the log evidence is
+perfect**, because silently preferring the evidence you like is how forged proof
+gets absorbed into a green result.
+
+**61 of the 74 executed harnesses are enforced. 13 are not, and they are named.**
+The 13 genuinely emit no count — a JSON report with no count key, or a bare
+`copilot runtime contract checks passed` — so each is listed in
+`gates.manifest.json` under `evidence.allowlist` by **exact filename**, with a
+concrete reason, a `temporary: true` marker and a `migrationPending` note saying
+what has to change for the entry to go away. The driver refuses patterns, refuses
+entries whose file is absent, refuses unreasoned entries, and refuses to run
+unless `evidence.allowlistDeclaredSize` matches the list's real length — so an
+exemption cannot be added without a visible, reviewable edit. Every run prints
+the list's size **and its full contents** to the console and into both summaries.
+
+That number is the honest measure of what this gate does not check. It should go
+down, never up.
 
 ## Focused runs cannot establish the gate
 
@@ -136,15 +202,19 @@ cd aiclone
 node scripts/gates/selftest.js
 ```
 
-Nineteen cases, each running the real driver against a deliberately broken
+Fifty-three cases, each running the real driver against a deliberately broken
 fixture and asserting both the real process exit code and the finding kind: a
 red harness, a zero-byte result, a missing file, a duplicated harness, an
 undeclared skip, a dropped or duplicated result record, a leaked connection
-string, a filtered red suite, and the live-database refusal. Two cases reconcile
-throwaway copies of the *real* manifest against the *real* harness tree, so the
-production path is covered without mutating a tracked file. Nothing here touches
-a database and all output goes to the OS temp directory.
+string, a filtered red suite, and the live-database refusal. Eighteen of them
+cover the assertion-evidence contract, one per rejection reason plus one that
+asserts the parser against the exact lines the real `check-*.ts` harnesses print
+and one that asserts the summary's existing field names are untouched. Two cases
+reconcile throwaway copies of the *real* manifest against the *real* harness
+tree, so the production path is covered without mutating a tracked file. Nothing
+here touches a database and all output goes to the OS temp directory.
 
-`GATES_SELFTEST_FAULT` lets the driver corrupt its own bookkeeping on purpose so
-the guards that cannot be tripped from outside can still be proven to fire. Any
-run with a fault injected is stamped void and cannot establish the gate.
+| flag / env | effect |
+|---|---|
+| `GATES_SELFTEST_FAULT` | the driver corrupts its own bookkeeping on purpose so the guards that cannot be tripped from outside can still be proven to fire. Any run with a fault injected is stamped void and cannot establish the gate. |
+| `GATES_EVIDENCE_DIR` | where evidence sidecars are read from and written to (default `<out-dir>/run-<stamp>/evidence`). The self-test points it at a temp directory holding a leftover evidence file to prove `EVIDENCE_ORPHAN_SIDECAR` fires. |
