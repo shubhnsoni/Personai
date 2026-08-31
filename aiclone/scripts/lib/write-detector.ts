@@ -549,12 +549,25 @@ export type SequenceAttributionContext = Readonly<{
     owners: ReadonlyMap<string, SequenceOwner>
     /** Per-table run scope declared by the caller's fingerprint specs, keyed by table name. */
     scopeByTable: ReadonlyMap<string, string>
-    /** Tables our INTERCEPTED writes touched, lowercased. */
+    /** Model names our INTERCEPTED model writes targeted, lowercased. */
     writtenTables: ReadonlySet<string>
+    /**
+     * The text of our intercepted RAW writes, lowercased and concatenated. A raw write names its table
+     * only inside the statement, and a sequence must not become unattributable just because Prisma had
+     * no model to report. Matched as a substring, which over-attributes rather than under-attributes:
+     * a red run costs a look, a missed advance costs the claim.
+     */
+    rawWriteText?: string
 }>
 
 function numericOrNull(value: string): string | null {
     return /^-?\d+$/.test(value) ? value : null
+}
+
+/** True when one of OUR intercepted writes targeted the table this sequence belongs to. */
+function ownedByOurWrites(owner: SequenceOwner, context: SequenceAttributionContext): boolean {
+    const table = owner.table.toLowerCase()
+    return context.writtenTables.has(table) || (context.rawWriteText ?? "").includes(table)
 }
 
 /**
@@ -583,7 +596,7 @@ export async function attributeSequenceDiffs(
 
         if (context.runToken !== undefined && diff.name.includes(context.runToken)) {
             attribution = "run-named"
-        } else if (owner !== undefined && context.writtenTables.has(owner.table.toLowerCase())) {
+        } else if (owner !== undefined && ownedByOurWrites(owner, context)) {
             attribution = "run-written-table"
         } else if (owner !== undefined) {
             const scope = context.scopeByTable.get(owner.table) ??
@@ -858,11 +871,11 @@ export async function createWriteDetector(options: WriteDetectorOptions): Promis
             const classes = [...new Set(writes.map((c) => c.mutationClass as MutationClass))].sort()
 
             // Which tables our own writes touched. A model write names its model; a raw write names
-            // its table only inside the statement, so the statement text is scanned too - otherwise a
-            // raw insert would make its sequence UNATTRIBUTABLE purely because Prisma had no model to
-            // report. Substring matching over-attributes (a table name can appear inside another
-            // table's name, or in `order by`), and that direction is deliberate: over-attribution
-            // costs a red run, under-attribution costs the claim.
+            // its table only inside the statement, so the statement text is handed to attribution as
+            // well - otherwise a raw insert would make its sequence UNATTRIBUTABLE purely because
+            // Prisma had no model to report. (An earlier version of this derived the raw-write tables
+            // from `sweepTables`, which silently attributed nothing when a caller passed an empty
+            // sweep list; the statement text does not depend on any caller-supplied list.)
             const writtenTables = new Set<string>()
             for (const write of writes) {
                 if (write.model !== null) writtenTables.add(write.model.toLowerCase())
@@ -871,11 +884,6 @@ export async function createWriteDetector(options: WriteDetectorOptions): Promis
                 .filter((c) => c.model === null)
                 .map((c) => (c.statement ?? "").toLowerCase())
                 .join(" ; ")
-            if (rawWriteText !== "") {
-                for (const table of sweepTables) {
-                    if (rawWriteText.includes(table.toLowerCase())) writtenTables.add(table.toLowerCase())
-                }
-            }
 
             const scopeByTable = new Map<string, string>()
             for (const spec of specs) {
@@ -886,6 +894,7 @@ export async function createWriteDetector(options: WriteDetectorOptions): Promis
                 owners: sequenceOwners,
                 scopeByTable,
                 writtenTables,
+                rawWriteText,
             })
             const tableDiffs = fingerprintDiffs.filter((d) => d.kind === "table")
             const sequenceDiffs = fingerprintDiffs.filter((d) => d.kind === "sequence")
