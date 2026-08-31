@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "description": "THE 'RUNTIME EVIDENCE IS STILL REQUIRED' CASE. One harness with three real assertions in its source and no assertion count anywhere in its output. It must fail with EVIDENCE_MISSING, and the corroboration block must report judged:0 - proving the static signal is an ADDITIONAL condition and never an alternative channel. A strong source signal says nothing about whether the assertions ran.",
+  "harnessDir": "scripts/gates/fixtures/selftest/corroboration/mute",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "expected": { "executedChecks": 1, "declaredSkips": 0, "harnessesOnDisk": 1 },
+  "harnesses": [{ "file": "check-mute-but-asserting.js", "package": "corroboration", "run": true }]
+}

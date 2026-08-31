@@ -29,10 +29,57 @@ destroyed the project's primary gate. This directory replaces that pair.
 |---|---|
 | `run-gates.js` | the driver |
 | `gates.manifest.json` | the declared inventory: every harness, its package, every skip with its reason, and the assertion-evidence allowlist |
+| `lib/corroborate.js` | the source-side corroboration layer: parses each harness with the TypeScript compiler API and requires a positive runtime assertion count to be backed by an executable assertion callsite |
 | `selftest.js` | proves the driver goes non-zero when it should |
 | `fixtures/selftest/**` | deliberately broken fixture manifests and harnesses used by `selftest.js` |
 | `fixtures/selftest/evidence/**` | one fixture harness per assertion-evidence defect (silent, zero, negative, forged, stale, duplicate, malformed) plus one per recognised evidence form |
+| `fixtures/selftest/corroboration/**` | one fixture harness per corroboration case: assertions only in comments and strings, a loop, an alias/wrapper chain, an unfollowable indirection, and a harness that asserts but prints no count |
+| `fixtures/audit-forgery/**` | the adversarial audit's three print-only liars — no imports, no comparisons, no subject under test — wired into `selftest.js` as the headline enforcement case |
 | `artifacts/` | run output (gitignored — see `.gitignore` here) |
+
+## Two independent signals, both required
+
+A harness counts as passed only if BOTH hold:
+
+1. **Runtime evidence.** It printed a positive assertion count the driver can read
+   (`EVIDENCE_*` findings). Exit 0 alone cannot tell a harness that proved sixty
+   invariants from one that asserted nothing.
+2. **Source corroboration.** Its own source contains at least one *executable*
+   assertion callsite (`CORROBORATION_*` findings), found by parsing the file with
+   the TypeScript compiler API.
+
+Signal 1 on its own measures a harness's willingness to print a number. Measured:
+three harnesses with no imports, no comparisons and no subject under test printed
+well-formed evidence and obtained `gate ESTABLISHED` with 104153 assertions
+counted; and neutering the assertion helper inside
+`check-vertical-pack-candidates.ts` dropped its reported count from 447 to 14
+while it still exited 0.
+
+Signal 2 uses a parser rather than a regex because the question is whether code
+*runs*, and a regex cannot tell code from text about code — a commented-out
+`assert(...)`, a string literal containing `check(...)`, and a
+`console.log("58/58 assertions passed")` all match a pattern and none of them can
+fail. `fixtures/selftest/corroboration/prose/check-prose.js` is made only of
+those, and `selftest.js` asserts that a representative regex scores it positive
+while the parser scores it zero.
+
+The two counts are **not** required to match. A loop runs one callsite many times
+and an untaken branch runs it zero times, so only the zero-versus-positive
+contradiction is enforced.
+
+Corroboration can be turned off only with
+`GATES_SELFTEST_FAULT=disable-corroboration`, which stamps the run void. That is
+the mutation switch `selftest.js` uses to prove the layer is load bearing; it is
+deliberately not a manifest field, because a manifest field would be a permanent
+bypass with a reasonable-looking name.
+
+To see the static signal for the whole corpus without running the sweep (no
+database, no harness executed):
+
+```powershell
+cd aiclone
+node scripts/gates/lib/corroborate.js scripts/one-off
+```
 
 ## Output
 

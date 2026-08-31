@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "description": "THE ALIAS/WRAPPER CASE. One harness whose five assertions are made only through a three-link forwarding chain and two levels of alias, never by calling the recording helper directly. It must PASS. Eight production harnesses forward their condition through a `checkInvertible` wrapper, so a discovery pass that recognised direct recorders only would score all eight zero and report them as asserting nothing.",
+  "harnessDir": "scripts/gates/fixtures/selftest/corroboration/wrapped",
+  "harnessPattern": "^check-.*\\.js$",
+  "runner": "node",
+  "defaults": {
+    "timeoutMs": 15000,
+    "requiresDatabase": true,
+    "databaseName": "personalink_phase0_rehearsal_20260826_210704"
+  },
+  "expected": { "executedChecks": 1, "declaredSkips": 0, "harnessesOnDisk": 1 },
+  "harnesses": [{ "file": "check-wrapped.js", "package": "corroboration", "run": true }]
+}
