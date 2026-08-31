@@ -213,14 +213,28 @@ check(
     summaries.some((s) => s.status === "deprecated"),
     `${summaries.filter((s) => s.status === "deprecated").length} deprecated`,
 )
+// MEASURED registry size, pinned as a literal here AND repeated inside each `all.every(...)` condition
+// below. The repetition is deliberate rather than clumsy: a guard held by a NEIGHBOURING assertion
+// still leaves each of those rules individually green over an empty registry, because `[].every(...)`
+// is true. Without the pin, a listBusinessBlueprints() that returned nothing - a registry that failed
+// to build, a filter that matched nothing - would leave all four "every previewed blueprint ..." rules
+// green having previewed nothing at all, and `summaries.length === all.length` would agree at 0 === 0.
+// The second payoff: adding a blueprint cannot silently inherit these guarantees. It fails HERE first,
+// and the fix is to preview the new blueprint, confirm it reports installed: null, carries the
+// limitations and derives its presentation from the role, and only then raise this number.
+check(
+    "MEASURED: the registry holds exactly the 9 blueprints the rules below were written against",
+    all.length === 9 && summaries.length === 9,
+    `registry=${all.length} listed=${summaries.length} expected=9`,
+)
 checkInvertible(
     "every previewed blueprint reports installed: null",
-    all.every((b) => service.preview(b.id)?.installed === null),
+    all.length === 9 && all.every((b) => service.preview(b.id)?.installed === null),
     `checked ${all.length}`,
 )
 checkInvertible(
     "every previewed blueprint carries the limitations, including that installation does not exist",
-    all.every((b) => {
+    all.length === 9 && all.every((b) => {
         const p = service.preview(b.id)
         return (
             p !== null &&
@@ -228,20 +242,20 @@ checkInvertible(
             p.limitations.some((l) => /Installation does not exist yet/.test(l))
         )
     }),
-    "all",
+    `checked ${all.length}`,
 )
 checkInvertible(
     "every presentation block is tagged role-derived, so it cannot be read as blueprint-declared",
-    all.every((b) => service.preview(b.id)?.presentation.source === "role-derived"),
-    "all role-derived",
+    all.length === 9 && all.every((b) => service.preview(b.id)?.presentation.source === "role-derived"),
+    `${all.length} role-derived`,
 )
 checkInvertible(
     "MEASURED: the owner console surface is never granted by a blueprint choice",
-    all.every((b) => {
+    all.length === 9 && all.every((b) => {
         const p = service.preview(b.id)
         return p !== null && p.presentation.businessOsRequiresOptIn === true && !p.presentation.surfaces.includes("businessOs")
     }),
-    "businessOs opt-in on every blueprint",
+    `businessOs opt-in on ${all.length} blueprint(s)`,
 )
 check("an unknown blueprint id resolves to null rather than a fabricated preview", service.preview("nonsense-v9") === null)
 check("a blank blueprint id resolves to null", service.preview("   ") === null)
