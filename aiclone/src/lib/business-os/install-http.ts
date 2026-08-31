@@ -15,17 +15,34 @@
  * oracle for a caller with no access to the workspace.
  */
 import { body, failure, str, success } from "@/lib/fieldjobs/http"
+import { logDependencyFailure } from "@/lib/operations/dependency-failure-log"
 
 import type { BlueprintInstallService } from "./install"
 import type { InstallPlanView, InstalledBlueprintView, WorkspaceInstallationView } from "./install-types"
 
 const UNAVAILABLE = "Blueprint installation is temporarily unavailable"
 
+/**
+ * The surface tag for the shared sanitizing failure logger. A fixed literal, never derived from a request;
+ * `logDependencyFailure` now checks that shape rather than trusting it - see `safeScope` there.
+ */
+const FAILURE_LOG_SCOPE = "[business-os/install]"
+
 export class BlueprintInstallApiService {
     constructor(private readonly installs: BlueprintInstallService) {}
 
+    /**
+     * THE ONE FAILURE FUNNEL FOR THIS SURFACE, AND NOW THE ONE PLACE IT IS TRACED. The `.catch` arrow and
+     * its `failure(error, UNAVAILABLE)` call are unchanged, so status, body and headers are byte-identical -
+     * including the 503's surface-accurate message. The logger is a side channel that swallows its own
+     * failures, and it skips `PersistenceError`, which is what keeps the FORBIDDEN refusals this file goes
+     * to some trouble to make byte-identical from becoming distinguishable through the log instead.
+     */
     private run(op: () => Promise<Response>): Promise<Response> {
-        return op().catch((error: unknown) => failure(error, UNAVAILABLE))
+        return op().catch((error: unknown) => {
+            logDependencyFailure(FAILURE_LOG_SCOPE, error)
+            return failure(error, UNAVAILABLE)
+        })
     }
 
     /** GET - what is installed here. */

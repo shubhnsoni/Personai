@@ -1,3 +1,4 @@
+import { logDependencyFailure } from "@/lib/operations/dependency-failure-log"
 import { PersistenceError } from "@/lib/persistence/errors"
 
 import type { FulfilmentService } from "./fulfilment"
@@ -131,6 +132,12 @@ function subjectType(value: unknown): "VARIANT" | "FULFILMENT" | "RETURN" {
     return raw as "VARIANT" | "FULFILMENT" | "RETURN"
 }
 
+/**
+ * The surface tag for the shared sanitizing failure logger. A fixed literal, never derived from a request;
+ * `logDependencyFailure` now checks that shape rather than trusting it - see `safeScope` there.
+ */
+const FAILURE_LOG_SCOPE = "[commerce]"
+
 export class CommerceApiService {
     constructor(
         private readonly variants: VariantService,
@@ -138,8 +145,19 @@ export class CommerceApiService {
         private readonly returns: ReturnService,
     ) {}
 
+    /**
+     * THE ONE FAILURE FUNNEL FOR THIS SURFACE, AND NOW THE ONE PLACE IT IS TRACED. Was
+     * `op().catch(failure)`: a 503 with no server-side trace at all, so an outage on any method of this
+     * boundary was invisible. `failure` still receives exactly the one argument a rejected promise handed
+     * it, so status, body and headers are byte-identical; the logger is a side channel that swallows its own
+     * failures, and it skips `PersistenceError` so routine refusals stay out of the incident log and cannot
+     * be used to tell a foreign id from a nonexistent one.
+     */
     private run(op: () => Promise<Response>): Promise<Response> {
-        return op().catch(failure)
+        return op().catch((error: unknown) => {
+            logDependencyFailure(FAILURE_LOG_SCOPE, error)
+            return failure(error)
+        })
     }
     private actor(): CommerceActor {
         return { actorType: "STAFF", actorId: null }
