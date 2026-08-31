@@ -413,6 +413,65 @@ const CASES = [
       r.probe.severities.includes("critical") &&
       r.probe.quoted === false,
   },
+  {
+    name: "scanner-short-word-password-does-not-poison-innocent-output",
+    why: "a short dictionary-word password must not make the driver report its OWN summary as a critical leak, while a real credential is still caught",
+    probe: () => {
+      // Text of the kind the driver genuinely writes into its own summary. It
+      // contains "post" and "true" as ordinary substrings.
+      const innocent =
+        'database: "postgres_rehearsal_20260826" host: localhost verdict: PASS trueDepth: 3';
+
+      // FALSE-POSITIVE DIRECTION. Measured before the fix: each of these
+      // produced 1 SECRET_LITERAL/critical against innocent text and rewrote it
+      // mid-word, so the gate could never go green on such a machine.
+      const poisoning = ["post", "true", "postgres"].map((pw) => {
+        const literals = SCANNER.collectSecretLiterals({ PGPASSWORD: pw });
+        return {
+          pw,
+          collected: literals.length,
+          findings: SCANNER.scanForLeaks(innocent, { secretLiterals: literals }).length,
+          corrupted: SCANNER.redact(innocent, literals) !== innocent,
+        };
+      });
+
+      // TRUE-POSITIVE DIRECTION. A real credential must still be collected,
+      // reported critical, redacted out of the text, and never quoted back.
+      const real = `S3cr3t${"Passw"}0rd99xyz`;
+      const realLiterals = SCANNER.collectSecretLiterals({ PGPASSWORD: real });
+      const realText = `[db] connecting with PGPASSWORD=${real} to localhost`;
+      const realFindings = SCANNER.scanForLeaks(realText, { secretLiterals: realLiterals });
+      const realRedacted = SCANNER.redact(realText, realLiterals);
+
+      // The whole DSN must still be redacted wholesale, which is the channel a
+      // short password keeps relying on after the fix.
+      const dsnLiterals = SCANNER.collectSecretLiterals({
+        DATABASE_URL: "postgresql://appuser:post@localhost:5432/personalink_rehearsal",
+      });
+      const dsnText = "url=postgresql://appuser:post@localhost:5432/personalink_rehearsal";
+
+      return {
+        poisoning,
+        realCollected: realLiterals.length,
+        realCritical: realFindings.some((f) => f.severity === "critical"),
+        realRedactedOut: !realRedacted.includes(real),
+        realQuoted: JSON.stringify(realFindings).includes(real),
+        dsnRedactedOut: !SCANNER.redact(dsnText, dsnLiterals).includes(":post@"),
+      };
+    },
+    expectExit: 0,
+    assert: (r) =>
+      // No short word-shaped password is ever hunted as a bare substring, so
+      // innocent output is neither flagged nor rewritten.
+      r.probe.poisoning.every((p) => p.collected === 0 && p.findings === 0 && p.corrupted === false) &&
+      // A real credential is still collected, still critical, still removed, still never echoed.
+      r.probe.realCollected === 1 &&
+      r.probe.realCritical === true &&
+      r.probe.realRedactedOut === true &&
+      r.probe.realQuoted === false &&
+      // And a short password inside a DSN is still redacted with the DSN.
+      r.probe.dsnRedactedOut === true,
+  },
 
   // ---- credential scanner: no value leakage, no false positives ------------
   {

@@ -402,6 +402,14 @@ function isProse(text) {
   return /^[A-Za-z_.-]+$/u.test(text);
 }
 
+/**
+ * Length floors for the bare-substring literal channel. See isSafeBareLiteral.
+ * A prose-shaped value needs to be long before it is safe to hunt for blindly;
+ * a value carrying a digit or symbol is already unlikely to occur by accident.
+ */
+const PROSE_BARE_MIN = 16;
+const MIXED_CLASS_BARE_MIN = 8;
+
 /** Is this captured value worth reporting as a shape finding? */
 function isSecretishValue(value, minLength = 1) {
   const text = String(value ?? "");
@@ -439,11 +447,51 @@ function classifyDsnUserinfo(scheme, userinfo) {
  * Only values long enough to be meaningful are used, so a one-character
  * password does not turn the scanner into a noise generator.
  */
+/**
+ * Is this value safe to hunt for as a BARE SUBSTRING anywhere in an artefact?
+ *
+ * The bare-literal channel is the only one with no syntactic context to anchor
+ * it: it replaces the value wherever it appears, so a value that also occurs
+ * inside ordinary text produces a critical finding about innocent output. That
+ * is not hypothetical. With `length >= 4` as the only test, a PGPASSWORD of
+ * "post" made the driver report SECRET_LITERAL/critical against ITS OWN summary
+ * and rewrote the database name mid-word:
+ *     database: "postgres_rehearsal_20260826"  ->  "<redacted>gres_rehearsal_20260826"
+ * "true" did the same to "trueDepth". On such a machine the gate can never go
+ * green, and the corrupted output actively misleads whoever reads the failure.
+ * This file already learned the lesson once for the DSN *username* (see the note
+ * in collectSecretLiterals); the password and the SECRET_ENV_NAMES values still
+ * went through unfiltered.
+ *
+ * The discriminator is incidental-collision risk, which is driven by length and
+ * by whether the value is word-shaped:
+ *   - prose-shaped (letters/._- only, so plausibly a real word): needs >= 16
+ *     chars, because short lowercase words are exactly what collide;
+ *   - anything with a digit or symbol: needs >= 8, since character variety makes
+ *     an accidental match implausible.
+ *
+ * What this deliberately gives up: a SHORT password is no longer redacted when
+ * it appears completely bare, with no surrounding syntax. It is still caught in
+ * every context that identifies it as a credential - the whole-DSN literal, the
+ * URI_USERINFO_ANY span, and the PASSWORD_KV / SECRET_ASSIGNMENT forms - so the
+ * loss is narrow and bounded, and it is a far better trade than a gate that can
+ * never pass. A short bare secret is also, by construction, weak evidence: any
+ * 4-character string appears somewhere in a large enough corpus.
+ *
+ * @param {string} text already trimmed, non-empty, not a placeholder
+ */
+function isSafeBareLiteral(text) {
+  if (text.length < MIXED_CLASS_BARE_MIN) return false;
+  return isProse(text) ? text.length >= PROSE_BARE_MIN : true;
+}
+
 function collectSecretLiterals(env) {
   const literals = new Set();
   const add = (value) => {
     const text = typeof value === "string" ? value.trim() : "";
-    if (text.length >= 4 && !PLACEHOLDERS.has(text.toLowerCase())) literals.add(text);
+    if (text === "" || PLACEHOLDERS.has(text.toLowerCase())) return;
+    if (!isSafeBareLiteral(text)) return;
+    literals.add(text);
   };
 
   for (const key of ["DATABASE_URL", "DIRECT_URL", "SHADOW_DATABASE_URL"]) {
