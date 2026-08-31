@@ -18,38 +18,9 @@
   "evidence": {
     "required": true,
     "contract": "A harness counts as passed only if it yields machine-readable evidence carrying a harness identity and a POSITIVE assertion count. Exit 0 alone cannot distinguish a harness that proved sixty invariants from one that asserted nothing, which is exactly the hole this closes. The driver reads evidence the harnesses ALREADY print — '58/58 assertions passed', '39/39 invariants passed', '46/46 installation route assertions passed', a JSON report carrying \"assertions\": 41 or \"assertions\": [ ... ], a 'SUMMARY ... passed=41 failed=0' line — so enforcement needed no harness edits. Missing, malformed, zero, negative, duplicate, forged and stale evidence each fail the run under their own named EVIDENCE_* finding.",
-    "allowlistDeclaredSize": 4,
+    "allowlistDeclaredSize": 0,
     "allowlistNote": "THE SIZE OF THIS LIST IS THE HONEST MEASURE OF WHAT THIS GATE DOES NOT CHECK. 13 of the 74 executed harnesses are exempt; the other 61 are enforced. Entries are EXACT filenames — the driver refuses any entry containing a wildcard, glob, regex or path metacharacter (EVIDENCE_ALLOWLIST_PATTERN_FORBIDDEN), because one pattern would silently cover harnesses added later and the count would stop being a measurement. The driver also fails if an entry names a file that is not on disk, if an entry lacks a concrete reason or the temporary/migrationPending markers, and if this declared size disagrees with the real length — so the list cannot grow without a visible, reviewable edit. Every entry is printed on the console and in both summaries on every run.",
-    "allowlist": [
-        {
-          "file": "check-copilot-runtime.ts",
-          "reason": "Its entire success output is the single line 'copilot runtime contract checks passed' — no number at all. Its log is one of the smallest in the sweep, which is precisely the shape that made 'exited 0' worthless as evidence.",
-          "temporary": true,
-          "migrationPending": "Change the final line to 'N/N assertions passed' using a counter on the assert() helper it already uses.",
-          "declaredBy": "Q4-E, assertion-evidence contract"
-        },
-        {
-          "file": "check-executable-copilot-runtime.ts",
-          "reason": "Its success output is 'executable copilot runtime checks passed' plus a prose 'evidence:' line listing coverage areas by name. Neither carries a number.",
-          "temporary": true,
-          "migrationPending": "Change the first line to 'N/N assertions passed'; the prose coverage line can stay as it is.",
-          "declaredBy": "Q4-E, assertion-evidence contract"
-        },
-        {
-          "file": "check-restaurant-order-transaction.ts",
-          "reason": "Prints one JSON report of observed values — database, orderNumber, lines, events, totalCents, replayedOrderIdMatched, tableScans. lines and events are row counts from the order under test, not assertion counts, and treating them as evidence would report the size of a fixture as the strength of a proof.",
-          "temporary": true,
-          "migrationPending": "Add \"assertions\": <count> driven by the assert() helper it already uses.",
-          "declaredBy": "Q4-E, assertion-evidence contract"
-        },
-        {
-          "file": "check-restaurant-phase0-behavior.ts",
-          "reason": "Prints one JSON report of observed values — concurrentAllocation, authoritativeThreeLineOrder, rejectionChecks, cleanup. rejectionChecks is a map of booleans, not a count, and no key totals the assertions made.",
-          "temporary": true,
-          "migrationPending": "Add \"assertions\": <count> to the report object.",
-          "declaredBy": "Q4-E, assertion-evidence contract"
-        }
-      ]
+    "allowlist": []
   },
   "harnesses": [
     { "file": "check-actions-authz.ts", "package": "authz", "run": true },

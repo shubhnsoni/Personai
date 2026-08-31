@@ -995,7 +995,7 @@ const CASES = [
   },
   {
     name: "evidence-real-manifest-allowlist-is-honest",
-    why: "the committed allowlist is exactly 4 exactly-named, reasoned, on-disk harnesses out of 76 executed — the number root will check",
+    why: "the production allowlist is now EMPTY - every runnable harness is evidence-enforced - and the entry-shape rules below are proven on fixtures (see the ENTRY_INVALID / PATTERN_FORBIDDEN / SIZE_DRIFT cases), not on production — the number root will check",
     args: ["--integrity-only"],
     expectExit: 0,
     assert: (r) => {
@@ -1005,15 +1005,21 @@ const CASES = [
       return (
         r.summary.integrityFindings.length === 0 &&
         ev.required === true &&
-        ev.allowlist.actualSize === 4 &&
-        ev.allowlist.declaredSize === 4 &&
+        ev.allowlist.actualSize === 0 &&
+        ev.allowlist.declaredSize === 0 &&
         runnable === 76 &&
-        // Honest arithmetic: 76 runnable = 72 enforced + 4 allowlisted. T1 groups A and B
+        // Honest arithmetic: 76 runnable = 76 enforced + 0 allowlisted. T1 groups A, B and C
         // migrated the four meta/contract harnesses (assertion-vacuity,
-        // harness-exit-integrity, disposable-db-guard, foundation-contracts) to emit
-        // their own dynamically-counted evidence, so they moved allowlisted -> enforced.
-        runnable - ev.allowlist.actualSize === 72 &&
+        // migrated all 13 formerly-allowlisted harnesses to emit their own dynamically
+        // counted evidence, so the allowlist reached zero and enforced reached runnable.
+        runnable - ev.allowlist.actualSize === 76 &&
         ev.allowlist.files.length === new Set(ev.allowlist.files).size &&
+        // The allowlist is empty, so there are no entries to shape-check here; that is
+        // stated as an explicit equality rather than left to `entries.every` passing
+        // vacuously over zero elements. The entry-shape and growth rules are still
+        // enforced and proven on dedicated fixtures (EVIDENCE_ALLOWLIST_ENTRY_INVALID,
+        // _PATTERN_FORBIDDEN, _SIZE_DRIFT, _ENTRY_MISSING_ON_DISK cases below).
+        ev.allowlist.entries.length === 0 &&
         ev.allowlist.entries.every(
           (e) =>
             e.temporary === true &&
@@ -1353,8 +1359,8 @@ const CASES = [
         s.integrityFindings.length === 0 &&
         // Additive: the evidence block and every count key still read exactly as before.
         s.evidence.schema === "personai.gates.evidence-summary/1" &&
-        s.evidence.allowlist.actualSize === 4 &&
-        s.evidence.allowlist.declaredSize === 4 &&
+        s.evidence.allowlist.actualSize === 0 &&
+        s.evidence.allowlist.declaredSize === 0 &&
         typeof s.corroboration === "object" &&
         s.corroboration.schema === "personai.gates.corroboration/1" &&
         // Every rejection reason is enumerable from the summary, like the evidence kinds are.
