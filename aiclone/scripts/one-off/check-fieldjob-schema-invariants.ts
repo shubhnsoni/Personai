@@ -21,10 +21,37 @@
 import { PrismaClient } from "@prisma/client"
 
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
+import { sweepRunToken, type RunTokenHit } from "../lib/write-detector"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
 const RUN = `wg4s_${Date.now()}_${Math.floor(Math.random() * 1e6)}`
+
+/**
+ * THE RESIDUE SCOPE. Every table this harness's fixture can reach, swept for THIS RUN's token.
+ *
+ * The residue assertion used to compare a GLOBAL `count(*)` per table before and after the run, which
+ * is unsound three ways: (a) a row we leak cancels against an unrelated concurrent delete, the totals
+ * match, and the assertion reports success with residue still present - the quiet one, and the one
+ * that matters; (b) an unrelated concurrent insert that stays fails a clean run; (c) on an empty table
+ * `0 == 0` holds without this execution having proven anything about its own cleanup.
+ *
+ * Every id this harness invents is `<RUN>_<tag>_<name>`, so every row it writes mentions the token
+ * somewhere, and `sweepRunToken` asks that question per table over the whole row cast to text.
+ */
+const RESIDUE_TABLES = [
+    "User",
+    "Profile",
+    "Workspace",
+    "Location",
+    "ServiceOffering",
+    "AppointmentResource",
+    "Booking",
+    "FieldJobRequest",
+    "FieldJob",
+    "FieldJobAssignment",
+    "FieldJobEvent",
+] as const
 
 const NEW_TABLES = ["FieldJobRequest", "FieldJob", "FieldJobAssignment", "FieldJobEvent"] as const
 
@@ -323,7 +350,23 @@ async function main() {
             console.error(`ABORT: connected to ${live[0].db}`)
             process.exit(1)
         }
+        // GLOBAL totals. Kept, but REPORTED at the end and never asserted on - see the residue block.
         const baseline = await counts(prisma)
+
+        // ANTI-VACUITY PROBE for the residue scope. Seeds inside a transaction that always rolls back
+        // and asks - WHILE THE ROWS EXIST - how many of them the residue sweep can actually see. A
+        // scope that never matched anything would otherwise satisfy "nothing of mine is left" by
+        // construction, which is the same vacuity the global-count version had, just relocated.
+        let inWindowHits: RunTokenHit[] = []
+        try {
+            await prisma.$transaction(async (tx) => {
+                await seed(tx, "scope")
+                inWindowHits = await sweepRunToken(tx as unknown as PrismaClient, RUN, RESIDUE_TABLES)
+                throw new Rollback()
+            })
+        } catch (e) {
+            if (!(e instanceof Rollback)) throw e
+        }
 
         // ---- 1. tables present, forks and overclaims absent -----------------
         const tables = (
@@ -621,12 +664,38 @@ async function main() {
         })
         checkInvertible("the database refuses to erase a job event", erase.refused && /is append-only; DELETE is forbidden/.test(erase.raw), erase.refused ? `is append-only; DELETE is forbidden | ${erase.detail}` : "ACCEPTED - no refusal")
 
-        // ---- 9. residue ----------------------------------------------------
-        const after = await counts(prisma)
-        const residue = Object.entries(after)
+        // ---- 9. residue, scoped to THIS execution --------------------------
+        //
+        // WHAT THIS REPLACED:
+        //   const after = await counts(prisma)
+        //   const residue = Object.entries(after).filter(([k, v]) => v !== baseline[k])...
+        //   check("harness left zero residue", residue.length === 0, ...)
+        // - GLOBAL per-table totals compared before and after. What is asserted now is that no row in
+        // any of these tables mentions THIS RUN's token: a question no concurrent harness can answer
+        // for us, satisfy on our behalf, or defeat by cancelling a leak of ours out of the total.
+        const residue = await sweepRunToken(prisma, RUN, RESIDUE_TABLES)
+        check(
+            "harness left zero residue",
+            residue.length === 0,
+            residue.length === 0
+                ? `prefix=${RUN} rows=0 across ${RESIDUE_TABLES.length} tables`
+                : residue.map((h) => `${h.table}=${h.rows}`).join(", "),
+        )
+        check(
+            "the residue sweep demonstrably saw this run's own rows in-window, so zero-after is not vacuous",
+            inWindowHits.length > 0,
+            `prefix=${RUN} in-window ${inWindowHits.map((h) => `${h.table}=${h.rows}`).join(",") || "NOTHING SEEN"}`,
+        )
+        // REPORTED, NEVER ASSERTED. The old mechanism's numbers, printed so that a cancellation is
+        // visible: a global delta of zero beside a non-zero scoped residue is the false pass removed.
+        const globalAfter = await counts(prisma)
+        const moved = Object.entries(globalAfter)
             .filter(([k, v]) => v !== baseline[k])
-            .map(([k, v]) => `${k}:${baseline[k]}->${v}`)
-        check("harness left zero residue", residue.length === 0, residue.join(", ") || "clean")
+            .map(([k, v]) => `${k} ${baseline[k]}->${v}`)
+        console.log(
+            `REPORT  GLOBAL row totals (the old mechanism's signal, NOT asserted on): ${moved.length === 0 ? "unchanged during this window" : `MOVED ${moved.join(", ")}`}`,
+        )
+        console.log(`RUN_PREFIX=${RUN}`)
     } finally {
         await prisma.$disconnect()
     }

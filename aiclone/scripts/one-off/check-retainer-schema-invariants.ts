@@ -31,10 +31,39 @@
 import { PrismaClient } from "@prisma/client"
 
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
+import { runTokenTextPredicate, sweepRunToken, type RunTokenHit } from "../lib/write-detector"
 
 const AUTHORIZED_TARGET = "personalink_phase0_rehearsal_20260826_210704"
 const INVERT = process.env.INVERT_ASSERTION === "1"
 const RUN = `wg3r_${Date.now()}_${Math.floor(Math.random() * 1e6)}`
+
+/**
+ * THE RESIDUE SCOPE. Every table this harness's fixture can reach, swept for THIS RUN's token.
+ *
+ * The residue assertion used to compare a GLOBAL `count(*)` per table before and after the run. That
+ * is unsound three ways, and only the first one is loud: (a) a row we leak cancels against an
+ * unrelated concurrent delete, the totals match, and the assertion reports success with residue still
+ * present; (b) an unrelated concurrent insert that stays fails a run that was perfectly clean; (c) on
+ * an empty table `0 == 0` holds without this execution having proven anything about its own cleanup.
+ *
+ * Every id this harness invents is `<RUN>_<tag>_<name>`, so every row it writes - including the
+ * CaseRetainerCaseLink rows, which have no id column of their own - mentions the token somewhere.
+ * `sweepRunToken` asks exactly that question, per table, over the whole row cast to text.
+ */
+const RESIDUE_TABLES = [
+    "User",
+    "Profile",
+    "Workspace",
+    "CaseProject",
+    "CaseInvoice",
+    "CaseEvent",
+    "CaseRetainer",
+    "CaseRetainerCaseLink",
+    "CaseRetainerPeriod",
+    "CaseRetainerDraw",
+    "CaseRetainerEvent",
+    "Payment",
+] as const
 
 const NEW_TABLES = [
     "CaseRetainer",
@@ -288,7 +317,23 @@ async function main() {
             process.exit(1)
         }
 
+        // GLOBAL totals. Kept, but REPORTED at the end and never asserted on - see the residue block.
         const baseline = await counts(prisma)
+
+        // ANTI-VACUITY PROBE for the residue scope. Seeds inside a transaction that always rolls back
+        // and asks - WHILE THE ROWS EXIST - how many of them the residue sweep can actually see. A
+        // residue assertion whose scope never matched anything would otherwise pass by construction,
+        // which is the same vacuity the global-count version had, just relocated.
+        let inWindowHits: RunTokenHit[] = []
+        try {
+            await prisma.$transaction(async (tx) => {
+                await seed(tx, "scope")
+                inWindowHits = await sweepRunToken(tx as unknown as PrismaClient, RUN, RESIDUE_TABLES)
+                throw new Rollback()
+            })
+        } catch (e) {
+            if (!(e instanceof Rollback)) throw e
+        }
 
         // ---- 1. tables present, forks absent -----------------------------------
         const tables = (
@@ -655,13 +700,19 @@ async function main() {
 
         // ---- 11. billing state is a reference, never money -------------------
         const invoiceLink = await refuses("il", async (tx, s) => {
-            const before = await tx.$queryRawUnsafe<{ n: bigint }[]>(`select count(*) as n from "Payment"`)
+            // Scoped to THIS RUN, not a global `count(*) from "Payment"`. A Payment row created by
+            // linking an invoice would reference this run's period, invoice or case, so it carries the
+            // token; a global count is also wrong for a subtler reason - these two reads are separate
+            // statements in a READ COMMITTED transaction, so a concurrent COMMIT between them moves the
+            // number and the harness reports a defect that belongs to someone else.
+            const scoped = `select count(*) as n from "Payment" q where ${runTokenTextPredicate(RUN)}`
+            const before = await tx.$queryRawUnsafe<{ n: bigint }[]>(scoped)
             await tx.$executeRawUnsafe(
                 `update "CaseRetainerPeriod" set "invoiceId" = '${s.invoiceA}', "billingState" = 'ISSUED' where "id" = '${s.periodUnits}'`,
             )
-            const after = await tx.$queryRawUnsafe<{ n: bigint }[]>(`select count(*) as n from "Payment"`)
+            const after = await tx.$queryRawUnsafe<{ n: bigint }[]>(scoped)
             if (Number(after[0].n) !== Number(before[0].n)) {
-                throw new Error(`Payment count moved from ${before[0].n} to ${after[0].n}`)
+                throw new Error(`Payment rows scoped to this run moved from ${before[0].n} to ${after[0].n}`)
             }
             throw new Error("ACCEPTED")
         })
@@ -678,12 +729,39 @@ async function main() {
             checkInvertible(`CaseRetainerPeriod has no ${forbidden} column, so it cannot become a payment record`, !names.includes(forbidden))
         }
 
-        // ---- 12. residue ------------------------------------------------------
-        const after = await counts(prisma)
-        const residue = Object.entries(after)
+        // ---- 12. residue, scoped to THIS execution ---------------------------
+        //
+        // WHAT THIS REPLACED:
+        //   const after = await counts(prisma)
+        //   const residue = Object.entries(after).filter(([k, v]) => v !== baseline[k])...
+        //   check("harness left zero residue", residue.length === 0, ...)
+        // - a GLOBAL per-table total compared before and after. Unsound by cancellation, by
+        // concurrency, and vacuous on an empty table. What is asserted now is that NO row in any of
+        // these tables mentions THIS RUN's token, which no concurrent harness can satisfy or defeat.
+        const residue = await sweepRunToken(prisma, RUN, RESIDUE_TABLES)
+        check(
+            "harness left zero residue",
+            residue.length === 0,
+            residue.length === 0
+                ? `prefix=${RUN} rows=0 across ${RESIDUE_TABLES.length} tables`
+                : residue.map((h) => `${h.table}=${h.rows}`).join(", "),
+        )
+        check(
+            "the residue sweep demonstrably saw this run's own rows in-window, so zero-after is not vacuous",
+            inWindowHits.length > 0,
+            `prefix=${RUN} in-window ${inWindowHits.map((h) => `${h.table}=${h.rows}`).join(",") || "NOTHING SEEN"}`,
+        )
+        // REPORTED, NEVER ASSERTED. The old mechanism's numbers. They move for reasons that have
+        // nothing to do with this harness, and printing them beside a scoped residue of zero is what
+        // makes a cancellation visible instead of silent.
+        const globalAfter = await counts(prisma)
+        const moved = Object.entries(globalAfter)
             .filter(([k, v]) => v !== baseline[k])
-            .map(([k, v]) => `${k}:${baseline[k]}->${v}`)
-        check("harness left zero residue", residue.length === 0, residue.join(", ") || "clean")
+            .map(([k, v]) => `${k} ${baseline[k]}->${v}`)
+        console.log(
+            `REPORT  GLOBAL row totals (the old mechanism's signal, NOT asserted on): ${moved.length === 0 ? "unchanged during this window" : `MOVED ${moved.join(", ")}`}`,
+        )
+        console.log(`RUN_PREFIX=${RUN}`)
     } finally {
         await prisma.$disconnect()
     }
