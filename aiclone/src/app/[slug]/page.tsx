@@ -67,7 +67,17 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
 
     return (
         <ProfileView
-            profile={profile as any}
+            profile={{
+                ...profile,
+                // Prisma types Event.startTime/endTime as DateTime (Date). ProfileView and the
+                // ContentPanel it feeds both declare them as `string` and only ever hand them to
+                // `new Date(...)`, so serialise here instead of asserting a type the data does not have.
+                events: profile.events.map((event) => ({
+                    ...event,
+                    startTime: event.startTime.toISOString(),
+                    endTime: event.endTime.toISOString(),
+                })),
+            }}
             animationConfig={animationConfig}
             colors={colors}
         />

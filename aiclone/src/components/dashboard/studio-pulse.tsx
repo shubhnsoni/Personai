@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 
 type Point = { date: string; visits?: number; conversations: number; leads: number; revenue: number }
 type Metric = "visits" | "conversations" | "leads" | "revenue"
@@ -19,23 +19,20 @@ export function StudioPulse({
     const max = Math.max(...values, 1)
     const total = values.reduce((a, b) => a + b, 0)
 
-    const path = useMemo(() => {
-        if (slice.length === 0) return ""
-        const w = 280
-        const h = 72
-        return slice
-            .map((d, i) => {
-                const x = (i / Math.max(slice.length - 1, 1)) * w
-                const y = h - ((d[metric] ?? 0) / max) * (h - 8) - 4
-                return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`
-            })
-            .join(" ")
-    }, [slice, metric, max])
+    // Not memoized: `slice` is a freshly allocated array on every render, so this dependency check
+    // could never hit and the body already recomputed on every render. `[].map(...).join(" ")` is
+    // "", so the old `slice.length === 0` early return is redundant.
+    const w = 280
+    const h = 72
+    const path = slice
+        .map((d, i) => {
+            const x = (i / Math.max(slice.length - 1, 1)) * w
+            const y = h - ((d[metric] ?? 0) / max) * (h - 8) - 4
+            return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`
+        })
+        .join(" ")
 
-    const fill = useMemo(() => {
-        if (!path) return ""
-        return `${path} L 280 72 L 0 72 Z`
-    }, [path])
+    const fill = path ? `${path} L 280 72 L 0 72 Z` : ""
 
     const stages = [
         ...(funnel.visits != null ? [{ label: "Visit", value: funnel.visits, w: 100 }] : []),
