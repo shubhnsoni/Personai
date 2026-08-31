@@ -451,12 +451,12 @@ function proveAdoption(): void {
     )
     checkInvertible(
         "MEASURED: no boundary file contains a console call of its own, so none of them can serialise a raw Error alongside the sanitized line",
-        withOwnConsole === 0,
+        BOUNDARIES.length === 11 && withOwnConsole === 0,
         `${withOwnConsole} boundary file(s) carry their own console call`,
     )
     checkInvertible(
         "MEASURED: each boundary's scope literal is present in its own source, so the tag this harness asserts against is the tag the file actually passes rather than one this harness invented",
-        scopeMismatch === 0,
+        BOUNDARIES.length === 11 && scopeMismatch === 0,
         `${BOUNDARIES.length - scopeMismatch}/${BOUNDARIES.length} scope literals found in their own file`,
     )
 
@@ -554,7 +554,7 @@ async function proveNoLeaks(): Promise<void> {
     )
     checkInvertible(
         `MEASURED: none of the ${FORBIDDEN_FRAGMENTS.length} planted secret substrings - a credential, a bearer token, a full DSN with password, a secret-bearing query string, a serialised request body with card and email, a provider payload, and markers in the message, the cause messages, a bare-string cause and the deep frames - appears in what console.error received at ANY of the eleven boundaries`,
-        leaking === 0,
+        BOUNDARIES.length === 11 && leaking === 0,
         leaking === 0
             ? `${FORBIDDEN_FRAGMENTS.length} planted shapes x ${BOUNDARIES.length} boundaries, zero present`
             : `LEAKED at: ${leakDetail.join(" ; ")}`,

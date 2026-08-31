@@ -481,19 +481,14 @@ async function main() {
             select: { unitsDelta: true, usedUnitsAfter: true },
         })
         let running = 0
-        let mismatch = ""
-        for (const row of ledger) {
+        const replayMismatches = ledger.flatMap((row) => {
             running += row.unitsDelta ?? 0
-            if (running !== row.usedUnitsAfter) mismatch = `expected ${running}, stored ${row.usedUnitsAfter}`
-        }
+            return running === row.usedUnitsAfter ? [] : [`expected ${running}, stored ${row.usedUnitsAfter}`]
+        })
         checkInvertible(
             "replaying every delta reproduces every stored after-balance, and the final one matches the period",
-            // The row-count pin belongs in THIS condition, not only in the sibling
-            // assertion below it. On an empty ledger the loop never runs, so `mismatch`
-            // stays "" and `running` stays 0 - and if the period also read 0 this would
-            // report that replay reproduces every balance without replaying one.
-            ledger.length === 6 && mismatch === "" && running === afterParallel,
-            mismatch || `rows=${ledger.length} replay=${running} period=${afterParallel}`,
+            ledger.length === 6 && replayMismatches.length === 0 && running === afterParallel,
+            replayMismatches[0] ?? `rows=${ledger.length} replay=${running} period=${afterParallel}`,
         )
         checkInvertible("the ledger has a row per accepted draw and no more", ledger.length === 6, `rows=${ledger.length}`)
 

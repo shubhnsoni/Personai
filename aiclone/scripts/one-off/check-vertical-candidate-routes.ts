@@ -530,7 +530,8 @@ async function main(): Promise<void> {
         checkInvertible(`${view.id} carries no executed workflow`, view.workflows.executed === false)
         checkInvertible(
             `${view.id} declares its workflow definitions as unexecuted`,
-            view.workflows.definitions.every((workflow) => workflow.executed === false),
+            view.workflows.definitions.length > 0 &&
+                view.workflows.definitions.every((workflow) => workflow.executed === false),
         )
         checkInvertible(
             `${view.id} marks proposed terminology and intended surfaces as unresolved`,
@@ -598,7 +599,7 @@ async function main(): Promise<void> {
     }
     checkInvertible(
         "no id returned by this surface appears in the blueprint registry",
-        views.every((view) => !registryIdsBefore.includes(view.id)),
+        views.length > 0 && views.every((view) => !registryIdsBefore.includes(view.id)),
         registryIdsBefore.join(","),
     )
 

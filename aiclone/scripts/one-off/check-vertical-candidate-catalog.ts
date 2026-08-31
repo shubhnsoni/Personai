@@ -515,10 +515,11 @@ for (const candidate of candidates) {
     const article = articleFor(populated, candidate.blueprint.id)
     if (!article) continue
     const levels = [...article.matchAll(/<h([1-6])[ >]/g)].map((m) => Number(m[1]))
+    const subordinateLevels = levels.slice(1)
     check(`${candidate.blueprint.id} card has headings to check`, levels.length > 1, `${levels.length} found`)
     check(
         `${candidate.blueprint.id} card starts at h3 and uses only h4 below it`,
-        levels[0] === 3 && levels.slice(1).every((level) => level === 4),
+        levels[0] === 3 && subordinateLevels.length > 0 && subordinateLevels.every((level) => level === 4),
         `sequence was ${levels.join(",")}`,
     )
 }

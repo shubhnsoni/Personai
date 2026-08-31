@@ -242,7 +242,7 @@ async function main() {
         )
         check(
             "a slot outside published hours is refused",
-            !outsideHours.ok && !outsideHours.ok && /outside published hours/i.test(outsideHours.message),
+            !outsideHours.ok && /outside published hours/i.test(outsideHours.message),
             !outsideHours.ok ? outsideHours.message : "ACCEPTED",
         )
 

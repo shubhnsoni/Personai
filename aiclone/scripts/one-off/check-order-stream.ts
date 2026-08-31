@@ -331,7 +331,7 @@ async function main() {
                 `Replay did not include the missed event ${synthetic.seq.toString()}`,
             )
             assert(
-                replayed.events.every((event) => event.orderId === order.id),
+                replayed.events.length >= 1 && replayed.events.every((event) => event.orderId === order.id),
                 "Replay leaked an event from another order",
             )
             assert(
