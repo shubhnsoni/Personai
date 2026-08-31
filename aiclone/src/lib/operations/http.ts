@@ -26,6 +26,7 @@
 import { failure, serialise, success } from "@/lib/fieldjobs/http"
 import { PersistenceError } from "@/lib/persistence/errors"
 
+import { logDependencyFailure } from "./dependency-failure-log"
 import type { OperationsService } from "./engine"
 
 function param(request: Request, name: string): string {
@@ -190,7 +191,10 @@ export class OperationsApiService {
                     mixedScope: summary.mixedScope,
                 })
             })
-            .catch((error: unknown) => failure(error, "Operations are temporarily unavailable", methodRefusalHeaders(error)))
+            .catch((error: unknown) => {
+                logDependencyFailure("[operations/today]", error)
+                return failure(error, "Operations are temporarily unavailable", methodRefusalHeaders(error))
+            })
             .then((response) => withoutContentForHead(method, response))
     }
 }

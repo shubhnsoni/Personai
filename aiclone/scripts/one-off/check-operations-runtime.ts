@@ -65,6 +65,7 @@
  */
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { inspect } from "node:util"
 
 import { PrismaClient } from "@prisma/client"
 
@@ -74,6 +75,8 @@ import {
     COHORT_NEEDS_ACTION_SORT_KEYS,
     COHORT_NEEDS_ACTION_UNBOUNDED_READS,
 } from "../../src/lib/cohorts/needs-action"
+import { failure } from "../../src/lib/fieldjobs/http"
+import { logDependencyFailure } from "../../src/lib/operations/dependency-failure-log"
 import {
     OPERATIONS_DOMAINS,
     OPERATIONS_DOMAIN_SCOPE,
@@ -84,6 +87,7 @@ import {
 } from "../../src/lib/operations/engine"
 import { OperationsApiService } from "../../src/lib/operations/http"
 import { OperationsContext } from "../../src/lib/operations/shared"
+import { PersistenceError } from "../../src/lib/persistence/errors"
 import { PersistedTenancy, type PlatformIdentity } from "../../src/lib/persistence/tenancy"
 import { assertDisposableTarget, parseDatabaseName } from "../lib/disposable-db"
 import {
@@ -916,6 +920,249 @@ async function seed(tx: Tx): Promise<Seeded> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// 6. Behavioural: the sanitizing dependency-failure logger at the operations boundary
+// ---------------------------------------------------------------------------
+/**
+ * THE FAILURE PATH NOW LOGS, AND IT LOGS SAFELY. `operations/http.ts` used to `.catch` an unexpected
+ * failure straight into `failure(...)` with NO trace through any sanitizer, so a dependency outage on the
+ * operations view was either silent or, if logged by some outer layer, unsanitized. It now calls the
+ * shared `logDependencyFailure("[operations/today]", error)` - the exact sanitizing logger the due-work
+ * preview uses - on that path.
+ *
+ * These proofs capture `console.error` (the precise call the logger makes) and assert what the line WOULD
+ * carry. Non-string args go through util.inspect exactly as console.error renders them, so a regression
+ * that logged a raw Error object would be SEEN with its message and stack rather than silently
+ * stringified away - a capture that only concatenated string args would miss the very defect this guards.
+ * Every assertion below is invertible, so INVERT_ASSERTION=1 turns the whole set red and proves it can
+ * fail; and each "leaks no X" is paired with a "the log actually ran" precondition so none can pass by
+ * logging nothing at all.
+ */
+function headerNames(response: Response): string {
+    const names: string[] = []
+    response.headers.forEach((_value, key) => names.push(key.toLowerCase()))
+    return names.sort().join(",")
+}
+
+async function captureConsoleError(run: () => Promise<void>): Promise<string[]> {
+    const lines: string[] = []
+    const realConsoleError = console.error
+    console.error = (...args: unknown[]): void => {
+        lines.push(args.map((a) => (typeof a === "string" ? a : inspect(a, { depth: 8 }))).join(" "))
+    }
+    try {
+        await run()
+    } finally {
+        console.error = realConsoleError
+    }
+    return lines
+}
+
+async function proveDependencyFailureLogging(): Promise<void> {
+    const OPS_SCOPE = "[operations/today]"
+    const OPS_URL = "http://ops.test/api/platform/operations?workspaceId=ws_probe"
+    const getRequest = () => new Request(OPS_URL, { method: "GET" })
+    const failingApi = (thrown: unknown): OperationsApiService =>
+        new OperationsApiService({ summary: () => Promise.reject(thrown) } as unknown as OperationsService)
+
+    // A hostile error carrying every secret shape at once, ASSEMBLED FROM PARTS so this source file never
+    // itself contains a complete DSN or the control secret - the run's own logs cannot be made to hold one
+    // by quoting this file. A wrapped TypeError (undici's shape), an AggregateError branch, a bare-string
+    // cause, a cause whose `code` is itself a DSN, and a stack of the four frame shapes the redactor must
+    // tell apart: an ESM file URI, a bundler query string, a DSN, and a plain Windows path.
+    const authority = `${["svcuser", "hunter2"].join(":")}@${["dbhost.internal", "5432"].join(":")}`
+    const dsn = `postgres://${authority}/appdb?sslmode=require`
+    const CONTROL_SECRET = "OPS_CONTROL_SECRET_MUST_NOT_APPEAR"
+    const CAUSE_MESSAGE_MARKER = "OPS_CAUSEMESSAGE_MUST_NOT_APPEAR"
+    const STRING_CAUSE_MARKER = "OPS_STRINGCAUSE_MUST_NOT_APPEAR"
+    const HOSTILE_CODE = `postgres://${authority}/appdb`
+
+    const innerCause = Object.assign(new Error(`${CAUSE_MESSAGE_MARKER} ${dsn} password=${"hunter2"}`), { code: "ECONNREFUSED" })
+    const hostileCoded = Object.assign(new Error("coded but unusable"), { code: HOSTILE_CODE })
+    const aggregate = new AggregateError([innerCause, hostileCoded, `${STRING_CAUSE_MARKER} ${dsn}`], "every attempt failed")
+    const hostile = Object.assign(new TypeError(`fetch failed ${CONTROL_SECRET} ${dsn}`), { cause: aggregate })
+    hostile.stack =
+        `TypeError: fetch failed ${CONTROL_SECRET} ${dsn}\n` +
+        `    at composeSummary (file:///C:/probe/app/src/lib/engine.ts:10:5)\n` +
+        `    at bundled (file:///C:/probe/app/y.js?v=abc123:20:7)\n` +
+        `    at driverConnect (${dsn})\n` +
+        `    at last (C:\\probe\\app\\z.ts:33:11)`
+
+    const hostileLines = await captureConsoleError(async () => {
+        logDependencyFailure(OPS_SCOPE, hostile)
+    })
+    const hostileLog = hostileLines.join("\n")
+    const hostileSurface = hostileLines.filter((line) => line.includes(OPS_SCOPE))
+    const payload = (() => {
+        const line = hostileSurface[0] ?? ""
+        const at = line.indexOf('{"kind"')
+        if (at < 0) return null
+        try {
+            const value: unknown = JSON.parse(line.slice(at))
+            return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : null
+        } catch {
+            return null
+        }
+    })()
+    const loggedCauses: ReadonlyArray<{ via?: unknown; kind?: unknown; code?: unknown }> = Array.isArray(payload?.causes)
+        ? (payload?.causes as Array<{ via?: unknown; kind?: unknown; code?: unknown }>)
+        : []
+    const framesText: string = Array.isArray(payload?.frames) ? (payload?.frames as unknown[]).map((f) => String(f)).join(" | ") : ""
+
+    // The precondition: the logger ran exactly once, tagged this surface and named the status - or every
+    // "leaks no X" below would be satisfied by an empty string.
+    checkInvertible(
+        "MEASURED: the operations failure path logs EXACTLY ONE sanitized line, tagged [operations/today] and naming the 503, and its JSON payload parses - so the assertions below read a real logged line, not nothing",
+        hostileSurface.length === 1 && hostileLog.includes("DEPENDENCY_UNAVAILABLE") && payload !== null,
+        `surface lines=${hostileSurface.length} total=${hostileLines.length} payload=${payload === null ? "unparsed" : "parsed"}`,
+    )
+    // Redaction: every planted credential / DSN / query-string / keyword shape is absent from the line.
+    const SECRET_FRAGMENTS = ["svcuser", "hunter2", "dbhost.internal", "5432", "sslmode", "postgres://", "password="]
+    const leaked = SECRET_FRAGMENTS.filter((fragment) => hostileLog.toLowerCase().includes(fragment.toLowerCase()))
+    checkInvertible(
+        "MEASURED: credentials, host, port, query string, a DSN and credential keywords - planted in the error's message, its cause chain and a stack frame - are all REDACTED out of the logged line",
+        leaked.length === 0,
+        leaked.length === 0 ? `${SECRET_FRAGMENTS.length} secret shapes planted, none present in the log` : `LEAKED: ${leaked.join(",")}`,
+    )
+    // The planted-secret control: a unique string placed only in the withheld message and stack header.
+    checkInvertible(
+        "MEASURED: a known planted control secret is provably ABSENT from the log - it lived only in the message (never logged) and the stack header cut away with it",
+        !hostileLog.includes(CONTROL_SECRET),
+        `control secret present=${hostileLog.includes(CONTROL_SECRET)}`,
+    )
+    // No raw Error, stack, request body or secret shape of any kind reaches output.
+    checkInvertible(
+        "MEASURED: no raw message field, no scheme:// URI, no query string and no credential-shaped assignment reaches the captured output - no raw Error or stack survives the allowlist",
+        !/"message":/.test(hostileLog) &&
+            !/[a-z][a-z0-9+.-]*:\/\//i.test(hostileLog) &&
+            !/\?[^\s]*=/.test(hostileLog) &&
+            !/(password|passwd|secret|token|apikey|api_key)\s*[:=]/i.test(hostileLog),
+        "no message field, no scheme://, no query string, no credential assignment",
+    )
+    // Safe classification SURVIVES the redaction - the kind/code that SHOULD appear still appears.
+    checkInvertible(
+        "MEASURED: safe classification survives - the top-level kind is TypeError, and reading through `cause` still surfaces the AggregateError branch and the real ECONNREFUSED an operator needs to tell an outage from a defect",
+        payload?.kind === "TypeError" &&
+            loggedCauses.some((c) => c.kind === "AggregateError") &&
+            loggedCauses.some((c) => c.code === "ECONNREFUSED"),
+        `kind=${String(payload?.kind)} causeKinds=[${loggedCauses.map((c) => String(c.kind)).join(",")}] causeCodes=[${loggedCauses.map((c) => JSON.stringify(c.code)).join(",")}]`,
+    )
+    // The allowlist is not weakened to get the classification: a cause whose `code` is a DSN is refused.
+    checkInvertible(
+        "MEASURED: a cause whose `code` is itself a connection string is REFUSED by the same allowlist as the top-level code, so walking the chain bought it no exemption - every logged code is null or a bare token",
+        loggedCauses.length >= 3 &&
+            loggedCauses.every((c) => c.code === null || /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(String(c.code))) &&
+            !hostileLog.includes("dbhost.internal"),
+        `logged codes=[${loggedCauses.map((c) => JSON.stringify(c.code)).join(",")}]`,
+    )
+    // No cause's MESSAGE reaches the log at any depth.
+    checkInvertible(
+        "MEASURED: no cause's message reaches the log at any depth - neither the wrapped cause's DSN-bearing message nor the bare-string cause's",
+        !hostileLog.includes(CAUSE_MESSAGE_MARKER) && !hostileLog.includes(STRING_CAUSE_MARKER),
+        `wrapped-cause marker present=${hostileLog.includes(CAUSE_MESSAGE_MARKER)}, string-cause marker present=${hostileLog.includes(STRING_CAUSE_MARKER)}`,
+    )
+    // The redactor keeps the evidence and drops only the authority.
+    checkInvertible(
+        "MEASURED: the redactor keeps evidence and drops only the authority - an ESM path/line/column survives, a bundler query is dropped WITHOUT the position, a DSN loses its whole authority while its path tail survives, and a plain Windows-path frame is untouched",
+        framesText.includes("/C:/probe/app/src/lib/engine.ts:10:5") &&
+            framesText.includes("y.js<redacted-query>:20:7") &&
+            framesText.includes("<redacted-authority>") &&
+            framesText.includes("/appdb") &&
+            framesText.includes("z.ts:33:11"),
+        framesText.slice(0, 220),
+    )
+
+    // -- the RESPONSE is byte-identical with and without the logger, and the logger is a pure side channel
+    const depError = new Error("operations dependency is down")
+    const baseline503 = failure(depError, "Operations are temporarily unavailable")
+    const baseline503Body = await baseline503.text()
+    const baseline503Headers = headerNames(baseline503)
+    let liveStatus = 0
+    let liveBody = ""
+    let liveHeaders = ""
+    const liveLines = await captureConsoleError(async () => {
+        const response = await failingApi(depError).today(getRequest())
+        liveStatus = response.status
+        liveBody = await response.text()
+        liveHeaders = headerNames(response)
+    })
+    const liveSurface = liveLines.filter((line) => line.includes(OPS_SCOPE))
+    checkInvertible(
+        "MEASURED: wiring the logger changed NOTHING about the response - the failure path's 503 status, body and header set are byte-identical to `failure(...)` with no logger at all, and the logger nonetheless ran exactly once",
+        liveStatus === 503 &&
+            liveBody === baseline503Body &&
+            liveHeaders === baseline503Headers &&
+            baseline503.status === 503 &&
+            liveSurface.length === 1,
+        `live=${liveStatus}/[${liveHeaders}] baseline=${baseline503.status}/[${baseline503Headers}] bodyMatch=${liveBody === baseline503Body} logged=${liveSurface.length}`,
+    )
+
+    // -- non-enumeration: a foreign workspace and a nonexistent one refuse identically AND are not logged
+    const refusal = new PersistenceError("FORBIDDEN", "You are not a member of this workspace")
+    const refusingApi = new OperationsApiService({ summary: () => Promise.reject(refusal) } as unknown as OperationsService)
+    let foreignStatus = 0
+    let foreignBody = ""
+    let foreignHeaders = ""
+    const foreignLines = await captureConsoleError(async () => {
+        const response = await refusingApi.today(new Request("http://ops.test/api/platform/operations?workspaceId=ws_belongs_to_someone_else", { method: "GET" }))
+        foreignStatus = response.status
+        foreignBody = await response.text()
+        foreignHeaders = headerNames(response)
+    })
+    let missingStatus = 0
+    let missingBody = ""
+    let missingHeaders = ""
+    const missingLines = await captureConsoleError(async () => {
+        const response = await refusingApi.today(new Request("http://ops.test/api/platform/operations?workspaceId=ws_does_not_exist_at_all", { method: "GET" }))
+        missingStatus = response.status
+        missingBody = await response.text()
+        missingHeaders = headerNames(response)
+    })
+    checkInvertible(
+        "MEASURED: a foreign workspace and a nonexistent one refuse BYTE-IDENTICALLY at the operations boundary - same 403 status, body and headers - so the response cannot be used to tell which id is real",
+        foreignStatus === 403 && missingStatus === 403 && foreignBody === missingBody && foreignHeaders === missingHeaders,
+        `foreign=${foreignStatus}/${foreignBody.length}b/[${foreignHeaders}] missing=${missingStatus}/${missingBody.length}b/[${missingHeaders}] bodyMatch=${foreignBody === missingBody}`,
+    )
+    checkInvertible(
+        "MEASURED: neither refusal is LOGGED - a PersistenceError is a client-caused refusal, not an incident, so the logger emits nothing for either and cannot enumerate real workspaces through the side channel",
+        foreignLines.filter((line) => line.includes(OPS_SCOPE)).length === 0 &&
+            missingLines.filter((line) => line.includes(OPS_SCOPE)).length === 0,
+        `foreign log lines=${foreignLines.length} missing log lines=${missingLines.length}`,
+    )
+    let refusalCodesLogged = 0
+    for (const code of ["UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND"] as const) {
+        const lines = await captureConsoleError(async () => {
+            logDependencyFailure(OPS_SCOPE, new PersistenceError(code, "refused"))
+        })
+        refusalCodesLogged += lines.length
+    }
+    checkInvertible(
+        "MEASURED: UNAUTHORIZED, FORBIDDEN and NOT_FOUND are each logged ZERO times by the shared logger, so no deliberate refusal reaches the incident log where its presence could enumerate",
+        refusalCodesLogged === 0,
+        `total lines logged across the three non-enumerating refusal codes=${refusalCodesLogged}`,
+    )
+
+    // -- a failure INSIDE the logger cannot break the response path
+    let survivedStatus = 0
+    let survivedBody = ""
+    const realConsoleErrorForThrow = console.error
+    console.error = () => {
+        throw new Error("the log transport itself is down")
+    }
+    try {
+        const response = await failingApi(depError).today(getRequest())
+        survivedStatus = response.status
+        survivedBody = await response.text()
+    } finally {
+        console.error = realConsoleErrorForThrow
+    }
+    checkInvertible(
+        "MEASURED: when the logger's own transport throws, the failure is swallowed inside logDependencyFailure and the response is STILL produced correctly - a broken log cannot become a broken response",
+        survivedStatus === 503 && survivedBody === baseline503Body,
+        `status=${survivedStatus} bodyMatch=${survivedBody === baseline503Body}`,
+    )
+}
+
 async function main() {
     const url = process.env.DATABASE_URL
     const db = parseDatabaseName(url)
@@ -924,6 +1171,11 @@ async function main() {
         console.error(`ABORT: harness only runs against ${AUTHORIZED_TARGET}, got ${db}`)
         process.exit(1)
     }
+
+    // The sanitizing dependency-failure logger at the operations boundary is proven here. It is DB-free -
+    // it captures console.error around the pure logger and the boundary's own failure path - so it runs
+    // on a validated environment before the disposable database is opened.
+    await proveDependencyFailureLogging()
 
     const prisma = new PrismaClient()
     try {
