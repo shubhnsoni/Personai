@@ -14,8 +14,24 @@ import {
 const report: Record<string, unknown> = {}
 const failures: string[] = []
 
+/**
+ * ASSERTION EVIDENCE. Counted INSIDE the recorder, so the number the gate reads is produced by the
+ * same call that decides the verdict — there is no separate tally that could drift from the checks.
+ * Deliberately never a literal: a hard-coded total would keep printing a healthy count after someone
+ * deleted half the assertions, which is the exact failure the evidence contract exists to catch. Every
+ * call increments `assertionsRun`; only one whose condition held increments `assertionsPassed`, so a
+ * failing assertion necessarily LOWERS the passed count and, through `failures`, sets a non-zero exit.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function check(name: string, condition: unknown, detail?: string) {
-    if (!condition) failures.push(detail ? `${name}: ${detail}` : name)
+    assertionsRun += 1
+    if (condition) {
+        assertionsPassed += 1
+        return
+    }
+    failures.push(detail ? `${name}: ${detail}` : name)
 }
 
 const base = "postgresql://postgres:secret@127.0.0.1:5432"
@@ -96,8 +112,18 @@ report.accepted = accepted.length
 report.liveVariantsRejected = liveVariants.length
 report.otherRejections = rejected.length + 2
 report.redactedExample = redacted
+report.assertionsRun = assertionsRun
+report.assertionsPassed = assertionsPassed
 report.result = failures.length === 0 ? "PASS" : "FAIL"
 report.failures = failures
 
 console.log(JSON.stringify(report, null, 2))
+
+// Machine-readable assertion evidence for scripts/gates/run-gates.js. The identity-bearing
+// GATE-EVIDENCE line must be the WHOLE line and name this EXACT file, or the driver reports
+// EVIDENCE_IDENTITY_MISMATCH. Both numbers come from the counters incremented inside check() above,
+// so they cannot claim more than actually ran; neutering check() collapses them to 0.
+console.log(`GATE-EVIDENCE harness=check-disposable-db-guard.ts assertions=${assertionsPassed}`)
+console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+
 if (failures.length > 0) process.exitCode = 1

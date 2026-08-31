@@ -2274,11 +2274,32 @@ function controlledBadFixture(): ScanResult {
     return scan("controlled-bad-fixture.ts", fixtureSource(fixtureNamed("conditional-init")))
 }
 
+/**
+ * ASSERTION EVIDENCE. This file is a SOURCE SCANNER: its "Assertion calls examined", "Per class: ..."
+ * and "REAL vacuous assertions" lines count the CORPUS it scanned, never what it proved about itself,
+ * so none of them is read as evidence. What this harness actually PROVES are its OWN gating invariants —
+ * the --self-test fixtures (one vacuous case per class that MUST be caught, one live control per class
+ * that must NOT be), the coverage-plumbing checks, and the inventory-reconciliation fixtures — now run
+ * on every invocation. Each is recorded through `recordSelfCheck`, so the number is produced by the same
+ * call that decides `selfTestOk`; it is never a literal (neutering the recorder collapses it), and a
+ * failing self-check LOWERS `assertionsPassed` and exits non-zero. It counts NONE of the
+ * UNGUARDED_EVERY / UNRESOLVED / candidate findings this scanner reports about OTHER files.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
+function recordSelfCheck(pass: boolean): boolean {
+    assertionsRun += 1
+    if (pass) assertionsPassed += 1
+    return pass
+}
+
 function runSelfTest(): boolean {
     let ok = true
     for (const fixture of VACUOUS_FIXTURES) {
         const result = scan(`fixture-${fixture.name}.ts`, fixtureSource(fixture))
         const hit = result.findings.find((finding) => finding.classification === fixture.expect)
+        recordSelfCheck(hit !== undefined)
         if (!hit) {
             const saw = result.findings.map((finding) => `${finding.classification}@${finding.line}`).join(", ") || "nothing"
             console.error(`FAIL self-test ${fixture.name}: expected ${fixture.expect}, saw ${saw}`)
@@ -2290,6 +2311,7 @@ function runSelfTest(): boolean {
     for (const fixture of NON_DEFECT_FIXTURES) {
         const result = scan(`fixture-${fixture.name}.ts`, fixtureSource(fixture))
         const hit = result.findings.find((finding) => finding.classification === fixture.expect)
+        recordSelfCheck(hit !== undefined)
         if (!hit) {
             const saw = result.findings.map((finding) => `${finding.classification}@${finding.line}`).join(", ") || "nothing"
             console.error(`FAIL self-test ${fixture.name}: expected ${fixture.expect}, saw ${saw}`)
@@ -2298,7 +2320,7 @@ function runSelfTest(): boolean {
         }
         // A non-defect fixture must ALSO not be counted as a defect, or the class boundary is fiction.
         const flagged = result.findings.filter((finding) => VACUOUS.includes(finding.classification))
-        if (flagged.length > 0) {
+        if (!recordSelfCheck(flagged.length === 0)) {
             console.error(
                 `FAIL self-test ${fixture.name}: a non-defect fixture was ALSO counted as a defect: ${flagged.map((f) => `${f.classification}@${f.line}`).join(", ")}`,
             )
@@ -2310,7 +2332,7 @@ function runSelfTest(): boolean {
     for (const control of LIVE_CONTROLS) {
         const result = scan(`control-${control.name}.ts`, fixtureSource(control))
         const flagged = result.findings.filter((finding) => VACUOUS.includes(finding.classification))
-        if (flagged.length > 0) {
+        if (!recordSelfCheck(flagged.length === 0)) {
             console.error(
                 `FAIL self-test ${control.name}: a LIVE control was flagged ${flagged.map((finding) => `${finding.classification}@${finding.line}`).join(", ")}`,
             )
@@ -2322,14 +2344,14 @@ function runSelfTest(): boolean {
 
     // Coverage plumbing, proven rather than asserted in a comment.
     const aliasResult = scan("coverage-alias.ts", fixtureSource(fixtureNamed("alias-followed")))
-    if (aliasResult.discovery.aliases.length === 0) {
+    if (!recordSelfCheck(aliasResult.discovery.aliases.length > 0)) {
         console.error("FAIL self-test coverage-alias: the alias fixture registered no alias, so alias following is not actually wired")
         ok = false
     } else {
         console.log(`PASS self-test coverage-alias: followed ${aliasResult.discovery.aliases.join("; ")}`)
     }
     const wrapperResult = scan("coverage-wrapper.ts", fixtureSource(fixtureNamed("forwarding-wrapper-followed")))
-    if (wrapperResult.discovery.wrappers.length === 0) {
+    if (!recordSelfCheck(wrapperResult.discovery.wrappers.length > 0)) {
         console.error("FAIL self-test coverage-wrapper: the wrapper fixture registered no wrapper, so wrapper following is not actually wired")
         ok = false
     } else {
@@ -2347,6 +2369,7 @@ function runSelfTest(): boolean {
     ]) {
         const result = scan(`coverage-wrapper-depth-${depth.round}.ts`, fixtureSource(fixtureNamed(depth.fixture)))
         const note = result.discovery.wrappers.find((wrapper) => wrapper.startsWith(`${depth.outermost} `))
+        recordSelfCheck(note !== undefined && note.includes(`(round ${depth.round})`))
         if (!note || !note.includes(`(round ${depth.round})`)) {
             console.error(
                 `FAIL self-test coverage-wrapper-depth-${depth.round}: expected \`${depth.outermost}\` to be registered in round ${depth.round}, saw ${result.discovery.wrappers.join("; ") || "no wrappers"}`,
@@ -2354,7 +2377,7 @@ function runSelfTest(): boolean {
             ok = false
             continue
         }
-        if (result.discovery.wrapperRounds !== depth.rounds || result.discovery.wrapperRoundsExhausted) {
+        if (!recordSelfCheck(result.discovery.wrapperRounds === depth.rounds && !result.discovery.wrapperRoundsExhausted)) {
             console.error(
                 `FAIL self-test coverage-wrapper-depth-${depth.round}: expected the fixed point in ${depth.rounds} round(s) with the safety bound untouched, saw ${result.discovery.wrapperRounds} round(s), exhausted=${String(result.discovery.wrapperRoundsExhausted)}`,
             )
@@ -2362,6 +2385,7 @@ function runSelfTest(): boolean {
             continue
         }
         const hit = result.findings.find((finding) => finding.classification === "VACUOUS_LITERAL")
+        recordSelfCheck(hit !== undefined)
         if (!hit) {
             console.error(
                 `FAIL self-test coverage-wrapper-depth-${depth.round}: the chain was registered but the assertion made through it was not classified, so the depth buys nothing`,
@@ -2379,11 +2403,12 @@ function runSelfTest(): boolean {
         "coverage-builder-callsite.ts",
         fixtureSource(fixtureNamed("callsite-derived-expectation-through-a-builder-wrapper")),
     )
-    if (builderResult.builderCallsites === 0) {
+    if (!recordSelfCheck(builderResult.builderCallsites > 0)) {
         console.error("FAIL self-test coverage-builder-callsite: no condition-building wrapper callsite was substituted, so the pass is not wired")
         ok = false
     }
     const lifted = builderResult.findings.find((finding) => finding.classification === "VACUOUS_DERIVED_EXPECTATION")
+    recordSelfCheck(lifted !== undefined && lifted.evidence.startsWith("CALLSITE-DERIVED"))
     if (!lifted) {
         console.error("FAIL self-test coverage-builder-callsite: the callsite-derived expectation was not caught")
         ok = false
@@ -2395,14 +2420,14 @@ function runSelfTest(): boolean {
             `PASS self-test coverage-builder-callsite: ${builderResult.builderNotes.join("; ")}, and the callsite-derived expectation is caught at fixture line ${lifted.line} (the callsite, not the wrapper body)`,
         )
     }
-    if (builderResult.builderSkipped.length > 0) {
+    if (!recordSelfCheck(builderResult.builderSkipped.length === 0)) {
         console.error(`FAIL self-test coverage-builder-callsite: substitution was skipped: ${builderResult.builderSkipped.join("; ")}`)
         ok = false
     }
     const rejectResult = scan("coverage-reject.ts", fixtureSource(
         LIVE_CONTROLS.find((control) => control.name === "live-wrapper-that-builds-its-own-condition") as Fixture,
     ))
-    if (rejectResult.discovery.wrappers.some((wrapper) => wrapper.startsWith("expectOrder"))) {
+    if (!recordSelfCheck(!rejectResult.discovery.wrappers.some((wrapper) => wrapper.startsWith("expectOrder")))) {
         console.error("FAIL self-test coverage-reject: a wrapper that BUILDS its condition was registered; the callsite argument is an array, and folding it would fabricate a defect")
         ok = false
     } else {
@@ -2412,7 +2437,7 @@ function runSelfTest(): boolean {
     for (const fixture of INVENTORY_FIXTURES) {
         const found = reconcile(fixture.declared, fixture.onDisk)
         if (fixture.expect === null) {
-            if (found.length > 0) {
+            if (!recordSelfCheck(found.length === 0)) {
                 console.error(`FAIL self-test ${fixture.name}: expected no finding, saw ${found.map((f) => f.kind).join(", ")}`)
                 ok = false
                 continue
@@ -2420,7 +2445,7 @@ function runSelfTest(): boolean {
             console.log(`PASS self-test ${fixture.name}: nothing flagged, as required`)
             continue
         }
-        if (!found.some((finding) => finding.kind === fixture.expect)) {
+        if (!recordSelfCheck(found.some((finding) => finding.kind === fixture.expect))) {
             console.error(`FAIL self-test ${fixture.name}: expected ${fixture.expect}, saw ${found.map((f) => f.kind).join(", ") || "nothing"}`)
             ok = false
             continue
@@ -2649,10 +2674,21 @@ console.log(
     `Gating classes: ${gatingDefects.length} defect(s). Reported-only (UNGUARDED_EVERY, pre-existing debt): ${reportedOnly.length}.`,
 )
 
-const selfTestOk = argv.includes("--self-test") ? runSelfTest() : true
+// This scanner's OWN gating invariants (its controlled fixtures + inventory reconciliation) now run on
+// EVERY invocation, not only under --self-test, so it emits a real assertion-evidence count instead of
+// leaning on exit 0 alone. --self-test remains accepted (now the default) for backward compatibility.
+const selfTestOk = runSelfTest()
 
 for (const problem of declaredInventory.integrity) console.log(`INTEGRITY ${problem.kind}: ${problem.detail}`)
 console.log(`Inventory integrity findings: ${declaredInventory.integrity.length}.`)
+
+// Machine-readable assertion evidence for scripts/gates/run-gates.js. The identity-bearing line must be
+// the WHOLE line and name this EXACT file, or the driver reports EVIDENCE_IDENTITY_MISMATCH. Both numbers
+// come from recordSelfCheck() — the same calls that feed selfTestOk — so they cannot exceed what actually
+// ran and collapse to 0 if the recorder is neutered. This counts ONLY this scanner's own gating
+// invariants, never the vacuity findings it reports about other files.
+console.log(`GATE-EVIDENCE harness=check-assertion-vacuity.ts assertions=${assertionsPassed}`)
+console.log(`${assertionsPassed}/${assertionsRun} invariants passed`)
 
 if (gatingDefects.length > 0 || !selfTestOk || missing.length > 0 || declaredInventory.integrity.length > 0 || exhausted.length > 0) {
     process.exitCode = 1

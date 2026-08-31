@@ -94,8 +94,12 @@ type IntegrityFinding = { kind: string; detail: string }
  * scanner red on arrival, which turns a control into a disabled one; not gating at all would let the
  * hole grow quietly. So the exception is named, and the CHANGE is what fails.
  */
-const NO_HELPER_BY_DESIGN: ReadonlyMap<string, string> = new Map([
-    ["check-assertion-vacuity.ts", "A source scanner, not a behavioural harness. It reports through console.log and one `process.exitCode` at the end, with no assertion helper of its own; its own controls are its `--self-test` fixtures. Its exit shape is still checked here - it simply contributes no assertion calls."],
+const NO_HELPER_BY_DESIGN: ReadonlyMap<string, string> = new Map<string, string>([
+    // check-assertion-vacuity.ts USED to be listed here: a scanner that recorded its verdict only
+    // through console.log and one process.exitCode, with no assertion helper of its own. It now records
+    // its OWN gating invariants (its controlled fixtures) through a recordSelfCheck() helper and emits an
+    // assertion-evidence count, so it is judgeable like any other harness and the entry was removed. The
+    // map is empty today; per the note above, a CHANGE to it is still what gates.
 ])
 
 const SELF_NAME = "check-harness-exit-integrity.ts"
@@ -1063,6 +1067,30 @@ const INVENTORY_FIXTURES: ReadonlyArray<Readonly<{
     },
 ]
 
+// ---------------------------------------------------------------------------------------------
+// assertion evidence: THIS scanner's OWN gating invariants
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * This file is a SCANNER: its `Candidates/final verdicts/.../real defects` line counts the CORPUS it
+ * inspected, never what it proved about itself, so that number must NOT be read as assertion evidence.
+ * What this harness actually PROVES are its own controls — the controlled fixtures in `runSelfTest`,
+ * now run on every invocation — each asserting that its detector classifies a controlled input EXACTLY
+ * as declared. Those are the gating invariants counted here, through `recordSelfCheck`, so the number
+ * is produced by the same call that decides `selfTestOk`. It is never a literal: neutering the recorder
+ * collapses it, and a failing self-check LOWERS `assertionsPassed` and (via `ok = false`) exits non-zero.
+ * It counts NONE of the candidates, callsites, guards or verdicts discovered in the OTHER harnesses —
+ * those stay in the conclusions line, unchanged.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
+function recordSelfCheck(pass: boolean): boolean {
+    assertionsRun += 1
+    if (pass) assertionsPassed += 1
+    return pass
+}
+
 function runSelfTest(elsewhere: ReadonlySet<string>): boolean {
     let ok = true
     for (const fixture of FIXTURES) {
@@ -1070,7 +1098,7 @@ function runSelfTest(elsewhere: ReadonlySet<string>): boolean {
         const interesting = result.findings.filter((finding) => finding.classification !== "FINAL_VERDICT")
 
         if (fixture.expect === "NO_FINDING") {
-            if (interesting.length > 0) {
+            if (!recordSelfCheck(interesting.length === 0)) {
                 console.error(
                     `FAIL self-test ${fixture.name}: expected no finding, saw ${interesting.map((f) => `${f.classification}@${f.line}`).join(", ")}`,
                 )
@@ -1082,6 +1110,7 @@ function runSelfTest(elsewhere: ReadonlySet<string>): boolean {
         }
 
         const hit = result.findings.find((finding) => finding.classification === fixture.expect)
+        recordSelfCheck(hit !== undefined)
         if (!hit) {
             const saw = result.findings.map((finding) => `${finding.classification}@${finding.line}`).join(", ") || "nothing"
             console.error(`FAIL self-test ${fixture.name}: expected ${fixture.expect}, saw ${saw}`)
@@ -1096,7 +1125,7 @@ function runSelfTest(elsewhere: ReadonlySet<string>): boolean {
     for (const fixture of INVENTORY_FIXTURES) {
         const found = reconcile(fixture.declared, fixture.onDisk)
         if (fixture.expect === null) {
-            if (found.length > 0) {
+            if (!recordSelfCheck(found.length === 0)) {
                 console.error(`FAIL self-test ${fixture.name}: expected no finding, saw ${found.map((f) => f.kind).join(", ")}`)
                 ok = false
                 continue
@@ -1104,7 +1133,7 @@ function runSelfTest(elsewhere: ReadonlySet<string>): boolean {
             console.log(`PASS self-test ${fixture.name}: nothing flagged, as required (${fixture.covers})`)
             continue
         }
-        if (!found.some((finding) => finding.kind === fixture.expect)) {
+        if (!recordSelfCheck(found.some((finding) => finding.kind === fixture.expect))) {
             console.error(`FAIL self-test ${fixture.name}: expected ${fixture.expect}, saw ${found.map((f) => f.kind).join(", ") || "nothing"}`)
             ok = false
             continue
@@ -1134,7 +1163,7 @@ function runAdversarialSelfTest(elsewhere: ReadonlySet<string>): boolean {
     let ok = true
     for (const fixture of ADVERSARIAL_FIXTURES) {
         const path = join(ADVERSARIAL_ROOT, fixture.directory, fixture.file)
-        if (!existsSync(path)) {
+        if (!recordSelfCheck(existsSync(path))) {
             console.error(
                 `FAIL self-test ${fixture.name}: fixture ${fixture.directory}/${fixture.file} is declared but missing from disk. A declared control that cannot run is a failure, not a skip.`,
             )
@@ -1158,7 +1187,7 @@ function runAdversarialSelfTest(elsewhere: ReadonlySet<string>): boolean {
         const unresolved = result.effective.unresolved
         const budgetNote = fixture.budget === undefined ? "production budget" : `starved budget ${fixture.budget}`
 
-        if (fixture.expectUnresolved !== (unresolved !== null)) {
+        if (!recordSelfCheck(fixture.expectUnresolved === (unresolved !== null))) {
             console.error(
                 fixture.expectUnresolved
                     ? `FAIL self-test ${fixture.name}: resolution was starved (${budgetNote}) but reported itself COMPLETE. An incomplete helper set that does not announce itself is a silent truncation.`
@@ -1168,7 +1197,7 @@ function runAdversarialSelfTest(elsewhere: ReadonlySet<string>): boolean {
             continue
         }
 
-        if (fixture.expectAssertionCount !== undefined && result.assertionCount !== fixture.expectAssertionCount) {
+        if (!recordSelfCheck(fixture.expectAssertionCount === undefined || result.assertionCount === fixture.expectAssertionCount)) {
             console.error(
                 `FAIL self-test ${fixture.name}: expected ${fixture.expectAssertionCount} recognised assertion call(s), saw ${result.assertionCount}`,
             )
@@ -1181,7 +1210,7 @@ function runAdversarialSelfTest(elsewhere: ReadonlySet<string>): boolean {
         if (fixture.expectAssertionCount === 0 || fixture.expectUnresolved) {
             const escalation = coverageVerdict(`fixture-${fixture.name}.ts`, result.assertionCount, unresolved)
             const expectedKind = fixture.expectUnresolved ? "HELPER_RESOLUTION_INCOMPLETE" : "NO_ASSERTION_RECOGNISED"
-            if (!escalation.gating.some((finding) => finding.kind === expectedKind)) {
+            if (!recordSelfCheck(escalation.gating.some((finding) => finding.kind === expectedKind))) {
                 console.error(
                     `FAIL self-test ${fixture.name}: expected the gating ${expectedKind}, saw ${escalation.gating.map((finding) => finding.kind).join(", ") || "nothing"}`,
                 )
@@ -1196,7 +1225,7 @@ function runAdversarialSelfTest(elsewhere: ReadonlySet<string>): boolean {
 
         const interesting = result.findings.filter((finding) => finding.classification !== "FINAL_VERDICT")
         if (fixture.expect === "NO_FINDING") {
-            if (interesting.length > 0) {
+            if (!recordSelfCheck(interesting.length === 0)) {
                 console.error(
                     `FAIL self-test ${fixture.name}: expected no finding, saw ${interesting.map((finding) => `${finding.classification}@${finding.line}`).join(", ")}`,
                 )
@@ -1208,6 +1237,7 @@ function runAdversarialSelfTest(elsewhere: ReadonlySet<string>): boolean {
         }
 
         const hit = result.findings.find((finding) => finding.classification === fixture.expect)
+        recordSelfCheck(hit !== undefined)
         if (!hit) {
             const saw = result.findings.map((finding) => `${finding.classification}@${finding.line}`).join(", ") || "nothing"
             console.error(`FAIL self-test ${fixture.name}: expected ${fixture.expect}, saw ${saw}`)
@@ -1347,5 +1377,17 @@ console.log(
     `Coverage notes (declared, non-gating): ${coverageNotes.length}. Inventory/coverage integrity findings (gating): ${integrity.length}.`,
 )
 
-const selfTestOk = argv.includes("--self-test") ? runSelfTest(elsewhere) : true
+// This scanner's own gating invariants (its controlled fixtures) now run on EVERY invocation, not
+// only under --self-test, so it emits a real assertion-evidence count instead of leaning on exit 0
+// alone. --self-test is still accepted (it is now the default behaviour) for backward compatibility.
+const selfTestOk = runSelfTest(elsewhere)
+
+// Machine-readable assertion evidence for scripts/gates/run-gates.js. The identity-bearing line must
+// be the WHOLE line and name this EXACT file, or the driver reports EVIDENCE_IDENTITY_MISMATCH. Both
+// numbers come from recordSelfCheck() — the same calls that feed selfTestOk — so they cannot exceed
+// what actually ran and collapse to 0 if the recorder is neutered. This counts ONLY this scanner's own
+// gating invariants, not the candidates/guards/verdicts reported for other files above.
+console.log(`GATE-EVIDENCE harness=check-harness-exit-integrity.ts assertions=${assertionsPassed}`)
+console.log(`${assertionsPassed}/${assertionsRun} invariants passed`)
+
 if (defects.length > 0 || integrity.length > 0 || !selfTestOk) process.exitCode = 1

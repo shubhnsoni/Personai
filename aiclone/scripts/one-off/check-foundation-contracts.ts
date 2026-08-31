@@ -29,11 +29,25 @@ import {
 const report: Record<string, unknown> = {}
 let failures = 0
 
+/**
+ * ASSERTION EVIDENCE. Counted INSIDE the recorder, so the number the gate reads is produced by the
+ * same call that decides the verdict. Never a literal: a hard-coded total would keep printing a
+ * healthy count after assertions were deleted — the exact failure the evidence contract exists to
+ * catch. Every call increments `assertionsRun`; only a passing condition increments `assertionsPassed`,
+ * so a failing assertion LOWERS the passed count and, through `failures`, sets a non-zero exit. Only
+ * the real per-condition `assert()` is counted; `section()` is a try/catch grouping, not an assertion.
+ */
+let assertionsRun = 0
+let assertionsPassed = 0
+
 function assert(condition: unknown, message: string): void {
-    if (!condition) {
-        failures += 1
-        console.error(`FAIL: ${message}`)
+    assertionsRun += 1
+    if (condition) {
+        assertionsPassed += 1
+        return
     }
+    failures += 1
+    console.error(`FAIL: ${message}`)
 }
 
 function section(name: string, fn: () => void): void {
@@ -315,8 +329,18 @@ section("notifications_adapter_projection", () => {
 
 // ---------------------------------------------------------------------------
 
+report.assertionsRun = assertionsRun
+report.assertionsPassed = assertionsPassed
 report.failures = failures
 console.log(JSON.stringify(report, null, 2))
+
+// Machine-readable assertion evidence for scripts/gates/run-gates.js, printed BEFORE the exit
+// branches so it appears on both the pass and fail paths. The identity-bearing GATE-EVIDENCE line
+// must be the WHOLE line and name this EXACT file, or the driver reports EVIDENCE_IDENTITY_MISMATCH.
+// Both numbers come from the counters incremented inside assert(); neutering assert() collapses them.
+console.log(`GATE-EVIDENCE harness=check-foundation-contracts.ts assertions=${assertionsPassed}`)
+console.log(`${assertionsPassed}/${assertionsRun} assertions passed`)
+
 if (failures > 0) {
     console.error(`${failures} check(s) failed.`)
     process.exit(1)
