@@ -1139,9 +1139,16 @@ async function main() {
                 Object.values(DOES_NOT_COVER).every((reason) => emptyText.includes(reason)) &&
                 emptyText.includes(domainLabel("fieldJobs")),
         )
+        // THE COUNT IS PART OF THE CLAIM. `[].every(...)` is true, so without the length pin this passes
+        // when the limitation list is empty - and an empty list is exactly the failure this assertion
+        // exists to catch, because "the empty state renders every limitation" and "the empty state renders
+        // nothing" would then be the same green. DUE_WORK_PREVIEW_LIMITATIONS is imported, so its emptiness
+        // is decided in another module and nothing this run observes would notice. Five is the count
+        // due-work-preview-types.ts declares.
         checkInvertible(
-            "MEASURED: an empty plan still renders every limitation from the response body",
-            DUE_WORK_PREVIEW_LIMITATIONS.every((limitation) => emptyText.includes(limitation)),
+            "MEASURED: an empty plan still renders every one of the FIVE limitations from the response body",
+            DUE_WORK_PREVIEW_LIMITATIONS.length === 5 &&
+                DUE_WORK_PREVIEW_LIMITATIONS.every((limitation) => emptyText.includes(limitation)),
         )
         checkInvertible(
             "an empty plan still names the clock reading it was computed against",

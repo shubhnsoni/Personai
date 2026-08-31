@@ -1422,9 +1422,15 @@ async function main() {
             `string cause logged as kind=${String(causeAt("cause.cause.errors[2]")?.kind)} code=${JSON.stringify(causeAt("cause.cause.errors[2]")?.code)}`,
         )
         checkInvertible(
-            "MEASURED: a cause whose `code` is itself a connection string is REFUSED by the same allowlist as the top-level code - reading the chain did not buy the chain an exemption",
+            "MEASURED: a cause whose `code` is itself a connection string is REFUSED by the same allowlist as the top-level code - reading the chain did not buy the chain an exemption, over all five logged links",
             causeAt("cause.cause.errors[1]")?.code === null &&
                 !causeLog.includes("dbhost.internal") &&
+                // The length pin belongs INSIDE this condition and not three assertions above it. It is
+                // pinned there too, which means the SUITE would notice an empty chain - but THIS assertion
+                // would not, and "every logged code passes the allowlist" over zero logged codes is exactly
+                // the shape that lets an allowlist regression read as a success. Five is the number of links
+                // this probe's error actually has.
+                loggedCauses.length === 5 &&
                 loggedCauses.every(
                     (c) => c.code === null || /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(String(c.code)),
                 ),

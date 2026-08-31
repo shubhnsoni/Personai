@@ -215,9 +215,17 @@ checkInvertible(
 )
 // The scope difference is the kind of thing that silently makes a total unreconcilable, so it must be
 // reported rather than merely known.
+//
+// THE LENGTH PIN IS PART OF THE ASSERTION, not decoration. `[].every(...)` is true, so without it this
+// conjunct passes on an empty domain list - which is the state in which "every domain declares its
+// boundary" is most misleading, because no domain would be declaring anything. `OPERATIONS_DOMAINS` is
+// imported, so its emptiness is decided in another module and nothing this run observes would notice.
+// Nine is the count engine.ts declares; a tenth domain must come here and say which boundary it is read
+// on, which is the whole point of the assertion.
 checkInvertible(
-    "every domain declares which tenant boundary it was read on",
-    OPERATIONS_DOMAINS.every((domain) => OPERATIONS_DOMAIN_SCOPE[domain] === "profile" || OPERATIONS_DOMAIN_SCOPE[domain] === "workspace"),
+    "every domain declares which tenant boundary it was read on, and all NINE of them are present to declare it",
+    OPERATIONS_DOMAINS.length === 9 &&
+        OPERATIONS_DOMAINS.every((domain) => OPERATIONS_DOMAIN_SCOPE[domain] === "profile" || OPERATIONS_DOMAIN_SCOPE[domain] === "workspace"),
     Object.entries(OPERATIONS_DOMAIN_SCOPE)
         .map(([d, s]) => `${d}:${s}`)
         .join(" "),
@@ -498,15 +506,23 @@ check(
     `${literalTagged.length + constantTagged.length} tags for ${uniqueTagged.length} domains`,
 )
 // An unexplained absence reads as an oversight and gets "fixed" badly by the next person.
+//
+// THE GUARD WAS ON THE WRONG COLLECTION. It read `Object.keys(...).length > 0` while the `.every` ran over
+// `Object.values(...)`, so the two were different expressions and the values list was unguarded: an empty
+// UNCOVERED_DOMAINS satisfied "every reason is long enough" by having no reasons. The pin is now on the
+// collection actually iterated, and it pins the COUNT - six, being durableTasks plus the five entries
+// COHORT_NEEDS_ACTION_NOT_COVERED spreads in - so removing a declared gap has to be done deliberately here
+// rather than by deleting an entry and leaving this green.
 check(
-    "domains deliberately not covered are listed with a reason rather than omitted",
-    Object.keys(UNCOVERED_DOMAINS).length > 0 &&
+    "all SIX domains deliberately not covered are listed with a reason rather than omitted",
+    Object.values(UNCOVERED_DOMAINS).length === 6 &&
         Object.values(UNCOVERED_DOMAINS).every((reason) => typeof reason === "string" && reason.length > 40),
     Object.keys(UNCOVERED_DOMAINS).join(", "),
 )
 check(
-    "no domain is both covered and listed as uncovered",
-    Object.keys(UNCOVERED_DOMAINS).every((key) => !(OPERATIONS_DOMAINS as readonly string[]).includes(key)),
+    "no domain is both covered and listed as uncovered, over all six uncovered names",
+    Object.keys(UNCOVERED_DOMAINS).length === 6 &&
+        Object.keys(UNCOVERED_DOMAINS).every((key) => !(OPERATIONS_DOMAINS as readonly string[]).includes(key)),
 )
 
 // ---------------------------------------------------------------------------
@@ -1122,15 +1138,24 @@ async function main() {
                  * harmful rather than merely cheaper.
                  */
                 const reservationIds = idsIn(a, "reservations")
+                // THE EXCLUSION SET'S SIZE IS THE ASSERTION'S PREMISE. "The later-dated rows are absent" is
+                // evidence only if later-dated rows exist: `[].every(...)` is true, so an empty
+                // `reservationsLater` would satisfy this while proving nothing about what the cap dropped.
+                // Two is what the fixture seeds (`group("res", 101, 2)`), pinned as a literal here so that
+                // changing the fixture forces a look at the assertion whose meaning depends on it.
                 checkInvertible(
-                    "the reservation cap drops LATER work, never earlier work - 22 rows share the earliest startAt and the cap is full of them",
-                    reservationIds.length === CAP && ids.tie.reservationsLater.every((id) => !reservationIds.includes(id)),
+                    "the reservation cap drops LATER work, never earlier work - 22 rows share the earliest startAt and the cap is full of them, and the 2 later-dated rows really exist to be dropped",
+                    reservationIds.length === CAP &&
+                        ids.tie.reservationsLater.length === 2 &&
+                        ids.tie.reservationsLater.every((id) => !reservationIds.includes(id)),
                     `returned ${reservationIds.length} of ${RES_TIED + ids.tie.reservationsLater.length} candidates; the ${ids.tie.reservationsLater.length} later-dated rows are absent`,
                 )
                 const inventoryIds = idsIn(a, "inventory")
                 checkInvertible(
-                    "the inventory cap drops the BEST-STOCKED candidates first; with 24 rows tied at onHand 0 and a cap of 20 the cut falls INSIDE that level, so four stockouts are dropped and the label must not claim otherwise",
-                    inventoryIds.length === CAP && ids.tie.inventoryHigher.every((id) => !inventoryIds.includes(id)),
+                    "the inventory cap drops the BEST-STOCKED candidates first; with 24 rows tied at onHand 0 and a cap of 20 the cut falls INSIDE that level, so four stockouts are dropped and the label must not claim otherwise - and the 3 better-stocked rows really exist to be dropped",
+                    inventoryIds.length === CAP &&
+                        ids.tie.inventoryHigher.length === 3 &&
+                        ids.tie.inventoryHigher.every((id) => !inventoryIds.includes(id)),
                     `returned ${inventoryIds.length}; the ${ids.tie.inventoryHigher.length} rows at onHand 4 are absent while stockouts fill the cap`,
                 )
                 checkInvertible(
@@ -1181,9 +1206,19 @@ async function main() {
                  * that regression is invisible on A's data and is why this second shape exists.
                  */
                 const bInventory = idsIn(b, "inventory")
+                // ALL THREE GROUPS ARE SIZE-PINNED, for the same reason and against three different failure
+                // modes. An empty `nonCandidatesLowerStock` would satisfy "the lower-stock non-candidates are
+                // excluded" by having none to exclude - which is exactly the fixture shape this probe was
+                // built to avoid, since tenant A is already blind to that regression. An empty
+                // `candidatesUrgent` or `candidatesLessUrgent` would satisfy "every real candidate is
+                // reported" by there being no candidates, i.e. by the engine returning nothing at all. The
+                // counts are the fixture's: 4, 3 and 3 from `seedInventoryProbe`.
                 checkInvertible(
-                    "a row holding LESS stock than a reported candidate is still excluded when it sits above its OWN reorder point, so the bound compares two columns and not one column against the cap",
-                    ids.probeB.nonCandidatesLowerStock.every((id) => !bInventory.includes(id)) &&
+                    "a row holding LESS stock than a reported candidate is still excluded when it sits above its OWN reorder point, so the bound compares two columns and not one column against the cap - over a probe that really holds 4 such rows and 6 real candidates",
+                    ids.probeB.nonCandidatesLowerStock.length === 4 &&
+                        ids.probeB.candidatesUrgent.length === 3 &&
+                        ids.probeB.candidatesLessUrgent.length === 3 &&
+                        ids.probeB.nonCandidatesLowerStock.every((id) => !bInventory.includes(id)) &&
                         ids.probeB.candidatesUrgent.every((id) => bInventory.includes(id)) &&
                         ids.probeB.candidatesLessUrgent.every((id) => bInventory.includes(id)),
                     `${ids.probeB.nonCandidatesLowerStock.length} lower-stock non-candidates excluded; all ${ids.probeB.candidatesUrgent.length + ids.probeB.candidatesLessUrgent.length} real candidates reported`,
