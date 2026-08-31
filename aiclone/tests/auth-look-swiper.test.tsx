@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { act } from "react"
-import { renderToStaticMarkup } from "react-dom/server"
+import { hydrateRoot } from "react-dom/client"
+import { renderToStaticMarkup, renderToString } from "react-dom/server"
 import { AuthLookSwiper } from "@/components/auth/auth-look-swiper"
 import { AUTH_LOOKS } from "@/lib/auth-looks"
 import { recordCommits } from "./helpers/commits"
@@ -263,19 +264,18 @@ describe("AuthLookSwiper - swipe gestures", () => {
 })
 
 /**
- * THE CASCADING-RENDER TEST - tied to the lint error at auth-look-swiper.tsx:38.
+ * THE CASCADING-RENDER REGRESSION - tied to the former lint error in auth-look-swiper.tsx.
  *
  * `setIndex(next)` runs synchronously in a mount effect, so when a look is requested by URL or by
  * sessionStorage React commits look 0 first and the requested look second. On a sign-in page that
  * is a visible flash of the wrong shell.
  *
- * This test is recorded but NOT used to justify a change - see the report. Moving the read into a
- * `useState` initialiser removes the flash on the client and introduces a hydration mismatch
- * instead, because the server cannot see sessionStorage. The next test pins the property that
- * makes that trade-off unacceptable.
+ * A plain state initialiser would remove the extra client frame but create a hydration mismatch.
+ * `useSyncExternalStore` provides the missing third option: a server snapshot for hydration and a
+ * browser snapshot for a clean client-only mount. Both behaviours are pinned below.
  */
-describe("AuthLookSwiper - initialisation cost (documented, not fixed)", () => {
-    it("records how many frames it takes to reach the requested look", () => {
+describe("AuthLookSwiper - hydration-safe external initialisation", () => {
+    it("reaches the requested look in one frame on a client-only mount", () => {
         sessionStorage.setItem(STORAGE_KEY, "well")
         const target = AUTH_LOOKS.findIndex((l) => l.id === "well")
 
@@ -291,39 +291,45 @@ describe("AuthLookSwiper - initialisation cost (documented, not fixed)", () => {
         )
 
         expect(currentIndex()).toBe(target)
-        // Two frames: look 1/5 is committed, then the effect corrects it to 5/5. This is the
-        // cascading render the lint rule names. It is asserted as-is so that the report's claim
-        // ("the flash is real") is measured rather than argued, and so a future fix that removes
-        // it fails here loudly and has to be justified against the hydration test below.
+        // No mount effect corrects state after commit. A regression to setState-in-effect would
+        // restore a stale first frame and make this sequence longer than one.
         const showsFirst = frames.filter((f) => f.includes(`1 / ${AUTH_LOOKS.length}`))
-        expect(showsFirst.length).toBeGreaterThan(0)
-        expect(frames.length).toBeGreaterThanOrEqual(2)
+        expect(showsFirst).toHaveLength(0)
+        expect(frames).toHaveLength(1)
+        expect(frames[0]).toContain(`${target + 1} / ${AUTH_LOOKS.length}`)
     })
 
-    it("HYDRATION SAFETY: the first client render must match the server render", () => {
-        // This is the constraint that blocks the obvious fix. The server has no sessionStorage and
-        // no query string, so it can only ever render look 0. If the client computed the look
-        // during its FIRST render - which is what moving the read into useState does - React would
-        // hydrate a tree that does not match the server HTML.
+    it("HYDRATION SAFETY: real hydration uses the server snapshot before the browser snapshot", async () => {
         sessionStorage.setItem(STORAGE_KEY, "well")
-        const serverHtml = renderToStaticMarkup(
+        const element = (
             <AuthLookSwiper title="Welcome back">
                 <button type="button">Continue</button>
-            </AuthLookSwiper>,
+            </AuthLookSwiper>
         )
-        expect(serverHtml).toContain(`1 / ${AUTH_LOOKS.length}`)
+        // Hydration requires React's text-boundary markers. renderToStaticMarkup intentionally
+        // strips those markers and would manufacture a mismatch that production SSR does not.
+        const serverHtml = renderToString(element)
 
-        const { container } = render(<div />)
+        const container = document.createElement("div")
+        document.body.appendChild(container)
+        container.innerHTML = serverHtml
+        expect(container.textContent).toContain(`1 / ${AUTH_LOOKS.length}`)
         const { frames, Recorder } = recordCommits(container)
-        render(
-            <Recorder>
-                <AuthLookSwiper title="Welcome back">
-                    <button type="button">Continue</button>
-                </AuthLookSwiper>
-            </Recorder>,
-            { container },
-        )
-        // The FIRST committed frame is the one React would have to reconcile against server HTML.
+        const recoverableErrors: unknown[] = []
+        let root: ReturnType<typeof hydrateRoot> | undefined
+        await act(async () => {
+            root = hydrateRoot(container, <Recorder>{element}</Recorder>, {
+                onRecoverableError: (error) => recoverableErrors.push(error),
+            })
+            await Promise.resolve()
+        })
+
+        expect(recoverableErrors).toHaveLength(0)
         expect(frames[0]).toContain(`1 / ${AUTH_LOOKS.length}`)
+        expect(frames.at(-1)).toContain(`${AUTH_LOOKS.findIndex((look) => look.id === "well") + 1} / ${AUTH_LOOKS.length}`)
+        expect(frames.length).toBeGreaterThanOrEqual(2)
+
+        act(() => root?.unmount())
+        container.remove()
     })
 })

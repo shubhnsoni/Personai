@@ -1,11 +1,31 @@
 "use client"
 
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { AUTH_LOOKS, isAuthLook, type AuthLookId } from "@/lib/auth-looks"
 import { cn } from "@/lib/utils"
 
 const STORAGE_KEY = "pl-auth-look"
+
+function readRequestedLookIndex(): number {
+    if (typeof window === "undefined") return 0
+    const fromUrl = new URLSearchParams(window.location.search).get("look")
+    const saved = (() => {
+        try {
+            return sessionStorage.getItem(STORAGE_KEY)
+        } catch {
+            return null
+        }
+    })()
+    const wanted = isAuthLook(fromUrl) ? fromUrl : isAuthLook(saved) ? saved : null
+    if (!wanted) return 0
+    const index = AUTH_LOOKS.findIndex((look) => look.id === wanted)
+    return index >= 0 ? index : 0
+}
+
+// The request is read once after hydration. getServerSnapshot keeps the server and first client frame
+// identical; React then reads the browser snapshot without a synchronous setState inside an effect.
+const subscribeRequestedLook = () => () => undefined
 
 export function AuthLookSwiper({
     title,
@@ -20,27 +40,14 @@ export function AuthLookSwiper({
     altLabel?: string
     children: ReactNode
 }) {
-    const [index, setIndex] = useState(0)
+    const requestedIndex = useSyncExternalStore(subscribeRequestedLook, readRequestedLookIndex, () => 0)
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+    const index = selectedIndex ?? requestedIndex
     const startX = useRef<number | null>(null)
-
-    useEffect(() => {
-        const fromUrl = new URLSearchParams(window.location.search).get("look")
-        const saved = (() => {
-            try {
-                return sessionStorage.getItem(STORAGE_KEY)
-            } catch {
-                return null
-            }
-        })()
-        const wanted = isAuthLook(fromUrl) ? fromUrl : isAuthLook(saved) ? saved : null
-        if (!wanted) return
-        const next = AUTH_LOOKS.findIndex((look) => look.id === wanted)
-        if (next >= 0) setIndex(next)
-    }, [])
 
     const go = (next: number) => {
         const i = (next + AUTH_LOOKS.length) % AUTH_LOOKS.length
-        setIndex(i)
+        setSelectedIndex(i)
         try {
             sessionStorage.setItem(STORAGE_KEY, AUTH_LOOKS[i].id)
         } catch { /* ignore */ }
