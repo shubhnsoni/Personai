@@ -10,8 +10,8 @@
     "databaseName": "personalink_phase0_rehearsal_20260826_210704"
   },
   "expected": {
-    "harnessesOnDisk": 76,
-    "executedChecks": 75,
+    "harnessesOnDisk": 77,
+    "executedChecks": 76,
     "declaredSkips": 1,
     "note": "Derived from the declared inventory below (75 entries, 1 declared skip), not from any prior run. The driver reports what it measured; if a run disagrees with these numbers it raises EXECUTED_COUNT_DRIFT. Investigate the difference — do not edit this block to make a run agree with it."
   },
@@ -163,6 +163,7 @@
     { "file": "check-fieldjob-runtime.ts", "package": "fieldjob", "run": true },
     { "file": "check-fieldjob-schema-invariants.ts", "package": "fieldjob", "run": true },
     { "file": "check-foundation-contracts.ts", "package": "foundation", "run": true },
+    { "file": "check-http-method-classifier.ts", "package": "meta", "run": true },
     { "file": "check-harness-exit-integrity.ts", "package": "meta", "run": true },
     { "file": "check-import-library-actions-authz.ts", "package": "authz", "run": true },
     { "file": "check-inventory-routes.ts", "package": "inventory", "run": true },

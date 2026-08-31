@@ -1007,12 +1007,13 @@ const CASES = [
         ev.required === true &&
         ev.allowlist.actualSize === 13 &&
         ev.allowlist.declaredSize === 13 &&
-        runnable === 75 &&
-        // Honest arithmetic: 75 runnable = 62 enforced + 13 allowlisted. The 75th is
-        // check-vertical-pack-candidates.ts, registered enforced rather than
-        // allowlisted because it emits its own identity-bearing GATE-EVIDENCE line
-        // with a count taken from its assertion helper.
-        runnable - ev.allowlist.actualSize === 62 &&
+        runnable === 76 &&
+        // Honest arithmetic: 76 runnable = 63 enforced + 13 allowlisted. The two most
+        // recent additions are check-vertical-pack-candidates.ts (its own
+        // identity-bearing GATE-EVIDENCE line, count taken from its assertion helper)
+        // and check-http-method-classifier.ts (a ratio line). Both are registered
+        // ENFORCED rather than allowlisted, which is why the allowlist stays at 13.
+        runnable - ev.allowlist.actualSize === 63 &&
         ev.allowlist.files.length === new Set(ev.allowlist.files).size &&
         ev.allowlist.entries.every(
           (e) =>
@@ -1257,7 +1258,7 @@ const CASES = [
   },
   {
     name: "corroboration-real-corpus-has-no-zero-scoring-harness",
-    why: "the enforcement must not break the 76 production harnesses: every one of them, measured here without running the sweep, has executable assertion callsites and none is refused",
+    why: "the enforcement must not break the 77 production harnesses: every one of them, measured here without running the sweep, has executable assertion callsites and none is refused",
     probe: () => {
       const dir = path.join(APP_DIR, "scripts", "one-off");
       const files = fs.readdirSync(dir).filter((n) => /^check-.*\.ts$/u.test(n)).sort();
@@ -1275,7 +1276,7 @@ const CASES = [
     },
     expectExit: 0,
     assert: (r) =>
-      r.probe.files === 76 &&
+      r.probe.files === 77 &&
       r.probe.zero.length === 0 &&
       r.probe.refused.length === 0 &&
       r.probe.unparseable.length === 0 &&
