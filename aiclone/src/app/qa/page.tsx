@@ -8,6 +8,21 @@ import { surfacesFor, shopNavLabel } from "@/lib/surfaces"
 
 export const dynamic = "force-dynamic"
 
+const KIT_SECTIONS = [
+    {
+        category: "new",
+        eyebrow: "New",
+        title: "New business profiles",
+        description: "Open the shared engines added in the latest Business OS waves.",
+    },
+    {
+        category: "classic",
+        eyebrow: "Original",
+        title: "Classic profiles",
+        description: "The original public-page, commerce, booking, and portfolio kits.",
+    },
+] as const
+
 export default async function QaKitsPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")
@@ -24,14 +39,20 @@ export default async function QaKitsPage() {
     return (
         <div className="min-h-dvh bg-background px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
             <div className="mx-auto w-full max-w-lg">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-aurora">Temporary</p>
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight">Try every kit</h1>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-aurora">QA profiles</p>
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight">Try every business profile</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                    Open the studio as that kit, or walk through onboarding and pick extra features.
+                    Open a temporary studio as that profile, or walk through its onboarding path.
                 </p>
 
-                <div className="mt-6 grid gap-2.5">
-                    {TRY_KITS.map((kit) => {
+                <div className="mt-7 space-y-8">
+                    {KIT_SECTIONS.map((section) => (
+                        <section key={section.category} aria-labelledby={`qa-${section.category}-profiles`}>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-aurora">{section.eyebrow}</p>
+                            <h2 id={`qa-${section.category}-profiles`} className="mt-1 text-lg font-semibold tracking-tight">{section.title}</h2>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">{section.description}</p>
+                            <div className="mt-3 grid gap-2.5">
+                    {TRY_KITS.filter((kit) => kit.category === section.category).map((kit) => {
                         const existing = byRole.get(kit.role)
                         const surfaces = surfacesFor(kit.role)
                             .filter((s) => s !== "home" && s !== "profile" && s !== "inbox")
@@ -72,6 +93,9 @@ export default async function QaKitsPage() {
                             </div>
                         )
                     })}
+                            </div>
+                        </section>
+                    ))}
                 </div>
             </div>
         </div>

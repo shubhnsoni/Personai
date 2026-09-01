@@ -7,6 +7,17 @@ import { prisma } from "@/lib/prisma"
 import { syncUser } from "@/lib/auth-sync"
 import { ACTIVE_PROFILE_COOKIE, TRY_KITS, TRY_NOW_COOKIE } from "@/lib/try-kits"
 
+const SERVICE_SEED: Record<string, { name: string; description: string; durationMinutes: number }> = {
+    CONSULTANT: { name: "Fit call", description: "A first conversation to see if we should work together.", durationMinutes: 30 },
+    CA: { name: "Tax and books consultation", description: "A first review of the client requirement.", durationMinutes: 30 },
+    COACH: { name: "Intro session", description: "A first coaching conversation.", durationMinutes: 30 },
+    FIELD_SERVICE: { name: "Site visit", description: "An initial on-site assessment.", durationMinutes: 60 },
+    SALON_SPA: { name: "Signature treatment", description: "A bookable treatment with a named team member.", durationMinutes: 60 },
+    EVENTS_STUDIO: { name: "Event planning call", description: "Capture the brief, date, and delivery requirements.", durationMinutes: 45 },
+    REAL_ESTATE_BROKERAGE: { name: "Property consultation", description: "Discuss a property requirement or mandate.", durationMinutes: 30 },
+    RECRUITMENT_AGENCY: { name: "Hiring brief call", description: "Capture the role, timeline, and candidate requirements.", durationMinutes: 30 },
+}
+
 async function seedRole(profileId: string, role: string) {
     if (role === "RESTAURANT") {
         const existing = await prisma.serviceOffering.count({ where: { profileId } })
@@ -40,17 +51,18 @@ async function seedRole(profileId: string, role: string) {
         }
     }
 
-    if (role === "CONSULTANT" || role === "CA" || role === "COACH") {
+    const serviceSeed = SERVICE_SEED[role]
+    if (serviceSeed) {
         const existing = await prisma.serviceOffering.count({ where: { profileId } })
         if (existing === 0) {
             await prisma.serviceOffering.create({
                 data: {
                     profileId,
-                    name: role === "COACH" ? "Intro session" : "Fit call",
-                    description: "A first conversation to see if we should work together.",
+                    name: serviceSeed.name,
+                    description: serviceSeed.description,
                     priceCents: 0,
                     isFree: true,
-                    durationMinutes: 30,
+                    durationMinutes: serviceSeed.durationMinutes,
                     currency: "USD",
                     isActive: true,
                     kind: "SESSION",
