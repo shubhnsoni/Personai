@@ -14,10 +14,22 @@ export const dynamic = "force-dynamic"
  * Scene Viewer and Quick Look fetch these files themselves and fail opaquely if
  * one is missing, so only advertise a native AR path when the asset is on disk.
  */
-function servedAsset(url?: string | null): string | null {
+function publicFile(url?: string | null): string | null {
     if (!url || !url.startsWith("/")) return null
-    const onDisk = path.join(process.cwd(), "public", url.replace(/^\//, "").split("/").join(path.sep))
-    return existsSync(onDisk) ? url : null
+    const clean = url.split("?")[0]
+    const onDisk = path.join(process.cwd(), "public", clean.replace(/^\//, "").split("/").join(path.sep))
+    return existsSync(onDisk) ? clean : null
+}
+
+function servedAsset(url?: string | null): string | null {
+    return publicFile(url)
+}
+
+/** Quick Look will not open a URL that does not end in `.usdz`. */
+function servedUsdz(url?: string | null): string | null {
+    const file = publicFile(url)
+    if (!file || !/\.usdz$/i.test(file)) return null
+    return file
 }
 
 export default async function ArMenuPage({
@@ -65,9 +77,11 @@ export default async function ArMenuPage({
                 ready: readyLabel(p.category, serve),
                 glb,
                 // real-scale, plain-glTF twin for Google Scene Viewer
-                glbAr: servedAsset(glb.replace(/\.glb$/i, "-ar.glb")),
-                // real-scale USDZ for iOS AR Quick Look
-                usdz: servedAsset((p as { arUsdzUrl?: string | null }).arUsdzUrl),
+                glbAr: servedAsset(glb.replace(/\.glb$/i, "-sv.glb"))
+                    || servedAsset(glb.replace(/\.glb$/i, "-ar.glb")),
+                usdz: servedUsdz(glb.replace(/\.glb$/i, ".ql.usdz"))
+                    || servedUsdz(glb.replace(/\.glb$/i, ".ar.usdz"))
+                    || servedUsdz((p as { arUsdzUrl?: string | null }).arUsdzUrl),
                 sizeMeters: arSizeFor(glb),
                 rating,
                 reviewCount: reviews.length,

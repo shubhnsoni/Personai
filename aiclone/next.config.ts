@@ -26,8 +26,8 @@ const nextConfig: NextConfig = {
         source: "/:path*.usdz",
         headers: [
           { key: "Content-Type", value: "model/vnd.usdz+zip" },
-          // these are large, immutable, and fetched by an external AR runtime
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "Content-Disposition", value: 'inline; filename="model.usdz"' },
+          { key: "Cache-Control", value: "public, max-age=3600" },
         ],
       },
       {

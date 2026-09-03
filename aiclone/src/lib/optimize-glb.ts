@@ -4,7 +4,7 @@ import { dequantize, dedup, flatten, join, prune, quantize, reorder, simplify, w
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from "meshoptimizer"
 import jpeg from "jpeg-js"
 import { PNG } from "pngjs"
-import { zipSync, strToU8 } from "three/examples/jsm/libs/fflate.module.js"
+import { strToU8 } from "three/examples/jsm/libs/fflate.module.js"
 import { DEFAULT_AR_SIZE } from "@/lib/ar-scale"
 
 export type GlbProfile = "web" | "ar"
@@ -136,7 +136,17 @@ function resizeTexture(doc: Document, texture: Texture) {
     texture.setMimeType("image/jpeg")
 }
 
-async function transformDoc(doc: Document, profile: GlbProfile) {
+function stripArUnsafeExtensions(doc: Document) {
+    for (const ext of [...doc.getRoot().listExtensionsUsed()]) {
+        const name = ext.extensionName
+        if (name === "EXT_meshopt_compression" || name === "KHR_mesh_quantization") ext.dispose()
+    }
+}
+
+async function transformDoc(doc: Document, profile: GlbProfile, sizeMeters?: number) {
+    // Scene Viewer rejects required KHR_mesh_quantization ("object can't be loaded").
+    await doc.transform(dequantize())
+    stripArUnsafeExtensions(doc)
     const tris = triangleCount(doc)
     await doc.transform(dedup(), flatten(), join())
     if (tris > TRI_SOFT_CAP) {
@@ -152,6 +162,20 @@ async function transformDoc(doc: Document, profile: GlbProfile) {
     if (profile === "web") {
         await doc.transform(reorder({ encoder: MeshoptEncoder }), quantize())
         doc.createExtension(EXTMeshoptCompression).setRequired(true)
+    } else {
+        stripArUnsafeExtensions(doc)
+        if (sizeMeters && sizeMeters > 0) {
+            const mesh = doc.getRoot().listMeshes()[0]
+            const prim = mesh?.listPrimitives()[0]
+            const pos = prim?.getAttribute("POSITION")
+            if (pos) {
+                const arr = floats(pos)
+                if (arr.length) {
+                    scaleAndSeat(arr, sizeMeters)
+                    pos.setArray(arr)
+                }
+            }
+        }
     }
     const root = doc.getRoot()
     const asset = root.getAsset()
@@ -159,11 +183,12 @@ async function transformDoc(doc: Document, profile: GlbProfile) {
     delete (asset as { extras?: unknown }).extras
 }
 
-export async function optimizeGlb(input: Buffer, profile: GlbProfile = "web"): Promise<Buffer> {
+export async function optimizeGlb(input: Buffer, profile: GlbProfile = "web", sizeMeters?: number): Promise<Buffer> {
     const fileIO = await io()
     const doc = await fileIO.readBinary(new Uint8Array(input))
-    await transformDoc(doc, profile)
+    await transformDoc(doc, profile, sizeMeters)
     const out = Buffer.from(await fileIO.writeBinary(doc))
+    if (profile === "ar") return out
     return out.length < input.length ? out : input
 }
 
@@ -238,76 +263,71 @@ export async function glbToUsdz(input: Buffer, sizeMeters = DEFAULT_AR_SIZE): Pr
         if (uv) uvs.push(`(${fmt(uv[i * 2])}, ${fmt(1 - uv[i * 2 + 1])})`)
     }
 
+    let minX = Infinity, minY = Infinity, minZ = Infinity
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+    for (let i = 0; i < positions.length; i += 3) {
+        minX = Math.min(minX, positions[i]); maxX = Math.max(maxX, positions[i])
+        minY = Math.min(minY, positions[i + 1]); maxY = Math.max(maxY, positions[i + 1])
+        minZ = Math.min(minZ, positions[i + 2]); maxZ = Math.max(maxZ, positions[i + 2])
+    }
+
     const mat = prim.getMaterial()
     const baseTex = mat?.getBaseColorTexture()
-    const files: Record<string, Uint8Array> = {}
+    const zipEntries: Array<[string, Uint8Array]> = []
     let textureDecl = ""
     if (baseTex?.getImage()) {
         const img = baseTex.getImage()!
-        let jpegBytes: Buffer
-        if (baseTex.getMimeType().includes("png")) {
-            const decoded = decodeImage(img, "image/png")
-            jpegBytes = Buffer.from(jpeg.encode({ data: Buffer.from(decoded.data), width: decoded.width, height: decoded.height }, COLOR_QUALITY).data)
-        } else {
-            jpegBytes = Buffer.from(img)
-        }
-        files["textures/color.jpg"] = new Uint8Array(jpegBytes)
+        const mime = baseTex.getMimeType() || "image/jpeg"
+        const decoded = decodeImage(img, mime)
+        const jpegBytes = Buffer.from(jpeg.encode({
+            data: Buffer.from(decoded.data),
+            width: decoded.width,
+            height: decoded.height,
+        }, COLOR_QUALITY).data)
+        zipEntries.push(["0/0.jpg", new Uint8Array(jpegBytes)])
         textureDecl = `
-		def Shader "uvReader"
-		{
-			uniform token info:id = "UsdPrimvarReader_float2"
-			float2 inputs:fallback = (0, 0)
-			token inputs:varname = "st"
-			float2 outputs:result
-		}
-		def Shader "tex"
-		{
-			uniform token info:id = "UsdUVTexture"
-			asset inputs:file = @./textures/color.jpg@
-			float2 inputs:st.connect = </Materials/Material/uvReader.outputs:result>
-			float3 outputs:rgb
-		}
-		def Shader "preview"
-		{
-			uniform token info:id = "UsdPreviewSurface"
-			color3f inputs:diffuseColor.connect = </Materials/Material/tex.outputs:rgb>
-			float inputs:roughness = 0.62
-			float inputs:metallic = 0.04
-			token outputs:surface
-		}
+			def Shader "uvReader_st"
+			{
+				uniform token info:id = "UsdPrimvarReader_float2"
+				float2 inputs:fallback = (0, 0)
+				token inputs:varname = "st"
+				float2 outputs:result
+			}
+			def Shader "color_map"
+			{
+				uniform token info:id = "UsdUVTexture"
+				asset inputs:file = @0/0.jpg@
+				float2 inputs:st.connect = </Materials/Material/uvReader_st.outputs:result>
+				token inputs:sourceColorSpace = "sRGB"
+				token inputs:wrapS = "repeat"
+				token inputs:wrapT = "repeat"
+				float4 outputs:rgba
+				float3 outputs:rgb
+			}
+			def Shader "PreviewSurface"
+			{
+				uniform token info:id = "UsdPreviewSurface"
+				color3f inputs:diffuseColor.connect = </Materials/Material/color_map.outputs:rgb>
+				float inputs:roughness = 0.55
+				float inputs:metallic = 0
+				int inputs:useSpecularWorkflow = 0
+				token outputs:surface
+			}
 `
     } else {
         textureDecl = `
-		def Shader "preview"
-		{
-			uniform token info:id = "UsdPreviewSurface"
-			color3f inputs:diffuseColor = (0.82, 0.82, 0.8)
-			float inputs:roughness = 0.62
-			token outputs:surface
-		}
+			def Shader "PreviewSurface"
+			{
+				uniform token info:id = "UsdPreviewSurface"
+				color3f inputs:diffuseColor = (0.82, 0.82, 0.8)
+				float inputs:roughness = 0.55
+				float inputs:metallic = 0
+				int inputs:useSpecularWorkflow = 0
+				token outputs:surface
+			}
 `
     }
 
-    const geom = `#usda 1.0
-(
-    defaultPrim = "Geometry"
-    metersPerUnit = 1
-    upAxis = "Y"
-)
-
-def "Geometry"
-{
-    def Mesh "Geometry"
-    {
-        int[] faceVertexCounts = [${Array(faceCount).fill(3).join(", ")}]
-        int[] faceVertexIndices = [${indices.join(", ")}]
-        ${nrm ? `normal3f[] normals = [${nrms.join(", ")}] (\n            interpolation = "vertex"\n        )` : ""}
-        point3f[] points = [${pts.join(", ")}]
-        ${uv ? `texCoord2f[] primvars:st = [${uvs.join(", ")}] (\n            interpolation = "vertex"\n        )` : ""}
-        uniform token subdivisionScheme = "none"
-    }
-}
-`
     const model = `#usda 1.0
 (
     customLayerData = {
@@ -331,33 +351,134 @@ def Xform "Root"
             token preliminary:anchoring:type = "plane"
             token preliminary:planeAnchoring:alignment = "horizontal"
             def Xform "Object" (
-                prepend references = @./geometries/Geometry.usda@</Geometry>
                 prepend apiSchemas = ["MaterialBindingAPI"]
             )
             {
                 rel material:binding = </Materials/Material>
+                def Mesh "Mesh"
+                {
+                    float3[] extent = [(${fmt(minX)}, ${fmt(minY)}, ${fmt(minZ)}), (${fmt(maxX)}, ${fmt(maxY)}, ${fmt(maxZ)})]
+                    int[] faceVertexCounts = [${Array(faceCount).fill(3).join(", ")}]
+                    int[] faceVertexIndices = [${indices.join(", ")}]
+                    ${nrm ? `normal3f[] normals = [${nrms.join(", ")}] (\n                        interpolation = "vertex"\n                    )` : ""}
+                    point3f[] points = [${pts.join(", ")}]
+                    ${uv ? `texCoord2f[] primvars:st = [${uvs.join(", ")}] (\n                        interpolation = "vertex"\n                    )` : ""}
+                    uniform token subdivisionScheme = "none"
+                }
             }
         }
     }
-    def "Materials"
+}
+
+def "Materials"
+{
+    def Material "Material"
     {
-        def Material "Material"
-        {
 ${textureDecl}
-            token outputs:surface.connect = </Materials/Material/preview.outputs:surface>
-        }
+        token outputs:surface.connect = </Materials/Material/PreviewSurface.outputs:surface>
     }
 }
 `
-    files["model.usda"] = strToU8(model)
-    files["geometries/Geometry.usda"] = strToU8(geom)
-    const zipped = zipSync(files, { level: 9 })
-    return Buffer.from(zipped)
+    zipEntries.unshift(["model.usda", strToU8(model)])
+    return packUsdz(zipEntries)
+}
+
+const CRC_TABLE = (() => {
+    const table = new Uint32Array(256)
+    for (let n = 0; n < 256; n++) {
+        let c = n
+        for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+        table[n] = c >>> 0
+    }
+    return table
+})()
+
+function crc32(buf: Uint8Array) {
+    let c = 0xffffffff
+    for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8)
+    return (c ^ 0xffffffff) >>> 0
+}
+
+function u16(n: number) {
+    const b = Buffer.alloc(2)
+    b.writeUInt16LE(n)
+    return b
+}
+
+function u32(n: number) {
+    const b = Buffer.alloc(4)
+    b.writeUInt32LE(n)
+    return b
+}
+
+function packUsdz(entries: Array<[string, Uint8Array]>) {
+    const locals: Buffer[] = []
+    const centrals: Buffer[] = []
+    let offset = 0
+    for (const [name, data] of entries) {
+        const nameBuf = Buffer.from(name, "utf8")
+        const crc = crc32(data)
+        const size = data.byteLength
+        const headerWithoutExtra = 30 + nameBuf.length
+        const extraLen = (64 - ((offset + headerWithoutExtra) % 64)) % 64
+        const extra = Buffer.alloc(extraLen)
+        const local = Buffer.concat([
+            u32(0x04034b50),
+            u16(20),
+            u16(0),
+            u16(0),
+            u16(0),
+            u16(0),
+            u32(crc),
+            u32(size),
+            u32(size),
+            u16(nameBuf.length),
+            u16(extraLen),
+            nameBuf,
+            extra,
+            Buffer.from(data.buffer, data.byteOffset, data.byteLength),
+        ])
+        const central = Buffer.concat([
+            u32(0x02014b50),
+            u16(20),
+            u16(20),
+            u16(0),
+            u16(0),
+            u16(0),
+            u16(0),
+            u32(crc),
+            u32(size),
+            u32(size),
+            u16(nameBuf.length),
+            u16(0),
+            u16(0),
+            u16(0),
+            u16(0),
+            u32(0),
+            u32(offset),
+            nameBuf,
+        ])
+        locals.push(local)
+        centrals.push(central)
+        offset += local.length
+    }
+    const centralDir = Buffer.concat(centrals)
+    const eocd = Buffer.concat([
+        u32(0x06054b50),
+        u16(0),
+        u16(0),
+        u16(entries.length),
+        u16(entries.length),
+        u32(centralDir.length),
+        u32(offset),
+        u16(0),
+    ])
+    return Buffer.concat([...locals, centralDir, eocd])
 }
 
 export async function optimizeModelSet(glb: Buffer, sizeMeters = DEFAULT_AR_SIZE) {
     const web = await optimizeGlb(glb, "web")
-    const ar = await optimizeGlb(glb, "ar")
+    const ar = await optimizeGlb(glb, "ar", sizeMeters)
     let usdz: Buffer | null = null
     try {
         usdz = await glbToUsdz(ar, sizeMeters)

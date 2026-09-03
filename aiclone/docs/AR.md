@@ -71,13 +71,36 @@ hint text points at the in-scene arrows instead.
 
 ## Assets
 
-Three files per dish in `public/uploads/skydine-ar/`:
+Three payloads per dish in `public/uploads/skydine-ar/`, plus aliases so native
+AR runtimes get a URL they will actually open:
 
 ```
-<name>.glb       meshopt-compressed, arbitrary units  -> in-page three.js viewer
-<name>-ar.glb    plain glTF, real-world scale         -> Scene Viewer
-<name>.usdz      real-world scale                     -> Quick Look
+<name>.glb        meshopt-compressed, arbitrary units  -> in-page three.js viewer
+<name>-sv.glb     plain glTF, real-world scale         -> Scene Viewer (preferred)
+<name>-ar.glb     same bytes as -sv.glb                -> Scene Viewer fallback
+<name>.ql.usdz    real-world scale, 64-byte aligned    -> iOS Quick Look (preferred)
+<name>.usdz       same bytes as .ql.usdz               -> Quick Look fallback
+<name>.ar.usdz    same bytes as .ql.usdz               -> extra alias
 ```
+
+`/[slug]/ar` prefers `-sv.glb` then `-ar.glb`, and `.ql.usdz` then `.ar.usdz`
+then `arUsdzUrl`. Quick Look silently no-ops unless the URL ends in `.usdz`.
+Scene Viewer rejects `KHR_mesh_quantization` / meshopt (`object can't be loaded`).
+
+### Rebuild SkyDine twins (current)
+
+From `aiclone/` after editing `src/lib/optimize-glb.ts`:
+
+```powershell
+npx tsx scripts/one-off/rebuild-ar-glb.ts
+npx tsx scripts/one-off/rebuild-usdz.ts
+node scripts/one-off/check-usdz.mjs
+node scripts/one-off/inspect-glb.mjs
+```
+
+`glbToUsdz` packs a stored (not deflated) zip with 64-byte-aligned file data.
+Safari fails with "Object could not be opened" if those constraints are missed.
+`optimize-ar-assets.ts` writes the same twins for a full recompress.
 
 `<name>.glb` is normalised to real size at load time by the viewer. The other
 two **must** carry real scale in the file, because Scene Viewer and Quick Look
@@ -281,7 +304,9 @@ fake ARCore or ARKit. What is checkable locally:
   well-formed `intent://arvr.google.com/scene-viewer/1.0?...` with an absolute
   `file=` and a `browser_fallback_url`
 - with an iOS UA, the CTA clicks a hidden `<a rel="ar">` pointing at the `.usdz`
-- `curl -I` the `.usdz` returns `model/vnd.usdz+zip`
+- `curl -I` the `.usdz` returns `model/vnd.usdz+zip` (and `Content-Disposition: inline`)
+- `node scripts/one-off/check-usdz.mjs` reports every `.usdz` OK (stored, 64-aligned, usda first)
+- `node scripts/one-off/inspect-glb.mjs` shows `-sv.glb` / `-ar.glb` with empty `extReq`
 
 The last mile needs a real phone on the tunnel URL: that ARCore/ARKit anchors the
 dish to a real table, that it stays put while you walk around it, and that the

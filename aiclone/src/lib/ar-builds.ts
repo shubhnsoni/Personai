@@ -111,7 +111,13 @@ async function persistOptimizedModels(profileId: string, glbBytes: Buffer, produ
     const set = await optimizeModelSet(glbBytes, arSizeFor(productTitle || stem))
     const glbUrl = await persistBytes(profileId, `${stem}.glb`, set.web)
     await persistBytes(profileId, `${stem}-ar.glb`, set.ar)
-    const usdzUrl = set.usdz ? await persistBytes(profileId, `${stem}.usdz`, set.usdz) : null
+    await persistBytes(profileId, `${stem}-sv.glb`, set.ar)
+    let usdzUrl: string | null = null
+    if (set.usdz) {
+        usdzUrl = await persistBytes(profileId, `${stem}.usdz`, set.usdz)
+        await persistBytes(profileId, `${stem}.ar.usdz`, set.usdz)
+        await persistBytes(profileId, `${stem}.ql.usdz`, set.usdz)
+    }
     return { glbUrl, usdzUrl }
 }
 
