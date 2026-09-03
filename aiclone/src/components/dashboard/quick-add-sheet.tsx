@@ -527,6 +527,9 @@ export function QuickAddSheet({
             sourcePhotos={photos}
             restaurant={restaurant}
             onPhotoreal={onPhotoreal}
+            onPhoto={(url) => {
+                setPhotos((prev) => (prev.includes(url) ? prev : [...prev, url]))
+            }}
             onReady={(glb, usdz) => {
                 setArModelUrl(glb)
                 if (usdz) setArUsdzUrl(usdz)

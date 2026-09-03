@@ -16,7 +16,6 @@ import {
     Upload,
     ExternalLink,
     Gift,
-    Box,
 } from "lucide-react"
 import { deleteProduct, setAllPrepMinutes, setProductActive } from "@/app/actions/products"
 import { StudioDock } from "@/components/dashboard/studio-dock"
@@ -67,7 +66,6 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, r
     const [importCtl, setImportCtl] = useState<ImportApplyCtl>(null)
     const [allMins, setAllMins] = useState("15")
     const [arOpen, setArOpen] = useState(() => Boolean(arBatch && arBatch !== "cancel"))
-    const [arIds, setArIds] = useState<string[] | undefined>()
 
     const showAr = fieldOn(role, "ar", extras)
     const sold = products.reduce((s, p) => s + (p.downloadCount || 0), 0)
@@ -145,23 +143,6 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, r
                 </button>
             ) : null}
 
-            {showAr ? (
-                <button
-                    type="button"
-                    onClick={() => { setArIds(undefined); setArOpen(true) }}
-                    className="studio-panel flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left"
-                >
-                    <span>
-                        <span className="block text-sm font-medium">Photoreal 3D</span>
-                        <span className="mt-0.5 block text-[12px] text-muted-foreground">
-                            {restaurant
-                                ? "Pick dishes — or all — and we’ll build table-ready 3D from photos"
-                                : "Pick items — or all — and we’ll build 3D from photos. View in your space."}
-                        </span>
-                    </span>
-                    <Box className="h-4 w-4 shrink-0 text-cyan-500" />
-                </button>
-            ) : null}
 
             <div className="flex items-center gap-3">
                 <CatalogSearch value={q} onChange={setQ} />
@@ -322,19 +303,12 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, r
                 jewelry={jewelry}
                 goldBoard={goldBoard}
                 role={role}
-                onPhotoreal={showAr && editing ? () => {
-                    setArIds([editing.id])
-                    setAdding(false)
-                    setEditing(null)
-                    setArOpen(true)
-                } : undefined}
             />
-            {showAr ? (
+            {showAr && arBatch && arBatch !== "cancel" ? (
                 <ArBuildSheet
                     open={arOpen}
                     onOpenChange={setArOpen}
-                    initialIds={arIds}
-                    batchId={arBatch && arBatch !== "cancel" ? arBatch : null}
+                    batchId={arBatch}
                 />
             ) : null}
         </div>
