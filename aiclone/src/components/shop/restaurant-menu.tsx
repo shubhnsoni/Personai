@@ -7,6 +7,9 @@ import { formatStoredPrice, type DisplayCurrency } from "@/lib/pricing"
 import { whatsappHref } from "@/lib/commerce"
 import { createRestaurantOrder } from "@/app/actions/orders"
 import type { ModifierSelectionInput } from "@/lib/restaurant-orders"
+import { writeLiveOrderToken } from "@/lib/live-order"
+import { OrderPlacedSplash } from "@/components/shop/order-placed-splash"
+import { LiveOrderCountButton } from "@/components/shop/live-order-button"
 import {
     defaultPicks,
     dishGroups,
@@ -16,6 +19,8 @@ import {
     type DishGroup,
 } from "@/lib/dish-options"
 import { cn } from "@/lib/utils"
+import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
+import { categoryIcon } from "@/lib/category-icons"
 
 type Item = {
     id: string
@@ -48,6 +53,25 @@ function money(cents: number, stored: string | null | undefined, display: Displa
     return formatStoredPrice(cents, stored, display)
 }
 
+/** Weak hints only — applied when these names exist on THIS menu, after unknown cats. */
+const CATEGORY_ORDER = [
+    "Breakfast & Combos",
+    "Burgers & Sandwiches",
+    "Starters & Snacks",
+    "Main Course",
+    "Coffee & Beverages",
+    "Desserts",
+    "Pizza & Pasta",
+    "Soup",
+    "Salads",
+    "Starter",
+    "Fried Rice & Noodles",
+    "Momo",
+    "Fish&prawn",
+    "Shakes",
+    "Mocktails",
+]
+
 export function RestaurantMenu({
     slug,
     shopName,
@@ -57,6 +81,7 @@ export function RestaurantMenu({
     upiId,
     tableCode,
     tableLabel,
+    prepaid,
 }: {
     slug: string
     shopName: string
@@ -67,35 +92,17 @@ export function RestaurantMenu({
     upiId?: string | null
     tableCode?: string | null
     tableLabel?: string | null
+    prepaid?: boolean
 }) {
     const cats = useMemo(() => {
         const set = new Set<string>()
         for (const p of items) if (p.category?.trim()) set.add(p.category.trim())
-        const preferred = [
-            "Breakfast & Combos",
-            "Burgers & Sandwiches",
-            "Starters & Snacks",
-            "Main Course",
-            "Coffee & Beverages",
-            "Desserts",
-            "Pizza & Pasta",
-            "Soup",
-            "Salads",
-            "Starter",
-            "Fried Rice & Noodles",
-            "Momo",
-            "Fish&prawn",
-            "Shakes",
-            "Mocktails",
-        ]
-        return Array.from(set).sort((a, b) => {
-            const ia = preferred.indexOf(a)
-            const ib = preferred.indexOf(b)
-            if (ia === -1 && ib === -1) return a.localeCompare(b)
-            if (ia === -1) return 1
-            if (ib === -1) return -1
-            return ia - ib
-        })
+        const names = Array.from(set)
+        const known = CATEGORY_ORDER.filter((name) => set.has(name))
+        const unknown = names
+            .filter((name) => !known.includes(name))
+            .sort((a, b) => a.localeCompare(b))
+        return [...unknown, ...known]
     }, [items])
 
     const buckets = useMemo(() => {
@@ -129,6 +136,7 @@ export function RestaurantMenu({
     const cartHydrated = useRef(false)
     const [custom, setCustom] = useState<Item | null>(null)
     const [cartOpen, setCartOpen] = useState(false)
+    const [placed, setPlaced] = useState<{ token: string; number: number; dish: string } | null>(null)
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -278,21 +286,25 @@ export function RestaurantMenu({
                         { on: nonveg, set: () => setNonveg((v) => !v), label: "Non-Veg" },
                         { on: best, set: () => setBest((v) => !v), label: "Bestsellers" },
                         { on: rated, set: () => setRated((v) => !v), label: "Ratings 4.0+" },
-                    ].map((c) => (
+                    ].map((c) => {
+                        const Icon = categoryIcon(c.label)
+                        return (
                         <button
                             key={c.label}
                             type="button"
                             onClick={c.set}
                             className={cn(
-                                "shrink-0 rounded-full border px-3.5 py-[6px] text-[13px] font-medium",
+                                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-[6px] text-[13px] font-medium",
                                 c.on
                                     ? "border-emerald-700 bg-emerald-50 text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950/50 dark:text-emerald-300"
                                     : "border-border/70 bg-card text-foreground",
                             )}
                         >
+                            <Icon className="h-3.5 w-3.5" />
                             {c.label}
                         </button>
-                    ))}
+                        )
+                    })}
                 </div>
                 <div className="mx-auto max-w-lg border-t border-border/40 px-4 py-2 text-[13px] font-semibold tracking-tight">
                     {activeLabel}
@@ -317,7 +329,10 @@ export function RestaurantMenu({
                     if (!rows.length) return null
                     return (
                         <section key={sec.id} data-sec={sec.id} id={`sec-${encodeURIComponent(sec.id)}`}>
-                            <h2 className="mb-3 px-0.5 text-[17px] font-semibold tracking-tight">{sec.label}</h2>
+                            <h2 className="mb-3 flex items-center gap-2 px-0.5 text-[17px] font-semibold tracking-tight">
+                                {(() => { const Icon = categoryIcon(sec.label); return <Icon className="h-4 w-4 text-muted-foreground" /> })()}
+                                {sec.label}
+                            </h2>
                             <div className="grid grid-cols-2 gap-3">
                                 {rows.map((p) => (
                                     <DishCard
@@ -356,6 +371,7 @@ export function RestaurantMenu({
                     <span className="flex-1" />
                 )}
                 <div className="pointer-events-auto flex items-center gap-2">
+                    {!searchOpen ? <LiveOrderCountButton slug={slug} /> : null}
                     {searchOpen ? (
                         <label className="flex w-[min(17rem,calc(100vw-7.5rem))] items-center gap-2 rounded-full bg-background px-3 py-2.5 shadow-[0_10px_28px_rgba(0,0,0,0.18)]">
                             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -423,7 +439,10 @@ export function RestaurantMenu({
                                         active === sec.id ? "bg-white/10" : "hover:bg-white/5",
                                     )}
                                 >
-                                    <span className={cn(active === sec.id ? "font-semibold text-white" : "font-normal text-zinc-400")}>{sec.label}</span>
+                                    <span className={cn("inline-flex items-center gap-2", active === sec.id ? "font-semibold text-white" : "font-normal text-zinc-400")}>
+                                        {(() => { const Icon = categoryIcon(sec.label); return <Icon className="h-3.5 w-3.5" /> })()}
+                                        {sec.label}
+                                    </span>
                                     <span className="tabular-nums text-[13px] text-zinc-500">{sec.items.length}</span>
                                 </button>
                             ))}
@@ -451,9 +470,24 @@ export function RestaurantMenu({
                     upiId={upiId}
                     tableCode={tableCode}
                     tableLabel={tableLabel}
+                    prepaid={prepaid}
                     onClose={() => setCartOpen(false)}
                     onChange={setCart}
                     onClear={() => { setCart([]); setCartOpen(false) }}
+                    onPlaced={(next) => {
+                        setCart([])
+                        setCartOpen(false)
+                        setPlaced(next)
+                    }}
+                />
+            ) : null}
+
+            {placed ? (
+                <OrderPlacedSplash
+                    shopName={shopName}
+                    number={placed.number}
+                    dish={placed.dish}
+                    onDone={() => window.location.assign(`/o/${placed.token}`)}
                 />
             ) : null}
         </div>
@@ -477,18 +511,28 @@ function DishCard({
     onAdd: () => void
     onSub: () => void
 }) {
-    const fallback = "/uploads/blu-cafe/sandwich.jpg"
-    const [src, setSrc] = useState(item.thumbnailUrl || fallback)
+    const [failedSrc, setFailedSrc] = useState<string | null>(null)
+    const photo = item.thumbnailUrl && item.thumbnailUrl !== failedSrc ? item.thumbnailUrl : null
+    const initial = (item.title.trim().charAt(0) || "?").toUpperCase()
     return (
         <article className="overflow-hidden rounded-[1.35rem] bg-card shadow-[0_12px_32px_-22px_rgba(15,23,42,0.5)]">
             <div className="relative aspect-square overflow-hidden rounded-[1.25rem] bg-muted">
                 <Link href={`/${slug}/shop/${item.id}`} className="absolute inset-0">
-                    <img
-                        src={src}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        onError={() => setSrc(fallback)}
-                    />
+                    {photo ? (
+                        <img
+                            src={photo}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            onError={() => setFailedSrc(item.thumbnailUrl)}
+                        />
+                    ) : (
+                        <div
+                            className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-200 via-stone-100 to-zinc-300 text-2xl font-semibold text-zinc-500 dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-900 dark:text-zinc-400"
+                            aria-hidden
+                        >
+                            {initial}
+                        </div>
+                    )}
                 </Link>
                 {item.diet ? <DietMark diet={item.diet} /> : null}
                 {item.ar ? (
@@ -648,9 +692,11 @@ function CartSheet({
     upiId,
     tableCode,
     tableLabel,
+    prepaid,
     onClose,
     onChange,
     onClear,
+    onPlaced,
 }: {
     slug: string
     shopName: string
@@ -660,13 +706,15 @@ function CartSheet({
     upiId?: string | null
     tableCode?: string | null
     tableLabel?: string | null
+    prepaid?: boolean
     onClose: () => void
     onChange: (cart: CartLine[]) => void
     onClear: () => void
+    onPlaced: (next: { token: string; number: number; dish: string }) => void
 }) {
     const [name, setName] = useState("")
     const [email, setEmail] = useState("")
-    const [pay, setPay] = useState<"UPI" | "COD" | "WHATSAPP">(upiId ? "UPI" : whatsapp ? "WHATSAPP" : "COD")
+    const [pay, setPay] = useState<"UPI" | "COD" | "WHATSAPP">(prepaid && upiId ? "UPI" : upiId ? "UPI" : whatsapp ? "WHATSAPP" : "COD")
     const [idempotencyKey, setIdempotencyKey] = useState("")
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -730,12 +778,6 @@ function CartSheet({
         onChange(nextQty <= 0 ? cart.filter((l) => l.key !== key) : cart.map((l) => l.key === key ? { ...l, qty: nextQty } : l))
     }
 
-    function finish(message: string) {
-        setDone(message)
-        onChange([])
-        rotateOrderKey()
-    }
-
     async function place() {
         if (!name.trim() || !email.includes("@")) {
             setError("Name and a real email are required.")
@@ -771,22 +813,20 @@ function CartSheet({
             const authoritativeTotal = money(result.totalCents, result.currency, currency)
             const location = result.tableLabel ? `\nTable: ${result.tableLabel}` : "\nTakeaway"
 
+            writeLiveOrderToken(slug, result.publicToken)
+            rotateOrderKey()
             if (pay === "WHATSAPP") {
                 const href = whatsappHref(
                     result.whatsapp || whatsapp,
                     `Hi ${shopName}, order #${result.number}:\n${summary}\nTotal ${authoritativeTotal}\nName: ${name.trim()}${location}`,
                 )
                 if (href) window.open(href, "_blank")
-                finish(`Order #${result.number} placed. WhatsApp opened with the confirmed total.`)
-                return
             }
-            if (pay === "UPI") {
-                finish(`Order #${result.number} placed. Pay ${authoritativeTotal} to ${result.upiId || upiId || "the restaurant UPI ID"}.`)
-                return
-            }
-            finish(channel === "DINE_IN"
-                ? `Order #${result.number} placed for ${result.tableLabel}. Pay at the table when it arrives.`
-                : `Order #${result.number} placed for takeaway. Pay on pickup.`)
+            onPlaced({
+                token: result.publicToken,
+                number: result.number,
+                dish: result.lines[0]?.title || "",
+            })
         } catch (e) {
             setError(e instanceof Error ? e.message : "Could not place that order")
         } finally {
@@ -839,14 +879,16 @@ function CartSheet({
                             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full rounded-2xl bg-muted px-3 py-2.5 text-sm outline-none" />
                             <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="w-full rounded-2xl bg-muted px-3 py-2.5 text-sm outline-none" />
                             <div className="flex gap-2">
-                                {(["COD", "UPI", "WHATSAPP"] as const).filter((method) => method === "COD" || (method === "UPI" && upiId) || (method === "WHATSAPP" && whatsapp)).map((method) => (
+                                {(["COD", "UPI", "WHATSAPP"] as const).filter((method) => (method === "COD" && !prepaid) || (method === "UPI" && upiId) || (method === "WHATSAPP" && whatsapp && !prepaid)).map((method) => (
                                     <button
                                         key={method}
                                         type="button"
                                         onClick={() => setPay(method)}
-                                        className={cn("rounded-full px-3 py-1.5 text-[12px] font-medium", pay === method ? "bg-foreground text-background" : "bg-muted")}
+                                        className={cn("inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-medium", pay === method ? "bg-foreground text-background" : "bg-muted")}
                                     >
-                                        {method === "COD" ? (channel === "DINE_IN" ? "Pay at table" : "Pay on pickup") : method === "UPI" ? "UPI" : "WhatsApp"}
+                                        {method === "COD" ? (channel === "DINE_IN" ? "Pay at table" : "Pay on pickup") : method === "UPI" ? (prepaid ? "Prepaid UPI" : "UPI") : (
+                                            <WhatsAppIcon className="h-4 w-4" />
+                                        )}
                                     </button>
                                 ))}
                             </div>

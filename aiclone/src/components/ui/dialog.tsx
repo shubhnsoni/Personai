@@ -59,6 +59,7 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        aria-describedby={undefined}
         className={cn(
           "bg-zinc-950 text-white border-white/10 z-50 grid w-full gap-4 border shadow-2xl duration-200",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
@@ -68,6 +69,7 @@ function DialogContent({
           className
         )}
         {...props}
+        aria-describedby={props["aria-describedby"] ?? undefined}
       >
         {children}
         {showCloseButton && (

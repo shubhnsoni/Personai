@@ -8,7 +8,7 @@ export const env = {
     return !!process.env.DATABASE_URL
   },
   get hasOpenAI() {
-    return !!process.env.OPENAI_API_KEY
+    return !!(process.env.XAI_API_KEY || process.env.OPENAI_API_KEY)
   },
   get hasStripe() {
     return !!(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -18,6 +18,9 @@ export const env = {
   },
   get hasClerk() {
     return !!(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY)
+  },
+  get hasMeshy() {
+    return !!process.env.MESHY_API_KEY
   },
   get appUrl() {
     return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'

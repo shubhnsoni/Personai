@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto"
 import type { Prisma } from "@prisma/client"
 import OpenAI from "openai"
 import { prisma } from "@/lib/prisma"
-import { vectorRetrieval, buildSystemPrompt, scopeDocuments } from "@/lib/rag"
+import { vectorRetrieval, buildSystemPrompt, scopeDocuments, showStoryDescription } from "@/lib/rag"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { getMemberFromSession } from "@/lib/members"
 import { generateSuggestions } from "@/lib/suggestions"
@@ -11,6 +11,7 @@ import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { createOwnershipFoundation, ownershipRefusalResponse } from "@/lib/security"
 import { getRequestCurrency } from "@/lib/request-currency"
+import { llmClient, resolveChatModel, resolveLlm } from "@/lib/llm"
 
 export const dynamic = "force-dynamic"
 
@@ -150,6 +151,7 @@ export function verifyConversationCapability(input: {
 function productionCapabilitySecret(): string | null {
     return process.env.CONVERSATION_CAPABILITY_SECRET
         || process.env.CLERK_SECRET_KEY
+        || process.env.XAI_API_KEY
         || process.env.OPENAI_API_KEY
         || null
 }
@@ -162,11 +164,15 @@ const productionDependencies: ChatRouteDependencies = {
     buildPrompt: buildSystemPrompt,
     requestCurrency: getRequestCurrency,
     createCompletion: async (input) => {
-        const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-        return client.chat.completions.create(input)
+        const llm = llmClient()
+        if (!llm) throw new Error("ai_not_configured")
+        return llm.client.chat.completions.create({
+            ...input,
+            model: resolveChatModel(input.model, llm.provider),
+        })
     },
     summarizeConversation: maybeSummarizeConversation,
-    providerConfigured: () => Boolean(process.env.OPENAI_API_KEY),
+    providerConfigured: () => Boolean(resolveLlm()),
     capabilitySecret: productionCapabilitySecret,
     now: Date.now,
 }
@@ -299,7 +305,8 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             visitorId = existing.visitorId
         }
 
-        if (!providerConfigured() || !capabilitySecret()) {
+        const restaurantDesk = profile.roleTemplate === "RESTAURANT"
+        if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk)) {
             return new Response(
                 JSON.stringify({ error: "ai_not_configured", message: "AI chat is coming soon! The creator hasn't set up AI yet." }),
                 { status: 503, headers: { "Content-Type": "application/json" } },
@@ -364,6 +371,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         const authorizedProfileId = profileId
 
         const profileData = {
+            slug: profile.slug,
             displayName: profile.displayName,
             headline: profile.headline,
             bio: profile.bio,
@@ -482,8 +490,16 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         {
             type: "function",
             function: {
+                name: "showStory",
+                description: showStoryDescription(profile.roleTemplate),
+                parameters: { type: "object", properties: {} }
+            }
+        },
+        {
+            type: "function",
+            function: {
                 name: "bookTable",
-                description: "Reserve a table after you have the guest name, party size, date (YYYY-MM-DD), and time (HH:MM). Never invent an empty table.",
+                description: "Reserve a table after you have the guest name, party size, date (YYYY-MM-DD), and time (HH:MM). Parties of 12 or more join tables. For 20+ also offer WhatsApp. Never invent an empty table.",
                 parameters: {
                     type: "object",
                     properties: {
@@ -543,6 +559,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         allowedTools.add("showProjects")
     }
     if (hasSurface(role, "shop", extras) && (role === "RESTAURANT" || extras?.packs?.includes("menuDish") || role === "CUSTOM")) allowedTools.add("showMenu")
+    allowedTools.add("showStory")
     if (hasSurface(role, "shop", extras) && role !== "RESTAURANT") allowedTools.add("showProducts")
     if (fieldOn(role, "tableBook", extras)) allowedTools.add("bookTable")
     if (hasSurface(role, "courses", extras)) allowedTools.add("showCourses")
@@ -620,6 +637,17 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 
                 return `${profileData.displayName}'s Projects:\n${projectList}`
             }
+            case "showStory": {
+                const { publishedStoryForSlug } = await import("@/app/actions/story")
+                const { storyLabel, storyPath } = await import("@/lib/story")
+                const story = await publishedStoryForSlug(profileData.slug)
+                const label = storyLabel(profileData.roleTemplate)
+                if (!story?.frames.length) {
+                    return `${profileData.displayName} hasn't published ${label.page.toLowerCase()} photos yet.`
+                }
+                const peek = story.frames.slice(0, 4).map((frame) => `- **${frame.title || "Frame"}**${frame.body ? ` — ${frame.body.slice(0, 80)}` : ""}`).join("\n")
+                return `Here's ${label.page} at ${profileData.displayName}:\n${peek}\n\nOpen ${storyPath(profileData.slug)} for the full about page.`
+            }
             case "showProducts":
             case "showMenu": {
                 const products = profileData.digitalProducts
@@ -645,7 +673,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             case "bookTable": {
                 const { createBooking, getAvailableSlots } = await import("@/app/actions/bookings")
                 const visitorName = String(args.visitorName || "").trim()
-                const partySize = Math.max(1, Math.min(24, Number(args.partySize) || 1))
+                const partySize = Math.max(1, Math.min(80, Number(args.partySize) || 1))
                 const date = String(args.date || "").slice(0, 10)
                 const time = String(args.time || "").slice(0, 5)
                 const visitorEmail = String(args.visitorEmail || "").trim() || `${visitorName.replace(/\s+/g, ".").toLowerCase() || "guest"}@guest.local`
@@ -754,6 +782,45 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             content: m.content || "",
         }))
     ]
+
+    async function restaurantDeskReply(text: string) {
+        const t = text.toLowerCase()
+        if (/menu|dish|eat|food|hungry|veg|price|what's on|whats on/.test(t)) {
+            const n = profileData.digitalProducts.length
+            return n
+                ? `${profileData.displayName} has ${n} dishes on. Tap Menu to browse, or tell me veg / non-veg / a dish name.`
+                : executeTool("showMenu", {})
+        }
+        if (/story|inside|about|ambiance|ambience|vibe|room|people|photos/.test(t)) {
+            return executeTool("showStory", {})
+        }
+        if (/table|reserv|book|seat|party/.test(t)) {
+            return "Tap Reserve a table and I’ll hold seats. How many people, and which day?"
+        }
+        if (/order|timer|kitchen|ready|ticket/.test(t)) {
+            return "If you’ve already ordered, tap the Order chip on this chat for the kitchen timer. You can place more than one — each ticket has its own timer."
+        }
+        if (/hi|hello|hey|namaste/.test(t)) {
+            return `Hi — I’m ${profileData.displayName}'s desk. Menu, a table, or an order ticket?`
+        }
+        return `I can open the menu, hold a table, or send you to your kitchen timer. What do you need?`
+    }
+
+    if (!providerConfigured()) {
+        const notice = await restaurantDeskReply(query)
+        await db.message.create({
+            data: {
+                conversationId: authorizedConversationId,
+                senderType: "AI",
+                text: notice,
+                role: "assistant",
+            },
+        })
+        const encoder = new TextEncoder()
+        return new Response(encoder.encode(`0:${JSON.stringify(notice)}\n`), {
+            headers: responseHeaders(),
+        })
+    }
 
     const aiModel = profile.aiModel || "gpt-4o-mini"
 

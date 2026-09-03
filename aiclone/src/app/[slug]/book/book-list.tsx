@@ -3,8 +3,7 @@
 import { useState } from "react"
 import { Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { BookingModal } from "@/components/booking/booking-modal"
-import { ReserveSheet } from "@/components/booking/reserve-sheet"
+import { ReserveSheet, type ReserveConfirmLabel } from "@/components/booking/reserve-sheet"
 import { useMoney } from "@/components/pricing-provider"
 
 type Service = {
@@ -19,14 +18,36 @@ type Service = {
     covers?: number | null
 }
 
+function sessionSheetProps(role?: string | null, durationMinutes?: number): {
+    hideParty?: boolean
+    partyLabel?: string
+    confirmLabel: ReserveConfirmLabel
+} {
+    switch (role) {
+        case "CA":
+            return { hideParty: true, confirmLabel: "Book consult" }
+        case "SALON_SPA":
+            return {
+                confirmLabel: "Book treatment",
+                partyLabel: durationMinutes ? `${durationMinutes} min` : "Duration",
+            }
+        case "FIELD_SERVICE":
+            return { confirmLabel: "Request visit" }
+        default:
+            return { confirmLabel: "Book session", partyLabel: "Attendees" }
+    }
+}
+
 export function BookList({
     profile,
     services,
     restaurant,
+    roleTemplate,
 }: {
-    profile: { id: string; displayName: string; whatsapp?: string | null }
+    profile: { id: string; displayName: string; whatsapp?: string | null; roleTemplate?: string | null }
     services: Service[]
     restaurant?: boolean
+    roleTemplate?: string | null
 }) {
     const [open, setOpen] = useState(false)
     const [serviceId, setServiceId] = useState<string | null>(null)
@@ -35,6 +56,8 @@ export function BookList({
     const sessions = services.filter((s) => s.kind !== "TABLE")
     const tableOnly = restaurant || (tables.length > 0 && sessions.length === 0)
     const table = tables[0] || null
+    const role = roleTemplate ?? profile.roleTemplate
+    const selectedSession = sessions.find((s) => s.id === serviceId) || sessions[0] || null
 
     if (tableOnly && table) {
         return (
@@ -117,11 +140,13 @@ export function BookList({
                     service={table}
                 />
             ) : (
-                <BookingModal
-                    isOpen={open}
+                <ReserveSheet
+                    open={open}
                     onClose={() => setOpen(false)}
-                    profile={{ id: profile.id, displayName: profile.displayName, serviceOfferings: sessions }}
-                    selectedServiceId={serviceId}
+                    profile={profile}
+                    service={selectedSession}
+                    mode="session"
+                    {...sessionSheetProps(role, selectedSession?.durationMinutes)}
                 />
             )}
         </>

@@ -228,6 +228,7 @@ model Profile {
   profileImages     ProfileImage[]
   restaurantReviews OfferReview[]
   reservations      Reservation[]
+  arBuilds          ArBuild[]
 
   appointmentResources AppointmentResource[]
   appointmentWaitlist  AppointmentWaitlistEntry[]
@@ -664,6 +665,7 @@ model DigitalProduct {
   diet           String?
   spiceLevel     Int?
   serveWindow    String?
+  prepMinutes    Int?
   arModelUrl     String?
   arUsdzUrl      String?
   variantsJson   String?
@@ -678,6 +680,7 @@ model DigitalProduct {
 
   purchases      ProductPurchase[]
   reviews        OfferReview[]
+  arBuilds       ArBuild[]
   orderLines     OrderLine[]
   InventoryItem  InventoryItem[]
   ProductOption  ProductOption[]
@@ -929,6 +932,8 @@ model Order {
   acceptedAt     DateTime?
   preparingAt    DateTime?
   readyAt        DateTime?
+  dueAt          DateTime?
+  staffNote      String?
   servedAt       DateTime?
   cancelledAt    DateTime?
   cancelReason   String?
@@ -1005,8 +1010,9 @@ model RestaurantTable {
   seats     Int?
   zone      String?
   code      String   @unique
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
+  isActive   Boolean  @default(true)
+  isReserved Boolean  @default(false)
+  sortOrder  Int      @default(0)
   scans     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1093,16 +1099,44 @@ model OrderCounter {
 }
 
 model ProfileImage {
-  id        String               @id @default(cuid())
-  profileId String
-  profile   Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  url       String
-  caption   String?
-  category  ProfileImageCategory @default(AMBIENCE)
-  sortOrder Int                  @default(0)
-  createdAt DateTime             @default(now())
+  id          String               @id @default(cuid())
+  profileId   String
+  profile     Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  url         String
+  title       String?
+  caption     String?
+  body        String?
+  category    ProfileImageCategory @default(AMBIENCE)
+  sortOrder   Int                  @default(0)
+  isPublished Boolean              @default(true)
+  createdAt   DateTime             @default(now())
 
   @@index([profileId, sortOrder])
+}
+
+/// Photoreal 3D jobs. Provider ids stay server-only.
+model ArBuild {
+  id               String         @id
+  profileId        String
+  profile          Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  productId        String
+  product          DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  batchId          String
+  imageUrl         String
+  status           String
+  providerTaskId   String?
+  glbUrl           String?
+  usdzUrl          String?
+  credits          Int
+  costCents        Int
+  chargeCents      Int
+  stripeSessionId  String?
+  error            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([batchId])
+  @@index([profileId, createdAt])
 }
 
 model CourseEnrollment {

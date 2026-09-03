@@ -1,14 +1,9 @@
 /**
  * Real-world size for each AR model, in metres, measured on its largest axis.
  *
- * Generated models carry no useful units — Meshy normalises everything into a
- * roughly 2-unit box — so the size has to come from somewhere else. The in-page
- * viewer, the Scene Viewer export and the Quick Look export all read this, so a
- * dish is the same size however it is opened.
- *
- * Longer term this belongs on DigitalProduct as an `arSizeCm` column that the
- * dashboard collects when a model is uploaded. Until that exists, keying off
- * the model filename keeps the three consumers from drifting apart.
+ * Prefer an explicit `sizeMeters` from the caller. The filename table is a
+ * demo-only override for baked SkyDine assets. Everything else uses pack
+ * defaults: a plated dish vs a physical shop object.
  */
 
 const SIZES: Record<string, number> = {
@@ -24,12 +19,20 @@ const SIZES: Record<string, number> = {
     "veg-momos": 0.22,
 }
 
-/** A plated main course. Safe when a model is not in the table above. */
-export const DEFAULT_AR_SIZE = 0.22
+export const DEFAULT_AR_SIZE_MENU = 0.22
+export const DEFAULT_AR_SIZE_OBJECT = 0.35
+/** Alias for `DEFAULT_AR_SIZE_MENU` — one-arg callers and `optimize-glb`. */
+export const DEFAULT_AR_SIZE = DEFAULT_AR_SIZE_MENU
 
-export function arSizeFor(modelUrl?: string | null): number {
-    if (!modelUrl) return DEFAULT_AR_SIZE
-    const file = modelUrl.split("/").pop() || ""
-    const key = file.replace(/(-ar)?\.(glb|gltf|usdz)$/i, "")
-    return SIZES[key] ?? DEFAULT_AR_SIZE
+export function arSizeFor(
+    modelUrl?: string | null,
+    opts?: { sizeMeters?: number | null; pack?: "menuDish" | "shopPhysical" | string },
+): number {
+    if (opts?.sizeMeters != null && opts.sizeMeters > 0) return opts.sizeMeters
+    if (modelUrl) {
+        const file = modelUrl.split("/").pop() || ""
+        const key = file.replace(/(-ar)?\.(glb|gltf|usdz)$/i, "")
+        if (SIZES[key]) return SIZES[key]
+    }
+    return !opts?.pack || opts.pack === "menuDish" ? DEFAULT_AR_SIZE_MENU : DEFAULT_AR_SIZE_OBJECT
 }

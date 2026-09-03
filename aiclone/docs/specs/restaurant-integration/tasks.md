@@ -1,5 +1,12 @@
 # Restaurant integration — tasks
 
+> **Stale vs code (2026-09-03).** Phases 0–4 in this file are largely implemented
+> (Order model, kitchen, tables, QR, receipts, Floor remap). Do **not** follow
+> “add Orders to `navGroups`” — Floor is a sales remap, not a new sidebar item.
+> Canonical next work for restaurant **and every other kit**:
+> [`docs/strategy/all-ends-plan.md`](../../strategy/all-ends-plan.md)
+> and [`docs/specs/all-ends/`](../all-ends/README.md).
+
 Requirement numbers refer to `requirements.md`. Phase order and reasoning are in
 `design.md`.
 

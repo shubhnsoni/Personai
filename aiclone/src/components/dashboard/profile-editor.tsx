@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
 import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -14,7 +15,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WelcomeOrb } from "@/components/welcome-orb"
-import { User, Briefcase, FolderKanban, Palette, Sparkles, Globe, ChevronDown } from "lucide-react"
+import { User, Briefcase, FolderKanban, Palette, Sparkles, Globe, BookOpen, ChevronDown, Check, MapPin } from "lucide-react"
+import { previewListing, applyListing } from "@/app/actions/listing"
+import { OfferSheet, LiveRow } from "@/components/dashboard/offer-sheet"
 import {
     parseOrbBag,
     resolveBloubColor,
@@ -33,6 +36,9 @@ import { cn } from "@/lib/utils"
 import { QrCard } from "@/components/profile/qr-card"
 import { ADDONS, extrasFromAddons, suggestedAddons, type AddonId } from "@/lib/onboarding-needs"
 import { extrasOf, fieldOn, hasSurface, writeExtras } from "@/lib/surfaces"
+import { defaultPrepMinutesFromConfig, payModeFromConfig, paymentQrUrlFromConfig, writeDefaultPrepMinutes, writePayMode, writePaymentQrUrl } from "@/lib/payment-qr"
+import { socialsFromConfig, writeSocials } from "@/lib/socials"
+import { StoryStudio } from "@/components/dashboard/story-studio"
 
 const profileSchema = z.object({
     displayName: z.string().min(2),
@@ -73,12 +79,19 @@ interface ProfileEditorProps {
     profile: Profile & { workExperiences?: WorkExperience[]; projects?: Project[] }
     presets: WelcomeAnimationPreset[]
     onSavingChange?: (saving: boolean) => void
+    defaultTab?: "general" | "about" | "appearance" | "ai" | "public"
 }
 
-export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEditorProps) {
+export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "general" }: ProfileEditorProps) {
+    const router = useRouter()
     const [, setIsSaving] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [blobOpen, setBlobOpen] = useState(false)
+    const [googleOpen, setGoogleOpen] = useState(false)
+    const [paymentQrUrl, setPaymentQrUrl] = useState(() => paymentQrUrlFromConfig(profile.personalityConfig))
+    const [payMode, setPayMode] = useState(() => payModeFromConfig(profile.personalityConfig))
+    const [defaultPrepMinutes, setDefaultPrepMinutes] = useState(() => defaultPrepMinutesFromConfig(profile.personalityConfig))
+    const [socials, setSocials] = useState(() => socialsFromConfig(profile.personalityConfig))
 
     const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<ProfileData>({
         // zod v4 and @hookform/resolvers v5 disagree on the internal issue type,
@@ -196,7 +209,16 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
         setIsSaving(true)
         onSavingChange?.(true)
         try {
-            await updateProfile(profile.id, data)
+            await updateProfile(profile.id, {
+                ...data,
+                personalityConfig: writeSocials(
+                    writeDefaultPrepMinutes(
+                        writePayMode(writePaymentQrUrl(data.personalityConfig || profile.personalityConfig, paymentQrUrl), payMode),
+                        defaultPrepMinutes,
+                    ),
+                    socials,
+                ),
+            })
             toast.success("Profile updated successfully")
         } catch (error) {
             console.error(error)
@@ -208,10 +230,12 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
     }
 
     return (
+        <>
         <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-            <Tabs defaultValue="general" className="w-full gap-3">
+            <Tabs defaultValue={defaultTab} className="w-full gap-3">
                 <TabsList>
                     <TabsTrigger value="general"><User /><span>General</span></TabsTrigger>
+                    <TabsTrigger value="about"><BookOpen /><span>About</span></TabsTrigger>
                     {fieldOn(watch("roleTemplate"), "portfolio", extrasOf(watch("personalityConfig"))) ? <TabsTrigger value="experience"><Briefcase /><span>Experience</span></TabsTrigger> : null}
                     {fieldOn(watch("roleTemplate"), "portfolio", extrasOf(watch("personalityConfig"))) ? <TabsTrigger value="projects"><FolderKanban /><span>Projects</span></TabsTrigger> : null}
                     <TabsTrigger value="appearance"><Palette /><span>Appearance</span></TabsTrigger>
@@ -221,7 +245,21 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
 
                 <TabsContent value="general">
                     <div className="overflow-hidden rounded-2xl border bg-card">
-                        <div className="space-y-5 px-5 py-5">
+                        <div className="flex flex-col gap-3 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium">Google listing</p>
+                                <p className="text-xs text-muted-foreground">Name, address, hours, and photos from Maps. Fill is free.</p>
+                            </div>
+                            <Button
+                                type="button"
+                                onClick={() => setGoogleOpen(true)}
+                                className="h-11 shrink-0 gap-2 rounded-full border border-[#00D7FF]/40 bg-[#00D7FF]/10 text-[#00D7FF] backdrop-blur hover:bg-[#00D7FF]/20"
+                            >
+                                <MapPin className="h-4 w-4" />
+                                Fill from Google
+                            </Button>
+                        </div>
+                        <div className="space-y-4 px-5 py-5">
                             <GhostField label="Name" error={errors.displayName?.message}>
                                 <Input id="displayName" className={cn(ghostInput, "text-base font-medium")} {...register("displayName")} />
                             </GhostField>
@@ -236,61 +274,16 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
                             <GhostField label="Bio">
                                 <Textarea
                                     id="bio"
-                                    rows={6}
-                                    className={cn(ghostInput, "min-h-[140px] resize-y")}
+                                    rows={4}
+                                    className={cn(ghostInput, "min-h-[96px] resize-y")}
                                     {...register("bio")}
                                 />
                             </GhostField>
                         </div>
-                        <div className="space-y-5 border-t px-5 py-5">
-                            <GhostField label="Role">
-                                <ChoiceRow
-                                    value={watch("roleTemplate")}
-                                    onChange={(val) => setValue("roleTemplate", val)}
-                                    options={ROLES}
-                                />
+                        <div className="grid grid-cols-1 gap-4 border-t px-5 py-5 sm:grid-cols-2">
+                            <GhostField label="WhatsApp">
+                                <Input className={ghostInput} placeholder="91xxxxxxxxxx" {...register("whatsapp")} />
                             </GhostField>
-                            <GhostField label="Goal">
-                                <ChoiceRow
-                                    value={watch("primaryGoal")}
-                                    onChange={(val) => setValue("primaryGoal", val)}
-                                    options={GOALS}
-                                />
-                            </GhostField>
-                            <GhostField label="Also on this page">
-                                <div className="flex flex-wrap gap-1.5">
-                                    {ADDONS.map((addon) => {
-                                        const role = watch("roleTemplate")
-                                        const extra = extrasOf(watch("personalityConfig"))
-                                        const suggested = suggestedAddons(role).includes(addon.id)
-                                        const on = suggested || (extra.addons || []).includes(addon.id)
-                                        return (
-                                            <button
-                                                key={addon.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    const current = new Set(extra.addons || [])
-                                                    if (suggested) return
-                                                    if (current.has(addon.id)) current.delete(addon.id)
-                                                    else current.add(addon.id)
-                                                    const next = extrasFromAddons(role, [...suggestedAddons(role), ...current] as AddonId[])
-                                                    setValue("personalityConfig", writeExtras(watch("personalityConfig"), next))
-                                                }}
-                                                className={cn(
-                                                    "h-8 rounded-full border px-3 text-xs font-medium",
-                                                    on
-                                                        ? "border-foreground bg-foreground text-background"
-                                                        : "border-border bg-background text-muted-foreground",
-                                                )}
-                                            >
-                                                {addon.label}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </GhostField>
-                        </div>
-                        <div className="grid grid-cols-1 gap-5 border-t px-5 py-5 sm:grid-cols-2">
                             <GhostField label="Language">
                                 <Input id="language" className={ghostInput} placeholder="English" {...register("language")} />
                             </GhostField>
@@ -298,28 +291,55 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
                                 <Input id="timezone" className={ghostInput} placeholder="Asia/Kolkata" {...register("timezone")} />
                             </GhostField>
                         </div>
-                        <div className="grid grid-cols-1 gap-5 border-t px-5 py-5 sm:grid-cols-2">
-                            <GhostField label="WhatsApp">
-                                <Input className={ghostInput} placeholder="91xxxxxxxxxx" {...register("whatsapp")} />
+                        <div className="space-y-4 border-t px-5 py-5">
+                            <GhostField label="Instagram">
+                                <Input
+                                    className={ghostInput}
+                                    placeholder="https://instagram.com/yourpage"
+                                    value={socials.instagram || ""}
+                                    onChange={(e) => setSocials((cur) => ({ ...cur, instagram: e.target.value }))}
+                                />
                             </GhostField>
-                            {fieldOn(watch("roleTemplate"), "whatsappUpi", extrasOf(watch("personalityConfig"))) || hasSurface(watch("roleTemplate"), "shop", extrasOf(watch("personalityConfig"))) ? (
-                            <>
-                            <GhostField label="UPI ID">
-                                <Input className={ghostInput} placeholder="shop@okaxis" {...register("upiId")} />
+                            <GhostField label="Facebook">
+                                <Input
+                                    className={ghostInput}
+                                    placeholder="https://facebook.com/..."
+                                    value={socials.facebook || ""}
+                                    onChange={(e) => setSocials((cur) => ({ ...cur, facebook: e.target.value }))}
+                                />
                             </GhostField>
-                            <GhostField label="GSTIN">
-                                <Input className={ghostInput} placeholder="optional" {...register("gstin")} />
+                            <GhostField label="YouTube">
+                                <Input
+                                    className={ghostInput}
+                                    placeholder="https://youtube.com/..."
+                                    value={socials.youtube || ""}
+                                    onChange={(e) => setSocials((cur) => ({ ...cur, youtube: e.target.value }))}
+                                />
                             </GhostField>
-                            <GhostField label="Delivery note">
-                                <Input className={ghostInput} placeholder="We deliver in the area" {...register("deliveryNote")} />
+                            <GhostField label="Google Maps">
+                                <Input
+                                    className={ghostInput}
+                                    placeholder="https://maps.google.com/..."
+                                    value={socials.maps || ""}
+                                    onChange={(e) => setSocials((cur) => ({ ...cur, maps: e.target.value }))}
+                                />
                             </GhostField>
-                            </>
+                            {fieldOn(watch("roleTemplate"), "menuDish", extrasOf(watch("personalityConfig"))) ? (
+                                <GhostField label="Zomato">
+                                    <Input
+                                        className={ghostInput}
+                                        placeholder="https://zomato.com/yourpage"
+                                        value={socials.zomato || ""}
+                                        onChange={(e) => setSocials((cur) => ({ ...cur, zomato: e.target.value }))}
+                                    />
+                                </GhostField>
                             ) : null}
                         </div>
                     </div>
-                    <div className="mt-3 max-w-sm">
-                        <QrCard name={watch("displayName") || profile.displayName} slug={watch("slug") || profile.slug} />
-                    </div>
+                </TabsContent>
+
+                <TabsContent value="about">
+                    <StoryStudio slug={profile.slug} role={watch("roleTemplate")} personalityConfig={profile.personalityConfig} />
                 </TabsContent>
 
                 {fieldOn(watch("roleTemplate"), "portfolio", extrasOf(watch("personalityConfig"))) ? (
@@ -532,9 +552,158 @@ export function ProfileEditor({ profile, presets, onSavingChange }: ProfileEdito
                             </Select>
                         </Field>
                     </Section>
+                    <Section title="This page is" description="Role, goal, and extra surfaces.">
+                        <Field label="Role">
+                            <ChoiceRow
+                                value={watch("roleTemplate")}
+                                onChange={(val) => setValue("roleTemplate", val)}
+                                options={ROLES}
+                            />
+                        </Field>
+                        <Field label="Goal">
+                            <ChoiceRow
+                                value={watch("primaryGoal")}
+                                onChange={(val) => setValue("primaryGoal", val)}
+                                options={GOALS}
+                            />
+                        </Field>
+                        <Field label="Also on this page">
+                            <div className="flex flex-wrap gap-1.5">
+                                {ADDONS.map((addon) => {
+                                    const role = watch("roleTemplate")
+                                    const extra = extrasOf(watch("personalityConfig"))
+                                    const suggested = suggestedAddons(role).includes(addon.id)
+                                    const on = suggested || (extra.addons || []).includes(addon.id)
+                                    return (
+                                        <button
+                                            key={addon.id}
+                                            type="button"
+                                            onClick={() => {
+                                                const current = new Set(extra.addons || [])
+                                                if (suggested) return
+                                                if (current.has(addon.id)) current.delete(addon.id)
+                                                else current.add(addon.id)
+                                                const next = extrasFromAddons(role, [...suggestedAddons(role), ...current] as AddonId[])
+                                                setValue("personalityConfig", writeExtras(watch("personalityConfig"), next))
+                                            }}
+                                            className={cn(
+                                                "h-8 rounded-full border px-3 text-xs font-medium",
+                                                on
+                                                    ? "border-foreground bg-foreground text-background"
+                                                    : "border-border bg-background text-muted-foreground",
+                                            )}
+                                        >
+                                            {addon.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </Field>
+                    </Section>
+                    <Section title="Reach" description="How guests pay.">
+                        {fieldOn(watch("roleTemplate"), "whatsappUpi", extrasOf(watch("personalityConfig"))) || hasSurface(watch("roleTemplate"), "shop", extrasOf(watch("personalityConfig"))) ? (
+                            <>
+                                <Field label="UPI ID">
+                                    <Input placeholder="shop@okaxis" {...register("upiId")} />
+                                </Field>
+                                {watch("roleTemplate") === "RESTAURANT" ? (
+                                    <>
+                                        <Field label="Guest payment">
+                                            <div className="flex gap-2">
+                                                {(["LATER", "PREPAID"] as const).map((mode) => (
+                                                    <button
+                                                        key={mode}
+                                                        type="button"
+                                                        onClick={() => setPayMode(mode)}
+                                                        className={cn(
+                                                            "h-9 rounded-full border px-3 text-xs font-medium",
+                                                            payMode === mode ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground",
+                                                        )}
+                                                    >
+                                                        {mode === "PREPAID" ? "Prepaid UPI" : "Pay on pickup"}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <p className="mt-1 text-[12px] text-muted-foreground">Prepaid shows a Pay button under the QR on the guest ticket.</p>
+                                        </Field>
+                                        <Field label="Default cooking time">
+                                            <div className="flex items-center justify-between text-[12px] text-muted-foreground">
+                                                <span>Used when a dish has no time of its own</span>
+                                                <span className="tabular-nums font-medium text-foreground">{defaultPrepMinutes} min</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={5}
+                                                max={90}
+                                                step={5}
+                                                value={defaultPrepMinutes}
+                                                onChange={(e) => setDefaultPrepMinutes(Number(e.target.value))}
+                                                className="mt-2 w-full accent-cyan-500"
+                                            />
+                                        </Field>
+                                        <Field label="Payment QR">
+                                            <p className="mb-2 text-[12px] text-muted-foreground">Shown to guests after they order. Upload your bank QR, or leave empty to generate one from the UPI ID.</p>
+                                            {paymentQrUrl ? <img src={paymentQrUrl} alt="" className="mb-2 h-28 w-28 rounded-xl object-cover" /> : null}
+                                            <FileField
+                                                accept="image/*"
+                                                disabled={isUploading}
+                                                onFile={(file) => {
+                                                    if (!file) return
+                                                    void (async () => {
+                                                        setIsUploading(true)
+                                                        try {
+                                                            const body = new FormData()
+                                                            body.append("file", file)
+                                                            const res = await fetch("/api/upload", { method: "POST", body })
+                                                            const data = await res.json()
+                                                            if (!res.ok || !data.url) throw new Error(data.error || "Upload failed")
+                                                            setPaymentQrUrl(data.url)
+                                                            toast.success("Payment QR uploaded")
+                                                        } catch {
+                                                            toast.error("Could not upload QR")
+                                                        } finally {
+                                                            setIsUploading(false)
+                                                        }
+                                                    })()
+                                                }}
+                                            />
+                                        </Field>
+                                    </>
+                                ) : null}
+                                <Field label="GSTIN">
+                                    <Input placeholder="optional" {...register("gstin")} />
+                                </Field>
+                                <Field label="Delivery note">
+                                    <Input placeholder="We deliver in the area" {...register("deliveryNote")} />
+                                </Field>
+                            </>
+                        ) : null}
+                        <div className="max-w-sm">
+                            <QrCard name={watch("displayName") || profile.displayName} slug={watch("slug") || profile.slug} />
+                        </div>
+                    </Section>
                 </TabsContent>
             </Tabs>
         </form>
+        <FillFromGoogleSheet
+            open={googleOpen}
+            onOpenChange={setGoogleOpen}
+            mapsUrl={socials.maps || ""}
+            name={watch("displayName") || profile.displayName}
+            whatsapp={watch("whatsapp") || ""}
+            personalityConfig={watch("personalityConfig") || ""}
+            onApplied={(patch) => {
+                if (patch.displayName) setValue("displayName", patch.displayName, { shouldDirty: true })
+                if (patch.whatsapp) setValue("whatsapp", patch.whatsapp, { shouldDirty: true })
+                if (patch.mapsUrl) {
+                    const maps = patch.mapsUrl
+                    setSocials((cur) => ({ ...cur, maps }))
+                }
+                if (patch.personalityConfig) setValue("personalityConfig", patch.personalityConfig, { shouldDirty: true })
+                router.refresh()
+            }}
+        />
+        </>
     )
 }
 
@@ -913,5 +1082,303 @@ function ToggleRow({
             </div>
             <div className="shrink-0 pt-0.5">{children}</div>
         </div>
+    )
+}
+
+const LISTING_FIELDS = ["placeId", "mapsUrl", "address", "phone", "hours", "photos", "displayName"] as const
+type ListingField = (typeof LISTING_FIELDS)[number]
+
+const LISTING_FIELD_COPY: Record<ListingField, { label: string; hint: string }> = {
+    placeId: { label: "Place ID", hint: "Saved on the listing, not shown to guests" },
+    mapsUrl: { label: "Maps link", hint: "Replaces the Google Maps field" },
+    address: { label: "Address", hint: "Written to the venue bag" },
+    phone: { label: "Phone", hint: "Venue phone; WhatsApp only if empty or overwrite" },
+    hours: { label: "Hours", hint: "Weekly hours on the booking calendar" },
+    photos: { label: "Photos", hint: "Stay unpublished unless you turn publish on" },
+    displayName: { label: "Name", hint: "Profile display name" },
+}
+
+type ListingPreviewLoose = {
+    placeId?: string | null
+    mapsUrl?: string | null
+    name?: string | null
+    rating?: number | null
+    address?: unknown
+    phone?: unknown
+    hours?: unknown
+    photos?: unknown
+    warnings?: unknown
+}
+
+function listingText(value: unknown, keys: string[]) {
+    if (typeof value === "string") return value.trim()
+    if (!value || typeof value !== "object") return ""
+    const bag = value as Record<string, unknown>
+    for (const key of keys) {
+        const hit = bag[key]
+        if (typeof hit === "string" && hit.trim()) return hit.trim()
+    }
+    return ""
+}
+
+function listingAddress(preview?: ListingPreviewLoose | null) {
+    return listingText(preview?.address, ["formatted", "line1"])
+}
+
+function listingPhone(preview?: ListingPreviewLoose | null) {
+    return listingText(preview?.phone, ["display", "e164"])
+}
+
+function listingHours(preview?: ListingPreviewLoose | null) {
+    const direct = listingText(preview?.hours, ["statusText"])
+    if (direct) return direct
+    const weekly = preview?.hours && typeof preview.hours === "object" ? (preview.hours as { weekly?: unknown }).weekly : null
+    return Array.isArray(weekly) && weekly.length ? `${weekly.length} days` : ""
+}
+
+function listingPhotos(preview?: ListingPreviewLoose | null) {
+    return Array.isArray(preview?.photos) ? preview.photos.length : 0
+}
+
+function listingWarnings(preview?: ListingPreviewLoose | null) {
+    return Array.isArray(preview?.warnings) ? preview.warnings.filter((w): w is string => typeof w === "string" && Boolean(w)) : []
+}
+
+function fieldPresent(preview: ListingPreviewLoose | null, field: ListingField, mapsUrl: string) {
+    if (!preview) return false
+    if (field === "placeId") return Boolean(preview.placeId)
+    if (field === "mapsUrl") return Boolean(preview.mapsUrl || mapsUrl.trim())
+    if (field === "address") return Boolean(listingAddress(preview))
+    if (field === "phone") return Boolean(listingPhone(preview))
+    if (field === "hours") return Boolean(listingHours(preview))
+    if (field === "photos") return listingPhotos(preview) > 0
+    return Boolean(preview.name)
+}
+
+function mergeListingConfig(raw: string, patch: { placeId?: string | null; venue?: unknown }) {
+    let bag: Record<string, unknown> = {}
+    try { bag = JSON.parse(raw || "{}") as Record<string, unknown> } catch { bag = {} }
+    if (patch.placeId) bag.googlePlaceId = patch.placeId
+    if (patch.venue && typeof patch.venue === "object") bag.venue = patch.venue
+    return JSON.stringify(bag)
+}
+
+function FillFromGoogleSheet({
+    open,
+    onOpenChange,
+    mapsUrl,
+    name,
+    whatsapp,
+    personalityConfig,
+    onApplied,
+}: {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    mapsUrl: string
+    name: string
+    whatsapp: string
+    personalityConfig: string
+    onApplied: (patch: { displayName?: string; whatsapp?: string; mapsUrl?: string; personalityConfig?: string }) => void
+}) {
+    const [mapsInput, setMapsInput] = useState(mapsUrl)
+    const [preview, setPreview] = useState<ListingPreviewLoose | null>(null)
+    const [fields, setFields] = useState<ListingField[]>([...LISTING_FIELDS])
+    const [overwrite, setOverwrite] = useState(false)
+    const [publishPhotos, setPublishPhotos] = useState(false)
+    const [previewing, setPreviewing] = useState(false)
+    const [applying, setApplying] = useState(false)
+
+    useEffect(() => {
+        if (!open) return
+        setMapsInput(mapsUrl)
+        setPreview(null)
+        setFields([...LISTING_FIELDS])
+        setOverwrite(false)
+        setPublishPhotos(false)
+    }, [open, mapsUrl])
+
+    const toggleField = (id: ListingField) => {
+        setFields((cur) => (cur.includes(id) ? cur.filter((f) => f !== id) : [...cur, id]))
+    }
+
+    const runPreview = async () => {
+        const url = mapsInput.trim()
+        if (!url) {
+            toast.error("Paste a Google Maps link first")
+            return
+        }
+        setPreviewing(true)
+        try {
+            const next = await previewListing({ mapsUrl: url, name: name || undefined })
+            setPreview((next ?? null) as ListingPreviewLoose | null)
+            const available = LISTING_FIELDS.filter((field) => fieldPresent((next ?? null) as ListingPreviewLoose | null, field, url))
+            if (available.length) setFields(available)
+        } catch (error) {
+            setPreview(null)
+            toast.error(error instanceof Error ? error.message : "Could not preview that listing")
+        } finally {
+            setPreviewing(false)
+        }
+    }
+
+    const runApply = async () => {
+        if (!preview || !fields.length) return
+        setApplying(true)
+        try {
+            const result = await applyListing({
+                mapsUrl: mapsInput.trim() || preview.mapsUrl || undefined,
+                placeId: preview.placeId || undefined,
+                fields: fields as Array<
+                    | "placeId" | "mapsUrl"
+                    | "displayName" | "headline" | "bio"
+                    | "phone" | "hours" | "address"
+                    | "photos" | "categories"
+                >,
+                overwrite,
+                publishPhotos,
+            }) as { applied?: unknown; skipped?: Array<{ field?: string; reason?: string } | string>; venue?: unknown; personalityConfig?: unknown } | void
+            const skipped = Array.isArray(result?.skipped) ? result.skipped : []
+            const patch: { displayName?: string; whatsapp?: string; mapsUrl?: string; personalityConfig?: string } = {}
+            if (fields.includes("displayName") && preview.name && (overwrite || !name.trim())) patch.displayName = preview.name
+            if (fields.includes("phone")) {
+                const phone = listingPhone(preview)
+                if (phone && (overwrite || !whatsapp.trim())) patch.whatsapp = phone
+            }
+            if (fields.includes("mapsUrl")) {
+                const nextMaps = (typeof preview.mapsUrl === "string" && preview.mapsUrl) || mapsInput.trim()
+                if (nextMaps && (overwrite || !mapsUrl.trim())) patch.mapsUrl = nextMaps
+            }
+            const venue = result && typeof result === "object" ? result.venue : undefined
+            const placeId = fields.includes("placeId") ? preview.placeId : undefined
+            let nextConfig: string | undefined
+            if (result && typeof result === "object" && typeof result.personalityConfig === "string") {
+                nextConfig = result.personalityConfig
+            } else if (placeId || venue) {
+                nextConfig = mergeListingConfig(personalityConfig, { placeId, venue })
+            }
+            if (nextConfig) patch.personalityConfig = nextConfig
+            onApplied(patch)
+            if (skipped.length) {
+                const reasons = skipped.map((row) => typeof row === "string" ? row : [row.field, row.reason].filter(Boolean).join(": ")).filter(Boolean)
+                toast.success(reasons.length ? `Applied. Skipped ${reasons.join("; ")}` : "Listing applied")
+            } else {
+                toast.success("Listing applied")
+            }
+            onOpenChange(false)
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not apply that listing")
+        } finally {
+            setApplying(false)
+        }
+    }
+
+    const warnings = listingWarnings(preview)
+    const address = listingAddress(preview)
+    const phone = listingPhone(preview)
+    const hours = listingHours(preview)
+    const photos = listingPhotos(preview)
+
+    return (
+        <OfferSheet
+            open={open}
+            onOpenChange={onOpenChange}
+            title="Fill from Google"
+            description="Preview the listing, pick fields, then apply. Does not make the page public."
+            footer={
+                <div className="flex gap-2">
+                    <Button type="button" variant="outline" className="h-11 flex-1 rounded-full" onClick={() => onOpenChange(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        className="h-11 flex-[1.4] rounded-full bg-[#00D7FF] text-zinc-950 hover:bg-[#00D7FF]/90"
+                        disabled={!preview || !fields.length || previewing || applying}
+                        onClick={() => void runApply()}
+                    >
+                        {applying ? "Applying…" : "Apply"}
+                    </Button>
+                </div>
+            }
+        >
+            <div className="space-y-4 pb-4">
+                <label className="block space-y-1.5">
+                    <span className="text-sm font-medium">Maps URL</span>
+                    <Input
+                        value={mapsInput}
+                        onChange={(e) => setMapsInput(e.target.value)}
+                        placeholder="https://maps.google.com/..."
+                        className="h-11 rounded-xl"
+                        inputMode="url"
+                    />
+                </label>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full rounded-full border-[#00D7FF]/40 bg-[#00D7FF]/10 text-[#00D7FF] backdrop-blur hover:bg-[#00D7FF]/20"
+                    disabled={previewing || applying}
+                    onClick={() => void runPreview()}
+                >
+                    {previewing ? "Previewing…" : "Preview"}
+                </Button>
+
+                {preview ? (
+                    <div className="space-y-2 rounded-2xl border border-[#00D7FF]/25 bg-[#00D7FF]/5 p-3.5 backdrop-blur">
+                        <p className="text-sm font-medium">{preview.name || name || "Listing"}</p>
+                        {typeof preview.rating === "number" ? (
+                            <p className="text-xs text-muted-foreground">{preview.rating.toFixed(1)} on Google</p>
+                        ) : null}
+                        {address ? <p className="text-xs text-muted-foreground">{address}</p> : null}
+                        {phone ? <p className="text-xs text-muted-foreground">{phone}</p> : null}
+                        {hours ? <p className="text-xs text-muted-foreground">{hours}</p> : null}
+                        {photos > 0 ? <p className="text-xs text-muted-foreground">{photos} photo{photos === 1 ? "" : "s"}</p> : null}
+                        {warnings.map((warning) => (
+                            <p key={warning} className="text-xs text-amber-500">{warning}</p>
+                        ))}
+                    </div>
+                ) : null}
+
+                <div className="space-y-1.5">
+                    <p className="text-sm font-medium">Apply</p>
+                    <div className="grid gap-1.5">
+                        {LISTING_FIELDS.map((id) => {
+                            const copy = LISTING_FIELD_COPY[id]
+                            const on = fields.includes(id)
+                            const missing = Boolean(preview) && !fieldPresent(preview, id, mapsInput)
+                            return (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => toggleField(id)}
+                                    className={cn(
+                                        "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left",
+                                        on ? "border-[#00D7FF]/50 bg-[#00D7FF]/5" : "border-border/70",
+                                        missing && "opacity-60",
+                                    )}
+                                >
+                                    <span className={cn(
+                                        "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
+                                        on ? "border-[#00D7FF] bg-[#00D7FF] text-zinc-950" : "border-border",
+                                    )}>
+                                        {on ? <Check className="h-3.5 w-3.5" /> : null}
+                                    </span>
+                                    <span className="min-w-0">
+                                        <span className="block text-sm font-medium">{copy.label}</span>
+                                        <span className="block text-xs text-muted-foreground">{copy.hint}</span>
+                                    </span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <LiveRow checked={overwrite} onChange={setOverwrite} label="Overwrite existing" />
+                    <LiveRow checked={publishPhotos} onChange={setPublishPhotos} label="Publish photos" />
+                    <p className="px-1 text-[12px] text-muted-foreground">
+                        Empty fields fill unless overwrite is on. Photos stay hidden unless you publish them. Listing fill is free.
+                    </p>
+                </div>
+            </div>
+        </OfferSheet>
     )
 }

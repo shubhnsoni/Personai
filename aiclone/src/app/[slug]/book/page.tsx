@@ -56,7 +56,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                     </p>
                 ) : (
                     <BookList
-                        profile={{ id: profile.id, displayName: profile.displayName, whatsapp: profile.whatsapp }}
+                        profile={{ id: profile.id, displayName: profile.displayName, whatsapp: profile.whatsapp, roleTemplate: profile.roleTemplate }}
                         services={profile.serviceOfferings}
                         restaurant={restaurant}
                     />

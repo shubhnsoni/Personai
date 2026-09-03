@@ -12,6 +12,7 @@ import { toast } from "sonner"
 import { createBooking, getAvailableSlots } from "@/app/actions/bookings"
 import { useMoney } from "@/components/pricing-provider"
 import { CalendarLinks } from "@/components/calendar/calendar-links"
+import { PartySizePicker } from "@/components/booking/party-size-picker"
 
 interface ServiceOffering {
     id: string
@@ -252,24 +253,7 @@ export function BookingModal({ isOpen, onClose, profile, selectedServiceId }: Bo
                                             ))
                                         )}
                                         {services.find((s) => s.id === currentServiceId)?.kind === "TABLE" ? (
-                                            <div className="space-y-2">
-                                                <Label className="text-zinc-400">Party size</Label>
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                                                        <button
-                                                            key={n}
-                                                            type="button"
-                                                            onClick={() => setPartySize(n)}
-                                                            className={cn(
-                                                                "h-9 w-9 rounded-full text-sm",
-                                                                partySize === n ? "bg-cyan-500 text-zinc-950" : "bg-zinc-800 text-zinc-300",
-                                                            )}
-                                                        >
-                                                            {n}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                            <PartySizePicker value={partySize} onChange={setPartySize} />
                                         ) : null}
                                         <Button
                                             className="h-10 w-full rounded-full"

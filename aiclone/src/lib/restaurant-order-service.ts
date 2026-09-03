@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto"
 import { Prisma } from "@prisma/client"
 import { prisma } from "./prisma"
+import { defaultPrepMinutesFromConfig } from "./payment-qr"
 import {
     businessDateKey,
     normalizeCreateRestaurantOrderInput,
@@ -98,6 +99,7 @@ export async function createRestaurantOrderRecord(rawInput: CreateRestaurantOrde
                         timezone: true,
                         upiId: true,
                         whatsapp: true,
+                        personalityConfig: true,
                     },
                 })
                 if (!profile || !profile.isPublic || profile.roleTemplate !== "RESTAURANT") {
@@ -220,6 +222,22 @@ export async function createRestaurantOrderRecord(rawInput: CreateRestaurantOrde
                         data: { scans: { increment: 1 } },
                     })
                 }
+
+                const defaultMins = defaultPrepMinutesFromConfig(profile.personalityConfig)
+                let minutes = defaultMins
+                const preps = await tx.$queryRaw<Array<{ id: string; prepMinutes: number | null }>>`
+                    SELECT id, "prepMinutes" FROM "DigitalProduct" WHERE id IN (${Prisma.join(productIds)})
+                `.catch(() => [] as Array<{ id: string; prepMinutes: number | null }>)
+                if (preps.length) {
+                    const byId = new Map(preps.map((row) => [row.id, row.prepMinutes]))
+                    minutes = Math.max(
+                        defaultMins,
+                        ...priced.lines.map((line) => byId.get(line.productId) || defaultMins),
+                    )
+                }
+                minutes = Math.max(1, Math.min(90, minutes))
+                const dueAt = new Date(now.getTime() + minutes * 60 * 1000)
+                await tx.$executeRaw`UPDATE "Order" SET "dueAt" = ${dueAt.toISOString()}::timestamptz WHERE id = ${order.id}`
 
                 return { order, replayed: false }
             }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })

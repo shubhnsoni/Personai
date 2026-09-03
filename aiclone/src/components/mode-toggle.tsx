@@ -16,6 +16,7 @@ export function ModeToggle() {
             variant="outline"
             size="icon"
             className="h-8 w-8"
+            suppressHydrationWarning
             onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             disabled={!mounted}
         >

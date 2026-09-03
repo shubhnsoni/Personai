@@ -6,12 +6,16 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { ChatInterface, type ChatChip } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"
-import { BookingModal } from "@/components/booking/booking-modal"
-import { ReserveSheet } from "@/components/booking/reserve-sheet"
+import { ReserveSheet, type ReserveConfirmLabel } from "@/components/booking/reserve-sheet"
+import { bookChip as kitBookChip } from "@/lib/kit-copy"
 import { extrasOf, publicChipAllowed } from "@/lib/surfaces"
 import { CheckoutSheet, type CheckoutItem } from "@/components/checkout/checkout-sheet"
 import { TipSheet } from "@/components/profile/tip-sheet"
-import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound } from "lucide-react"
+import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, Instagram, Facebook, Youtube, MapPin } from "lucide-react"
+import { storyLabel, storyPath } from "@/lib/story"
+import { socialsFromConfig } from "@/lib/socials"
+import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
+import { useLiveOrders } from "@/components/shop/use-live-order"
 import { ModeToggle } from "@/components/mode-toggle"
 import { toast } from "sonner"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
@@ -29,6 +33,7 @@ interface ProfileViewProps {
         roleTemplate?: string | null
         primaryGoal?: string | null
         personalityConfig?: string | null
+        hasStory?: boolean
         imageUrl?: string | null
         chatAvatarMode?: string | null
         workExperiences: Array<{
@@ -136,7 +141,8 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
     // frame was a hydration mismatch, not merely a flash. (A statically prerendered route would
     // have the opposite constraint, which is why this is safe HERE specifically.)
     const [successDismissed, setSuccessDismissed] = useState(false)
-    const [introStage, setIntroStage] = useState<"hi" | "type" | "orb" | "ready">("hi")
+    const restaurant = profile.roleTemplate === "RESTAURANT"
+    const [introStage, setIntroStage] = useState<"hi" | "type" | "orb" | "ready">(restaurant ? "ready" : "hi")
     const searchParams = useSearchParams()
     const checkoutSucceeded = searchParams.get('checkout') === 'success'
     const showSuccessNotification = checkoutSucceeded && !successDismissed
@@ -149,6 +155,12 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
         }, 5000)
         return () => clearTimeout(timer)
     }, [checkoutSucceeded, profile.slug])
+
+    useEffect(() => {
+        if (restaurant || introStage === "ready") return
+        const timer = window.setTimeout(() => setIntroStage("ready"), 4200)
+        return () => window.clearTimeout(timer)
+    }, [restaurant, introStage])
 
     const handleShowContent = (type: Exclude<ContentType, null>) => {
         setActiveContent(type)
@@ -168,17 +180,35 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
         setCheckoutItem(item)
     }
 
-    const chips = buildGoalChips(profile, {
-        openBooking: () => setIsBookingOpen(true),
-        openContent: (type) => setActiveContent(type),
-        openTip: () => setTipOpen(true),
-    }).map((chip) => ({
-        ...chip,
-        onSelect: () => {
-            track(profile.slug, chip.id === "wa" ? "wa_tap" : "chip", { chip: chip.id })
-            chip.onSelect?.()
-        },
-    }))
+    const liveOrders = useLiveOrders(profile.slug)
+    const socials = socialsFromConfig(profile.personalityConfig)
+    const chips = [
+        ...liveOrders.slice(0, 4).map((order, index) => ({
+            id: `order-${order.token}`,
+            label: `Order #${order.number}`,
+            highlighted: index === 0,
+            available: true,
+            icon: <Clock3 className="w-3.5 h-3.5" />,
+            href: `/o/${order.token}`,
+        })),
+        ...buildGoalChips(profile, {
+            openBooking: () => setIsBookingOpen(true),
+            openContent: (type) => setActiveContent(type),
+            openTip: () => setTipOpen(true),
+        }),
+    ].map((chip) => {
+        const href = "href" in chip ? chip.href : undefined
+        const select = "onSelect" in chip ? chip.onSelect : undefined
+        return {
+            ...chip,
+            onSelect: href
+                ? undefined
+                : () => {
+                    track(profile.slug, chip.id === "wa" ? "wa_tap" : "chip", { chip: chip.id })
+                    select?.()
+                },
+        }
+    })
     const theme = ORB_THEMES[resolveOrbVariant(colors, animationConfig.variant)]
 
     return (
@@ -219,12 +249,37 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                 }}
             />
 
-            <div className="absolute right-3 top-3 z-30">
+            <div className="absolute right-3 top-3 z-30 flex items-center gap-1.5">
+                {socials.instagram ? (
+                    <a href={socials.instagram} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Instagram">
+                        <Instagram className="h-3.5 w-3.5" />
+                    </a>
+                ) : null}
+                {socials.facebook ? (
+                    <a href={socials.facebook} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Facebook">
+                        <Facebook className="h-3.5 w-3.5" />
+                    </a>
+                ) : null}
+                {socials.youtube ? (
+                    <a href={socials.youtube} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="YouTube">
+                        <Youtube className="h-3.5 w-3.5" />
+                    </a>
+                ) : null}
+                {socials.maps ? (
+                    <a href={socials.maps} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Maps">
+                        <MapPin className="h-3.5 w-3.5" />
+                    </a>
+                ) : null}
+                {socials.zomato ? (
+                    <a href={socials.zomato} target="_blank" rel="noreferrer" className="flex h-8 items-center rounded-full border border-black/10 bg-profile-chip px-2 text-[11px] font-medium text-profile-text dark:border-white/10">
+                        Zomato
+                    </a>
+                ) : null}
                 <ModeToggle />
             </div>
 
             <Tracker slug={profile.slug} />
-            <IntroVeil stage={introStage} />
+            {restaurant ? null : <IntroVeil stage={introStage} />}
 
             <div className="relative z-10 flex h-full min-w-0 w-full flex-1 flex-col">
                 <div className="relative mx-auto h-full w-full flex-1 overflow-hidden">
@@ -250,31 +305,29 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                 onPurchase={handlePurchase}
             />
 
-            {profile.serviceOfferings.some((s) => s.kind === "TABLE") ? (
-                <ReserveSheet
-                    open={isBookingOpen}
-                    onClose={() => {
-                        setIsBookingOpen(false)
-                        setSelectedService(null)
-                    }}
-                    profile={profile}
-                    service={
-                        profile.serviceOfferings.find((s) => s.id === selectedService && s.kind === "TABLE")
-                        || profile.serviceOfferings.find((s) => s.kind === "TABLE")
-                        || null
-                    }
-                />
-            ) : (
-                <BookingModal
-                    isOpen={isBookingOpen}
-                    onClose={() => {
-                        setIsBookingOpen(false)
-                        setSelectedService(null)
-                    }}
-                    profile={profile}
-                    selectedServiceId={selectedService}
-                />
-            )}
+            {(() => {
+                const selected = profile.serviceOfferings.find((s) => s.id === selectedService)
+                const tables = profile.serviceOfferings.filter((s) => s.kind === "TABLE")
+                const sessions = profile.serviceOfferings.filter((s) => s.kind !== "TABLE" && s.isActive)
+                const useTable = selected?.kind === "TABLE" || (!selected && tables.length > 0 && sessions.length === 0)
+                const session = selected && selected.kind !== "TABLE" ? selected : sessions[0] || null
+                const sheet = sessionSheetProps(profile.roleTemplate, session?.durationMinutes)
+                return (
+                    <ReserveSheet
+                        open={isBookingOpen}
+                        onClose={() => {
+                            setIsBookingOpen(false)
+                            setSelectedService(null)
+                        }}
+                        profile={profile}
+                        service={useTable ? (selected?.kind === "TABLE" ? selected : tables[0] || null) : session}
+                        mode={useTable ? "table" : "session"}
+                        hideParty={sheet.hideParty}
+                        partyLabel={sheet.partyLabel}
+                        confirmLabel={sheet.confirmLabel}
+                    />
+                )
+            })()}
 
             {checkoutItem && (
                 <CheckoutSheet item={checkoutItem} onClose={() => setCheckoutItem(null)} />
@@ -311,7 +364,7 @@ function IntroVeil({ stage }: { stage: "hi" | "type" | "orb" | "ready" }) {
     return (
         <motion.div
             aria-hidden
-            className="pointer-events-none absolute inset-0 z-[1]"
+            className="pl-intro-veil pointer-events-none absolute inset-0 z-[1]"
             style={{ opacity: veilOp, background: veilBg }}
         />
     )
@@ -357,11 +410,44 @@ function resolveCheckoutItem(
     return null
 }
 
+function sessionSheetProps(role?: string | null, durationMinutes?: number): {
+    hideParty?: boolean
+    partyLabel?: string
+    confirmLabel: ReserveConfirmLabel
+} {
+    switch (role) {
+        case "CA":
+            return { hideParty: true, confirmLabel: "Book consult" }
+        case "SALON_SPA":
+            return { confirmLabel: "Book treatment", partyLabel: durationMinutes ? `${durationMinutes} min` : "Duration" }
+        case "FIELD_SERVICE":
+            return { confirmLabel: "Request visit" }
+        default:
+            return { confirmLabel: "Book session", partyLabel: "Attendees" }
+    }
+}
+
+function bookChip(role?: string | null, goal?: string | null) {
+    if (goal === "BOOK_TABLE") return "Reserve a table"
+    return kitBookChip(role)
+}
+
 function welcomeTopics(profile: ProfileViewProps["profile"]) {
-    if (profile.roleTemplate === "RESTAURANT") {
+    const role = profile.roleTemplate
+    if (role === "RESTAURANT") {
         return ["the menu", "a table", "today's specials"]
     }
+    const kitTopics =
+        role === "SHOP" ? ["the shop", "orders", "pickup"]
+        : role === "CREATOR" ? ["the guide", "files", "tipping"]
+        : role === "CONSULTANT" || role === "CA" ? ["a session", "services", "rates"]
+        : role === "SALON_SPA" ? ["treatments", "hours"]
+        : role === "FIELD_SERVICE" ? ["a visit", "a quote"]
+        : role === "DESIGNER" || role === "DEVELOPER" || role === "EDITOR" || role === "JOB_SEEKER"
+            ? ["the work", "me"]
+            : ["me", "a chat"]
     const raw = [
+        ...kitTopics,
         ...profile.serviceOfferings.filter((s) => s.isActive).map((s) => s.name),
         ...(profile.digitalProducts || []).map((p) => p.title),
         ...(profile.courses || []).map((c) => c.title),
@@ -374,6 +460,7 @@ function welcomeTopics(profile: ProfileViewProps["profile"]) {
         const title = item.replace(/\s+/g, " ").trim()
         const key = title.toLowerCase()
         if (!title || title.length < 2 || /^project\s*\d*$/i.test(title) || seen.has(key)) continue
+        if (/\b(menu|table|specials)\b/i.test(title)) continue
         seen.add(key)
         out.push(title.slice(0, 36))
         if (out.length >= 5) break
@@ -399,7 +486,7 @@ function buildGoalChips(
     const catalog: Record<string, ChipDef> = {
         book: {
             id: "book",
-            label: profile.roleTemplate === "RESTAURANT" || profile.primaryGoal === "BOOK_TABLE" ? "Reserve a table" : "Book a call",
+            label: bookChip(profile.roleTemplate, profile.primaryGoal),
             available: hasServices,
             icon: <Calendar className="w-3.5 h-3.5" />,
             onSelect: actions.openBooking,
@@ -458,7 +545,8 @@ function buildGoalChips(
             label: "About",
             available: true,
             icon: <User className="w-3.5 h-3.5" />,
-            onSelect: () => actions.openContent("about"),
+            href: profile.hasStory ? storyPath(profile.slug) : undefined,
+            onSelect: profile.hasStory ? undefined : () => actions.openContent("about"),
         },
         guide: {
             id: "guide",
@@ -487,11 +575,18 @@ function buildGoalChips(
             icon: <DollarSign className="w-3.5 h-3.5" />,
             href: profile.roleTemplate === "RESTAURANT" ? `/${profile.slug}/menu` : `/${profile.slug}/shop`,
         },
+        story: {
+            id: "story",
+            label: storyLabel(profile.roleTemplate).chip,
+            available: Boolean(profile.hasStory),
+            icon: <Images className="w-3.5 h-3.5" />,
+            href: storyPath(profile.slug),
+        },
         wa: {
             id: "wa",
-            label: "WhatsApp",
+            label: "",
             available: Boolean(profile.whatsapp),
-            icon: <MessageCircle className="w-3.5 h-3.5" />,
+            icon: <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />,
             href: profile.whatsapp
                 ? `https://wa.me/${profile.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${profile.displayName}`)}`
                 : undefined,
@@ -526,6 +621,23 @@ function buildGoalChips(
         },
     }
 
+    const orderByKit: Record<string, string[]> = {
+        RESTAURANT: ["shop", "about", "book", "wa"],
+        SHOP: ["shop", "products", "wa", "about"],
+        CREATOR: ["guide", "ask", "shop", "tip", "about"],
+        CONSULTANT: ["book", "services", "rates", "about"],
+        CA: ["book", "services", "rates", "about"],
+        SALON_SPA: ["book", "services", "about"],
+        FIELD_SERVICE: ["book", "services", "about"],
+        COACH: ["shop", "products", "book", "courses", "wa"],
+        DESIGNER: ["work", "about", "book"],
+        DEVELOPER: ["work", "about", "book"],
+        EDITOR: ["work", "about", "book"],
+        JOB_SEEKER: ["portfolio", "history", "about"],
+        EVENTS_STUDIO: ["ask", "about", "book", "events"],
+        REAL_ESTATE_BROKERAGE: ["ask", "about", "book"],
+        RECRUITMENT_AGENCY: ["ask", "about", "book"],
+    }
     const orderByGoal: Record<string, string[]> = {
         BOOK_CALL: ["book", "services", "rates", "work"],
         HIRE_ME: ["portfolio", "history", "rates", "book"],
@@ -534,14 +646,14 @@ function buildGoalChips(
         COLLECT_LEADS: ["guide", "ask", "work", "book"],
         SELL_PRODUCTS: ["products", "shop", "wa", "tip"],
         TAKE_APPOINTMENTS: ["book", "services", "rates", "about"],
-        BOOK_TABLE: ["shop", "book", "wa"],
+        BOOK_TABLE: ["shop", "about", "book", "wa"],
     }
 
     const goal = profile.primaryGoal || "BOOK_CALL"
-    const keys = orderByGoal[goal] ?? ["about", "work", "services", "book"]
+    const keys = orderByKit[profile.roleTemplate || ""] ?? orderByGoal[goal] ?? ["about", "work", "services", "book"]
     const extraKeys = profile.roleTemplate === "RESTAURANT"
-        ? ["wa", "tip"]
-        : ["products", "shop", "wa", "tip", "courses", "events", "communities"]
+        ? ["about", "wa", "tip"]
+        : ["about", "products", "shop", "wa", "tip", "courses", "events", "communities", "book"]
     const extras = extraKeys.filter((k) => !keys.includes(k))
     const allowed = [...keys, ...extras].filter((k) => publicChipAllowed(profile.roleTemplate, k, extrasOf(profile)))
     const chips = allowed

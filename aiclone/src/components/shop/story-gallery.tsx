@@ -5,12 +5,21 @@ import { motion, useMotionValue, useTransform, type MotionValue } from "framer-m
 import type { ItemPhoto } from "@/lib/item-photos"
 import { cn } from "@/lib/utils"
 
+const DEFAULT_LABELS: Record<ItemPhoto["source"], string> = {
+    owner: "Menu",
+    review: "Guest",
+    auto: "More",
+    google: "Google",
+}
+
 export function StoryGallery({
     photos,
     title,
+    labels,
 }: {
     photos: ItemPhoto[]
     title: string
+    labels?: Partial<Record<ItemPhoto["source"], string>>
 }) {
     const scroller = useRef<HTMLDivElement>(null)
     const box = useRef<HTMLDivElement>(null)
@@ -69,6 +78,7 @@ export function StoryGallery({
                         padLeft={padLeft}
                         scrollX={scrollX}
                         count={photos.length}
+                        labels={labels}
                     />
                 ))}
             </div>
@@ -85,6 +95,7 @@ function StoryCard({
     padLeft,
     scrollX,
     count,
+    labels,
 }: {
     photo: ItemPhoto
     index: number
@@ -94,6 +105,7 @@ function StoryCard({
     padLeft: number
     scrollX: MotionValue<number>
     count: number
+    labels?: Partial<Record<ItemPhoto["source"], string>>
 }) {
     const tx = useTransform(
         scrollX,
@@ -105,7 +117,7 @@ function StoryCard({
         [(index - 2) * itemW, (index - 1) * itemW, index * itemW, (index + 1) * itemW],
         [0.8, 0.9, 1, 1],
     )
-    const label = photo.source === "owner" ? "Menu" : photo.source === "review" ? "Guest" : "More"
+    const label = labels?.[photo.source] || DEFAULT_LABELS[photo.source] || "More"
 
     return (
         <motion.div
@@ -127,7 +139,9 @@ function StoryCard({
                         ? "bg-amber-300/90 text-zinc-950"
                         : photo.source === "owner"
                             ? "bg-white/90 text-zinc-950"
-                            : "bg-cyan-400/90 text-zinc-950",
+                            : photo.source === "google"
+                                ? "bg-cyan-400/90 text-zinc-950"
+                                : "bg-cyan-400/90 text-zinc-950",
                 )}
             >
                 {label}

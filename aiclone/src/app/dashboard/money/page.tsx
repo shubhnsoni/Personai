@@ -12,7 +12,8 @@ export default async function DashboardMoneyPage() {
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
     requireSurface(profile.roleTemplate, "sales", profile)
-    const restaurant = profile.roleTemplate === "RESTAURANT"
+    if (profile.roleTemplate === "RESTAURANT") redirect("/dashboard/orders")
+    const restaurant = false
 
     const [restaurantOrders, productPurchases, courseEnrollments, eventRegistrations, communityMembers, bookings, payments] = await Promise.all([
         prisma.order.findMany({

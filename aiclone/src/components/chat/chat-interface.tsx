@@ -76,7 +76,7 @@ export function ChatInterface({
     const [conversationId, setConversationId] = useState<string | null>(null)
     const [visitorId, setVisitorId] = useState<string | null>(null)
     const [, setIsLoadingHistory] = useState(true)
-    const [introReady, setIntroReady] = useState(false)
+    const [introReady, setIntroReady] = useState(() => profile.roleTemplate === "RESTAURANT")
     const [chatMode, setChatMode] = useState("AI")
     const [liveChatEnabled, setLiveChatEnabled] = useState(false)
     const [isMember, setIsMember] = useState(false)
@@ -424,6 +424,7 @@ export function ChatInterface({
                         bare={animationConfig.look === "pixel" || animationConfig.look === "bloub" || animationConfig.look === "blob"}
                         onReady={() => setIntroReady(true)}
                         onStage={onIntroStage}
+                        skipIntro={profile.roleTemplate === "RESTAURANT"}
                     />
                 )}
 
@@ -696,6 +697,7 @@ function WelcomeIntro({
     bare,
     onReady,
     onStage,
+    skipIntro,
 }: {
     name: string
     welcome?: string | null
@@ -707,6 +709,7 @@ function WelcomeIntro({
     bare?: boolean
     onReady: () => void
     onStage?: (stage: "hi" | "type" | "orb" | "ready") => void
+    skipIntro?: boolean
 }) {
     const full = `I am ${name}'s AI.`
     const prefix = "I am "
@@ -715,25 +718,26 @@ function WelcomeIntro({
     const [lineVisible, setLineVisible] = useState(false)
     const readyOnce = useRef(false)
     const reduce = useReducedMotionPreference()
-    const visibleStage = reduce ? "ready" : stage
-    const visibleTyped = reduce ? full : typed
-    const visibleLine = reduce || lineVisible
+    const skip = skipIntro || reduce
+    const visibleStage = skip ? "ready" : stage
+    const visibleTyped = skip ? full : typed
+    const visibleLine = skip || lineVisible
 
     useEffect(() => {
-        if (reduce) return
+        if (skip) return
         // Fade in (~0.4s) + short hold, then exit. No empty beat after Hi.
         const leave = window.setTimeout(() => setStage("type"), 880)
         return () => window.clearTimeout(leave)
-    }, [reduce])
+    }, [skip])
 
     useEffect(() => {
-        if (reduce || stage !== "type" || lineVisible) return
+        if (skip || stage !== "type" || lineVisible) return
         const fallback = window.setTimeout(() => setLineVisible(true), 360)
         return () => window.clearTimeout(fallback)
-    }, [reduce, stage, lineVisible])
+    }, [skip, stage, lineVisible])
 
     useEffect(() => {
-        if (reduce || stage !== "type" || !lineVisible) return
+        if (skip || stage !== "type" || !lineVisible) return
         if (typed.length >= full.length) {
             const pause = window.setTimeout(() => setStage("orb"), 320)
             return () => window.clearTimeout(pause)
@@ -744,13 +748,13 @@ function WelcomeIntro({
         const speed = typed.length === 0 ? 160 : inPrefix ? 110 : atWordBreak ? 70 : 42
         const tick = window.setTimeout(() => setTyped(full.slice(0, typed.length + 1)), speed)
         return () => window.clearTimeout(tick)
-    }, [reduce, stage, lineVisible, typed, full, prefix.length])
+    }, [skip, stage, lineVisible, typed, full, prefix.length])
 
     useEffect(() => {
-        if (reduce || stage !== "orb") return
+        if (skip || stage !== "orb") return
         const t = window.setTimeout(() => setStage("ready"), 1480)
         return () => window.clearTimeout(t)
-    }, [reduce, stage])
+    }, [skip, stage])
 
     useEffect(() => {
         onStage?.(visibleStage)
@@ -763,7 +767,7 @@ function WelcomeIntro({
     }, [visibleStage, onReady])
 
     const showCaret =
-        !reduce &&
+        !skip &&
         ((visibleStage === "type" && visibleTyped.length < full.length) ||
             (visibleStage === "type" && !visibleLine))
     const typedPrefix = visibleTyped.slice(0, Math.min(visibleTyped.length, prefix.length))
@@ -776,7 +780,7 @@ function WelcomeIntro({
                     <motion.div
                         key="orb-slot"
                         className="relative z-[1] flex h-[180px] w-[180px] items-center justify-center overflow-visible"
-                        initial={{ opacity: 0, height: 0, marginBottom: -36 }}
+                        initial={skip ? false : { opacity: 0, height: 0, marginBottom: -36 }}
                         animate={{ opacity: 1, height: 180, marginBottom: 0 }}
                         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                     >
@@ -809,7 +813,7 @@ function WelcomeIntro({
                             </>
                         )}
                         <motion.div
-                            initial={{ opacity: 0, scale: bare ? 0.7 : 0.08, filter: bare ? "blur(0px)" : "blur(28px) brightness(2.6)" }}
+                            initial={skip ? false : { opacity: 0, scale: bare ? 0.7 : 0.08, filter: bare ? "blur(0px)" : "blur(28px) brightness(2.6)" }}
                             animate={{ opacity: 1, scale: 1, filter: "blur(0px) brightness(1)" }}
                             transition={{ duration: bare ? 0.55 : 1.2, delay: 0.06, ease: [0.16, 1, 0.3, 1] }}
                         >
@@ -823,7 +827,7 @@ function WelcomeIntro({
                 <AnimatePresence
                     mode="wait"
                     onExitComplete={() => {
-                        if (!reduce && stage === "type") setLineVisible(true)
+                        if (!skip && stage === "type") setLineVisible(true)
                     }}
                 >
                     {visibleStage === "hi" && (
@@ -841,7 +845,7 @@ function WelcomeIntro({
                     {(visibleStage === "type" || visibleStage === "orb" || visibleStage === "ready") && (
                         <motion.div
                             key="line"
-                            initial={{ opacity: 0 }}
+                            initial={skip ? false : { opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ duration: 0.12, ease: "easeOut" }}
                             className="max-w-xl"
@@ -870,7 +874,7 @@ function WelcomeIntro({
                 {visibleStage === "ready" && chips.map((chip, i) => (
                     <motion.div
                         key={chip.id}
-                        initial={{ opacity: 0, y: 14, filter: "blur(8px)" }}
+                        initial={skip ? false : { opacity: 0, y: 14, filter: "blur(8px)" }}
                         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                         transition={{ delay: 0.05 + i * 0.07, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
                     >

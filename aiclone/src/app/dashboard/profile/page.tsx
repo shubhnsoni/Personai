@@ -33,7 +33,7 @@ export default async function DashboardProfilePage({
 
     const { tab } = await searchParams
     const defaultTab =
-        tab === "import" ? "import" : tab === "knowledge" || tab === "brain" ? "knowledge" : "profile"
+        tab === "import" ? "import" : tab === "story" ? "story" : tab === "knowledge" || tab === "brain" ? "knowledge" : "profile"
 
     return (
         <YouStudio

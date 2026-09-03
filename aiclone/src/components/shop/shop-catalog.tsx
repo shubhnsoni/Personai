@@ -6,6 +6,7 @@ import { ShopCover } from "@/components/shop/shop-cover"
 import { formatStoredPrice, type DisplayCurrency } from "@/lib/pricing"
 import { whatsappHref } from "@/lib/commerce"
 import { dietDotClass, dietLabel } from "@/lib/menu"
+import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 
 type Item = {
     id: string
@@ -31,8 +32,6 @@ export function ShopCatalog({
     upiId,
     shopName,
     restaurant,
-    hours,
-    bookHref,
 }: {
     slug: string
     items: Item[]
@@ -52,52 +51,45 @@ export function ShopCatalog({
     }, [items])
     const [cat, setCat] = useState<string>("all")
     const [diet, setDiet] = useState<"all" | "VEG" | "NONVEG">("all")
+    const hasDiet = items.some((p) => p.diet)
+    const showDiet = Boolean(restaurant && hasDiet)
     const rows = items.filter((p) => {
         if (cat !== "all" && (p.category || "").trim() !== cat) return false
-        if (diet === "VEG" && p.diet !== "VEG" && p.diet !== "VEGAN") return false
-        if (diet === "NONVEG" && p.diet !== "NONVEG" && p.diet !== "EGG") return false
+        if (showDiet) {
+            if (diet === "VEG" && p.diet !== "VEG" && p.diet !== "VEGAN") return false
+            if (diet === "NONVEG" && p.diet !== "NONVEG" && p.diet !== "EGG") return false
+        }
         return true
     })
-    const wa = whatsappHref(whatsapp, `Hi ${shopName}, I want to see your ${restaurant ? "menu" : "shop"}: `)
-    const hasDiet = items.some((p) => p.diet)
+    const wa = whatsappHref(whatsapp, `Hi ${shopName}, I want to see your shop: `)
 
     return (
         <div className="space-y-4">
-            {restaurant && items.some((p) => p.ar) ? (
+            {items.some((p) => p.ar) ? (
                 <Link
                     href={`/${slug}/ar`}
                     className="flex items-center justify-between rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2.5"
                 >
                     <span>
-                        <span className="block text-sm font-medium text-cyan-100">View on your table</span>
-                        <span className="mt-0.5 block text-[12px] text-cyan-200/70">Open the camera, swipe dishes, save a photo</span>
+                        <span className="block text-sm font-medium text-cyan-100">View in your space</span>
+                        <span className="mt-0.5 block text-[12px] text-cyan-200/70">Open the camera, swipe products, save a photo</span>
                     </span>
-                    <span className="rounded-full bg-cyan-400 px-3 py-1.5 text-xs font-medium text-zinc-950">AR menu</span>
+                    <span className="rounded-full bg-cyan-400 px-3 py-1.5 text-xs font-medium text-zinc-950">See it in 3D</span>
                 </Link>
-            ) : null}
-            {(hours || bookHref) ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-zinc-900/50 px-3 py-2.5 text-sm">
-                    {hours ? <span className="text-zinc-300">{hours}</span> : null}
-                    {bookHref ? (
-                        <Link href={bookHref} className="ml-auto rounded-full bg-white px-3 py-1.5 text-xs font-medium text-zinc-950">
-                            Reserve a table
-                        </Link>
-                    ) : null}
-                </div>
             ) : null}
             {(whatsapp || upiId) && (
                 <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-zinc-900/50 px-3 py-2.5 text-sm">
                     {upiId ? <span className="text-zinc-400">UPI <span className="text-zinc-100">{upiId}</span></span> : null}
                     {wa ? (
-                        <a href={wa} target="_blank" rel="noreferrer" className="ml-auto rounded-full bg-[#25D366] px-3 py-1.5 text-xs font-medium text-zinc-950">
-                            WhatsApp
+                        <a href={wa} target="_blank" rel="noreferrer" className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-zinc-950" aria-label="WhatsApp">
+                            <WhatsAppIcon className="h-4 w-4" />
                         </a>
                     ) : null}
                 </div>
             )}
-            {(cats.length > 0 || hasDiet) ? (
+            {(cats.length > 0 || showDiet) ? (
                 <div className="flex gap-1 overflow-x-auto">
-                    {hasDiet ? (
+                    {showDiet ? (
                         <>
                             {(["all", "VEG", "NONVEG"] as const).map((d) => (
                                 <button
@@ -118,13 +110,13 @@ export function ShopCatalog({
                             onClick={() => setCat(c)}
                             className={`shrink-0 rounded-full px-3 py-1 text-xs ${cat === c ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-400"}`}
                         >
-                            {c === "all" ? (hasDiet ? "All sections" : "All") : c}
+                            {c === "all" ? (showDiet ? "All sections" : "All") : c}
                         </button>
                     ))}
                 </div>
             ) : null}
             {rows.length === 0 ? (
-                <p className="py-16 text-center text-sm text-zinc-500">{restaurant ? "Nothing on the menu yet." : "Nothing in the shop yet."}</p>
+                <p className="py-16 text-center text-sm text-zinc-500">Import a catalog or add a product</p>
             ) : (
                 <div className="grid grid-cols-2 gap-3">
                     {rows.map((p) => (
@@ -136,13 +128,13 @@ export function ShopCatalog({
                             <ShopCover src={p.thumbnailUrl} type={p.type} title={p.title} className="aspect-square" />
                             <div className="space-y-0.5 p-3">
                                 <p className="flex items-start gap-1.5 line-clamp-2 text-sm font-medium leading-snug">
-                                    {p.diet ? <span className={`mt-1 h-2 w-2 shrink-0 rounded-sm ${dietDotClass(p.diet)}`} title={dietLabel(p.diet) || ""} /> : null}
+                                    {showDiet && p.diet ? <span className={`mt-1 h-2 w-2 shrink-0 rounded-sm ${dietDotClass(p.diet)}`} title={dietLabel(p.diet) || ""} /> : null}
                                     {p.title}
                                 </p>
                                 <p className="text-sm tabular-nums" style={{ color: accent }}>
                                     {formatStoredPrice(p.priceCents, p.currency, currency)}
                                     {!restaurant && (p.fulfillment === "PHYSICAL" || p.fulfillment === "BOTH") ? " · Physical" : ""}
-                                    {p.spiceLevel ? ` · ${"🌶".repeat(p.spiceLevel)}` : ""}
+                                    {showDiet && p.spiceLevel ? ` · ${"🌶".repeat(p.spiceLevel)}` : ""}
                                     {p.ar ? " · AR" : ""}
                                     {p.stock != null && p.stock <= 3 ? ` · ${p.stock <= 0 ? "Sold out" : `${p.stock} left`}` : ""}
                                 </p>

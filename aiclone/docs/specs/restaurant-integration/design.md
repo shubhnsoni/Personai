@@ -4,6 +4,11 @@ Companion to `requirements.md`. Records the schema, the transport, and the
 decisions that were not obvious, with the reasoning kept attached so a later
 reader can tell an intentional choice from an accident.
 
+> **2026-09-03.** Kitchen/order design in this file is the shipped restaurant
+> reference. Guest-loop generalization (About footer, FillFromListing, other
+> kits) lives in [`docs/strategy/all-ends-plan.md`](../../strategy/all-ends-plan.md).
+> Do not add sidebar items from the old tasks list.
+
 ---
 
 ## Why the data model comes first

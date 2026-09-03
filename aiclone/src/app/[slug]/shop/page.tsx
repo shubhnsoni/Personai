@@ -7,6 +7,7 @@ import { RestaurantMenu } from "@/components/shop/restaurant-menu"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { parseGallery } from "@/lib/commerce"
 import { catalogLabel, hoursToday, isRestaurant } from "@/lib/menu"
+import { payModeFromConfig } from "@/lib/payment-qr"
 import { Tracker } from "@/components/profile/tracker"
 
 export const dynamic = "force-dynamic"
@@ -27,8 +28,13 @@ export default async function ShopPage({
         where: { slug },
         include: {
             animationStyle: true,
-            digitalProducts: { where: { isActive: true }, orderBy: { createdAt: "desc" } },
+            digitalProducts: {
+                where: { isActive: true },
+                orderBy: { createdAt: "desc" },
+                include: { reviews: { select: { rating: true } } },
+            },
             availability: true,
+            profileImages: { select: { id: true }, take: 1 },
         },
     })
     if (!profile || !profile.isPublic) notFound()
@@ -40,6 +46,8 @@ export default async function ShopPage({
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
     const logo = (profile as { shopLogoUrl?: string | null }).shopLogoUrl || profile.imageUrl
     const restaurant = isRestaurant(profile.roleTemplate)
+    const aboutHref = profile.profileImages.length ? `/${slug}/story` : undefined
+    const hours = profile.availability.length ? hoursToday(profile.availability) : null
     const restaurantTable = restaurant && requestedTableCode
         ? await prisma.restaurantTable.findFirst({
             where: { profileId: profile.id, code: requestedTableCode, isActive: true },
@@ -57,6 +65,8 @@ export default async function ShopPage({
                     logoUrl={logo}
                     label={catalogLabel(profile.roleTemplate)}
                     whatsapp={profile.whatsapp}
+                    aboutHref={aboutHref}
+                    hours={hours}
                     themeToggle
                     compact
                 />
@@ -69,19 +79,25 @@ export default async function ShopPage({
                     upiId={profile.upiId}
                     tableCode={requestedTableCode}
                     tableLabel={restaurantTable?.label || null}
-                    items={profile.digitalProducts.map((p) => ({
-                        id: p.id,
-                        title: p.title,
-                        thumbnailUrl: p.thumbnailUrl || parseGallery(p.galleryUrls)[0] || null,
-                        priceCents: p.priceCents,
-                        currency: p.currency,
-                        compareAtCents: p.compareAtCents,
-                        category: p.category,
-                        diet: (p as { diet?: string | null }).diet,
-                        sold: p.downloadCount,
-                        rating: p.downloadCount > 0 ? 4.5 : p.compareAtCents ? 4.2 : 4.1,
-                        ar: Boolean((p as { arModelUrl?: string | null }).arModelUrl),
-                    }))}
+                    prepaid={payModeFromConfig((profile as { personalityConfig?: string | null }).personalityConfig) === "PREPAID"}
+                    items={profile.digitalProducts.map((p) => {
+                        const reviews = p.reviews
+                        return {
+                            id: p.id,
+                            title: p.title,
+                            thumbnailUrl: p.thumbnailUrl || parseGallery(p.galleryUrls)[0] || null,
+                            priceCents: p.priceCents,
+                            currency: p.currency,
+                            compareAtCents: p.compareAtCents,
+                            category: p.category,
+                            diet: (p as { diet?: string | null }).diet,
+                            sold: p.downloadCount,
+                            rating: reviews.length
+                                ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+                                : null,
+                            ar: Boolean((p as { arModelUrl?: string | null }).arModelUrl),
+                        }
+                    })}
                 />
             </div>
         )
@@ -93,7 +109,7 @@ export default async function ShopPage({
             style={{ ["--pl-aurora" as string]: theme.accent, ["--pl-brand-foreground" as string]: theme.onAccent }}
         >
             <Tracker slug={slug} name="shop_view" />
-            <CatalogHeader slug={slug} name={profile.displayName} logoUrl={logo} label={catalogLabel(profile.roleTemplate)} whatsapp={profile.whatsapp} />
+            <CatalogHeader slug={slug} name={profile.displayName} logoUrl={logo} label={catalogLabel(profile.roleTemplate)} whatsapp={profile.whatsapp} aboutHref={aboutHref} hours={hours} />
 
             <main className="mx-auto max-w-2xl px-4 py-5 pb-10">
                 <ShopCatalog

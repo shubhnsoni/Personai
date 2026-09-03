@@ -86,6 +86,15 @@
   --text-micro--letter-spacing: 0.02em;
 }
 
+/* If JS never hydrates, the intro veil still lifts instead of staying black. */
+@keyframes pl-veil-lift {
+  0%, 55% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.pl-intro-veil {
+  animation: pl-veil-lift 3.8s ease forwards;
+}
+
 :root {
   /* Brand — Octagos-inspired cyan / electric blue, not pink */
   --pl-orb-from: #52E8FF;

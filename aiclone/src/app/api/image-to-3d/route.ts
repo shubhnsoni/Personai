@@ -121,7 +121,23 @@ async function persistOwnedArtifact(input: Readonly<{ profileId: string; filenam
   if (!directory.startsWith(`${baseDirectory}${sep}`) || dirname(fullPath) !== directory) throw new Error("Unsafe artifact path")
 
   await mkdir(directory, { recursive: true })
-  await writeFile(fullPath, input.bytes, { flag: "wx" })
+  let bytes = input.bytes
+  try {
+    const { optimizeModelSet } = await import("../../../lib/optimize-glb")
+    const set = await optimizeModelSet(input.bytes)
+    bytes = set.web
+    if (set.ar) {
+      const arPath = fullPath.replace(/\.glb$/i, "-ar.glb")
+      await writeFile(arPath, set.ar)
+    }
+    if (set.usdz) {
+      const usdzPath = fullPath.replace(/\.glb$/i, ".usdz")
+      await writeFile(usdzPath, set.usdz)
+    }
+  } catch {
+    bytes = input.bytes
+  }
+  await writeFile(fullPath, bytes, { flag: "wx" })
   const url = `/uploads/${owner}/${input.filename}`
   try {
     await prisma.profileEvent.create({
@@ -129,7 +145,7 @@ async function persistOwnedArtifact(input: Readonly<{ profileId: string; filenam
         profileId: input.profileId,
         name: ARTIFACT_EVENT,
         path: url,
-        meta: JSON.stringify({ mediaType: "model/gltf-binary", size: input.bytes.length, source: "sf3d" }),
+        meta: JSON.stringify({ mediaType: "model/gltf-binary", size: bytes.length, source: "sf3d" }),
       },
     })
   } catch (error) {

@@ -26,12 +26,12 @@ export function YouStudio({
     presets,
     documents,
 }: {
-    defaultTab: "profile" | "knowledge" | "import"
+    defaultTab: "profile" | "knowledge" | "import" | "story"
     profile: FaceProfile
     presets: WelcomeAnimationPreset[]
     documents: ProfileDocument[]
 }) {
-    const [tab, setTab] = useState(defaultTab)
+    const [tab, setTab] = useState(defaultTab === "story" ? "profile" : defaultTab)
     const [saving, setSaving] = useState(false)
     const [openKnowledge, setOpenKnowledge] = useState<(() => void) | null>(null)
     const [importCtl, setImportCtl] = useState<ImportApplyCtl>(null)
@@ -43,7 +43,12 @@ export function YouStudio({
     return (
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="gap-0">
             <TabsContent value="profile">
-                <ProfileEditor profile={profile} presets={presets} onSavingChange={setSaving} />
+                <ProfileEditor
+                    profile={profile}
+                    presets={presets}
+                    onSavingChange={setSaving}
+                    defaultTab={defaultTab === "story" ? "about" : "general"}
+                />
             </TabsContent>
             <TabsContent value="knowledge">
                 <ContentManager profileId={profile.id} documents={documents} onBindAdd={bindAdd} role={profile.roleTemplate} extras={extras} />
@@ -54,7 +59,7 @@ export function YouStudio({
 
             <StudioDock>
                 <DockTabs
-                    value={tab}
+                    value={tab === "story" ? "profile" : tab}
                     tabs={[
                         { id: "profile", label: "Profile", icon: <User />, onClick: () => setTab("profile") },
                         { id: "knowledge", label: "Knowledge", icon: <Brain />, onClick: () => setTab("knowledge") },

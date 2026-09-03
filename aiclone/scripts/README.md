@@ -7,8 +7,16 @@ Excluded from `tsc` via `tsconfig.json`. Run from `aiclone/`.
 | `fixtures/` | Sample resume and rupee-menu text for import tests |
 | `test-import.ts` | Import extractor smoke tests |
 | `one-off/` | One-shot demo/debug and guarded data-maintenance scripts |
+| `fill-skydine.mjs` | Demo seed for SkyDine Cafe only — not product defaults |
+| `optimize-ar-assets.ts` | Compress GLBs; default dir `public/uploads/skydine-ar` |
 
 One-off scripts are not part of `npm run dev`. Most expect `DATABASE_URL` in `.env`.
+
+## Demo fixture (SkyDine Cafe)
+
+SkyDine Cafe (Hinoo, Ranchi, slug `skydine-cafe`) is a **demo restaurant**. Seed it with `fill-skydine.mjs`. Assets live in `public/uploads/skydine-cafe/` and `public/uploads/skydine-ar/`.
+
+Do not copy Hinoo address, hours, Instagram, or printer chrome into shared UI. Other kits read `personalityConfig.venue`, `AvailabilitySchedule`, and `src/lib/kit-copy.ts`.
 
 ## Restaurant purchase backfill
 

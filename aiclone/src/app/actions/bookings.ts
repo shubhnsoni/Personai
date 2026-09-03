@@ -42,8 +42,22 @@ export async function getAvailableSlots(
 
     const bufferMinutes = Number((profile as { bufferMinutes?: number }).bufferMinutes || 0)
     const table = service && (service as { kind?: string }).kind === "TABLE"
-    const covers = table
-        ? Number((service as { covers?: number | null }).covers || (service as { maxBookingsPerDay?: number | null }).maxBookingsPerDay || 20)
+    const configured = table
+        ? Number((service as { covers?: number | null }).covers || (service as { maxBookingsPerDay?: number | null }).maxBookingsPerDay || 0)
+        : 0
+    const floor = table
+        ? await prisma.$queryRaw<Array<{ isReserved: boolean; seats: number | null }>>`
+            SELECT "isReserved", seats FROM "RestaurantTable"
+            WHERE "profileId" = ${profileId} AND "isActive" = true
+        `.catch(() => [])
+        : []
+    const openTables = floor.filter((row) => !row.isReserved)
+    const avgSeats = openTables.length
+        ? Math.max(2, Math.round(openTables.reduce((sum, row) => sum + (row.seats || 4), 0) / openTables.length))
+        : 4
+    const tablesNeeded = (people: number) => Math.max(1, Math.ceil(Math.max(1, people) / avgSeats))
+    const coverLimit = table
+        ? Math.max(0, floor.length ? (configured > 0 ? Math.min(openTables.length, configured) : openTables.length) : configured || 8)
         : null
 
     const slots = generateSlots({
@@ -57,12 +71,14 @@ export async function getAvailableSlots(
         })),
         durationMinutes,
         bufferMinutes,
-        coverLimit: covers,
-        partySize: opts?.partySize,
+        coverLimit,
+        partySize: table ? tablesNeeded(opts?.partySize || 2) : opts?.partySize,
         busy: bookings.map((b) => ({
             start: b.startTime,
             end: b.endTime,
-            covers: isHoldBooking(b.metadata, b.visitorEmail) ? (covers || 999) : parsePartySize(b.metadata),
+            covers: table
+                ? (isHoldBooking(b.metadata, b.visitorEmail) ? (coverLimit || 999) : tablesNeeded(parsePartySize(b.metadata)))
+                : parsePartySize(b.metadata),
         })),
     })
     const { filterPastSlots } = await import("@/lib/menu")
@@ -111,7 +127,7 @@ export async function createBooking(data: {
     const start = new Date(data.startTime)
     const end = new Date(start.getTime() + service.durationMinutes * 60000)
     const table = (service as { kind?: string }).kind === "TABLE"
-    const partySize = Math.max(1, Math.min(24, Math.floor(data.partySize || 1)))
+    const partySize = Math.max(1, Math.min(80, Math.floor(data.partySize || 1)))
 
     if (table) {
         const dateStr = data.startTime.slice(0, 10)

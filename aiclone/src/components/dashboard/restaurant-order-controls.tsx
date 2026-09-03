@@ -3,36 +3,37 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { advanceOrder, cancelOrder, markOrderPaid, setLineStatus } from "@/app/actions/orders"
-import type { RestaurantOrderLineStatus, RestaurantOrderStatus } from "@/lib/restaurant-orders"
+import { Input } from "@/components/ui/input"
+import { advanceOrder, extendOrder, markOrderPaid, rejectOrder } from "@/app/actions/orders"
+import type { RestaurantOrderStatus } from "@/lib/restaurant-orders"
 
-const ORDER_ACTION: Partial<Record<RestaurantOrderStatus, string>> = {
-    PLACED: "Accept",
-    ACCEPTED: "Start preparing",
+const NEXT_LABEL: Partial<Record<RestaurantOrderStatus, string>> = {
+    PLACED: "Approve",
+    ACCEPTED: "Mark cooking",
     PREPARING: "Mark ready",
-    READY: "Mark served",
+    READY: "Deliver",
     SERVED: "Mark paid",
-}
-
-const LINE_NEXT: Partial<Record<RestaurantOrderLineStatus, RestaurantOrderLineStatus>> = {
-    QUEUED: "PREPARING",
-    PREPARING: "READY",
-    READY: "SERVED",
 }
 
 export function RestaurantOrderControls({
     orderId,
     status,
-    lines,
+    staffNote,
+    dueAt,
+    guestPaid,
 }: {
     orderId: string
     status: RestaurantOrderStatus
-    lines: Array<{ id: string; title: string; status: RestaurantOrderLineStatus }>
+    staffNote?: string | null
+    dueAt?: string | null
+    guestPaid?: boolean
 }) {
     const router = useRouter()
     const [busy, setBusy] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [note, setNote] = useState("")
     const closed = status === "PAID" || status === "CANCELLED"
+    const next = NEXT_LABEL[status]
 
     async function run(key: string, action: () => Promise<unknown>) {
         setBusy(key)
@@ -47,53 +48,74 @@ export function RestaurantOrderControls({
         }
     }
 
-    const orderAction = ORDER_ACTION[status]
     return (
-        <div className="mt-3 space-y-2">
-            {!closed && orderAction ? (
-                <Button
-                    size="sm"
-                    className="h-8 rounded-full"
-                    disabled={busy !== null}
-                    onClick={() => run("order", () => status === "SERVED" ? markOrderPaid(orderId) : advanceOrder(orderId))}
-                >
-                    {busy === "order" ? "Updating…" : orderAction}
-                </Button>
+        <div className="mt-2 space-y-1.5">
+            {guestPaid && status !== "PAID" ? (
+                <p className="text-xs font-medium text-emerald-700">Guest says they paid</p>
             ) : null}
-            {!closed ? (
-                <Button
-                    size="sm"
-                    variant="outline"
-                    className="ml-2 h-8 rounded-full"
-                    disabled={busy !== null}
-                    onClick={() => {
-                        const reason = window.prompt("Why is this order being cancelled?")?.trim()
-                        if (reason) void run("cancel", () => cancelOrder(orderId, reason))
-                    }}
-                >
-                    {busy === "cancel" ? "Cancelling…" : "Cancel"}
-                </Button>
+            {staffNote ? <p className="text-xs text-muted-foreground">Kitchen note: {staffNote}</p> : null}
+            {dueAt && !closed ? (
+                <p className="text-xs text-muted-foreground">Due {new Date(dueAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
             ) : null}
-
-            {!closed && lines.some((line) => LINE_NEXT[line.status]) ? (
-                <div className="flex flex-wrap gap-1.5">
-                    {lines.map((line) => {
-                        const next = LINE_NEXT[line.status]
-                        if (!next) return null
-                        const key = `line:${line.id}`
-                        return (
-                            <Button
-                                key={line.id}
-                                size="sm"
-                                variant="secondary"
-                                className="h-7 rounded-full text-[11px]"
-                                disabled={busy !== null}
-                                onClick={() => run(key, () => setLineStatus(line.id, next))}
-                            >
-                                {busy === key ? "Updating…" : `${line.title}: ${next.toLowerCase()}`}
-                            </Button>
-                        )
-                    })}
+            <div className="flex flex-wrap gap-1.5">
+                {next && !closed ? (
+                    <Button
+                        size="sm"
+                        className="h-8 rounded-full"
+                        disabled={busy !== null}
+                        onClick={() => run("next", () => status === "SERVED" ? markOrderPaid(orderId) : advanceOrder(orderId))}
+                    >
+                        {busy === "next" ? "Updating…" : next}
+                    </Button>
+                ) : null}
+                {status === "PLACED" ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 rounded-full"
+                        disabled={busy !== null}
+                        onClick={() => {
+                            const reason = window.prompt("Reject reason?")?.trim()
+                            if (reason) void run("reject", () => rejectOrder(orderId, reason))
+                        }}
+                    >
+                        {busy === "reject" ? "Rejecting…" : "Reject"}
+                    </Button>
+                ) : !closed ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 rounded-full"
+                        disabled={busy !== null}
+                        onClick={() => {
+                            const reason = window.prompt("Cancel reason?")?.trim()
+                            if (reason) void run("reject", () => rejectOrder(orderId, reason))
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                ) : null}
+            </div>
+            {!closed && (status === "ACCEPTED" || status === "PREPARING" || status === "PLACED") ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                    {[5, 10, 15].map((mins) => (
+                        <Button
+                            key={mins}
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 rounded-full text-[11px]"
+                            disabled={busy !== null}
+                            onClick={() => run(`plus${mins}`, () => extendOrder(orderId, mins, note || undefined))}
+                        >
+                            +{mins} min
+                        </Button>
+                    ))}
+                    <Input
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="Note with extra time (optional)"
+                        className="h-8 min-w-40 flex-1 rounded-full text-xs"
+                    />
                 </div>
             ) : null}
             {error ? <p className="text-xs text-rose-600">{error}</p> : null}

@@ -16,19 +16,23 @@ import {
     Upload,
     ExternalLink,
     Gift,
+    Box,
 } from "lucide-react"
-import { deleteProduct, setProductActive } from "@/app/actions/products"
+import { deleteProduct, setAllPrepMinutes, setProductActive } from "@/app/actions/products"
 import { StudioDock } from "@/components/dashboard/studio-dock"
 import { DockTabs } from "@/components/dashboard/dock-tabs"
 import { CatalogSearch, FilterChips, ViewToggle, useCatalogView } from "@/components/dashboard/catalog-chrome"
 import { QuickAddSheet } from "@/components/dashboard/quick-add-sheet"
 import { ImportStudio, type ImportApplyCtl } from "@/components/dashboard/import-studio"
+import { ArBuildSheet } from "@/components/dashboard/ar-build-sheet"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useMoney } from "@/components/pricing-provider"
 import { isPhysical, parseGallery, stockLabel, whatsappHref } from "@/lib/commerce"
 import { fieldOn, type SurfaceExtras } from "@/lib/surfaces"
+
+type CatalogProduct = DigitalProduct & { prepMinutes?: number | null }
 
 interface ProductsListProps {
     profileId: string
@@ -37,7 +41,8 @@ interface ProductsListProps {
     restaurant?: boolean
     role?: string | null
     extras?: SurfaceExtras | null
-    products: DigitalProduct[]
+    products: CatalogProduct[]
+    arBatch?: string | null
 }
 
 const typeIcon: Record<string, typeof FileText> = {
@@ -48,17 +53,21 @@ const typeIcon: Record<string, typeof FileText> = {
     PHYSICAL: Package,
 }
 
-export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extras, products }: ProductsListProps) {
+export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extras, products, arBatch }: ProductsListProps) {
     const [view, setViewPersist] = useCatalogView("pl-shop-view")
     const [q, setQ] = useState("")
     const [filter, setFilter] = useState<"all" | "on" | "off" | "free" | "low">("all")
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [pending, startTransition] = useTransition()
     const [adding, setAdding] = useState(false)
-    const [editing, setEditing] = useState<DigitalProduct | null>(null)
+    const [editing, setEditing] = useState<CatalogProduct | null>(null)
     const [importOpen, setImportOpen] = useState(false)
     const [importCtl, setImportCtl] = useState<ImportApplyCtl>(null)
+    const [allMins, setAllMins] = useState("15")
+    const [arOpen, setArOpen] = useState(() => Boolean(arBatch && arBatch !== "cancel"))
+    const [arIds, setArIds] = useState<string[] | undefined>()
 
+    const showAr = fieldOn(role, "ar", extras)
     const sold = products.reduce((s, p) => s + (p.downloadCount || 0), 0)
     const live = products.filter((p) => p.isActive).length
 
@@ -87,6 +96,40 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
     return (
         <div className="space-y-3">
             {restaurant ? (
+                <div className="studio-panel space-y-3 rounded-2xl px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <span>
+                            <span className="block text-sm font-medium">Cooking time for all dishes</span>
+                            <span className="mt-0.5 block text-[12px] text-muted-foreground">Applies to every item. Edit a dish to set its own time.</span>
+                        </span>
+                        <span className="tabular-nums text-sm font-medium">{allMins} min</span>
+                    </div>
+                    <input
+                        type="range"
+                        min={5}
+                        max={90}
+                        step={5}
+                        value={Number(allMins) || 15}
+                        onChange={(e) => setAllMins(e.target.value)}
+                        className="w-full accent-cyan-500"
+                    />
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-9 rounded-full"
+                        disabled={pending}
+                        onClick={() => startTransition(async () => {
+                            await setAllPrepMinutes(profileId, parseInt(allMins, 10) || 15)
+                            toast.success(`Every dish is ${allMins} min`)
+                        })}
+                    >
+                        Set one time for all
+                    </Button>
+                </div>
+            ) : null}
+
+            {restaurant ? (
                 <button
                     type="button"
                     onClick={() => setImportOpen(true)}
@@ -97,6 +140,24 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
                         <span className="mt-0.5 block text-[12px] text-muted-foreground">Google Business, Swiggy, Zomato, or Uber Eats — paste the public link</span>
                     </span>
                     <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+            ) : null}
+
+            {showAr ? (
+                <button
+                    type="button"
+                    onClick={() => { setArIds(undefined); setArOpen(true) }}
+                    className="studio-panel flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left"
+                >
+                    <span>
+                        <span className="block text-sm font-medium">Photoreal 3D</span>
+                        <span className="mt-0.5 block text-[12px] text-muted-foreground">
+                            {restaurant
+                                ? "Pick dishes — or all — and we’ll build table-ready 3D from photos"
+                                : "Pick items — or all — and we’ll build 3D from photos. View in your space."}
+                        </span>
+                    </span>
+                    <Box className="h-4 w-4 shrink-0 text-cyan-500" />
                 </button>
             ) : null}
 
@@ -138,6 +199,7 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
                         <ProductRow
                             key={product.id}
                             product={product}
+                            restaurant={restaurant}
                             deleting={deletingId === product.id}
                             pending={pending}
                             onOpen={() => setEditing(product)}
@@ -152,6 +214,7 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
                         <ProductTile
                             key={product.id}
                             product={product}
+                            restaurant={restaurant}
                             deleting={deletingId === product.id}
                             pending={pending}
                             onOpen={() => setEditing(product)}
@@ -253,7 +316,21 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
                 product={editing}
                 restaurant={restaurant}
                 role={role}
+                onPhotoreal={showAr && editing ? () => {
+                    setArIds([editing.id])
+                    setAdding(false)
+                    setEditing(null)
+                    setArOpen(true)
+                } : undefined}
             />
+            {showAr ? (
+                <ArBuildSheet
+                    open={arOpen}
+                    onOpenChange={setArOpen}
+                    initialIds={arIds}
+                    batchId={arBatch && arBatch !== "cancel" ? arBatch : null}
+                />
+            ) : null}
         </div>
     )
 }
@@ -296,13 +373,15 @@ function Thumb({ product, className, compact = false }: { product: DigitalProduc
 
 function ProductRow({
     product,
+    restaurant,
     deleting,
     pending,
     onOpen,
     onToggle,
     onDelete,
 }: {
-    product: DigitalProduct
+    product: CatalogProduct
+    restaurant?: boolean
     deleting: boolean
     pending: boolean
     onOpen: () => void
@@ -319,9 +398,10 @@ function ProductRow({
                 <p className="truncate text-sm font-medium">{product.title}</p>
                 <p className="truncate text-[11px] text-muted-foreground">
                     {money(product.priceCents, product.currency)}
-                    {isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
+                    {restaurant ? ` · ${product.prepMinutes || 15} min` : isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
                     {stockLabel(product.stock) ? ` · ${stockLabel(product.stock)}` : ""}
                     {!product.isActive ? " · Off" : ""}
+                    {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}
                 </p>
             </button>
             <Switch checked={product.isActive} disabled={pending} onCheckedChange={onToggle} />
@@ -334,13 +414,15 @@ function ProductRow({
 
 function ProductTile({
     product,
+    restaurant,
     deleting,
     pending,
     onOpen,
     onToggle,
     onDelete,
 }: {
-    product: DigitalProduct
+    product: CatalogProduct
+    restaurant?: boolean
     deleting: boolean
     pending: boolean
     onOpen: () => void
@@ -358,9 +440,10 @@ function ProductTile({
                     <p className="line-clamp-2 text-sm font-medium leading-5">{product.title}</p>
                     <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
                         {money(product.priceCents, product.currency)}
-                        {isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
+                        {restaurant ? ` · ${product.prepMinutes || 15} min` : isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
                         {stockLabel(product.stock) ? ` · ${stockLabel(product.stock)}` : ""}
                         {!product.isActive ? " · Off" : ""}
+                        {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}
                     </p>
                 </button>
                 <div className="flex items-center justify-between pt-0.5">

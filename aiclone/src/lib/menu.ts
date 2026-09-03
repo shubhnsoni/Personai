@@ -89,7 +89,7 @@ export function parseReservation(metadata?: string | null) {
         const parsed = JSON.parse(metadata) as { partySize?: number; phone?: string; notes?: string }
         const n = Number(parsed.partySize)
         return {
-            partySize: Number.isFinite(n) && n > 0 ? Math.min(24, Math.floor(n)) : 1,
+            partySize: Number.isFinite(n) && n > 0 ? Math.min(80, Math.floor(n)) : 1,
             phone: parsed.phone || "",
             notes: parsed.notes || "",
         }

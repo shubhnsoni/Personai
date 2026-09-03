@@ -28,6 +28,7 @@ export interface ProductData {
     diet?: string
     spiceLevel?: number | null
     serveWindow?: string
+    prepMinutes?: number | null
     arModelUrl?: string
     arUsdzUrl?: string
     currency?: string
@@ -80,6 +81,9 @@ export async function createProduct(profileId: string, data: ProductData) {
             variantsJson: write.variantsJson ?? null,
         },
     })
+    if (data.prepMinutes && data.prepMinutes > 0) {
+        await prisma.$executeRaw`UPDATE "DigitalProduct" SET "prepMinutes" = ${Math.min(90, Math.floor(data.prepMinutes))} WHERE id = ${created.id}`
+    }
     revalidatePath("/dashboard/products")
     return created
 }
@@ -95,6 +99,17 @@ export async function updateProduct(productId: string, data: ProductData) {
             return updated.count === 1 ? true : null
         },
     }))
+    if (data.prepMinutes != null) {
+        const minutes = data.prepMinutes > 0 ? Math.min(90, Math.floor(data.prepMinutes)) : null
+        await prisma.$executeRaw`UPDATE "DigitalProduct" SET "prepMinutes" = ${minutes} WHERE id = ${productId}`
+    }
+    revalidatePath("/dashboard/products")
+}
+
+export async function setAllPrepMinutes(profileId: string, minutes: number) {
+    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
+    const n = Math.max(1, Math.min(90, Math.floor(minutes)))
+    await prisma.$executeRaw`UPDATE "DigitalProduct" SET "prepMinutes" = ${n} WHERE "profileId" = ${profile.id}`
     revalidatePath("/dashboard/products")
 }
 

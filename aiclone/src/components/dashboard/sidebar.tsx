@@ -75,11 +75,14 @@ export function visibleNavItems(role?: string | null, extras?: import("@/lib/sur
             const surface = navHrefToSurface(item.href)
             return !surface || hasSurface(role, surface, extras)
         })
-        .map((item) => (
-            item.href === "/dashboard/products"
-                ? { ...item, name: shopNavLabel(role) }
-                : item
-        ))
+        .map((item) => {
+            if (item.href === "/dashboard/products") return { ...item, name: shopNavLabel(role) }
+            if (role === "RESTAURANT" && item.href === "/dashboard/calendar") return { ...item, name: "Reservations" }
+            if (role === "RESTAURANT" && item.href === "/dashboard/money") {
+                return { ...item, name: "Floor", href: "/dashboard/orders", prefixes: ["/dashboard/orders", "/dashboard/money", "/dashboard/payments"] }
+            }
+            return item
+        })
 }
 
 export function isActivePath(pathname: string, item: NavItem) {

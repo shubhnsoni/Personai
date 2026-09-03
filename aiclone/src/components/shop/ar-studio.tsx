@@ -26,6 +26,7 @@ export function ArStudio({
     existing,
     sourcePhotos,
     restaurant,
+    onPhotoreal,
 }: {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -33,6 +34,7 @@ export function ArStudio({
     existing?: string | null
     sourcePhotos?: string[]
     restaurant?: boolean
+    onPhotoreal?: () => void
 }) {
     const videoRef = useRef<HTMLVideoElement>(null)
     const streamRef = useRef<MediaStream | null>(null)
@@ -553,6 +555,25 @@ export function ArStudio({
                                     />
                                 </label>
                             </div>
+
+                            {onPhotoreal ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onOpenChange(false)
+                                        onPhotoreal()
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-2xl border border-cyan-400/40 bg-cyan-400/10 p-3 text-left"
+                                >
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400 text-zinc-950">
+                                        <Sparkles className="h-4 w-4" />
+                                    </span>
+                                    <span>
+                                        <span className="block text-sm font-medium text-white">Photoreal 3D</span>
+                                        <span className="block text-[12px] text-zinc-400">Paid. Built from a photo. Guests put it on the table.</span>
+                                    </span>
+                                </button>
+                            ) : null}
 
                             {sourcePhotos?.[0] && !photo ? (
                                 <button

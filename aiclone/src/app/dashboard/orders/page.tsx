@@ -22,7 +22,7 @@ export default async function DashboardOrdersPage() {
     requireSurface(profile.roleTemplate, "shop", profile)
 
     if (profile.roleTemplate === "RESTAURANT") {
-        return <RestaurantOrdersDashboard profileId={profile.id} />
+        return <RestaurantOrdersDashboard profileId={profile.id} slug={profile.slug} />
     }
 
     const [productPurchases, courseEnrollments, eventRegistrations, communityMembers, payments] = await Promise.all([

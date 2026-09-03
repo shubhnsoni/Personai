@@ -37,6 +37,7 @@ export function QuickAddSheet({
     product,
     restaurant,
     role,
+    onPhotoreal,
 }: {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -44,6 +45,7 @@ export function QuickAddSheet({
     product?: DigitalProduct | null
     restaurant?: boolean
     role?: string | null
+    onPhotoreal?: () => void
 }) {
     const pack = (p: Parameters<typeof fieldOn>[1]) => fieldOn(role, p)
     const showPhysical = pack("shopPhysical")
@@ -73,6 +75,7 @@ export function QuickAddSheet({
     const [diet, setDiet] = useState("")
     const [spiceLevel, setSpiceLevel] = useState("")
     const [serveWindow, setServeWindow] = useState("ALL")
+    const [prepMinutes, setPrepMinutes] = useState("15")
     const [arModelUrl, setArModelUrl] = useState("")
     const [arUsdzUrl, setArUsdzUrl] = useState("")
     const [arOpen, setArOpen] = useState(false)
@@ -102,6 +105,7 @@ export function QuickAddSheet({
         setDiet((product as { diet?: string | null })?.diet || "")
         setSpiceLevel((product as { spiceLevel?: number | null })?.spiceLevel != null ? String((product as { spiceLevel?: number | null }).spiceLevel) : "")
         setServeWindow((product as { serveWindow?: string | null })?.serveWindow || "ALL")
+        setPrepMinutes(String((product as { prepMinutes?: number | null })?.prepMinutes || 15))
         setArModelUrl((product as { arModelUrl?: string | null })?.arModelUrl || "")
         setArUsdzUrl((product as { arUsdzUrl?: string | null })?.arUsdzUrl || "")
     }, [open, product, editing])
@@ -127,6 +131,7 @@ export function QuickAddSheet({
         setDiet("")
         setSpiceLevel("")
         setServeWindow("ALL")
+        setPrepMinutes("15")
         setArModelUrl("")
         setArUsdzUrl("")
         setArOpen(false)
@@ -178,6 +183,7 @@ export function QuickAddSheet({
                                 diet: diet || undefined,
                                 spiceLevel: spiceLevel === "" ? null : parseInt(spiceLevel, 10),
                                 serveWindow: serveWindow || undefined,
+                                prepMinutes: restaurant ? parseInt(prepMinutes, 10) || 15 : undefined,
                                 arModelUrl: arModelUrl || undefined,
                                 arUsdzUrl: arUsdzUrl || undefined,
                             }
@@ -290,6 +296,23 @@ export function QuickAddSheet({
                             Live now
                             <Switch checked={live} onCheckedChange={setLive} />
                         </label>
+                        {restaurant ? (
+                            <label className="block rounded-2xl bg-muted/50 px-3.5 py-3">
+                                <span className="flex justify-between text-[12px] text-muted-foreground">
+                                    <span>Cooking time</span>
+                                    <span className="tabular-nums font-medium text-foreground">{prepMinutes} min</span>
+                                </span>
+                                <input
+                                    type="range"
+                                    min={5}
+                                    max={90}
+                                    step={5}
+                                    value={Number(prepMinutes) || 15}
+                                    onChange={(e) => setPrepMinutes(e.target.value)}
+                                    className="mt-2 w-full accent-cyan-500"
+                                />
+                            </label>
+                        ) : null}
                         {showAr ? (
                             <ArTrigger hasModel={Boolean(arModelUrl)} restaurant={restaurant} onClick={() => setArOpen(true)} />
                         ) : null}
@@ -443,6 +466,7 @@ export function QuickAddSheet({
             existing={arModelUrl || null}
             sourcePhotos={photos}
             restaurant={restaurant}
+            onPhotoreal={onPhotoreal}
             onReady={(glb, usdz) => {
                 setArModelUrl(glb)
                 if (usdz) setArUsdzUrl(usdz)

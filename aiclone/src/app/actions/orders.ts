@@ -52,20 +52,36 @@ function emitOrderEvents(profileId: string, orderId: string, orderNumber: number
     }
 }
 
+function publicPlaceError(error: unknown): never {
+    if (error instanceof Error && !/Invalid `prisma|does not exist in the current database/i.test(error.message)) {
+        throw error
+    }
+    throw new Error("Could not place that order. Please try again.")
+}
+
 export async function createRestaurantOrder(input: CreateRestaurantOrderInput) {
-    const result = await createRestaurantOrderRecord(input)
+    let result
+    try {
+        result = await createRestaurantOrderRecord(input)
+    } catch (error) {
+        publicPlaceError(error)
+    }
 
     // A replay is not a new fact, so it must not re-broadcast.
     if (!result.replayed) {
-        const created = await prisma.order.findUnique({
-            where: { id: result.id },
-            select: {
-                profileId: true,
-                number: true,
-                events: { orderBy: { seq: "asc" }, take: 1, select: EVENT_SELECT },
-            },
-        })
-        if (created) emitOrderEvents(created.profileId, result.id, created.number, created.events)
+        try {
+            const created = await prisma.order.findUnique({
+                where: { id: result.id },
+                select: {
+                    profileId: true,
+                    number: true,
+                    events: { orderBy: { seq: "asc" }, take: 1, select: EVENT_SELECT },
+                },
+            })
+            if (created) emitOrderEvents(created.profileId, result.id, created.number, created.events)
+        } catch {
+            // Order is already saved; live kitchen ping can catch up on the next poll.
+        }
     }
 
     revalidatePath("/dashboard/orders")
@@ -312,4 +328,77 @@ export async function cancelOrder(orderId: string, reason: string) {
     revalidatePath("/dashboard/orders")
     revalidatePath("/dashboard/money")
     return { id: result.id, status: result.status }
+}
+
+export async function rejectOrder(orderId: string, reason: string) {
+    return cancelOrder(orderId, reason || "Rejected")
+}
+
+export async function extendOrder(orderId: string, extraMinutes: number, note?: string) {
+    const id = orderId.trim()
+    const minutes = Math.max(1, Math.min(90, Math.floor(extraMinutes)))
+    const staffNote = note?.trim().slice(0, 240) || null
+    const owner = await requireOrderOwner()
+    const order = await prisma.order.findUnique({
+        where: { id },
+        select: { profileId: true, status: true, number: true, placedAt: true },
+    })
+    if (!order) throw new Error("Order not found.")
+    assertOwned(owner.profileId, order.profileId)
+    if (order.status === "PAID" || order.status === "CANCELLED" || order.status === "SERVED") {
+        throw new Error("This ticket is already closed.")
+    }
+    const rows = await prisma.$queryRaw<Array<{ dueAt: Date | null }>>`
+        SELECT "dueAt" FROM "Order" WHERE id = ${id}
+    `
+    const currentDue = rows[0]?.dueAt ? new Date(rows[0].dueAt) : new Date(order.placedAt.getTime() + 15 * 60 * 1000)
+    const nextDue = new Date(Math.max(Date.now(), currentDue.getTime()) + minutes * 60 * 1000)
+    await prisma.$executeRaw`
+        UPDATE "Order"
+        SET "dueAt" = ${nextDue.toISOString()}::timestamptz, "staffNote" = COALESCE(${staffNote}, "staffNote"), "updatedAt" = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+    `
+    const event = await prisma.orderEvent.create({
+        data: {
+            orderId: id,
+            kind: "ORDER_STATUS",
+            from: order.status,
+            to: order.status,
+            actor: "STAFF",
+            actorId: owner.actorId,
+            metadata: { extraMinutes: minutes, note: staffNote },
+        },
+        select: EVENT_SELECT,
+    })
+    emitOrderEvents(owner.profileId, id, order.number, [event])
+    revalidatePath("/dashboard/orders")
+    return { id, dueAt: nextDue.toISOString() }
+}
+
+export async function guestConfirmPaid(token: string) {
+    const publicToken = token.trim()
+    if (!publicToken) throw new Error("Order is required.")
+    const order = await prisma.order.findUnique({
+        where: { publicToken },
+        select: { id: true, profileId: true, number: true, payStatus: true, status: true },
+    })
+    if (!order) throw new Error("Order not found.")
+    if (order.status === "CANCELLED") throw new Error("This order was cancelled.")
+    if (order.payStatus === "PAID") return { ok: true }
+    await prisma.order.update({
+        where: { id: order.id },
+        data: { paymentRef: "guest-confirmed" },
+    })
+    const event = await prisma.orderEvent.create({
+        data: {
+            orderId: order.id,
+            kind: "PAYMENT_STATUS",
+            from: order.payStatus,
+            to: "GUEST_CONFIRMED",
+            actor: "GUEST",
+        },
+        select: EVENT_SELECT,
+    })
+    emitOrderEvents(order.profileId, order.id, order.number, [event])
+    return { ok: true }
 }

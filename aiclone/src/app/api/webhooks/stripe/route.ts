@@ -77,6 +77,17 @@ export async function POST(req: Request) {
                 })
                 console.log(`Fulfilled ${itemType} purchase for ${visitorEmail}`)
             } else switch (itemType) {
+                case "ar-build": {
+                    const batchId = metadata.itemId
+                    const profileId = metadata.profileId
+                    if (batchId && profileId) {
+                        const { markBatchPaid, tickBatch } = await import("@/lib/ar-builds")
+                        await markBatchPaid(batchId, paymentId)
+                        await tickBatch(batchId, profileId)
+                    }
+                    break
+                }
+
                 case "booking": {
                     const bookingId = metadata.bookingId
                     if (bookingId) {

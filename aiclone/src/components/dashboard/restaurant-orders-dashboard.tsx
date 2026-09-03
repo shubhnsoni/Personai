@@ -1,11 +1,15 @@
 import Link from "next/link"
+import { headers } from "next/headers"
 import { formatDistanceToNow } from "date-fns"
-import { CircleDollarSign, Clock3, Package, ReceiptText } from "lucide-react"
 import { prisma } from "@/lib/prisma"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RestaurantOrderControls } from "@/components/dashboard/restaurant-order-controls"
 import { OrderStreamIndicator } from "@/components/dashboard/order-stream-indicator"
+import { TableQrStudio } from "@/components/dashboard/table-qr-studio"
+import { FloorKitchenTabs } from "@/components/dashboard/floor-kitchen-tabs"
+import { tablesForProfile } from "@/lib/restaurant-tables"
+import { reservationLabel } from "@/lib/menu"
+import { ensureProfilePaymentQr } from "@/app/actions/payment-qr"
 
 function money(cents: number, currency: string) {
     try {
@@ -22,15 +26,44 @@ function revenueLabel(orders: Array<{ totalCents: number; currency: string }>) {
     return [...totals.entries()].map(([currency, cents]) => money(cents, currency)).join(" + ")
 }
 
-export async function RestaurantOrdersDashboard({ profileId }: { profileId: string }) {
-    const orders = await prisma.order.findMany({
-        where: { profileId },
-        include: {
-            lines: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
-        },
-        orderBy: { placedAt: "desc" },
-        take: 200,
-    })
+export async function RestaurantOrdersDashboard({ profileId, slug }: { profileId: string; slug: string }) {
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 1)
+    const h = await headers()
+    const host = h.get("x-forwarded-host") || h.get("host") || "localhost:3000"
+    const proto = h.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https")
+    const origin = `${proto}://${host}`
+
+    await ensureProfilePaymentQr(profileId).catch(() => null)
+    const [orders, tables, bookings, dueRows] = await Promise.all([
+        prisma.order.findMany({
+            where: { profileId },
+            include: {
+                lines: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+            },
+            orderBy: { placedAt: "desc" },
+            take: 200,
+        }),
+        tablesForProfile(profileId).catch((err) => {
+            console.error("restaurant tables", err)
+            return []
+        }),
+        prisma.booking.findMany({
+            where: {
+                profileId,
+                status: { not: "CANCELLED" },
+                startTime: { gte: start, lt: end },
+            },
+            include: { serviceOffering: true },
+            orderBy: { startTime: "asc" },
+        }),
+        prisma.$queryRaw<Array<{ id: string; dueAt: Date | null; staffNote: string | null }>>`
+            SELECT id, "dueAt", "staffNote" FROM "Order" WHERE "profileId" = ${profileId}
+        `.catch(() => []),
+    ])
+    const dueById = new Map(dueRows.map((row) => [row.id, row]))
     const paidOrders = orders.filter((order) => order.status === "PAID" && order.payStatus === "PAID")
     const itemsSold = paidOrders.reduce(
         (sum, order) => sum + order.lines.reduce((lineSum, line) => lineSum + line.qty, 0),
@@ -42,105 +75,103 @@ export async function RestaurantOrdersDashboard({ profileId }: { profileId: stri
         : 0
     const averageCurrency = paidOrders[0]?.currency || orders[0]?.currency || "USD"
 
+    const stats = [
+        { label: "Paid", value: revenueLabel(paidOrders) },
+        { label: "Open", value: String(openOrders) },
+        { label: "Sold", value: String(itemsSold) },
+        { label: "Avg ticket", value: paidOrders.length ? money(averageTicket, averageCurrency) : "—" },
+    ]
+
     return (
-        <div className="flex-1 space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm text-muted-foreground">Restaurant orders — grouped by guest checkout</p>
-                <OrderStreamIndicator />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Paid revenue</CardTitle>
-                        <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{revenueLabel(paidOrders)}</div></CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Open orders</CardTitle>
-                        <Clock3 className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{openOrders}</div></CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Items sold</CardTitle>
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{itemsSold}</div></CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Average ticket</CardTitle>
-                        <ReceiptText className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{paidOrders.length ? money(averageTicket, averageCurrency) : "—"}</div></CardContent>
-                </Card>
-            </div>
-
-            <Card>
-                <CardHeader><CardTitle>Restaurant orders</CardTitle></CardHeader>
-                <CardContent>
-                    {orders.length === 0 ? (
-                        <p className="py-8 text-center text-muted-foreground">No restaurant orders yet</p>
-                    ) : (
-                        <div className="space-y-4">
-                            {orders.map((order) => (
-                                <article key={order.id} className="rounded-2xl border border-border/70 bg-muted/20 p-4">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <p className="font-semibold">Order #{order.number}</p>
-                                                <Badge variant={order.status === "PAID" ? "default" : order.status === "CANCELLED" ? "destructive" : "secondary"}>
-                                                    {order.status}
-                                                </Badge>
-                                                <Badge variant="outline">{order.payStatus}</Badge>
-                                            </div>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                {order.guestName || "Guest"}{order.guestEmail ? ` · ${order.guestEmail}` : ""}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {order.tableLabel || "Takeaway"} · {order.payMethod || "Payment pending"} · {formatDistanceToNow(order.placedAt, { addSuffix: true })}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-lg font-semibold tabular-nums">{money(order.totalCents, order.currency)}</p>
-                                            <Link href={`/dashboard/orders/${order.id}/receipt`} className="text-[11px] text-muted-foreground underline">
-                                                Receipt
-                                            </Link>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-3 divide-y divide-border/50 rounded-xl bg-background/70 px-3">
-                                        {order.lines.map((line) => (
-                                            <div key={line.id} className="flex items-start justify-between gap-3 py-2 text-sm">
-                                                <div className="min-w-0">
-                                                    <p className="font-medium">{line.qty}× {line.titleSnapshot}</p>
-                                                    {line.modifiersLabel ? <p className="text-xs text-muted-foreground">{line.modifiersLabel}</p> : null}
-                                                    <p className="text-[11px] text-muted-foreground">{line.status}</p>
-                                                </div>
-                                                <span className="shrink-0 tabular-nums">{money(line.lineTotalCents, order.currency)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {order.cancelReason ? <p className="mt-2 text-xs text-rose-600">Cancelled: {order.cancelReason}</p> : null}
-                                    <RestaurantOrderControls
-                                        orderId={order.id}
-                                        status={order.status}
-                                        lines={order.lines.map((line) => ({
-                                            id: line.id,
-                                            title: line.titleSnapshot,
-                                            status: line.status,
-                                        }))}
-                                    />
-                                </article>
+        <div className="flex-1 space-y-5">
+            <FloorKitchenTabs
+                openOrders={openOrders}
+                actions={
+                    <div className="flex items-center gap-2">
+                        <Link href="/dashboard/calendar" className="text-[12px] text-muted-foreground underline">Reservations</Link>
+                        <Link href="/dashboard/profile" className="text-[12px] text-muted-foreground underline">Payment QR</Link>
+                        <OrderStreamIndicator />
+                    </div>
+                }
+                floor={
+                    <TableQrStudio
+                        slug={slug}
+                        origin={origin}
+                        bookings={bookings.map((booking) => ({
+                            id: booking.id,
+                            name: booking.visitorName,
+                            detail: reservationLabel(booking.metadata, booking.serviceOffering.name),
+                            time: booking.startTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                        }))}
+                        tables={tables.map((table) => ({
+                            id: table.id,
+                            label: table.label,
+                            seats: table.seats,
+                            zone: table.zone,
+                            code: table.code,
+                            isActive: table.isActive,
+                            isReserved: Boolean((table as { isReserved?: boolean }).isReserved),
+                        }))}
+                    />
+                }
+                kitchen={
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-4 divide-x divide-border/60 overflow-hidden rounded-2xl border border-border/60">
+                            {stats.map((stat) => (
+                                <div key={stat.label} className="min-w-0 px-3 py-3">
+                                    <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{stat.label}</p>
+                                    <p className="mt-1 truncate text-[1.05rem] font-semibold tabular-nums sm:text-lg">{stat.value}</p>
+                                </div>
                             ))}
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+
+                        {orders.length === 0 ? (
+                            <p className="py-10 text-center text-sm text-muted-foreground">No restaurant orders yet</p>
+                        ) : (
+                            <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60">
+                                {orders.map((order) => (
+                                    <article key={order.id} className="px-4 py-3.5">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <p className="font-semibold">#{order.number}</p>
+                                                    <Badge variant={order.status === "PAID" ? "default" : order.status === "CANCELLED" ? "destructive" : "secondary"}>
+                                                        {order.status}
+                                                    </Badge>
+                                                    {order.payStatus !== "UNPAID" ? <Badge variant="outline">{order.payStatus}</Badge> : null}
+                                                </div>
+                                                <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                                                    {order.guestName || "Guest"}
+                                                    {order.tableLabel ? ` · ${order.tableLabel}` : " · Takeaway"}
+                                                    {" · "}
+                                                    {formatDistanceToNow(order.placedAt, { addSuffix: true })}
+                                                </p>
+                                                <p className="mt-1 text-sm">
+                                                    {order.lines.map((line) => `${line.qty}× ${line.titleSnapshot}`).join(" · ")}
+                                                </p>
+                                            </div>
+                                            <div className="shrink-0 text-right">
+                                                <p className="font-semibold tabular-nums">{money(order.totalCents, order.currency)}</p>
+                                                <Link href={`/dashboard/orders/${order.id}/receipt`} className="text-[11px] text-muted-foreground underline">
+                                                    Receipt
+                                                </Link>
+                                            </div>
+                                        </div>
+                                        {order.cancelReason ? <p className="mt-1 text-xs text-rose-600">Cancelled: {order.cancelReason}</p> : null}
+                                        <RestaurantOrderControls
+                                            orderId={order.id}
+                                            status={order.status}
+                                            guestPaid={order.paymentRef === "guest-confirmed"}
+                                            dueAt={dueById.get(order.id)?.dueAt?.toISOString() || null}
+                                            staffNote={dueById.get(order.id)?.staffNote || null}
+                                        />
+                                    </article>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                }
+            />
         </div>
     )
 }

@@ -78,6 +78,7 @@ function SheetContent({
         data-slot="sheet-content"
         className={cn(sheetVariants({ side }), className)}
         {...props}
+        aria-describedby={props["aria-describedby"] ?? undefined}
       >
         <DialogPrimitive.Close
           data-slot="sheet-close"

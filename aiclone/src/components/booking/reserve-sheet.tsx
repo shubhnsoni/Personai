@@ -12,6 +12,8 @@ import { createBooking, getAvailableSlots } from "@/app/actions/bookings"
 import { localDateKey } from "@/lib/menu"
 import { whatsappHref } from "@/lib/commerce"
 import { cn } from "@/lib/utils"
+import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
+import { LARGE_PARTY_MIN, PartySizePicker } from "@/components/booking/party-size-picker"
 
 type TableService = {
     id: string
@@ -22,6 +24,14 @@ type TableService = {
     isFree?: boolean
     priceCents?: number
 }
+
+export type ReserveMode = "table" | "session"
+export type ReserveConfirmLabel =
+    | "Hold table"
+    | "Book session"
+    | "Book consult"
+    | "Book treatment"
+    | "Request visit"
 
 function dayOptions(count = 7) {
     const out: { key: string; label: string; sub: string }[] = []
@@ -40,18 +50,42 @@ function dayOptions(count = 7) {
     return out
 }
 
+function sessionCopy(confirmLabel?: ReserveConfirmLabel) {
+    switch (confirmLabel) {
+        case "Book consult":
+            return { title: "Book a consult", description: "Time and phone. We’ll hold it.", success: "Consult booked", empty: "No times left this day", toast: "Consult booked" }
+        case "Book treatment":
+            return { title: "Book a treatment", description: "Time and phone. We’ll hold it.", success: "Treatment booked", empty: "No times left this day", toast: "Treatment booked" }
+        case "Request visit":
+            return { title: "Request a visit", description: "Time and phone. We’ll request it.", success: "Visit requested", empty: "No times left this day", toast: "Visit requested" }
+        default:
+            return { title: "Book a session", description: "Time and phone. We’ll hold it.", success: "Session booked", empty: "No times left this day", toast: "Session booked" }
+    }
+}
+
 export function ReserveSheet({
     open,
     onClose,
     profile,
     service,
+    mode = "table",
+    partyLabel,
+    hideParty,
+    confirmLabel,
 }: {
     open: boolean
     onClose: () => void
     profile: { id: string; displayName: string; whatsapp?: string | null }
     service: TableService | null
+    mode?: ReserveMode
+    partyLabel?: string
+    hideParty?: boolean
+    confirmLabel?: ReserveConfirmLabel
 }) {
-    const [partySize, setPartySize] = useState(2)
+    const isSession = mode === "session"
+    const copy = isSession ? sessionCopy(confirmLabel) : null
+    const defaultParty = isSession || hideParty ? 1 : 2
+    const [partySize, setPartySize] = useState(defaultParty)
     const [date, setDate] = useState(localDateKey())
     const [slots, setSlots] = useState<string[]>([])
     const [time, setTime] = useState("")
@@ -67,17 +101,22 @@ export function ReserveSheet({
         if (!open || !service) return
         setLoading(true)
         setTime("")
-        getAvailableSlots(profile.id, date, service.durationMinutes || 90, {
-            partySize,
-            serviceId: service.id,
-        })
+        const duration = service.durationMinutes || (isSession ? 30 : 90)
+        getAvailableSlots(
+            profile.id,
+            date,
+            duration,
+            isSession
+                ? { serviceId: service.id }
+                : { partySize, serviceId: service.id },
+        )
             .then(setSlots)
             .catch(() => setSlots([]))
             .finally(() => setLoading(false))
-    }, [open, date, partySize, profile.id, service])
+    }, [open, date, partySize, profile.id, service, isSession])
 
     function reset() {
-        setPartySize(2)
+        setPartySize(defaultParty)
         setDate(localDateKey())
         setTime("")
         setName("")
@@ -91,27 +130,35 @@ export function ReserveSheet({
         if (!service || !time || !name.trim() || !phone.trim()) return
         setBusy(true)
         try {
+            const extra = isSession
+                ? (!hideParty && partyLabel === "Attendees" && partySize > 1 ? `${partySize} attendees` : "")
+                : (partySize >= LARGE_PARTY_MIN ? `Large group of ${partySize} — join tables` : "")
             const created = await createBooking({
                 profileId: profile.id,
                 serviceOfferingId: service.id,
                 startTime: `${date}T${time}:00`,
                 visitorName: name.trim(),
                 visitorPhone: phone.trim(),
-                partySize,
-                notes: notes.trim() || undefined,
+                partySize: isSession && hideParty ? undefined : partySize,
+                notes: [extra, notes.trim()].filter(Boolean).join(". ") || undefined,
             })
             setBooked({
                 id: created.id,
                 start: new Date(created.startTime),
                 end: new Date(created.endTime),
             })
-            toast.success("Table reserved")
+            toast.success(isSession ? copy!.toast : "Table reserved")
         } catch {
             toast.error("That time just filled. Pick another.")
-            const next = await getAvailableSlots(profile.id, date, service.durationMinutes || 90, {
-                partySize,
-                serviceId: service.id,
-            }).catch(() => [])
+            const duration = service.durationMinutes || (isSession ? 30 : 90)
+            const next = await getAvailableSlots(
+                profile.id,
+                date,
+                duration,
+                isSession
+                    ? { serviceId: service.id }
+                    : { partySize, serviceId: service.id },
+            ).catch(() => [])
             setSlots(next)
             setTime("")
         } finally {
@@ -121,8 +168,18 @@ export function ReserveSheet({
 
     const wa = whatsappHref(
         profile.whatsapp,
-        `Hi ${profile.displayName}, table for ${partySize} on ${date}${time ? ` at ${time}` : ""} — ${name || ""} ${phone || ""}`.trim(),
+        isSession
+            ? `Hi ${profile.displayName}, ${service?.name || "session"} on ${date}${time ? ` at ${time}` : ""} — ${name || ""} ${phone || ""}`.trim()
+            : `Hi ${profile.displayName}, table for ${partySize} on ${date}${time ? ` at ${time}` : ""} — ${name || ""} ${phone || ""}`.trim(),
     )
+
+    const confirmText = busy
+        ? (isSession ? "Booking…" : "Holding…")
+        : isSession
+            ? (confirmLabel || "Book session")
+            : partySize >= LARGE_PARTY_MIN
+                ? `Request tables for ${partySize}`
+                : `Hold table for ${partySize}`
 
     return (
         <Sheet
@@ -145,15 +202,19 @@ export function ReserveSheet({
                             <CheckCircle className="h-7 w-7 text-emerald-400" />
                         </div>
                         <SheetHeader className="space-y-1 p-0">
-                            <SheetTitle className="text-xl text-white">Table reserved</SheetTitle>
+                            <SheetTitle className="text-xl text-white">{isSession ? copy!.success : "Table reserved"}</SheetTitle>
                             <SheetDescription className="text-zinc-400">
-                                {profile.displayName} · table for {partySize} · {date} at {time}
+                                {isSession
+                                    ? `${profile.displayName} · ${service?.name || "Session"} · ${date} at ${time}`
+                                    : `${profile.displayName} · table for ${partySize} · ${date} at ${time}`}
                             </SheetDescription>
                         </SheetHeader>
                         <CalendarLinks
                             event={{
                                 id: booked.id,
-                                title: `Table for ${partySize} at ${profile.displayName}`,
+                                title: isSession
+                                    ? `${service?.name || "Session"} with ${profile.displayName}`
+                                    : `Table for ${partySize} at ${profile.displayName}`,
                                 start: booked.start,
                                 end: booked.end,
                             }}
@@ -173,28 +234,20 @@ export function ReserveSheet({
                     <div className="flex min-h-0 flex-1 flex-col">
                         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pt-3 pb-4">
                             <SheetHeader className="space-y-1 p-0 text-left">
-                                <SheetTitle className="text-lg text-white">Reserve a table</SheetTitle>
-                                <SheetDescription>Party, time, phone. We hold it for you.</SheetDescription>
+                                <SheetTitle className="text-lg text-white">{isSession ? copy!.title : "Reserve a table"}</SheetTitle>
+                                <SheetDescription>
+                                    {isSession
+                                        ? [service?.name, service?.durationMinutes ? `${service.durationMinutes} min` : null, copy!.description].filter(Boolean).join(" · ")
+                                        : "Party, time, phone. We hold it for you."}
+                                </SheetDescription>
                             </SheetHeader>
 
-                            <div>
-                                <p className="mb-2 text-xs text-zinc-500">Party</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                                        <button
-                                            key={n}
-                                            type="button"
-                                            onClick={() => setPartySize(n)}
-                                            className={cn(
-                                                "h-10 w-10 rounded-full text-sm",
-                                                partySize === n ? "bg-cyan-500 text-zinc-950" : "bg-white/8 text-zinc-300",
-                                            )}
-                                        >
-                                            {n}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            <PartySizePicker
+                                value={partySize}
+                                onChange={setPartySize}
+                                label={partyLabel}
+                                hidden={hideParty}
+                            />
 
                             <div>
                                 <p className="mb-2 text-xs text-zinc-500">When</p>
@@ -240,12 +293,12 @@ export function ReserveSheet({
                                     </div>
                                 ) : (
                                     <p className="py-4 text-center text-sm text-zinc-500">
-                                        No tables left this day
+                                        {isSession ? copy!.empty : "No tables left this day"}
                                         {wa ? (
                                             <>
                                                 {" · "}
-                                                <a href={wa} target="_blank" rel="noreferrer" className="text-cyan-400">
-                                                    WhatsApp us
+                                                <a href={wa} target="_blank" rel="noreferrer" className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#25D366] text-zinc-950" aria-label="WhatsApp">
+                                                    <WhatsAppIcon className="h-4 w-4" />
                                                 </a>
                                             </>
                                         ) : null}
@@ -270,19 +323,30 @@ export function ReserveSheet({
                                 <Textarea
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    placeholder="Notes — window, high chair, allergy"
+                                    placeholder={isSession ? "Notes — agenda, add-on, access" : "Notes — window, high chair, allergy"}
                                     rows={2}
                                     className="rounded-2xl border-white/10 bg-zinc-900"
                                 />
                             </div>
                         </div>
-                        <div className="shrink-0 border-t border-white/10 px-5 py-3 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
+                        <div className="shrink-0 space-y-2 border-t border-white/10 px-5 py-3 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
+                            {!isSession && partySize >= 20 && wa ? (
+                                <a
+                                    href={wa}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#25D366] text-sm font-semibold text-zinc-950"
+                                >
+                                    <WhatsAppIcon className="h-4 w-4" />
+                                    WhatsApp for {partySize}
+                                </a>
+                            ) : null}
                             <Button
                                 className="h-11 w-full rounded-full bg-cyan-500 text-zinc-950 hover:bg-cyan-400"
                                 disabled={busy || !time || !name.trim() || !phone.trim()}
                                 onClick={() => void hold()}
                             >
-                                {busy ? "Holding…" : `Hold table for ${partySize}`}
+                                {confirmText}
                             </Button>
                         </div>
                     </div>

@@ -10,6 +10,7 @@ import { ReviewForm } from "@/components/shop/review-form"
 import { StoryGallery } from "@/components/shop/story-gallery"
 import { collectItemPhotos } from "@/lib/item-photos"
 import { catalogLabel, dietLabel, isRestaurant, serveLabel } from "@/lib/menu"
+import { extrasOf } from "@/lib/surfaces"
 import { Camera } from "lucide-react"
 import Link from "next/link"
 
@@ -43,15 +44,18 @@ export default async function ProductSalesPage({
     })()
     const logo = (product.profile as { shopLogoUrl?: string | null }).shopLogoUrl
     const reviewRows = product.reviews
+    const restaurant = isRestaurant(product.profile.roleTemplate)
     const photos = await collectItemPhotos({
         title: product.title,
         category: product.category,
         galleryUrls: product.galleryUrls,
         thumbnailUrl: product.thumbnailUrl,
         reviews: reviewRows,
+        kind: restaurant ? "menu" : "product",
     })
     const variants = parseVariants(product.variantsJson)
-    const restaurant = isRestaurant(product.profile.roleTemplate)
+    const extras = extrasOf(product.profile.personalityConfig)
+    const menuOrder = restaurant || extras.packs?.includes("menuDish") === true
     const diet = (product as { diet?: string | null }).diet
     const spice = (product as { spiceLevel?: number | null }).spiceLevel
     const serve = serveLabel((product as { serveWindow?: string | null }).serveWindow)
@@ -80,7 +84,7 @@ export default async function ProductSalesPage({
                         className="flex h-12 items-center justify-center gap-1.5 rounded-full bg-cyan-400 text-sm font-medium text-zinc-950"
                     >
                         <Camera className="h-4 w-4" />
-                        View on table
+                        {restaurant ? "View on table" : "View in your space"}
                     </Link>
                 ) : null}
                 <div>
@@ -137,25 +141,34 @@ export default async function ProductSalesPage({
             </main>
             <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-zinc-950/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <div className="mx-auto max-w-2xl">
-                    <CourseEnrollButton
-                        item={{
-                            itemType: "product",
-                            itemId: product.id,
-                            title: product.title,
-                            priceCents: product.priceCents,
-                            currency: product.currency,
-                            description: product.description,
-                            fulfillment: product.fulfillment,
-                            allowCod: product.allowCod,
-                            upiId: product.profile.upiId,
-                            whatsapp: product.profile.whatsapp,
-                            shipMode: product.shipMode,
-                            shipFeeCents: product.shipFeeCents,
-                            gstin: product.profile.gstin,
-                            soldOut: product.stock != null && product.stock <= 0,
-                            variants: variants.map((v) => v.name),
-                        }}
-                    />
+                    {menuOrder ? (
+                        <Link
+                            href={`/${slug}/menu?item=${product.id}`}
+                            className="flex h-12 w-full items-center justify-center rounded-full bg-brand text-sm font-medium text-brand-foreground"
+                        >
+                            Add on the menu
+                        </Link>
+                    ) : (
+                        <CourseEnrollButton
+                            item={{
+                                itemType: "product",
+                                itemId: product.id,
+                                title: product.title,
+                                priceCents: product.priceCents,
+                                currency: product.currency,
+                                description: product.description,
+                                fulfillment: product.fulfillment,
+                                allowCod: product.allowCod,
+                                upiId: product.profile.upiId,
+                                whatsapp: product.profile.whatsapp,
+                                shipMode: product.shipMode,
+                                shipFeeCents: product.shipFeeCents,
+                                gstin: product.profile.gstin,
+                                soldOut: product.stock != null && product.stock <= 0,
+                                variants: variants.map((v) => v.name),
+                            }}
+                        />
+                    )}
                 </div>
             </div>
         </div>

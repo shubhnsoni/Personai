@@ -2,6 +2,7 @@ import { ProfileDocument } from "@prisma/client"
 import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings"
 import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
+import { waPrefill } from "@/lib/kit-copy"
 
 export interface PersonalityConfig {
     tone?: "professional" | "casual" | "friendly" | "witty"
@@ -219,10 +220,62 @@ function formatRoleTemplate(role: string): string {
         'RESTAURANT': 'Restaurant',
         'CA': 'Chartered Accountant',
         'CREATOR': 'Creator',
+        'EVENTS_STUDIO': 'Events studio',
+        'REAL_ESTATE_BROKERAGE': 'Real-estate brokerage',
+        'RECRUITMENT_AGENCY': 'Recruitment agency',
+        'SALON_SPA': 'Salon or spa',
+        'FIELD_SERVICE': 'Field service',
         'CUSTOM': 'Professional'
     }
     return roleMap[role] || 'Professional'
 }
+
+export function showStoryDescription(role?: string | null): string {
+    return `Show the about page — ${showStorySubject(role)}, and a shareable about link`
+}
+
+function showStorySubject(role?: string | null): string {
+    switch (role) {
+        case "RESTAURANT":
+            return "photos of the room"
+        case "EVENTS_STUDIO":
+        case "SALON_SPA":
+        case "DESIGNER":
+        case "DEVELOPER":
+        case "EDITOR":
+            return "photos and the studio"
+        case "CONSULTANT":
+        case "CA":
+        case "COACH":
+        case "RECRUITMENT_AGENCY":
+            return "photos and the practice"
+        default:
+            return "photos and the story"
+    }
+}
+
+function bookChip(role: string): string {
+    switch (role) {
+        case "RESTAURANT": return "Reserve a table"
+        case "SHOP": return "Shop now"
+        case "CONSULTANT": return "Book a session"
+        case "CA": return "Book a consult"
+        case "COACH": return "Learn with me"
+        case "JOB_SEEKER": return "Open to work"
+        case "DESIGNER":
+        case "DEVELOPER":
+        case "EDITOR": return "Selected work"
+        case "CREATOR": return "Get the free guide"
+        case "FIELD_SERVICE": return "Request a visit"
+        case "SALON_SPA": return "Book a treatment"
+        case "EVENTS_STUDIO": return "Plan your event"
+        case "REAL_ESTATE_BROKERAGE": return "Discuss a property"
+        case "RECRUITMENT_AGENCY": return "Share a hiring brief"
+        default: return "Let's talk"
+    }
+}
+
+
 
 function buildPersonalitySection(personalityConfigStr?: string | null): string {
     if (!personalityConfigStr) return ""
@@ -422,6 +475,8 @@ ${contextSection}
 ## Your Behavior Guidelines
 - You speak in first person as ${profile.displayName}'s AI representative
 - Your primary goal is to ${goalDescription}
+- Preferred next-step chip: ${bookChip(role)}
+- If you send them to WhatsApp, prefill "${waPrefill(role, profile.displayName)}". Do not use "A table at" unless this is a restaurant.
 - Be professional, friendly, and conversational
 - When asked about services, products, courses, or events, provide accurate information from the data above
 - When asked about experience or projects, reference specific details from the data
@@ -436,6 +491,7 @@ ${buildPersonalitySection(profile.personalityConfig)}
 ## Tools Available
 You have access to these functions that you should use when appropriate:
 - collectLead: Use when the visitor shows interest and provides their contact info
+- showStory: ${showStoryDescription(role)}
 ${showServices ? "- showServices: Use when asked about rates, booking, or sessions\n" : ""}${showPortfolio ? "- showWorkExperience: Use when asked about background, CV, or work history\n- showProjects: Use when asked about portfolio or past projects\n" : ""}${showShop && role === "RESTAURANT" ? "- showMenu: Use when asked about the menu or dishes\n- bookTable: Use when they want to reserve a table. Never invent an empty table.\n" : ""}${showShop && role !== "RESTAURANT" ? "- showProducts: Use when asked about products or the shop\n" : ""}${showCourses ? "- showCourses: Use when asked about courses or training\n" : ""}${showEvents ? "- showEvents: Use when asked about events\n- showCommunities: Use when asked about groups\n" : ""}- showLeadMagnets: Use when asked about free resources, guides, or giveaways
 
 Remember: You are representing ${profile.displayName} professionally. Help visitors discover valuable content and services!`

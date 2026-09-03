@@ -190,7 +190,19 @@ async function persistOwnedArtifact(input: Readonly<{
   if (!directory.startsWith(`${baseDirectory}${sep}`) || dirname(fullPath) !== directory) throw new Error("Unsafe artifact path")
 
   await mkdir(directory, { recursive: true })
-  await writeFile(fullPath, input.bytes, { flag: "wx" })
+  let bytes = input.bytes
+  if (input.filename.toLowerCase().endsWith(".glb")) {
+    try {
+      const { optimizeModelSet } = await import("../../../lib/optimize-glb")
+      const set = await optimizeModelSet(input.bytes)
+      bytes = set.web
+      await writeFile(fullPath.replace(/\.glb$/i, "-ar.glb"), set.ar)
+      if (set.usdz) await writeFile(fullPath.replace(/\.glb$/i, ".usdz"), set.usdz)
+    } catch {
+      bytes = input.bytes
+    }
+  }
+  await writeFile(fullPath, bytes, { flag: "wx" })
   const url = `/uploads/${owner}/${input.filename}`
   try {
     await prisma.profileEvent.create({
@@ -198,7 +210,7 @@ async function persistOwnedArtifact(input: Readonly<{
         profileId: input.profileId,
         name: ARTIFACT_EVENT,
         path: url,
-        meta: JSON.stringify({ mediaType: input.mediaType, size: input.bytes.length }),
+        meta: JSON.stringify({ mediaType: input.mediaType, size: bytes.length }),
       },
     })
   } catch (error) {

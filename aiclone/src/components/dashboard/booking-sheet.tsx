@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { CalendarLinks } from "@/components/calendar/calendar-links"
 import { parseReservation, reservationLabel } from "@/lib/menu"
 import { whatsappHref } from "@/lib/commerce"
+import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 
 export function BookingSheet({
     booking,
@@ -57,8 +58,8 @@ export function BookingSheet({
                         </p>
                     ) : null}
                     {wa ? (
-                        <a href={wa} target="_blank" rel="noreferrer" className="inline-flex rounded-full bg-[#25D366] px-3 py-1.5 text-xs font-medium text-zinc-950">
-                            WhatsApp guest
+                        <a href={wa} target="_blank" rel="noreferrer" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-zinc-950" aria-label="WhatsApp guest">
+                            <WhatsAppIcon className="h-4 w-4" />
                         </a>
                     ) : null}
                     {!hold && (

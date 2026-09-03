@@ -8,6 +8,7 @@ import { X } from "lucide-react"
 import { useMoney } from "@/components/pricing-provider"
 import { isPhysical, whatsappHref } from "@/lib/commerce"
 import { placeManualOrder } from "@/app/actions/products"
+import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 
 export type CheckoutItem = {
     itemType: "product" | "course" | "event" | "community"
@@ -198,7 +199,7 @@ export function CheckoutSheet({
                                         onClick={() => setPayMethod(id)}
                                         className={`h-9 rounded-full text-xs font-medium ${payMethod === id ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-300"}`}
                                     >
-                                        {label}
+                                        {id === "WHATSAPP" ? <WhatsAppIcon className="mx-auto h-4 w-4" /> : label}
                                     </button>
                                 )
                             })}
