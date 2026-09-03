@@ -2,10 +2,12 @@ import type { FieldPack, Surface } from "@/lib/surfaces"
 
 export type NeedId =
     | "sell" | "dine" | "time" | "teach" | "ca" | "hire" | "show" | "leads" | "page" | "field"
-    | "salon" | "eventStudio" | "estate" | "recruit"
+    | "salon" | "eventStudio" | "estate" | "recruit" | "jewelryRetail" | "goldWholesale"
 
 export type RoleTemplate =
     | "SHOP"
+    | "JEWELRY_RETAIL"
+    | "JEWELRY_WHOLESALE"
     | "RESTAURANT"
     | "CONSULTANT"
     | "CA"
@@ -42,6 +44,8 @@ export type Need = {
 
 export const NEEDS: Need[] = [
     { id: "sell", role: "SHOP", goal: "SELL_PRODUCTS", title: "Shopkeeper", blurb: "I sell products, in person or online.", folk: "shopkeepers", headline: "Shop now", next: "/dashboard/products" },
+    { id: "jewelryRetail", role: "JEWELRY_RETAIL", goal: "SELL_PRODUCTS", title: "Jewellery store", blurb: "Gold by weight and purity, priced from today's city rate.", folk: "jewellers", headline: "See jewellery", next: "/dashboard/products" },
+    { id: "goldWholesale", role: "JEWELRY_WHOLESALE", goal: "COLLECT_LEADS", title: "Gold wholesale", blurb: "Buy on touch, sell to shops, cash or udhar.", folk: "wholesalers", headline: "See stock", next: "/dashboard/products" },
     { id: "dine", role: "RESTAURANT", goal: "BOOK_TABLE", title: "Restaurant", blurb: "I run a kitchen, cafe, or bar.", folk: "restaurants", headline: "Reserve a table", next: "/dashboard/products" },
     { id: "time", role: "CONSULTANT", goal: "TAKE_APPOINTMENTS", title: "Consultant", blurb: "People book time with me.", folk: "consultants", headline: "Book a session", next: "/dashboard/services" },
     { id: "teach", role: "COACH", goal: "SELL_PRODUCTS", title: "Coach", blurb: "I teach, train, or mentor.", folk: "coaches", headline: "Learn with me", next: "/dashboard/courses" },
@@ -92,6 +96,8 @@ export const ADDONS: {
 
 const ROLE_ADDONS: Record<string, AddonId[]> = {
     SHOP: ["shop", "digital"],
+    JEWELRY_RETAIL: ["shop"],
+    JEWELRY_WHOLESALE: ["shop", "leads"],
     RESTAURANT: ["menu"],
     CONSULTANT: ["leads", "services", "calendar", "portfolio"],
     CA: ["leads", "services", "calendar", "portfolio"],
@@ -189,6 +195,10 @@ export const ROLES_WITHOUT_BLUEPRINT: readonly RoleTemplate[] = Object.freeze([
     "DESIGNER",
     "CREATOR",
     "CUSTOM",
+    // Same commerce engines as SHOP. The coverage harness forbids two roles claiming
+    // retail-storefront-v1, so this kit is unmapped on purpose and still uses SHOP surfaces.
+    "JEWELRY_RETAIL",
+    "JEWELRY_WHOLESALE",
 ])
 
 export function correspondingBlueprintId(role: string | null | undefined): string | null {

@@ -711,6 +711,8 @@ const ghostInput = "h-auto rounded-none border-0 border-b border-border/70 bg-tr
 
 const ROLES = [
     { id: "SHOP", label: "Shop" },
+    { id: "JEWELRY_RETAIL", label: "Jewellery store" },
+    { id: "JEWELRY_WHOLESALE", label: "Gold wholesale" },
     { id: "RESTAURANT", label: "Restaurant" },
     { id: "CONSULTANT", label: "Consultant" },
     { id: "CA", label: "CA / professional" },

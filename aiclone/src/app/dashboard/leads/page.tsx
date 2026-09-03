@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma"
 import { LeadsStudio, type StudioLead } from "@/components/dashboard/leads-studio"
 import { parseLeadTags } from "@/lib/lead-meta"
 import { requireSurface } from "@/lib/require-surface"
+import { isJewelryWholesale } from "@/lib/metal/math"
+import { listParties } from "@/lib/metal/ledger"
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +15,10 @@ export default async function DashboardLeadsPage() {
     const profile = user.profiles[0]
     if (!profile) redirect("/onboarding")
     requireSurface(profile.roleTemplate, "leads", profile)
+
+    const parties = isJewelryWholesale(profile.roleTemplate)
+        ? await listParties(profile.id)
+        : []
 
     const [leads, conversations, purchases, enrollments, bookings] = await Promise.all([
         prisma.visitorLead.findMany({
@@ -72,5 +78,21 @@ export default async function DashboardLeadsPage() {
         }
     })
 
-    return <LeadsStudio leads={rows} slug={profile.slug} displayName={profile.displayName} />
+    return (
+        <div className="space-y-4">
+            {parties.length ? (
+                <div className="studio-panel divide-y divide-white/8 rounded-2xl">
+                    {parties.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between px-4 py-3">
+                            <div>
+                                <p className="text-sm font-medium">{p.displayName}</p>
+                                <p className="text-[12px] text-muted-foreground">{p.kind.toLowerCase()}{p.phone ? ` · ${p.phone}` : ""} · {p.termsDays}d</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+            <LeadsStudio leads={rows} slug={profile.slug} displayName={profile.displayName} />
+        </div>
+    )
 }

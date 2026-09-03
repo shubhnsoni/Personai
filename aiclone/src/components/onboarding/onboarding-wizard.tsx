@@ -13,6 +13,7 @@ import {
     Clock,
     FileDown,
     FolderKanban,
+    Gem,
     Gift,
     GraduationCap,
     ImagePlus,
@@ -56,6 +57,8 @@ const NEED_ICON: Record<NeedId, typeof Store> = {
     eventStudio: Ticket,
     estate: Store,
     recruit: Briefcase,
+    jewelryRetail: Gem,
+    goldWholesale: Gem,
     page: Sparkles,
 }
 

@@ -6,7 +6,10 @@ export function isRestaurant(role?: string | null) {
 }
 
 export function catalogLabel(role?: string | null) {
-    return isRestaurant(role) ? "Menu" : "Shop"
+    if (isRestaurant(role)) return "Menu"
+    if (role === "JEWELRY_RETAIL") return "Jewellery"
+    if (role === "JEWELRY_WHOLESALE") return "Stock"
+    return "Shop"
 }
 
 export function catalogPath(slug: string, role?: string | null) {

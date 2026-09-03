@@ -3,6 +3,8 @@ import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
 import { MoneyBoard, type MoneyPerson } from "@/components/dashboard/money-board"
 import { requireSurface } from "@/lib/require-surface"
+import { isJewelryKit } from "@/lib/metal/math"
+import { UdharBoard } from "@/components/shop/udhar-board"
 
 export const dynamic = "force-dynamic"
 
@@ -153,15 +155,18 @@ export default async function DashboardMoneyPage() {
         : productPurchases.filter((purchase) => purchase.status === "COMPLETED").length
 
     return (
-        <MoneyBoard
-            people={[...peopleMap.values()]}
-            stats={{
-                revenueCents: totalRevenue,
-                products: productsSold,
-                courses: courseEnrollments.length,
-                events: eventRegistrations.length,
-                members: communityMembers.filter((m) => m.status === "ACTIVE").length,
-            }}
-        />
+        <div className="space-y-4">
+            {isJewelryKit(profile.roleTemplate) ? <UdharBoard upiId={profile.upiId} /> : null}
+            <MoneyBoard
+                people={[...peopleMap.values()]}
+                stats={{
+                    revenueCents: totalRevenue,
+                    products: productsSold,
+                    courses: courseEnrollments.length,
+                    events: eventRegistrations.length,
+                    members: communityMembers.filter((m) => m.status === "ACTIVE").length,
+                }}
+            />
+        </div>
     )
 }

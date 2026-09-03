@@ -1,12 +1,26 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { SignIn, SignUp } from "@clerk/nextjs"
 import { AnimatePresence, motion } from "framer-motion"
 import { Logo } from "@/components/brand/logo"
 import { clerkAppearance } from "@/lib/clerk-appearance"
+
+/**
+ * Clerk's <SignIn>/<SignUp> host (`data-clerk-component`) is inserted on the
+ * first client render and omitted from SSR HTML. Reading `typeof window`
+ * during render is the mismatch Next logged on /sign-in.
+ *
+ * useSyncExternalStore keeps the server snapshot and the hydration frame
+ * identical (no Clerk host), then the client snapshot mounts the widgets.
+ * A client-only mount skips the placeholder and shows Clerk immediately.
+ */
+const subscribeNever = () => () => {}
+function useIsClient() {
+    return useSyncExternalStore(subscribeNever, () => true, () => false)
+}
 
 type Mode = "sign-in" | "sign-up"
 
@@ -34,6 +48,7 @@ export function AuthScreen() {
     const router = useRouter()
     const routeMode = modeFromPath(pathname)
     const [mode, setMode] = useState<Mode>(routeMode)
+    const clerkReady = useIsClient()
 
     useEffect(() => {
         setMode(routeMode)
@@ -82,26 +97,32 @@ export function AuthScreen() {
                         </div>
 
                         <div className="auth-clerk relative w-full">
-                            <div
-                                className={mode === "sign-in" ? "block" : "hidden"}
-                                aria-hidden={mode !== "sign-in"}
-                            >
-                                <SignIn
-                                    appearance={clerkAppearance}
-                                    fallbackRedirectUrl="/dashboard"
-                                    signUpUrl="/sign-up"
-                                />
-                            </div>
-                            <div
-                                className={mode === "sign-up" ? "block" : "hidden"}
-                                aria-hidden={mode !== "sign-up"}
-                            >
-                                <SignUp
-                                    appearance={clerkAppearance}
-                                    fallbackRedirectUrl="/onboarding"
-                                    signInUrl="/sign-in"
-                                />
-                            </div>
+                            {clerkReady ? (
+                                <>
+                                    <div
+                                        className={mode === "sign-in" ? "block" : "hidden"}
+                                        aria-hidden={mode !== "sign-in"}
+                                    >
+                                        <SignIn
+                                            appearance={clerkAppearance}
+                                            fallbackRedirectUrl="/dashboard"
+                                            signUpUrl="/sign-up"
+                                        />
+                                    </div>
+                                    <div
+                                        className={mode === "sign-up" ? "block" : "hidden"}
+                                        aria-hidden={mode !== "sign-up"}
+                                    >
+                                        <SignUp
+                                            appearance={clerkAppearance}
+                                            fallbackRedirectUrl="/onboarding"
+                                            signInUrl="/sign-in"
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="min-h-[14rem]" aria-hidden />
+                            )}
                         </div>
 
                         <p className="mt-6 text-center text-[12px] text-white/35">

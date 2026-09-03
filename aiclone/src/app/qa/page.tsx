@@ -4,7 +4,7 @@ import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
 import { ACTIVE_PROFILE_COOKIE, TRY_KITS } from "@/lib/try-kits"
 import { openTryKit } from "@/app/actions/try-kits"
-import { surfacesFor, shopNavLabel } from "@/lib/surfaces"
+import { surfacesFor, leadsNavLabel, salesNavLabel, shopNavLabel } from "@/lib/surfaces"
 
 export const dynamic = "force-dynamic"
 
@@ -56,7 +56,12 @@ export default async function QaKitsPage() {
                         const existing = byRole.get(kit.role)
                         const surfaces = surfacesFor(kit.role)
                             .filter((s) => s !== "home" && s !== "profile" && s !== "inbox")
-                            .map((s) => (s === "shop" ? shopNavLabel(kit.role) : s))
+                            .map((s) => {
+                                if (s === "shop") return shopNavLabel(kit.role)
+                                if (s === "leads") return leadsNavLabel(kit.role)
+                                if (s === "sales") return salesNavLabel(kit.role)
+                                return s
+                            })
                         const on = existing && existing.id === activeId
                         return (
                             <div key={kit.role} className="rounded-2xl border border-border/70 bg-card px-4 py-3.5">

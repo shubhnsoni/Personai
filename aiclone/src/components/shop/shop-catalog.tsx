@@ -21,6 +21,7 @@ type Item = {
     diet?: string | null
     spiceLevel?: number | null
     ar?: boolean
+    metalLine?: string | null
 }
 
 export function ShopCatalog({
@@ -131,9 +132,14 @@ export function ShopCatalog({
                                     {showDiet && p.diet ? <span className={`mt-1 h-2 w-2 shrink-0 rounded-sm ${dietDotClass(p.diet)}`} title={dietLabel(p.diet) || ""} /> : null}
                                     {p.title}
                                 </p>
+                                {p.metalLine ? (
+                                    <p className="text-[11px] text-zinc-500">{p.metalLine}</p>
+                                ) : null}
                                 <p className="text-sm tabular-nums" style={{ color: accent }}>
-                                    {formatStoredPrice(p.priceCents, p.currency, currency)}
-                                    {!restaurant && (p.fulfillment === "PHYSICAL" || p.fulfillment === "BOTH") ? " · Physical" : ""}
+                                    {p.metalLine && p.priceCents <= 0
+                                        ? "On bill"
+                                        : formatStoredPrice(p.priceCents, p.currency, currency)}
+                                    {!restaurant && !p.metalLine && (p.fulfillment === "PHYSICAL" || p.fulfillment === "BOTH") ? " · Physical" : ""}
                                     {showDiet && p.spiceLevel ? ` · ${"🌶".repeat(p.spiceLevel)}` : ""}
                                     {p.ar ? " · AR" : ""}
                                     {p.stock != null && p.stock <= 3 ? ` · ${p.stock <= 0 ? "Sold out" : `${p.stock} left`}` : ""}

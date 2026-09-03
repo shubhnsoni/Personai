@@ -247,6 +247,10 @@ model Profile {
   fieldJobInspectionTemplates FieldJobInspectionTemplate[]
   fieldJobInspections         FieldJobInspection[]
   BlueprintInstallation       BlueprintInstallation[]
+  partyAccounts               PartyAccount[]
+  metalLots                   MetalLot[]
+  metalBills                  MetalBill[]
+  metalPayments               MetalPayment[]
 }
 
 model ProfileEvent {
@@ -685,6 +689,7 @@ model DigitalProduct {
   InventoryItem  InventoryItem[]
   ProductOption  ProductOption[]
   ProductVariant ProductVariant[]
+  metalLots      MetalLot[]
 }
 
 model Course {
@@ -1322,6 +1327,7 @@ model Contact {
   sourceLinks  ContactSourceLink[]
   activities   ActivityEvent[]
   CaseRetainer CaseRetainer[]
+  partyAccount PartyAccount?
 
   @@index([workspaceId, email])
   @@index([workspaceId, phone])
@@ -3691,4 +3697,138 @@ model BlueprintInstallationEvent {
 
   @@index([installationId, createdAt])
   @@index([workspaceId, createdAt])
+}
+
+/// Gold wholesale / store stock-in. Kind is SUPPLIER | RETAILER | CUSTOMER.
+model PartyAccount {
+  id                String   @id @default(cuid())
+  profileId         String
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  contactId         String?  @unique
+  contact           Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  kind              String
+  displayName       String
+  phone             String?
+  gstin             String?
+  creditLimitPaise  Int      @default(0)
+  termsDays         Int      @default(0)
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  bills     MetalBill[]
+  payments  MetalPayment[]
+  ledger    PartyLedgerEntry[]
+
+  @@index([profileId, kind])
+  @@index([profileId, phone])
+}
+
+model MetalLot {
+  id                String   @id @default(cuid())
+  profileId         String
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  productId         String?
+  product           DigitalProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  title             String
+  grossMg           Int
+  remainingGrossMg  Int
+  remainingQty      Int      @default(0)
+  purityBps         Int
+  costTouchBps      Int
+  sourceBillId      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  lines MetalBillLine[]
+
+  @@index([profileId, remainingGrossMg])
+}
+
+model MetalBill {
+  id              String    @id @default(cuid())
+  profileId       String
+  profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  partyAccountId  String
+  party           PartyAccount @relation(fields: [partyAccountId], references: [id], onDelete: Restrict)
+  kind            String
+  k24PaisePer10g  Int
+  totalPaise      Int
+  paidPaise       Int       @default(0)
+  payStatus       String    @default("UNPAID")
+  dueOn           DateTime?
+  publicToken     String    @unique
+  liftedAt        DateTime?
+  liftedByProfileId String?
+  note            String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lines       MetalBillLine[]
+  allocations MetalAllocation[]
+
+  @@index([profileId, kind, payStatus])
+  @@index([partyAccountId, payStatus])
+}
+
+model MetalBillLine {
+  id             String    @id @default(cuid())
+  billId         String
+  bill           MetalBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  lotId          String?
+  lot            MetalLot? @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  title          String
+  grossMg        Int
+  touchBpsBilled Int
+  makingPaise    Int       @default(0)
+  linePaise      Int
+  qty            Int       @default(1)
+}
+
+model MetalPayment {
+  id             String   @id @default(cuid())
+  profileId      String
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  partyAccountId String
+  party          PartyAccount @relation(fields: [partyAccountId], references: [id], onDelete: Restrict)
+  method         String
+  paise          Int
+  fineMg         Int      @default(0)
+  ref            String?
+  at             DateTime @default(now())
+
+  allocations MetalAllocation[]
+
+  @@index([profileId, at])
+  @@index([partyAccountId, at])
+}
+
+model MetalAllocation {
+  id        String       @id @default(cuid())
+  paymentId String
+  payment   MetalPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  billId    String
+  bill      MetalBill    @relation(fields: [billId], references: [id], onDelete: Cascade)
+  paise     Int
+
+  @@unique([paymentId, billId])
+}
+
+/// Append-only. UPDATE/DELETE refused by trigger.
+model PartyLedgerEntry {
+  id             String       @id @default(cuid())
+  partyAccountId String
+  party          PartyAccount @relation(fields: [partyAccountId], references: [id], onDelete: Cascade)
+  kind           String
+  paiseDelta     Int
+  fineMgDelta    Int          @default(0)
+  paiseAfter     Int
+  fineMgAfter    Int          @default(0)
+  billId         String?
+  paymentId      String?
+  idempotencyKey String?
+  at             DateTime     @default(now())
+
+  @@unique([partyAccountId, idempotencyKey])
+  @@index([partyAccountId, at])
 }

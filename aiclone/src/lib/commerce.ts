@@ -29,9 +29,14 @@ export function parseVariants(raw?: string | null): { name: string; stock?: numb
     if (!raw?.trim()) return []
     try {
         const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) {
-            return parsed
-                .map((v) => ({ name: String(v.name || v).trim(), stock: typeof v.stock === "number" ? v.stock : undefined }))
+        const list = Array.isArray(parsed)
+            ? parsed
+            : parsed && typeof parsed === "object" && Array.isArray((parsed as { variants?: unknown }).variants)
+                ? (parsed as { variants: unknown[] }).variants
+                : null
+        if (list) {
+            return list
+                .map((v) => ({ name: String((v as { name?: string }).name || v).trim(), stock: typeof (v as { stock?: number }).stock === "number" ? (v as { stock: number }).stock : undefined }))
                 .filter((v) => v.name)
         }
     } catch {

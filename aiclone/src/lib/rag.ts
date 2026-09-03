@@ -3,6 +3,8 @@ import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings"
 import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { waPrefill } from "@/lib/kit-copy"
+import { goldBoardFromConfig } from "@/lib/metal/board"
+import { formatRatePerGram } from "@/lib/metal/math"
 
 export interface PersonalityConfig {
     tone?: "professional" | "casual" | "friendly" | "witty"
@@ -217,6 +219,8 @@ function formatRoleTemplate(role: string): string {
         'DEVELOPER': 'Developer',
         'JOB_SEEKER': 'Professional',
         'SHOP': 'Shopkeeper',
+        'JEWELRY_RETAIL': 'Jewellery store',
+        'JEWELRY_WHOLESALE': 'Gold wholesaler',
         'RESTAURANT': 'Restaurant',
         'CA': 'Chartered Accountant',
         'CREATOR': 'Creator',
@@ -327,6 +331,10 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
     const showCourses = hasSurface(role, "courses", extras)
     const showEvents = hasSurface(role, "events", extras)
     const showPortfolio = fieldOn(role, "portfolio", extras) || role === "CUSTOM"
+    const board = goldBoardFromConfig(profile.personalityConfig)
+    const goldBoardSection = (role === "JEWELRY_RETAIL" || role === "JEWELRY_WHOLESALE") && board
+        ? `\n## Today's ${board.city} gold board\n22K ${formatRatePerGram(board.k22PaisePer10g)} · 24K ${formatRatePerGram(board.k24PaisePer10g)} · 18K ${formatRatePerGram(board.k18PaisePer10g)}\nQuote this board. Do not invent a different city rate.\n`
+        : ""
 
     let experienceSection = ""
     if (showPortfolio && profile.workExperiences && profile.workExperiences.length > 0) {
@@ -386,6 +394,10 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
         }).join('\n')
         productsSection = restaurant
             ? `\n## Menu\nNever invent a dish, price, or sold-out status. If they want to order, send them to the menu or WhatsApp. If they want a table, book it with bookTable after you have party size, date, and time.\n${productList}`
+            : role === "JEWELRY_RETAIL"
+                ? `\n## Jewellery\nPrices are metal (weight × today's city purity rate) plus making. Never invent a rate or a gram weight. Send them to the shop or WhatsApp to buy.\n${productList}`
+            : role === "JEWELRY_WHOLESALE"
+                ? `\n## Wholesale stock\nWe supply shops. Bills are on touch against 24K, not the 22K retail board. Never grant udhar from chat. Send them to WhatsApp or the stock page.\n${productList}`
             : `\n## Shop\nNever invent stock. If sold out, say so. If they want to buy, send them to the shop or WhatsApp.\n${productList}`
         if (profile.whatsapp) productsSection += `\nWhatsApp: ${profile.whatsapp}`
         if (profile.upiId) productsSection += `\nUPI: ${profile.upiId}`
@@ -452,6 +464,7 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
 ## About ${profile.displayName}
 ${profile.headline ? `Headline: ${profile.headline}` : ''}
 ${profile.bio ? `\nBio: ${profile.bio}` : ''}
+${goldBoardSection}
 ${experienceSection}
 ${projectsSection}
 ${servicesSection}

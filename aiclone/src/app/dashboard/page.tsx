@@ -10,6 +10,9 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { extrasOf, hasSurface } from "@/lib/surfaces"
 import { buildHomeStats } from "@/lib/analytics"
 import { StudioPageHead, StudioPanel, StudioRow } from "@/components/dashboard/studio-ui"
+import { isJewelryKit } from "@/lib/metal/math"
+import { goldBoardFromConfig } from "@/lib/metal/board"
+import { GoldBoardCard } from "@/components/shop/gold-board-card"
 
 export const dynamic = "force-dynamic"
 
@@ -90,6 +93,14 @@ export default async function DashboardPage() {
                 hint={nextAction(stats)}
                 action={<ShareSheet slug={profile.slug} name={profile.displayName} baseUrl={baseUrl} />}
             />
+
+            {isJewelryKit(profile.roleTemplate) ? (
+                <GoldBoardCard
+                    profileId={profile.id}
+                    board={goldBoardFromConfig(profile.personalityConfig)}
+                    personalityConfig={profile.personalityConfig}
+                />
+            ) : null}
 
             <HomePulse stats={stats} slug={profile.slug} />
 

@@ -3,6 +3,10 @@ import { syncUser } from "@/lib/auth-sync"
 import { ProductsList } from "@/components/dashboard/products-list"
 import { requireSurface } from "@/lib/require-surface"
 import { extrasOf } from "@/lib/surfaces"
+import { isJewelryKit, isJewelryRetail, isJewelryWholesale } from "@/lib/metal/math"
+import { goldBoardFromConfig } from "@/lib/metal/board"
+import { GoldBoardCard } from "@/components/shop/gold-board-card"
+import { GoldStockActions } from "@/components/shop/gold-stock-actions"
 
 export const dynamic = 'force-dynamic'
 
@@ -32,15 +36,31 @@ export default async function DashboardProductsPage({
 
     return (
         <div className="flex-1 space-y-4">
+            {isJewelryKit(profile.roleTemplate) ? (
+                <div className="space-y-2">
+                    <GoldBoardCard
+                        profileId={profile.id}
+                        board={goldBoardFromConfig(profile.personalityConfig)}
+                        personalityConfig={profile.personalityConfig}
+                        wholesale={isJewelryWholesale(profile.roleTemplate)}
+                    />
+                    <GoldStockActions
+                        mode={isJewelryWholesale(profile.roleTemplate) ? "wholesale" : "retail"}
+                        k24PaisePer10g={goldBoardFromConfig(profile.personalityConfig)?.k24PaisePer10g || 0}
+                    />
+                </div>
+            ) : null}
             <ProductsList
                 profileId={profile.id}
                 slug={profile.slug}
                 whatsapp={profile.whatsapp}
                 restaurant={profile.roleTemplate === "RESTAURANT"}
+                jewelry={isJewelryRetail(profile.roleTemplate)}
                 role={profile.roleTemplate}
                 extras={extrasOf(profile)}
                 products={dishes}
                 arBatch={ar}
+                goldBoard={goldBoardFromConfig(profile.personalityConfig)}
             />
         </div>
     )

@@ -16,6 +16,10 @@ export function waPrefill(role?: string | null, name = "") {
             return `A table at ${name}`
         case "SHOP":
             return `An order from ${name}`
+        case "JEWELRY_RETAIL":
+            return `Hi, I want to see jewellery at ${name}`
+        case "JEWELRY_WHOLESALE":
+            return `Hi, I supply shops. Asking about stock from ${name}`
         case "CREATOR":
             return `Hi, I want the guide from ${name}`
         case "CONSULTANT":
@@ -59,6 +63,16 @@ export function aboutFooterCtas(role?: string | null): AboutFooterCta[] {
         case "SHOP":
             return [
                 { hrefKind: "shop", label: "Shop" },
+                { hrefKind: "chat", label: "WhatsApp" },
+            ]
+        case "JEWELRY_RETAIL":
+            return [
+                { hrefKind: "shop", label: "Jewellery" },
+                { hrefKind: "chat", label: "WhatsApp" },
+            ]
+        case "JEWELRY_WHOLESALE":
+            return [
+                { hrefKind: "shop", label: "Stock" },
                 { hrefKind: "chat", label: "WhatsApp" },
             ]
         case "CREATOR":

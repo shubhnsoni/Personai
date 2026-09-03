@@ -85,7 +85,7 @@ function looksLikeUrl(raw: string) {
 
 function defaultHintFor(role?: string | null, initial?: SourceHint): SourceHint {
     if (initial) return initial
-    if (role === "RESTAURANT" || role === "SHOP") return "shop"
+    if (role === "RESTAURANT" || role === "SHOP" || role === "JEWELRY_RETAIL" || role === "JEWELRY_WHOLESALE") return "shop"
     if (role === "COACH") return "course"
     if (role === "CONSULTANT" || role === "CA") return "services"
     return "cv"

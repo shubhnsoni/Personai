@@ -23,6 +23,8 @@ const FALLBACK: StoryNouns = {
 const NOUNS: Record<string, StoryNouns> = {
     RESTAURANT: { verb: "the room", AMBIENCE: "Ambience", INTERIOR: "The room", FOOD: "The plate", TEAM: "People", EVENT: "Nights" },
     SHOP: { verb: "the shop", AMBIENCE: "Space", INTERIOR: "Floor", FOOD: "Craft", TEAM: "People", EVENT: "Drops" },
+    JEWELRY_RETAIL: { verb: "the showroom", AMBIENCE: "Showroom", INTERIOR: "Counter", FOOD: "Pieces", TEAM: "People", EVENT: "Days" },
+    JEWELRY_WHOLESALE: { verb: "the godown", AMBIENCE: "Godown", INTERIOR: "Lots", FOOD: "Parcels", TEAM: "People", EVENT: "Lifts" },
     SALON_SPA: { verb: "the salon", AMBIENCE: "Room", INTERIOR: "Station", FOOD: "Treatments", TEAM: "People", EVENT: "Looks" },
     EVENTS_STUDIO: { verb: "the studio", AMBIENCE: "Venue", INTERIOR: "Setup", FOOD: "Work", TEAM: "Crew", EVENT: "Nights" },
     CONSULTANT: { verb: "the practice", AMBIENCE: "Space", INTERIOR: "Studio", FOOD: "Craft", TEAM: "People", EVENT: "Talks" },

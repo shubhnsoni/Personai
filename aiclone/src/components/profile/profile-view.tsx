@@ -624,6 +624,8 @@ function buildGoalChips(
     const orderByKit: Record<string, string[]> = {
         RESTAURANT: ["shop", "about", "book", "wa"],
         SHOP: ["shop", "products", "wa", "about"],
+        JEWELRY_RETAIL: ["shop", "products", "wa", "about"],
+        JEWELRY_WHOLESALE: ["shop", "wa", "about"],
         CREATOR: ["guide", "ask", "shop", "tip", "about"],
         CONSULTANT: ["book", "services", "rates", "about"],
         CA: ["book", "services", "rates", "about"],

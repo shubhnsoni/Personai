@@ -18,6 +18,9 @@ import { createProduct, updateProduct } from "@/app/actions/products"
 import { cn } from "@/lib/utils"
 import { ArStudio, ArTrigger } from "@/components/shop/ar-studio"
 import { defaultFulfillment, fieldOn } from "@/lib/surfaces"
+import type { GoldBoard } from "@/lib/metal/board"
+import { bpsToKarat, gramsToMg, isJewelryRetail, karatToBps, mgToGrams, rupeesToPaise, ticketPaise, type Karat } from "@/lib/metal/math"
+import { parseProductMetal } from "@/lib/metal/product"
 
 type Kind = "PHYSICAL" | "DIGITAL" | "BOTH"
 
@@ -37,6 +40,8 @@ export function QuickAddSheet({
     product,
     restaurant,
     role,
+    jewelry,
+    goldBoard,
     onPhotoreal,
 }: {
     open: boolean
@@ -45,6 +50,8 @@ export function QuickAddSheet({
     product?: DigitalProduct | null
     restaurant?: boolean
     role?: string | null
+    jewelry?: boolean
+    goldBoard?: GoldBoard | null
     onPhotoreal?: () => void
 }) {
     const pack = (p: Parameters<typeof fieldOn>[1]) => fieldOn(role, p)
@@ -81,6 +88,10 @@ export function QuickAddSheet({
     const [arOpen, setArOpen] = useState(false)
     const [busy, setBusy] = useState(false)
     const [uploading, setUploading] = useState(false)
+    const gold = jewelry || isJewelryRetail(role)
+    const [grams, setGrams] = useState("")
+    const [karat, setKarat] = useState<Karat>("22K")
+    const [making, setMaking] = useState("")
 
     useEffect(() => {
         if (!open) return
@@ -108,6 +119,10 @@ export function QuickAddSheet({
         setPrepMinutes(String((product as { prepMinutes?: number | null })?.prepMinutes || 15))
         setArModelUrl((product as { arModelUrl?: string | null })?.arModelUrl || "")
         setArUsdzUrl((product as { arUsdzUrl?: string | null })?.arUsdzUrl || "")
+        const metal = parseProductMetal(product?.variantsJson)
+        setGrams(metal ? String(mgToGrams(metal.grossMg)) : "")
+        setKarat(metal ? bpsToKarat(metal.purityBps) || "22K" : "22K")
+        setMaking(metal ? String(metal.makingPaise / 100) : "")
     }, [open, product, editing])
 
     function reset() {
@@ -135,6 +150,9 @@ export function QuickAddSheet({
         setArModelUrl("")
         setArUsdzUrl("")
         setArOpen(false)
+        setGrams("")
+        setKarat("22K")
+        setMaking("")
     }
 
     return (
@@ -158,9 +176,20 @@ export function QuickAddSheet({
                         if (!title.trim()) return
                         setBusy(true)
                         try {
+                            const metal = gold && Number(grams) > 0
+                                ? {
+                                    grossMg: gramsToMg(Number(grams)),
+                                    purityBps: karatToBps(karat),
+                                    makingPaise: rupeesToPaise(Number(making) || 0),
+                                }
+                                : undefined
+                            const ticket = metal && goldBoard ? ticketPaise(metal, goldBoard) / 100 : parseFloat(price) || 0
                             const payload = {
                                 title: title.trim(),
-                                price: parseFloat(price) || 0,
+                                price: ticket,
+                                currency: gold ? "INR" as const : undefined,
+                                metal: metal ?? undefined,
+                                existingVariantsJson: product?.variantsJson,
                                 type: (fulfillment === "PHYSICAL" ? "PHYSICAL" : "OTHER") as "PHYSICAL" | "OTHER",
                                 fulfillment,
                                 stock: stock === "" ? null : parseInt(stock, 10),
@@ -202,9 +231,11 @@ export function QuickAddSheet({
                 >
                     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pt-3">
                         <SheetHeader className="space-y-1 p-0 text-left">
-                            <SheetTitle className="text-lg">{editing ? "Edit item" : restaurant ? "Add to menu" : "Add to shop"}</SheetTitle>
+                            <SheetTitle className="text-lg">{editing ? "Edit item" : restaurant ? "Add to menu" : gold ? "Add a piece" : "Add to shop"}</SheetTitle>
                             <SheetDescription>
-                                {more ? "Extra detail. You can still save with just name and price." : "Photo, name, price. Tap More if you need it."}
+                                {gold
+                                    ? "Weight, purity, making. Price follows today’s city board."
+                                    : more ? "Extra detail. You can still save with just name and price." : "Photo, name, price. Tap More if you need it."}
                             </SheetDescription>
                         </SheetHeader>
 
@@ -269,7 +300,35 @@ export function QuickAddSheet({
                             autoFocus
                             className="h-12 rounded-2xl border-border/70 text-base"
                         />
+                        {gold ? (
+                        <div className="grid grid-cols-3 gap-2.5">
+                            <Input
+                                inputMode="decimal"
+                                value={grams}
+                                onChange={(e) => setGrams(e.target.value)}
+                                placeholder="Grams"
+                                className="h-12 rounded-2xl border-border/70 text-base"
+                            />
+                            <select
+                                value={karat}
+                                onChange={(e) => setKarat(e.target.value as Karat)}
+                                className="h-12 rounded-2xl border border-border/70 bg-background px-3 text-base"
+                            >
+                                <option value="22K">22K</option>
+                                <option value="24K">24K</option>
+                                <option value="18K">18K</option>
+                            </select>
+                            <Input
+                                inputMode="decimal"
+                                value={making}
+                                onChange={(e) => setMaking(e.target.value)}
+                                placeholder="Making ₹"
+                                className="h-12 rounded-2xl border-border/70 text-base"
+                            />
+                        </div>
+                        ) : null}
                         <div className="grid grid-cols-2 gap-2.5">
+                            {gold ? null : (
                             <Input
                                 type="number"
                                 min="0"
@@ -279,6 +338,7 @@ export function QuickAddSheet({
                                 placeholder="Price"
                                 className="h-12 rounded-2xl border-border/70 text-base"
                             />
+                            )}
                             {showPhysical || showMenu ? (
                             <Input
                                 type="number"

@@ -39,10 +39,12 @@ interface ProductsListProps {
     slug: string
     whatsapp?: string | null
     restaurant?: boolean
+    jewelry?: boolean
     role?: string | null
     extras?: SurfaceExtras | null
     products: CatalogProduct[]
     arBatch?: string | null
+    goldBoard?: import("@/lib/metal/board").GoldBoard | null
 }
 
 const typeIcon: Record<string, typeof FileText> = {
@@ -53,7 +55,7 @@ const typeIcon: Record<string, typeof FileText> = {
     PHYSICAL: Package,
 }
 
-export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extras, products, arBatch }: ProductsListProps) {
+export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, role, extras, products, arBatch, goldBoard }: ProductsListProps) {
     const [view, setViewPersist] = useCatalogView("pl-shop-view")
     const [q, setQ] = useState("")
     const [filter, setFilter] = useState<"all" | "on" | "off" | "free" | "low">("all")
@@ -183,11 +185,13 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
                 <div className="studio-panel overflow-hidden rounded-2xl">
                     <EmptyState
                         icon={<Package />}
-                        title={products.length === 0 ? (restaurant ? "Nothing on the menu" : "Nothing in the shop") : "Nothing matches"}
+                        title={products.length === 0 ? (restaurant ? "Nothing on the menu" : jewelry ? "No pieces yet" : "Nothing in the shop") : "Nothing matches"}
                         description={
                             products.length === 0
                                 ? restaurant
                                     ? "Import from Swiggy, Zomato, or Uber Eats — or add a dish."
+                                    : jewelry
+                                        ? "Set today’s city rate, then add a piece by grams, purity, and making."
                                     : "Photo, name, price. Live in one tap."
                                 : "Try another search or filter."
                         }
@@ -315,6 +319,8 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, role, extr
                 profileId={profileId}
                 product={editing}
                 restaurant={restaurant}
+                jewelry={jewelry}
+                goldBoard={goldBoard}
                 role={role}
                 onPhotoreal={showAr && editing ? () => {
                     setArIds([editing.id])

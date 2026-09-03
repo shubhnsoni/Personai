@@ -1,0 +1,38 @@
+[
+  {
+    "name": "wholesale-home",
+    "url": "http://127.0.0.1:3000/try-gold-wholesale",
+    "title": "Gold wholesale | PersonaLink",
+    "text": "Toggle theme I"
+  },
+  {
+    "name": "wholesale-shop",
+    "url": "http://127.0.0.1:3000/try-gold-wholesale/shop",
+    "title": "PersonaLink",
+    "text": "Gold wholesale STOCK MUMBAI BOARD 24K ₹15,535/g · 22K ₹14,240/g as of 3 Sept, 6:06 pm · bills in touch All Bangles PHYSICAL Light bangle Light bangle 10 g · 70.0% On bill"
+  },
+  {
+    "name": "wholesale-pdp",
+    "url": "http://127.0.0.1:3000/try-gold-wholesale/shop/cmtlie7z00007dx0uqqmyc8d5",
+    "title": "PersonaLink",
+    "text": "Gold wholesale STOCK MUMBAI BOARD 24K ₹15,535/g · 22K ₹14,240/g as of 3 Sept, 6:06 pm · bills in touch MORE MORE MORE MORE MORE PHYSICAL · BANGLES Light bangle On bill 10 g · 70 touch · billed on 24K 10 in stock LEAVE A REVIEW ★ ★ ★ ★ ★ Add a photo Post Ask on WhatsApp"
+  },
+  {
+    "name": "retail-shop",
+    "url": "http://127.0.0.1:3000/try-jewelry-retail/shop",
+    "title": "PersonaLink",
+    "text": "Jewellery store JEWELLERY MUMBAI BOARD 22K ₹14,240/g · 24K ₹15,535/g as of 3 Sept, 6:06 pm · metal + making All Bangles Chains PHYSICAL Light bangle Light bangle 10 g · 22K ₹1,42,900 PHYSICAL Rope chain Rope chain 20 g · 22K ₹2,85,600 · 2 left"
+  },
+  {
+    "name": "lift",
+    "url": "http://127.0.0.1:3000/try-gold-wholesale/lift/zJ4C7QYkLw9Y",
+    "title": "PersonaLink",
+    "text": "LIFT PARCEL Gold wholesale 10 g · 74 touch Light bangle Open your jewellery store studio and paste this code on Buy stock: zJ4C7QYkLw9Y Open studio Must be signed in as a jewellery store. Udhar on this bill stays with the wholesaler."
+  },
+  {
+    "name": "dashboard-products",
+    "url": "http://127.0.0.1:3000/sign-in",
+    "title": "PersonaLink",
+    "text": "PersonaLink Home Welcome back Sign in to your account Continue OR Continue with Google Don't have an account? Sign up"
+  }
+]

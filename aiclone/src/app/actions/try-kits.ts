@@ -6,6 +6,10 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { syncUser } from "@/lib/auth-sync"
 import { ACTIVE_PROFILE_COOKIE, TRY_KITS, TRY_NOW_COOKIE } from "@/lib/try-kits"
+import { writeGoldBoard } from "@/lib/metal/board"
+import { K22_BPS, rupeesPerGramToPaisePer10g, ticketPaise } from "@/lib/metal/math"
+import { writeProductMetal } from "@/lib/metal/product"
+import { ensureParty, listOpenLots, recordPurchase, recordSale } from "@/lib/metal/ledger"
 
 const SERVICE_SEED: Record<string, { name: string; description: string; durationMinutes: number }> = {
     CONSULTANT: { name: "Fit call", description: "A first conversation to see if we should work together.", durationMinutes: 30 },
@@ -47,6 +51,130 @@ async function seedRole(profileId: string, role: string) {
                     endTime: "22:00",
                     isEnabled: dayOfWeek !== 1,
                 })),
+            })
+        }
+    }
+
+    if (role === "JEWELRY_RETAIL") {
+        const rates = {
+            k24PaisePer10g: rupeesPerGramToPaisePer10g(15535),
+            k22PaisePer10g: rupeesPerGramToPaisePer10g(14240),
+            k18PaisePer10g: rupeesPerGramToPaisePer10g(11651),
+        }
+        const row = await prisma.profile.findUnique({ where: { id: profileId }, select: { personalityConfig: true } })
+        await prisma.profile.update({
+            where: { id: profileId },
+            data: {
+                personalityConfig: writeGoldBoard(row?.personalityConfig, {
+                    city: "Mumbai",
+                    citySlug: "mumbai",
+                    asOf: new Date().toISOString(),
+                    source: "city-feed",
+                    ...rates,
+                    lastCheckedAt: new Date().toISOString(),
+                }),
+                timezone: "Asia/Kolkata",
+            },
+        })
+        const existing = await prisma.digitalProduct.count({ where: { profileId } })
+        if (existing === 0) {
+            const bangle = { grossMg: 10000, purityBps: K22_BPS, makingPaise: 50_000 }
+            const chain = { grossMg: 20000, purityBps: K22_BPS, makingPaise: 80_000 }
+            await prisma.digitalProduct.createMany({
+                data: [
+                    {
+                        profileId,
+                        title: "Light bangle",
+                        category: "Bangles",
+                        type: "PHYSICAL",
+                        fulfillment: "PHYSICAL",
+                        currency: "INR",
+                        priceCents: ticketPaise(bangle, rates),
+                        weightGrams: 10,
+                        stock: 4,
+                        isActive: true,
+                        variantsJson: writeProductMetal(null, bangle),
+                    },
+                    {
+                        profileId,
+                        title: "Rope chain",
+                        category: "Chains",
+                        type: "PHYSICAL",
+                        fulfillment: "PHYSICAL",
+                        currency: "INR",
+                        priceCents: ticketPaise(chain, rates),
+                        weightGrams: 20,
+                        stock: 2,
+                        isActive: true,
+                        variantsJson: writeProductMetal(null, chain),
+                    },
+                ],
+            })
+        }
+    }
+
+    if (role === "JEWELRY_WHOLESALE") {
+        const rates = {
+            k24PaisePer10g: rupeesPerGramToPaisePer10g(15535),
+            k22PaisePer10g: rupeesPerGramToPaisePer10g(14240),
+            k18PaisePer10g: rupeesPerGramToPaisePer10g(11651),
+        }
+        const row = await prisma.profile.findUnique({ where: { id: profileId }, select: { personalityConfig: true } })
+        await prisma.profile.update({
+            where: { id: profileId },
+            data: {
+                personalityConfig: writeGoldBoard(row?.personalityConfig, {
+                    city: "Mumbai",
+                    citySlug: "mumbai",
+                    asOf: new Date().toISOString(),
+                    source: "city-feed",
+                    ...rates,
+                    lastCheckedAt: new Date().toISOString(),
+                }),
+                timezone: "Asia/Kolkata",
+            },
+        })
+        const lots = await listOpenLots(profileId)
+        if (lots.length === 0) {
+            const gujarat = await ensureParty(profileId, { kind: "SUPPLIER", displayName: "Gujarat House", phone: "07912345678" })
+            const sharma = await ensureParty(profileId, { kind: "RETAILER", displayName: "Sharma Jewellers", phone: "9876543210", termsDays: 15 })
+            const cityGold = await ensureParty(profileId, { kind: "RETAILER", displayName: "City Gold", phone: "9876500000", termsDays: 7 })
+            await recordPurchase(profileId, {
+                partyId: gujarat.id,
+                k24PaisePer10g: rates.k24PaisePer10g,
+                lines: [{ title: "Light bangles", grossMg: 120000, touchBps: 7000, qty: 12 }],
+                payNowPaise: 0,
+                dueOn: new Date(Date.now() + 7 * 86400000),
+            })
+            const openLots = await listOpenLots(profileId)
+            const openLot = openLots[0]
+            await recordSale(profileId, {
+                partyId: sharma.id,
+                k24PaisePer10g: rates.k24PaisePer10g,
+                lines: [{ title: "Light bangle", grossMg: 10000, touchBps: 7400, lotId: openLot?.id }],
+                payNowPaise: 0,
+                dueOn: new Date(Date.now() - 3 * 86400000),
+            })
+            await recordSale(profileId, {
+                partyId: cityGold.id,
+                k24PaisePer10g: rates.k24PaisePer10g,
+                lines: [{ title: "Light bangle", grossMg: 10000, touchBps: 7400, lotId: openLot?.id }],
+                payNowPaise: 20_000_000,
+            })
+            await prisma.digitalProduct.create({
+                data: {
+                    profileId,
+                    title: "Light bangle",
+                    category: "Bangles",
+                    type: "PHYSICAL",
+                    fulfillment: "PHYSICAL",
+                    currency: "INR",
+                    priceCents: 0,
+                    weightGrams: 10,
+                    stock: 10,
+                    isActive: true,
+                    variantsJson: writeProductMetal(null, { grossMg: 10000, purityBps: 7000, makingPaise: 0 }),
+                },
             })
         }
     }

@@ -11,6 +11,12 @@ import { StoryGallery } from "@/components/shop/story-gallery"
 import { collectItemPhotos } from "@/lib/item-photos"
 import { catalogLabel, dietLabel, isRestaurant, serveLabel } from "@/lib/menu"
 import { extrasOf } from "@/lib/surfaces"
+import { isJewelryRetail, isJewelryWholesale, formatInrPaise, metalPaise, ticketPaise, bpsToKarat, mgToGrams } from "@/lib/metal/math"
+import { touchPercent } from "@/lib/metal/touch"
+import { whatsappHref } from "@/lib/commerce"
+import { goldBoardFromConfig } from "@/lib/metal/board"
+import { parseProductMetal } from "@/lib/metal/product"
+import { GoldRateStrip } from "@/components/shop/gold-rate-strip"
 import { Camera } from "lucide-react"
 import Link from "next/link"
 
@@ -61,6 +67,12 @@ export default async function ProductSalesPage({
     const serve = serveLabel((product as { serveWindow?: string | null }).serveWindow)
     const arGlb = (product as { arModelUrl?: string | null }).arModelUrl
     const arUsdz = (product as { arUsdzUrl?: string | null }).arUsdzUrl
+    const jewelry = isJewelryRetail(product.profile.roleTemplate)
+    const wholesale = isJewelryWholesale(product.profile.roleTemplate)
+    const board = goldBoardFromConfig(product.profile.personalityConfig)
+    const metal = jewelry || wholesale ? parseProductMetal(product.variantsJson) : null
+    const metalValue = metal && board ? metalPaise(metal.grossMg, metal.purityBps, board) : 0
+    const ticket = metal && board ? ticketPaise(metal, board) : product.priceCents
 
     return (
         <div
@@ -77,6 +89,7 @@ export default async function ProductSalesPage({
             />
 
             <main className="mx-auto max-w-2xl space-y-5 px-4 py-5 pb-28">
+                {jewelry || wholesale ? <GoldRateStrip board={board} wholesale={wholesale} /> : null}
                 <StoryGallery photos={photos} title={product.title} />
                 {(arGlb || arUsdz) ? (
                     <Link
@@ -98,12 +111,23 @@ export default async function ProductSalesPage({
                 </div>
                 <div className="flex items-end gap-3">
                     <p className="text-3xl font-semibold tabular-nums">
-                        {formatStoredPrice(product.priceCents, product.currency, currency)}
+                        {wholesale
+                            ? "On bill"
+                            : jewelry
+                                ? formatInrPaise(ticket)
+                                : formatStoredPrice(product.priceCents, product.currency, currency)}
                     </p>
                     {product.compareAtCents && product.compareAtCents > product.priceCents && (
                         <p className="pb-1 text-zinc-500 line-through">{formatStoredPrice(product.compareAtCents, product.currency, currency)}</p>
                     )}
                 </div>
+                {metal && board ? (
+                    <p className="text-sm text-zinc-400">
+                        {wholesale
+                            ? `${mgToGrams(metal.grossMg)} g · ${touchPercent(metal.purityBps)} touch · billed on 24K`
+                            : `${mgToGrams(metal.grossMg)} g · ${bpsToKarat(metal.purityBps) || `${metal.purityBps / 100}%`} · metal ${formatInrPaise(metalValue)}${metal.makingPaise > 0 ? ` · making ${formatInrPaise(metal.makingPaise)}` : ""}`}
+                    </p>
+                ) : null}
                 {spice ? <p className="text-sm text-zinc-400">Spice {"🌶".repeat(spice)}</p> : null}
                 {restaurant ? (
                     <Link href={`/${slug}/reserve`} className="inline-flex rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium">
@@ -148,14 +172,21 @@ export default async function ProductSalesPage({
                         >
                             Add on the menu
                         </Link>
+                    ) : isJewelryWholesale(product.profile.roleTemplate) ? (
+                        <a
+                            href={whatsappHref(product.profile.whatsapp, `Hi ${product.profile.displayName}, asking about ${product.title}`) || `/${slug}`}
+                            className="flex h-12 w-full items-center justify-center rounded-full bg-[#25D366] text-sm font-medium text-zinc-950"
+                        >
+                            Ask on WhatsApp
+                        </a>
                     ) : (
                         <CourseEnrollButton
                             item={{
                                 itemType: "product",
                                 itemId: product.id,
                                 title: product.title,
-                                priceCents: product.priceCents,
-                                currency: product.currency,
+                                priceCents: jewelry ? ticket : product.priceCents,
+                                currency: jewelry ? "INR" : product.currency,
                                 description: product.description,
                                 fulfillment: product.fulfillment,
                                 allowCod: product.allowCod,

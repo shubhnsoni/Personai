@@ -6,7 +6,7 @@ import { Logo } from "@/components/brand/logo"
 import { StudioSignOut } from "@/components/dashboard/studio-sign-out"
 import { cn } from "@/lib/utils"
 import { countForHref, type NavCounts } from "@/lib/nav-counts"
-import { hasSurface, navHrefToSurface, shopNavLabel } from "@/lib/surfaces"
+import { hasSurface, leadsNavLabel, navHrefToSurface, salesNavLabel, shopNavLabel } from "@/lib/surfaces"
 import {
     LayoutDashboard,
     User,
@@ -77,10 +77,12 @@ export function visibleNavItems(role?: string | null, extras?: import("@/lib/sur
         })
         .map((item) => {
             if (item.href === "/dashboard/products") return { ...item, name: shopNavLabel(role) }
+            if (item.href === "/dashboard/leads") return { ...item, name: leadsNavLabel(role) }
             if (role === "RESTAURANT" && item.href === "/dashboard/calendar") return { ...item, name: "Reservations" }
             if (role === "RESTAURANT" && item.href === "/dashboard/money") {
                 return { ...item, name: "Floor", href: "/dashboard/orders", prefixes: ["/dashboard/orders", "/dashboard/money", "/dashboard/payments"] }
             }
+            if (item.href === "/dashboard/money") return { ...item, name: salesNavLabel(role) }
             return item
         })
 }
