@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { expiryState, isExpiredMedicine, medicineLine, parseMedicine, writeMedicine } from "@/lib/pharmacy/batch"
+import { expiryState, isExpiredMedicine, medicineLine, parseMedicine, shopExpiryLine, writeMedicine } from "@/lib/pharmacy/batch"
 
 describe("pharmacy batch", () => {
     it("round-trips batch and expiry", () => {
@@ -16,9 +16,13 @@ describe("pharmacy batch", () => {
         const now = new Date("2026-09-04T00:00:00Z")
         const gone = writeMedicine(null, { batch: "X", expiry: "2026-01-20", mrpPaise: 100 })
         const ok = writeMedicine(null, { batch: "Y", expiry: "2027-08-01", mrpPaise: 100 })
+        const soon = writeMedicine(null, { batch: "Z", expiry: "2026-10-01", mrpPaise: 100 })
         expect(isExpiredMedicine(gone, now)).toBe(true)
         expect(isExpiredMedicine(ok, now)).toBe(false)
         expect(medicineLine(ok, now)).toBe("Batch Y")
         expect(medicineLine(gone, now)).toBe("Expired 2026-01-20")
+        expect(shopExpiryLine(gone, now)).toBeNull()
+        expect(shopExpiryLine(ok, now)).toEqual({ text: "Exp · Aug 2027", warn: false })
+        expect(shopExpiryLine(soon, now)).toEqual({ text: "Exp · Oct 2026", warn: true })
     })
 })

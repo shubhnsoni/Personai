@@ -23,6 +23,7 @@ type Item = {
     ar?: boolean
     metalLine?: string | null
     extraLine?: string | null
+    extraWarn?: boolean
     fitmentMake?: string | null
 }
 
@@ -97,7 +98,21 @@ export function ShopCatalog({
                     ) : null}
                 </div>
             )}
-            {(cats.length > 0 || showDiet || makes.length > 0) ? (
+            {makes.length > 0 ? (
+                <div className="flex gap-1 overflow-x-auto">
+                    {["all", ...makes].map((m) => (
+                        <button
+                            key={`make-${m}`}
+                            type="button"
+                            onClick={() => setMake(m)}
+                            className={`shrink-0 rounded-full px-3 py-1 text-xs ${make === m ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-400"}`}
+                        >
+                            {m === "all" ? "All cars" : m}
+                        </button>
+                    ))}
+                </div>
+            ) : null}
+            {(cats.length > 0 || showDiet) ? (
                 <div className="flex gap-1 overflow-x-auto">
                     {showDiet ? (
                         <>
@@ -109,20 +124,6 @@ export function ShopCatalog({
                                     className={`shrink-0 rounded-full px-3 py-1 text-xs ${diet === d ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-400"}`}
                                 >
                                     {d === "all" ? "All" : d === "VEG" ? "Veg" : "Non-veg"}
-                                </button>
-                            ))}
-                        </>
-                    ) : null}
-                    {makes.length > 0 ? (
-                        <>
-                            {["all", ...makes].map((m) => (
-                                <button
-                                    key={`make-${m}`}
-                                    type="button"
-                                    onClick={() => setMake(m)}
-                                    className={`shrink-0 rounded-full px-3 py-1 text-xs ${make === m ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-400"}`}
-                                >
-                                    {m === "all" ? "All cars" : m}
                                 </button>
                             ))}
                         </>
@@ -158,7 +159,7 @@ export function ShopCatalog({
                                 {p.metalLine ? (
                                     <p className="text-[11px] text-zinc-500">{p.metalLine}</p>
                                 ) : p.extraLine ? (
-                                    <p className="text-[11px] text-zinc-500">{p.extraLine}</p>
+                                    <p className={`text-[11px] ${p.extraWarn ? "text-amber-400/80" : "text-zinc-500"}`}>{p.extraLine}</p>
                                 ) : null}
                                 <p className="text-sm tabular-nums" style={{ color: accent }}>
                                     {p.metalLine && p.priceCents <= 0

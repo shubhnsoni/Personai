@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { parseDiet } from "@/lib/menu"
 import type { ProductMetal } from "@/lib/metal/math"
 import { parseProductMetal, writeProductMetal } from "@/lib/metal/product"
+import { writeMedicine, type MedicineBatch } from "@/lib/pharmacy/batch"
 import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
 
 export interface ProductData {
@@ -35,6 +36,7 @@ export interface ProductData {
     currency?: string
     variantsText?: string
     metal?: ProductMetal | null
+    medicine?: MedicineBatch | null
     existingVariantsJson?: string | null
     shipMode?: "NONE" | "PICKUP" | "DELIVER" | "BOTH"
     shipFeeCents?: number
@@ -66,14 +68,18 @@ function productWrite(data: ProductData) {
         serveWindow: data.serveWindow?.trim() || null,
         arModelUrl: data.arModelUrl?.trim() || null,
         arUsdzUrl: data.arUsdzUrl?.trim() || null,
-        variantsJson:
-            data.variantsText != null || data.metal !== undefined
-                ? writeProductMetal(
-                      data.existingVariantsJson ?? null,
-                      data.metal === undefined ? parseProductMetal(data.existingVariantsJson ?? null) : data.metal,
-                      data.variantsText,
-                  )
-                : undefined,
+        variantsJson: (() => {
+            let json: string | null | undefined =
+                data.variantsText != null || data.metal !== undefined
+                    ? writeProductMetal(
+                          data.existingVariantsJson ?? null,
+                          data.metal === undefined ? parseProductMetal(data.existingVariantsJson ?? null) : data.metal,
+                          data.variantsText,
+                      )
+                    : data.existingVariantsJson ?? null
+            if (data.medicine !== undefined) json = writeMedicine(json, data.medicine)
+            return json ?? undefined
+        })(),
         shipMode: data.shipMode || "NONE",
         shipFeeCents: data.shipFeeCents ?? 0,
         currency: data.currency?.trim() || undefined,

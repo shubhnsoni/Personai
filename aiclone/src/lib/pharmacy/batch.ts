@@ -4,11 +4,19 @@ export type MedicineBatch = {
     mrpPaise: number
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+function asBag(raw: unknown): Record<string, unknown> {
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>
+    if (Array.isArray(raw)) return { variants: raw }
+    return {}
+}
+
 export function parseMedicine(variantsJson?: string | null): MedicineBatch | null {
     if (!variantsJson) return null
     try {
-        const o = JSON.parse(variantsJson) as { medicine?: MedicineBatch }
-        const m = o?.medicine
+        const o = asBag(JSON.parse(variantsJson) as unknown)
+        const m = o?.medicine as MedicineBatch | undefined
         if (!m || typeof m.batch !== "string" || typeof m.expiry !== "string") return null
         return {
             batch: m.batch,
@@ -20,10 +28,11 @@ export function parseMedicine(variantsJson?: string | null): MedicineBatch | nul
     }
 }
 
-export function writeMedicine(existing: string | null | undefined, medicine: MedicineBatch) {
+export function writeMedicine(existing: string | null | undefined, medicine: MedicineBatch | null) {
     let o: Record<string, unknown> = {}
-    try { o = JSON.parse(existing || "{}") as Record<string, unknown> } catch { o = {} }
-    o.medicine = medicine
+    try { o = asBag(JSON.parse(existing || "{}") as unknown) } catch { o = {} }
+    if (medicine) o.medicine = medicine
+    else delete o.medicine
     return JSON.stringify(o)
 }
 
@@ -47,6 +56,17 @@ export function medicineLine(variantsJson?: string | null, now = new Date()): st
     if (state === "expired") return `Expired ${m.expiry}`
     if (state === "soon") return `Exp ${m.expiry}`
     return `Batch ${m.batch}`
+}
+
+export function shopExpiryLine(variantsJson?: string | null, now = new Date()): { text: string; warn: boolean } | null {
+    const m = parseMedicine(variantsJson)
+    if (!m) return null
+    const state = expiryState(m.expiry, now)
+    if (state === "expired") return null
+    const t = Date.parse(m.expiry)
+    if (!Number.isFinite(t)) return null
+    const d = new Date(t)
+    return { text: `Exp · ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`, warn: state === "soon" }
 }
 
 export function isExpiredMedicine(variantsJson?: string | null, now = new Date()) {

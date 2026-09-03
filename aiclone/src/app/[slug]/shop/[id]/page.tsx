@@ -16,6 +16,7 @@ import { touchPercent } from "@/lib/metal/touch"
 import { whatsappHref } from "@/lib/commerce"
 import { goldBoardFromConfig } from "@/lib/metal/board"
 import { parseProductMetal } from "@/lib/metal/product"
+import { isExpiredMedicine, isPharmacy } from "@/lib/pharmacy/batch"
 import { GoldRateStrip } from "@/components/shop/gold-rate-strip"
 import { Camera } from "lucide-react"
 import Link from "next/link"
@@ -34,6 +35,7 @@ export default async function ProductSalesPage({
         include: { profile: { include: { animationStyle: true } }, reviews: { orderBy: { createdAt: "desc" }, take: 8 } },
     })
     if (!product) notFound()
+    if (isPharmacy(product.profile.roleTemplate) && isExpiredMedicine(product.variantsJson)) notFound()
 
     let config: { colors?: string[]; variant?: string } = {}
     try {

@@ -12,7 +12,7 @@ import { Tracker } from "@/components/profile/tracker"
 import { isJewelryRetail, isJewelryWholesale } from "@/lib/metal/math"
 import { goldBoardFromConfig } from "@/lib/metal/board"
 import { catalogTicketPaise, metalLine } from "@/lib/metal/product"
-import { isExpiredMedicine, isPharmacy, medicineLine } from "@/lib/pharmacy/batch"
+import { isExpiredMedicine, isPharmacy, shopExpiryLine } from "@/lib/pharmacy/batch"
 import { fitmentLine, isAutoParts, parseFitment } from "@/lib/autoparts/fitment"
 import { GoldRateStrip } from "@/components/shop/gold-rate-strip"
 
@@ -155,7 +155,8 @@ export default async function ShopPage({
                         spiceLevel: (p as { spiceLevel?: number | null }).spiceLevel,
                         ar: Boolean((p as { arModelUrl?: string | null }).arModelUrl),
                         metalLine: jewelry || wholesale ? metalLine(p.variantsJson) : null,
-                        extraLine: pharmacy ? medicineLine(p.variantsJson) : autoParts ? fitmentLine(p.variantsJson) : null,
+                        extraLine: pharmacy ? (shopExpiryLine(p.variantsJson)?.text || null) : autoParts ? fitmentLine(p.variantsJson) : null,
+                        extraWarn: pharmacy ? Boolean(shopExpiryLine(p.variantsJson)?.warn) : false,
                         fitmentMake: autoParts ? (parseFitment(p.variantsJson)?.make || null) : null,
                         }
                     })}

@@ -21,6 +21,7 @@ import { defaultFulfillment, fieldOn } from "@/lib/surfaces"
 import type { GoldBoard } from "@/lib/metal/board"
 import { bpsToKarat, gramsToMg, isJewelryRetail, karatToBps, mgToGrams, rupeesToPaise, ticketPaise, type Karat } from "@/lib/metal/math"
 import { parseProductMetal } from "@/lib/metal/product"
+import { isPharmacy, parseMedicine } from "@/lib/pharmacy/batch"
 
 type Kind = "PHYSICAL" | "DIGITAL" | "BOTH"
 
@@ -89,9 +90,12 @@ export function QuickAddSheet({
     const [busy, setBusy] = useState(false)
     const [uploading, setUploading] = useState(false)
     const gold = jewelry || isJewelryRetail(role)
+    const pharmacy = isPharmacy(role)
     const [grams, setGrams] = useState("")
     const [karat, setKarat] = useState<Karat>("22K")
     const [making, setMaking] = useState("")
+    const [batch, setBatch] = useState("")
+    const [expiry, setExpiry] = useState("")
 
     useEffect(() => {
         if (!open) return
@@ -123,6 +127,9 @@ export function QuickAddSheet({
         setGrams(metal ? String(mgToGrams(metal.grossMg)) : "")
         setKarat(metal ? bpsToKarat(metal.purityBps) || "22K" : "22K")
         setMaking(metal ? String(metal.makingPaise / 100) : "")
+        const med = parseMedicine(product?.variantsJson)
+        setBatch(med?.batch || "")
+        setExpiry(med?.expiry || "")
     }, [open, product, editing])
 
     function reset() {
@@ -153,6 +160,8 @@ export function QuickAddSheet({
         setGrams("")
         setKarat("22K")
         setMaking("")
+        setBatch("")
+        setExpiry("")
     }
 
     return (
@@ -184,11 +193,15 @@ export function QuickAddSheet({
                                 }
                                 : undefined
                             const ticket = metal && goldBoard ? ticketPaise(metal, goldBoard) / 100 : parseFloat(price) || 0
+                            const medicine = pharmacy && expiry.trim()
+                                ? { batch: batch.trim() || "—", expiry: expiry.trim(), mrpPaise: Math.round(ticket * 100) }
+                                : pharmacy ? null : undefined
                             const payload = {
                                 title: title.trim(),
                                 price: ticket,
                                 currency: gold ? "INR" as const : undefined,
                                 metal: metal ?? undefined,
+                                medicine,
                                 existingVariantsJson: product?.variantsJson,
                                 type: (fulfillment === "PHYSICAL" ? "PHYSICAL" : "OTHER") as "PHYSICAL" | "OTHER",
                                 fulfillment,
@@ -231,10 +244,12 @@ export function QuickAddSheet({
                 >
                     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pt-3">
                         <SheetHeader className="space-y-1 p-0 text-left">
-                            <SheetTitle className="text-lg">{editing ? "Edit item" : restaurant ? "Add to menu" : gold ? "Add a piece" : "Add to shop"}</SheetTitle>
+                            <SheetTitle className="text-lg">{editing ? "Edit item" : restaurant ? "Add to menu" : gold ? "Add a piece" : pharmacy ? "Add a medicine" : "Add to shop"}</SheetTitle>
                             <SheetDescription>
                                 {gold
                                     ? "Weight, purity, making. Price follows today’s city board."
+                                    : pharmacy
+                                    ? "Name, price, batch, and expiry. Expired stock stays off the public shop."
                                     : more ? "Extra detail. You can still save with just name and price." : "Photo, name, price. Tap More if you need it."}
                             </SheetDescription>
                         </SheetHeader>
@@ -323,6 +338,23 @@ export function QuickAddSheet({
                                 value={making}
                                 onChange={(e) => setMaking(e.target.value)}
                                 placeholder="Making ₹"
+                                className="h-12 rounded-2xl border-border/70 text-base"
+                            />
+                        </div>
+                        ) : null}
+                        {pharmacy ? (
+                        <div className="grid grid-cols-2 gap-2.5">
+                            <Input
+                                value={batch}
+                                onChange={(e) => setBatch(e.target.value)}
+                                placeholder="Batch"
+                                className="h-12 rounded-2xl border-border/70 text-base"
+                            />
+                            <Input
+                                type="date"
+                                value={expiry}
+                                onChange={(e) => setExpiry(e.target.value)}
+                                placeholder="Expiry"
                                 className="h-12 rounded-2xl border-border/70 text-base"
                             />
                         </div>
