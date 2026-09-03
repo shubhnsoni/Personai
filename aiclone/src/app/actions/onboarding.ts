@@ -174,7 +174,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
     }
     const need = needById(data.needId)
     const next = data.needId ? need.next : (
-        data.roleTemplate === "DISTRIBUTOR" ? "/dashboard/orders" : data.roleTemplate === "RESTAURANT" || data.roleTemplate === "SHOP" || data.roleTemplate === "JEWELRY_RETAIL" || data.roleTemplate === "JEWELRY_WHOLESALE" ? "/dashboard/products"
+        data.roleTemplate === "DISTRIBUTOR" ? "/dashboard/orders" : data.roleTemplate === "RESTAURANT" || data.roleTemplate === "SHOP" || data.roleTemplate === "JEWELRY_RETAIL" || data.roleTemplate === "JEWELRY_WHOLESALE" || data.roleTemplate === "PHARMACY" ? "/dashboard/products"
         : data.roleTemplate === "CONSULTANT" || data.roleTemplate === "CA" ? "/dashboard/services"
         : data.roleTemplate === "COACH" ? "/dashboard/courses"
         : "/dashboard"

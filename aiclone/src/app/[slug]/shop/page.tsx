@@ -12,6 +12,7 @@ import { Tracker } from "@/components/profile/tracker"
 import { isJewelryRetail, isJewelryWholesale } from "@/lib/metal/math"
 import { goldBoardFromConfig } from "@/lib/metal/board"
 import { catalogTicketPaise, metalLine } from "@/lib/metal/product"
+import { isExpiredMedicine, isPharmacy, medicineLine } from "@/lib/pharmacy/batch"
 import { GoldRateStrip } from "@/components/shop/gold-rate-strip"
 
 export const dynamic = "force-dynamic"
@@ -55,6 +56,7 @@ export default async function ShopPage({
     const goldBoard = goldBoardFromConfig(profile.personalityConfig)
     const jewelry = isJewelryRetail(profile.roleTemplate)
     const wholesale = isJewelryWholesale(profile.roleTemplate)
+    const pharmacy = isPharmacy(profile.roleTemplate)
     const restaurantTable = restaurant && requestedTableCode
         ? await prisma.restaurantTable.findFirst({
             where: { profileId: profile.id, code: requestedTableCode, isActive: true },
@@ -134,7 +136,7 @@ export default async function ShopPage({
                     restaurant={restaurant}
                     hours={restaurant ? hoursToday(profile.availability) : null}
                     bookHref={restaurant ? `/${slug}/reserve` : null}
-                    items={profile.digitalProducts.map((p) => {
+                    items={profile.digitalProducts.filter((p) => !(pharmacy && isExpiredMedicine(p.variantsJson))).map((p) => {
                         return {
                         id: p.id,
                         title: p.title,
@@ -151,6 +153,7 @@ export default async function ShopPage({
                         spiceLevel: (p as { spiceLevel?: number | null }).spiceLevel,
                         ar: Boolean((p as { arModelUrl?: string | null }).arModelUrl),
                         metalLine: jewelry || wholesale ? metalLine(p.variantsJson) : null,
+                        extraLine: pharmacy ? medicineLine(p.variantsJson) : null,
                         }
                     })}
                 />

@@ -26,6 +26,7 @@ const NOUNS: Record<string, StoryNouns> = {
     JEWELRY_RETAIL: { verb: "the showroom", AMBIENCE: "Showroom", INTERIOR: "Counter", FOOD: "Pieces", TEAM: "People", EVENT: "Days" },
     JEWELRY_WHOLESALE: { verb: "the godown", AMBIENCE: "Godown", INTERIOR: "Lots", FOOD: "Parcels", TEAM: "People", EVENT: "Lifts" },
     DISTRIBUTOR: { verb: "the godown", AMBIENCE: "Godown", INTERIOR: "Racks", FOOD: "Cartons", TEAM: "People", EVENT: "Dispatches" },
+    PHARMACY: { verb: "the counter", AMBIENCE: "Shop", INTERIOR: "Shelves", FOOD: "Medicines", TEAM: "People", EVENT: "Days" },
     SALON_SPA: { verb: "the salon", AMBIENCE: "Room", INTERIOR: "Station", FOOD: "Treatments", TEAM: "People", EVENT: "Looks" },
     EVENTS_STUDIO: { verb: "the studio", AMBIENCE: "Venue", INTERIOR: "Setup", FOOD: "Work", TEAM: "Crew", EVENT: "Nights" },
     CONSULTANT: { verb: "the practice", AMBIENCE: "Space", INTERIOR: "Studio", FOOD: "Craft", TEAM: "People", EVENT: "Talks" },

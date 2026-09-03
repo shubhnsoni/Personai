@@ -27,6 +27,7 @@ import { ArBuildSheet } from "@/components/dashboard/ar-build-sheet"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { expiryState, parseMedicine } from "@/lib/pharmacy/batch"
 import { useMoney } from "@/components/pricing-provider"
 import { isPhysical, parseGallery, stockLabel, whatsappHref } from "@/lib/commerce"
 import { fieldOn, type SurfaceExtras } from "@/lib/surfaces"
@@ -66,6 +67,7 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, r
     const [importCtl, setImportCtl] = useState<ImportApplyCtl>(null)
     const [allMins, setAllMins] = useState("15")
     const [arOpen, setArOpen] = useState(() => Boolean(arBatch && arBatch !== "cancel"))
+    const [arIds, setArIds] = useState<string[] | undefined>()
 
     const showAr = fieldOn(role, "ar", extras)
     const sold = products.reduce((s, p) => s + (p.downloadCount || 0), 0)
@@ -303,12 +305,19 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, r
                 jewelry={jewelry}
                 goldBoard={goldBoard}
                 role={role}
+                onPhotoreal={showAr && editing ? () => {
+                    setArIds([editing.id])
+                    setAdding(false)
+                    setEditing(null)
+                    setArOpen(true)
+                } : undefined}
             />
-            {showAr && arBatch && arBatch !== "cancel" ? (
+            {showAr ? (
                 <ArBuildSheet
                     open={arOpen}
                     onOpenChange={setArOpen}
-                    batchId={arBatch}
+                    initialIds={arIds}
+                    batchId={arBatch && arBatch !== "cancel" ? arBatch : null}
                 />
             ) : null}
         </div>
@@ -351,6 +360,16 @@ function Thumb({ product, className, compact = false }: { product: DigitalProduc
     )
 }
 
+
+function medicineNote(product: DigitalProduct) {
+    const med = parseMedicine(product.variantsJson)
+    if (!med) return ""
+    const state = expiryState(med.expiry)
+    if (state === "expired") return ` · Expired ${med.expiry}`
+    if (state === "soon") return ` · Exp ${med.expiry}`
+    return ` · Batch ${med.batch}`
+}
+
 function ProductRow({
     product,
     restaurant,
@@ -381,7 +400,7 @@ function ProductRow({
                     {restaurant ? ` · ${product.prepMinutes || 15} min` : isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
                     {stockLabel(product.stock) ? ` · ${stockLabel(product.stock)}` : ""}
                     {!product.isActive ? " · Off" : ""}
-                    {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}
+                    {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}{medicineNote(product)}
                 </p>
             </button>
             <Switch checked={product.isActive} disabled={pending} onCheckedChange={onToggle} />
@@ -423,7 +442,7 @@ function ProductTile({
                         {restaurant ? ` · ${product.prepMinutes || 15} min` : isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
                         {stockLabel(product.stock) ? ` · ${stockLabel(product.stock)}` : ""}
                         {!product.isActive ? " · Off" : ""}
-                        {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}
+                        {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}{medicineNote(product)}
                     </p>
                 </button>
                 <div className="flex items-center justify-between pt-0.5">

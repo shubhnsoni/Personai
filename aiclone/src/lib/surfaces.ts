@@ -59,6 +59,10 @@ const KIT: Record<string, { surfaces: Surface[]; packs: FieldPack[] }> = {
         surfaces: [...CORE, "shop", "sales", "leads"],
         packs: ["shopPhysical", "whatsappUpi"],
     },
+    PHARMACY: {
+        surfaces: [...CORE, "shop", "sales"],
+        packs: ["shopPhysical", "whatsappUpi"],
+    },
     RESTAURANT: {
         surfaces: [...CORE, "shop", "calendar", "sales"],
         packs: ["menuDish", "ar", "tableBook", "whatsappUpi"],
@@ -177,6 +181,7 @@ export function shopNavLabel(role?: string | null) {
     if (role === "JEWELRY_RETAIL") return "Jewellery"
     if (role === "JEWELRY_WHOLESALE") return "Stock"
     if (role === "DISTRIBUTOR") return "Inventory"
+    if (role === "PHARMACY") return "Medicines"
     return "Shop"
 }
 
@@ -194,7 +199,7 @@ export function salesNavLabel(role?: string | null) {
 
 export function defaultFulfillment(role?: string | null, extras?: SurfaceExtras | null): "PHYSICAL" | "DIGITAL" | "BOTH" {
     if (fieldOn(role, "shopDigital", extras) && !fieldOn(role, "shopPhysical", extras) && !fieldOn(role, "menuDish", extras)) return "DIGITAL"
-    if (role === "RESTAURANT" || role === "SHOP" || role === "JEWELRY_RETAIL" || role === "JEWELRY_WHOLESALE" || role === "DISTRIBUTOR") return "PHYSICAL"
+    if (role === "RESTAURANT" || role === "SHOP" || role === "JEWELRY_RETAIL" || role === "JEWELRY_WHOLESALE" || role === "DISTRIBUTOR" || role === "PHARMACY") return "PHYSICAL"
     return "PHYSICAL"
 }
 

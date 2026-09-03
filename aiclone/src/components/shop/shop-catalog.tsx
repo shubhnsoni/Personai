@@ -22,6 +22,7 @@ type Item = {
     spiceLevel?: number | null
     ar?: boolean
     metalLine?: string | null
+    extraLine?: string | null
 }
 
 export function ShopCatalog({
@@ -134,6 +135,8 @@ export function ShopCatalog({
                                 </p>
                                 {p.metalLine ? (
                                     <p className="text-[11px] text-zinc-500">{p.metalLine}</p>
+                                ) : p.extraLine ? (
+                                    <p className="text-[11px] text-zinc-500">{p.extraLine}</p>
                                 ) : null}
                                 <p className="text-sm tabular-nums" style={{ color: accent }}>
                                     {p.metalLine && p.priceCents <= 0
