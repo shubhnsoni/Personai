@@ -855,8 +855,8 @@ function scanForLeaks(text, { secretLiterals = [], label = "input" } = {}) {
     }
 
     for (const match of matchSpans(line, SK_KEY_SHAPE)) {
-      // Judge the key MATERIAL, not the prefix: sk_live_<docs>
-      // is documentation, sk_live_<40 mixed chars> is a key.
+      // Judge the key MATERIAL, not the prefix: a long sk_live placeholder
+      // is documentation; mixed-char material after the prefix is a key.
       if (isSecretishValue(match[2], 20)) push("SECRET_KEY_SHAPE", "shape");
     }
   });
