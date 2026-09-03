@@ -82,6 +82,9 @@ export function visibleNavItems(role?: string | null, extras?: import("@/lib/sur
             if (role === "RESTAURANT" && item.href === "/dashboard/money") {
                 return { ...item, name: "Floor", href: "/dashboard/orders", prefixes: ["/dashboard/orders", "/dashboard/money", "/dashboard/payments"] }
             }
+            if (role === "DISTRIBUTOR" && item.href === "/dashboard/money") {
+                return { ...item, name: "Orders", href: "/dashboard/orders", prefixes: ["/dashboard/orders", "/dashboard/money", "/dashboard/payments"] }
+            }
             if (item.href === "/dashboard/money") return { ...item, name: salesNavLabel(role) }
             return item
         })

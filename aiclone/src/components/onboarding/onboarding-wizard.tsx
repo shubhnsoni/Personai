@@ -59,6 +59,7 @@ const NEED_ICON: Record<NeedId, typeof Store> = {
     recruit: Briefcase,
     jewelryRetail: Gem,
     goldWholesale: Gem,
+    distribute: Store,
     page: Sparkles,
 }
 

@@ -713,6 +713,7 @@ const ROLES = [
     { id: "SHOP", label: "Shop" },
     { id: "JEWELRY_RETAIL", label: "Jewellery store" },
     { id: "JEWELRY_WHOLESALE", label: "Gold wholesale" },
+    { id: "DISTRIBUTOR", label: "Distributor" },
     { id: "RESTAURANT", label: "Restaurant" },
     { id: "CONSULTANT", label: "Consultant" },
     { id: "CA", label: "CA / professional" },

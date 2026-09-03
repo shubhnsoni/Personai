@@ -179,6 +179,59 @@ async function seedRole(profileId: string, role: string) {
         }
     }
 
+
+    if (role === "DISTRIBUTOR") {
+        const existing = await prisma.digitalProduct.count({ where: { profileId } })
+        if (existing === 0) {
+            await prisma.digitalProduct.createMany({
+                data: [
+                    { profileId, title: "ACC Gold 50kg", category: "Cement", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 42000, stock: 180, sku: "CEM-ACC-50", isActive: true },
+                    { profileId, title: "TMT 12mm bundle", category: "Steel", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 68500, stock: 40, sku: "STL-TMT-12", isActive: true },
+                    { profileId, title: "Emulsion 20L", category: "Paint", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 310000, stock: 24, sku: "PNT-EML-20", isActive: true },
+                ],
+            })
+            const items = await prisma.digitalProduct.findMany({ where: { profileId }, orderBy: { title: "asc" } })
+            const acc = items.find((i) => i.sku === "CEM-ACC-50")
+            const tmt = items.find((i) => i.sku === "STL-TMT-12")
+            if (acc && tmt) {
+                const { writeDistroMeta } = await import("@/lib/distribute/meta")
+                const meta = {
+                    salesman: "SUNNY",
+                    location: "Ranchi",
+                    dealer: "Sharma Traders",
+                    approval: "PENDING" as const,
+                    warehouse: "WAITING" as const,
+                    accounts: "HOLD" as const,
+                    invoice: "",
+                }
+                const total = 2 * acc.priceCents + 1 * tmt.priceCents
+                await prisma.order.create({
+                    data: {
+                        profileId,
+                        publicToken: `dseed${profileId.slice(-8)}`,
+                        number: 1,
+                        businessDate: new Date(),
+                        channel: "TAKEAWAY",
+                        status: "PLACED",
+                        guestName: "Sharma Traders",
+                        tableLabel: "Ranchi",
+                        staffNote: writeDistroMeta(meta),
+                        subtotalCents: total,
+                        totalCents: total,
+                        currency: "INR",
+                        payStatus: "UNPAID",
+                        lines: {
+                            create: [
+                                { productId: acc.id, titleSnapshot: acc.title, qty: 2, unitPriceCents: acc.priceCents, lineTotalCents: 2 * acc.priceCents },
+                                { productId: tmt.id, titleSnapshot: tmt.title, qty: 1, unitPriceCents: tmt.priceCents, lineTotalCents: tmt.priceCents },
+                            ],
+                        },
+                    },
+                })
+            }
+        }
+    }
+
     const serviceSeed = SERVICE_SEED[role]
     if (serviceSeed) {
         const existing = await prisma.serviceOffering.count({ where: { profileId } })

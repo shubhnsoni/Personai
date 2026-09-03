@@ -1,6 +1,7 @@
 export const TRY_KITS = [
     { category: "new", role: "JEWELRY_RETAIL", goal: "SELL_PRODUCTS", slug: "try-jewelry-retail", name: "Jewellery store", blurb: "City gold board, weight × purity, making charges.", next: "/dashboard/products" },
     { category: "new", role: "JEWELRY_WHOLESALE", goal: "COLLECT_LEADS", slug: "try-gold-wholesale", name: "Gold wholesale", blurb: "70 touch in, 74 out, cash or udhar.", next: "/dashboard/products" },
+    { category: "new", role: "DISTRIBUTOR", goal: "SELL_PRODUCTS", slug: "try-distributor", name: "Distributor", blurb: "Dealer orders, godown stock, warehouse, billing.", next: "/dashboard/orders" },
     { category: "new", role: "FIELD_SERVICE", goal: "TAKE_APPOINTMENTS", slug: "try-field-service", name: "Field service", blurb: "Intake, dispatch, site visits, and inspections.", next: "/dashboard/services" },
     { category: "new", role: "SALON_SPA", goal: "TAKE_APPOINTMENTS", slug: "try-salon-spa", name: "Salon or spa", blurb: "Treatments, named staff, calendar, and retail.", next: "/dashboard/services" },
     { category: "new", role: "EVENTS_STUDIO", goal: "COLLECT_LEADS", slug: "try-events-studio", name: "Events studio", blurb: "Briefs, documents, approvals, and event delivery.", next: "/dashboard/events" },

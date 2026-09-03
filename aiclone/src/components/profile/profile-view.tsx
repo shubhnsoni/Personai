@@ -626,6 +626,7 @@ function buildGoalChips(
         SHOP: ["shop", "products", "wa", "about"],
         JEWELRY_RETAIL: ["shop", "products", "wa", "about"],
         JEWELRY_WHOLESALE: ["shop", "wa", "about"],
+        DISTRIBUTOR: ["shop", "wa", "about"],
         CREATOR: ["guide", "ask", "shop", "tip", "about"],
         CONSULTANT: ["book", "services", "rates", "about"],
         CA: ["book", "services", "rates", "about"],
