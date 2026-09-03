@@ -223,6 +223,7 @@ function formatRoleTemplate(role: string): string {
         'JEWELRY_WHOLESALE': 'Gold wholesaler',
         'DISTRIBUTOR': 'Distributor',
         'PHARMACY': 'Pharmacy',
+        'AUTO_PARTS': 'Auto parts',
         'RESTAURANT': 'Restaurant',
         'CA': 'Chartered Accountant',
         'CREATOR': 'Creator',

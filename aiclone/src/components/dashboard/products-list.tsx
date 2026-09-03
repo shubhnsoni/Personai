@@ -28,6 +28,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { expiryState, parseMedicine } from "@/lib/pharmacy/batch"
+import { fitmentLine } from "@/lib/autoparts/fitment"
 import { useMoney } from "@/components/pricing-provider"
 import { isPhysical, parseGallery, stockLabel, whatsappHref } from "@/lib/commerce"
 import { fieldOn, type SurfaceExtras } from "@/lib/surfaces"
@@ -370,6 +371,11 @@ function medicineNote(product: DigitalProduct) {
     return ` · Batch ${med.batch}`
 }
 
+function fitmentNote(product: DigitalProduct) {
+    const line = fitmentLine(product.variantsJson)
+    return line ? ` · ${line}` : ""
+}
+
 function ProductRow({
     product,
     restaurant,
@@ -400,7 +406,7 @@ function ProductRow({
                     {restaurant ? ` · ${product.prepMinutes || 15} min` : isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
                     {stockLabel(product.stock) ? ` · ${stockLabel(product.stock)}` : ""}
                     {!product.isActive ? " · Off" : ""}
-                    {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}{medicineNote(product)}
+                    {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}{medicineNote(product)}{fitmentNote(product)}
                 </p>
             </button>
             <Switch checked={product.isActive} disabled={pending} onCheckedChange={onToggle} />
@@ -442,7 +448,7 @@ function ProductTile({
                         {restaurant ? ` · ${product.prepMinutes || 15} min` : isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
                         {stockLabel(product.stock) ? ` · ${stockLabel(product.stock)}` : ""}
                         {!product.isActive ? " · Off" : ""}
-                        {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}{medicineNote(product)}
+                        {(product as { arModelUrl?: string | null }).arModelUrl ? " · 3D" : ""}{medicineNote(product)}{fitmentNote(product)}
                     </p>
                 </button>
                 <div className="flex items-center justify-between pt-0.5">

@@ -2,7 +2,7 @@ import type { FieldPack, Surface } from "@/lib/surfaces"
 
 export type NeedId =
     | "sell" | "dine" | "time" | "teach" | "ca" | "hire" | "show" | "leads" | "page" | "field"
-    | "salon" | "eventStudio" | "estate" | "recruit" | "jewelryRetail" | "goldWholesale" | "distribute" | "pharmacy"
+    | "salon" | "eventStudio" | "estate" | "recruit" | "jewelryRetail" | "goldWholesale" | "distribute" | "pharmacy" | "autoParts"
 
 export type RoleTemplate =
     | "SHOP"
@@ -10,6 +10,7 @@ export type RoleTemplate =
     | "JEWELRY_WHOLESALE"
     | "DISTRIBUTOR"
     | "PHARMACY"
+    | "AUTO_PARTS"
     | "RESTAURANT"
     | "CONSULTANT"
     | "CA"
@@ -50,6 +51,7 @@ export const NEEDS: Need[] = [
     { id: "goldWholesale", role: "JEWELRY_WHOLESALE", goal: "COLLECT_LEADS", title: "Gold wholesale", blurb: "Buy on touch, sell to shops, cash or udhar.", folk: "wholesalers", headline: "See stock", next: "/dashboard/products" },
     { id: "distribute", role: "DISTRIBUTOR", goal: "SELL_PRODUCTS", title: "Distributor", blurb: "Dealer orders, stock, warehouse, and billing — like a sales godown.", folk: "distributors", headline: "Place an order", next: "/dashboard/orders" },
     { id: "pharmacy", role: "PHARMACY", goal: "SELL_PRODUCTS", title: "Pharmacy", blurb: "Medicines with batch and expiry, billed over the counter.", folk: "pharmacies", headline: "See medicines", next: "/dashboard/products" },
+    { id: "autoParts", role: "AUTO_PARTS", goal: "SELL_PRODUCTS", title: "Auto parts", blurb: "Parts by make, model, and year — billed over the counter.", folk: "parts shops", headline: "Find a part", next: "/dashboard/products" },
     { id: "dine", role: "RESTAURANT", goal: "BOOK_TABLE", title: "Restaurant", blurb: "I run a kitchen, cafe, or bar.", folk: "restaurants", headline: "Reserve a table", next: "/dashboard/products" },
     { id: "time", role: "CONSULTANT", goal: "TAKE_APPOINTMENTS", title: "Consultant", blurb: "People book time with me.", folk: "consultants", headline: "Book a session", next: "/dashboard/services" },
     { id: "teach", role: "COACH", goal: "SELL_PRODUCTS", title: "Coach", blurb: "I teach, train, or mentor.", folk: "coaches", headline: "Learn with me", next: "/dashboard/courses" },
@@ -104,6 +106,7 @@ const ROLE_ADDONS: Record<string, AddonId[]> = {
     JEWELRY_WHOLESALE: ["shop", "leads"],
     DISTRIBUTOR: ["shop", "leads"],
     PHARMACY: ["shop"],
+    AUTO_PARTS: ["shop"],
     RESTAURANT: ["menu"],
     CONSULTANT: ["leads", "services", "calendar", "portfolio"],
     CA: ["leads", "services", "calendar", "portfolio"],
@@ -207,6 +210,7 @@ export const ROLES_WITHOUT_BLUEPRINT: readonly RoleTemplate[] = Object.freeze([
     "JEWELRY_WHOLESALE",
     "DISTRIBUTOR",
     "PHARMACY",
+    "AUTO_PARTS",
 ])
 
 export function correspondingBlueprintId(role: string | null | undefined): string | null {

@@ -23,6 +23,7 @@ type Item = {
     ar?: boolean
     metalLine?: string | null
     extraLine?: string | null
+    fitmentMake?: string | null
 }
 
 export function ShopCatalog({
@@ -53,10 +54,17 @@ export function ShopCatalog({
     }, [items])
     const [cat, setCat] = useState<string>("all")
     const [diet, setDiet] = useState<"all" | "VEG" | "NONVEG">("all")
+    const [make, setMake] = useState<string>("all")
     const hasDiet = items.some((p) => p.diet)
     const showDiet = Boolean(restaurant && hasDiet)
+    const makes = useMemo(() => {
+        const set = new Set<string>()
+        for (const p of items) if (p.fitmentMake?.trim()) set.add(p.fitmentMake.trim())
+        return Array.from(set).sort()
+    }, [items])
     const rows = items.filter((p) => {
         if (cat !== "all" && (p.category || "").trim() !== cat) return false
+        if (make !== "all" && (p.fitmentMake || "") !== make) return false
         if (showDiet) {
             if (diet === "VEG" && p.diet !== "VEG" && p.diet !== "VEGAN") return false
             if (diet === "NONVEG" && p.diet !== "NONVEG" && p.diet !== "EGG") return false
@@ -89,7 +97,7 @@ export function ShopCatalog({
                     ) : null}
                 </div>
             )}
-            {(cats.length > 0 || showDiet) ? (
+            {(cats.length > 0 || showDiet || makes.length > 0) ? (
                 <div className="flex gap-1 overflow-x-auto">
                     {showDiet ? (
                         <>
@@ -101,6 +109,20 @@ export function ShopCatalog({
                                     className={`shrink-0 rounded-full px-3 py-1 text-xs ${diet === d ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-400"}`}
                                 >
                                     {d === "all" ? "All" : d === "VEG" ? "Veg" : "Non-veg"}
+                                </button>
+                            ))}
+                        </>
+                    ) : null}
+                    {makes.length > 0 ? (
+                        <>
+                            {["all", ...makes].map((m) => (
+                                <button
+                                    key={`make-${m}`}
+                                    type="button"
+                                    onClick={() => setMake(m)}
+                                    className={`shrink-0 rounded-full px-3 py-1 text-xs ${make === m ? "bg-white text-zinc-950" : "bg-white/8 text-zinc-400"}`}
+                                >
+                                    {m === "all" ? "All cars" : m}
                                 </button>
                             ))}
                         </>

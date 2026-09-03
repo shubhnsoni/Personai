@@ -11,6 +11,7 @@ export function catalogLabel(role?: string | null) {
     if (role === "JEWELRY_WHOLESALE") return "Stock"
     if (role === "DISTRIBUTOR") return "Inventory"
     if (role === "PHARMACY") return "Medicines"
+    if (role === "AUTO_PARTS") return "Parts"
     return "Shop"
 }
 

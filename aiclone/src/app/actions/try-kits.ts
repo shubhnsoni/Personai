@@ -247,6 +247,21 @@ async function seedRole(profileId: string, role: string) {
         }
     }
 
+
+    if (role === "AUTO_PARTS") {
+        const existing = await prisma.digitalProduct.count({ where: { profileId } })
+        if (existing === 0) {
+            const { writeFitment } = await import("@/lib/autoparts/fitment")
+            await prisma.digitalProduct.createMany({
+                data: [
+                    { profileId, title: "Front brake pad", category: "Brakes", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 145000, stock: 8, sku: "BP-SWIFT", isActive: true, variantsJson: writeFitment(null, { make: "Maruti", model: "Swift", yearFrom: 2018, yearTo: 2024 }) },
+                    { profileId, title: "Oil filter", category: "Filters", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 28000, stock: 20, sku: "OF-I20", isActive: true, variantsJson: writeFitment(null, { make: "Hyundai", model: "i20", yearFrom: 2015, yearTo: 2023 }) },
+                    { profileId, title: "Battery 35Ah", category: "Electrical", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 385000, stock: 4, sku: "BAT-ALTO", isActive: true, variantsJson: writeFitment(null, { make: "Maruti", model: "Alto", yearFrom: 2012, yearTo: 2020 }) },
+                ],
+            })
+        }
+    }
+
     const serviceSeed = SERVICE_SEED[role]
     if (serviceSeed) {
         const existing = await prisma.serviceOffering.count({ where: { profileId } })
