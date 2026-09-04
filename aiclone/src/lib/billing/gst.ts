@@ -12,6 +12,8 @@
  */
 
 export const DEFAULT_GST_RATE_BPS = 1800
+/** Gold jewellery taxable at 3% under GST. */
+export const JEWELLERY_GST_RATE_BPS = 300
 
 /** Distro godown locations → GST state code (first two digits of a GSTIN). */
 export const DISTRO_LOCATION_STATE: Record<string, string> = {
@@ -46,6 +48,11 @@ export function stateCodeFromGstin(gstin?: string | null): string | null {
 export function stateCodeFromDistroLocation(location?: string | null): string | null {
     if (!location) return null
     return DISTRO_LOCATION_STATE[location] ?? null
+}
+
+/** Prefer buyer GSTIN state code; otherwise a mapped fallback (e.g. distro location). */
+export function resolveBuyerStateCode(buyerGstin?: string | null, fallbackStateCode?: string | null): string | null {
+    return stateCodeFromGstin(buyerGstin) ?? (fallbackStateCode?.trim() || null)
 }
 
 /**

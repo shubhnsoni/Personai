@@ -105,6 +105,7 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
     const [catalog, setCatalog] = useState<CatalogRow[]>([])
     const [pending, start] = useTransition()
     const [dealer, setDealer] = useState("Sharma Traders")
+    const [buyerGstin, setBuyerGstin] = useState("")
     const [location, setLocation] = useState<string>(DISTRO_LOCATIONS[0])
     const [salesman, setSalesman] = useState<string>(DISTRO_SALESMEN[0])
     const [qty, setQty] = useState<Record<string, number>>({})
@@ -148,9 +149,10 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
             .filter((l) => l.qty > 0)
         start(async () => {
             try {
-                const placed = await placeDistroOrder({ profileId, dealer, location, salesman, lines })
+                const placed = await placeDistroOrder({ profileId, dealer, location, salesman, buyerGstin, lines })
                 toast.success(`Order #${placed.number} is in pending approval`)
                 setQty({})
+                setBuyerGstin("")
                 setTab("pending")
                 reload()
             } catch (e) {
@@ -233,8 +235,9 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
             {canCreate ? (
                 <div className="studio-panel space-y-3 rounded-2xl p-4">
                     <p className="text-sm font-medium">New order</p>
-                    <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         <Input value={dealer} onChange={(e) => setDealer(e.target.value)} placeholder="Dealer" />
+                        <Input value={buyerGstin} onChange={(e) => setBuyerGstin(e.target.value)} placeholder="Buyer GSTIN (optional)" className="font-mono uppercase" />
                         <select className="h-10 rounded-md border bg-background px-3 text-sm" value={location} onChange={(e) => setLocation(e.target.value)}>
                             {DISTRO_LOCATIONS.map((l) => <option key={l}>{l}</option>)}
                         </select>

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
 import {
     DEFAULT_GST_RATE_BPS,
+    JEWELLERY_GST_RATE_BPS,
     computeGstBreakup,
     gstReceiptLines,
+    resolveBuyerStateCode,
     stampGstInvoice,
     stateCodeFromDistroLocation,
     stateCodeFromGstin,
@@ -59,5 +61,25 @@ describe("GST invoice stamp", () => {
 
     it("returns null when profile has no GSTIN", () => {
         expect(stampGstInvoice({ gstin: null, totalPaise: 5000 })).toBeNull()
+    })
+})
+
+describe("buyer GSTIN state preference", () => {
+    it("prefers buyer GSTIN state over location fallback", () => {
+        expect(resolveBuyerStateCode("27AABCU9603R1ZM", "20")).toBe("27")
+        expect(resolveBuyerStateCode("", "20")).toBe("20")
+        expect(resolveBuyerStateCode(null, null)).toBeNull()
+    })
+
+    it("stamps jewellery at 3% with IGST across states", () => {
+        const stamp = stampGstInvoice({
+            gstin: "20AABCU9603R1ZM",
+            totalPaise: 10300,
+            rateBps: JEWELLERY_GST_RATE_BPS,
+            buyerStateCode: resolveBuyerStateCode("27AABCU9603R1ZM"),
+        })
+        expect(stamp?.rateBps).toBe(300)
+        expect(stamp?.mode).toBe("igst")
+        expect(stamp?.taxablePaise + stamp!.gstPaise).toBe(10300)
     })
 })

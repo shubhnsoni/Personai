@@ -8,8 +8,9 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { createMetalPurchase, createMetalSale, listMetalLots, listMetalParties, saveParty } from "@/app/actions/metal-bills"
 import { gramsToMg, rupeesToPaise } from "@/lib/metal/math"
 import { touchBpsFromPercent, touchPaise } from "@/lib/metal/touch"
+import { openReceiptPdf } from "@/lib/receipt"
 
-type Party = { id: string; kind: string; displayName: string; phone: string | null }
+type Party = { id: string; kind: string; displayName: string; phone: string | null; gstin?: string | null }
 type Lot = { id: string; title: string; remainingGrossMg: number }
 
 export function MetalBillSheet({
@@ -29,6 +30,8 @@ export function MetalBillSheet({
     const [partyId, setPartyId] = useState("")
     const [newName, setNewName] = useState("")
     const [newPhone, setNewPhone] = useState("")
+    const [buyerGstin, setBuyerGstin] = useState("")
+    const [hsnSac, setHsnSac] = useState("7113")
     const [title, setTitle] = useState("")
     const [grams, setGrams] = useState("")
     const [touch, setTouch] = useState(kind === "PURCHASE" ? "70" : "74")
@@ -43,7 +46,10 @@ export function MetalBillSheet({
         void listMetalParties().then((rows) => {
             const next = rows.filter((p) => p.kind === partyKind)
             setParties(next)
-            if (next[0] && !partyId) setPartyId(next[0].id)
+            if (next[0] && !partyId) {
+                setPartyId(next[0].id)
+                if (kind === "SALE") setBuyerGstin(next[0].gstin || "")
+            }
         })
         if (kind === "SALE") void listMetalLots().then(setLots)
     }, [open, kind, partyKind])
@@ -59,7 +65,7 @@ export function MetalBillSheet({
                 <SheetHeader>
                     <SheetTitle>{kind === "PURCHASE" ? "Purchase in" : "Sale to a shop"}</SheetTitle>
                     <SheetDescription>
-                        {kind === "PURCHASE" ? "Gujarat / vendor parcel at buy touch." : "Bill a retailer at sell touch. Udhar stays on Cashflow."}
+                        {kind === "PURCHASE" ? "Gujarat / vendor parcel at buy touch." : "Bill a retailer at sell touch. GST tax invoice prints on save."}
                     </SheetDescription>
                 </SheetHeader>
                 <form
@@ -71,7 +77,12 @@ export function MetalBillSheet({
                                 let id = partyId
                                 if (!id) {
                                     if (!newName.trim()) throw new Error("Name the party")
-                                    const party = await saveParty({ kind: partyKind, displayName: newName, phone: newPhone })
+                                    const party = await saveParty({
+                                        kind: partyKind,
+                                        displayName: newName,
+                                        phone: newPhone,
+                                        gstin: kind === "SALE" ? buyerGstin : undefined,
+                                    })
                                     id = party.id
                                 }
                                 const lines = [{
@@ -83,10 +94,19 @@ export function MetalBillSheet({
                                 const payNowPaise = udhar ? rupeesToPaise(Number(payNow) || 0) : preview
                                 if (kind === "PURCHASE") {
                                     await createMetalPurchase({ partyId: id, lines, payNowPaise, dueDays: udhar ? 15 : 0 })
+                                    toast.success("Stock in")
                                 } else {
-                                    await createMetalSale({ partyId: id, lines, payNowPaise, dueDays: udhar ? 15 : 0 })
+                                    const saved = await createMetalSale({
+                                        partyId: id,
+                                        lines,
+                                        payNowPaise,
+                                        dueDays: udhar ? 15 : 0,
+                                        buyerGstin,
+                                        hsnSac,
+                                    })
+                                    toast.success("Bill saved")
+                                    if (saved.receipt) openReceiptPdf(saved.receipt)
                                 }
-                                toast.success(kind === "PURCHASE" ? "Stock in" : "Bill saved")
                                 onOpenChange(false)
                             } catch (err) {
                                 toast.error(err instanceof Error ? err.message : "Could not save bill")
@@ -95,7 +115,16 @@ export function MetalBillSheet({
                     }}
                 >
                     {parties.length ? (
-                        <select value={partyId} onChange={(e) => setPartyId(e.target.value)} className="h-11 w-full rounded-2xl border bg-background px-3">
+                        <select
+                            value={partyId}
+                            onChange={(e) => {
+                                const next = e.target.value
+                                setPartyId(next)
+                                const row = parties.find((p) => p.id === next)
+                                if (kind === "SALE") setBuyerGstin(row?.gstin || "")
+                            }}
+                            className="h-11 w-full rounded-2xl border bg-background px-3"
+                        >
                             {parties.map((p) => (
                                 <option key={p.id} value={p.id}>{p.displayName}</option>
                             ))}
@@ -106,6 +135,22 @@ export function MetalBillSheet({
                         <div className="grid grid-cols-2 gap-2">
                             <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={kind === "PURCHASE" ? "Supplier" : "Shop name"} className="h-11" />
                             <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Phone" className="h-11" />
+                        </div>
+                    ) : null}
+                    {kind === "SALE" ? (
+                        <div className="grid grid-cols-2 gap-2">
+                            <Input
+                                value={buyerGstin}
+                                onChange={(e) => setBuyerGstin(e.target.value)}
+                                placeholder="Buyer GSTIN (optional)"
+                                className="h-11 font-mono uppercase"
+                            />
+                            <Input
+                                value={hsnSac}
+                                onChange={(e) => setHsnSac(e.target.value)}
+                                placeholder="HSN/SAC"
+                                className="h-11 font-mono"
+                            />
                         </div>
                     ) : null}
                     {kind === "SALE" && lots.length ? (

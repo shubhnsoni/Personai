@@ -17,6 +17,7 @@ import {
 import {
     stampGstInvoice,
     stateCodeFromDistroLocation,
+    resolveBuyerStateCode,
 } from "@/lib/billing/gst"
 import {
     DISTRO_ASSIGNABLE_DESKS,
@@ -207,6 +208,7 @@ export async function placeDistroOrder(input: {
     dealer: string
     location: string
     salesman: string
+    buyerGstin?: string
     lines: { productId: string; qty: number; unitPaise: number }[]
 }) {
     const actor = await distroActor(input.profileId)
@@ -235,6 +237,7 @@ export async function placeDistroOrder(input: {
     meta.salesman = input.salesman
     meta.dealer = dealer
     meta.location = input.location
+    meta.buyerGstin = (input.buyerGstin || "").trim().toUpperCase()
 
     const order = await prisma.order.create({
         data: {
@@ -272,7 +275,7 @@ function applyGstStamp(meta: DistroMeta, totalPaise: number, sellerGstin: string
     const stamp = stampGstInvoice({
         gstin: sellerGstin,
         totalPaise,
-        buyerStateCode: stateCodeFromDistroLocation(meta.location),
+        buyerStateCode: resolveBuyerStateCode(meta.buyerGstin, stateCodeFromDistroLocation(meta.location)),
     })
     if (!stamp) {
         return {
