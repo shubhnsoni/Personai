@@ -22,6 +22,7 @@ import type { GoldBoard } from "@/lib/metal/board"
 import { bpsToKarat, gramsToMg, isJewelryRetail, karatToBps, mgToGrams, rupeesToPaise, ticketPaise, type Karat } from "@/lib/metal/math"
 import { parseProductMetal } from "@/lib/metal/product"
 import { isPharmacy, parseMedicine } from "@/lib/pharmacy/batch"
+import { isAutoParts, parseFitment } from "@/lib/autoparts/fitment"
 
 type Kind = "PHYSICAL" | "DIGITAL" | "BOTH"
 
@@ -91,11 +92,16 @@ export function QuickAddSheet({
     const [uploading, setUploading] = useState(false)
     const gold = jewelry || isJewelryRetail(role)
     const pharmacy = isPharmacy(role)
+    const autoParts = isAutoParts(role)
     const [grams, setGrams] = useState("")
     const [karat, setKarat] = useState<Karat>("22K")
     const [making, setMaking] = useState("")
     const [batch, setBatch] = useState("")
     const [expiry, setExpiry] = useState("")
+    const [fitMake, setFitMake] = useState("")
+    const [fitModel, setFitModel] = useState("")
+    const [fitYearFrom, setFitYearFrom] = useState("")
+    const [fitYearTo, setFitYearTo] = useState("")
 
     useEffect(() => {
         if (!open) return
@@ -130,6 +136,11 @@ export function QuickAddSheet({
         const med = parseMedicine(product?.variantsJson)
         setBatch(med?.batch || "")
         setExpiry(med?.expiry || "")
+        const fit = parseFitment(product?.variantsJson)
+        setFitMake(fit?.make || "")
+        setFitModel(fit?.model || "")
+        setFitYearFrom(fit ? String(fit.yearFrom) : "")
+        setFitYearTo(fit ? String(fit.yearTo) : "")
     }, [open, product, editing])
 
     function reset() {
@@ -162,6 +173,10 @@ export function QuickAddSheet({
         setMaking("")
         setBatch("")
         setExpiry("")
+        setFitMake("")
+        setFitModel("")
+        setFitYearFrom("")
+        setFitYearTo("")
     }
 
     return (
@@ -196,12 +211,18 @@ export function QuickAddSheet({
                             const medicine = pharmacy && expiry.trim()
                                 ? { batch: batch.trim() || "—", expiry: expiry.trim(), mrpPaise: Math.round(ticket * 100) }
                                 : pharmacy ? null : undefined
+                            const yearFromN = parseInt(fitYearFrom, 10)
+                            const yearToN = parseInt(fitYearTo, 10)
+                            const fitment = autoParts && fitMake.trim() && fitModel.trim() && Number.isFinite(yearFromN) && Number.isFinite(yearToN)
+                                ? { make: fitMake.trim(), model: fitModel.trim(), yearFrom: yearFromN, yearTo: yearToN }
+                                : autoParts ? null : undefined
                             const payload = {
                                 title: title.trim(),
                                 price: ticket,
                                 currency: gold ? "INR" as const : undefined,
                                 metal: metal ?? undefined,
                                 medicine,
+                                fitment,
                                 existingVariantsJson: product?.variantsJson,
                                 type: (fulfillment === "PHYSICAL" ? "PHYSICAL" : "OTHER") as "PHYSICAL" | "OTHER",
                                 fulfillment,
@@ -244,12 +265,14 @@ export function QuickAddSheet({
                 >
                     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pt-3">
                         <SheetHeader className="space-y-1 p-0 text-left">
-                            <SheetTitle className="text-lg">{editing ? "Edit item" : restaurant ? "Add to menu" : gold ? "Add a piece" : pharmacy ? "Add a medicine" : "Add to shop"}</SheetTitle>
+                            <SheetTitle className="text-lg">{editing ? "Edit item" : restaurant ? "Add to menu" : gold ? "Add a piece" : pharmacy ? "Add a medicine" : autoParts ? "Add a part" : "Add to shop"}</SheetTitle>
                             <SheetDescription>
                                 {gold
                                     ? "Weight, purity, making. Price follows today’s city board."
                                     : pharmacy
                                     ? "Name, price, batch, and expiry. Expired stock stays off the public shop."
+                                    : autoParts
+                                    ? "Name, price, and vehicle fitment (make, model, years)."
                                     : more ? "Extra detail. You can still save with just name and price." : "Photo, name, price. Tap More if you need it."}
                             </SheetDescription>
                         </SheetHeader>
@@ -357,6 +380,42 @@ export function QuickAddSheet({
                                 placeholder="Expiry"
                                 className="h-12 rounded-2xl border-border/70 text-base"
                             />
+                        </div>
+                        ) : null}
+                        {autoParts ? (
+                        <div className="space-y-2.5">
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <Input
+                                    value={fitMake}
+                                    onChange={(e) => setFitMake(e.target.value)}
+                                    placeholder="Make"
+                                    className="h-12 rounded-2xl border-border/70 text-base"
+                                />
+                                <Input
+                                    value={fitModel}
+                                    onChange={(e) => setFitModel(e.target.value)}
+                                    placeholder="Model"
+                                    className="h-12 rounded-2xl border-border/70 text-base"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    value={fitYearFrom}
+                                    onChange={(e) => setFitYearFrom(e.target.value)}
+                                    placeholder="Year from"
+                                    className="h-12 rounded-2xl border-border/70 text-base"
+                                />
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    value={fitYearTo}
+                                    onChange={(e) => setFitYearTo(e.target.value)}
+                                    placeholder="Year to"
+                                    className="h-12 rounded-2xl border-border/70 text-base"
+                                />
+                            </div>
                         </div>
                         ) : null}
                         <div className="grid grid-cols-2 gap-2.5">

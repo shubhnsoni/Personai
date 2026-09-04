@@ -7,6 +7,7 @@ import { formatStoredPrice, type DisplayCurrency } from "@/lib/pricing"
 import { whatsappHref } from "@/lib/commerce"
 import { dietDotClass, dietLabel } from "@/lib/menu"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
+import { fitsShopVehicle, yearsInCatalog, type VehicleFitment } from "@/lib/autoparts/fitment"
 
 type Item = {
     id: string
@@ -25,6 +26,8 @@ type Item = {
     extraLine?: string | null
     extraWarn?: boolean
     fitmentMake?: string | null
+    fitmentYearFrom?: number | null
+    fitmentYearTo?: number | null
 }
 
 export function ShopCatalog({
@@ -63,12 +66,38 @@ export function ShopCatalog({
         for (const p of items) if (p.fitmentMake?.trim()) set.add(p.fitmentMake.trim())
         return Array.from(set).sort()
     }, [items])
+    const [year, setYear] = useState<string>("")
+    const yearOptions = useMemo(() => {
+        const fitments: VehicleFitment[] = []
+        for (const p of items) {
+            if (p.fitmentYearFrom == null || p.fitmentYearTo == null) continue
+            fitments.push({
+                make: p.fitmentMake || "",
+                model: "",
+                yearFrom: p.fitmentYearFrom,
+                yearTo: p.fitmentYearTo,
+            })
+        }
+        return yearsInCatalog(fitments)
+    }, [items])
+    const yearNum = year.trim() === "" ? null : Number(year)
     const rows = items.filter((p) => {
         if (cat !== "all" && (p.category || "").trim() !== cat) return false
-        if (make !== "all" && (p.fitmentMake || "") !== make) return false
         if (showDiet) {
             if (diet === "VEG" && p.diet !== "VEG" && p.diet !== "VEGAN") return false
             if (diet === "NONVEG" && p.diet !== "NONVEG" && p.diet !== "EGG") return false
+        }
+        if (yearNum != null && Number.isFinite(yearNum)) {
+            if (p.fitmentYearFrom == null || p.fitmentYearTo == null) return false
+            const fitment: VehicleFitment = {
+                make: p.fitmentMake || "",
+                model: "",
+                yearFrom: p.fitmentYearFrom,
+                yearTo: p.fitmentYearTo,
+            }
+            if (!fitsShopVehicle(fitment, { make: make === "all" ? null : make, year: yearNum })) return false
+        } else if (make !== "all" && (p.fitmentMake || "") !== make) {
+            return false
         }
         return true
     })
@@ -110,6 +139,22 @@ export function ShopCatalog({
                             {m === "all" ? "All cars" : m}
                         </button>
                     ))}
+                </div>
+            ) : null}
+            {yearOptions.length > 0 ? (
+                <div className="flex items-center gap-2">
+                    <label className="shrink-0 text-xs text-zinc-500" htmlFor="fitment-year">Year</label>
+                    <select
+                        id="fitment-year"
+                        value={year}
+                        onChange={(e) => setYear(e.target.value)}
+                        className="h-8 rounded-full border border-white/10 bg-white/8 px-3 text-xs text-zinc-100"
+                    >
+                        <option value="">Any year</option>
+                        {yearOptions.map((y) => (
+                            <option key={y} value={String(y)}>{y}</option>
+                        ))}
+                    </select>
                 </div>
             ) : null}
             {(cats.length > 0 || showDiet) ? (

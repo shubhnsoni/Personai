@@ -6,6 +6,7 @@ import { parseDiet } from "@/lib/menu"
 import type { ProductMetal } from "@/lib/metal/math"
 import { parseProductMetal, writeProductMetal } from "@/lib/metal/product"
 import { writeMedicine, type MedicineBatch } from "@/lib/pharmacy/batch"
+import { writeFitment, type VehicleFitment } from "@/lib/autoparts/fitment"
 import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
 
 export interface ProductData {
@@ -37,6 +38,7 @@ export interface ProductData {
     variantsText?: string
     metal?: ProductMetal | null
     medicine?: MedicineBatch | null
+    fitment?: VehicleFitment | null
     existingVariantsJson?: string | null
     shipMode?: "NONE" | "PICKUP" | "DELIVER" | "BOTH"
     shipFeeCents?: number
@@ -78,6 +80,7 @@ function productWrite(data: ProductData) {
                       )
                     : data.existingVariantsJson ?? null
             if (data.medicine !== undefined) json = writeMedicine(json, data.medicine)
+            if (data.fitment !== undefined) json = writeFitment(json, data.fitment)
             return json ?? undefined
         })(),
         shipMode: data.shipMode || "NONE",

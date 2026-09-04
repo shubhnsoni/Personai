@@ -139,6 +139,7 @@ export default async function ShopPage({
                     hours={restaurant ? hoursToday(profile.availability) : null}
                     bookHref={restaurant ? `/${slug}/reserve` : null}
                     items={profile.digitalProducts.filter((p) => !(pharmacy && isExpiredMedicine(p.variantsJson))).map((p) => {
+                        const fitment = autoParts ? parseFitment(p.variantsJson) : null
                         return {
                         id: p.id,
                         title: p.title,
@@ -155,9 +156,11 @@ export default async function ShopPage({
                         spiceLevel: (p as { spiceLevel?: number | null }).spiceLevel,
                         ar: Boolean((p as { arModelUrl?: string | null }).arModelUrl),
                         metalLine: jewelry || wholesale ? metalLine(p.variantsJson) : null,
-                        extraLine: pharmacy ? (shopExpiryLine(p.variantsJson)?.text || null) : autoParts ? fitmentLine(p.variantsJson) : null,
+                        extraLine: pharmacy ? (shopExpiryLine(p.variantsJson)?.text || null) : fitment ? fitmentLine(p.variantsJson) : null,
                         extraWarn: pharmacy ? Boolean(shopExpiryLine(p.variantsJson)?.warn) : false,
-                        fitmentMake: autoParts ? (parseFitment(p.variantsJson)?.make || null) : null,
+                        fitmentMake: fitment?.make || null,
+                        fitmentYearFrom: fitment?.yearFrom ?? null,
+                        fitmentYearTo: fitment?.yearTo ?? null,
                         }
                     })}
                 />
