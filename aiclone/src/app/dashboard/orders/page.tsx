@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
+import { parseBuyerPrescription } from "@/lib/pharmacy/batch"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -140,6 +141,14 @@ export default async function DashboardOrdersPage() {
                                                 <div>
                                                     <p className="font-medium">{purchase.product.title}</p>
                                                     <p className="text-sm text-muted-foreground">{purchase.visitorEmail}</p>
+                                                    {(() => {
+                                                        const rx = parseBuyerPrescription(purchase.buyerNote)
+                                                        return rx.url ? (
+                                                            <a href={rx.url} target="_blank" rel="noreferrer" className="mt-1 block text-[11px] text-amber-600 underline">
+                                                                Prescription
+                                                            </a>
+                                                        ) : null
+                                                    })()}
                                                     <ResendLibraryLink email={purchase.visitorEmail} />
                                                 </div>
                                             </div>

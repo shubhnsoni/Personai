@@ -16,7 +16,7 @@ import { touchPercent } from "@/lib/metal/touch"
 import { whatsappHref } from "@/lib/commerce"
 import { goldBoardFromConfig } from "@/lib/metal/board"
 import { parseProductMetal } from "@/lib/metal/product"
-import { isExpiredMedicine, isPharmacy } from "@/lib/pharmacy/batch"
+import { isExpiredMedicine, isPharmacy, isRxRequired, shopExpiryLine } from "@/lib/pharmacy/batch"
 import { GoldRateStrip } from "@/components/shop/gold-rate-strip"
 import { Camera } from "lucide-react"
 import Link from "next/link"
@@ -199,6 +199,7 @@ export default async function ProductSalesPage({
                                 gstin: product.profile.gstin,
                                 soldOut: product.stock != null && product.stock <= 0,
                                 variants: variants.map((v) => v.name),
+                                requiresRx: isRxRequired(product.variantsJson),
                             }}
                         />
                     )}

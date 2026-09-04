@@ -26,6 +26,7 @@ export type CheckoutItem = {
     gstin?: string | null
     soldOut?: boolean
     variants?: string[]
+    requiresRx?: boolean
 }
 
 export function CheckoutSheet({
@@ -42,6 +43,8 @@ export function CheckoutSheet({
     const [payMethod, setPayMethod] = useState<"CARD" | "UPI" | "COD" | "WHATSAPP">(
         item.upiId ? "UPI" : item.whatsapp ? "WHATSAPP" : "CARD",
     )
+    const [rxUrl, setRxUrl] = useState("")
+    const [rxBusy, setRxBusy] = useState(false)
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [done, setDone] = useState<string | null>(null)
@@ -73,6 +76,10 @@ export function CheckoutSheet({
             return
         }
         if (item.soldOut) return
+        if (item.requiresRx && !rxUrl.trim()) {
+            setError("Attach a prescription photo for this medicine.")
+            return
+        }
         setBusy(true)
         setError(null)
         try {
@@ -85,11 +92,12 @@ export function CheckoutSheet({
                     visitorEmail: email.trim(),
                     payMethod,
                     address: [variant, address.trim()].filter(Boolean).join(" · ") || undefined,
+                    prescriptionUrl: item.requiresRx ? rxUrl.trim() : undefined,
                 })
                 if (payMethod === "WHATSAPP") {
                     const href = whatsappHref(
                         item.whatsapp || order.whatsapp,
-                        `Hi, I want ${item.title}${variant ? ` (${variant})` : ""} (${price}). Name: ${name.trim()}`,
+                        `Hi, I want ${item.title}${variant ? ` (${variant})` : ""} (${price}). Name: ${name.trim()}${item.requiresRx && rxUrl ? ` · Prescription: ${rxUrl}` : ""}`,
                     )
                     if (href) window.open(href, "_blank")
                     setDone("WhatsApp opened. The shop has your order.")
@@ -181,6 +189,43 @@ export function CheckoutSheet({
                         <div className="space-y-1.5">
                             <Label>Address / pickup note</Label>
                             <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Optional" />
+                        </div>
+                    ) : null}
+                    {item.requiresRx ? (
+                        <div className="space-y-1.5 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3">
+                            <Label>Prescription photo</Label>
+                            <p className="text-[11px] text-amber-100/80">This medicine needs a doctor&apos;s prescription. Upload a clear photo.</p>
+                            {rxUrl ? (
+                                <div className="flex items-center justify-between gap-2">
+                                    <a href={rxUrl} target="_blank" rel="noreferrer" className="truncate text-xs text-amber-100 underline">View attached</a>
+                                    <button type="button" className="text-xs text-zinc-400" onClick={() => setRxUrl("")}>Remove</button>
+                                </div>
+                            ) : (
+                                <Input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    disabled={rxBusy}
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0]
+                                        if (!file) return
+                                        setRxBusy(true)
+                                        setError(null)
+                                        try {
+                                            const body = new FormData()
+                                            body.append("file", file)
+                                            const res = await fetch("/api/upload", { method: "POST", body })
+                                            const json = await res.json()
+                                            if (!json.url) throw new Error("Upload failed")
+                                            setRxUrl(json.url)
+                                        } catch {
+                                            setError("Could not upload the prescription")
+                                        } finally {
+                                            setRxBusy(false)
+                                        }
+                                    }}
+                                />
+                            )}
                         </div>
                     ) : null}
                     {item.itemType === "product" ? (

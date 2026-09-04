@@ -2,9 +2,11 @@ export type MedicineBatch = {
     batch: string
     expiry: string // YYYY-MM-DD
     mrpPaise: number
+    rxRequired?: boolean
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const RX_PREFIX = "RX|"
 
 function asBag(raw: unknown): Record<string, unknown> {
     if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>
@@ -22,6 +24,7 @@ export function parseMedicine(variantsJson?: string | null): MedicineBatch | nul
             batch: m.batch,
             expiry: m.expiry,
             mrpPaise: Number(m.mrpPaise) || 0,
+            rxRequired: Boolean(m.rxRequired),
         }
     } catch {
         return null
@@ -49,13 +52,17 @@ export function isPharmacy(role?: string | null) {
     return role === "PHARMACY"
 }
 
+export function isRxRequired(variantsJson?: string | null) {
+    return Boolean(parseMedicine(variantsJson)?.rxRequired)
+}
+
 export function medicineLine(variantsJson?: string | null, now = new Date()): string | null {
     const m = parseMedicine(variantsJson)
     if (!m) return null
     const state = expiryState(m.expiry, now)
     if (state === "expired") return `Expired ${m.expiry}`
     if (state === "soon") return `Exp ${m.expiry}`
-    return `Batch ${m.batch}`
+    return m.rxRequired ? `Rx · Batch ${m.batch}` : `Batch ${m.batch}`
 }
 
 export function shopExpiryLine(variantsJson?: string | null, now = new Date()): { text: string; warn: boolean } | null {
@@ -66,11 +73,31 @@ export function shopExpiryLine(variantsJson?: string | null, now = new Date()): 
     const t = Date.parse(m.expiry)
     if (!Number.isFinite(t)) return null
     const d = new Date(t)
-    return { text: `Exp · ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`, warn: state === "soon" }
+    const exp = `Exp · ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+    return { text: m.rxRequired ? `Rx · ${exp}` : exp, warn: state === "soon" }
 }
 
 export function isExpiredMedicine(variantsJson?: string | null, now = new Date()) {
     const m = parseMedicine(variantsJson)
     if (!m) return false
     return expiryState(m.expiry, now) === "expired"
+}
+
+export function writeBuyerPrescription(note: string | null | undefined, prescriptionUrl: string | null | undefined) {
+    const parsed = parseBuyerPrescription(note)
+    const rest = parsed.note || ""
+    if (!prescriptionUrl?.trim()) return rest || null
+    const head = `${RX_PREFIX}${prescriptionUrl.trim()}`
+    return rest ? `${head} ${rest}` : head
+}
+
+export function parseBuyerPrescription(note?: string | null): { url: string | null; note: string | null } {
+    if (!note) return { url: null, note: null }
+    if (!note.startsWith(RX_PREFIX)) return { url: null, note }
+    const space = note.indexOf(" ")
+    if (space < 0) return { url: note.slice(RX_PREFIX.length) || null, note: null }
+    return {
+        url: note.slice(RX_PREFIX.length, space) || null,
+        note: note.slice(space + 1).trim() || null,
+    }
 }

@@ -365,10 +365,11 @@ function Thumb({ product, className, compact = false }: { product: DigitalProduc
 function medicineNote(product: DigitalProduct) {
     const med = parseMedicine(product.variantsJson)
     if (!med) return ""
+    const rx = med.rxRequired ? " · Rx" : ""
     const state = expiryState(med.expiry)
-    if (state === "expired") return ` · Expired ${med.expiry}`
-    if (state === "soon") return ` · Exp ${med.expiry}`
-    return ` · Batch ${med.batch}`
+    if (state === "expired") return `${rx} · Expired ${med.expiry}`
+    if (state === "soon") return `${rx} · Exp ${med.expiry}`
+    return `${rx} · Batch ${med.batch}`
 }
 
 function fitmentNote(product: DigitalProduct) {

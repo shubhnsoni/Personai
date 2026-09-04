@@ -240,7 +240,7 @@ async function seedRole(profileId: string, role: string) {
             await prisma.digitalProduct.createMany({
                 data: [
                     { profileId, title: "Paracetamol 650", category: "Fever", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 2800, stock: 40, sku: "PCM-650", isActive: true, variantsJson: writeMedicine(null, { batch: "PCM2408", expiry: "2027-08-01", mrpPaise: 3200 }) },
-                    { profileId, title: "Amoxicillin 500", category: "Antibiotic", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 8500, stock: 18, sku: "AMX-500", isActive: true, variantsJson: writeMedicine(null, { batch: "AMX2311", expiry: "2026-10-15", mrpPaise: 9200 }) },
+                    { profileId, title: "Amoxicillin 500", category: "Antibiotic", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 8500, stock: 18, sku: "AMX-500", isActive: true, variantsJson: writeMedicine(null, { batch: "AMX2311", expiry: "2026-10-15", mrpPaise: 9200, rxRequired: true }) },
                     { profileId, title: "Cough syrup 100ml", category: "Cold", type: "PHYSICAL", fulfillment: "PHYSICAL", currency: "INR", priceCents: 12000, stock: 12, sku: "COU-100", isActive: true, variantsJson: writeMedicine(null, { batch: "COU2201", expiry: "2026-01-20", mrpPaise: 13500 }) },
                 ],
             })
