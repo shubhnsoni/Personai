@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
-import { parseBuyerPrescription } from "@/lib/pharmacy/batch"
+import { isRxRequired, parseBuyerPrescription } from "@/lib/pharmacy/batch"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -125,6 +125,33 @@ export default async function DashboardOrdersPage() {
                 </TabsList>
 
                 <TabsContent value="products">
+                    {productPurchases.some((p) => p.status === "PENDING" && (isRxRequired(p.product.variantsJson) || Boolean(parseBuyerPrescription(p.buyerNote).url))) ? (
+                        <Card className="mb-4 border-amber-500/40">
+                            <CardHeader>
+                                <CardTitle className="text-base">Pending Rx review</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {productPurchases.filter((p) => p.status === "PENDING" && (isRxRequired(p.product.variantsJson) || Boolean(parseBuyerPrescription(p.buyerNote).url))).map((purchase) => {
+                                    const rx = parseBuyerPrescription(purchase.buyerNote)
+                                    return (
+                                        <div key={`rx-${purchase.id}`} className="flex items-center justify-between rounded-lg bg-amber-500/10 p-3">
+                                            <div>
+                                                <p className="font-medium">{purchase.product.title}</p>
+                                                <p className="text-sm text-muted-foreground">{purchase.visitorName || purchase.visitorEmail}</p>
+                                                {rx.url ? <a href={rx.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-2 text-[11px] text-muted-foreground no-underline">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={rx.url} alt="" width={28} height={28} className="h-[28px] w-[28px] rounded object-cover" />
+                                                    <span>Rx attached</span>
+                                                </a> : null}
+                                                {rx.note ? <p className="text-[11px] text-muted-foreground">{rx.note}</p> : null}
+                                            </div>
+                                            <ConfirmOrderButton purchaseId={purchase.id} showReject />
+                                        </div>
+                                    )
+                                })}
+                            </CardContent>
+                        </Card>
+                    ) : null}
                     <Card>
                         <CardHeader>
                             <CardTitle>Product Purchases</CardTitle>
@@ -143,13 +170,21 @@ export default async function DashboardOrdersPage() {
                                                     <p className="text-sm text-muted-foreground">{purchase.visitorEmail}</p>
                                                     {(() => {
                                                         const rx = parseBuyerPrescription(purchase.buyerNote)
-                                                        return rx.url ? (
-                                                            <a href={rx.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-2 text-[11px] text-muted-foreground no-underline">
-                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                <img src={rx.url} alt="" width={28} height={28} className="h-[28px] w-[28px] rounded object-cover" />
-                                                                <span>Rx attached</span>
-                                                            </a>
-                                                        ) : null
+                                                        const needs = isRxRequired(purchase.product.variantsJson)
+                                                        if (!needs && !rx.url && !rx.note) return null
+                                                        return (
+                                                            <div className="mt-1 space-y-0.5">
+                                                                {needs ? <p className="text-[11px] font-medium text-amber-700">Rx review</p> : null}
+                                                                {rx.url ? (
+                                                                    <a href={rx.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[11px] text-muted-foreground no-underline">
+                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                        <img src={rx.url} alt="" width={28} height={28} className="h-[28px] w-[28px] rounded object-cover" />
+                                                                        <span>Rx attached</span>
+                                                                    </a>
+                                                                ) : null}
+                                                                {rx.note ? <p className="text-[11px] text-muted-foreground">{rx.note}</p> : null}
+                                                            </div>
+                                                        )
                                                     })()}
                                                     <ResendLibraryLink email={purchase.visitorEmail} />
                                                 </div>
@@ -161,7 +196,7 @@ export default async function DashboardOrdersPage() {
                                                 <p className="text-sm text-muted-foreground mt-1">
                                                     {formatDistanceToNow(new Date(purchase.createdAt), { addSuffix: true })}
                                                 </p>
-                                                {purchase.status === "PENDING" ? <ConfirmOrderButton purchaseId={purchase.id} /> : null}
+                                                {purchase.status === "PENDING" ? <ConfirmOrderButton purchaseId={purchase.id} showReject={isRxRequired(purchase.product.variantsJson) || Boolean(parseBuyerPrescription(purchase.buyerNote).url)} /> : null}
                                                 <a href={`/dashboard/orders/${purchase.id}/receipt`} className="mt-2 block text-[11px] text-muted-foreground underline">
                                                     Receipt
                                                 </a>

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import { parseDiet } from "@/lib/menu"
 import type { ProductMetal } from "@/lib/metal/math"
 import { parseProductMetal, writeProductMetal } from "@/lib/metal/product"
-import { writeMedicine, type MedicineBatch } from "@/lib/pharmacy/batch"
+import { canPurchaseRxSku, formatRxBuyerNote, isRxRequired, writeBuyerPrescription, writeMedicine, type MedicineBatch } from "@/lib/pharmacy/batch"
 import { writeFitment, type VehicleFitment } from "@/lib/autoparts/fitment"
 import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
 
@@ -165,6 +165,9 @@ export async function placeManualOrder(input: {
     payMethod: "UPI" | "COD" | "WHATSAPP"
     address?: string
     buyerNote?: string
+    prescriptionUrl?: string
+    rxNote?: string
+    doctorName?: string
 }) {
     const product = await prisma.digitalProduct.findUnique({
         where: { id: input.productId },
@@ -172,6 +175,10 @@ export async function placeManualOrder(input: {
     })
     if (!product || !product.isActive) throw new Error("Product not found")
     if (product.stock != null && product.stock <= 0) throw new Error("Sold out")
+    const rxNote = formatRxBuyerNote(input.rxNote ?? input.buyerNote, input.doctorName)
+    if (!canPurchaseRxSku(product.variantsJson, { prescriptionUrl: input.prescriptionUrl, rxNote })) {
+        throw new Error("This medicine needs a prescription photo or a short Rx note")
+    }
 
     const purchase = await prisma.productPurchase.create({
         data: {
@@ -181,7 +188,7 @@ export async function placeManualOrder(input: {
             status: "PENDING",
             payMethod: input.payMethod,
             address: input.address?.trim() || null,
-            buyerNote: input.buyerNote?.trim() || null,
+            buyerNote: writeBuyerPrescription(rxNote, input.prescriptionUrl),
         },
     })
 
@@ -230,6 +237,9 @@ export async function placeCartOrder(input: {
     for (const line of input.lines) {
         const product = products.find((p) => p.id === line.productId)
         if (!product) continue
+        if (isRxRequired(product.variantsJson)) {
+            throw new Error(`${product.title} needs a prescription — open the product page to attach one`)
+        }
         const qty = Math.max(1, Math.min(20, Math.floor(line.qty) || 1))
         const purchase = await prisma.productPurchase.create({
             data: {
@@ -290,6 +300,26 @@ export async function confirmProductOrder(purchaseId: string) {
     revalidatePath("/dashboard/orders")
     revalidatePath("/dashboard/money")
 }
+
+export async function rejectProductOrder(purchaseId: string) {
+    unwrapOwnershipResult(await executeOwnedResourceWrite({
+        resourceId: purchaseId,
+        writeOwned: async ({ resourceId, profile }) => {
+            const updated = await prisma.productPurchase.updateMany({
+                where: {
+                    id: resourceId,
+                    status: "PENDING",
+                    product: { profileId: profile.id },
+                },
+                data: { status: "REJECTED" },
+            })
+            return updated.count === 1 ? true : null
+        },
+    }))
+    revalidatePath("/dashboard/orders")
+    revalidatePath("/dashboard/money")
+}
+
 export async function placeTip(input: {
     profileId: string
     visitorName: string

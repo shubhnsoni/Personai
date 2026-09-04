@@ -44,6 +44,8 @@ export function CheckoutSheet({
         item.upiId ? "UPI" : item.whatsapp ? "WHATSAPP" : "CARD",
     )
     const [rxUrl, setRxUrl] = useState("")
+    const [rxNote, setRxNote] = useState("")
+    const [doctorName, setDoctorName] = useState("")
     const [rxBusy, setRxBusy] = useState(false)
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -76,8 +78,8 @@ export function CheckoutSheet({
             return
         }
         if (item.soldOut) return
-        if (item.requiresRx && !rxUrl.trim()) {
-            setError("Attach a prescription photo for this medicine.")
+        if (item.requiresRx && !rxUrl.trim() && !rxNote.trim()) {
+            setError("Attach a prescription photo or enter a short Rx note.")
             return
         }
         setBusy(true)
@@ -92,12 +94,14 @@ export function CheckoutSheet({
                     visitorEmail: email.trim(),
                     payMethod,
                     address: [variant, address.trim()].filter(Boolean).join(" · ") || undefined,
-                    prescriptionUrl: item.requiresRx ? rxUrl.trim() : undefined,
+                    prescriptionUrl: item.requiresRx ? rxUrl.trim() || undefined : undefined,
+                    rxNote: item.requiresRx ? rxNote.trim() || undefined : undefined,
+                    doctorName: item.requiresRx ? doctorName.trim() || undefined : undefined,
                 })
                 if (payMethod === "WHATSAPP") {
                     const href = whatsappHref(
                         item.whatsapp || order.whatsapp,
-                        `Hi, I want ${item.title}${variant ? ` (${variant})` : ""} (${price}). Name: ${name.trim()}${item.requiresRx && rxUrl ? ` · Prescription: ${rxUrl}` : ""}`,
+                        `Hi, I want ${item.title}${variant ? ` (${variant})` : ""} (${price}). Name: ${name.trim()}${item.requiresRx && (rxUrl || rxNote) ? ` · Rx: ${rxUrl || rxNote}${doctorName ? ` (Dr. ${doctorName})` : ""}` : ""}`,
                     )
                     if (href) window.open(href, "_blank")
                     setDone("WhatsApp opened. The shop has your order.")
@@ -192,9 +196,9 @@ export function CheckoutSheet({
                         </div>
                     ) : null}
                     {item.requiresRx ? (
-                        <div className="space-y-1.5 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3">
-                            <Label>Prescription photo</Label>
-                            <p className="text-[11px] text-amber-100/80">This medicine needs a doctor&apos;s prescription. Upload a clear photo.</p>
+                        <div className="space-y-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3">
+                            <Label>Prescription</Label>
+                            <p className="text-[11px] text-amber-100/80">Upload a photo or enter a short Rx note. Optional doctor name.</p>
                             {rxUrl ? (
                                 <div className="flex items-center justify-between gap-2">
                                     <a href={rxUrl} target="_blank" rel="noreferrer" className="truncate text-xs text-amber-100 underline">View attached</a>
@@ -226,6 +230,18 @@ export function CheckoutSheet({
                                     }}
                                 />
                             )}
+                            <Input
+                                value={rxNote}
+                                onChange={(e) => setRxNote(e.target.value)}
+                                placeholder="Short Rx note (if no photo)"
+                                className="h-10 rounded-xl border-white/10 bg-zinc-950/40"
+                            />
+                            <Input
+                                value={doctorName}
+                                onChange={(e) => setDoctorName(e.target.value)}
+                                placeholder="Doctor name (optional)"
+                                className="h-10 rounded-xl border-white/10 bg-zinc-950/40"
+                            />
                         </div>
                     ) : null}
                     {item.itemType === "product" ? (

@@ -101,3 +101,23 @@ export function parseBuyerPrescription(note?: string | null): { url: string | nu
         note: note.slice(space + 1).trim() || null,
     }
 }
+
+export function formatRxBuyerNote(rxNote?: string | null, doctorName?: string | null) {
+    const doc = doctorName?.trim()
+    const note = rxNote?.trim()
+    return [doc ? (doc.toLowerCase().startsWith("dr") ? doc : `Dr. ${doc}`) : null, note].filter(Boolean).join(" · ") || null
+}
+
+export function rxAttachmentOk(input: { prescriptionUrl?: string | null; rxNote?: string | null }) {
+    return Boolean(input.prescriptionUrl?.trim() || input.rxNote?.trim())
+}
+
+/** Gate: OTC always ok; Rx SKUs need a photo URL and/or a short Rx note. */
+export function canPurchaseRxSku(
+    variantsJson: string | null | undefined,
+    attachment: { prescriptionUrl?: string | null; rxNote?: string | null },
+) {
+    if (!isRxRequired(variantsJson)) return true
+    return rxAttachmentOk(attachment)
+}
+

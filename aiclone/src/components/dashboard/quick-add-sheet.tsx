@@ -98,6 +98,7 @@ export function QuickAddSheet({
     const [making, setMaking] = useState("")
     const [batch, setBatch] = useState("")
     const [expiry, setExpiry] = useState("")
+    const [rxRequired, setRxRequired] = useState(false)
     const [fitMake, setFitMake] = useState("")
     const [fitModel, setFitModel] = useState("")
     const [fitYearFrom, setFitYearFrom] = useState("")
@@ -136,6 +137,7 @@ export function QuickAddSheet({
         const med = parseMedicine(product?.variantsJson)
         setBatch(med?.batch || "")
         setExpiry(med?.expiry || "")
+        setRxRequired(Boolean(med?.rxRequired))
         const fit = parseFitment(product?.variantsJson)
         setFitMake(fit?.make || "")
         setFitModel(fit?.model || "")
@@ -173,6 +175,7 @@ export function QuickAddSheet({
         setMaking("")
         setBatch("")
         setExpiry("")
+        setRxRequired(false)
         setFitMake("")
         setFitModel("")
         setFitYearFrom("")
@@ -209,7 +212,7 @@ export function QuickAddSheet({
                                 : undefined
                             const ticket = metal && goldBoard ? ticketPaise(metal, goldBoard) / 100 : parseFloat(price) || 0
                             const medicine = pharmacy && expiry.trim()
-                                ? { batch: batch.trim() || "—", expiry: expiry.trim(), mrpPaise: Math.round(ticket * 100) }
+                                ? { batch: batch.trim() || "—", expiry: expiry.trim(), mrpPaise: Math.round(ticket * 100), rxRequired }
                                 : pharmacy ? null : undefined
                             const yearFromN = parseInt(fitYearFrom, 10)
                             const yearToN = parseInt(fitYearTo, 10)
@@ -270,7 +273,7 @@ export function QuickAddSheet({
                                 {gold
                                     ? "Weight, purity, making. Price follows today’s city board."
                                     : pharmacy
-                                    ? "Name, price, batch, and expiry. Expired stock stays off the public shop."
+                                    ? "Name, price, batch, expiry, and Rx if needed. Expired stock stays off the public shop."
                                     : autoParts
                                     ? "Name, price, and vehicle fitment (make, model, years)."
                                     : more ? "Extra detail. You can still save with just name and price." : "Photo, name, price. Tap More if you need it."}
@@ -366,6 +369,7 @@ export function QuickAddSheet({
                         </div>
                         ) : null}
                         {pharmacy ? (
+                        <>
                         <div className="grid grid-cols-2 gap-2.5">
                             <Input
                                 value={batch}
@@ -381,6 +385,11 @@ export function QuickAddSheet({
                                 className="h-12 rounded-2xl border-border/70 text-base"
                             />
                         </div>
+                        <label className="flex h-12 items-center justify-between rounded-2xl bg-muted/50 px-3.5 text-sm">
+                            Needs prescription
+                            <Switch checked={rxRequired} onCheckedChange={setRxRequired} />
+                        </label>
+                        </>
                         ) : null}
                         {autoParts ? (
                         <div className="space-y-2.5">

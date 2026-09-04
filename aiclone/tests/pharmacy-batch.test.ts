@@ -4,6 +4,8 @@ import {
     isExpiredMedicine,
     isRxRequired,
     medicineLine,
+    canPurchaseRxSku,
+    formatRxBuyerNote,
     parseBuyerPrescription,
     parseMedicine,
     shopExpiryLine,
@@ -46,3 +48,14 @@ describe("pharmacy batch", () => {
         expect(parseBuyerPrescription("just a note")).toEqual({ url: null, note: "just a note" })
     })
 })
+
+    it("gates purchase for Rx SKUs", () => {
+        const rx = writeMedicine(null, { batch: "A", expiry: "2027-01-01", mrpPaise: 100, rxRequired: true })
+        const otc = writeMedicine(null, { batch: "B", expiry: "2027-01-01", mrpPaise: 100 })
+        expect(canPurchaseRxSku(otc, {})).toBe(true)
+        expect(canPurchaseRxSku(rx, {})).toBe(false)
+        expect(canPurchaseRxSku(rx, { prescriptionUrl: "https://cdn.example/rx.jpg" })).toBe(true)
+        expect(canPurchaseRxSku(rx, { rxNote: "Amox 500 TID x 5d" })).toBe(true)
+        expect(formatRxBuyerNote("TID x 5d", "Mehta")).toBe("Dr. Mehta · TID x 5d")
+    })
+
