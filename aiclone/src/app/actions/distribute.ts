@@ -11,8 +11,13 @@ import {
     orderTotalPaise,
     type DistroAccounts,
     type DistroApproval,
+    type DistroMeta,
     type DistroWarehouse,
 } from "@/lib/distribute/meta"
+import {
+    stampGstInvoice,
+    stateCodeFromDistroLocation,
+} from "@/lib/billing/gst"
 import {
     DISTRO_ASSIGNABLE_DESKS,
     assertDistroPermission,
@@ -31,6 +36,7 @@ type DistroActor = {
     role: string
     desk: DistroDesk | null
     perms: DistroDeskPermissions
+    gstin: string | null
 }
 
 /**
@@ -44,7 +50,7 @@ async function distroActor(profileId: string): Promise<DistroActor> {
 
     const profile = await prisma.profile.findFirst({
         where: { id: profileId },
-        select: { id: true, userId: true, roleTemplate: true, personalityConfig: true },
+        select: { id: true, userId: true, roleTemplate: true, personalityConfig: true, gstin: true },
     })
     if (!profile) throw new Error("Not your workspace")
     if (profile.roleTemplate !== "DISTRIBUTOR") throw new Error("Not a distributor kit")
@@ -77,6 +83,7 @@ async function distroActor(profileId: string): Promise<DistroActor> {
         role,
         desk: perms.desk,
         perms,
+        gstin: profile.gstin ?? null,
     }
 }
 
@@ -254,6 +261,39 @@ export async function placeDistroOrder(input: {
     return { id: order.id, number: order.number }
 }
 
+function applyGstStamp(meta: DistroMeta, totalPaise: number, sellerGstin: string | null): DistroMeta {
+    if (meta.accounts !== "BILLED") return meta
+    const stamp = stampGstInvoice({
+        gstin: sellerGstin,
+        totalPaise,
+        buyerStateCode: stateCodeFromDistroLocation(meta.location),
+    })
+    if (!stamp) {
+        return {
+            ...meta,
+            gstin: "",
+            taxablePaise: totalPaise,
+            gstRateBps: 0,
+            gstMode: "",
+            gstPaise: 0,
+            cgstPaise: 0,
+            sgstPaise: 0,
+            igstPaise: 0,
+        }
+    }
+    return {
+        ...meta,
+        gstin: stamp.gstin,
+        taxablePaise: stamp.taxablePaise,
+        gstRateBps: stamp.rateBps,
+        gstMode: stamp.mode,
+        gstPaise: stamp.gstPaise,
+        cgstPaise: stamp.cgstPaise,
+        sgstPaise: stamp.sgstPaise,
+        igstPaise: stamp.igstPaise,
+    }
+}
+
 async function patchMeta(
     profileId: string,
     orderId: string,
@@ -265,7 +305,10 @@ async function patchMeta(
 
     const row = await prisma.order.findFirst({ where: { id: orderId, profileId: actor.profileId } })
     if (!row) throw new Error("Order not found")
-    const meta = { ...parseDistroMeta(row.staffNote, row.guestName, row.tableLabel), ...patch }
+    let meta = { ...parseDistroMeta(row.staffNote, row.guestName, row.tableLabel), ...patch }
+    if (action === "accounts") {
+        meta = applyGstStamp(meta, row.totalCents, actor.gstin)
+    }
     const status =
         meta.accounts === "BILLED" ? "PAID"
             : meta.warehouse === "DISPATCHED" ? "READY"
@@ -282,6 +325,9 @@ async function patchMeta(
             payStatus: meta.accounts === "BILLED" ? "PAID" : "UNPAID",
             paymentRef: meta.invoice || null,
             paidAt: meta.accounts === "BILLED" ? new Date() : null,
+            // Persist GST amount on the order row for shared receipt views.
+            taxCents: meta.accounts === "BILLED" ? meta.gstPaise : row.taxCents,
+            subtotalCents: meta.accounts === "BILLED" && meta.taxablePaise > 0 ? meta.taxablePaise : row.subtotalCents,
         },
     })
     revalidatePath("/dashboard/orders")

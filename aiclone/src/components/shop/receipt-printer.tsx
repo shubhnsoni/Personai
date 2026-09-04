@@ -30,6 +30,7 @@ export function ReceiptPrinter({
                         <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em]">{data.shopName}</p>
                         <p className="mt-1 text-center text-[10px] uppercase tracking-[0.16em] text-zinc-500">Tax invoice · Receipt</p>
                         {data.gstin ? <p className="mt-1 text-center font-mono text-[10px] text-zinc-500">GSTIN {data.gstin}</p> : null}
+                        {data.invoice ? <p className="mt-1 text-center font-mono text-[10px] text-zinc-500">{data.invoice}</p> : null}
                         <div className="my-3 border-t border-dashed border-zinc-400" />
                         <p className="font-mono text-[11px]">Order #{data.number}</p>
                         <p className="font-mono text-[11px] text-zinc-600">{data.tableLabel || "Takeaway"} · {data.guestName || "Guest"}</p>
@@ -49,7 +50,12 @@ export function ReceiptPrinter({
                         </div>
                         <div className="my-3 border-t border-dashed border-zinc-400" />
                         <div className="flex justify-between font-mono text-[12px]"><span>Subtotal</span><span>{data.subtotal}</span></div>
-                        {data.tax ? <div className="flex justify-between font-mono text-[12px]"><span>Tax</span><span>{data.tax}</span></div> : null}
+                        {data.taxable ? <div className="flex justify-between font-mono text-[12px]"><span>Taxable</span><span>{data.taxable}</span></div> : null}
+                        {(data.gstLines && data.gstLines.length > 0)
+                            ? data.gstLines.map((g) => (
+                                <div key={g.label} className="flex justify-between font-mono text-[12px]"><span>{g.label}</span><span>{g.amount}</span></div>
+                            ))
+                            : (data.tax ? <div className="flex justify-between font-mono text-[12px]"><span>Tax</span><span>{data.tax}</span></div> : null)}
                         <div className="mt-2 flex justify-between font-mono text-[15px] font-bold"><span>TOTAL</span><span>{data.total}</span></div>
                         {data.upiId ? <p className="mt-3 text-center font-mono text-[11px]">UPI {data.upiId}</p> : null}
                         <p className="mt-4 text-center text-[11px] text-zinc-500">Thank you · Visit again</p>

@@ -26,8 +26,23 @@ describe("distributor workflow tabs", () => {
         const dispatch = parseDistroMeta(writeDistroMeta({ ...approved, warehouse: "DISPATCHED" }))
         expect(distroTab(dispatch)).toBe("dispatch")
 
-        const billed = parseDistroMeta(writeDistroMeta({ ...dispatch, accounts: "BILLED", invoice: "INV-104" }))
+        const billed = parseDistroMeta(writeDistroMeta({
+            ...dispatch,
+            accounts: "BILLED",
+            invoice: "INV-104",
+            gstin: "20AABCU9603R1ZM",
+            taxablePaise: 10000,
+            gstRateBps: 1800,
+            gstMode: "cgst_sgst",
+            gstPaise: 1800,
+            cgstPaise: 900,
+            sgstPaise: 900,
+            igstPaise: 0,
+        }))
         expect(billed.invoice).toBe("INV-104")
+        expect(billed.gstin).toBe("20AABCU9603R1ZM")
+        expect(billed.taxablePaise).toBe(10000)
+        expect(billed.gstMode).toBe("cgst_sgst")
         expect(distroTab(billed)).toBe("billed")
     })
 })

@@ -3,6 +3,8 @@ import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
 import { requireSurface } from "@/lib/require-surface"
 import { OrderReceiptClient } from "@/components/dashboard/order-receipt-client"
+import { parseDistroMeta } from "@/lib/distribute/meta"
+import { gstReceiptLines } from "@/lib/billing/gst"
 
 export const dynamic = "force-dynamic"
 
@@ -22,17 +24,35 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
     requireSurface(profile.roleTemplate, "shop", profile)
     const { id } = await params
 
-    if (profile.roleTemplate === "RESTAURANT") {
+    if (profile.roleTemplate === "RESTAURANT" || profile.roleTemplate === "DISTRIBUTOR") {
         const order = await prisma.order.findFirst({
             where: { id, profileId: profile.id },
             include: { lines: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
         })
         if (!order) notFound()
+
+        const distro = profile.roleTemplate === "DISTRIBUTOR"
+            ? parseDistroMeta(order.staffNote, order.guestName, order.tableLabel)
+            : null
+        const gstin = distro?.gstin || profile.gstin
+        const gstLines = distro?.gstMode
+            ? gstReceiptLines({
+                mode: distro.gstMode,
+                rateBps: distro.gstRateBps,
+                gstPaise: distro.gstPaise,
+                cgstPaise: distro.cgstPaise,
+                sgstPaise: distro.sgstPaise,
+                igstPaise: distro.igstPaise,
+            }).map((g) => ({ label: g.label, amount: money(g.paise, order.currency) }))
+            : []
+        const taxablePaise = distro && distro.taxablePaise > 0 ? distro.taxablePaise : order.subtotalCents
+
         return (
             <OrderReceiptClient
                 data={{
                     shopName: profile.displayName,
-                    gstin: profile.gstin,
+                    gstin,
+                    invoice: distro?.invoice || order.paymentRef,
                     number: order.number,
                     tableLabel: order.tableLabel,
                     guestName: order.guestName,
@@ -47,8 +67,10 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
                         modifiersLabel: line.modifiersLabel,
                         lineTotal: money(line.lineTotalCents, order.currency),
                     })),
-                    subtotal: money(order.subtotalCents, order.currency),
-                    tax: order.taxCents ? money(order.taxCents, order.currency) : null,
+                    subtotal: money(taxablePaise || order.subtotalCents, order.currency),
+                    taxable: distro && distro.taxablePaise > 0 ? money(distro.taxablePaise, order.currency) : null,
+                    gstLines,
+                    tax: !gstLines.length && order.taxCents ? money(order.taxCents, order.currency) : null,
                     total: money(order.totalCents, order.currency),
                     upiId: profile.upiId,
                 }}

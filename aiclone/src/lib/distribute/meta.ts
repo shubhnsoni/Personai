@@ -7,6 +7,8 @@ export type DistroApproval = "PENDING" | "APPROVED" | "NOT_APPROVED" | "ON_HOLD"
 export type DistroWarehouse = "WAITING" | "DISPATCHED" | "NO_STOCK"
 export type DistroAccounts = "HOLD" | "BILLED" | "NO_STOCK"
 
+export type DistroGstMode = "cgst_sgst" | "igst" | "gst"
+
 export type DistroMeta = {
     salesman: string
     location: string
@@ -15,6 +17,16 @@ export type DistroMeta = {
     warehouse: DistroWarehouse
     accounts: DistroAccounts
     invoice: string
+    /** Seller GSTIN stamped at Accounts bill time (from Profile.gstin). */
+    gstin: string
+    /** Inclusive-total breakup stamped at bill time (paise). */
+    taxablePaise: number
+    gstRateBps: number
+    gstMode: DistroGstMode | ""
+    gstPaise: number
+    cgstPaise: number
+    sgstPaise: number
+    igstPaise: number
 }
 
 const DEFAULT: DistroMeta = {
@@ -25,6 +37,18 @@ const DEFAULT: DistroMeta = {
     warehouse: "WAITING",
     accounts: "HOLD",
     invoice: "",
+    gstin: "",
+    taxablePaise: 0,
+    gstRateBps: 0,
+    gstMode: "",
+    gstPaise: 0,
+    cgstPaise: 0,
+    sgstPaise: 0,
+    igstPaise: 0,
+}
+
+function num(v: unknown, fallback = 0) {
+    return typeof v === "number" && Number.isFinite(v) ? Math.round(v) : fallback
 }
 
 export function parseDistroMeta(staffNote?: string | null, guestName?: string | null, tableLabel?: string | null): DistroMeta {
@@ -37,6 +61,7 @@ export function parseDistroMeta(staffNote?: string | null, guestName?: string | 
     try {
         const o = JSON.parse(staffNote) as Partial<DistroMeta>
         if (!o || typeof o !== "object") return base
+        const mode = o.gstMode === "cgst_sgst" || o.gstMode === "igst" || o.gstMode === "gst" ? o.gstMode : base.gstMode
         return {
             salesman: typeof o.salesman === "string" ? o.salesman : base.salesman,
             location: typeof o.location === "string" && o.location ? o.location : base.location,
@@ -45,6 +70,14 @@ export function parseDistroMeta(staffNote?: string | null, guestName?: string | 
             warehouse: o.warehouse === "DISPATCHED" || o.warehouse === "NO_STOCK" || o.warehouse === "WAITING" ? o.warehouse : base.warehouse,
             accounts: o.accounts === "BILLED" || o.accounts === "NO_STOCK" || o.accounts === "HOLD" ? o.accounts : base.accounts,
             invoice: typeof o.invoice === "string" ? o.invoice : base.invoice,
+            gstin: typeof o.gstin === "string" ? o.gstin : base.gstin,
+            taxablePaise: num(o.taxablePaise, base.taxablePaise),
+            gstRateBps: num(o.gstRateBps, base.gstRateBps),
+            gstMode: mode,
+            gstPaise: num(o.gstPaise, base.gstPaise),
+            cgstPaise: num(o.cgstPaise, base.cgstPaise),
+            sgstPaise: num(o.sgstPaise, base.sgstPaise),
+            igstPaise: num(o.igstPaise, base.igstPaise),
         }
     } catch {
         return base

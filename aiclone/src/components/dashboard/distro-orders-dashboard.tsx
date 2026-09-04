@@ -28,6 +28,12 @@ import {
     setDistroApproval,
     setDistroWarehouse,
 } from "@/app/actions/distribute"
+import { ReceiptPrinter } from "@/components/shop/receipt-printer"
+import type { ReceiptData } from "@/lib/receipt"
+import { gstReceiptLines } from "@/lib/billing/gst"
+import { ReceiptPrinter } from "@/components/shop/receipt-printer"
+import type { ReceiptData } from "@/lib/receipt"
+import { gstReceiptLines } from "@/lib/billing/gst"
 
 type Tab = "pending" | "approved" | "dispatch" | "billed"
 
@@ -46,6 +52,42 @@ function rupees(paise: number) {
     return `₹${(paise / 100).toLocaleString("en-IN")}`
 }
 
+function distroReceiptData(order: OrderRow, shopName = "Invoice"): ReceiptData {
+    const meta = order.meta
+    const gstLines = meta.gstMode
+        ? gstReceiptLines({
+            mode: meta.gstMode,
+            rateBps: meta.gstRateBps,
+            gstPaise: meta.gstPaise,
+            cgstPaise: meta.cgstPaise,
+            sgstPaise: meta.sgstPaise,
+            igstPaise: meta.igstPaise,
+        }).map((g) => ({ label: g.label, amount: rupees(g.paise) }))
+        : []
+    return {
+        shopName,
+        gstin: meta.gstin || null,
+        invoice: meta.invoice || null,
+        number: order.number,
+        tableLabel: meta.location,
+        guestName: meta.dealer,
+        status: meta.accounts === "BILLED" ? "PAID" : "PLACED",
+        payStatus: meta.accounts === "BILLED" ? "PAID" : "UNPAID",
+        payMethod: meta.invoice || "Bill",
+        placedAt: new Date(order.placedAt).toLocaleString(),
+        lines: order.lines.map((l) => ({
+            qty: l.qty,
+            title: l.title,
+            lineTotal: rupees(l.linePaise),
+        })),
+        subtotal: rupees(meta.taxablePaise > 0 ? meta.taxablePaise : order.totalPaise),
+        taxable: meta.taxablePaise > 0 ? rupees(meta.taxablePaise) : null,
+        gstLines,
+        tax: meta.gstPaise > 0 && gstLines.length === 0 ? rupees(meta.gstPaise) : null,
+        total: rupees(order.totalPaise),
+    }
+}
+
 export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
     const [seat, setSeat] = useState<Seat | null>(null)
     const [tab, setTab] = useState<Tab>("pending")
@@ -59,6 +101,7 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
     const [price, setPrice] = useState<Record<string, number>>({})
     const [inviteEmail, setInviteEmail] = useState("")
     const [inviteDesk, setInviteDesk] = useState<DistroAssignableDesk>("sales")
+    const [receipt, setReceipt] = useState<ReceiptData | null>(null)
 
     function reload() {
         start(async () => {
@@ -271,10 +314,23 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
                                 </Tiny>
                             ) : null}
                             {order.meta.invoice ? <span className="text-[12px] text-muted-foreground">{order.meta.invoice}</span> : null}
+                            {order.meta.accounts === "BILLED" && order.meta.gstin ? (
+                                <span className="text-[12px] text-muted-foreground">GSTIN {order.meta.gstin}</span>
+                            ) : null}
+                            {order.meta.accounts === "BILLED" && order.meta.taxablePaise > 0 ? (
+                                <span className="text-[12px] text-muted-foreground">
+                                    Taxable {rupees(order.meta.taxablePaise)}
+                                    {order.meta.gstPaise > 0 ? ` · GST ${rupees(order.meta.gstPaise)}` : ""}
+                                </span>
+                            ) : null}
+                            {order.meta.accounts === "BILLED" ? (
+                                <Tiny onClick={() => setReceipt(distroReceiptData(order))} disabled={pending}>Receipt</Tiny>
+                            ) : null}
                         </div>
                     </div>
                 ))}
             </div>
+            {receipt ? <ReceiptPrinter data={receipt} onClose={() => setReceipt(null)} /> : null}
         </div>
     )
 }

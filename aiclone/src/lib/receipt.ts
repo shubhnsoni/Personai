@@ -5,6 +5,11 @@ export type ReceiptLine = {
     lineTotal: string
 }
 
+export type ReceiptGstLine = {
+    label: string
+    amount: string
+}
+
 export type ReceiptData = {
     shopName: string
     gstin?: string | null
@@ -18,9 +23,14 @@ export type ReceiptData = {
     placedAt: string
     lines: ReceiptLine[]
     subtotal: string
+    /** Optional taxable amount (shown when GST breakup is present). */
+    taxable?: string | null
     tax?: string | null
+    /** Structured GST breakup lines (CGST/SGST, IGST, or single GST). */
+    gstLines?: ReceiptGstLine[]
     total: string
     upiId?: string | null
+    invoice?: string | null
 }
 
 function escapeHtml(value: string) {
@@ -38,6 +48,8 @@ export function receiptPrintHtml(data: ReceiptData) {
         <td>${escapeHtml(line.title)}${line.modifiersLabel ? `<div class="mod">${escapeHtml(line.modifiersLabel)}</div>` : ""}</td>
         <td class="r">${escapeHtml(line.lineTotal)}</td>
       </tr>`).join("")
+    const gstRows = (data.gstLines || []).map((g) => `
+      <tr><td>${escapeHtml(g.label)}</td><td class="r">${escapeHtml(g.amount)}</td></tr>`).join("")
     return `<!doctype html>
 <html>
 <head>
@@ -65,6 +77,7 @@ export function receiptPrintHtml(data: ReceiptData) {
     <p class="center shop">${escapeHtml(data.shopName)}</p>
     <p class="center muted">TAX INVOICE / RECEIPT</p>
     ${data.gstin ? `<p class="center muted">GSTIN ${escapeHtml(data.gstin)}</p>` : ""}
+    ${data.invoice ? `<p class="center muted">${escapeHtml(data.invoice)}</p>` : ""}
     <hr class="dash"/>
     <p class="muted">Order #${escapeHtml(String(data.number))}</p>
     <p class="muted">${escapeHtml(data.tableLabel || "Takeaway")} · ${escapeHtml(data.guestName || "Guest")}</p>
@@ -78,7 +91,9 @@ export function receiptPrintHtml(data: ReceiptData) {
     <hr class="dash"/>
     <table>
       <tr><td>Subtotal</td><td class="r">${escapeHtml(data.subtotal)}</td></tr>
-      ${data.tax ? `<tr><td>Tax</td><td class="r">${escapeHtml(data.tax)}</td></tr>` : ""}
+      ${data.taxable ? `<tr><td>Taxable</td><td class="r">${escapeHtml(data.taxable)}</td></tr>` : ""}
+      ${gstRows}
+      ${!gstRows && data.tax ? `<tr><td>Tax</td><td class="r">${escapeHtml(data.tax)}</td></tr>` : ""}
       <tr class="total"><td>TOTAL</td><td class="r">${escapeHtml(data.total)}</td></tr>
     </table>
     ${data.upiId ? `<p class="center muted" style="margin-top:10px">UPI ${escapeHtml(data.upiId)}</p>` : ""}
