@@ -13,18 +13,148 @@ import {
     type DistroApproval,
     type DistroWarehouse,
 } from "@/lib/distribute/meta"
+import {
+    DISTRO_ASSIGNABLE_DESKS,
+    assertDistroPermission,
+    membershipRoleForDesk,
+    membershipRoleToDesk,
+    resolveDistroDeskPermissions,
+    type DistroAssignableDesk,
+    type DistroDesk,
+    type DistroDeskPermissions,
+} from "@/lib/distribute/desks"
 
-async function ownedProfile(profileId: string) {
+type DistroActor = {
+    profileId: string
+    userId: string
+    workspaceId: string | null
+    role: string
+    desk: DistroDesk | null
+    perms: DistroDeskPermissions
+}
+
+/**
+ * Resolve the caller's workspace Membership for this distributor profile.
+ * Profile ownership alone is not enough once invited seats exist — desk
+ * permissions come from Membership.role (OWNER → admin by default).
+ */
+async function distroActor(profileId: string): Promise<DistroActor> {
     const user = await syncUser()
     if (!user) throw new Error("Sign in")
-    const profile = user.profiles.find((p) => p.id === profileId)
+
+    const profile = await prisma.profile.findFirst({
+        where: { id: profileId },
+        select: { id: true, userId: true, roleTemplate: true, personalityConfig: true },
+    })
     if (!profile) throw new Error("Not your workspace")
     if (profile.roleTemplate !== "DISTRIBUTOR") throw new Error("Not a distributor kit")
-    return profile
+
+    const workspace = await prisma.workspace.findFirst({
+        where: { profileId: profile.id },
+        select: { id: true },
+    })
+
+    let role: string | null = null
+    if (workspace) {
+        const membership = await prisma.membership.findUnique({
+            where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
+            select: { role: true },
+        })
+        role = membership?.role ?? null
+    }
+
+    // Legacy / try-kit: profile owner without a membership row still gets OWNER.
+    if (!role && profile.userId === user.id) role = "OWNER"
+    if (!role) throw new Error("Not a workspace member")
+
+    const perms = resolveDistroDeskPermissions(role, profile.personalityConfig)
+    assertDistroPermission(perms, "read")
+
+    return {
+        profileId: profile.id,
+        userId: user.id,
+        workspaceId: workspace?.id ?? null,
+        role,
+        desk: perms.desk,
+        perms,
+    }
+}
+
+export async function getDistroSeat(profileId: string) {
+    const actor = await distroActor(profileId)
+    const members = actor.perms.canInvite && actor.workspaceId
+        ? await listMembers(actor.workspaceId)
+        : []
+    return {
+        role: actor.role,
+        desk: actor.desk,
+        canCreate: actor.perms.canCreate,
+        canApprove: actor.perms.canApprove,
+        canWarehouse: actor.perms.canWarehouse,
+        canAccounts: actor.perms.canAccounts,
+        canInvite: actor.perms.canInvite,
+        members,
+    }
+}
+
+async function listMembers(workspaceId: string) {
+    const rows = await prisma.membership.findMany({
+        where: { workspaceId },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, userId: true, role: true },
+    })
+    const users = rows.length
+        ? await prisma.user.findMany({
+            where: { id: { in: rows.map((m) => m.userId) } },
+            select: { id: true, email: true, name: true },
+        })
+        : []
+    const byId = new Map(users.map((u) => [u.id, u]))
+    return rows.map((m) => {
+        const u = byId.get(m.userId)
+        return {
+            id: m.id,
+            userId: m.userId,
+            email: u?.email || "",
+            name: u?.name || "",
+            role: m.role,
+            desk: membershipRoleToDesk(m.role),
+        }
+    })
+}
+
+export async function assignDistroDesk(profileId: string, email: string, desk: DistroAssignableDesk) {
+    const actor = await distroActor(profileId)
+    if (!actor.perms.canInvite) throw new Error("Admin desk required to assign seats")
+    if (!actor.workspaceId) throw new Error("No workspace")
+    if (!DISTRO_ASSIGNABLE_DESKS.includes(desk)) throw new Error("Pick a desk")
+
+    const cleaned = email.trim().toLowerCase()
+    if (!cleaned || !cleaned.includes("@")) throw new Error("Enter their email")
+
+    const target = await prisma.user.findUnique({ where: { email: cleaned }, select: { id: true } })
+    if (!target) throw new Error("They need to sign in once first, then you can assign a desk")
+    if (target.id === actor.userId) throw new Error("You already have a desk")
+
+    const existing = await prisma.membership.findUnique({
+        where: { workspaceId_userId: { workspaceId: actor.workspaceId, userId: target.id } },
+        select: { role: true },
+    })
+    if (existing?.role === "OWNER") throw new Error("Cannot reassign the owner")
+
+    const role = membershipRoleForDesk(desk)
+    // Desk roles live on MembershipRole (SALES/WAREHOUSE/ACCOUNTS/ADMIN).
+    await prisma.membership.upsert({
+        where: { workspaceId_userId: { workspaceId: actor.workspaceId, userId: target.id } },
+        create: { workspaceId: actor.workspaceId, userId: target.id, role: role as never },
+        update: { role: role as never },
+    })
+    revalidatePath("/dashboard/orders")
+    return { ok: true as const, desk, role }
 }
 
 export async function listDistroOrders(profileId: string) {
-    await ownedProfile(profileId)
+    await distroActor(profileId)
     const rows = await prisma.order.findMany({
         where: { profileId },
         include: { lines: { orderBy: { createdAt: "asc" } } },
@@ -52,7 +182,7 @@ export async function listDistroOrders(profileId: string) {
 }
 
 export async function listDistroCatalog(profileId: string) {
-    await ownedProfile(profileId)
+    await distroActor(profileId)
     return prisma.digitalProduct.findMany({
         where: { profileId, isActive: true },
         orderBy: { title: "asc" },
@@ -67,7 +197,9 @@ export async function placeDistroOrder(input: {
     salesman: string
     lines: { productId: string; qty: number; unitPaise: number }[]
 }) {
-    const profile = await ownedProfile(input.profileId)
+    const actor = await distroActor(input.profileId)
+    assertDistroPermission(actor.perms, "create")
+
     const dealer = input.dealer.trim()
     if (!dealer) throw new Error("Name the dealer")
     if (!DISTRO_LOCATIONS.includes(input.location as (typeof DISTRO_LOCATIONS)[number])) throw new Error("Pick a location")
@@ -76,7 +208,7 @@ export async function placeDistroOrder(input: {
     if (qtyLines.length === 0) throw new Error("Add at least one item")
 
     const products = await prisma.digitalProduct.findMany({
-        where: { profileId: profile.id, id: { in: qtyLines.map((l) => l.productId) } },
+        where: { profileId: actor.profileId, id: { in: qtyLines.map((l) => l.productId) } },
     })
     const byId = new Map(products.map((p) => [p.id, p]))
     const priced = qtyLines.map((l) => {
@@ -86,7 +218,7 @@ export async function placeDistroOrder(input: {
         return { productId: p.id, title: p.title, qty: l.qty, unitPaise: unit, linePaise: l.qty * unit }
     })
     const total = orderTotalPaise(priced.map((l) => ({ qty: l.qty, unitPaise: l.unitPaise })))
-    const last = await prisma.order.findFirst({ where: { profileId: profile.id }, orderBy: { number: "desc" }, select: { number: true } })
+    const last = await prisma.order.findFirst({ where: { profileId: actor.profileId }, orderBy: { number: "desc" }, select: { number: true } })
     const meta = parseDistroMeta(null, dealer, input.location)
     meta.salesman = input.salesman
     meta.dealer = dealer
@@ -94,7 +226,7 @@ export async function placeDistroOrder(input: {
 
     const order = await prisma.order.create({
         data: {
-            profileId: profile.id,
+            profileId: actor.profileId,
             publicToken: `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
             number: (last?.number || 0) + 1,
             businessDate: new Date(),
@@ -122,9 +254,16 @@ export async function placeDistroOrder(input: {
     return { id: order.id, number: order.number }
 }
 
-async function patchMeta(profileId: string, orderId: string, patch: Partial<ReturnType<typeof parseDistroMeta>>) {
-    await ownedProfile(profileId)
-    const row = await prisma.order.findFirst({ where: { id: orderId, profileId } })
+async function patchMeta(
+    profileId: string,
+    orderId: string,
+    patch: Partial<ReturnType<typeof parseDistroMeta>>,
+    action: "approve" | "warehouse" | "accounts",
+) {
+    const actor = await distroActor(profileId)
+    assertDistroPermission(actor.perms, action)
+
+    const row = await prisma.order.findFirst({ where: { id: orderId, profileId: actor.profileId } })
     if (!row) throw new Error("Order not found")
     const meta = { ...parseDistroMeta(row.staffNote, row.guestName, row.tableLabel), ...patch }
     const status =
@@ -149,13 +288,13 @@ async function patchMeta(profileId: string, orderId: string, patch: Partial<Retu
 }
 
 export async function setDistroApproval(profileId: string, orderId: string, approval: DistroApproval) {
-    await patchMeta(profileId, orderId, { approval })
+    await patchMeta(profileId, orderId, { approval }, "approve")
 }
 
 export async function setDistroWarehouse(profileId: string, orderId: string, warehouse: DistroWarehouse) {
-    await patchMeta(profileId, orderId, { warehouse })
+    await patchMeta(profileId, orderId, { warehouse }, "warehouse")
 }
 
 export async function setDistroAccounts(profileId: string, orderId: string, accounts: DistroAccounts, invoice?: string) {
-    await patchMeta(profileId, orderId, { accounts, invoice: invoice ?? "" })
+    await patchMeta(profileId, orderId, { accounts, invoice: invoice ?? "" }, "accounts")
 }

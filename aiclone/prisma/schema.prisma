@@ -1237,6 +1237,9 @@ enum MembershipRole {
   MANAGER
   STAFF
   VIEWER
+  SALES
+  WAREHOUSE
+  ACCOUNTS
 }
 
 model Workspace {

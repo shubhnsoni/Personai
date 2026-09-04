@@ -14,6 +14,13 @@ import {
     type DistroWarehouse,
 } from "@/lib/distribute/meta"
 import {
+    DISTRO_ASSIGNABLE_DESKS,
+    type DistroAssignableDesk,
+    type DistroDesk,
+} from "@/lib/distribute/desks"
+import {
+    assignDistroDesk,
+    getDistroSeat,
     listDistroCatalog,
     listDistroOrders,
     placeDistroOrder,
@@ -22,25 +29,25 @@ import {
     setDistroWarehouse,
 } from "@/app/actions/distribute"
 
-type Desk = "admin" | "sales" | "warehouse" | "accounts"
 type Tab = "pending" | "approved" | "dispatch" | "billed"
 
 type OrderRow = Awaited<ReturnType<typeof listDistroOrders>>[number]
 type CatalogRow = Awaited<ReturnType<typeof listDistroCatalog>>[number]
+type Seat = Awaited<ReturnType<typeof getDistroSeat>>
 
-const DESKS: { id: Desk; label: string; hint: string }[] = [
-    { id: "sales", label: "Sales", hint: "Create orders. No approve / dispatch / bill." },
-    { id: "admin", label: "Admin", hint: "Approve. See every desk." },
-    { id: "warehouse", label: "Warehouse", hint: "Dispatch or mark no stock." },
-    { id: "accounts", label: "Accounts", hint: "Bill and set the invoice number." },
-]
+const DESK_LABEL: Record<DistroDesk, string> = {
+    admin: "Admin",
+    sales: "Sales",
+    warehouse: "Warehouse",
+    accounts: "Accounts",
+}
 
 function rupees(paise: number) {
     return `₹${(paise / 100).toLocaleString("en-IN")}`
 }
 
 export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
-    const [desk, setDesk] = useState<Desk>("admin")
+    const [seat, setSeat] = useState<Seat | null>(null)
     const [tab, setTab] = useState<Tab>("pending")
     const [orders, setOrders] = useState<OrderRow[]>([])
     const [catalog, setCatalog] = useState<CatalogRow[]>([])
@@ -50,13 +57,20 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
     const [salesman, setSalesman] = useState<string>(DISTRO_SALESMEN[0])
     const [qty, setQty] = useState<Record<string, number>>({})
     const [price, setPrice] = useState<Record<string, number>>({})
+    const [inviteEmail, setInviteEmail] = useState("")
+    const [inviteDesk, setInviteDesk] = useState<DistroAssignableDesk>("sales")
 
     function reload() {
         start(async () => {
             try {
-                const [o, c] = await Promise.all([listDistroOrders(profileId), listDistroCatalog(profileId)])
+                const [o, c, s] = await Promise.all([
+                    listDistroOrders(profileId),
+                    listDistroCatalog(profileId),
+                    getDistroSeat(profileId),
+                ])
                 setOrders(o)
                 setCatalog(c)
+                setSeat(s)
                 setPrice((cur) => {
                     const next = { ...cur }
                     for (const row of c) if (next[row.id] == null) next[row.id] = row.priceCents
@@ -70,7 +84,6 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
 
     useEffect(() => {
         reload()
-        // First load only — desk/tab changes refetch via the action buttons.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [profileId])
 
@@ -93,34 +106,76 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
         })
     }
 
-    const canCreate = desk === "sales" || desk === "admin"
-    const canApprove = desk === "admin"
-    const canWarehouse = desk === "admin" || desk === "warehouse"
-    const canAccounts = desk === "admin" || desk === "accounts"
+    function invite() {
+        start(async () => {
+            try {
+                const res = await assignDistroDesk(profileId, inviteEmail, inviteDesk)
+                toast.success(`Assigned ${DESK_LABEL[res.desk]} desk`)
+                setInviteEmail("")
+                reload()
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : "Could not assign desk")
+            }
+        })
+    }
+
+    const canCreate = !!seat?.canCreate
+    const canApprove = !!seat?.canApprove
+    const canWarehouse = !!seat?.canWarehouse
+    const canAccounts = !!seat?.canAccounts
+    const canInvite = !!seat?.canInvite
 
     return (
         <div className="flex-1 space-y-5">
             <div>
                 <p className="text-sm font-medium">Dealer orders</p>
-                <p className="text-[12px] text-muted-foreground">Same loop as a sales godown: salesman books the dealer, admin approves, warehouse dispatches, accounts bills. Tally sync comes later.</p>
+                <p className="text-[12px] text-muted-foreground">
+                    Salesman books the dealer, admin approves, warehouse dispatches, accounts bills.
+                </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {DESKS.map((d) => (
-                    <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => setDesk(d.id)}
-                        className={cn(
-                            "rounded-2xl border px-3 py-2.5 text-left",
-                            desk === d.id ? "border-cyan-400 bg-cyan-400/10" : "border-border/70 bg-muted/30",
-                        )}
-                    >
-                        <span className="block text-sm font-medium">{d.label}</span>
-                        <span className="block text-[11px] text-muted-foreground">{d.hint}</span>
-                    </button>
-                ))}
+            <div className="rounded-2xl border border-border/70 bg-muted/30 px-3 py-2.5">
+                <p className="text-sm font-medium">
+                    {seat?.desk ? `${DESK_LABEL[seat.desk]} desk` : "No desk seat"}
+                    <span className="ml-2 text-[11px] font-normal text-muted-foreground">via membership · {seat?.role ?? "…"}</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                    Actions follow your Membership role. Wrong desks cannot approve, dispatch, or bill.
+                </p>
             </div>
+
+            {canInvite ? (
+                <div className="studio-panel space-y-3 rounded-2xl p-4">
+                    <p className="text-sm font-medium">Team desks</p>
+                    <p className="text-[12px] text-muted-foreground">Assign a Membership desk by email. They must have signed in once.</p>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+                        <Input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="teammate@email.com" />
+                        <select
+                            className="h-10 rounded-md border bg-background px-3 text-sm"
+                            value={inviteDesk}
+                            onChange={(e) => setInviteDesk(e.target.value as DistroAssignableDesk)}
+                        >
+                            {DISTRO_ASSIGNABLE_DESKS.map((d) => (
+                                <option key={d} value={d}>{DESK_LABEL[d]}</option>
+                            ))}
+                        </select>
+                        <Button className="rounded-full" disabled={pending} onClick={invite}>Assign</Button>
+                    </div>
+                    {(seat?.members?.length ?? 0) > 0 ? (
+                        <ul className="space-y-1 text-[12px] text-muted-foreground">
+                            {seat!.members.map((m) => (
+                                <li key={m.id}>
+                                    {m.name || m.email || m.userId}
+                                    {m.email && m.name ? ` · ${m.email}` : ""}
+                                    {" · "}
+                                    {m.desk ? DESK_LABEL[m.desk] : m.role}
+                                    {m.role === "OWNER" ? " (owner)" : ""}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
+                </div>
+            ) : null}
 
             {canCreate ? (
                 <div className="studio-panel space-y-3 rounded-2xl p-4">
@@ -158,7 +213,9 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
                     <Button className="rounded-full" disabled={pending} onClick={place}>Place order</Button>
                 </div>
             ) : (
-                <p className="text-[12px] text-muted-foreground">Sales desk creates orders. Switch to Sales to book a dealer.</p>
+                <p className="text-[12px] text-muted-foreground">
+                    {seat ? "Your membership seat cannot create orders. Sales or admin desk required." : "Loading seat…"}
+                </p>
             )}
 
             <div className="flex gap-1 overflow-x-auto">
@@ -197,19 +254,19 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
                         <div className="flex flex-wrap gap-2 pt-1">
                             {canApprove && tab === "pending" ? (
                                 <>
-                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "APPROVED" as DistroApproval).then(reload))} disabled={pending}>Approve</Tiny>
-                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "ON_HOLD" as DistroApproval).then(reload))} disabled={pending}>Hold</Tiny>
-                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "NOT_APPROVED" as DistroApproval).then(reload))} disabled={pending}>Reject</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "APPROVED" as DistroApproval).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>Approve</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "ON_HOLD" as DistroApproval).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>Hold</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "NOT_APPROVED" as DistroApproval).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>Reject</Tiny>
                                 </>
                             ) : null}
                             {canWarehouse && tab === "approved" ? (
                                 <>
-                                    <Tiny onClick={() => start(() => setDistroWarehouse(profileId, order.id, "DISPATCHED" as DistroWarehouse).then(reload))} disabled={pending}>Dispatch</Tiny>
-                                    <Tiny onClick={() => start(() => setDistroWarehouse(profileId, order.id, "NO_STOCK" as DistroWarehouse).then(reload))} disabled={pending}>No stock</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroWarehouse(profileId, order.id, "DISPATCHED" as DistroWarehouse).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>Dispatch</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroWarehouse(profileId, order.id, "NO_STOCK" as DistroWarehouse).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>No stock</Tiny>
                                 </>
                             ) : null}
                             {canAccounts && (tab === "dispatch" || tab === "approved") ? (
-                                <Tiny onClick={() => start(() => setDistroAccounts(profileId, order.id, "BILLED" as DistroAccounts, `INV-${order.number}`).then(reload))} disabled={pending}>
+                                <Tiny onClick={() => start(() => setDistroAccounts(profileId, order.id, "BILLED" as DistroAccounts, `INV-${order.number}`).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>
                                     Bill INV-{order.number}
                                 </Tiny>
                             ) : null}
