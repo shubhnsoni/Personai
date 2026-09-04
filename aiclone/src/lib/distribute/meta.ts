@@ -19,6 +19,8 @@ export type DistroMeta = {
     invoice: string
     /** Seller GSTIN stamped at Accounts bill time (from Profile.gstin). */
     gstin: string
+    /** Buyer / dealer GSTIN when known (optional). */
+    buyerGstin: string
     /** Inclusive-total breakup stamped at bill time (paise). */
     taxablePaise: number
     gstRateBps: number
@@ -38,6 +40,7 @@ const DEFAULT: DistroMeta = {
     accounts: "HOLD",
     invoice: "",
     gstin: "",
+    buyerGstin: "",
     taxablePaise: 0,
     gstRateBps: 0,
     gstMode: "",
@@ -71,6 +74,7 @@ export function parseDistroMeta(staffNote?: string | null, guestName?: string | 
             accounts: o.accounts === "BILLED" || o.accounts === "NO_STOCK" || o.accounts === "HOLD" ? o.accounts : base.accounts,
             invoice: typeof o.invoice === "string" ? o.invoice : base.invoice,
             gstin: typeof o.gstin === "string" ? o.gstin : base.gstin,
+            buyerGstin: typeof o.buyerGstin === "string" ? o.buyerGstin : base.buyerGstin,
             taxablePaise: num(o.taxablePaise, base.taxablePaise),
             gstRateBps: num(o.gstRateBps, base.gstRateBps),
             gstMode: mode,

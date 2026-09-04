@@ -164,7 +164,7 @@ export async function listDistroOrders(profileId: string) {
     await distroActor(profileId)
     const rows = await prisma.order.findMany({
         where: { profileId },
-        include: { lines: { orderBy: { createdAt: "asc" } } },
+        include: { lines: { orderBy: { createdAt: "asc" }, include: { product: { select: { sku: true, category: true } } } } },
         orderBy: { placedAt: "desc" },
         take: 80,
     })
@@ -183,6 +183,11 @@ export async function listDistroOrders(profileId: string) {
                 qty: l.qty,
                 unitPaise: l.unitPriceCents,
                 linePaise: l.lineTotalCents,
+                hsn: l.product?.sku
+                    || (typeof l.modifiersLabel === "string" && l.modifiersLabel.startsWith("HSN:")
+                        ? l.modifiersLabel.slice(4).trim()
+                        : "")
+                    || "",
             })),
         }
     })
@@ -222,7 +227,7 @@ export async function placeDistroOrder(input: {
         const p = byId.get(l.productId)
         if (!p) throw new Error("Unknown item")
         const unit = l.unitPaise || p.priceCents
-        return { productId: p.id, title: p.title, qty: l.qty, unitPaise: unit, linePaise: l.qty * unit }
+        return { productId: p.id, title: p.title, qty: l.qty, unitPaise: unit, linePaise: l.qty * unit, hsn: p.sku || "" }
     })
     const total = orderTotalPaise(priced.map((l) => ({ qty: l.qty, unitPaise: l.unitPaise })))
     const last = await prisma.order.findFirst({ where: { profileId: actor.profileId }, orderBy: { number: "desc" }, select: { number: true } })
@@ -253,6 +258,7 @@ export async function placeDistroOrder(input: {
                     qty: l.qty,
                     unitPriceCents: l.unitPaise,
                     lineTotalCents: l.linePaise,
+                    modifiersLabel: l.hsn ? `HSN:${l.hsn}` : null,
                 })),
             },
         },

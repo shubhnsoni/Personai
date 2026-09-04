@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { requireSurface } from "@/lib/require-surface"
 import { OrderReceiptClient } from "@/components/dashboard/order-receipt-client"
 import { parseDistroMeta } from "@/lib/distribute/meta"
-import { gstReceiptLines } from "@/lib/billing/gst"
+import { computeGstBreakup, gstReceiptLines } from "@/lib/billing/gst"
 
 export const dynamic = "force-dynamic"
 
@@ -47,12 +47,18 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
             : []
         const taxablePaise = distro && distro.taxablePaise > 0 ? distro.taxablePaise : order.subtotalCents
 
+        const rateBps = distro?.gstRateBps || 1800
+        const placed = order.placedAt.toLocaleString("en-IN")
         return (
             <OrderReceiptClient
                 data={{
                     shopName: profile.displayName,
                     gstin,
+                    buyerName: distro?.dealer || order.guestName,
+                    buyerGstin: distro?.buyerGstin || null,
+                    buyerPlace: distro?.location || order.tableLabel,
                     invoice: distro?.invoice || order.paymentRef,
+                    invoiceDate: placed,
                     number: order.number,
                     tableLabel: order.tableLabel,
                     guestName: order.guestName,
@@ -60,13 +66,23 @@ export default async function OrderReceiptPage({ params }: { params: Promise<{ i
                     status: order.status,
                     payStatus: order.payStatus,
                     payMethod: order.payMethod,
-                    placedAt: order.placedAt.toLocaleString(),
-                    lines: order.lines.map((line) => ({
-                        qty: line.qty,
-                        title: line.titleSnapshot,
-                        modifiersLabel: line.modifiersLabel,
-                        lineTotal: money(line.lineTotalCents, order.currency),
-                    })),
+                    placedAt: placed,
+                    lines: order.lines.map((line) => {
+                        const hsn = typeof line.modifiersLabel === "string" && line.modifiersLabel.startsWith("HSN:")
+                            ? line.modifiersLabel.slice(4).trim()
+                            : ""
+                        const br = computeGstBreakup(line.lineTotalCents, { rateBps })
+                        return {
+                            qty: line.qty,
+                            title: line.titleSnapshot,
+                            modifiersLabel: hsn ? null : line.modifiersLabel,
+                            hsn,
+                            rate: money(line.unitPriceCents, order.currency),
+                            taxable: money(br.taxablePaise, order.currency),
+                            tax: money(br.gstPaise, order.currency),
+                            lineTotal: money(line.lineTotalCents, order.currency),
+                        }
+                    }),
                     subtotal: money(taxablePaise || order.subtotalCents, order.currency),
                     taxable: distro && distro.taxablePaise > 0 ? money(distro.taxablePaise, order.currency) : null,
                     gstLines,

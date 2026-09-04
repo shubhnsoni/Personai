@@ -30,10 +30,7 @@ import {
 } from "@/app/actions/distribute"
 import { ReceiptPrinter } from "@/components/shop/receipt-printer"
 import type { ReceiptData } from "@/lib/receipt"
-import { gstReceiptLines } from "@/lib/billing/gst"
-import { ReceiptPrinter } from "@/components/shop/receipt-printer"
-import type { ReceiptData } from "@/lib/receipt"
-import { gstReceiptLines } from "@/lib/billing/gst"
+import { computeGstBreakup, gstReceiptLines } from "@/lib/billing/gst"
 
 type Tab = "pending" | "approved" | "dispatch" | "billed"
 
@@ -54,6 +51,7 @@ function rupees(paise: number) {
 
 function distroReceiptData(order: OrderRow, shopName = "Invoice"): ReceiptData {
     const meta = order.meta
+    const rateBps = meta.gstRateBps || 1800
     const gstLines = meta.gstMode
         ? gstReceiptLines({
             mode: meta.gstMode,
@@ -64,22 +62,34 @@ function distroReceiptData(order: OrderRow, shopName = "Invoice"): ReceiptData {
             igstPaise: meta.igstPaise,
         }).map((g) => ({ label: g.label, amount: rupees(g.paise) }))
         : []
+    const placed = new Date(order.placedAt).toLocaleString("en-IN")
     return {
         shopName,
         gstin: meta.gstin || null,
+        buyerName: meta.dealer || null,
+        buyerGstin: meta.buyerGstin || null,
+        buyerPlace: meta.location || null,
         invoice: meta.invoice || null,
+        invoiceDate: placed,
         number: order.number,
         tableLabel: meta.location,
         guestName: meta.dealer,
         status: meta.accounts === "BILLED" ? "PAID" : "PLACED",
         payStatus: meta.accounts === "BILLED" ? "PAID" : "UNPAID",
         payMethod: meta.invoice || "Bill",
-        placedAt: new Date(order.placedAt).toLocaleString(),
-        lines: order.lines.map((l) => ({
-            qty: l.qty,
-            title: l.title,
-            lineTotal: rupees(l.linePaise),
-        })),
+        placedAt: placed,
+        lines: order.lines.map((l) => {
+            const br = computeGstBreakup(l.linePaise, { rateBps })
+            return {
+                qty: l.qty,
+                title: l.title,
+                hsn: ("hsn" in l ? (l as { hsn?: string }).hsn : "") || "",
+                rate: rupees(l.unitPaise),
+                taxable: rupees(br.taxablePaise),
+                tax: rupees(br.gstPaise),
+                lineTotal: rupees(l.linePaise),
+            }
+        }),
         subtotal: rupees(meta.taxablePaise > 0 ? meta.taxablePaise : order.totalPaise),
         taxable: meta.taxablePaise > 0 ? rupees(meta.taxablePaise) : null,
         gstLines,
