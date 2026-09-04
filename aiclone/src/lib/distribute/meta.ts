@@ -55,11 +55,22 @@ export function writeDistroMeta(meta: DistroMeta) {
     return JSON.stringify(meta)
 }
 
-export function distroTab(meta: DistroMeta): "pending" | "approved" | "dispatch" | "billed" {
+export type DistroPipelineTab = "pending" | "approved" | "dispatch" | "billed"
+
+export function distroTab(meta: DistroMeta): DistroPipelineTab {
     if (meta.accounts === "BILLED") return "billed"
     if (meta.warehouse === "DISPATCHED" || meta.warehouse === "NO_STOCK") return "dispatch"
     if (meta.approval === "APPROVED") return "approved"
     return "pending"
+}
+
+/** Single real B2B desk: actions follow order pipeline state, not a fake role preview toggle. */
+export function distroDeskActions(tab: DistroPipelineTab) {
+    return {
+        showApprove: tab === "pending",
+        showDispatch: tab === "approved",
+        showBill: tab === "approved" || tab === "dispatch",
+    }
 }
 
 export function lineAmountPaise(qty: number, unitPaise: number) {
