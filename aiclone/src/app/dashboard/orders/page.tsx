@@ -144,8 +144,10 @@ export default async function DashboardOrdersPage() {
                                                     {(() => {
                                                         const rx = parseBuyerPrescription(purchase.buyerNote)
                                                         return rx.url ? (
-                                                            <a href={rx.url} target="_blank" rel="noreferrer" className="mt-1 block text-[11px] text-amber-600 underline">
-                                                                Prescription
+                                                            <a href={rx.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-2 text-[11px] text-muted-foreground no-underline">
+                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                <img src={rx.url} alt="" width={28} height={28} className="h-[28px] w-[28px] rounded object-cover" />
+                                                                <span>Rx attached</span>
                                                             </a>
                                                         ) : null
                                                     })()}

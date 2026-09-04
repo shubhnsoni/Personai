@@ -25,6 +25,7 @@ type Item = {
     metalLine?: string | null
     extraLine?: string | null
     extraWarn?: boolean
+    rxRequired?: boolean
     fitmentMake?: string | null
     fitmentYearFrom?: number | null
     fitmentYearTo?: number | null
@@ -199,7 +200,10 @@ export function ShopCatalog({
                             <div className="space-y-0.5 p-3">
                                 <p className="flex items-start gap-1.5 line-clamp-2 text-sm font-medium leading-snug">
                                     {showDiet && p.diet ? <span className={`mt-1 h-2 w-2 shrink-0 rounded-sm ${dietDotClass(p.diet)}`} title={dietLabel(p.diet) || ""} /> : null}
-                                    {p.title}
+                                    <span className="min-w-0">{p.title}</span>
+                                    {p.rxRequired ? (
+                                        <span className="mt-0.5 shrink-0 rounded-full bg-white/8 px-1.5 py-0.5 text-[10px] font-normal text-zinc-400">Rx</span>
+                                    ) : null}
                                 </p>
                                 {p.metalLine ? (
                                     <p className="text-[11px] text-zinc-500">{p.metalLine}</p>

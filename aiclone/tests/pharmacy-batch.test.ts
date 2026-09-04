@@ -33,7 +33,7 @@ describe("pharmacy batch", () => {
         expect(medicineLine(ok, now)).toBe("Rx · Batch Y")
         expect(medicineLine(gone, now)).toBe("Expired 2026-01-20")
         expect(shopExpiryLine(gone, now)).toBeNull()
-        expect(shopExpiryLine(ok, now)).toEqual({ text: "Rx · Exp · Aug 2027", warn: false })
+        expect(shopExpiryLine(ok, now)).toEqual({ text: "Exp · Aug 2027", warn: false })
         expect(shopExpiryLine(soon, now)).toEqual({ text: "Exp · Oct 2026", warn: true })
     })
     it("stores a prescription url on the purchase note", () => {

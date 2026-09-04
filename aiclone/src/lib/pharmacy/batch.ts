@@ -74,7 +74,7 @@ export function shopExpiryLine(variantsJson?: string | null, now = new Date()): 
     if (!Number.isFinite(t)) return null
     const d = new Date(t)
     const exp = `Exp · ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
-    return { text: m.rxRequired ? `Rx · ${exp}` : exp, warn: state === "soon" }
+    return { text: exp, warn: state === "soon" }
 }
 
 export function isExpiredMedicine(variantsJson?: string | null, now = new Date()) {
