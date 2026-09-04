@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 import { extrasFromAddons, needById, type AddonId, type NeedId } from "@/lib/onboarding-needs"
 import { writeExtras } from "@/lib/surfaces"
+import { writeGoldBoard } from "@/lib/metal/board"
+import { citySlug, displayCity } from "@/lib/metal/city"
+import { DEFAULT_GOLD_RATES } from "@/lib/onboarding-chat"
+import { seedRole } from "@/lib/try-kit-seed"
 import { ACTIVE_PROFILE_COOKIE } from "@/lib/try-kits"
 import { requireAuthenticatedUser, unwrapOwnershipResult } from "@/lib/security"
 
@@ -23,6 +27,14 @@ export interface CreateProfileData {
     imageUrl?: string
     chatAvatarMode?: string
     personalityConfig?: string
+    speakerName?: string
+    speakerRole?: string
+    whatsapp?: string
+    gstin?: string
+    upiId?: string
+    goldCity?: string
+    distroInviteDesks?: boolean
+    seedSample?: boolean
 }
 
 export interface CreateProfileResult {
@@ -63,6 +75,29 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
     const slug = await availableBusinessSlug(displayName)
     const extras = extrasFromAddons(data.roleTemplate, data.addons || [])
     const defaultService = DEFAULT_SERVICE_BY_ROLE[data.roleTemplate]
+    let personality = writeExtras(data.personalityConfig || null, extras)
+    try {
+        const bag = JSON.parse(personality) as Record<string, unknown>
+        if (data.speakerName?.trim() || data.speakerRole?.trim()) {
+            bag.speaker = {
+                name: (data.speakerName || "").trim() || undefined,
+                role: (data.speakerRole || "").trim() || undefined,
+            }
+        }
+        if (data.distroInviteDesks) bag.distroDesk = "invite"
+        personality = JSON.stringify(bag)
+    } catch { /* keep extras-only bag */ }
+    if (data.goldCity?.trim() && data.roleTemplate === "JEWELRY_WHOLESALE") {
+        const city = displayCity(data.goldCity)
+        personality = writeGoldBoard(personality, {
+            city,
+            citySlug: citySlug(city),
+            asOf: new Date().toISOString(),
+            source: "city-feed",
+            ...DEFAULT_GOLD_RATES,
+            lastCheckedAt: new Date().toISOString(),
+        })
+    }
     const profile = await prisma.$transaction(async (tx) => {
         const created = await tx.profile.create({
             data: {
@@ -79,7 +114,10 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
                 isPublic: true,
                 imageUrl: data.imageUrl || null,
                 chatAvatarMode: data.chatAvatarMode === "IMAGE" && data.imageUrl ? "IMAGE" : "ORB",
-                personalityConfig: writeExtras(data.personalityConfig || null, extras),
+                personalityConfig: personality,
+                whatsapp: data.whatsapp?.trim() || null,
+                gstin: data.gstin?.trim() || null,
+                upiId: data.upiId?.trim() || null,
             },
         })
         const workspace = await tx.workspace.create({
@@ -166,6 +204,10 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
 
         return created
     })
+
+    if (data.seedSample) {
+        await seedRole(profile.id, data.roleTemplate)
+    }
 
     revalidatePath("/dashboard")
     if (data.activate) {
