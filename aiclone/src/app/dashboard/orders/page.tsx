@@ -63,60 +63,60 @@ export default async function DashboardOrdersPage() {
     const totalRevenue = payments.reduce((sum, p) => sum + p.amountCents, 0)
 
     return (
-        <div className="flex-1 space-y-6">
+        <div className="flex-1 space-y-3">
             <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Orders and enrollments</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-5">
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 py-2 pb-1">
+                        <CardTitle className="text-[12px] font-medium text-muted-foreground">Total Revenue</CardTitle>
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">${(totalRevenue / 100).toFixed(2)}</div>
+                    <CardContent className="px-3 pb-3 pt-0">
+                        <div className="text-lg font-semibold tabular-nums">${(totalRevenue / 100).toFixed(2)}</div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Products Sold</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 py-2 pb-1">
+                        <CardTitle className="text-[12px] font-medium text-muted-foreground">Products Sold</CardTitle>
                         <Package className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{productPurchases.filter(p => p.status === 'COMPLETED').length}</div>
+                    <CardContent className="px-3 pb-3 pt-0">
+                        <div className="text-lg font-semibold tabular-nums">{productPurchases.filter(p => p.status === 'COMPLETED').length}</div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Course Enrollments</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 py-2 pb-1">
+                        <CardTitle className="text-[12px] font-medium text-muted-foreground">Course Enrollments</CardTitle>
                         <GraduationCap className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{courseEnrollments.length}</div>
+                    <CardContent className="px-3 pb-3 pt-0">
+                        <div className="text-lg font-semibold tabular-nums">{courseEnrollments.length}</div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Event Registrations</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 py-2 pb-1">
+                        <CardTitle className="text-[12px] font-medium text-muted-foreground">Event Registrations</CardTitle>
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{eventRegistrations.length}</div>
+                    <CardContent className="px-3 pb-3 pt-0">
+                        <div className="text-lg font-semibold tabular-nums">{eventRegistrations.length}</div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Community Members</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 py-2 pb-1">
+                        <CardTitle className="text-[12px] font-medium text-muted-foreground">Community Members</CardTitle>
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{communityMembers.filter(m => m.status === 'ACTIVE').length}</div>
+                    <CardContent className="px-3 pb-3 pt-0">
+                        <div className="text-lg font-semibold tabular-nums">{communityMembers.filter(m => m.status === 'ACTIVE').length}</div>
                     </CardContent>
                 </Card>
             </div>
 
-            <Tabs defaultValue="products" className="space-y-4">
+            <Tabs defaultValue="products" className="space-y-2">
                 <TabsList>
                     <TabsTrigger value="products"><Package /><span>Products {productPurchases.length}</span></TabsTrigger>
                     <TabsTrigger value="courses"><GraduationCap /><span>Courses {courseEnrollments.length}</span></TabsTrigger>
@@ -126,15 +126,15 @@ export default async function DashboardOrdersPage() {
 
                 <TabsContent value="products">
                     {productPurchases.some((p) => p.status === "PENDING" && (isRxRequired(p.product.variantsJson) || Boolean(parseBuyerPrescription(p.buyerNote).url))) ? (
-                        <Card className="mb-4 border-amber-500/40">
+                        <Card className="mb-2 border-amber-500/40">
                             <CardHeader>
-                                <CardTitle className="text-base">Pending Rx review</CardTitle>
+                                <CardTitle className="text-[13px]">Pending Rx review</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-3">
+                            <CardContent className="space-y-2 px-3 pb-3">
                                 {productPurchases.filter((p) => p.status === "PENDING" && (isRxRequired(p.product.variantsJson) || Boolean(parseBuyerPrescription(p.buyerNote).url))).map((purchase) => {
                                     const rx = parseBuyerPrescription(purchase.buyerNote)
                                     return (
-                                        <div key={`rx-${purchase.id}`} className="flex items-center justify-between rounded-lg bg-amber-500/10 p-3">
+                                        <div key={`rx-${purchase.id}`} className="flex items-center justify-between rounded-lg bg-amber-500/10 px-2.5 py-2">
                                             <div>
                                                 <p className="font-medium">{purchase.product.title}</p>
                                                 <p className="text-sm text-muted-foreground">{purchase.visitorName || purchase.visitorEmail}</p>
@@ -153,18 +153,18 @@ export default async function DashboardOrdersPage() {
                         </Card>
                     ) : null}
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Product Purchases</CardTitle>
+                        <CardHeader className="px-3 py-2.5">
+                            <CardTitle className="text-[13px]">Product Purchases</CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="px-3 pb-3">
                             {productPurchases.length === 0 ? (
-                                <p className="text-muted-foreground text-center py-8">No product purchases yet</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">No product purchases yet</p>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-2">
                                     {productPurchases.map((purchase) => (
-                                        <div key={purchase.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-                                            <div className="flex items-center gap-4">
-                                                <Package className="h-8 w-8 text-purple-500" />
+                                        <div key={purchase.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-2.5 py-2">
+                                            <div className="flex items-center gap-2.5">
+                                                <Package className="h-5 w-5 text-purple-500" />
                                                 <div>
                                                     <p className="font-medium">{purchase.product.title}</p>
                                                     <p className="text-sm text-muted-foreground">{purchase.visitorEmail}</p>
@@ -211,18 +211,18 @@ export default async function DashboardOrdersPage() {
 
                 <TabsContent value="courses">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Course Enrollments</CardTitle>
+                        <CardHeader className="px-3 py-2.5">
+                            <CardTitle className="text-[13px]">Course Enrollments</CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="px-3 pb-3">
                             {courseEnrollments.length === 0 ? (
-                                <p className="text-muted-foreground text-center py-8">No course enrollments yet</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">No course enrollments yet</p>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-2">
                                     {courseEnrollments.map((enrollment) => (
-                                        <div key={enrollment.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-                                            <div className="flex items-center gap-4">
-                                                <GraduationCap className="h-8 w-8 text-blue-500" />
+                                        <div key={enrollment.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-2.5 py-2">
+                                            <div className="flex items-center gap-2.5">
+                                                <GraduationCap className="h-5 w-5 text-blue-500" />
                                                 <div>
                                                     <p className="font-medium">{enrollment.course.title}</p>
                                                     <p className="text-sm text-muted-foreground">{enrollment.visitorEmail}</p>
@@ -247,18 +247,18 @@ export default async function DashboardOrdersPage() {
 
                 <TabsContent value="events">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Event Registrations</CardTitle>
+                        <CardHeader className="px-3 py-2.5">
+                            <CardTitle className="text-[13px]">Event Registrations</CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="px-3 pb-3">
                             {eventRegistrations.length === 0 ? (
-                                <p className="text-muted-foreground text-center py-8">No event registrations yet</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">No event registrations yet</p>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-2">
                                     {eventRegistrations.map((registration) => (
-                                        <div key={registration.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-                                            <div className="flex items-center gap-4">
-                                                <Calendar className="h-8 w-8 text-green-500" />
+                                        <div key={registration.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-2.5 py-2">
+                                            <div className="flex items-center gap-2.5">
+                                                <Calendar className="h-5 w-5 text-green-500" />
                                                 <div>
                                                     <p className="font-medium">{registration.event.title}</p>
                                                     <p className="text-sm text-muted-foreground">{registration.visitorEmail}</p>
@@ -282,18 +282,18 @@ export default async function DashboardOrdersPage() {
 
                 <TabsContent value="communities">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Community Members</CardTitle>
+                        <CardHeader className="px-3 py-2.5">
+                            <CardTitle className="text-[13px]">Community Members</CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="px-3 pb-3">
                             {communityMembers.length === 0 ? (
-                                <p className="text-muted-foreground text-center py-8">No community members yet</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">No community members yet</p>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-2">
                                     {communityMembers.map((member) => (
-                                        <div key={member.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-                                            <div className="flex items-center gap-4">
-                                                <Users className="h-8 w-8 text-orange-500" />
+                                        <div key={member.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-2.5 py-2">
+                                            <div className="flex items-center gap-2.5">
+                                                <Users className="h-5 w-5 text-orange-500" />
                                                 <div>
                                                     <p className="font-medium">{member.community.name}</p>
                                                     <p className="text-sm text-muted-foreground">{member.visitorEmail}</p>
