@@ -3,6 +3,7 @@ import Link from "next/link"
 import { PdpGallery } from "@/components/shop/pdp-gallery"
 import { PdpBuy, type PdpBuyAction } from "@/components/shop/pdp-buy"
 import { PdpReviewPanel } from "@/components/shop/pdp-review-panel"
+import { PdpThemeLock } from "@/components/shop/pdp-theme-lock"
 import {
     PDP_CRAFT_MARK,
     PDP_LIFESTYLE,
@@ -75,6 +76,7 @@ export function PdpLight({
             className="pdp-v13 light"
             style={{ ["--pdp-life" as string]: `url("${life}")` }}
         >
+            <PdpThemeLock />
             <header className="shop-header">
                 <Link href={`/${slug}/shop`} className="shop-brand">
                     <div className="shop-mark" aria-hidden="true">

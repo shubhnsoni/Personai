@@ -24,8 +24,10 @@
     color: var(--pdp-ink);
     font-family: var(--font-geist-sans), system-ui, -apple-system, "Inter", "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
     min-height: 100dvh;
     padding-bottom: 72px;
+    overflow-x: hidden;
 }
 
 .pdp-v13 *,
@@ -357,12 +359,15 @@
 
 .pdp-v13 .meta-label {
     color: var(--pdp-fog);
+    flex-shrink: 0;
 }
 
 .pdp-v13 .meta-value {
     color: var(--pdp-ink);
     font-weight: 550;
     text-align: right;
+    flex: 1;
+    min-width: 0;
 }
 
 .pdp-v13 .review-link {
