@@ -197,7 +197,7 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, r
                     ))}
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-2">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-2.5 lg:grid-cols-4 lg:gap-2">
                     {rows.map((product) => (
                         <ProductTile
                             key={product.id}
