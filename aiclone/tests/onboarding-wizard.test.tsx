@@ -53,8 +53,8 @@ describe("v4 onboarding chat", () => {
         fireEvent.click(screen.getByLabelText("Send"))
         fireEvent.click(screen.getByText(COPY.who.skip))
         expect(screen.getByText(COPY.type.h)).toBeTruthy()
-        expect(screen.getByText("Pharmacy")).toBeTruthy()
-        expect(screen.getByText("Gold wholesale")).toBeTruthy()
+        expect(screen.getByText("Medicines & pharmacy")).toBeTruthy()
+        expect(screen.getByText("Gold & jewellery wholesale")).toBeTruthy()
         const elseRow = screen.getAllByText(COPY.type.else)[0]
         expect(elseRow.closest("button")?.className).toMatch(/w-full/)
     })
@@ -76,8 +76,8 @@ describe("v4 onboarding chat", () => {
         fireEvent.change(screen.getByPlaceholderText(COPY.name.placeholder), { target: { value: "City Gold" } })
         fireEvent.click(screen.getByLabelText("Send"))
         fireEvent.click(screen.getByText(COPY.who.skip))
-        fireEvent.click(screen.getByText("Gold wholesale"))
-        fireEvent.click(screen.getByText(COPY.extras.continue))
+        fireEvent.click(screen.getByText("Gold & jewellery wholesale"))
+        fireEvent.click(screen.getByText(COPY.features.confirm))
         expect(screen.getByText(COPY.extras.goldWholesale.h)).toBeTruthy()
         expect(screen.getByText(COPY.extras.cityLabel)).toBeTruthy()
         for (const city of GOLD_CITIES) {

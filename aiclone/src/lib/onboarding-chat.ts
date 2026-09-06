@@ -44,6 +44,7 @@ export const COPY = {
     features: {
         h: "What do you need on day one?",
         s: "You can change these later.",
+        confirm: "Looks good",
     },
     extras: {
         pharmacy: {
@@ -62,7 +63,7 @@ export const COPY = {
             h: "Gold wholesale extras",
             s: "City rates and try kits for dealers.",
         },
-        cityLabel: "City rates",
+        cityLabel: "City for rates",
         cityHint: "Ranchi and nearby boards",
         desksJustMe: "Just me",
         desksInvite: "Invite desk",

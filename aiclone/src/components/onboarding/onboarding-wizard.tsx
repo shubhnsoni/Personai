@@ -93,6 +93,7 @@ export function OnboardingWizard({
     const [waLater, setWaLater] = useState(false)
     const [goldCity, setGoldCity] = useState<string>("Ranchi")
     const [inviteDesks, setInviteDesks] = useState(true)
+    const [emailSkipped, setEmailSkipped] = useState(false)
     const [busy, setBusy] = useState(false)
 
     const picked = needById(need)
@@ -256,7 +257,7 @@ export function OnboardingWizard({
         : beat === "type" && elseOpen ? COPY.type.elsePlaceholder
         : beat === "type" ? "Filter kits"
         : beat === "extras" && !waOk && !waLater ? COPY.extras.waPlaceholder
-        : beat === "extras" && need !== "autoParts" && !gstin ? COPY.extras.gstinPlaceholder
+        : beat === "extras" && (need === "pharmacy" || need === "distribute" || need === "goldWholesale") && !gstin ? COPY.extras.gstinPlaceholder
         : beat === "extras" ? COPY.extras.upiPlaceholder
         : ""
 
@@ -312,7 +313,7 @@ export function OnboardingWizard({
                                 <div
                                     className={cn(
                                         "max-w-[85%] rounded-[1.35rem] px-4 py-3",
-                                        line.role === "user" ? "bg-cyan-400 text-zinc-950" : "bg-white/[0.06] text-zinc-100",
+                                        line.role === "user" ? "bg-white/[0.08] text-zinc-100" : "bg-white/[0.06] text-zinc-100",
                                     )}
                                 >
                                     <p className="text-[15px] leading-snug">{line.text}</p>
@@ -332,8 +333,8 @@ export function OnboardingWizard({
                         <div className="mt-3 space-y-2">
                             <div className="flex flex-wrap gap-2">
                                 {visibleKits.map((k) => (
-                                    <Chip key={k.id} selected={need === k.id} onClick={() => afterType(k.id, k.chip)}>
-                                        {k.chip}
+                                    <Chip key={k.id} selected={need === k.id} onClick={() => afterType(k.id, k.line)}>
+                                        {k.line}
                                     </Chip>
                                 ))}
                             </div>
@@ -350,12 +351,7 @@ export function OnboardingWizard({
                             </button>
                             {elseOpen ? (
                                 <div className="space-y-2 rounded-[1.2rem] border border-white/10 bg-white/[0.03] p-3">
-                                    <input
-                                        value={elseQuery}
-                                        onChange={(e) => setElseQuery(e.target.value)}
-                                        placeholder={COPY.type.elsePlaceholder}
-                                        className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/35 focus:outline-none focus:ring-1 focus:ring-cyan-400/60"
-                                    />
+                                    <p className="text-[12px] text-white/45">{COPY.type.elseHint}</p>
                                     <div className="flex flex-wrap gap-2">
                                         {visibleElse.map((k) => (
                                             <Chip key={k.id} selected={need === k.id} onClick={() => afterType(k.id, k.chip)}>
@@ -394,7 +390,7 @@ export function OnboardingWizard({
                                     ))}
                                 </div>
                             ) : null}
-                            <Chip selected onClick={afterFeatures}>{COPY.extras.continue}</Chip>
+                            <Chip selected onClick={afterFeatures}>{COPY.features.confirm}</Chip>
                         </div>
                     ) : null}
 
@@ -421,7 +417,7 @@ export function OnboardingWizard({
                             ) : null}
                             {need === "goldWholesale" ? (
                                 <div>
-                                    <p className="text-[13px] font-medium text-white/80">{COPY.extras.cityLabel}</p>
+                                    <p className="text-[15px] font-semibold text-white/90">{COPY.extras.cityLabel}</p>
                                     <p className="mt-0.5 text-[12px] text-white/40">{COPY.extras.cityHint}</p>
                                     <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         {GOLD_CITIES.map((city) => (
@@ -430,8 +426,8 @@ export function OnboardingWizard({
                                                 type="button"
                                                 onClick={() => setGoldCity(city)}
                                                 className={cn(
-                                                    "min-h-12 rounded-[1.1rem] border px-4 py-3 text-left text-[15px]",
-                                                    goldCity === city ? "border-cyan-400 bg-cyan-400/15 text-cyan-100" : "border-white/10 bg-white/[0.04] text-white/80",
+                                                    "min-h-12 rounded-[1.1rem] border px-4 py-3.5 text-left text-[15px] font-medium",
+                                                    goldCity === city ? "border-cyan-400 bg-cyan-400/20 text-cyan-50 ring-1 ring-cyan-400/50" : "border-white/10 bg-white/[0.04] text-white/80",
                                                 )}
                                             >
                                                 {city}
@@ -441,11 +437,11 @@ export function OnboardingWizard({
                                 </div>
                             ) : null}
                             <div className="flex flex-wrap gap-2">
-                                {need !== "autoParts" ? (
+                                {(need === "pharmacy" || need === "distribute" || need === "goldWholesale") ? (
                                     <Chip onClick={() => setGstin("")} aria-label="Skip GSTIN">{COPY.extras.gstinSkip}</Chip>
                                 ) : null}
                                 <Chip selected={waLater} onClick={() => { setWaLater(true); toast.message(COPY.extras.waWarn) }}>{COPY.extras.waLater}</Chip>
-                                <Chip onClick={() => undefined} aria-label="Skip email">{COPY.extras.emailSkip}</Chip>
+                                <Chip selected={emailSkipped} onClick={() => { setEmailSkipped(true); toast.message("Email skipped — you can add it later") }} aria-label="Skip email">{COPY.extras.emailSkip}</Chip>
                             </div>
                             {whatsapp && waOk ? <p className="text-[12px] text-white/45">WhatsApp {normalizeWhatsapp(whatsapp)}</p> : null}
                             <Chip selected={extrasReady} onClick={afterExtras}>{COPY.extras.continue}</Chip>
