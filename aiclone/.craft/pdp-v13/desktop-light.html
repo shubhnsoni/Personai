@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Paracetamol 650 · E2E Sunrise Pharmacy · PersonaLink v1.3</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --bg-white: #ffffff;
+    --ink: #0b1220;
+    --ink-soft: #1a2332;
+    --fog: #5c6570;
+    --fog-dim: #8b949e;
+    --line: rgba(11, 18, 32, 0.08);
+    --line-strong: rgba(11, 18, 32, 0.12);
+    --cyan: #00d7ff;
+    --cyan-ink: #061018;
+    --blue-a: #52E8FF;
+    --blue-b: #1A4DFF;
+    --star: #c9a227;
+    --green: #1a9f63;
+    --radius: 0.75rem;
+    --radius-xl: 1.1rem;
+    --font: system-ui, -apple-system, "Inter", "Geist", "Segoe UI", sans-serif;
+    --shadow-sm: 0 1px 2px rgba(11,18,32,0.04), 0 4px 16px rgba(11,18,32,0.04);
+    --shadow-md: 0 8px 28px rgba(11,18,32,0.08);
+    --shadow-deck: 0 18px 40px rgba(11,18,32,0.14);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    width: 1280px;
+    min-height: 100vh;
+  }
+
+  /* —— Header —— */
+  .shop-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 40px;
+    background: var(--bg-white);
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  .shop-brand { display: flex; align-items: center; gap: 12px; }
+  .shop-mark {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--blue-a), var(--blue-b));
+    box-shadow: 0 2px 10px rgba(26, 77, 255, 0.25);
+  }
+  .shop-name { font-size: 14px; font-weight: 650; letter-spacing: -0.01em; color: var(--ink); }
+  .shop-pipe { color: var(--fog-dim); font-weight: 400; margin: 0 4px; }
+  .shop-cat {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--fog);
+  }
+  .ghost-btn {
+    font-size: 13px; color: var(--ink-soft); font-weight: 500;
+    padding: 8px 16px; border-radius: 999px;
+    border: 1px solid var(--line-strong); background: var(--bg-white);
+  }
+
+  /* —— Buy block —— */
+  .wrap {
+    max-width: 68rem;
+    margin: 0 auto;
+    padding: 40px 40px 8px;
+  }
+  .pdp {
+    display: grid;
+    grid-template-columns: 1fr 1.05fr;
+    gap: 48px;
+    align-items: start;
+  }
+
+  .gallery { display: flex; flex-direction: column; gap: 14px; }
+  .hero {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    max-height: 420px;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    background: var(--bg-white);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
+  }
+  .hero-art {
+    width: 100%; height: 100%;
+    background:
+      radial-gradient(ellipse 65% 50% at 50% 40%, rgba(0,215,255,0.10) 0%, transparent 55%),
+      radial-gradient(ellipse 45% 40% at 75% 70%, rgba(26,77,255,0.08) 0%, transparent 50%),
+      linear-gradient(165deg, #eef3f7 0%, #f7f9fb 50%, #e8eef4 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .silhouette { width: 58%; height: 48%; }
+  .blister {
+    width: 100%; height: 100%;
+    border-radius: 14px;
+    background: linear-gradient(145deg, #ffffff 0%, #f0f4f8 100%);
+    border: 1px solid rgba(11,18,32,0.08);
+    box-shadow: 0 12px 32px rgba(11,18,32,0.08), inset 0 1px 0 #fff;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 10px; padding: 18px 20px;
+  }
+  .pill-dot {
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(0,215,255,0.45), rgba(82,232,255,0.15) 50%, rgba(255,255,255,0.9));
+    border: 1px solid rgba(11,18,32,0.06);
+    box-shadow: inset 0 -2px 4px rgba(11,18,32,0.06);
+  }
+  .thumbs { display: flex; gap: 10px; }
+  .thumb {
+    width: 64px; height: 64px;
+    border-radius: 12px;
+    border: 1.5px solid var(--line);
+    background: var(--bg-white);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .thumb.active {
+    border-color: rgba(0,215,255,0.7);
+    box-shadow: 0 0 0 2px rgba(0,215,255,0.2);
+  }
+  .thumb-fill {
+    width: 100%; height: 100%;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(0,215,255,0.12), transparent 60%),
+      linear-gradient(160deg, #e8eef4, #f7f9fb);
+  }
+  .thumb:nth-child(2) .thumb-fill { background: linear-gradient(160deg, #e4f0e8, #f5faf6); }
+  .thumb:nth-child(3) .thumb-fill { background: linear-gradient(160deg, #ebe8f2, #f7f6fa); }
+  .thumb:nth-child(4) .thumb-fill { background: linear-gradient(160deg, #f0e8e4, #faf7f5); }
+
+  .info { display: flex; flex-direction: column; padding-top: 8px; }
+  .kicker {
+    font-size: 11px; font-weight: 650; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--fog); margin-bottom: 10px;
+  }
+  .title {
+    font-size: 36px; font-weight: 700; letter-spacing: -0.035em;
+    line-height: 1.1; margin-bottom: 12px; color: var(--ink);
+  }
+  .rating {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+  }
+  .stars {
+    display: inline-flex; gap: 2px; color: var(--star);
+    font-size: 14px; line-height: 1;
+  }
+  .rating-count { font-size: 13px; color: var(--fog); }
+  .price {
+    font-size: 32px; font-weight: 700; letter-spacing: -0.03em;
+    margin-bottom: 8px; line-height: 1.1; color: var(--ink);
+  }
+  .stock {
+    font-size: 13px; color: var(--fog); margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .stock-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 0 3px rgba(26,159,99,0.15);
+  }
+  .cta {
+    display: block; width: 100%; max-width: 320px; text-align: center;
+    font-size: 15px; font-weight: 650; letter-spacing: -0.01em;
+    color: var(--cyan-ink); background: var(--cyan);
+    border: none; border-radius: 999px; padding: 14px 24px;
+    box-shadow: 0 4px 20px rgba(0,215,255,0.35); margin-bottom: 22px;
+    cursor: pointer;
+  }
+  .blurb {
+    font-size: 14px; color: var(--fog); line-height: 1.55;
+    margin-bottom: 20px; max-width: 34em;
+  }
+  .meta {
+    border-top: 1px solid var(--line); padding-top: 4px;
+    max-width: 340px;
+  }
+  .meta-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px;
+  }
+  .meta-row:last-child { border-bottom: none; }
+  .meta-label { color: var(--fog); }
+  .meta-value { color: var(--ink); font-weight: 550; }
+  .review-link {
+    margin-top: 16px; font-size: 13px; color: var(--fog);
+    text-decoration: none; border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 1px; align-self: flex-start;
+  }
+
+  /* —— Sections —— */
+  .story {
+    max-width: 68rem;
+    margin: 0 auto;
+    padding: 56px 40px 0;
+  }
+  .section-label {
+    font-size: 12px; font-weight: 650; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--fog);
+    margin-bottom: 24px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .section-label::after {
+    content: ""; flex: 1; height: 1px; background: var(--line);
+  }
+
+  /* Stacked MORE deck — generous */
+  .more-row {
+    display: flex;
+    align-items: center;
+    gap: 48px;
+    margin-bottom: 64px;
+    padding: 8px 0 16px;
+  }
+  .more-deck {
+    position: relative;
+    width: 280px;
+    height: 300px;
+    flex-shrink: 0;
+  }
+  .deck-card {
+    position: absolute;
+    inset: 0;
+    width: 240px;
+    height: 280px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-white);
+    box-shadow: var(--shadow-deck);
+  }
+  .deck-card img {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+  .deck-card.back-2 {
+    transform: translate(36px, 8px) rotate(3deg);
+    opacity: 0.5;
+    filter: brightness(0.92) saturate(0.75);
+    z-index: 1;
+  }
+  .deck-card.back-1 {
+    transform: translate(18px, 4px) rotate(1.4deg);
+    opacity: 0.78;
+    filter: brightness(0.96) saturate(0.88);
+    z-index: 2;
+  }
+  .deck-card.front {
+    z-index: 3;
+    transform: none;
+  }
+  .deck-more {
+    position: absolute;
+    top: 14px; left: 14px;
+    z-index: 4;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--cyan-ink);
+    background: var(--cyan);
+    padding: 5px 12px;
+    border-radius: 999px;
+    box-shadow: 0 2px 12px rgba(0,215,255,0.4);
+  }
+  .deck-caption { max-width: 360px; }
+  .deck-caption h3 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.025em;
+    margin-bottom: 10px; color: var(--ink);
+  }
+  .deck-caption p {
+    font-size: 15px; color: var(--fog); line-height: 1.55;
+  }
+
+  /* From the brand — A+ */
+  .brand-mods { display: flex; flex-direction: column; gap: 28px; margin-bottom: 56px; }
+
+  .a-full {
+    position: relative;
+    height: 280px;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background:
+      linear-gradient(100deg, rgba(11,18,32,0.72) 0%, rgba(11,18,32,0.35) 48%, rgba(11,18,32,0.12) 100%),
+      url("ref-stacked-more.png") center 30% / cover no-repeat;
+    box-shadow: var(--shadow-md);
+  }
+  .a-full-copy {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 0 48px; max-width: 48%;
+    color: #fff;
+  }
+  .a-full-copy .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--cyan); margin-bottom: 12px;
+  }
+  .a-full-copy h3 {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.025em;
+    margin-bottom: 10px; line-height: 1.2;
+  }
+  .a-full-copy p { font-size: 14px; color: rgba(255,255,255,0.78); line-height: 1.5; }
+
+  .a-two {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr;
+    gap: 32px;
+    align-items: stretch;
+    background: var(--bg-white);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .a-two-media {
+    min-height: 260px;
+    background:
+      linear-gradient(160deg, rgba(0,215,255,0.15), rgba(26,77,255,0.12)),
+      url("ref-stacked-more.png") 55% 40% / cover no-repeat;
+  }
+  .a-two-copy {
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 40px 40px 40px 8px;
+  }
+  .a-two-copy .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--fog); margin-bottom: 12px;
+  }
+  .a-two-copy h3 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.025em;
+    margin-bottom: 12px; color: var(--ink);
+  }
+  .a-two-copy p { font-size: 15px; color: var(--fog); line-height: 1.55; max-width: 32em; }
+
+  .a-three {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  .a-tile {
+    height: 200px;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    border: 1px solid var(--line);
+    position: relative;
+    box-shadow: var(--shadow-sm);
+    background: var(--bg-white);
+  }
+  .a-tile:nth-child(1) {
+    background:
+      linear-gradient(180deg, transparent 35%, rgba(11,18,32,0.72) 100%),
+      url("ref-stacked-more.png") 15% 25% / cover;
+  }
+  .a-tile:nth-child(2) {
+    background:
+      linear-gradient(180deg, transparent 35%, rgba(11,18,32,0.72) 100%),
+      linear-gradient(135deg, #d4ebe0, #b8d4c8);
+  }
+  .a-tile:nth-child(3) {
+    background:
+      linear-gradient(180deg, transparent 35%, rgba(11,18,32,0.72) 100%),
+      url("ref-stacked-more.png") 75% 55% / cover;
+  }
+  .a-tile span {
+    position: absolute; left: 18px; bottom: 16px;
+    font-size: 14px; font-weight: 650; color: #fff;
+    letter-spacing: -0.01em;
+  }
+
+  /* Reviews strip */
+  .reviews {
+    max-width: 68rem;
+    margin: 0 auto;
+    padding: 8px 40px 72px;
+  }
+  .reviews-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .review-card {
+    background: var(--bg-white);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px 22px 20px;
+    box-shadow: var(--shadow-sm);
+  }
+  .review-card .stars {
+    font-size: 12px; margin-bottom: 10px;
+  }
+  .review-card p {
+    font-size: 13px; color: var(--ink-soft); line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .review-card .who {
+    font-size: 12px; color: var(--fog-dim);
+  }
+
+  .craft-tag {
+    text-align: center;
+    padding: 24px 16px 40px;
+    font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--fog-dim); opacity: 0.55;
+  }
+</style>
+</head>
+<body>
+  <header class="shop-header">
+    <div class="shop-brand">
+      <div class="shop-mark" aria-hidden="true"></div>
+      <div>
+        <span class="shop-name">E2E Sunrise Pharmacy</span>
+        <span class="shop-pipe">|</span>
+        <span class="shop-cat">Medicines</span>
+      </div>
+    </div>
+    <span class="ghost-btn">Cart · 0</span>
+  </header>
+
+  <main class="wrap">
+    <div class="pdp">
+      <section class="gallery" aria-label="Product media">
+        <div class="hero">
+          <div class="hero-art">
+            <div class="silhouette">
+              <div class="blister" aria-hidden="true">
+                <div class="pill-dot"></div><div class="pill-dot"></div><div class="pill-dot"></div><div class="pill-dot"></div><div class="pill-dot"></div>
+                <div class="pill-dot"></div><div class="pill-dot"></div><div class="pill-dot"></div><div class="pill-dot"></div><div class="pill-dot"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="thumbs">
+          <div class="thumb active"><div class="thumb-fill"></div></div>
+          <div class="thumb"><div class="thumb-fill"></div></div>
+          <div class="thumb"><div class="thumb-fill"></div></div>
+          <div class="thumb"><div class="thumb-fill"></div></div>
+        </div>
+      </section>
+
+      <section class="info">
+        <div class="kicker">Physical · Fever</div>
+        <h1 class="title">Paracetamol 650</h1>
+        <div class="rating" aria-label="5 stars, 12 reviews">
+          <span class="stars" aria-hidden="true"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></span>
+          <span class="rating-count">12 reviews</span>
+        </div>
+        <div class="price">$0.32</div>
+        <div class="stock"><span class="stock-dot"></span>40 in stock</div>
+        <button class="cta" type="button">Order · $0.32</button>
+        <p class="blurb">Fast-acting fever &amp; pain relief. 650&nbsp;mg film-coated tablets for adults — trusted OTC from Sunrise Pharmacy.</p>
+        <div class="meta">
+          <div class="meta-row"><span class="meta-label">Form</span><span class="meta-value">Tablet</span></div>
+          <div class="meta-row"><span class="meta-label">Strength</span><span class="meta-value">650 mg</span></div>
+          <div class="meta-row"><span class="meta-label">Category</span><span class="meta-value">Fever / Analgesic</span></div>
+          <div class="meta-row"><span class="meta-label">Pack size</span><span class="meta-value">10 tablets</span></div>
+        </div>
+        <a class="review-link" href="#">Leave a review</a>
+      </section>
+    </div>
+  </main>
+
+  <section class="story" aria-label="Brand story">
+    <div class="section-label">More details</div>
+    <div class="more-row">
+      <div class="more-deck" aria-label="Stacked lifestyle gallery">
+        <div class="deck-card back-2">
+          <img src="ref-stacked-more.png" alt="" />
+        </div>
+        <div class="deck-card back-1">
+          <img src="ref-stacked-more.png" alt="" />
+        </div>
+        <div class="deck-card front">
+          <img src="ref-stacked-more.png" alt="Lifestyle · brand story" />
+        </div>
+        <span class="deck-more">MORE</span>
+      </div>
+      <div class="deck-caption">
+        <h3>Relief you can count on</h3>
+        <p>When fever hits, reach for a pharmacy staple. Paracetamol 650 is formulated for clear, dependable relief — so you can get back to your day.</p>
+      </div>
+    </div>
+
+    <div class="section-label">From the brand</div>
+    <div class="brand-mods">
+      <div class="a-full">
+        <div class="a-full-copy">
+          <span class="tag">Sunrise Pharmacy</span>
+          <h3>Trusted OTC, everyday care</h3>
+          <p>Clinically familiar strength. Clear dosing. The kind of medicine cabinet essential families keep on hand.</p>
+        </div>
+      </div>
+
+      <div class="a-two">
+        <div class="a-two-media" aria-hidden="true"></div>
+        <div class="a-two-copy">
+          <span class="tag">Why 650 mg</span>
+          <h3>Fast fever &amp; pain relief</h3>
+          <p>Film-coated tablets designed for adults who need reliable antipyretic and analgesic action. One clear dose. No fuss.</p>
+        </div>
+      </div>
+
+      <div class="a-three">
+        <div class="a-tile"><span>Daytime ease</span></div>
+        <div class="a-tile"><span>Family ready</span></div>
+        <div class="a-tile"><span>Shelf trusted</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reviews" aria-label="Customer reviews">
+    <div class="section-label">Reviews</div>
+    <div class="reviews-grid">
+      <div class="review-card">
+        <div class="stars" aria-hidden="true"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
+        <p>“Brought my fever down overnight. Easy to take and exactly what I keep at home.”</p>
+        <div class="who">Priya S. · Verified</div>
+      </div>
+      <div class="review-card">
+        <div class="stars" aria-hidden="true"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
+        <p>“Pharmacy staple. Good pack size, fair price, works as expected every time.”</p>
+        <div class="who">Marcus L. · Verified</div>
+      </div>
+      <div class="review-card">
+        <div class="stars" aria-hidden="true"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
+        <p>“Clear labeling and fast shipping. Exactly the 650 mg strength I asked for.”</p>
+        <div class="who">Amina R. · Verified</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="craft-tag">PersonaLink craft v1.3 · light · not production</div>
+</body>
+</html>
