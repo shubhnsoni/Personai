@@ -79,7 +79,7 @@ describe("PdpLight v1.3", () => {
         expect(screen.getByText("Shelf trusted")).toBeTruthy()
         expect(screen.getByText("Reviews")).toBeTruthy()
         expect(screen.getByText("Priya S. · Verified")).toBeTruthy()
-        expect(screen.getByText("PersonaLink craft v1.3 · light · not production")).toBeTruthy()
+        expect(screen.queryByText(/PersonaLink craft v1\.3/i)).toBeNull()
         expect(container.querySelector(".sticky-bar")).toBeTruthy()
         expect(container.innerHTML.toLowerCase()).not.toContain("merchants upload")
         expect(container.innerHTML).not.toContain("#07080a")

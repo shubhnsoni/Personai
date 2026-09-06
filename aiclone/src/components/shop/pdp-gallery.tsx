@@ -3,10 +3,11 @@
 import { useState } from "react"
 
 const THUMB_COUNT = 4
+const TONE_LABELS = ["Blue pack", "Green tone", "Violet tone", "Peach tone"] as const
 
-function Blister() {
+function Blister({ tone }: { tone: number }) {
     return (
-        <div className="hero-art">
+        <div className={`hero-art tone-${tone % THUMB_COUNT}`}>
             <div className="silhouette">
                 <div className="blister" aria-hidden="true">
                     {Array.from({ length: 10 }).map((_, i) => (
@@ -29,28 +30,38 @@ export function PdpGallery({
 }) {
     const [index, setIndex] = useState(0)
     const showPhoto = photos.length > 0
-    const activePhoto = showPhoto ? photos[Math.min(index, photos.length - 1)] : null
     const thumbCount = showPhoto ? Math.min(photos.length, THUMB_COUNT) : blister ? THUMB_COUNT : 0
+    const safeIndex = thumbCount > 0 ? Math.min(index, thumbCount - 1) : 0
+    const activePhoto = showPhoto ? photos[safeIndex] : null
 
     return (
         <section className="gallery" aria-label="Product media">
-            <div className="hero">
-                {activePhoto ? <img src={activePhoto} alt={title} /> : blister ? <Blister /> : <div className="hero-art" />}
+            <div className={`hero${blister && !activePhoto ? ` tone-${safeIndex}` : ""}`}>
+                {activePhoto ? (
+                    <img src={activePhoto} alt={title} />
+                ) : blister ? (
+                    <Blister tone={safeIndex} />
+                ) : (
+                    <div className="hero-art" />
+                )}
             </div>
             {thumbCount > 0 ? (
-                <div className="thumbs">
+                <div className="thumbs" role="tablist" aria-label="Product photos">
                     {Array.from({ length: thumbCount }).map((_, i) => {
                         const src = photos[i]
+                        const active = i === safeIndex
                         return (
                             <button
                                 key={src || `tone-${i}`}
                                 type="button"
-                                className={i === index ? "thumb active" : "thumb"}
-                                aria-label={`Photo ${i + 1}`}
-                                aria-pressed={i === index}
+                                role="tab"
+                                className={active ? "thumb active" : "thumb"}
+                                aria-label={src ? `Photo ${i + 1}` : TONE_LABELS[i] || `Tone ${i + 1}`}
+                                aria-selected={active}
+                                aria-pressed={active}
                                 onClick={() => setIndex(i)}
                             >
-                                {src ? <img src={src} alt="" /> : <div className="thumb-fill" />}
+                                {src ? <img src={src} alt="" /> : <div className={`thumb-fill tone-${i}`} />}
                             </button>
                         )
                     })}

@@ -1107,3 +1107,16 @@ html:has(.pdp-v13) body {
         display: none;
     }
 }
+
+
+.pdp-v13 .hero.tone-0,.pdp-v13 .hero-art.tone-0{background:linear-gradient(160deg,#e8eef4,#f7f9fb)}
+.pdp-v13 .hero.tone-1,.pdp-v13 .hero-art.tone-1{background:linear-gradient(160deg,#e4f0e8,#f5faf6)}
+.pdp-v13 .hero.tone-2,.pdp-v13 .hero-art.tone-2{background:linear-gradient(160deg,#ebe8f2,#f7f6fa)}
+.pdp-v13 .hero.tone-3,.pdp-v13 .hero-art.tone-3{background:linear-gradient(160deg,#f0e8e4,#faf7f5)}
+.pdp-v13 .thumb-fill.tone-0{background:linear-gradient(160deg,#e8eef4,#f7f9fb)}
+.pdp-v13 .thumb-fill.tone-1{background:linear-gradient(160deg,#e4f0e8,#f5faf6)}
+.pdp-v13 .thumb-fill.tone-2{background:linear-gradient(160deg,#ebe8f2,#f7f6fa)}
+.pdp-v13 .thumb-fill.tone-3{background:linear-gradient(160deg,#f0e8e4,#faf7f5)}
+.pdp-v13 button.deck-card{padding:0;margin:0;font:inherit;color:inherit;appearance:none;cursor:pointer}
+.pdp-v13 button.deck-more{appearance:none;cursor:pointer;border:0}
+.pdp-v13 .deck-card.back-1,.pdp-v13 .deck-card.back-2{pointer-events:auto;cursor:pointer}

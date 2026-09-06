@@ -4,8 +4,8 @@ import { PdpGallery } from "@/components/shop/pdp-gallery"
 import { PdpBuy, type PdpBuyAction } from "@/components/shop/pdp-buy"
 import { PdpReviewPanel } from "@/components/shop/pdp-review-panel"
 import { PdpThemeLock } from "@/components/shop/pdp-theme-lock"
+import { PdpMoreDeck } from "@/components/shop/pdp-more-deck"
 import {
-    PDP_CRAFT_MARK,
     PDP_LIFESTYLE,
     type PdpContent,
     type PdpQuote,
@@ -145,24 +145,11 @@ export function PdpLight({
 
             <section className="story" aria-label="Brand story">
                 <div className="section-label">More details</div>
-                <div className="more-row">
-                    <div className="more-deck" aria-label="Stacked lifestyle gallery">
-                        <div className="deck-card back-2">
-                            <img src={life} alt="" />
-                        </div>
-                        <div className="deck-card back-1">
-                            <img src={life} alt="" />
-                        </div>
-                        <div className="deck-card front">
-                            <img src={life} alt="Lifestyle" />
-                        </div>
-                        <span className="deck-more">MORE</span>
-                    </div>
-                    <div className="deck-caption">
-                        <h3>{content.storyTitle}</h3>
-                        <p>{content.storyBody}</p>
-                    </div>
-                </div>
+                <PdpMoreDeck
+                    images={[life, photos[1] || life, photos[2] || photos[0] || life]}
+                    storyTitle={content.storyTitle}
+                    storyBody={content.storyBody}
+                />
 
                 <div className="section-label">From the brand</div>
                 <div className="brand-mods">
@@ -212,8 +199,6 @@ export function PdpLight({
                     <PdpReviewPanel productId={productId} />
                 </section>
             )}
-
-            <div className="craft-tag">{PDP_CRAFT_MARK}</div>
             <PdpBuy action={buy} sticky />
         </div>
     )
