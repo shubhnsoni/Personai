@@ -50,7 +50,7 @@ export function StoryGallery({
     const listPad = width - itemW
 
     return (
-        <div ref={box} className="relative w-full" style={{ height: itemH }}>
+        <div ref={box} className="relative z-0 isolate w-full overflow-hidden" style={{ height: itemH, contain: "paint" }}>
             <div
                 ref={scroller}
                 className="flex h-full snap-x snap-mandatory overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -66,7 +66,7 @@ export function StoryGallery({
                 ))}
                 <div className="shrink-0" style={{ width: listPad - padLeft }} />
             </div>
-            <div className="pointer-events-none absolute inset-0 overflow-visible">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
                 {photos.map((photo, i) => (
                     <StoryCard
                         key={`${photo.source}-${photo.url}-${i}`}

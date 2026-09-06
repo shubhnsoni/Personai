@@ -172,7 +172,7 @@ export default async function ProductSalesPage({
                     </div>
                 </div>
             </main>
-            <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-zinc-950/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-zinc-950/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <div className="mx-auto max-w-5xl">
                     {menuOrder ? (
                         <Link
