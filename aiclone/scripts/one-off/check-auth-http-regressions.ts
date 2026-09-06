@@ -78,7 +78,7 @@ const localRequire = createRequire(__filename)
 
 function loadMiddlewareWithClerkDouble(): MiddlewareHandler {
   const clerkModuleId = localRequire.resolve("@clerk/nextjs/server")
-  const middlewareModuleId = localRequire.resolve("../../src/middleware")
+  const middlewareModuleId = localRequire.resolve("../../src/proxy")
   const clerkCache = localRequire.cache[clerkModuleId]
   if (!clerkCache) throw new Error("Clerk middleware module was not loaded")
 
@@ -110,7 +110,7 @@ function loadMiddlewareWithClerkDouble(): MiddlewareHandler {
   }
 
   delete localRequire.cache[middlewareModuleId]
-  const loaded = localRequire("../../src/middleware") as { default: MiddlewareHandler }
+  const loaded = localRequire("../../src/proxy") as { default: MiddlewareHandler }
   clerkCache.exports = originalExports
   delete localRequire.cache[middlewareModuleId]
   return loaded.default
