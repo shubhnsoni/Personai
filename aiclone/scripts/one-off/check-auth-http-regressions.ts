@@ -8,7 +8,7 @@ import { createRouteMatcher } from "@clerk/nextjs/server"
 import { NextRequest } from "next/server"
 
 import { GET as healthGet } from "../../src/app/api/health/route"
-import { PROTECTED_ROUTE_PATTERNS } from "../../src/middleware"
+import { PROTECTED_ROUTE_PATTERNS } from "../../src/proxy"
 import { assertDisposableTarget } from "../lib/disposable-db"
 import {
   createBusinessOsRoute,
