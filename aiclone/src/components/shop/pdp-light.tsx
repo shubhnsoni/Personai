@@ -5,7 +5,6 @@ import { PdpBuy, type PdpBuyAction } from "@/components/shop/pdp-buy"
 import { PdpReviewPanel } from "@/components/shop/pdp-review-panel"
 import { PdpThemeLock } from "@/components/shop/pdp-theme-lock"
 import {
-    PDP_CRAFT_MARK,
     PDP_LIFESTYLE,
     type PdpContent,
     type PdpQuote,
@@ -213,7 +212,6 @@ export function PdpLight({
                 </section>
             )}
 
-            <div className="craft-tag">{PDP_CRAFT_MARK}</div>
             <PdpBuy action={buy} sticky />
         </div>
     )
