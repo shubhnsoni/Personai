@@ -25,13 +25,16 @@ export const PROTECTED_ROUTE_PATTERNS = [
 
 const isProtectedRoute = createRouteMatcher([...PROTECTED_ROUTE_PATTERNS]);
 
-export default clerkMiddleware(async (auth, req) => {
+// Next 16 proxy convention: named proxy (replaces deprecated middleware.ts).
+const proxy = clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     await auth.protect({
       unauthenticatedUrl: new URL("/sign-in", req.url).toString(),
     });
   }
 });
+
+export default proxy;
 
 export const config = {
   matcher: [
