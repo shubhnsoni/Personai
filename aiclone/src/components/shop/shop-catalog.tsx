@@ -189,16 +189,16 @@ export function ShopCatalog({
             {rows.length === 0 ? (
                 <p className="py-16 text-center text-sm text-zinc-500">Import a catalog or add a product</p>
             ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-2.5 lg:grid-cols-4 lg:gap-2">
                     {rows.map((p) => (
                         <Link
                             key={p.id}
                             href={`/${slug}/shop/${p.id}`}
-                            className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50"
+                            className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 lg:rounded-xl"
                         >
                             <ShopCover src={p.thumbnailUrl} type={p.type} title={p.title} className="aspect-square" />
-                            <div className="space-y-0.5 p-3">
-                                <p className="flex items-start gap-1.5 line-clamp-2 text-sm font-medium leading-snug">
+                            <div className="space-y-0.5 p-3 lg:p-2">
+                                <p className="flex items-start gap-1.5 line-clamp-2 text-sm font-medium leading-snug lg:text-[13px]">
                                     {showDiet && p.diet ? <span className={`mt-1 h-2 w-2 shrink-0 rounded-sm ${dietDotClass(p.diet)}`} title={dietLabel(p.diet) || ""} /> : null}
                                     <span className="min-w-0">{p.title}</span>
                                     {p.rxRequired ? (

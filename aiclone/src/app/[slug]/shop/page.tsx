@@ -122,7 +122,7 @@ export default async function ShopPage({
             <Tracker slug={slug} name="shop_view" />
             <CatalogHeader slug={slug} name={profile.displayName} logoUrl={logo} label={catalogLabel(profile.roleTemplate)} whatsapp={profile.whatsapp} aboutHref={aboutHref} hours={hours} />
 
-            <main className="mx-auto max-w-2xl px-4 py-5 pb-10">
+            <main className="mx-auto max-w-5xl px-3 py-3 pb-10 lg:px-4 lg:py-4">
                 {jewelry || wholesale ? (
                     <div className="mb-4">
                         <GoldRateStrip board={goldBoard} wholesale={wholesale} />

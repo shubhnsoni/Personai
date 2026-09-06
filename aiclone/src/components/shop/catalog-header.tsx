@@ -38,7 +38,7 @@ export function CatalogHeader({
     const hoursLabel = [hours, openToday].map((value) => value?.trim()).find(Boolean) || null
     return (
         <header className="sticky top-0 z-40 border-b border-border/70 bg-background/90 backdrop-blur-md">
-            <div className={cn("mx-auto flex h-14 items-center gap-2 px-4", compact ? "max-w-lg" : "max-w-2xl")}>
+            <div className={cn("mx-auto flex h-14 items-center gap-2 px-4", compact ? "max-w-lg" : "max-w-5xl")}>
                 <Link href={backHref || `/${slug}`} className="flex min-w-0 flex-1 items-center gap-2.5">
                     {compact && logoUrl ? (
                         <>

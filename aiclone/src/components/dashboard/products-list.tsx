@@ -147,7 +147,7 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, r
             ) : null}
 
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 lg:gap-2 lg:py-2.5">
                 <CatalogSearch value={q} onChange={setQ} />
                 <ViewToggle view={view} onChange={setViewPersist} />
             </div>
@@ -197,7 +197,7 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, r
                     ))}
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-2">
                     {rows.map((product) => (
                         <ProductTile
                             key={product.id}
@@ -396,9 +396,9 @@ function ProductRow({
 }) {
     const money = useMoney()
     return (
-        <div className="flex items-center gap-2.5 border-b border-border/50 px-2.5 py-2 last:border-b-0">
+        <div className="flex items-center gap-2.5 border-b border-border/50 px-2.5 py-2 last:border-b-0 lg:py-1.5">
             <button type="button" onClick={onOpen} className="shrink-0">
-                <Thumb product={product} compact className="h-12 w-12 rounded-xl" />
+                <Thumb product={product} compact className="h-12 w-12 rounded-xl lg:h-10 lg:w-10" />
             </button>
             <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
                 <p className="truncate text-sm font-medium">{product.title}</p>
@@ -437,13 +437,13 @@ function ProductTile({
 }) {
     const money = useMoney()
     return (
-        <div className="studio-panel overflow-hidden rounded-2xl">
+        <div className="studio-panel overflow-hidden rounded-2xl lg:rounded-xl">
             <button type="button" onClick={onOpen} className="block w-full">
                 <Thumb product={product} className="aspect-square w-full" />
             </button>
-            <div className="flex flex-col gap-3 p-3">
+            <div className="flex flex-col gap-3 p-3 lg:p-2.5">
                 <button type="button" onClick={onOpen} className="min-h-[2.75rem] text-left">
-                    <p className="line-clamp-2 text-sm font-medium leading-5">{product.title}</p>
+                    <p className="line-clamp-2 text-sm font-medium leading-snug lg:text-[13px]">{product.title}</p>
                     <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
                         {money(product.priceCents, product.currency)}
                         {restaurant ? ` · ${product.prepMinutes || 15} min` : isPhysical(product.fulfillment) ? " · Physical" : ` · ${product.downloadCount} sold`}
