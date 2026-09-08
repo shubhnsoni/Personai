@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import { ThemeToggle } from "./theme-toggle"
 import { MobileNav } from "./mobile-nav"
 import { IntroifyWordmark } from "@/components/brand/wordmark"
+import { cn } from "@/lib/utils"
 import "./marketing.css"
 import "./marketing-theme.css"
 
@@ -17,8 +18,8 @@ export function BrandMark() {
 
 const navigation = [
     ["Product", "/#product"],
-    ["Conversations", "/#conversations"],
-    ["Stories", "/#stories"],
+    ["For you", "/#stories"],
+    ["How it works", "/#how-it-works"],
     ["Pricing", "/pricing"],
     ["FAQ", "/#faq"],
 ] as const
@@ -55,10 +56,11 @@ const footerGroups = [
         title: "Explore",
         links: [
             ["Product", "/#product"],
-            ["Chat examples", "/#conversations"],
-            ["Stories", "/#stories"],
+            ["For you", "/#stories"],
+            ["How it works", "/#how-it-works"],
             ["Pricing", "/pricing"],
-            ["Example page", "/demo"],
+            ["FAQ", "/#faq"],
+            ["Explore a page", "/demo"],
             ["Create your page", "/sign-up"],
             ["Sign in", "/sign-in"],
         ],
@@ -125,9 +127,9 @@ export function MarketingFooter() {
     )
 }
 
-export function MarketingShell({ children }: { children: ReactNode }) {
+export function MarketingShell({ children, className }: { children: ReactNode; className?: string }) {
     return (
-        <div className="mk-page" id="top">
+        <div className={cn("mk-page", className)} id="top">
             <a className="mk-skip-link" href="#main-content">
                 Skip to content
             </a>

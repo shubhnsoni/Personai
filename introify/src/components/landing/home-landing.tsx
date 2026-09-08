@@ -1,579 +1,93 @@
 import Image from "next/image"
 import Link from "next/link"
-import {
-    ArrowDown,
-    ArrowRight,
-    ArrowUpRight,
-    CalendarDays,
-    Check,
-    ChevronRight,
-    CircleUserRound,
-    Globe2,
-    Layers3,
-    Link2,
-    QrCode,
-    ShoppingBag,
-    Sparkles,
-} from "lucide-react"
+import { ArrowDown, ArrowRight, ArrowUpRight, Check, CalendarDays, Link2, Plus, ScanLine, Sparkles } from "lucide-react"
 import { MarketingShell } from "@/components/marketing/marketing-shell"
-import { AudienceExplorer } from "./audience-explorer"
-import { ChatShowcase } from "./chat-showcase"
-import { PeopleStories } from "./people-stories"
+import { IntroifyWordmark } from "@/components/brand/wordmark"
+import { LandingMotion, MotionToggle } from "./brand-motion"
+import { ProfilePreview } from "./profile-preview"
+import { IntroifyGuide } from "./introify-guide"
+import "./forest-home.css"
 
 const faqs = [
-    [
-        "What is Introify?",
-        "Introify brings your public profile, links and business offerings into one shareable page. Depending on what you do, you can add services and bookings, a product catalog, digital products, courses, events or a restaurant menu.",
-    ],
-    [
-        "Who is it for?",
-        "Independent professionals, consultants, coaches, creators and local businesses. Start with the information your visitors need most: who you are, what you offer and how to take the next step.",
-    ],
-    [
-        "Do I need to know how to code?",
-        "No. Create an account, set up your profile and add your offerings from your dashboard. You can update your page as your work changes, without editing a website.",
-    ],
-    [
-        "How much does it cost?",
-        "Introify is currently in free early access. You can create your page without a card. Future paid plans, limits and any applicable charges will be shown before you choose a paid service. Prices set by individual page owners for their own offerings are separate.",
-    ],
-    [
-        "Can visitors pay or book through my page?",
-        "You can list services and let visitors request available booking slots. Product pages can support page-owner-provided payment and fulfillment options, such as manual UPI, cash on delivery or WhatsApp ordering. Online card checkout is not currently enabled. Visitors should check each offering’s terms before ordering.",
-    ],
-    [
-        "Does the page include an AI assistant?",
-        "AI features are planned as part of Introify’s broader product, but an AI assistant is not currently active in this early-access release. Your profile, links and supported business tools can be used without it.",
-    ],
-    [
-        "Can I use Introify alongside my existing website?",
-        "Yes. Add your website and other links to your Introify page, then share the page in your social bio, messages or QR card. It can be a focused starting point for visitors alongside your existing website.",
-    ],
-    [
-        "What should I put on my page first?",
-        "Use a clear headline that says what you do and who you help. Add a short introduction, a few strong examples of your work and one primary offering. Make the next step specific: view a collection, explore a service or choose a booking slot.",
-    ],
+    ["What is Introify?", "Introify is a home for your work on the web. Bring your profile, links, services, products and bookings into one shareable page, so visitors can understand what you do and find their next step."],
+    ["Who can make an Introify page?", "Creators, independent professionals, consultants, coaches and local businesses. Whether you’re sharing a portfolio, offering a service or building a shop, start with the parts that fit your work."],
+    ["Do I need a website or coding experience?", "Neither. Create your account, choose your page name and add your content from the dashboard. If you already have a website, link to it from your page. Introify works as a focused starting point alongside the places you already share your work."],
+    ["How much does it cost?", "Introify is free during early access, with no card required to create your page. Any future paid plans, limits or charges will be shown before you choose a paid service. Prices you set for your own offerings are separate."],
+    ["Can visitors pay or book through my page?", "You can add services and let visitors request available booking slots. Product pages can offer payment and fulfillment methods provided by the page owner, including manual UPI, cash on delivery or WhatsApp ordering. Online card checkout is not currently enabled. Each offering’s details and terms apply."],
+    ["Does the page include an AI assistant?", "An AI assistant is on our roadmap. In the current release, you can build your profile, share your offerings and use the supported booking and business tools. We’ll share availability as new features are ready."],
+    ["Can I update my page later?", "Of course. Edit your introduction, links and offerings from your dashboard as your work evolves. Keep sharing the same page address—your latest updates are there when visitors arrive."],
 ] as const
 
-function ProfilePreview() {
-    return (
-        <div
-            className="mk-hero-visual"
-            aria-label="Illustrative Introify profile preview"
-        >
-            <div className="mk-orbit mk-orbit-one" />
-            <div className="mk-orbit mk-orbit-two" />
-            <span className="mk-visual-caption">
-                <span /> A LITTLE MORE YOU. A LOT MORE POSSIBLE.
-            </span>
-            <div className="mk-profile-card">
-                <div className="mk-profile-url">
-                    <span className="mk-url-dots">
-                        <i />
-                        <i />
-                        <i />
-                    </span>
-                    <Link2 size={11} />
-                    <span>introify.com/yourname</span>
-                    <ArrowUpRight size={13} />
-                </div>
-                <div className="mk-profile-photo">
-                    <Image
-                        src="/marketing/ceramic-artist.png"
-                        alt="Illustrative ceramic artist in a sunlit pottery studio"
-                        fill
-                        priority
-                        sizes="(max-width: 600px) 80vw, 390px"
-                    />
-                    <span className="mk-photo-tag">
-                        MADE BY HAND. SHARED WITH YOU.
-                    </span>
-                </div>
-                <div className="mk-profile-info">
-                    <div className="mk-profile-title">
-                        <h2>
-                            Mira Studio<span>✳</span>
-                        </h2>
-                        <span className="mk-profile-category">
-                            CERAMICS & CREATIVE WORKSHOPS
-                        </span>
-                    </div>
-                    <p>
-                        Everyday objects.
-                        <br />A little out of the ordinary.
-                    </p>
-                    <Link href="/demo" className="mk-profile-action">
-                        Explore an example page <ArrowUpRight size={16} />
-                    </Link>
-                    <div className="mk-profile-bottom">
-                        <span>
-                            <Globe2 size={12} /> Made for the curious
-                        </span>
-                        <span>introify.</span>
-                    </div>
-                </div>
-            </div>
-            <div className="mk-floating-card mk-booking-card">
-                <span className="mk-float-icon">
-                    <CalendarDays size={20} />
-                </span>
-                <div>
-                    <span className="mk-small-label">
-                        MAKE TIME FOR YOUR WORK
-                    </span>
-                    <strong>A visit. A call. A new start.</strong>
-                    <span>Give visitors a way to book.</span>
-                </div>
-                <ArrowUpRight size={16} />
-            </div>
-            <div className="mk-floating-card mk-link-card">
-                <span className="mk-lime-icon">
-                    <Link2 size={20} />
-                </span>
-                <div>
-                    <strong>Everything, connected.</strong>
-                    <span>One link that opens doors.</span>
-                </div>
-            </div>
-            <span className="mk-preview-disclaimer">
-                Illustrative profile · Explore the demo to try Introify
-            </span>
-        </div>
-    )
+const audiences = [
+    { title: "For the things you make.", group: "CREATORS & MAKERS", image: "/marketing/ceramic-artist.png", alt: "A ceramic artist shaping clay in her studio", text: "Give your craft a space of its own. Bring your portfolio, collections and workshops together, so people can explore more of what you do.", tags: ["Portfolio", "Collections", "Workshops"], cta: "Make room for your craft" },
+    { title: "For the expertise you share.", group: "CONSULTANTS & INDEPENDENTS", image: "/marketing/design-consultant.png", alt: "An independent professional working at a studio desk", text: "Let a potential client get to know your approach before the first call. Put your experience, services and booking options in one place.", tags: ["Services", "Experience", "Bookings"], cta: "Introduce your expertise" },
+    { title: "For your corner of the world.", group: "LOCAL BUSINESSES", image: "/marketing/cafe-owner.png", alt: "A café owner welcoming visitors at the counter", text: "Make it easy to find the details that bring people through your door. Share a menu, a catalog or your contact links from one familiar address.", tags: ["Menus", "Catalogs", "Contact"], cta: "Bring your business closer" },
+] as const
+
+function Flower({ className = "" }: { className?: string }) {
+    return <svg className={className} viewBox="0 0 100 100" aria-hidden="true" fill="none"><path d="M50 4v92M4 50h92M17.5 17.5l65 65m0-65-65 65" stroke="currentColor" strokeWidth="12" strokeLinecap="round" /></svg>
 }
 
 export function HomeLanding() {
     return (
-        <MarketingShell>
-            <main id="main-content">
-                <section
-                    className="mk-hero mk-container"
-                    aria-labelledby="hero-title"
-                >
-                    <div className="mk-hero-copy">
-                        <span className="mk-eyebrow">
-                            <span className="mk-live-dot" /> YOUR NEXT CHAPTER
-                            STARTS HERE
-                        </span>
-                        <h1 id="hero-title">
-                            One home for
-                            <br />
-                            <em>what you do.</em>
-                        </h1>
-                        <p className="mk-hero-description">
-                            Bring your profile, services, products and bookings
-                            together. Give every visitor a clear next step.
-                        </p>
-                        <div className="mk-hero-ctas">
-                            <Link className="mk-button" href="/sign-up">
-                                Create your page <ArrowUpRight size={19} />
-                            </Link>
-                            <Link className="mk-text-link" href="/demo">
-                                Explore the demo <ArrowRight size={17} />
-                            </Link>
-                        </div>
-                        <p className="mk-hero-note">
-                            <Check size={14} /> Free early access <span /> No
-                            card required
-                        </p>
-                        <div className="mk-hero-footnote">
-                            <span className="mk-tiny-rule" />
-                            <p>
-                                Less “find me everywhere.”
-                                <br />
-                                <strong>More “start right here.”</strong>
-                            </p>
-                        </div>
-                    </div>
-                    <ProfilePreview />
-                </section>
-                <div className="mk-audience-strip">
-                    <div className="mk-container">
-                        <span>
-                            A SPACE FOR YOUR
-                            <br />
-                            <strong>KIND OF WORK.</strong>
-                        </span>
-                        <p>
-                            <Sparkles size={19} /> Creators
-                        </p>
-                        <p>
-                            <CircleUserRound size={19} /> Consultants
-                        </p>
-                        <p>
-                            <ShoppingBag size={19} /> Independent shops
-                        </p>
-                        <p>
-                            <Globe2 size={19} /> Local businesses
-                        </p>
-                        <a href="#product" aria-label="Explore the product">
-                            <ArrowDown size={20} />
-                        </a>
-                    </div>
-                </div>
-                <section className="mk-section mk-container" id="product">
-                    <div className="mk-section-heading">
-                        <div>
-                            <span className="mk-eyebrow">
-                                A GOOD INTRODUCTION GOES FURTHER
-                            </span>
-                            <h2>
-                                More than a link.
-                                <br />
-                                <em>A place to begin.</em>
-                            </h2>
-                        </div>
-                        <p>
-                            Your best work shouldn’t get lost between a social
-                            bio, a booking link and a dozen messages. Bring the
-                            important parts together.
-                        </p>
-                    </div>
-                    <div className="mk-feature-grid">
-                        <article className="mk-feature mk-feature-profile">
-                            <div className="mk-feature-art mk-mini-profile">
-                                <div className="mk-mini-avatar">
-                                    m<span>✳</span>
-                                </div>
-                                <div className="mk-mini-lines">
-                                    <strong>A clear first impression.</strong>
-                                    <span>Your story, in your words.</span>
-                                </div>
-                                <div className="mk-mini-link">
-                                    <span>01</span> About my work{" "}
-                                    <ArrowUpRight size={14} />
-                                </div>
-                                <div className="mk-mini-link">
-                                    <span>02</span> Selected projects{" "}
-                                    <ArrowUpRight size={14} />
-                                </div>
-                                <div className="mk-mini-link">
-                                    <span>03</span> Let’s work together{" "}
-                                    <ArrowUpRight size={14} />
-                                </div>
+        <MarketingShell className="brand-home">
+            <LandingMotion>
+                <main id="main-content">
+                    <section className="fh-hero" aria-labelledby="fh-hero-title">
+                        <div className="fh-container fh-hero-grid">
+                            <div className="fh-hero-copy">
+                                <p className="fh-eyebrow"><span className="fh-status-dot" /> YOUR WORK, OPEN TO THE WORLD</p>
+                                <h1 id="fh-hero-title">Big things<br />start with a<br /><em>good intro.</em><Flower className="fh-heading-flower" /></h1>
+                                <p className="fh-hero-description">Your story. Your work. Your next opportunity.<br className="fh-desktop-break" /> Bring them together in one beautiful page—with a clear way to explore, book or get in touch.</p>
+                                <div className="fh-hero-actions"><Link className="fh-button" href="/sign-up">Make your intro <ArrowUpRight size={19} /></Link><Link className="fh-text-link" href="#product">See what’s possible <ArrowDown size={17} /></Link></div>
+                                <div className="fh-hero-notes"><span><Check size={13} /> Free early access</span><span><Check size={13} /> No card needed</span><span><Check size={13} /> Yours to make</span></div>
                             </div>
-                            <span className="mk-feature-number">
-                                01 / INTRODUCE YOURSELF
-                            </span>
-                            <h3>Let your work do the talking.</h3>
-                            <p>
-                                A considered profile with your story,
-                                experience, work and links. Give people a reason
-                                to stay—and a way to explore.
-                            </p>
-                        </article>
-                        <article className="mk-feature mk-feature-booking">
-                            <div className="mk-feature-art mk-mini-calendar">
-                                <div className="mk-calendar-top">
-                                    <CalendarDays size={17} />
-                                    <strong>
-                                        Make room for a conversation
-                                    </strong>
-                                </div>
-                                <div className="mk-calendar-days">
-                                    {["M", "T", "W", "T", "F", "S", "S"].map(
-                                        (day, i) => (
-                                            <span key={i}>{day}</span>
-                                        ),
-                                    )}
-                                    {Array.from({ length: 14 }, (_, i) => (
-                                        <span
-                                            className={
-                                                i === 9
-                                                    ? "mk-calendar-selected"
-                                                    : ""
-                                            }
-                                            key={`day-${i}`}
-                                        >
-                                            {i + 8}
-                                        </span>
-                                    ))}
-                                </div>
-                                <div className="mk-mini-slots">
-                                    <span>10:00 AM</span>
-                                    <span>11:30 AM</span>
-                                    <span>2:00 PM</span>
-                                </div>
-                                <span className="mk-art-label">
-                                    EXAMPLE AVAILABILITY
-                                </span>
-                            </div>
-                            <span className="mk-feature-number">
-                                02 / OPEN THE CONVERSATION
-                            </span>
-                            <h3>Turn interest into a next step.</h3>
-                            <p>
-                                Show your services and available booking slots.
-                                Help visitors find the right offering and make
-                                time to connect.
-                            </p>
-                        </article>
-                        <article className="mk-feature mk-feature-shop">
-                            <div className="mk-feature-art mk-mini-shop">
-                                <div className="mk-shop-heading">
-                                    <ShoppingBag size={17} />
-                                    <strong>
-                                        A collection of possibilities
-                                    </strong>
-                                </div>
-                                <div className="mk-shop-items">
-                                    <div>
-                                        <span className="mk-shop-tile mk-tile-course">
-                                            <Layers3 size={33} />
-                                        </span>
-                                        <strong>Digital guides</strong>
-                                        <span>Ideas worth sharing</span>
-                                    </div>
-                                    <div>
-                                        <span className="mk-shop-tile mk-tile-event">
-                                            <Sparkles size={33} />
-                                        </span>
-                                        <strong>Workshops</strong>
-                                        <span>Bring people together</span>
-                                    </div>
-                                </div>
-                                <span className="mk-art-label">
-                                    ILLUSTRATIVE OFFERINGS
-                                </span>
-                            </div>
-                            <span className="mk-feature-number">
-                                03 / SHARE WHAT YOU OFFER
-                            </span>
-                            <h3>Give every offering a home.</h3>
-                            <p>
-                                Present products, courses and events in context.
-                                Make it easier for visitors to understand what
-                                you offer before they decide.
-                            </p>
-                        </article>
-                    </div>
-                </section>
-                <section className="mk-audience-section" id="for-you">
-                    <div className="mk-container">
-                        <div className="mk-section-heading">
-                            <div>
-                                <span className="mk-eyebrow">
-                                    AS INDIVIDUAL AS YOUR AMBITION
-                                </span>
-                                <h2>
-                                    Your work doesn’t fit a box.
-                                    <br />
-                                    <em>Your page shouldn’t either.</em>
-                                </h2>
-                            </div>
-                            <p>
-                                A creative practice. An independent business.
-                                Your next big idea. Start with the tools that
-                                make sense for you.
-                            </p>
+                            <div className="fh-hero-art"><ProfilePreview /><div className="fh-art-caption"><span>ONE LINK. A LITTLE MORE YOU.</span><MotionToggle /></div></div>
                         </div>
-                        <AudienceExplorer />
-                    </div>
-                </section>
-                <ChatShowcase />
-                <PeopleStories />
-                <section className="mk-studio-section mk-container">
-                    <div className="mk-studio-copy">
-                        <span className="mk-eyebrow">BEHIND YOUR PAGE</span>
-                        <h2>
-                            A little less admin.
-                            <br />
-                            <em>A little more doing.</em>
-                        </h2>
-                        <p>
-                            Keep your profile, offerings and business activity
-                            close at hand. Your dashboard gives you a place to
-                            update your page, manage bookings and organize
-                            leads.
-                        </p>
-                        <ul>
-                            <li>
-                                <Check size={17} /> Update your content as your
-                                work evolves.
-                            </li>
-                            <li>
-                                <Check size={17} /> Keep lead notes and
-                                follow-ups in one place.
-                            </li>
-                            <li>
-                                <Check size={17} /> See visitor activity and
-                                share your QR card.
-                            </li>
-                        </ul>
-                        <Link href="/sign-up" className="mk-text-link">
-                            Find your starting point <ArrowRight size={17} />
-                        </Link>
-                    </div>
-                    <div className="mk-studio-preview">
-                        <div className="mk-studio-top">
-                            <span className="mk-studio-logo">i.</span>
-                            <span>Your studio</span>
-                            <span className="mk-example-pill">EXAMPLE</span>
-                        </div>
-                        <div className="mk-studio-body">
-                            <div className="mk-studio-greeting">
-                                <span>A little space for the big picture.</span>
-                                <h3>Make it yours.</h3>
-                            </div>
-                            {[
-                                {
-                                    icon: CircleUserRound,
-                                    title: "Your profile",
-                                    note: "A story only you can tell",
-                                },
-                                {
-                                    icon: CalendarDays,
-                                    title: "Services & bookings",
-                                    note: "Good conversations start here",
-                                },
-                                {
-                                    icon: ShoppingBag,
-                                    title: "Products & offerings",
-                                    note: "Bring your ideas into the world",
-                                },
-                            ].map((item) => (
-                                <div className="mk-studio-row" key={item.title}>
-                                    <span className="mk-studio-row-icon">
-                                        <item.icon size={19} />
-                                    </span>
-                                    <div>
-                                        <strong>{item.title}</strong>
-                                        <span>{item.note}</span>
-                                    </div>
-                                    <ChevronRight size={16} />
-                                </div>
-                            ))}
-                            <div className="mk-studio-share">
-                                <QrCode size={39} strokeWidth={1.4} />
-                                <div>
-                                    <strong>
-                                        One page. Many possibilities.
-                                    </strong>
-                                    <span>Share your link or QR card.</span>
-                                </div>
-                                <ArrowUpRight size={19} />
+                    </section>
+                    <div className="fh-possibilities"><div className="fh-container"><p>All the parts of you.<br /><strong>Finally, together.</strong></p><div><span>Your story</span><Flower /><span>Your services</span><Flower /><span>Your products</span><Flower /><span>Your next chapter</span></div></div></div>
+                    <section className="fh-product fh-section" id="product" aria-labelledby="fh-product-title">
+                        <div className="fh-container">
+                            <div className="fh-section-heading" data-reveal><div><p className="fh-eyebrow">A PAGE THAT OPENS DOORS</p><h2 id="fh-product-title">Less scattered.<br /><em>More connected.</em></h2></div><p>A bio here. A booking link there. Give people one place to understand your work—and a reason to take the next step.</p></div>
+                            <div className="fh-feature-grid">
+                                <article className="fh-feature fh-feature-story" data-reveal>
+                                    <div className="fh-feature-top"><span className="fh-index">01 / YOUR STORY</span><Link2 size={21} /></div>
+                                    <h3>More than a list of links.<br />A sense of who you are.</h3><p>Put your experience, best work and important links in context. Make the first impression feel like you.</p>
+                                    <div className="fh-link-stack" aria-hidden="true"><div><span className="fh-stack-icon">a.</span><span><strong>A little about me</strong><small>The story behind the work</small></span><ArrowUpRight size={18} /></div><div><span className="fh-stack-icon"><Sparkles size={19} /></span><span><strong>Things I’ve made</strong><small>A few favourites, all in one place</small></span><ArrowUpRight size={18} /></div><div><span className="fh-stack-icon"><Link2 size={19} /></span><span><strong>Find me around the web</strong><small>Everywhere else we can connect</small></span><ArrowUpRight size={18} /></div></div>
+                                    <span className="fh-feature-end">YOUR WORLD, WITH A FRONT DOOR.</span>
+                                </article>
+                                <article className="fh-feature fh-feature-bookings" data-reveal>
+                                    <div className="fh-feature-top"><span className="fh-index">02 / YOUR TIME</span><CalendarDays size={21} /></div><h3>From “I’m interested”<br />to “let’s talk.”</h3><p>Describe your services and open up your availability. Help the right people find a time to connect.</p>
+                                    <div className="fh-calendar" aria-hidden="true"><div><strong>Make a little time.</strong><span>30 MIN</span></div><div className="fh-calendar-days">{["M", "T", "W", "T", "F"].map((day, i) => <div className={i === 2 ? "is-chosen" : ""} key={i}><span>{day}</span><b>{12 + i}</b></div>)}</div><div className="fh-slots"><span>10:00 am</span><span>11:30 am</span><span>2:00 pm</span></div></div>
+                                </article>
+                                <article className="fh-feature fh-feature-offers" data-reveal>
+                                    <div className="fh-feature-top"><span className="fh-index">03 / YOUR OFFERINGS</span><ArrowUpRight size={21} /></div><h3>Make space for<br />your next good thing.</h3><p>A collection, a course, a workshop. Give every offering the details and attention it deserves.</p>
+                                    <div className="fh-offer-visual"><div className="fh-offer-photo"><Image src="/marketing/ceramic-vase.jpg" alt="Handcrafted ceramic vase" fill sizes="(max-width: 700px) 60vw, 260px" /></div><div className="fh-offer-label"><span>MADE WITH INTENTION</span><strong>Objects with a story.</strong><ArrowUpRight size={18} /></div></div>
+                                </article>
                             </div>
                         </div>
-                    </div>
-                </section>
-                <section className="mk-how-section" id="how-it-works">
-                    <div className="mk-container">
-                        <div className="mk-section-heading">
-                            <div>
-                                <span className="mk-eyebrow">
-                                    FROM AN IDEA TO AN INTRODUCTION
-                                </span>
-                                <h2>
-                                    Make it yours.
-                                    <br />
-                                    <em>Then put it out there.</em>
-                                </h2>
-                            </div>
-                            <Link
-                                href="/sign-up"
-                                className="mk-button mk-button-outline"
-                            >
-                                Let’s get started <ArrowUpRight size={18} />
-                            </Link>
+                    </section>
+                    <section className="fh-share-section" aria-labelledby="fh-share-title">
+                        <div className="fh-container fh-share-grid">
+                            <div className="fh-share-copy" data-reveal><p className="fh-eyebrow">MEET THEM WHERE THEY ARE</p><h2 id="fh-share-title">In your bio.<br />On your card.<br /><em>Out in the world.</em></h2><p>Share your Introify link anywhere a good introduction can happen. On a screen, across a counter or at the end of a conversation.</p><Link className="fh-button fh-button-lime" href="/sign-up">Find your starting point <ArrowUpRight size={19} /></Link></div>
+                            <div className="fh-share-art" data-reveal aria-hidden="true"><div className="fh-share-orbit" /><div className="fh-share-orbit fh-share-orbit-two" /><span className="fh-share-chip fh-share-chip-top"><Link2 size={16} /> YOUR SOCIAL BIO</span><div className="fh-name-card"><IntroifyWordmark decorative /><span>GOOD TO MEET YOU.</span><strong>Let’s make<br />something happen.</strong><div className="fh-name-card-bottom"><span>YOUR WORK.<br />ONE LINK.</span><ScanLine size={43} strokeWidth={1.4} /></div></div><span className="fh-share-chip fh-share-chip-bottom"><ArrowUpRight size={16} /> YOUR NEXT OPPORTUNITY</span><Flower className="fh-share-flower" /></div>
                         </div>
-                        <ol className="mk-steps">
-                            <li>
-                                <span>01</span>
-                                <h3>Tell your story.</h3>
-                                <p>
-                                    Choose your page name. Add a photo, a clear
-                                    introduction and the links that matter.
-                                </p>
-                            </li>
-                            <li>
-                                <span>02</span>
-                                <h3>Bring your work.</h3>
-                                <p>
-                                    Add your services, products or other
-                                    offerings. Give each one a clear description
-                                    and next step.
-                                </p>
-                            </li>
-                            <li>
-                                <span>03</span>
-                                <h3>Make the introduction.</h3>
-                                <p>
-                                    Share your link in your bio, send it in a
-                                    message or bring your QR card into the real
-                                    world.
-                                </p>
-                            </li>
-                        </ol>
-                    </div>
-                </section>
-                <section className="mk-faq-section mk-container" id="faq">
-                    <div>
-                        <span className="mk-eyebrow">A FEW GOOD QUESTIONS</span>
-                        <h2>
-                            Before you
-                            <br />
-                            <em>make your intro.</em>
-                        </h2>
-                        <p>A little clarity for your next chapter.</p>
-                        <Link href="/about" className="mk-text-link">
-                            Get to know Introify <ArrowUpRight size={16} />
-                        </Link>
-                    </div>
-                    <div className="mk-faq-list">
-                        {faqs.map(([question, answer], index) => (
-                            <details key={question}>
-                                <summary>
-                                    <span className="mk-faq-number">
-                                        {String(index + 1).padStart(2, "0")}
-                                    </span>
-                                    <h3>{question}</h3>
-                                    <span
-                                        className="mk-faq-plus"
-                                        aria-hidden="true"
-                                    >
-                                        +
-                                    </span>
-                                </summary>
-                                <p>{answer}</p>
-                            </details>
-                        ))}
-                    </div>
-                </section>
-                <section className="mk-final-cta">
-                    <div className="mk-container">
-                        <div>
-                            <span className="mk-eyebrow">
-                                THERE’S MORE TO YOU. SHOW IT.
-                            </span>
-                            <h2>
-                                Good work deserves
-                                <br />
-                                <em>a great introduction.</em>
-                            </h2>
-                            <p>Give what you do a place to grow.</p>
-                            <Link
-                                className="mk-button mk-button-lime"
-                                href="/sign-up"
-                            >
-                                Create your page <ArrowUpRight size={19} />
-                            </Link>
-                            <span className="mk-cta-note">
-                                Free early access. Yours to make.
-                            </span>
+                    </section>
+                    <section className="fh-people fh-section" id="stories" aria-labelledby="fh-people-title">
+                        <div className="fh-container"><div className="fh-section-heading" data-reveal><div><p className="fh-eyebrow">MANY WAYS TO MAKE IT YOURS</p><h2 id="fh-people-title">Built for people<br /><em>doing their thing.</em></h2></div><p>The side project becoming something bigger. The independent practice. The little shop with a big personality. There’s room for all of it.</p></div>
+                            <div className="fh-people-grid">{audiences.map((audience, i) => <article className="fh-person" key={audience.group} data-reveal><div className={`fh-person-photo fh-person-photo-${i}`}><Image src={audience.image} alt={audience.alt} fill sizes="(max-width: 700px) 92vw, (max-width: 1000px) 45vw, 390px" /><span>0{i + 1}</span><div className="fh-person-tags">{audience.tags.map(tag => <span key={tag}>{tag}</span>)}</div></div><p className="fh-eyebrow">{audience.group}</p><h3>{audience.title}</h3><p className="fh-person-description">{audience.text}</p><Link href="/sign-up" className="fh-text-link">{audience.cta} <ArrowUpRight size={17} /></Link></article>)}</div>
                         </div>
-                        <div className="mk-cta-art" aria-hidden="true">
-                            <span className="mk-cta-star">✳</span>
-                            <span className="mk-cta-link">
-                                <Link2 size={25} /> introify.com/you{" "}
-                                <ArrowUpRight size={20} />
-                            </span>
-                            <span className="mk-cta-handwriting">
-                                start something.
-                            </span>
-                        </div>
-                    </div>
-                </section>
-            </main>
+                    </section>
+                    <IntroifyGuide />
+                    <section className="fh-how fh-section" id="how-it-works" aria-labelledby="fh-how-title"><div className="fh-container"><div className="fh-section-heading" data-reveal><div><p className="fh-eyebrow">FROM “ONE DAY” TO DAY ONE</p><h2 id="fh-how-title">A little setup.<br /><em>A lot of you.</em></h2></div><Link href="/sign-up" className="fh-text-link">Let’s get you started <ArrowUpRight size={19} /></Link></div><div className="fh-steps">{[
+                        ["01", "Say a proper hello.", "Choose your page name. Add a photo and an introduction that tells people what you do and why it matters."],
+                        ["02", "Bring your good stuff.", "Add the links, services and offerings that fit your work. Start with one clear next step. Build from there."],
+                        ["03", "Put yourself out there.", "Share your link in your bio, messages or QR card. Keep it fresh from your dashboard as your work grows."],
+                    ].map(([number, title, text]) => <article key={number} data-reveal><span>{number}<ArrowRight size={25} /></span><h3>{title}</h3><p>{text}</p></article>)}</div></div></section>
+                    <section className="fh-faq fh-section" id="faq" aria-labelledby="fh-faq-title"><div className="fh-container fh-faq-grid"><div data-reveal><p className="fh-eyebrow">A LITTLE CLARITY</p><h2 id="fh-faq-title">Good questions.<br /><em>Clear answers.</em></h2><p>Before your next chapter begins.</p><Flower className="fh-faq-flower" /></div><div className="fh-faq-list">{faqs.map(([question, answer], i) => <details key={question} data-reveal><summary><span>0{i + 1}</span><h3>{question}</h3><Plus size={20} /></summary><p>{answer}</p></details>)}</div></div></section>
+                    <section className="fh-final" aria-labelledby="fh-final-title"><div className="fh-container" data-reveal><p className="fh-eyebrow">YOU’VE GOT SOMETHING GOOD GOING.</p><h2 id="fh-final-title">Let’s make<br /><em>the introduction.</em></h2><Link className="fh-button fh-button-lime" href="/sign-up">Make your intro <ArrowUpRight size={20} /></Link><p className="fh-final-note">Free early access. No card needed. A page that’s yours.</p><Flower className="fh-final-flower" /></div></section>
+                </main>
+            </LandingMotion>
         </MarketingShell>
     )
 }

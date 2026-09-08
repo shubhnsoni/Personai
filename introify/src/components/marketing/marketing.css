@@ -1,11 +1,13 @@
 /* Public-page layout. Adaptive palette overrides live in marketing-theme.css. */
 .mk-page {
-    --mk-paper: #f8f7f4;
-    --mk-ink: #172523;
-    --mk-muted: #616964;
-    --mk-blue: #2456df;
-    --mk-line: #dedfd8;
-    --mk-lime: #d7ee89;
+    --mk-paper: #f8faf2;
+    --mk-ink: #12392d;
+    --mk-muted: #626f66;
+    --mk-accent: #276244;
+    /* Older public-page components inherit the new brand accent through this alias. */
+    --mk-blue: var(--mk-accent);
+    --mk-line: #dce3d5;
+    --mk-lime: #dcecba;
     background: var(--mk-paper);
     color: var(--mk-ink);
     font-family: var(--font-geist-sans), Arial, sans-serif;
@@ -41,7 +43,7 @@
     letter-spacing: -0.045em;
 }
 .mk-page :focus-visible {
-    outline: 3px solid var(--mk-blue);
+    outline: 3px solid var(--mk-accent);
     outline-offset: 5px;
 }
 .mk-page [id] {
@@ -104,7 +106,7 @@
 }
 .mk-desktop-nav a:hover,
 .mk-sign-in:hover {
-    color: var(--mk-blue);
+    color: var(--mk-accent);
 }
 .mk-header-actions {
     display: flex;
@@ -120,13 +122,13 @@
     align-items: center;
     justify-content: center;
     gap: 26px;
-    background: var(--mk-blue);
-    color: #fff;
+    background: var(--mk-action);
+    color: var(--mk-action-ink);
     font-size: 14px;
     font-weight: 600;
     padding: 17px 22px;
-    border: 1px solid var(--mk-blue);
-    border-radius: 5px;
+    border: 1px solid var(--mk-action);
+    border-radius: 999px;
     transition:
         background 0.2s,
         transform 0.2s;
@@ -135,8 +137,9 @@
     text-align: center;
 }
 .mk-button:hover {
-    background: #1744c5;
-    transform: translateY(-2px);
+    background: var(--mk-action-hover);
+    border-color: var(--mk-action-hover);
+    transform: translateY(-1px);
 }
 .mk-button-small {
     font-size: 12px;
@@ -149,7 +152,8 @@
     border-color: #b4bcb3;
 }
 .mk-button-outline:hover {
-    background: #efeee8;
+    background: var(--mk-elevated);
+    border-color: var(--mk-accent);
 }
 .mk-button-lime {
     background: var(--mk-lime);
@@ -158,6 +162,7 @@
 }
 .mk-button-lime:hover {
     background: #e5f7af;
+    border-color: #e5f7af;
 }
 .mk-text-link {
     display: inline-flex;
@@ -187,7 +192,7 @@
     height: 6px;
     background: var(--mk-blue);
     border-radius: 50%;
-    box-shadow: 0 0 0 4px #2456df0d;
+    box-shadow: 0 0 0 4px #27624412;
 }
 .mk-small-label {
     font-size: 8px;
@@ -1160,7 +1165,7 @@
     color: #c7daaa;
 }
 .mk-footer {
-    background: #f0efe7;
+    background: #edf2e4;
     padding-top: 63px;
 }
 .mk-footer-top {
@@ -1177,7 +1182,7 @@
 }
 .mk-footer-brand > .mk-small-label {
     font-size: 8px;
-    color: #79806f;
+    color: var(--mk-muted);
 }
 .mk-footer nav h2 {
     font-size: 10px;
@@ -1192,18 +1197,18 @@
 }
 .mk-footer nav a {
     font-size: 11px;
-    color: #697162;
+    color: var(--mk-muted);
 }
 .mk-footer nav a:hover {
     color: var(--mk-blue);
 }
 .mk-footer-bottom {
-    border-top: 1px solid #d6dacd;
+    border-top: 1px solid var(--mk-line);
     display: flex;
     justify-content: space-between;
     gap: 20px;
     padding: 21px 0;
-    color: #74806a;
+    color: var(--mk-muted);
     font-size: 9px;
 }
 .mk-policy-main {

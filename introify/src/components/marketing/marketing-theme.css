@@ -1,9 +1,10 @@
 /* Marketing follows the existing next-themes preference; photos keep their original colours. */
 .mk-page {
     --mk-surface: #fff;
-    --mk-elevated: #efeee7;
-    --mk-action: #2456df;
-    --mk-action-hover: #1744c5;
+    --mk-elevated: #edf2e4;
+    --mk-action: #073d30;
+    --mk-action-hover: #0d503e;
+    --mk-action-ink: #fff;
 }
 
 .mk-header { position: sticky; top: 0; }
@@ -44,16 +45,17 @@
 .mk-theme-toggle select:focus-visible { outline: none; }
 
 .dark .mk-page {
-    --mk-paper: #101715;
-    --mk-ink: #eff3eb;
-    --mk-muted: #a7b3aa;
-    --mk-blue: #91b0ff;
-    --mk-line: #34423b;
-    --mk-lime: #d7ee89;
-    --mk-surface: #19241f;
-    --mk-elevated: #223028;
-    --mk-action: #315de0;
-    --mk-action-hover: #426dec;
+    --mk-paper: #101c16;
+    --mk-ink: #f0f5e9;
+    --mk-muted: #aab9ac;
+    --mk-accent: #b2df75;
+    --mk-line: #34493b;
+    --mk-lime: #dcecba;
+    --mk-surface: #19291e;
+    --mk-elevated: #233729;
+    --mk-action: #a3db42;
+    --mk-action-hover: #b8e565;
+    --mk-action-ink: #103626;
     color-scheme: dark;
 }
 
@@ -62,14 +64,14 @@
     color: #fdfdfd;
 }
 
-.dark .mk-page .mk-button { background: var(--mk-action); border-color: var(--mk-action); color: #fff; }
+.dark .mk-page .mk-button { background: var(--mk-action); border-color: var(--mk-action); color: var(--mk-action-ink); }
 .dark .mk-page .mk-button:hover { background: var(--mk-action-hover); border-color: var(--mk-action-hover); }
 .dark .mk-page .mk-button-outline { background: transparent; border-color: #65786a; color: var(--mk-ink); }
 .dark .mk-page .mk-button-outline:hover { background: var(--mk-elevated); border-color: var(--mk-muted); }
 .dark .mk-page .mk-button-lime { background: var(--mk-lime); border-color: var(--mk-lime); color: #172523; }
 .dark .mk-page .mk-button-lime:hover { background: #e5f7af; border-color: #e5f7af; }
 .dark .mk-page .mk-skip-link { background: var(--mk-lime); color: #172523; }
-.dark .mk-page .mk-live-dot { box-shadow: 0 0 0 4px #91b0ff18; }
+.dark .mk-page .mk-live-dot { box-shadow: 0 0 0 4px #b2df7518; }
 .dark .mk-page .mk-orbit { border-color: #344239; }
 .dark .mk-page .mk-orbit-two { border-color: #28372e; }
 

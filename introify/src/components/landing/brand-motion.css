@@ -1,0 +1,278 @@
+.bm-motion {
+  min-width: 0;
+}
+
+.bm-motion [data-bm-reveal] {
+  transition: opacity 650ms ease, transform 850ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--bm-reveal-delay, 0ms);
+}
+
+.bm-motion[data-bm-motion="on"] [data-bm-reveal="waiting"] {
+  opacity: 0;
+  transform: translateY(24px);
+}
+
+.bm-motion[data-bm-motion="off"] [data-reveal] {
+  transition: none;
+}
+
+.bm-motion-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+
+.bm-motion-toggle:hover {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  border-color: color-mix(in srgb, currentColor 44%, transparent);
+}
+
+.bm-motion-toggle:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+.bm-orb-scene {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  flex: 0 0 auto;
+  width: min(100%, 440px);
+  aspect-ratio: 1;
+  container-type: inline-size;
+  pointer-events: none;
+}
+
+.bm-orb-compact {
+  width: min(100%, 190px);
+}
+
+.bm-orb-halo {
+  position: absolute;
+  inset: 3%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(177, 222, 86, 0.2), rgba(142, 194, 52, 0.045) 48%, transparent 71%);
+  animation: bm-orb-breathe 7s ease-in-out infinite;
+}
+
+.bm-orb-body {
+  position: absolute;
+  inset: 14%;
+  overflow: hidden;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 24%, #f3ffc4 0%, #d0f68b 18%, transparent 53%),
+    radial-gradient(circle at 68% 72%, #50872c 0%, transparent 56%),
+    linear-gradient(142deg, #c5f56c 15%, #aae046 49%, #5a9635 78%, #244d30 100%);
+  box-shadow:
+    inset 1.3cqw 1.3cqw 4cqw rgba(255, 255, 219, 0.42),
+    inset -1.8cqw -3cqw 5.5cqw rgba(20, 64, 28, 0.2),
+    0 2.4cqw 5cqw rgba(28, 67, 34, 0.12);
+  animation: bm-orb-float 6.8s ease-in-out infinite;
+}
+
+.bm-orb-wash {
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 72% 40%, rgba(235, 255, 192, 0.75), transparent 35%),
+    radial-gradient(ellipse at 35% 80%, rgba(63, 110, 38, 0.3), transparent 39%);
+  animation: bm-orb-wash 15s ease-in-out infinite;
+}
+
+.bm-orb-ribbon {
+  position: absolute;
+  width: 123%;
+  height: 49%;
+  border: 1.3cqw solid rgba(228, 255, 177, 0.18);
+  border-top-width: 0.3cqw;
+  border-radius: 50%;
+  transform: rotate(-43deg);
+}
+
+.bm-orb-ribbon-one {
+  top: 21%;
+  left: -19%;
+  box-shadow: 0 1cqw 3cqw rgba(218, 255, 174, 0.13);
+}
+
+.bm-orb-ribbon-two {
+  top: 30%;
+  left: -9%;
+  opacity: 0.55;
+}
+
+.bm-orb-gloss {
+  position: absolute;
+  top: 7%;
+  left: 15%;
+  width: 44%;
+  height: 22%;
+  transform: rotate(-31deg);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 255, 244, 0.86), rgba(255, 255, 226, 0.21) 49%, transparent 72%);
+  filter: blur(0.45cqw);
+}
+
+.bm-orb-rim {
+  position: absolute;
+  inset: 0.8%;
+  border: 1px solid rgba(238, 255, 210, 0.28);
+  border-top-color: rgba(255, 255, 239, 0.62);
+  border-bottom-color: rgba(215, 252, 167, 0.12);
+  border-radius: 50%;
+}
+
+.bm-orb-face {
+  position: absolute;
+  top: 43%;
+  left: 32%;
+  width: 36%;
+  height: 25%;
+  animation: bm-orb-look 12s ease-in-out infinite;
+}
+
+.bm-orb-eye {
+  position: absolute;
+  top: 0;
+  width: 16%;
+  height: 46%;
+  border-radius: 50%;
+  background: linear-gradient(155deg, #103b24, #153b25 60%, #3c6330);
+  box-shadow: 0 0.5cqw 1.2cqw rgba(66, 107, 40, 0.12);
+  animation: bm-orb-blink 7.6s ease-in-out infinite;
+}
+
+.bm-orb-eye:first-child {
+  left: 8%;
+  rotate: -3deg;
+}
+
+.bm-orb-eye:nth-child(2) {
+  right: 8%;
+  rotate: 3deg;
+}
+
+.bm-orb-eye > i {
+  position: absolute;
+  top: 17%;
+  left: 22%;
+  width: 22%;
+  height: 18%;
+  border-radius: 50%;
+  background: rgba(246, 255, 221, 0.72);
+}
+
+.bm-orb-smile {
+  position: absolute;
+  top: 48%;
+  left: 27%;
+  width: 46%;
+  height: 40%;
+  overflow: visible;
+}
+
+.bm-orb-smile > path {
+  stroke: #2a562b;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.bm-orb-shadow {
+  position: absolute;
+  left: 25%;
+  bottom: 6%;
+  width: 50%;
+  height: 7%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(40, 76, 35, 0.18), transparent 70%);
+  filter: blur(1.2cqw);
+  animation: bm-orb-shadow 6.8s ease-in-out infinite;
+}
+
+.bm-orb-orbit {
+  position: absolute;
+  inset: 25% 3%;
+  transform: rotate(-27deg);
+  border: 1px solid rgba(113, 158, 72, 0.17);
+  border-radius: 50%;
+}
+
+.bm-orb-satellite {
+  position: absolute;
+  top: 49%;
+  right: -0.7%;
+  width: 2.2%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #b5e56a;
+  box-shadow: 0 0 1.6cqw rgba(167, 215, 89, 0.35);
+}
+
+.bm-orb-scene[data-bm-orb-active="false"] *,
+.bm-motion[data-bm-motion="off"] .bm-orb-scene * {
+  animation-play-state: paused;
+}
+
+.bm-motion[data-bm-motion="off"] .bm-orb-eye {
+  animation: none;
+  transform: none;
+}
+
+@keyframes bm-orb-float {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50% { transform: translateY(-2.2cqw) rotate(1.5deg); }
+}
+
+@keyframes bm-orb-breathe {
+  0%, 100% { opacity: 0.72; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+@keyframes bm-orb-wash {
+  0%, 100% { transform: rotate(-12deg) scale(1); }
+  50% { transform: rotate(22deg) scale(1.08); }
+}
+
+@keyframes bm-orb-look {
+  0%, 20%, 60%, 100% { transform: translate(0, 0); }
+  30%, 42% { transform: translate(0.7cqw, -0.4cqw); }
+  72%, 83% { transform: translate(-0.4cqw, 0.2cqw); }
+}
+
+@keyframes bm-orb-blink {
+  0%, 44%, 47%, 81%, 84%, 100% { transform: scaleY(1); }
+  45.5%, 82.5% { transform: scaleY(0.12); }
+}
+
+@keyframes bm-orb-shadow {
+  0%, 100% { transform: scaleX(1); opacity: 0.85; }
+  50% { transform: scaleX(0.86); opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-motion:not([data-bm-motion="on"]) [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .bm-motion:not([data-bm-motion="on"]) .bm-orb-scene * {
+    animation: none;
+  }
+}

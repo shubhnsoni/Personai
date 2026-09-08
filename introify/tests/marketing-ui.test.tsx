@@ -70,7 +70,7 @@ describe("marketing FAQ and navigation", () => {
         fireEvent.click(aiSummary)
         expect(ai.open).toBe(true)
         expect(payment.open).toBe(true)
-        expect(within(ai).getByText(/not currently active/)).toBeTruthy()
+        expect(within(ai).getByText(/on our roadmap/)).toBeTruthy()
         fireEvent.click(paymentSummary)
         expect(payment.open).toBe(false)
         expect(ai.open).toBe(true)
