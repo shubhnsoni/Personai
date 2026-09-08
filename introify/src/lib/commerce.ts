@@ -1,0 +1,93 @@
+export type Fulfillment = "DIGITAL" | "PHYSICAL" | "BOTH"
+
+export function isPhysical(fulfillment?: string | null) {
+    return fulfillment === "PHYSICAL" || fulfillment === "BOTH"
+}
+
+export function isDigital(fulfillment?: string | null) {
+    return !fulfillment || fulfillment === "DIGITAL" || fulfillment === "BOTH"
+}
+
+export function stockLabel(stock: number | null | undefined) {
+    if (stock == null) return null
+    if (stock <= 0) return "Sold out"
+    if (stock <= 3) return `${stock} left`
+    return `${stock} in stock`
+}
+
+export function digitsPhone(raw?: string | null) {
+    return (raw || "").replace(/\D/g, "")
+}
+
+export function whatsappHref(phone: string | null | undefined, text: string) {
+    const n = digitsPhone(phone)
+    if (!n) return null
+    return `https://wa.me/${n}?text=${encodeURIComponent(text)}`
+}
+
+function isSellableVariantName(name: string) {
+    if (!name || name.length > 48) return false
+    if (name.startsWith("{") || name.startsWith("[")) return false
+    if (name.includes('"medicine"') || name.includes('"batch"') || name.includes('"grossMg"') || name.includes('"fitment"')) return false
+    return true
+}
+
+export function parseVariants(raw?: string | null): { name: string; stock?: number }[] {
+    if (!raw?.trim()) return []
+    try {
+        const parsed = JSON.parse(raw)
+        const list = Array.isArray(parsed)
+            ? parsed
+            : parsed && typeof parsed === "object" && Array.isArray((parsed as { variants?: unknown }).variants)
+                ? (parsed as { variants: unknown[] }).variants
+                : null
+        if (list) {
+            return list
+                .map((v) => ({ name: String((v as { name?: string }).name || v).trim(), stock: typeof (v as { stock?: number }).stock === "number" ? (v as { stock: number }).stock : undefined }))
+                .filter((v) => isSellableVariantName(v.name))
+        }
+        // Medicine / metal / fitment bags are JSON objects, not a size list.
+        if (parsed && typeof parsed === "object") return []
+    } catch {
+        /* lines */
+    }
+    return raw
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((name) => ({ name }))
+        .filter((v) => isSellableVariantName(v.name))
+}
+
+export function parseGallery(raw?: string | null, fallback?: string | null): string[] {
+    const out: string[] = []
+    if (raw?.trim()) {
+        try {
+            const parsed = JSON.parse(raw)
+            if (Array.isArray(parsed)) {
+                for (const item of parsed) {
+                    const url = typeof item === "string" ? item : item?.url
+                    if (url) out.push(url)
+                }
+            }
+        } catch {
+            if (raw.startsWith("http") || raw.startsWith("/")) out.push(raw)
+        }
+    }
+    if (fallback && !out.includes(fallback)) out.unshift(fallback)
+    return out.filter(Boolean)
+}
+
+export function galleryToJson(urls: string[]) {
+    const clean = urls.filter(Boolean)
+    return clean.length ? JSON.stringify(clean) : null
+}
+
+export function variantsToJson(lines: string) {
+    const items = lines
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((name) => ({ name }))
+    return items.length ? JSON.stringify(items) : null
+}

@@ -1,0 +1,3944 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderChannel {
+  DINE_IN
+  TAKEAWAY
+}
+
+enum OrderStatus {
+  PLACED
+  ACCEPTED
+  PREPARING
+  READY
+  SERVED
+  PAID
+  CANCELLED
+}
+
+enum OrderLineStatus {
+  QUEUED
+  PREPARING
+  READY
+  SERVED
+}
+
+enum OrderPayMethod {
+  UPI
+  COD
+  WHATSAPP
+  STRIPE
+}
+
+enum OrderPayStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+enum OrderEventActor {
+  GUEST
+  STAFF
+  SYSTEM
+}
+
+enum OrderEventKind {
+  CREATED
+  ORDER_STATUS
+  LINE_STATUS
+  PAYMENT_STATUS
+  BACKFILL
+}
+
+enum OfferReviewStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+}
+
+enum ProfileImageCategory {
+  AMBIENCE
+  INTERIOR
+  FOOD
+  TEAM
+  EVENT
+}
+
+/// Reservation lifecycle. Terminal states are COMPLETED, CANCELLED and NO_SHOW.
+/// Transitions are enforced in src/lib/reservations, not by the database alone.
+enum ReservationStatus {
+  REQUESTED
+  HELD
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ReservationEventKind {
+  CREATED
+  STATUS
+  HOLD_EXPIRED
+}
+
+/// Deliberately separate from OrderEventActor so the existing order enum is not
+/// widened or otherwise modified.
+enum ReservationEventActor {
+  GUEST
+  STAFF
+  SYSTEM
+}
+
+/// Assignable appointment capacity: a person, a room, or a piece of equipment.
+/// One vocabulary for coaching, consulting, CA practice, salon, events, real estate
+/// and pet care, so no industry gets a forked booking system.
+enum AppointmentResourceKind {
+  STAFF
+  ROOM
+  EQUIPMENT
+}
+
+enum AppointmentWaitlistStatus {
+  WAITING
+  OFFERED
+  CONVERTED
+  EXPIRED
+  CANCELLED
+}
+
+/// Deposit intent state. NONE means the service does not take a deposit; it is
+/// modelled explicitly rather than by a null row so the absence is deliberate.
+enum AppointmentDepositState {
+  NONE
+  REQUIRED
+  AUTHORIZED
+  CAPTURED
+  REFUNDED
+  FORFEITED
+  FAILED
+}
+
+enum AppointmentReminderChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum AppointmentReminderState {
+  SCHEDULED
+  SENT
+  FAILED
+  CANCELLED
+  SUPPRESSED
+}
+
+enum AppointmentEventKind {
+  CREATED
+  STATUS
+  DEPOSIT
+  REMINDER
+  WAITLIST
+}
+
+enum AppointmentEventActor {
+  GUEST
+  STAFF
+  SYSTEM
+}
+
+model User {
+  id                     String   @id @default(cuid())
+  clerkId                String   @unique // Map to Clerk User ID
+  email                  String   @unique
+  name                   String?
+  image                  String?
+  role                   String   @default("CREATOR") // "CREATOR" | "ADMIN"
+  stripeConnectAccountId String? // Stripe Connect account for payouts
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  profiles      Profile[]
+  notifications Notification[]
+}
+
+model Profile {
+  id                     String                  @id @default(cuid())
+  userId                 String
+  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug                   String                  @unique
+  linkStyle              String                  @default("PATH") // "PATH" | "SUBDOMAIN"
+  displayName            String
+  headline               String?
+  bio                    String?
+  roleTemplate           String                  @default("CUSTOM") // Enum as String
+  primaryGoal            String                  @default("BOOK_CALL") // Enum as String
+  language               String                  @default("en")
+  timezone               String                  @default("UTC")
+  themeColor             String                  @default("#000000")
+  imageUrl               String?
+  shopLogoUrl            String?
+  whatsapp               String?
+  upiId                  String?
+  gstin                  String?
+  deliveryNote           String?
+  chatAvatarMode         String                  @default("ORB") // "ORB" | "IMAGE"
+  animationStyleId       String?
+  animationStyle         WelcomeAnimationPreset? @relation(fields: [animationStyleId], references: [id])
+  isPublic               Boolean                 @default(false)
+  showInDirectory        Boolean                 @default(false)
+  welcomeMessageOverride String?
+  contentDisplayMode     String                  @default("POPUP") // "SIDE_PANEL" | "POPUP"
+  personalityConfig      String? // JSON: {tone, customInstructions, responseLength, language}
+  aiModel                String                  @default("gpt-4o-mini") // "gpt-4o-mini" | "gpt-4o"
+  autoMemoryEnabled      Boolean                 @default(false)
+  liveChatEnabled        Boolean                 @default(false)
+  liveChatSlaMinutes     Int                     @default(10)
+  aiProviderOverride     String?
+  suspendedAt            DateTime?
+  bufferMinutes          Int                     @default(0)
+  calendarToken          String?                 @unique
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  documents         ProfileDocument[]
+  serviceOfferings  ServiceOffering[]
+  bookings          Booking[]
+  conversations     Conversation[]
+  payments          Payment[]
+  leads             VisitorLead[]
+  availability      AvailabilitySchedule[]
+  calendarOverrides CalendarOverride[]
+  workExperiences   WorkExperience[]
+  projects          Project[]
+  digitalProducts   DigitalProduct[]
+  courses           Course[]
+  events            Event[]
+  communities       Community[]
+  leadMagnets       LeadMagnet[]
+  shortLinks        ShortLink[]
+  analyticsEvents   ProfileEvent[]
+  restaurantOrders  Order[]
+  restaurantTables  RestaurantTable[]
+  orderCounters     OrderCounter[]
+  profileImages     ProfileImage[]
+  restaurantReviews OfferReview[]
+  reservations      Reservation[]
+  arBuilds          ArBuild[]
+
+  appointmentResources AppointmentResource[]
+  appointmentWaitlist  AppointmentWaitlistEntry[]
+  appointmentDeposits  AppointmentDeposit[]
+  appointmentReminders AppointmentReminder[]
+  Cohort               Cohort[]
+  InventoryItem        InventoryItem[]
+  ProductVariant       ProductVariant[]
+  Fulfilment           Fulfilment[]
+  ReturnRequest        ReturnRequest[]
+  CommerceEvent        CommerceEvent[]
+  CourseAccessLevel    CourseAccessLevel[]
+  FieldJobRequest      FieldJobRequest[]
+  FieldJob             FieldJob[]
+
+  fieldJobInspectionTemplates FieldJobInspectionTemplate[]
+  fieldJobInspections         FieldJobInspection[]
+  BlueprintInstallation       BlueprintInstallation[]
+  partyAccounts               PartyAccount[]
+  metalLots                   MetalLot[]
+  metalBills                  MetalBill[]
+  metalPayments               MetalPayment[]
+  visitorSessions             VisitorSession[]
+  moneyEvents                 MoneyEvent[]
+}
+
+model ProfileEvent {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name      String
+  path      String?
+  ref       String?
+  visitor   String?
+  meta      String?
+  createdAt DateTime @default(now())
+
+  @@index([profileId, createdAt])
+  @@index([profileId, name, createdAt])
+}
+
+model PlatformConfig {
+  id        String   @id @default("platform")
+  aiJson    String   @default("{}")
+  opsJson   String   @default("{}")
+  updatedAt DateTime @updatedAt
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actorUserId String
+  action      String
+  profileId   String?
+  meta        String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([profileId, createdAt])
+}
+
+model VisitorSession {
+  id           String            @id @default(cuid())
+  profileId    String
+  profile      Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  visitorId    String
+  startedAt    DateTime          @default(now())
+  lastSeenAt   DateTime          @default(now())
+  endedAt      DateTime?
+  landPath     String?
+  landRef      String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  referrerHost String?
+  country      String?
+  region       String?
+  device       String?
+  visitorEmail String?
+  pages        VisitorPageview[]
+
+  @@index([profileId, lastSeenAt])
+  @@index([profileId, visitorId, lastSeenAt])
+}
+
+model VisitorPageview {
+  id        String         @id @default(cuid())
+  sessionId String
+  session   VisitorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  path      String
+  enteredAt DateTime       @default(now())
+  leftAt    DateTime?
+  ms        Int?
+
+  @@index([sessionId, enteredAt])
+}
+
+model AiCallLog {
+  id        String   @id @default(cuid())
+  profileId String?
+  provider  String
+  model     String
+  ok        Boolean
+  ms        Int
+  errorCode String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([provider, createdAt])
+}
+
+model MoneyEvent {
+  id           String   @id @default(cuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  kind         String
+  subjectId    String
+  amountCents  Int
+  currency     String   @default("USD")
+  payMethod    String?
+  payStatus    String
+  visitorEmail String?
+  createdAt    DateTime @default(now())
+
+  @@unique([kind, subjectId])
+  @@index([createdAt])
+  @@index([profileId, createdAt])
+  @@index([payStatus, createdAt])
+}
+
+model CapacitySample {
+  id              String   @id @default(cuid())
+  at              DateTime @default(now())
+  liveVisitors    Int
+  heartbeatQps    Float
+  liveChatPollQps Float
+  llmCalls5m      Int
+  llmErrors5m     Int
+  dbMs            Int
+  band            String
+
+  @@index([at])
+}
+
+model WorkExperience {
+  id           String   @id @default(cuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  company      String
+  role         String
+  startDate    String // e.g. "2022" or "Jan 2022"
+  endDate      String? // null = Present
+  description  String?
+  achievements String? // JSON string array
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  client      String?
+  year        String?
+  imageUrl    String?
+  link        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WelcomeAnimationPreset {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  config      String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profiles Profile[]
+}
+
+model ProfileDocument {
+  id                  String                @id @default(cuid())
+  profileId           String
+  profile             Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  type                String // Enum
+  title               String
+  sourceType          String // Enum
+  url                 String?
+  filePath            String?
+  rawText             String?
+  embedding           Float[] // OpenAI embedding vector
+  embeddingMetadata   String? // Json
+  visitorKey          String?
+  memberId            String?
+  conversationId      String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  CaseDeliverable     CaseDeliverable[]
+  CaseDocumentRequest CaseDocumentRequest[]
+  CohortSubmission    CohortSubmission[]
+  CohortCertificate   CohortCertificate[]
+
+  @@index([profileId, visitorKey])
+}
+
+model ServiceOffering {
+  id                String   @id @default(cuid())
+  profileId         String
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  priceCents        Int      @default(0)
+  currency          String   @default("USD")
+  isFree            Boolean  @default(false)
+  durationMinutes   Int      @default(30)
+  isActive          Boolean  @default(true)
+  isRecurring       Boolean  @default(false)
+  packageSessions   Int      @default(1)
+  maxBookingsPerDay Int?
+  kind              String   @default("SESSION") // "SESSION" | "TABLE"
+  covers            Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  bookings          Booking[]
+  eligibleResources ServiceResource[]
+  waitlistEntries   AppointmentWaitlistEntry[]
+  FieldJobRequest   FieldJobRequest[]
+  FieldJob          FieldJob[]
+
+  fieldJobInspectionTemplates FieldJobInspectionTemplate[]
+}
+
+/// Appointment booking.
+///
+/// EVOLVED, NOT REPLACED. Every column added by Wave B is nullable or defaulted, so
+/// the pre-existing rows and the pre-existing booking flow stay valid.
+///
+/// `status` is deliberately left as `String`. It is `text NOT NULL` in the live
+/// schema with real data in it, so converting it to a Prisma enum would be a
+/// breaking change rather than an additive one. The canonical vocabulary and the
+/// legal transitions live in src/lib/appointments/lifecycle.ts, which validates on
+/// the way in. A future migration may tighten the column once legacy values are
+/// audited; until then TypeScript is the single source of truth and the exclusion
+/// constraint below references the same literals.
+model Booking {
+  id                String          @id @default(cuid())
+  profileId         String
+  profile           Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  visitorId         String?
+  visitorName       String
+  visitorEmail      String
+  memberId          String?
+  member            Member?         @relation(fields: [memberId], references: [id])
+  serviceOfferingId String
+  serviceOffering   ServiceOffering @relation(fields: [serviceOfferingId], references: [id])
+  startTime         DateTime
+  endTime           DateTime
+  status            String          @default("PENDING_PAYMENT") // vocabulary owned by src/lib/appointments/lifecycle.ts
+  paymentId         String?         @unique
+  payment           Payment?        @relation(fields: [paymentId], references: [id])
+  metadata          String? // Json
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // ---- Wave B additive appointment fields ----
+  resourceId     String?
+  resource       AppointmentResource? @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  locationId     String?
+  location       Location?            @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  idempotencyKey String?
+  partySize      Int                  @default(1)
+  holdExpiresAt  DateTime?
+  confirmedAt    DateTime?
+  checkedInAt    DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  noShowAt       DateTime?
+  cancelReason   String?
+
+  deposit           AppointmentDeposit?
+  reminders         AppointmentReminder[]
+  appointmentEvents AppointmentEvent[]
+  waitlistOffers    AppointmentWaitlistEntry[]
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, startTime])
+  @@index([profileId, status])
+  @@index([resourceId, startTime])
+}
+
+/// A person, room, or piece of equipment that an appointment can consume.
+model AppointmentResource {
+  id         String                  @id @default(cuid())
+  profileId  String
+  profile    Profile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  locationId String?
+  location   Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  name       String
+  kind       AppointmentResourceKind @default(STAFF)
+  /// Simultaneous appointments this resource can hold. NULL means unknown, which the
+  /// engine treats as fail-closed rather than unlimited.
+  capacity   Int?
+  isActive   Boolean                 @default(true)
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  bookings           Booking[]
+  services           ServiceResource[]
+  waitlistEntries    AppointmentWaitlistEntry[]
+  FieldJobAssignment FieldJobAssignment[]
+
+  @@unique([profileId, name])
+  @@index([profileId, isActive])
+}
+
+/// Which resources are eligible to deliver which service.
+model ServiceResource {
+  serviceOfferingId String
+  serviceOffering   ServiceOffering     @relation(fields: [serviceOfferingId], references: [id], onDelete: Cascade)
+  resourceId        String
+  resource          AppointmentResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@id([serviceOfferingId, resourceId])
+  @@index([resourceId])
+}
+
+model AppointmentWaitlistEntry {
+  id                String                    @id @default(cuid())
+  profileId         String
+  profile           Profile                   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  serviceOfferingId String
+  serviceOffering   ServiceOffering           @relation(fields: [serviceOfferingId], references: [id], onDelete: Cascade)
+  resourceId        String?
+  resource          AppointmentResource?      @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  requestedStart    DateTime
+  requestedEnd      DateTime
+  partySize         Int                       @default(1)
+  guestName         String
+  guestEmail        String?
+  guestPhone        String?
+  status            AppointmentWaitlistStatus @default(WAITING)
+  offeredBookingId  String?
+  offeredBooking    Booking?                  @relation(fields: [offeredBookingId], references: [id], onDelete: SetNull)
+  offerExpiresAt    DateTime?
+  idempotencyKey    String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status, requestedStart])
+  @@index([serviceOfferingId, status])
+}
+
+model AppointmentDeposit {
+  id             String                  @id @default(cuid())
+  bookingId      String                  @unique
+  booking        Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  profileId      String
+  profile        Profile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  amountCents    Int
+  currency       String                  @default("USD")
+  state          AppointmentDepositState @default(REQUIRED)
+  /// Opaque reference from the payment provider. No provider is called by this wave.
+  providerRef    String?
+  idempotencyKey String?
+  failureCode    String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, state])
+}
+
+model AppointmentReminder {
+  id           String                     @id @default(cuid())
+  bookingId    String
+  booking      Booking                    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  profileId    String
+  profile      Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  channel      AppointmentReminderChannel
+  sendAt       DateTime
+  state        AppointmentReminderState   @default(SCHEDULED)
+  attempts     Int                        @default(0)
+  lastError    String?
+  dispatchedAt DateTime?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  /// One reminder per booking, channel and moment. This is what makes reminder
+  /// scheduling idempotent under replay.
+  @@unique([bookingId, channel, sendAt])
+  @@index([state, sendAt])
+  @@index([profileId, state])
+}
+
+/// Append-only appointment ledger. UPDATE and DELETE are refused by trigger, reusing
+/// reject_append_only_mutation() from 20260827140000_phase0_foundations.
+model AppointmentEvent {
+  id        String                @id @default(cuid())
+  bookingId String
+  booking   Booking               @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seq       BigInt                @default(autoincrement())
+  kind      AppointmentEventKind
+  from      String?
+  to        String
+  actor     AppointmentEventActor
+  actorId   String?
+  metadata  Json?
+  at        DateTime              @default(now())
+
+  @@index([bookingId, seq])
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  profileId         String
+  profile           Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  bookingId         String?         @unique
+  booking           Booking?
+  amountCents       Int
+  currency          String
+  status            String          @default("PENDING") // Enum
+  provider          String          @default("STRIPE") // Enum
+  providerPaymentId String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  ReturnRequest     ReturnRequest[]
+}
+
+model Conversation {
+  id                  String    @id @default(cuid())
+  profileId           String
+  profile             Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  visitorId           String?
+  visitorName         String?
+  visitorEmail        String?
+  memberId            String?
+  member              Member?   @relation(fields: [memberId], references: [id])
+  source              String    @default("PROFILE_PAGE") // Enum
+  leadStatus          String    @default("NEW") // Enum
+  notes               String?
+  mode                String    @default("AI") // "AI" | "LIVE_REQUESTED" | "LIVE"
+  liveRequestedAt     DateTime?
+  liveRespondedAt     DateTime?
+  lastSummarizedMsgId String?
+  startedAt           DateTime  @default(now())
+  endedAt             DateTime?
+  lastMessageAt       DateTime  @default(now())
+
+  messages     Message[]
+  visitorLeads VisitorLead[]
+
+  @@index([profileId, visitorId])
+  @@index([profileId, mode])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderType     String // Enum
+  text           String
+  role           String
+  createdAt      DateTime     @default(now())
+}
+
+model VisitorLead {
+  id             String        @id @default(cuid())
+  profileId      String
+  profile        Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+  name           String
+  email          String
+  company        String?
+  budgetRange    String?
+  status         String        @default("NEW") // Enum
+  tags           String? // Json
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model AdminSettings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String // Json
+}
+
+model AvailabilitySchedule {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  dayOfWeek Int // 0-6 (Sun-Sat)
+  startTime String // "09:00"
+  endTime   String // "17:00"
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CalendarOverride {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date      DateTime
+  isBlocked Boolean  @default(true)
+  startTime String?
+  endTime   String?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId, date])
+}
+
+// ==================== SuperProfile-like Features ====================
+
+model DigitalProduct {
+  id             String   @id @default(cuid())
+  profileId      String
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  type           String   @default("OTHER") // "PDF" | "VIDEO" | "AUDIO" | "OTHER" | "PHYSICAL"
+  fileUrl        String?
+  thumbnailUrl   String?
+  subtitle       String?
+  body           String?
+  compareAtCents Int?
+  highlights     String?
+  galleryUrls    String?
+  fulfillment    String   @default("DIGITAL") // "DIGITAL" | "PHYSICAL" | "BOTH"
+  stock          Int?
+  sku            String?
+  weightGrams    Int?
+  allowCod       Boolean  @default(false)
+  category       String?
+  diet           String?
+  spiceLevel     Int?
+  serveWindow    String?
+  prepMinutes    Int?
+  arModelUrl     String?
+  arUsdzUrl      String?
+  variantsJson   String?
+  shipMode       String   @default("NONE") // "NONE" | "PICKUP" | "DELIVER" | "BOTH"
+  shipFeeCents   Int      @default(0)
+  priceCents     Int      @default(0)
+  currency       String   @default("USD")
+  isActive       Boolean  @default(true)
+  downloadCount  Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  purchases      ProductPurchase[]
+  reviews        OfferReview[]
+  arBuilds       ArBuild[]
+  orderLines     OrderLine[]
+  InventoryItem  InventoryItem[]
+  ProductOption  ProductOption[]
+  ProductVariant ProductVariant[]
+  metalLots      MetalLot[]
+}
+
+model Course {
+  id             String   @id @default(cuid())
+  profileId      String
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  thumbnailUrl   String?
+  subtitle       String?
+  body           String?
+  outcomes       String?
+  level          String   @default("ALL")
+  compareAtCents Int?
+  priceCents     Int      @default(0)
+  currency       String   @default("USD")
+  isActive       Boolean  @default(true)
+  isPublished    Boolean  @default(false)
+  totalModules   Int      @default(0)
+  totalLessons   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  modules           CourseModule[]
+  enrollments       CourseEnrollment[]
+  Cohort            Cohort[]
+  CourseAccessLevel CourseAccessLevel[]
+  CourseAccessEvent CourseAccessEvent[]
+}
+
+model CourseModule {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lessons CourseLesson[]
+}
+
+model CourseLesson {
+  id                 String              @id @default(cuid())
+  moduleId           String
+  module             CourseModule        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  contentType        String              @default("VIDEO") // "VIDEO" | "TEXT" | "PDF"
+  contentUrl         String?
+  videoUrl           String?
+  body               String?
+  fileUrl            String?
+  durationMinutes    Int                 @default(0)
+  orderIndex         Int                 @default(0)
+  isFree             Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  CourseLessonAccess CourseLessonAccess?
+}
+
+model Event {
+  id           String   @id @default(cuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  eventType    String   @default("WEBINAR") // "WEBINAR" | "WORKSHOP" | "MEETUP"
+  thumbnailUrl String?
+  startTime    DateTime
+  endTime      DateTime
+  timezone     String   @default("UTC")
+  location     String? // For offline events
+  meetingUrl   String? // For online events
+  priceCents   Int      @default(0)
+  currency     String   @default("USD")
+  isFree       Boolean  @default(false)
+  maxAttendees Int?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  registrations EventRegistration[]
+}
+
+model Community {
+  id           String   @id @default(cuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  platform     String   @default("TELEGRAM") // "TELEGRAM" | "DISCORD"
+  inviteLink   String?
+  priceCents   Int      @default(0)
+  currency     String   @default("USD")
+  billingCycle String   @default("MONTHLY") // "MONTHLY" | "YEARLY" | "ONE_TIME"
+  isActive     Boolean  @default(true)
+  memberCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  members CommunityMember[]
+}
+
+model LeadMagnet {
+  id            String   @id @default(cuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  type          String   @default("DOWNLOAD") // "FORM" | "GIVEAWAY" | "DOWNLOAD"
+  fileUrl       String?
+  formFields    String? // JSON array of form field definitions
+  isActive      Boolean  @default(true)
+  downloadCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  submissions LeadMagnetSubmission[]
+}
+
+model ShortLink {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  code      String   @unique // Unique short code for the link
+  targetUrl String
+  title     String?
+  clicks    Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Member {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  name       String?
+  imageUrl   String?
+  clerkId    String?  @unique
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sessions      MemberSession[]
+  libraryLinks  LibraryLink[]
+  purchases     ProductPurchase[]
+  enrollments   CourseEnrollment[]
+  events        EventRegistration[]
+  communities   CommunityMember[]
+  bookings      Booking[]
+  conversations Conversation[]
+}
+
+model MemberSession {
+  id        String   @id @default(cuid())
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model LibraryLink {
+  id        String    @id @default(cuid())
+  memberId  String
+  member    Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model ProductPurchase {
+  id             String         @id @default(cuid())
+  productId      String
+  product        DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  memberId       String?
+  member         Member?        @relation(fields: [memberId], references: [id])
+  visitorEmail   String
+  visitorName    String?
+  paymentId      String?
+  status         String         @default("PENDING") // "PENDING" | "COMPLETED" | "REFUNDED"
+  payMethod      String?
+  buyerNote      String?
+  address        String?
+  confirmedAt    DateTime?
+  downloadToken  String?        @unique
+  downloadExpiry DateTime?
+  downloadedAt   DateTime?
+  createdAt      DateTime       @default(now())
+}
+
+model OfferReview {
+  id             String            @id @default(cuid())
+  productId      String?
+  product        DigitalProduct?   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  profileId      String?
+  profile        Profile?          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  orderId        String?
+  order          Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  rating         Int
+  text           String?
+  imageUrl       String?
+  visitorName    String
+  status         OfferReviewStatus @default(PUBLISHED)
+  ownerReply     String?
+  ownerRepliedAt DateTime?
+  createdAt      DateTime          @default(now())
+
+  @@index([productId, status, createdAt])
+  @@index([profileId, status, createdAt])
+  @@index([orderId])
+}
+
+model Order {
+  id             String           @id @default(cuid())
+  profileId      String
+  profile        Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  publicToken    String           @unique
+  idempotencyKey String?
+  legacyGroupKey String?          @unique
+  number         Int
+  businessDate   DateTime         @db.Date
+  channel        OrderChannel     @default(DINE_IN)
+  tableId        String?
+  table          RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  tableLabel     String?
+  status         OrderStatus      @default(PLACED)
+  guestName      String?
+  guestPhone     String?
+  guestEmail     String?
+  note           String?
+  subtotalCents  Int
+  taxCents       Int              @default(0)
+  totalCents     Int
+  currency       String
+  payMethod      OrderPayMethod?
+  payStatus      OrderPayStatus   @default(UNPAID)
+  paidAt         DateTime?
+  paidBy         String?
+  paymentRef     String?
+  placedAt       DateTime         @default(now())
+  acceptedAt     DateTime?
+  preparingAt    DateTime?
+  readyAt        DateTime?
+  dueAt          DateTime?
+  staffNote      String?
+  servedAt       DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  updatedAt      DateTime         @updatedAt
+
+  lines             OrderLine[]
+  events            OrderEvent[]
+  reviews           OfferReview[]
+  InventoryMovement InventoryMovement[]
+  Fulfilment        Fulfilment[]
+  ReturnRequest     ReturnRequest[]
+  CommerceEvent     CommerceEvent[]
+
+  @@unique([profileId, businessDate, number])
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status])
+  @@index([profileId, placedAt])
+  @@index([publicToken, status])
+}
+
+model OrderLine {
+  id                String          @id @default(cuid())
+  orderId           String
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId         String?
+  product           DigitalProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  titleSnapshot     String
+  skuSnapshot       String?
+  qty               Int
+  unitPriceCents    Int
+  unitModifierCents Int             @default(0)
+  modifiers         Json?
+  modifiersLabel    String?
+  lineTotalCents    Int
+  status            OrderLineStatus @default(QUEUED)
+  legacyPurchaseId  String?         @unique
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  events               OrderEvent[]
+  InventoryMovement    InventoryMovement[]
+  InventoryReservation InventoryReservation?
+  FulfilmentItem       FulfilmentItem[]
+  ReturnItem           ReturnItem[]
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderEvent {
+  id          String          @id @default(cuid())
+  orderId     String
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderLineId String?
+  orderLine   OrderLine?      @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+  seq         BigInt          @default(autoincrement())
+  kind        OrderEventKind
+  from        String?
+  to          String
+  actor       OrderEventActor
+  actorId     String?
+  metadata    Json?
+  at          DateTime        @default(now())
+
+  @@index([orderId, seq])
+  @@index([orderLineId, seq])
+}
+
+model RestaurantTable {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  label     String
+  seats     Int?
+  zone      String?
+  code      String   @unique
+  isActive   Boolean  @default(true)
+  isReserved Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  scans     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders       Order[]
+  reservations Reservation[]
+
+  @@unique([profileId, label])
+  @@index([profileId, isActive, sortOrder])
+}
+
+/// A table booking held against a real RestaurantTable.
+///
+/// Tenancy: profileId, matching RestaurantTable/Order/OrderCounter rather than
+/// introducing a second tenant key. Platform API access resolves workspace
+/// membership to Workspace.profileId (already @unique) and requires it to equal
+/// this profileId, which is what makes venue isolation checkable.
+///
+/// Overlap prevention is enforced two ways: a transactional row lock on the
+/// parent RestaurantTable in src/lib/reservations, plus a Postgres exclusion
+/// constraint added by the migration as defense-in-depth. Neither is sufficient
+/// alone: the constraint cannot express "non-terminal only" through Prisma, and
+/// the row lock alone would not survive a direct SQL writer.
+model Reservation {
+  id             String            @id @default(cuid())
+  profileId      String
+  profile        Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  tableId        String
+  table          RestaurantTable   @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  idempotencyKey String?
+  partySize      Int
+  startAt        DateTime
+  endAt          DateTime
+  status         ReservationStatus @default(REQUESTED)
+  guestName      String
+  guestPhone     String?
+  guestEmail     String?
+  note           String?
+  holdExpiresAt  DateTime?
+  confirmedAt    DateTime?
+  seatedAt       DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  noShowAt       DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  events ReservationEvent[]
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status])
+  @@index([profileId, startAt])
+  @@index([tableId, startAt])
+}
+
+/// Append-only reservation ledger. UPDATE and DELETE are refused by database
+/// trigger using the existing reject_append_only_mutation() function created by
+/// 20260827140000_phase0_foundations.
+model ReservationEvent {
+  id            String                @id @default(cuid())
+  reservationId String
+  reservation   Reservation           @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  seq           BigInt                @default(autoincrement())
+  kind          ReservationEventKind
+  from          String?
+  to            String
+  actor         ReservationEventActor
+  actorId       String?
+  metadata      Json?
+  at            DateTime              @default(now())
+
+  @@index([reservationId, seq])
+}
+
+model OrderCounter {
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  businessDate DateTime @db.Date
+  value        Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@id([profileId, businessDate])
+}
+
+model ProfileImage {
+  id          String               @id @default(cuid())
+  profileId   String
+  profile     Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  url         String
+  title       String?
+  caption     String?
+  body        String?
+  category    ProfileImageCategory @default(AMBIENCE)
+  sortOrder   Int                  @default(0)
+  isPublished Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+
+  @@index([profileId, sortOrder])
+}
+
+/// Photoreal 3D jobs. Provider ids stay server-only.
+model ArBuild {
+  id               String         @id
+  profileId        String
+  profile          Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  productId        String
+  product          DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  batchId          String
+  imageUrl         String
+  status           String
+  providerTaskId   String?
+  glbUrl           String?
+  usdzUrl          String?
+  credits          Int
+  costCents        Int
+  chargeCents      Int
+  stripeSessionId  String?
+  error            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([batchId])
+  @@index([profileId, createdAt])
+}
+
+model CourseEnrollment {
+  id             String    @id @default(cuid())
+  courseId       String
+  course         Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  memberId       String?
+  member         Member?   @relation(fields: [memberId], references: [id])
+  visitorEmail   String
+  visitorName    String?
+  paymentId      String?
+  status         String    @default("PENDING") // "PENDING" | "ACTIVE" | "COMPLETED" | "CANCELLED"
+  progress       String? // JSON object tracking lesson completion
+  /// Wave D: additive and nullable. Enrolment had no idempotency key, so a retried
+  /// enrolment created a duplicate row. NULLs are distinct in Postgres, so the unique
+  /// index below constrains only rows that actually carry a key.
+  idempotencyKey String?
+  enrolledAt     DateTime  @default(now())
+  completedAt    DateTime?
+
+  lessonCompletions LessonCompletion[]
+  CohortMembership  CohortMembership[]
+  CourseAccessGrant CourseAccessGrant?
+
+  @@unique([courseId, idempotencyKey])
+}
+
+model LessonCompletion {
+  id           String           @id @default(cuid())
+  enrollmentId String
+  enrollment   CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lessonId     String
+  completedAt  DateTime         @default(now())
+
+  @@unique([enrollmentId, lessonId])
+}
+
+model EventRegistration {
+  id           String    @id @default(cuid())
+  eventId      String
+  event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  memberId     String?
+  member       Member?   @relation(fields: [memberId], references: [id])
+  visitorEmail String
+  visitorName  String?
+  paymentId    String?
+  status       String    @default("REGISTERED") // "REGISTERED" | "ATTENDED" | "CANCELLED"
+  attendedAt   DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model CommunityMember {
+  id                 String    @id @default(cuid())
+  communityId        String
+  community          Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  memberId           String?
+  member             Member?   @relation(fields: [memberId], references: [id])
+  visitorEmail       String
+  visitorName        String?
+  paymentId          String?
+  status             String    @default("ACTIVE") // "ACTIVE" | "EXPIRED" | "CANCELLED"
+  subscriptionEndsAt DateTime?
+  createdAt          DateTime  @default(now())
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+model LeadMagnetSubmission {
+  id           String     @id @default(cuid())
+  leadMagnetId String
+  leadMagnet   LeadMagnet @relation(fields: [leadMagnetId], references: [id], onDelete: Cascade)
+  visitorEmail String
+  visitorName  String?
+  formData     String? // JSON object with form field values
+  createdAt    DateTime   @default(now())
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+  SALES
+  WAREHOUSE
+  ACCOUNTS
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  profileId String?  @unique
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  locations   Location[]
+  memberships Membership[]
+
+  caseIntakes  CaseIntake[]
+  caseProjects CaseProject[]
+  contacts     Contact[]
+  workflowRuns WorkflowRun[]
+  CaseRetainer CaseRetainer[]
+
+  blueprintInstallations BlueprintInstallation[]
+
+  @@index([profileId])
+}
+
+model Location {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  timezone    String    @default("UTC")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  membershipLocations MembershipLocation[]
+
+  caseProjects         CaseProject[]
+  bookings             Booking[]
+  appointmentResources AppointmentResource[]
+  CohortSession        CohortSession[]
+  InventoryItem        InventoryItem[]
+  Fulfilment           Fulfilment[]
+  FieldJob             FieldJob[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model Membership {
+  id          String         @id @default(cuid())
+  workspaceId String
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  role        MembershipRole
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  membershipLocations MembershipLocation[]
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId, role])
+}
+
+model MembershipLocation {
+  membershipId String
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  locationId   String
+  location     Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([membershipId, locationId])
+  @@index([locationId])
+}
+
+model Contact {
+  id          String     @id @default(cuid())
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  profileId   String?
+  displayName String?
+  email       String?
+  phone       String?
+  confidence  String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  caseIntakes  CaseIntake[]
+  caseProjects CaseProject[]
+  sourceLinks  ContactSourceLink[]
+  activities   ActivityEvent[]
+  CaseRetainer CaseRetainer[]
+  partyAccount PartyAccount?
+
+  @@index([workspaceId, email])
+  @@index([workspaceId, phone])
+  @@index([profileId, email])
+  @@index([profileId, phone])
+}
+
+model ContactSourceLink {
+  id         String   @id @default(cuid())
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  sourceKind String
+  sourceId   String
+  profileId  String?
+  observedAt DateTime
+
+  @@unique([sourceKind, sourceId])
+  @@index([contactId])
+  @@index([profileId])
+}
+
+model ActivityEvent {
+  id         String    @id
+  contactId  String
+  contact    Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  profileId  String?
+  type       String
+  sourceKind String
+  sourceId   String
+  occurredAt DateTime?
+  summary    String
+  metadata   String?
+  createdAt  DateTime  @default(now())
+
+  @@index([contactId, occurredAt, id])
+  @@index([profileId, occurredAt, id])
+  @@index([sourceKind, sourceId])
+}
+
+model TaskJob {
+  id               String             @id @default(cuid())
+  idempotencyKey   String?            @unique
+  payload          String
+  state            String
+  attempts         Int                @default(0)
+  maxAttempts      Int
+  nextAttemptAt    DateTime
+  leaseExpiresAt   DateTime?
+  leaseToken       String?
+  lastError        String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  CaseTaskLink     CaseTaskLink[]
+  CohortMembership CohortMembership[]
+
+  @@index([state, nextAttemptAt])
+}
+
+model WorkflowRun {
+  id             String     @id @default(cuid())
+  workspaceId    String?
+  workspace      Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  profileId      String?
+  workflowKey    String
+  workflowName   String
+  state          String
+  idempotencyKey String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  completedAt    DateTime?
+  failureCode    String?
+  failureDetail  String?
+
+  agentRuns   AgentRun[]
+  steps       WorkflowStep[]
+  approvals   Approval[]
+  auditEvents CopilotAuditEvent[]
+
+  @@unique([profileId, idempotencyKey])
+  @@index([workspaceId, state, createdAt])
+  @@index([profileId, state, createdAt])
+  @@index([state, updatedAt])
+}
+
+model AgentRun {
+  id            String      @id @default(cuid())
+  workflowRunId String
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  agentKey      String
+  state         String
+  attempt       Int         @default(1)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  failureCode   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  auditEvents CopilotAuditEvent[]
+
+  @@index([workflowRunId, createdAt])
+  @@index([state, updatedAt])
+}
+
+model WorkflowStep {
+  id            String      @id @default(cuid())
+  workflowRunId String
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  ordinal       Int
+  label         String
+  state         String
+  startedAt     DateTime?
+  completedAt   DateTime?
+  inputJson     Json?
+  resultJson    Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  toolCalls ToolCall[]
+  approvals Approval[]
+
+  @@unique([workflowRunId, ordinal])
+  @@index([workflowRunId, state, ordinal])
+}
+
+model ToolCall {
+  id             String       @id @default(cuid())
+  workflowStepId String
+  workflowStep   WorkflowStep @relation(fields: [workflowStepId], references: [id], onDelete: Cascade)
+  ordinal        Int
+  toolName       String
+  inputJson      Json
+  outputJson     Json?
+  state          String
+  startedAt      DateTime?
+  completedAt    DateTime?
+  errorCode      String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([workflowStepId, ordinal])
+  @@index([workflowStepId, createdAt])
+}
+
+model Approval {
+  id               String             @id @default(cuid())
+  workflowRunId    String
+  workflowRun      WorkflowRun        @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowStepId   String?
+  workflowStep     WorkflowStep?      @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
+  reason           String
+  state            String
+  requestedBy      String
+  requestedAt      DateTime           @default(now())
+  decidedBy        String?
+  decidedAt        DateTime?
+  decisionNote     String?
+  CaseApprovalLink CaseApprovalLink[]
+
+  @@index([workflowRunId, state, requestedAt])
+  @@index([workflowStepId])
+  @@index([state, requestedAt])
+}
+
+model CopilotAuditEvent {
+  id            String      @id @default(cuid())
+  workflowRunId String
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  agentRunId    String?
+  agentRun      AgentRun?   @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  sequence      Int
+  eventType     String
+  actorType     String
+  actorId       String?
+  occurredAt    DateTime    @default(now())
+  payloadJson   Json
+
+  @@unique([workflowRunId, sequence])
+  @@index([workflowRunId, sequence])
+  @@index([agentRunId])
+  @@index([eventType, occurredAt])
+}
+
+// ===========================================================================
+// Wave C / P2-006 — shared cases and projects foundation.
+//
+// One engine for consultants, agencies, CA/accounting practices, events and real
+// estate. Deliberately COMPOSES the systems that already exist rather than
+// duplicating them:
+//
+//   * Contact            — clients are Contacts, not a new party table
+//   * TaskJob            — case work items are durable tasks, via CaseTaskLink
+//   * Approval           — sign-off reuses the copilot approval ledger, via CaseApprovalLink
+//   * ProfileDocument    — uploaded files stay ProfileDocuments, via CaseDocumentRequest
+//   * ActivityEvent      — contact-level timeline is untouched; CaseEvent is case-level
+//   * Workspace/Location — tenancy, no new tenant key
+//   * Payment            — CaseInvoice records STATE and links out; it is not a ledger
+//
+// NAME NOTE: `Project` is already taken by the pre-existing portfolio model, so the
+// case aggregate is `CaseProject`. Renaming the existing model would have been a
+// breaking change for no benefit.
+//
+// Tenancy is workspaceId, which is what /api/platform already authorizes against.
+// Unlike the restaurant and appointment domains there is no legacy profileId-scoped
+// table to bridge to, so no bridge is invented.
+// ===========================================================================
+
+enum CaseStatus {
+  INTAKE
+  BRIEFED
+  ACTIVE
+  ON_HOLD
+  DELIVERED
+  CLOSED
+  CANCELLED
+}
+
+enum CaseIntakeStatus {
+  NEW
+  QUALIFYING
+  ACCEPTED
+  DECLINED
+  CONVERTED
+}
+
+enum CaseMilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  BLOCKED
+  CANCELLED
+}
+
+enum CaseDeliverableStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  DELIVERED
+  REJECTED
+}
+
+enum CaseDocumentRequestStatus {
+  REQUESTED
+  RECEIVED
+  WAIVED
+  REJECTED
+}
+
+/// Billing STATE only. Money movement stays with Payment; this records where an
+/// invoice is, so the engine never becomes a second accounting ledger.
+enum CaseInvoiceState {
+  NONE
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  VOID
+  WRITTEN_OFF
+}
+
+enum CaseEventKind {
+  CREATED
+  STATUS
+  MILESTONE
+  DELIVERABLE
+  DOCUMENT
+  INVOICE
+  TASK
+  APPROVAL
+  RETAINER
+  NOTE
+}
+
+enum CaseEventActor {
+  CLIENT
+  STAFF
+  SYSTEM
+}
+
+/// Lead / intake. Exists before a case does, so it is a sibling of CaseProject
+/// rather than a field on it.
+model CaseIntake {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contactId      String?
+  contact        Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  source         String
+  summary        String
+  status         CaseIntakeStatus @default(NEW)
+  declineReason  String?
+  idempotencyKey String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  convertedCase CaseProject?
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, status, createdAt])
+  @@index([contactId])
+}
+
+/// The case or project aggregate.
+model CaseProject {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  locationId     String?
+  location       Location?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  contactId      String?
+  contact        Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  intakeId       String?          @unique
+  intake         CaseIntake?      @relation(fields: [intakeId], references: [id], onDelete: SetNull)
+  reference      String
+  title          String
+  status         CaseStatus       @default(INTAKE)
+  invoiceState   CaseInvoiceState @default(NONE)
+  openedAt       DateTime?
+  deliveredAt    DateTime?
+  closedAt       DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  idempotencyKey String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  brief                CaseBrief?
+  milestones           CaseMilestone[]
+  deliverables         CaseDeliverable[]
+  documentRequests     CaseDocumentRequest[]
+  invoices             CaseInvoice[]
+  events               CaseEvent[]
+  taskLinks            CaseTaskLink[]
+  approvalLinks        CaseApprovalLink[]
+  CaseRetainerCaseLink CaseRetainerCaseLink[]
+  CaseRetainerDraw     CaseRetainerDraw[]
+
+  @@unique([workspaceId, reference])
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, status, createdAt])
+  @@index([contactId])
+}
+
+/// Agreed scope. One per case, so a 1:1 rather than a repeated row.
+model CaseBrief {
+  id          String      @id @default(cuid())
+  caseId      String      @unique
+  case        CaseProject @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  objectives  String
+  scope       String?
+  constraints String?
+  agreedAt    DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model CaseMilestone {
+  id              String              @id @default(cuid())
+  caseId          String
+  case            CaseProject         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title           String
+  ordinal         Int
+  status          CaseMilestoneStatus @default(PENDING)
+  dueAt           DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  CaseDeliverable CaseDeliverable[]
+
+  @@unique([caseId, ordinal])
+  @@index([caseId, status])
+}
+
+model CaseDeliverable {
+  id          String                @id @default(cuid())
+  caseId      String
+  case        CaseProject           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  milestoneId String?
+  milestone   CaseMilestone?        @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  title       String
+  status      CaseDeliverableStatus @default(DRAFT)
+  /// Reuses ProfileDocument rather than storing a second copy of the file.
+  documentId  String?
+  document    ProfileDocument?      @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  deliveredAt DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([caseId, status])
+  @@index([milestoneId])
+}
+
+/// A request for something the client must supply. When it arrives it is linked to an
+/// existing ProfileDocument; no parallel upload store is introduced.
+model CaseDocumentRequest {
+  id           String                    @id @default(cuid())
+  caseId       String
+  case         CaseProject               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  status       CaseDocumentRequestStatus @default(REQUESTED)
+  dueAt        DateTime?
+  documentId   String?
+  document     ProfileDocument?          @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  receivedAt   DateTime?
+  waivedReason String?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+
+  @@index([caseId, status])
+}
+
+/// Invoice STATE for a case. `paymentId` links to the existing Payment row when one
+/// exists; this table never holds amounts that contradict it.
+model CaseInvoice {
+  id                 String               @id @default(cuid())
+  caseId             String
+  case               CaseProject          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  reference          String
+  amountCents        Int
+  currency           String               @default("USD")
+  state              CaseInvoiceState     @default(DRAFT)
+  issuedAt           DateTime?
+  paidAt             DateTime?
+  paymentId          String?
+  idempotencyKey     String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  CaseRetainerPeriod CaseRetainerPeriod[]
+
+  @@unique([caseId, reference])
+  @@index([caseId, state])
+}
+
+/// Composition link to the EXISTING durable task queue. Case work items are TaskJobs;
+/// this table only records which case they belong to.
+model CaseTaskLink {
+  caseId    String
+  case      CaseProject @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  taskJobId String
+  taskJob   TaskJob     @relation(fields: [taskJobId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+
+  @@id([caseId, taskJobId])
+  @@index([taskJobId])
+}
+
+/// Composition link to the EXISTING approval ledger. Case sign-off reuses Approval
+/// rather than defining a second approval concept.
+model CaseApprovalLink {
+  caseId     String
+  case       CaseProject @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  approvalId String
+  approval   Approval    @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@id([caseId, approvalId])
+  @@index([approvalId])
+}
+
+/// Append-only case timeline. UPDATE and DELETE are refused by trigger, reusing
+/// reject_append_only_mutation() from 20260827140000_phase0_foundations.
+///
+/// This is case-level and deliberately separate from ActivityEvent, which is
+/// contact-level and remains untouched.
+model CaseEvent {
+  id       String         @id @default(cuid())
+  caseId   String
+  case     CaseProject    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  seq      BigInt         @default(autoincrement())
+  kind     CaseEventKind
+  from     String?
+  to       String
+  actor    CaseEventActor
+  actorId  String?
+  metadata Json?
+  at       DateTime       @default(now())
+
+  @@index([caseId, seq])
+}
+
+// ---------------------------------------------------------------------------
+// Wave D / P2-008: shared content and cohort persistence.
+//
+// The PROGRAM is the pre-existing Course, with its CourseModule and CourseLesson
+// children. Nothing here forks a coaching-only content tree. Learner identity stays
+// Member, the learner's relation to a program stays CourseEnrollment, and per-lesson
+// progress stays LessonCompletion, which is why no progress table is added: progress
+// is computed from the completion rows that already exist.
+//
+// A Cohort is the missing concept - a dated, capacity-bounded run of a Course that
+// people attend together. Everything below hangs off it.
+//
+// Tenancy is profileId, bridged from the caller's workspace exactly as the appointment
+// domain does, because Course is already profileId-scoped and Workspace.profileId is
+// unique. Inventing a second tenant key for cohorts would have split the course tree.
+//
+// Reuse, not duplication:
+//   - uploads are ProfileDocuments (submissions, certificates)
+//   - reminder dispatch is a TaskJob, pointed at from the membership
+//   - venues are Locations
+//   - money stays on CourseEnrollment.paymentId
+// ---------------------------------------------------------------------------
+
+enum CohortStatus {
+  PLANNED
+  ENROLLING
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+enum CohortMembershipStatus {
+  INVITED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  WITHDRAWN
+}
+
+enum CohortSessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  HELD
+  CANCELLED
+}
+
+enum CohortAttendanceStatus {
+  PRESENT
+  LATE
+  EXCUSED
+  ABSENT
+}
+
+enum CohortSubmissionState {
+  DRAFT
+  SUBMITTED
+  RETURNED
+  ACCEPTED
+  REJECTED
+}
+
+enum CohortCertificateState {
+  INELIGIBLE
+  ELIGIBLE
+  ISSUED
+  REVOKED
+}
+
+/// NONE is the default because most memberships never renew; a renewal is opt-in state.
+enum CohortRenewalState {
+  NONE
+  SCHEDULED
+  REMINDED
+  RENEWED
+  LAPSED
+  CANCELLED
+}
+
+enum CohortEventKind {
+  CREATED
+  STATUS
+  MEMBERSHIP
+  SESSION
+  ATTENDANCE
+  ASSIGNMENT
+  SUBMISSION
+  CERTIFICATE
+  RENEWAL
+  NOTE
+}
+
+enum CohortEventActor {
+  LEARNER
+  STAFF
+  SYSTEM
+}
+
+model Cohort {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  code  String
+  title String
+
+  status   CohortStatus @default(PLANNED)
+  timezone String       @default("UTC")
+  startsOn DateTime?
+  endsOn   DateTime?
+  capacity Int?
+
+  /// Certificate policy, stored so eligibility is computed from persisted records
+  /// against a configured rule rather than a constant buried in code.
+  attendanceThresholdPct Int     @default(0)
+  requireAllAssignments  Boolean @default(false)
+  requireAllLessons      Boolean @default(false)
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  memberships CohortMembership[]
+  sessions    CohortSession[]
+  assignments CohortAssignment[]
+  events      CohortEvent[]
+
+  @@unique([courseId, code])
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status])
+}
+
+model CohortMembership {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  /// The learner's relation to the PROGRAM already exists as CourseEnrollment. This row
+  /// is their relation to one RUN of it, so it points at the enrollment rather than
+  /// copying the learner's email, name or payment reference.
+  enrollmentId String
+  enrollment   CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  status      CohortMembershipStatus @default(INVITED)
+  joinedAt    DateTime?
+  completedAt DateTime?
+  leftAt      DateTime?
+  leaveReason String?
+
+  /// Renewal and reminder state lives on the membership because that is what it is
+  /// state about. Actual dispatch is a TaskJob, not a second queue.
+  renewalState     CohortRenewalState @default(NONE)
+  renewalDueAt     DateTime?
+  renewalRemindAt  DateTime?
+  renewalTaskJobId String?
+  renewalTaskJob   TaskJob?           @relation(fields: [renewalTaskJobId], references: [id])
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  attendance  CohortAttendance[]
+  submissions CohortSubmission[]
+  certificate CohortCertificate?
+
+  @@unique([cohortId, enrollmentId])
+  @@unique([cohortId, idempotencyKey])
+  @@index([cohortId, status])
+  @@index([renewalState, renewalRemindAt])
+}
+
+model CohortSession {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  ordinal Int
+  title   String
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  status CohortSessionStatus @default(SCHEDULED)
+
+  /// Venues reuse the existing Location model instead of a free-text venue column.
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+
+  heldAt       DateTime?
+  cancelReason String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  attendance CohortAttendance[]
+
+  @@unique([cohortId, ordinal])
+  @@index([cohortId, startsAt])
+}
+
+model CohortAttendance {
+  id        String        @id @default(cuid())
+  sessionId String
+  session   CohortSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  membershipId String
+  membership   CohortMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  status     CohortAttendanceStatus
+  note       String?
+  recordedAt DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@unique([sessionId, membershipId])
+  @@index([membershipId, status])
+}
+
+model CohortAssignment {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  ordinal      Int
+  title        String
+  instructions String?
+  dueAt        DateTime?
+  maxPoints    Int       @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submissions CohortSubmission[]
+
+  @@unique([cohortId, ordinal])
+}
+
+model CohortSubmission {
+  id           String           @id @default(cuid())
+  assignmentId String
+  assignment   CohortAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  membershipId String
+  membership   CohortMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  state CohortSubmissionState @default(DRAFT)
+
+  /// An attached submission is a ProfileDocument, the same upload store the rest of the
+  /// platform uses. There is no parallel file table.
+  documentId String?
+  document   ProfileDocument? @relation(fields: [documentId], references: [id])
+
+  notes       String?
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  points      Int?
+  feedback    String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([assignmentId, membershipId])
+  @@unique([assignmentId, idempotencyKey])
+  @@index([membershipId, state])
+}
+
+model CohortCertificate {
+  id           String           @id @default(cuid())
+  membershipId String           @unique
+  membership   CohortMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  state CohortCertificateState @default(INELIGIBLE)
+
+  /// Only set once the certificate is actually issued, so an unissued row cannot be
+  /// mistaken for a real credential.
+  serial    String?   @unique
+  issuedAt  DateTime?
+  revokedAt DateTime?
+  reason    String?
+
+  documentId String?
+  document   ProfileDocument? @relation(fields: [documentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([state])
+}
+
+/// Append-only cohort timeline, enforced by a trigger rather than by convention.
+model CohortEvent {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  seq      BigInt           @default(autoincrement())
+  kind     CohortEventKind
+  from     String?
+  to       String
+  actor    CohortEventActor
+  actorId  String?
+  metadata Json?
+  at       DateTime         @default(now())
+
+  @@index([cohortId, seq])
+}
+
+// ---------------------------------------------------------------------------
+// Wave F / P2-010: commerce inventory hardening.
+//
+// WHAT EXISTED: DigitalProduct.stock, one nullable Int. Nothing decremented it,
+// nothing reserved against it, there was no location dimension, no movement history
+// and no oversell refusal. That column is left EXACTLY as it is here - not renamed,
+// not dropped, not migrated - because deciding what its existing values mean is a
+// data decision, not a schema one. The new tables are authoritative going forward.
+//
+// Reuse, not duplication: the product is the pre-existing DigitalProduct, the site is
+// the pre-existing Location, and demand is the pre-existing Order and OrderLine. No
+// parallel product, order or fulfilment model appears here.
+//
+// locationId is REQUIRED on purpose. Stock that is not anywhere is not stock, and a
+// nullable location would need either a partial unique index or a denormalized
+// discriminator column to keep "one record per product per place" enforceable. The
+// runtime refuses with a clear message when a workspace has no Location yet.
+//
+// The oversell guarantee is enforced by CHECK constraints in the migration, not only by
+// application code: onHand >= 0, reserved >= 0 and reserved <= onHand. That makes the
+// guarantee falsifiable at the storage layer, independent of the engine. Like the four
+// append-only triggers and the two exclusion constraints already in this database,
+// those constraints live in SQL rather than in this file.
+// ---------------------------------------------------------------------------
+
+enum InventoryMovementKind {
+  RECEIPT
+  ADJUSTMENT
+  RESERVE
+  RELEASE
+  CONSUME
+  RETURN
+  COUNT
+}
+
+enum InventoryMovementActor {
+  STAFF
+  SYSTEM
+  CUSTOMER
+}
+
+enum InventoryReservationState {
+  HELD
+  RELEASED
+  CONSUMED
+  EXPIRED
+}
+
+model InventoryItem {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  /// Wave G: the sellable unit. Backfilled to each product's deterministic default variant
+  /// during the migration, then made NOT NULL, and the unique key moved from
+  /// (productId, locationId) to (variantId, locationId). productId is kept as a
+  /// denormalized parent and guarded by a composite foreign key so the two cannot disagree.
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  /// Physical units present. Never negative; enforced by a CHECK constraint.
+  onHand Int @default(0)
+
+  /// Units promised to an order line but not yet handed over. Never negative and never
+  /// greater than onHand; both enforced by CHECK constraints, so overselling is
+  /// impossible at the storage layer and not merely discouraged in code.
+  reserved Int @default(0)
+
+  reorderPoint Int?
+  safetyStock  Int  @default(0)
+
+  /// A product can opt out of stock control without losing its record, which is what a
+  /// made-to-order or digital item needs.
+  trackingEnabled Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements       InventoryMovement[]
+  reservations    InventoryReservation[]
+  /// Parts consumed on field-job inspections. The inspection engine does not restate variant,
+  /// product or location: it points at this row and reads them from here.
+  inspectionParts FieldJobInspectionPart[]
+
+  @@unique([variantId, locationId])
+  @@index([profileId, locationId])
+  @@index([profileId, onHand])
+  @@index([productId])
+}
+
+/// Append-only movement ledger, enforced by a trigger rather than by convention.
+model InventoryMovement {
+  id     String        @id @default(cuid())
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  seq  BigInt                @default(autoincrement())
+  kind InventoryMovementKind
+
+  /// Signed effect on onHand and reserved. Storing the deltas AND the resulting
+  /// balances makes the ledger self-verifying: replaying the deltas must reproduce the
+  /// stored after-values, and the harness checks exactly that.
+  qtyDelta      Int
+  reservedDelta Int @default(0)
+  onHandAfter   Int
+  reservedAfter Int
+
+  reason  String?
+  actor   InventoryMovementActor @default(STAFF)
+  actorId String?
+
+  orderId     String?
+  order       Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderLineId String?
+  orderLine   OrderLine? @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+
+  reservationId String?
+
+  idempotencyKey String?
+  at             DateTime                @default(now())
+  ReturnItem     ReturnItem?
+  /// The inspection part row this CONSUME movement settled, when it came from an inspection.
+  /// One movement settles at most one part line.
+  inspectionPart FieldJobInspectionPart?
+
+  @@unique([itemId, idempotencyKey])
+  @@index([itemId, seq])
+  @@index([orderId])
+}
+
+/// A hold on stock for one order line. One line, one reservation.
+model InventoryReservation {
+  id     String        @id @default(cuid())
+  itemId String
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  orderLineId String    @unique
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  qty   Int
+  state InventoryReservationState @default(HELD)
+
+  /// A hold that is never confirmed must not strand stock forever. Expiry is recorded
+  /// so a sweep can release it; nothing here expires a hold implicitly on read.
+  expiresAt  DateTime?
+  releasedAt DateTime?
+  consumedAt DateTime?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([itemId, idempotencyKey])
+  @@index([itemId, state])
+  @@index([state, expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Wave G / P2-011: commerce variants, fulfilment and returns.
+//
+// WHAT EXISTED: DigitalProduct."variantsJson", a JSON blob of `[{name}]` objects. It
+// carried a NAME and nothing else - no SKU, no price, no stock, no identity an order line
+// or a stock record could point at. Three UI files parse it back into a newline-joined
+// string. That is why commerce:variants was declared `partial` rather than available, and
+// it is why this wave adds real variants instead of extending the blob.
+//
+// The blob is left EXACTLY as it is, like DigitalProduct."stock" before it: still written
+// by src/app/actions/products.ts, still read by the product form, the quick-add sheet and
+// the public shop page. Reinterpreting its contents is a data decision, not a schema one.
+//
+// THE SELLABLE UNIT IS NOW ProductVariant. Every existing product receives exactly one
+// deterministic default variant in the migration, so nothing that used to be sellable
+// stops being sellable, and the reconciliation proof can be exact rather than approximate.
+//
+// INVENTORY IDENTITY MOVES from (product, location) to (variant, location). That is the
+// one non-additive change in this wave and it is enumerated statement by statement in the
+// migration. productId stays on InventoryItem as a denormalized parent, guarded by a
+// COMPOSITE foreign key (productId, variantId) -> ProductVariant(productId, id) so the
+// pair cannot drift apart.
+//
+// Reuse, not duplication: orders stay Order and OrderLine, money stays Payment, sites stay
+// Location, stock stays InventoryItem with its existing CHECK constraints. There is no new
+// order, cart, payment or carrier table here. Tracking fields are owner-entered metadata;
+// nothing in this wave calls a carrier, a payment processor or a messaging provider.
+// ---------------------------------------------------------------------------
+
+enum FulfilmentState {
+  DRAFT
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ReturnRequestState {
+  REQUESTED
+  APPROVED
+  REJECTED
+  RECEIVED
+  CANCELLED
+}
+
+/// PENDING is the honest default: a received return has not been restocked until someone
+/// decides whether the goods are resellable.
+enum ReturnItemRestockState {
+  PENDING
+  RESTOCKED
+  DISCARDED
+}
+
+enum CommerceEventKind {
+  VARIANT
+  FULFILMENT
+  RETURN
+  RESTOCK
+  NOTE
+}
+
+enum CommerceEventSubject {
+  VARIANT
+  FULFILMENT
+  RETURN
+}
+
+enum CommerceEventActor {
+  STAFF
+  SYSTEM
+  CUSTOMER
+}
+
+/// An axis of choice on a product, such as Size or Colour.
+model ProductOption {
+  id        String         @id @default(cuid())
+  productId String
+  product   DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  name    String
+  ordinal Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  values            ProductOptionValue[]
+  variantSelections ProductVariantOptionValue[]
+
+  @@unique([productId, name])
+  @@index([productId, ordinal])
+}
+
+/// One selectable value on an option, such as Medium.
+model ProductOptionValue {
+  id       String        @id @default(cuid())
+  optionId String
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  value   String
+  ordinal Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variantSelections ProductVariantOptionValue[]
+
+  @@unique([optionId, value])
+  @@index([optionId, ordinal])
+}
+
+/// The sellable unit. Stock, reservations, fulfilment lines and return lines all point here.
+model ProductVariant {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Every product has exactly one default variant, enforced by a partial unique index in
+  /// the migration. It is what a non-variant product resolves through, so existing
+  /// products keep working without any caller having to know about variants.
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  title   String
+  ordinal Int    @default(0)
+
+  /// NULL means "inherit the product price", which is what a default variant does. A
+  /// non-null value must be non-negative; enforced by a CHECK constraint.
+  priceCents     Int?
+  compareAtCents Int?
+  weightGrams    Int?
+
+  /// Unique per profile when set. NULLs are distinct in Postgres, so variants without a
+  /// SKU coexist freely.
+  sku String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  optionValues    ProductVariantOptionValue[]
+  inventoryItems  InventoryItem[]
+  fulfilmentItems FulfilmentItem[]
+  returnItems     ReturnItem[]
+
+  /// Target of the composite foreign key from InventoryItem, so a stock record's
+  /// productId and variantId cannot disagree.
+  @@unique([productId, id])
+  @@unique([profileId, sku])
+  @@unique([profileId, idempotencyKey])
+  @@index([productId, ordinal])
+  @@index([profileId, isActive])
+}
+
+/// Which option value a variant selects. optionId is denormalized on purpose: it is the
+/// only way to say "at most one value per option per variant" as a database constraint.
+model ProductVariantOptionValue {
+  id        String         @id @default(cuid())
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  optionId String
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  optionValueId String
+  optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([variantId, optionId])
+  @@unique([variantId, optionValueId])
+  @@index([optionValueId])
+}
+
+/// A shipment of part or all of an order. Carrier and tracking are owner-entered strings;
+/// nothing here contacts a carrier.
+model Fulfilment {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+
+  reference String
+  state     FulfilmentState @default(DRAFT)
+
+  /// Owner-entered metadata. There is no carrier integration in this wave, and the UI says
+  /// so, so a tracking number here means "the owner typed this", not "we queried anyone".
+  carrier        String?
+  trackingNumber String?
+  trackingUrl    String?
+
+  packedAt     DateTime?
+  shippedAt    DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items FulfilmentItem[]
+
+  @@unique([profileId, reference])
+  @@unique([profileId, idempotencyKey])
+  @@index([orderId, state])
+  @@index([profileId, state])
+}
+
+/// One order line, partially or wholly, on one shipment.
+model FulfilmentItem {
+  id           String     @id @default(cuid())
+  fulfilmentId String
+  fulfilment   Fulfilment @relation(fields: [fulfilmentId], references: [id], onDelete: Cascade)
+
+  orderLineId String
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  /// Positive; enforced by a CHECK constraint. The engine additionally refuses a quantity
+  /// that would take the line's cumulative fulfilled total past its ordered quantity.
+  qty Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([fulfilmentId, orderLineId])
+  @@index([orderLineId])
+  @@index([variantId])
+}
+
+/// A customer's request to send goods back.
+model ReturnRequest {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  reference String
+  state     ReturnRequestState @default(REQUESTED)
+
+  reason       String?
+  decisionNote String?
+  decidedBy    String?
+
+  requestedAt DateTime  @default(now())
+  decidedAt   DateTime?
+  receivedAt  DateTime?
+
+  /// A pointer to a refund that happened elsewhere. This wave executes no payment; the
+  /// field records that a refund exists, and is null until someone links one.
+  refundPaymentId String?
+  refundPayment   Payment? @relation(fields: [refundPaymentId], references: [id])
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items ReturnItem[]
+
+  @@unique([profileId, reference])
+  @@unique([profileId, idempotencyKey])
+  @@index([orderId, state])
+  @@index([profileId, state])
+}
+
+/// One order line on a return, with its own restock decision.
+model ReturnItem {
+  id              String        @id @default(cuid())
+  returnRequestId String
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+
+  orderLineId String
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  /// Positive; enforced by a CHECK constraint. The engine refuses more than was fulfilled.
+  qty Int
+
+  restockState ReturnItemRestockState @default(PENDING)
+  restockedAt  DateTime?
+
+  /// The movement that actually put the units back. Its presence is what makes restocking
+  /// idempotent: a second attempt finds this set and refuses to move stock again.
+  restockMovementId String?            @unique
+  restockMovement   InventoryMovement? @relation(fields: [restockMovementId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([returnRequestId, orderLineId])
+  @@index([orderLineId])
+  @@index([restockState])
+}
+
+/// Append-only commerce timeline for variants, fulfilments and returns, enforced by a
+/// trigger. Inventory balance changes keep their own ledger in InventoryMovement; this one
+/// records the commerce decisions that drive them.
+model CommerceEvent {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  seq         BigInt               @default(autoincrement())
+  kind        CommerceEventKind
+  subjectType CommerceEventSubject
+  subjectId   String
+
+  from    String?
+  to      String
+  actor   CommerceEventActor @default(STAFF)
+  actorId String?
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  metadata Json?
+  at       DateTime @default(now())
+
+  @@index([profileId, seq])
+  @@index([subjectType, subjectId])
+  @@index([orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Wave G3 - part one: retainers for cases and projects.
+//
+// A retainer is an AGREEMENT plus a DRAW-DOWN LEDGER, not a payment. Money movement stays
+// where it already lives: CaseInvoice records billing state and Payment records the charge.
+// Nothing in this block charges anything, and no row here can cause a charge.
+//
+// The retainer is workspace-scoped and associated to cases through a link table rather than
+// owning a single caseId, because a retainer is an agreement with a client that work from
+// several cases draws against. A one-case retainer would make "renewal period" meaningless -
+// you would be renewing per case rather than per agreement.
+// ---------------------------------------------------------------------------
+
+enum CaseRetainerState {
+  DRAFT
+  ACTIVE
+  PAUSED
+  EXPIRED
+  CANCELLED
+}
+
+/// Whether the agreement is denominated in units of work or in money. Exactly one of the two
+/// included columns may be set, enforced by a CHECK constraint, because a retainer that is
+/// both is a retainer nobody can reconcile.
+enum CaseRetainerBasis {
+  UNITS
+  VALUE
+}
+
+enum CaseRetainerPeriodKind {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  CUSTOM
+}
+
+enum CaseRetainerPeriodState {
+  OPEN
+  CLOSED
+  RENEWED
+  LAPSED
+}
+
+/// A DRAW consumes the allowance, a CREDIT gives some back (a cancelled engagement), and an
+/// ADJUSTMENT is a deliberate correction that is recorded rather than hidden by editing a
+/// balance. All three are append-only.
+enum CaseRetainerDrawKind {
+  DRAW
+  CREDIT
+  ADJUSTMENT
+}
+
+model CaseRetainer {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contactId   String?
+  contact     Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  reference String
+  title     String
+  state     CaseRetainerState @default(DRAFT)
+
+  basis              CaseRetainerBasis
+  includedUnits      Int?
+  includedValueCents Int?
+  currency           String            @default("USD")
+
+  /// The length of one period. CUSTOM is the only kind that carries periodDays, and it must
+  /// carry one - a CHECK constraint enforces both halves of that.
+  periodKind CaseRetainerPeriodKind @default(MONTHLY)
+  periodDays Int?
+
+  /// Whether an unused allowance survives into the next period. Recorded on the agreement so
+  /// that a period can be closed without re-deciding the policy.
+  rolloverAllowed Boolean @default(false)
+
+  /// Declares intent only. Nothing in this schema or its runtime renews a retainer on a
+  /// timer; renewal is an explicit operation, and a lapsed retainer is left lapsed.
+  autoRenew Boolean @default(false)
+
+  activatedAt  DateTime?
+  pausedAt     DateTime?
+  expiredAt    DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  periods           CaseRetainerPeriod[]
+  caseLinks         CaseRetainerCaseLink[]
+  draws             CaseRetainerDraw[]
+  CaseRetainerEvent CaseRetainerEvent[]
+
+  @@unique([workspaceId, reference])
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, state])
+  @@index([contactId])
+}
+
+/// Which cases may draw against a retainer. A compound primary key with no surrogate id, the
+/// same shape as CaseTaskLink and CaseApprovalLink, because the pair IS the fact.
+model CaseRetainerCaseLink {
+  retainerId String
+  retainer   CaseRetainer @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+  caseId     String
+  case       CaseProject  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+
+  @@id([retainerId, caseId])
+  @@index([caseId])
+}
+
+/// One concrete billing period. The included allowance is SNAPSHOT here rather than read from
+/// the agreement, so amending the agreement cannot rewrite what a closed period included.
+model CaseRetainerPeriod {
+  id         String       @id @default(cuid())
+  retainerId String
+  retainer   CaseRetainer @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+
+  ordinal  Int
+  startsOn DateTime
+  endsOn   DateTime
+
+  includedUnits      Int?
+  includedValueCents Int?
+
+  /// Maintained by the draw ledger inside the same transaction as the draw. Overage is
+  /// allowed - used may exceed included - because refusing a draw once an allowance is spent
+  /// would misrepresent work that was actually done. Overage is reported, not prevented.
+  usedUnits      Int @default(0)
+  usedValueCents Int @default(0)
+
+  state CaseRetainerPeriodState @default(OPEN)
+
+  /// Billing STATE only, mirroring the CaseProject.invoiceState convention. The invoice is a
+  /// real CaseInvoice row against one of the retainer's linked cases; this column never moves
+  /// money and no payment is executed by anything in this block.
+  billingState CaseInvoiceState @default(NONE)
+  invoiceId    String?
+  invoice      CaseInvoice?     @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  closedAt  DateTime?
+  renewedAt DateTime?
+  lapsedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  draws CaseRetainerDraw[]
+
+  @@unique([retainerId, ordinal])
+  @@index([retainerId, state])
+  @@index([invoiceId])
+}
+
+/// Append-only consumption ledger. Stores the signed delta AND the resulting used balance, so
+/// replaying the deltas must reproduce the stored after-values - the same self-verifying shape
+/// as InventoryMovement. A row here is never updated or deleted; a trigger enforces that.
+model CaseRetainerDraw {
+  id         String             @id @default(cuid())
+  retainerId String
+  retainer   CaseRetainer       @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+  periodId   String
+  period     CaseRetainerPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  /// Which case the work was done for. Nullable and SetNull on delete, because the ledger has
+  /// to survive a case being removed - the allowance really was consumed.
+  caseId String?
+  case   CaseProject? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  seq  BigInt               @default(autoincrement())
+  kind CaseRetainerDrawKind
+
+  unitsDelta          Int?
+  valueDeltaCents     Int?
+  usedUnitsAfter      Int
+  usedValueCentsAfter Int
+
+  note           String?
+  idempotencyKey String?
+  actor          CaseEventActor
+  actorId        String?
+  at             DateTime       @default(now())
+
+  @@unique([periodId, idempotencyKey])
+  @@index([retainerId, seq])
+  @@index([periodId, seq])
+  @@index([caseId])
+}
+
+// ---------------------------------------------------------------------------
+// Wave G3 - part two: access levels for courses and cohorts.
+//
+// This is the first real content-visibility decision in the repository. Until now any
+// ACTIVE or COMPLETED enrolment on a course returned every module and every lesson, and
+// CourseLesson.isFree was written by importers but never enforced anywhere.
+//
+// Tenancy follows the cohort domain exactly: profileId, bridged from Workspace.profileId.
+// No Cohort* or Course* table gains a workspaceId.
+//
+// Nothing here executes a payment. A tier may carry a price so an owner can describe it, and
+// an upgrade records that it was requested, decided and applied - but the charge itself stays
+// with Payment, referenced by id and never created here.
+// ---------------------------------------------------------------------------
+
+enum CourseAccessGrantState {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  REVOKED
+}
+
+/// Where an entitlement came from. PURCHASE means a payment row is referenced, not that this
+/// schema charged anybody.
+enum CourseAccessGrantSource {
+  MANUAL
+  PURCHASE
+  COHORT
+}
+
+enum CourseAccessChangeDirection {
+  UPGRADE
+  DOWNGRADE
+}
+
+enum CourseAccessChangeState {
+  REQUESTED
+  APPROVED
+  REJECTED
+  APPLIED
+  CANCELLED
+}
+
+enum CourseAccessEventKind {
+  LEVEL
+  VISIBILITY
+  GRANT
+  CHANGE
+  NOTE
+}
+
+enum CourseAccessEventActor {
+  LEARNER
+  STAFF
+  SYSTEM
+}
+
+/// A tier on a course. rank orders the tiers, so an upgrade is a move to a higher rank and a
+/// downgrade a move to a lower one - the direction is derived from data rather than trusted
+/// from the caller.
+model CourseAccessLevel {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  key         String
+  label       String
+  rank        Int
+  description String?
+
+  /// Describes the tier for an owner. It is not a checkout price and nothing reads it to
+  /// charge anybody.
+  priceCents Int?
+  currency   String  @default("USD")
+  isActive   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lessonAccess CourseLessonAccess[]
+  grants       CourseAccessGrant[]
+  changesFrom  CourseAccessChange[] @relation("CourseAccessChangeFrom")
+  changesTo    CourseAccessChange[] @relation("CourseAccessChangeTo")
+
+  @@unique([courseId, key])
+  @@unique([courseId, rank])
+  @@index([profileId, isActive])
+}
+
+/// The minimum tier a lesson requires. A lesson with no row here is visible to every tier,
+/// which keeps every existing course behaving exactly as it does today.
+model CourseLessonAccess {
+  id            String            @id @default(cuid())
+  lessonId      String            @unique
+  lesson        CourseLesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  accessLevelId String
+  accessLevel   CourseAccessLevel @relation(fields: [accessLevelId], references: [id], onDelete: Cascade)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([accessLevelId])
+}
+
+/// What a learner is entitled to. Keyed on the enrolment, one grant per enrolment, because the
+/// enrolment is already the learner-to-course record the content reader resolves. Making the
+/// enrolment the identity means the grant needs no idempotency key of its own: asking twice
+/// finds the same row.
+model CourseAccessGrant {
+  id            String            @id @default(cuid())
+  enrollmentId  String            @unique
+  enrollment    CourseEnrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  accessLevelId String
+  accessLevel   CourseAccessLevel @relation(fields: [accessLevelId], references: [id], onDelete: Cascade)
+
+  state  CourseAccessGrantState  @default(PENDING)
+  source CourseAccessGrantSource @default(MANUAL)
+
+  grantedAt    DateTime?
+  suspendedAt  DateTime?
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  revokeReason String?
+
+  /// A reference to an existing Payment row when one exists. Deliberately a bare string with
+  /// no foreign key, because Payment is profile-scoped while this tree hangs off a course -
+  /// the same reason CaseInvoice.paymentId is a bare string.
+  paymentId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  changes CourseAccessChange[]
+
+  @@index([accessLevelId, state])
+  @@index([state, expiresAt])
+}
+
+/// One requested move between tiers. This is where "upgrade and downgrade state without real
+/// payment execution" actually lives: the change is REQUESTED, then decided, then APPLIED, and
+/// applying it rewrites the grant's tier. No money moves at any step.
+model CourseAccessChange {
+  id      String            @id @default(cuid())
+  grantId String
+  grant   CourseAccessGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  fromAccessLevelId String
+  fromAccessLevel   CourseAccessLevel @relation("CourseAccessChangeFrom", fields: [fromAccessLevelId], references: [id], onDelete: Cascade)
+  toAccessLevelId   String
+  toAccessLevel     CourseAccessLevel @relation("CourseAccessChangeTo", fields: [toAccessLevelId], references: [id], onDelete: Cascade)
+
+  direction CourseAccessChangeDirection
+  state     CourseAccessChangeState     @default(REQUESTED)
+
+  reason       String?
+  decisionNote String?
+  decidedBy    String?
+  decidedAt    DateTime?
+  appliedAt    DateTime?
+  cancelledAt  DateTime?
+
+  /// Both are references an owner may record after settling up elsewhere. Nothing here reads
+  /// them to decide anything, and nothing here writes a Payment.
+  invoiceRef String?
+  paymentId  String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([grantId, idempotencyKey])
+  @@index([grantId, state])
+}
+
+/// Append-only history for tiers, visibility rules, entitlements and changes. subjectType and
+/// subjectId say what the row is about, so one stream covers all four without a fifth table.
+model CourseAccessEvent {
+  id          String                 @id @default(cuid())
+  courseId    String
+  course      Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  seq         BigInt                 @default(autoincrement())
+  kind        CourseAccessEventKind
+  subjectType String
+  subjectId   String
+  from        String?
+  to          String
+  actor       CourseAccessEventActor
+  actorId     String?
+  metadata    Json?
+  at          DateTime               @default(now())
+
+  @@index([courseId, seq])
+  @@index([courseId, subjectType, subjectId])
+}
+
+/// Append-only history for a retainer AGREEMENT and its periods.
+///
+/// CaseRetainerDraw already records every movement of the allowance, but it cannot record a
+/// state change, and CaseEvent cannot be used either: CaseEvent.caseId is NOT NULL, while a
+/// retainer legitimately exists before any case is linked to it. Fanning an agreement event out
+/// to every linked case was considered and rejected - a retainer with no links yet would have no
+/// history at all, which is precisely the moment an owner most wants one.
+///
+/// subjectType and subjectId say whether a row is about the agreement, a period, a case link or
+/// a draw, so one stream covers all four.
+model CaseRetainerEvent {
+  id          String         @id @default(cuid())
+  retainerId  String
+  retainer    CaseRetainer   @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+  seq         BigInt         @default(autoincrement())
+  kind        CaseEventKind
+  subjectType String
+  subjectId   String
+  from        String?
+  to          String
+  actor       CaseEventActor
+  actorId     String?
+  metadata    Json?
+  at          DateTime       @default(now())
+
+  @@index([retainerId, seq])
+  @@index([retainerId, subjectType, subjectId])
+}
+
+// ---------------------------------------------------------------------------
+// Wave G4 - the shared fieldJobs engine foundation: intake and dispatch.
+//
+// This is the FOUNDATION, not the whole engine. `inspection` - asset checks, parts,
+// completion notes and invoice handoff - is deliberately left unbuilt and still declared
+// `planned` in the capability registry, because declaring it available would be a claim about
+// code that does not exist.
+//
+// IT REUSES THE TECHNICIAN MODEL THAT ALREADY EXISTS. A field technician is an
+// AppointmentResource with kind STAFF: profile-scoped, optionally tied to a Location, already
+// carrying capacity and an isActive flag, already the thing services are made eligible for. A
+// separate Technician table would have been a second answer to "who can do this work", and the
+// two would have drifted the first time someone was added to one and not the other. Same for
+// ServiceOffering, which already describes what is being sold and for how long.
+//
+// TENANCY IS profileId, bridged from Workspace.profileId - the same key the appointments and
+// cohort domains use, and a requirement rather than a preference: reusing AppointmentResource
+// means sharing its scope.
+//
+// A JOB HAPPENS AT A CUSTOMER SITE, NOT AT A Location. Location models the owner's own
+// premises, so the site is free text plus optional coordinates. Inventing Location rows for
+// customer addresses would pollute a table the reservation, appointment and inventory engines
+// all read.
+//
+// NO ROUTING, NO MAPS, NO MESSAGING. `dispatch` here means assignment and job-card state. No
+// route is optimised, no distance is computed, no technician is notified. Whoever adds those
+// must say so explicitly rather than letting the word "dispatch" imply them.
+// ---------------------------------------------------------------------------
+
+enum FieldJobRequestStatus {
+  NEW
+  QUALIFYING
+  QUOTED
+  ACCEPTED
+  DECLINED
+  CONVERTED
+}
+
+enum FieldJobStatus {
+  DRAFT
+  SCHEDULED
+  DISPATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum FieldJobPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+/// LEAD is the technician answerable for the job. A job may have many HELPERs but only one
+/// active LEAD, enforced by a partial unique index - two leads means nobody is accountable.
+enum FieldJobAssignmentRole {
+  LEAD
+  HELPER
+}
+
+/// The job-card states a technician actually moves through. ACCEPTED and DECLINED exist because
+/// an assignment is a request until the technician answers it; recording only ASSIGNED would
+/// make a silent refusal look like agreement.
+enum FieldJobAssignmentState {
+  ASSIGNED
+  ACCEPTED
+  DECLINED
+  EN_ROUTE
+  ON_SITE
+  COMPLETED
+  RELEASED
+}
+
+enum FieldJobEventKind {
+  CREATED
+  STATUS
+  ASSIGNMENT
+  SCHEDULE
+  ESTIMATE
+  NOTE
+}
+
+enum FieldJobEventActor {
+  CUSTOMER
+  TECHNICIAN
+  STAFF
+  SYSTEM
+}
+
+/// An inbound request for work, before anybody has agreed to do it.
+///
+/// Kept separate from FieldJob for the same reason CaseIntake is separate from CaseProject: a
+/// request that is declined must remain a record, and a job that exists must mean somebody
+/// committed to it. Collapsing the two would make "how many jobs do we have" unanswerable.
+model FieldJobRequest {
+  id                String           @id @default(cuid())
+  profileId         String
+  profile           Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  /// The offering the customer is asking about, when they named one. Reuses the existing
+  /// catalogue rather than describing the work again.
+  serviceOfferingId String?
+  serviceOffering   ServiceOffering? @relation(fields: [serviceOfferingId], references: [id], onDelete: SetNull)
+
+  source  String
+  summary String
+
+  requesterName  String?
+  requesterEmail String?
+  requesterPhone String?
+
+  siteAddress String?
+
+  status        FieldJobRequestStatus @default(NEW)
+  /// What the owner quoted, if they quoted anything. Nullable because most requests are
+  /// declined or converted before a number exists.
+  estimateCents Int?
+  currency      String                @default("USD")
+  declineReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  convertedJob FieldJob?
+
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status, createdAt])
+}
+
+/// Work somebody has committed to doing.
+model FieldJob {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  /// One request converts to at most one job, which is what makes the conversion auditable.
+  requestId String?          @unique
+  request   FieldJobRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  serviceOfferingId String?
+  serviceOffering   ServiceOffering? @relation(fields: [serviceOfferingId], references: [id], onDelete: SetNull)
+
+  /// The owner's own premises the job is dispatched FROM, when that matters. The job itself
+  /// happens at siteAddress.
+  originLocationId String?
+  originLocation   Location? @relation(fields: [originLocationId], references: [id], onDelete: SetNull)
+
+  reference String
+  title     String
+  status    FieldJobStatus   @default(DRAFT)
+  priority  FieldJobPriority @default(NORMAL)
+
+  siteAddress  String
+  siteNotes    String?
+  contactName  String?
+  contactPhone String?
+
+  /// Both or neither. A job with a start and no end has no duration, and a job with an end and
+  /// no start has no beginning - a CHECK constraint refuses either.
+  scheduledStartAt DateTime?
+  scheduledEndAt   DateTime?
+
+  estimateCents Int?
+  currency      String @default("USD")
+
+  dispatchedAt DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assignments FieldJobAssignment[]
+  events      FieldJobEvent[]
+  inspections FieldJobInspection[]
+
+  @@unique([profileId, reference])
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, status, scheduledStartAt])
+  @@index([profileId, priority, status])
+}
+
+/// A technician on a job. The technician IS an AppointmentResource - see the block comment
+/// above for why there is no separate Technician table.
+model FieldJobAssignment {
+  id         String              @id @default(cuid())
+  jobId      String
+  job        FieldJob            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Cascade rather than SetNull: an assignment with no technician is not a record of anything,
+  /// and the job's event history keeps the fact that somebody was assigned.
+  resourceId String
+  resource   AppointmentResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  role  FieldJobAssignmentRole  @default(HELPER)
+  state FieldJobAssignmentState @default(ASSIGNED)
+
+  assignedAt    DateTime  @default(now())
+  respondedAt   DateTime?
+  enRouteAt     DateTime?
+  onSiteAt      DateTime?
+  completedAt   DateTime?
+  releasedAt    DateTime?
+  declineReason String?
+  releaseReason String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  /// Inspections produced during this technician's visit. Nullable on the inspection side: an
+  /// inspection can exist for a job before anybody has been assigned to it.
+  inspections FieldJobInspection[]
+
+  @@unique([jobId, idempotencyKey])
+  @@index([jobId, state])
+  @@index([resourceId, state])
+}
+
+/// Append-only job history. subjectType and subjectId say whether a row is about the request,
+/// the job, an assignment or the schedule, so one stream covers all four.
+model FieldJobEvent {
+  id          String             @id @default(cuid())
+  jobId       String
+  job         FieldJob           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  seq         BigInt             @default(autoincrement())
+  kind        FieldJobEventKind
+  subjectType String
+  subjectId   String
+  from        String?
+  to          String
+  actor       FieldJobEventActor
+  actorId     String?
+  metadata    Json?
+  at          DateTime           @default(now())
+
+  @@index([jobId, seq])
+  @@index([jobId, subjectType, subjectId])
+}
+
+// ---------------------------------------------------------------------------
+// Wave H0 / P2-017: fieldJobs:inspection - asset checks, checklists, parts,
+// completion notes and invoice HANDOFF.
+//
+// This is the capability the G4 foundation deliberately left unbuilt. G4's migration header, the
+// capability registry and the schema-invariant harness all said so out loud, and the harness
+// listed FieldJobInspection, FieldJobPart and FieldJobAsset as tables that must NOT exist. Three
+// of those names are now built, so that list is revised rather than quietly dropped - and the
+// names that stay forbidden stay forbidden for the same reasons as before.
+//
+// WHAT IS STILL NOT BUILT, stated here so the word "inspection" does not carry a claim:
+//   * No Asset registry. An ASSET item records the identity of the equipment it inspected
+//     (label, serial, where on site) as columns on the item. There is no Asset table, no asset
+//     lifecycle and no service history per asset. Building one would be a second answer to
+//     "what equipment do we own", and nothing here needs that answer yet.
+//   * No invoice and no payment. invoiceHandoffState is a HANDOFF FLAG - it records that the
+//     owner considers the inspection billable and has passed it on. No FieldJobInvoice table
+//     exists, no Payment row is written, and nothing calls a payment provider.
+//   * No file storage and no upload. evidenceManifest is owner-entered METADATA about evidence
+//     held somewhere else. Nothing in this wave stores, fetches or serves a byte of it.
+//   * No routing and no notification, unchanged from G4.
+//
+// THE EVENT LEDGER IS REUSED, NOT FORKED. FieldJobEvent's own comment says subjectType and
+// subjectId are what let one stream cover the request, the job, an assignment and the schedule.
+// Inspection is the fifth subject, so it uses subjectType "inspection", "inspectionItem",
+// "inspectionPart" and "inspectionHandoff" with the EXISTING kinds. That deliberately avoids
+// ALTER TYPE ... ADD VALUE on FieldJobEventKind: an enum value cannot be removed in Postgres, so
+// adding one would force the rollback to recreate the type and the apply/rollback/reapply proof
+// would no longer be able to show byte-identical catalog state. Extending by subjectType is both
+// the designed extension point and the only strictly additive one.
+//
+// PARTS COMPOSE THE INVENTORY ENGINE. FieldJobInspectionPart points at an InventoryItem and at
+// the InventoryMovement that consumed it. It does not restate variant, product, location, price
+// or stock level - those are read through InventoryItem, whose CHECK constraints already make
+// overselling impossible. A part line without a movement is a recorded intent; a part line with
+// one has moved real stock through the existing ledger.
+//
+// TENANCY is profileId, bridged from Workspace.profileId, exactly as G4. FieldJobInspection
+// carries a denormalized profileId for profile-scoped queries and a trigger guarantees it agrees
+// with its job - the same shape as InventoryItem's denormalized productId.
+// ---------------------------------------------------------------------------
+
+/// The states an inspection actually moves through.
+///
+/// SUBMITTED exists because a technician finishing on site and the office accepting the result
+/// are two different facts. Collapsing them would make "who said this passed" unanswerable, and
+/// it is the office that hands the job to billing.
+enum FieldJobInspectionStatus {
+  DRAFT
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  CANCELLED
+}
+
+/// ADVISORY is not a pass with extra words: it means nothing failed but the owner was told
+/// something. Folding it into PASS would lose the only record that a recommendation was made.
+enum FieldJobInspectionOutcome {
+  PASS
+  FAIL
+  ADVISORY
+}
+
+/// CHECK is a yes/no line. MEASUREMENT carries a reading and must carry a unit. ASSET names the
+/// specific equipment it looked at - which is how equipment checks are persisted without an
+/// Asset registry existing.
+enum FieldJobInspectionItemKind {
+  CHECK
+  MEASUREMENT
+  ASSET
+}
+
+/// PENDING is the default and is distinct from NOT_APPLICABLE: "nobody has looked yet" and
+/// "this does not apply here" are different answers, and only one of them blocks completion.
+enum FieldJobInspectionItemResult {
+  PENDING
+  PASS
+  FAIL
+  NOT_APPLICABLE
+}
+
+/// Invoice HANDOFF, not invoicing. NOT_READY is the default; READY means the owner marked it
+/// billable; HANDED_OFF means they passed it to whatever actually bills; DECLINED means they
+/// decided not to bill it. No invoice record is created by any of these and no money moves.
+enum FieldJobInvoiceHandoffState {
+  NOT_READY
+  READY
+  HANDED_OFF
+  DECLINED
+}
+
+/// A reusable checklist. Profile-scoped, and optionally tied to the ServiceOffering it inspects,
+/// reusing the existing catalogue rather than describing the work a second time.
+model FieldJobInspectionTemplate {
+  id        String  @id @default(cuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  serviceOfferingId String?
+  serviceOffering   ServiceOffering? @relation(fields: [serviceOfferingId], references: [id], onDelete: SetNull)
+
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+
+  /// Owner-visible bookkeeping only. History is preserved by SNAPSHOTTING template lines into
+  /// FieldJobInspectionItem when an inspection is created, so editing a template never rewrites
+  /// what a past inspection actually asked.
+  revision Int @default(1)
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items       FieldJobInspectionTemplateItem[]
+  inspections FieldJobInspection[]
+
+  @@unique([profileId, name])
+  @@unique([profileId, idempotencyKey])
+  @@index([profileId, isActive])
+  @@index([serviceOfferingId])
+}
+
+/// One line of a checklist template.
+model FieldJobInspectionTemplateItem {
+  id         String                     @id @default(cuid())
+  templateId String
+  template   FieldJobInspectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  position Int
+  kind     FieldJobInspectionItemKind @default(CHECK)
+  label    String
+  guidance String?
+  /// A required line must be answered before the inspection can complete. PENDING on a required
+  /// line is what blocks it; NOT_APPLICABLE is a real answer and does not.
+  required Boolean                    @default(true)
+
+  /// MEASUREMENT only. A number with no unit is not a reading, which a CHECK constraint enforces.
+  unit        String?
+  expectedMin Decimal? @db.Decimal(14, 4)
+  expectedMax Decimal? @db.Decimal(14, 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items FieldJobInspectionItem[]
+
+  @@unique([templateId, position])
+  @@index([templateId])
+}
+
+/// An inspection carried out on a job.
+model FieldJobInspection {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       FieldJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Denormalized tenant, so "every inspection for this profile" needs no join. A trigger
+  /// guarantees it equals the job's profileId, because the engine is not the only possible writer.
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  /// The checklist this was built from, kept for provenance. SetNull rather than Cascade: an
+  /// inspection whose template was deleted is still a record of what was found, and its lines
+  /// were snapshotted anyway.
+  templateId String?
+  template   FieldJobInspectionTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  /// Which technician's visit produced it. Nullable because an inspection can be raised on a job
+  /// before anybody is assigned.
+  assignmentId String?
+  assignment   FieldJobAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
+  reference String
+  status    FieldJobInspectionStatus   @default(DRAFT)
+  /// Null until there is a verdict. A COMPLETED inspection with no outcome is refused by a CHECK
+  /// constraint - it would be a finished inspection that says nothing.
+  outcome   FieldJobInspectionOutcome?
+
+  startedAt   DateTime?
+  submittedAt DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  cancelReason    String?
+  /// Required to complete. An inspection that passed without a word is indistinguishable from one
+  /// nobody filled in.
+  completionNotes String?
+
+  /// Owner-entered metadata ABOUT evidence held elsewhere: a list of
+  /// { kind, label, reference, capturedAt } objects. No byte is stored, uploaded or fetched here,
+  /// and nothing in the runtime dereferences a value in this column.
+  evidenceManifest Json?
+
+  invoiceHandoffState     FieldJobInvoiceHandoffState @default(NOT_READY)
+  invoiceHandoffAt        DateTime?
+  /// Whatever the owner's billing system calls it. Free text on purpose: this schema does not
+  /// know what is on the other side of the handoff and does not pretend to.
+  invoiceHandoffReference String?
+  invoiceHandoffNote      String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items FieldJobInspectionItem[]
+  parts FieldJobInspectionPart[]
+
+  @@unique([profileId, reference])
+  @@unique([jobId, idempotencyKey])
+  @@index([profileId, status, createdAt])
+  @@index([jobId, status])
+  @@index([templateId])
+  @@index([assignmentId])
+}
+
+/// One answered line of an inspection. Snapshotted from the template line, so editing the
+/// template later cannot rewrite what a past inspection asked or answered.
+model FieldJobInspectionItem {
+  id           String             @id @default(cuid())
+  inspectionId String
+  inspection   FieldJobInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  /// Provenance only. SetNull: the answer survives its template line being deleted.
+  templateItemId String?
+  templateItem   FieldJobInspectionTemplateItem? @relation(fields: [templateItemId], references: [id], onDelete: SetNull)
+
+  position Int
+  kind     FieldJobInspectionItemKind   @default(CHECK)
+  label    String
+  guidance String?
+  required Boolean                      @default(true)
+  result   FieldJobInspectionItemResult @default(PENDING)
+  /// A FAIL must say why, enforced by a CHECK constraint. An unexplained failure reads as a
+  /// mistake when somebody opens the inspection a week later - the same rule as a declined
+  /// assignment.
+  notes    String?
+
+  measuredValue Decimal? @db.Decimal(14, 4)
+  unit          String?
+  expectedMin   Decimal? @db.Decimal(14, 4)
+  expectedMax   Decimal? @db.Decimal(14, 4)
+
+  /// ASSET identity. These columns are the whole of this schema's answer to "which equipment" -
+  /// there is deliberately no Asset table behind them.
+  assetLabel        String?
+  assetSerial       String?
+  assetLocationHint String?
+
+  recordedAt DateTime?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([inspectionId, position])
+  @@unique([inspectionId, idempotencyKey])
+  @@index([inspectionId, result])
+  @@index([templateItemId])
+}
+
+/// A part used on an inspection.
+///
+/// Points at InventoryItem, which already knows the variant, the product, the location and the
+/// stock levels, and at the InventoryMovement that consumed it. Nothing here duplicates the
+/// inventory engine: quantity leaves stock through InventoryMovement with its existing
+/// append-only trigger and non-negative CHECK constraints, or it does not leave stock at all.
+model FieldJobInspectionPart {
+  id           String             @id @default(cuid())
+  inspectionId String
+  inspection   FieldJobInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  /// Restrict, not Cascade or SetNull: a part line whose stock record vanished would be a claim
+  /// about a part nobody can identify.
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  /// The CONSUME movement that settled this line, when stock has actually moved. Unique, so one
+  /// movement cannot be claimed by two part lines. SetNull is impossible to reach in practice
+  /// because InventoryMovement is append-only.
+  movementId String?            @unique
+  movement   InventoryMovement? @relation(fields: [movementId], references: [id], onDelete: SetNull)
+
+  qty           Int
+  /// Owner-entered cost for the record. No money moves and no Payment row is written.
+  unitCostCents Int?
+  currency      String  @default("USD")
+  notes         String?
+
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([inspectionId, idempotencyKey])
+  @@index([inspectionId])
+  @@index([inventoryItemId])
+}
+
+/// Lifecycle of one blueprint installation.
+///
+/// There is deliberately no FAILED state. A failed install leaves NO ROW AT ALL - it is one
+/// transaction, and a failure row would be a partial write that the zero-partial-rows proof would
+/// then have to carve an exception for.
+enum BlueprintInstallationState {
+  ACTIVE
+  SUPERSEDED
+  REMOVED
+}
+
+/// What happened to an installation. Append-only.
+///
+/// No kind describes a refusal, for the same reason there is no FAILED state: a refused install
+/// writes nothing anywhere.
+enum BlueprintInstallationEventKind {
+  INSTALLED
+  UPGRADED
+  SUPERSEDED
+  REMOVED
+}
+
+/// A durable record that a workspace runs a specific blueprint VERSION.
+///
+/// AT MOST ONE ACTIVE ROW PER WORKSPACE, enforced by a partial unique index in the migration
+/// (`WHERE state = 'ACTIVE'`), the same mechanism that already enforces one default variant per
+/// product. A blueprint carries terminology for a whole vertical - the calendar noun is "job" or
+/// "booking" or "reservation", not all three - so two active blueprints would leave the product
+/// unable to say what a thing is called. That constraint is what makes changing blueprint an
+/// UPGRADE THROUGH SUPERSESSION rather than a second install.
+///
+/// WHAT THIS TABLE DOES NOT DO:
+///   - It does not copy the blueprint's workflow declarations. `blueprintId` is the registry key and
+///     encodes the version (`restaurant-venue-v2` vs `-v3`), and the registry RETAINS deprecated
+///     entries rather than deleting them, so pinning the id is already immutable. A template table
+///     would be a second source of truth able to disagree with the first.
+///   - It does not grant anything. Surfaces live per PROFILE as JSON on `Profile.personalityConfig`,
+///     while this row is per WORKSPACE, and a user reaches many workspaces through `Membership`
+///     (keyed by userId). `configJson` RECORDS the resolved surfaces; nothing applies them.
+model BlueprintInstallation {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  /// The profile this install was performed for, when there is one. SetNull rather than Cascade: the
+  /// history of what a workspace ran must survive a profile being removed.
+  profileId String?
+  profile   Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  /// Registry key, e.g. "field-service-v1". Not a foreign key - the registry is static code, and a
+  /// table of blueprints would be a copy of `blueprints.ts` that can drift from it.
+  blueprintId      String
+  /// Recorded separately from the id even though the id encodes it, because a reader answering
+  /// "which version is this workspace on" should not have to parse a string to find out.
+  blueprintVersion String
+
+  state BlueprintInstallationState
+
+  /// Required, not optional. Every engine here uses `(scope, idempotencyKey)` uniqueness; making it
+  /// optional would make the replay guarantee depend on caller diligence.
+  idempotencyKey String
+
+  /// The configuration resolved AT INSTALL TIME and frozen here: role, surfaces, field packs,
+  /// terminology, engine ids. Frozen rather than re-derived, because the point of recording it is to
+  /// answer "what did this workspace agree to" after the registry has moved on. Where it differs from
+  /// today's resolution, that difference is reported as drift rather than silently corrected.
+  configJson Json
+
+  /// The installation this one replaced, on an upgrade. Unique, so two installations cannot both
+  /// claim to have superseded the same one. Restrict, because the superseded row is the evidence
+  /// that the upgrade happened.
+  supersedesInstallationId String?                @unique
+  supersedes               BlueprintInstallation? @relation("BlueprintInstallationSupersession", fields: [supersedesInstallationId], references: [id], onDelete: Restrict)
+  supersededBy             BlueprintInstallation? @relation("BlueprintInstallationSupersession")
+
+  /// Identity that performed the install. A string, not a relation: the ledger must stay readable
+  /// after the actor's record is gone.
+  installedBy String
+
+  installedAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  /// Set when state becomes REMOVED. The row and its history are retained; remove is not a delete.
+  removedAt   DateTime?
+
+  events BlueprintInstallationEvent[]
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, state, installedAt])
+  @@index([blueprintId, state])
+}
+
+/// Append-only history of installs, upgrades, supersessions and removals.
+///
+/// Guarded by `reject_append_only_mutation()` in the migration, so UPDATE and DELETE are refused by
+/// the DATABASE rather than by runtime discipline.
+model BlueprintInstallationEvent {
+  id             String                @id @default(cuid())
+  installationId String
+  installation   BlueprintInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  /// Denormalised so the ledger can be read per tenant without joining through an installation whose
+  /// own row may have moved to SUPERSEDED or REMOVED.
+  workspaceId String
+
+  kind BlueprintInstallationEventKind
+
+  /// Recorded on the event as well as the installation, because an upgrade writes events against two
+  /// installations and each line must state which blueprint version it is about.
+  blueprintId      String
+  blueprintVersion String
+
+  /// Identity that caused the transition. A string for the same reason as `installedBy`.
+  actor String
+
+  /// Why, when `kind` alone does not say. An upgrade records what it superseded here.
+  detail String?
+
+  metadataJson Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([installationId, createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+/// Gold wholesale / store stock-in. Kind is SUPPLIER | RETAILER | CUSTOMER.
+model PartyAccount {
+  id                String   @id @default(cuid())
+  profileId         String
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  contactId         String?  @unique
+  contact           Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  kind              String
+  displayName       String
+  phone             String?
+  gstin             String?
+  creditLimitPaise  Int      @default(0)
+  termsDays         Int      @default(0)
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  bills     MetalBill[]
+  payments  MetalPayment[]
+  ledger    PartyLedgerEntry[]
+
+  @@index([profileId, kind])
+  @@index([profileId, phone])
+}
+
+model MetalLot {
+  id                String   @id @default(cuid())
+  profileId         String
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  productId         String?
+  product           DigitalProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  title             String
+  grossMg           Int
+  remainingGrossMg  Int
+  remainingQty      Int      @default(0)
+  purityBps         Int
+  costTouchBps      Int
+  sourceBillId      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  lines MetalBillLine[]
+
+  @@index([profileId, remainingGrossMg])
+}
+
+model MetalBill {
+  id              String    @id @default(cuid())
+  profileId       String
+  profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  partyAccountId  String
+  party           PartyAccount @relation(fields: [partyAccountId], references: [id], onDelete: Restrict)
+  kind            String
+  k24PaisePer10g  Int
+  totalPaise      Int
+  paidPaise       Int       @default(0)
+  payStatus       String    @default("UNPAID")
+  dueOn           DateTime?
+  publicToken     String    @unique
+  liftedAt        DateTime?
+  liftedByProfileId String?
+  note            String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lines       MetalBillLine[]
+  allocations MetalAllocation[]
+
+  @@index([profileId, kind, payStatus])
+  @@index([partyAccountId, payStatus])
+}
+
+model MetalBillLine {
+  id             String    @id @default(cuid())
+  billId         String
+  bill           MetalBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  lotId          String?
+  lot            MetalLot? @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  title          String
+  grossMg        Int
+  touchBpsBilled Int
+  makingPaise    Int       @default(0)
+  linePaise      Int
+  qty            Int       @default(1)
+}
+
+model MetalPayment {
+  id             String   @id @default(cuid())
+  profileId      String
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  partyAccountId String
+  party          PartyAccount @relation(fields: [partyAccountId], references: [id], onDelete: Restrict)
+  method         String
+  paise          Int
+  fineMg         Int      @default(0)
+  ref            String?
+  at             DateTime @default(now())
+
+  allocations MetalAllocation[]
+
+  @@index([profileId, at])
+  @@index([partyAccountId, at])
+}
+
+model MetalAllocation {
+  id        String       @id @default(cuid())
+  paymentId String
+  payment   MetalPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  billId    String
+  bill      MetalBill    @relation(fields: [billId], references: [id], onDelete: Cascade)
+  paise     Int
+
+  @@unique([paymentId, billId])
+}
+
+/// Append-only. UPDATE/DELETE refused by trigger.
+model PartyLedgerEntry {
+  id             String       @id @default(cuid())
+  partyAccountId String
+  party          PartyAccount @relation(fields: [partyAccountId], references: [id], onDelete: Cascade)
+  kind           String
+  paiseDelta     Int
+  fineMgDelta    Int          @default(0)
+  paiseAfter     Int
+  fineMgAfter    Int          @default(0)
+  billId         String?
+  paymentId      String?
+  idempotencyKey String?
+  at             DateTime     @default(now())
+
+  @@unique([partyAccountId, idempotencyKey])
+  @@index([partyAccountId, at])
+}

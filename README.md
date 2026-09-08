@@ -1,6 +1,6 @@
-# PersonaLink
+# Introify
 
-The app lives in [`aiclone/`](aiclone/).
+The app lives in [`introify/`](introify/).
 
-- App README: [`aiclone/README.md`](aiclone/README.md)
-- Recovery handoff: [`aiclone/docs/HANDOFF.md`](aiclone/docs/HANDOFF.md)
+- App README: [`introify/README.md`](introify/README.md)
+- Domain: [introify.com](https://introify.com)
