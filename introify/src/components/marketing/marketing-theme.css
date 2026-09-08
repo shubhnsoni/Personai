@@ -227,7 +227,7 @@
     .mk-brand { flex-shrink: 0; }
 }
 
-@media (max-width: 370px) {
+@media (max-width: 480px) {
     .mk-header-actions > .mk-button-small { display: none; }
 }
 

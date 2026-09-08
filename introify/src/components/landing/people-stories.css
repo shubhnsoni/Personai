@@ -54,6 +54,8 @@
     letter-spacing: 1px;
 }
 .mk-story-content {
+    min-width: 0;
+    overflow-wrap: anywhere;
     padding: 25px 25px 8px;
 }
 .mk-story-person {
@@ -63,6 +65,7 @@
     margin-bottom: 25px;
 }
 .mk-story-person > span {
+    flex-shrink: 0;
     background: var(--mk-elevated, #eef0e6);
     color: var(--mk-ink);
     width: 34px;
@@ -72,6 +75,7 @@
     place-items: center;
 }
 .mk-story-person > div {
+    min-width: 0;
     display: grid;
     gap: 1px;
 }
@@ -157,7 +161,7 @@
     .mk-story:last-child {
         grid-column: 1 / -1;
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .mk-story:last-child .mk-story-photo {
         min-height: 330px;

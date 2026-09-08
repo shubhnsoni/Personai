@@ -33,6 +33,7 @@
 .mk-page h4,
 .mk-page p {
     margin: 0;
+    overflow-wrap: anywhere;
 }
 .mk-page em {
     font-family: Georgia, "Times New Roman", serif;
@@ -133,7 +134,9 @@
     transition:
         background 0.2s,
         transform 0.2s;
-    white-space: nowrap;
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
 }
 .mk-button:hover {
     background: #1744c5;
@@ -197,7 +200,7 @@
 }
 .mk-hero {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 26px;
     align-items: center;
     padding-block: 54px 42px;
@@ -546,11 +549,11 @@
 }
 .mk-feature-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 24px;
 }
 .mk-feature-art {
-    height: 264px;
+    min-height: 264px;
     margin-bottom: 27px;
     border: 1px solid #e1e1d9;
     border-radius: 7px;
@@ -561,7 +564,7 @@
 .mk-mini-profile {
     background: #eeede6;
     display: grid;
-    grid-template-columns: 49px 1fr;
+    grid-template-columns: 49px minmax(0, 1fr);
     align-content: start;
     align-items: center;
     gap: 10px;
@@ -636,7 +639,7 @@
 }
 .mk-calendar-days {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     text-align: center;
     gap: 4px;
     font-size: 9px;
@@ -645,18 +648,19 @@
 .mk-calendar-days > span {
     display: grid;
     place-items: center;
-    height: 26px;
+    min-height: 26px;
 }
 .mk-calendar-days > span:nth-child(-n + 7) {
     font-size: 8px;
     color: #677783;
-    height: 17px;
+    min-height: 17px;
 }
 .mk-calendar-selected {
     background: var(--mk-blue);
     color: #fff;
     border-radius: 50%;
     width: 26px;
+    max-width: 100%;
     justify-self: center;
 }
 .mk-mini-slots {
@@ -686,7 +690,7 @@
 }
 .mk-shop-items {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 13px;
 }
 .mk-shop-items > div {
@@ -767,7 +771,7 @@
 }
 .mk-audience-panel {
     display: grid;
-    grid-template-columns: 1.15fr 1fr;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
     gap: 80px;
     padding: 46px 50px;
     background: #f8f7f4;
@@ -882,7 +886,7 @@
 .mk-studio-section {
     padding-block: 116px;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 105px;
     align-items: center;
 }
@@ -1092,7 +1096,7 @@
 }
 .mk-final-cta > .mk-container {
     display: grid;
-    grid-template-columns: 1.5fr 1fr;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
     align-items: center;
     gap: 50px;
 }
@@ -1649,11 +1653,11 @@
         gap: 18px;
     }
     .mk-feature-art {
-        height: 236px;
+        min-height: 236px;
         padding: 22px 13px;
     }
     .mk-mini-profile {
-        grid-template-columns: 36px 1fr;
+        grid-template-columns: 36px minmax(0, 1fr);
         gap: 9px;
     }
     .mk-mini-avatar {
@@ -1997,13 +2001,13 @@
         gap: 38px;
     }
     .mk-feature-art {
-        height: 260px;
+        min-height: 260px;
         max-width: none;
         padding: 28px 30px;
         margin-bottom: 22px;
     }
     .mk-mini-profile {
-        grid-template-columns: 47px 1fr;
+        grid-template-columns: 47px minmax(0, 1fr);
         gap: 10px;
     }
     .mk-mini-avatar {
@@ -2378,6 +2382,111 @@
     }
     .mk-studio-body {
         padding: 19px;
+    }
+}
+/* Preview text must contribute to layout height, including enlarged mobile text. */
+.mk-hero-copy,
+.mk-feature,
+.mk-mini-lines,
+.mk-shop-items > div,
+.mk-audience-copy,
+.mk-audience-preview,
+.mk-floating-card > div,
+.mk-offering > div,
+.mk-studio-row > div,
+.mk-studio-share > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.mk-float-icon,
+.mk-lime-icon,
+.mk-studio-row-icon {
+    flex-shrink: 0;
+}
+@media (max-width: 900px) {
+    /* Collage elements become separate rows before space gets tight. */
+    .mk-hero-visual {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-content: center;
+        gap: 16px;
+        height: auto;
+        width: 100%;
+        max-width: 360px;
+        justify-self: center;
+        padding: 16px 0 0;
+    }
+    .mk-hero-visual .mk-orbit,
+    .mk-hero-visual .mk-link-card,
+    .mk-audience-asterisk {
+        display: none;
+    }
+    .mk-hero-visual .mk-profile-card,
+    .mk-hero-visual .mk-booking-card {
+        width: 100%;
+        transform: none;
+    }
+    .mk-hero-visual .mk-booking-card,
+    .mk-visual-caption,
+    .mk-preview-disclaimer {
+        position: static;
+        transform: none;
+    }
+    .mk-visual-caption {
+        justify-content: center;
+        white-space: normal;
+        text-align: center;
+    }
+    .mk-visual-caption > span {
+        flex-shrink: 0;
+    }
+    .mk-hero-visual .mk-booking-card strong {
+        font-size: 12px;
+    }
+    .mk-hero-visual .mk-booking-card > div > span:last-child {
+        font-size: 10px;
+    }
+    .mk-hero-visual .mk-booking-card .mk-small-label {
+        font-size: 8px;
+    }
+    .mk-studio-preview {
+        transform: none;
+    }
+    .mk-studio-top,
+    .mk-policy-meta {
+        flex-wrap: wrap;
+    }
+}
+@media (max-width: 650px) {
+    .mk-feature-art {
+        padding-inline: clamp(16px, 5vw, 30px);
+    }
+    .mk-audience-tabs {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 4px 10px;
+    }
+    .mk-audience-tabs button {
+        max-width: 100%;
+        text-align: left;
+        min-height: 44px;
+    }
+    .mk-cta-art {
+        height: auto;
+        min-height: 225px;
+        padding-block: 32px;
+        overflow: hidden;
+    }
+    .mk-cta-link {
+        max-width: calc(100% - 16px);
+        padding: 18px 16px;
+        font-size: clamp(17px, 5vw, 23px);
+        transform: none;
+    }
+    .mk-cta-handwriting {
+        margin-inline: 0;
+        transform: none;
+        text-align: center;
     }
 }
 @media (prefers-reduced-motion: reduce) {
