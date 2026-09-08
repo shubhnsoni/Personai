@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { PricingProvider } from "@/components/pricing-provider";
 import { getRequestCurrency } from "@/lib/request-currency";
 import { Toaster } from "sonner";
+import { BRAND_DESCRIPTION, marketingOrigin } from "@/lib/marketing-seo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,8 +25,6 @@ export const dynamic = 'force-dynamic'
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover" as const,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
@@ -34,9 +33,10 @@ export const viewport = {
 }
 
 export const metadata: Metadata = {
+  metadataBase: new URL(marketingOrigin()),
   title: "Introify",
   description:
-    "Your AI-powered professional profile. Chat with visitors, book calls, and sell from one link.",
+    BRAND_DESCRIPTION,
 };
 
 export default async function RootLayout({

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { ProfileView } from "@/components/profile/profile-view"
 import { Metadata } from "next"
+import { isIndexableProfileSlug, marketingOrigin } from "@/lib/marketing-seo"
 
 export const dynamic = 'force-dynamic'
 
@@ -90,22 +91,24 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     const { slug } = await params
     const profile = await prisma.profile.findUnique({
         where: { slug },
-        select: { displayName: true, headline: true, bio: true, slug: true }
+        select: { displayName: true, headline: true, bio: true, slug: true, isPublic: true }
     })
 
-    if (!profile) {
+    if (!profile || !profile.isPublic) {
         return {
             title: "Profile Not Found",
+            robots: { index: false, follow: false },
         }
     }
 
     const description = profile.headline || profile.bio || `Chat with ${profile.displayName}'s AI clone on Introify.`
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const baseUrl = marketingOrigin()
     const profileUrl = `${baseUrl}/${profile.slug}`
 
     return {
         title: `${profile.displayName} | Introify`,
         description,
+        robots: { index: isIndexableProfileSlug(profile.slug), follow: true },
         openGraph: {
             title: `${profile.displayName} — Introify`,
             description,

@@ -15,6 +15,21 @@ export const RESERVED = [
     "blog",
     "legal",
     "health",
+    "about",
+    "contact",
+    "privacy",
+    "terms",
+    "refund-policy",
+    "delivery-policy",
+    "cookie-policy",
+    "acceptable-use",
+    "sms-policy",
+    "library",
+    "qa",
+    "uploads",
+    "o",
+    "opengraph-image",
+    "twitter-image",
 ] as const
 
 export type ReservedSlug = (typeof RESERVED)[number]

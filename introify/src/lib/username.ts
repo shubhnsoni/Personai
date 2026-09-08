@@ -1,4 +1,7 @@
+import { RESERVED } from "./slugs"
+
 export const RESERVED_USERNAMES = new Set([
+    ...RESERVED,
     "www",
     "api",
     "app",

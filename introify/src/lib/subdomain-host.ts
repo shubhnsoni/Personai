@@ -1,4 +1,13 @@
+import { MARKETING_ROUTES } from "./marketing-seo"
+
 const SKIP = /^\/(api|_next|uploads|sign-in|sign-up|dashboard|onboarding|admin|qa|library|l\/|o\/|favicon\.ico)/i
+const GLOBAL_ROUTES = new Set<string>([
+    ...MARKETING_ROUTES.filter((route) => route.path !== "/").map((route) => route.path),
+    "/robots.txt",
+    "/sitemap.xml",
+    "/opengraph-image",
+    "/twitter-image",
+])
 
 export function tenantFromHost(hostHeader: string, apexHostname: string): string | null {
     const host = hostHeader.split(":")[0].toLowerCase()
@@ -14,7 +23,7 @@ export function tenantFromHost(hostHeader: string, apexHostname: string): string
 }
 
 export function subdomainRoute(pathname: string, tenant: string): { type: "skip" } | { type: "redirect"; pathname: string } | { type: "rewrite"; pathname: string } {
-    if (!tenant || SKIP.test(pathname)) return { type: "skip" }
+    if (!tenant || SKIP.test(pathname) || GLOBAL_ROUTES.has(pathname.replace(/\/$/, ""))) return { type: "skip" }
     const prefix = `/${tenant}`
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
         const next = pathname.slice(prefix.length) || "/"
