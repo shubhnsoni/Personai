@@ -1,0 +1,242 @@
+/* Marketing follows the existing next-themes preference; photos keep their original colours. */
+.mk-page {
+    --mk-surface: #fff;
+    --mk-elevated: #efeee7;
+    --mk-action: #2456df;
+    --mk-action-hover: #1744c5;
+}
+
+.mk-header { position: sticky; top: 0; }
+.mk-header-inner { gap: 28px; }
+.mk-header-actions { gap: 16px; }
+.mk-theme-toggle {
+    position: relative;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--mk-line);
+    border-radius: 50%;
+    color: var(--mk-ink);
+    background: var(--mk-surface);
+}
+.mk-theme-toggle > svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    pointer-events: none;
+}
+.mk-theme-toggle select {
+    display: block;
+    appearance: none;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    color: transparent;
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+}
+.mk-theme-toggle option { background: var(--mk-surface); color: var(--mk-ink); }
+.mk-theme-toggle:hover { border-color: var(--mk-blue); }
+.mk-theme-toggle:focus-within { outline: 3px solid var(--mk-blue); outline-offset: 3px; }
+.mk-theme-toggle select:focus-visible { outline: none; }
+
+.dark .mk-page {
+    --mk-paper: #101715;
+    --mk-ink: #eff3eb;
+    --mk-muted: #a7b3aa;
+    --mk-blue: #91b0ff;
+    --mk-line: #34423b;
+    --mk-lime: #d7ee89;
+    --mk-surface: #19241f;
+    --mk-elevated: #223028;
+    --mk-action: #315de0;
+    --mk-action-hover: #426dec;
+    color-scheme: dark;
+}
+
+.dark .mk-page .mk-button { background: var(--mk-action); border-color: var(--mk-action); color: #fff; }
+.dark .mk-page .mk-button:hover { background: var(--mk-action-hover); border-color: var(--mk-action-hover); }
+.dark .mk-page .mk-button-outline { background: transparent; border-color: #65786a; color: var(--mk-ink); }
+.dark .mk-page .mk-button-outline:hover { background: var(--mk-elevated); border-color: var(--mk-muted); }
+.dark .mk-page .mk-button-lime { background: var(--mk-lime); border-color: var(--mk-lime); color: #172523; }
+.dark .mk-page .mk-button-lime:hover { background: #e5f7af; border-color: #e5f7af; }
+.dark .mk-page .mk-skip-link { background: var(--mk-lime); color: #172523; }
+.dark .mk-page .mk-live-dot { box-shadow: 0 0 0 4px #91b0ff18; }
+.dark .mk-page .mk-orbit { border-color: #344239; }
+.dark .mk-page .mk-orbit-two { border-color: #28372e; }
+
+/* The sample profile remains a complete, readable card around its unaltered portrait. */
+.dark .mk-page .mk-profile-card,
+.dark .mk-page .mk-floating-card {
+    background: var(--mk-surface);
+    border-color: #3a493f;
+    color: var(--mk-ink);
+    box-shadow: 0 18px 45px #0004;
+}
+.dark .mk-page .mk-profile-url { background: #142019; border-color: var(--mk-line); color: var(--mk-muted); }
+.dark .mk-page .mk-url-dots i { background: #536155; }
+.dark .mk-page .mk-profile-title h2 span { color: #b7d39a; }
+.dark .mk-page .mk-profile-action { background: #b8d2a1; color: #18271c; }
+.dark .mk-page .mk-profile-action:hover { background: #cce4b7; }
+.dark .mk-page .mk-float-icon { background: #253756; color: var(--mk-blue); }
+.dark .mk-page .mk-lime-icon { color: #172523; }
+.dark .mk-page .mk-profile-bottom,
+.dark .mk-page .mk-floating-card > div > span:last-child,
+.dark .mk-page .mk-preview-disclaimer,
+.dark .mk-page .mk-audience-strip p svg { color: var(--mk-muted); }
+
+/* Product illustrations use tinted dark surfaces, rather than white panels with light text. */
+.dark .mk-page .mk-feature-art { border-color: var(--mk-line); }
+.dark .mk-page .mk-mini-profile { background: #202a23; }
+.dark .mk-page .mk-mini-calendar { background: #1d2937; }
+.dark .mk-page .mk-mini-shop { background: #2e2722; }
+.dark .mk-page .mk-mini-avatar { background: #394a35; color: #dae9c8; }
+.dark .mk-page .mk-mini-avatar > span { color: #bdd897; }
+.dark .mk-page .mk-mini-link { background: #2a362d; border-color: #465442; }
+.dark .mk-page .mk-mini-slots span { background: #2a394e; border-color: #455c77; }
+.dark .mk-page .mk-calendar-selected { color: #142135; }
+.dark .mk-page .mk-tile-course { background: #3b4a36; color: #d6e5c4; }
+.dark .mk-page .mk-tile-event { background: #644632; color: #f6dac4; }
+.dark .mk-page .mk-mini-lines span,
+.dark .mk-page .mk-mini-link > span,
+.dark .mk-page .mk-calendar-days > span:nth-child(-n + 7),
+.dark .mk-page .mk-art-label,
+.dark .mk-page .mk-shop-items > div > span:last-child,
+.dark .mk-page .mk-feature-number { color: var(--mk-muted); }
+
+.dark .mk-page .mk-audience-section,
+.dark .mk-page .mk-how-section { background: #16201b; }
+.dark .mk-page .mk-audience-panel { background: var(--mk-paper); border-color: var(--mk-line); }
+.dark .mk-page .mk-audience-tabs { border-color: var(--mk-line); }
+.dark .mk-page .mk-audience-tabs button { color: var(--mk-muted); }
+.dark .mk-page .mk-audience-tabs button[aria-selected="true"] { color: var(--mk-ink); border-color: var(--mk-blue); }
+.dark .mk-page .mk-audience-tabs button:hover { color: var(--mk-blue); }
+.dark .mk-page .mk-audience-copy li svg,
+.dark .mk-page .mk-studio-copy li svg { color: #bbd79c; }
+.dark .mk-page .mk-audience-preview { background: #3b2e27; }
+.dark .mk-page .mk-audience-blue .mk-audience-preview { background: #25374a; }
+.dark .mk-page .mk-audience-green .mk-audience-preview { background: #303e28; }
+.dark .mk-page .mk-audience-asterisk { color: #d5a48138; }
+.dark .mk-page .mk-audience-blue .mk-audience-asterisk { color: #acc7e43b; }
+.dark .mk-page .mk-audience-green .mk-audience-asterisk { color: #c2d98d38; }
+.dark .mk-page .mk-offering { background: #17201bcf; border-color: #66755c70; }
+.dark .mk-page .mk-offering > span,
+.dark .mk-page .mk-offering > div > span { color: #bec9ba; }
+
+.dark .mk-page .mk-studio-preview { background: #243127; }
+.dark .mk-page .mk-studio-top,
+.dark .mk-page .mk-studio-body { background: #17231b; border-color: #3a4a36; }
+.dark .mk-page .mk-studio-logo { color: #c8dea9; }
+.dark .mk-page .mk-example-pill { background: #2d3b26; border-color: #4b5b3e; color: #dae8c8; }
+.dark .mk-page .mk-studio-row { border-color: #394834; }
+.dark .mk-page .mk-studio-row-icon { background: #2d402a; color: #b8d69e; }
+.dark .mk-page .mk-studio-share { background: #293b24; border-color: #495d3c; }
+.dark .mk-page .mk-studio-greeting > span,
+.dark .mk-page .mk-studio-row > div > span,
+.dark .mk-page .mk-studio-share > div > span,
+.dark .mk-page .mk-studio-row > svg,
+.dark .mk-page .mk-steps li > span,
+.dark .mk-page .mk-faq-number { color: #b4c1a9; }
+.dark .mk-page .mk-steps li,
+.dark .mk-page .mk-faq-list,
+.dark .mk-page .mk-faq-list details,
+.dark .mk-page .mk-audience-strip a { border-color: var(--mk-line); }
+.dark .mk-page .mk-final-cta { background: #1b352a; }
+
+.dark .mk-page .mk-footer { background: #141f19; }
+.dark .mk-page .mk-footer-brand > .mk-small-label,
+.dark .mk-page .mk-footer nav a,
+.dark .mk-page .mk-footer-bottom { color: var(--mk-muted); }
+.dark .mk-page .mk-footer nav a:hover { color: var(--mk-blue); }
+.dark .mk-page .mk-footer-bottom { border-color: var(--mk-line); }
+
+/* Policy and pricing typography stays legible through long sections and blank fields. */
+.dark .mk-page .mk-back,
+.dark .mk-page .mk-policy-meta,
+.dark .mk-page .mk-policy-layout aside nav a,
+.dark .mk-page .mk-policy-layout aside nav a > span,
+.dark .mk-page .mk-section-number,
+.dark .mk-page .mk-policy-fields dt { color: var(--mk-muted); }
+.dark .mk-page .mk-policy-layout aside nav a:hover { color: var(--mk-blue); }
+.dark .mk-page .mk-policy-article p,
+.dark .mk-page .mk-policy-article li { color: #c2ccc2; }
+.dark .mk-page .mk-draft-notice { background: #29311f; border-color: #59623b; border-left-color: var(--mk-lime); }
+.dark .mk-page .mk-draft-notice p { color: #c1cead; }
+.dark .mk-page .mk-policy-fields { background: var(--mk-surface); }
+.dark .mk-page .mk-policy-layout aside nav,
+.dark .mk-page .mk-policy-help,
+.dark .mk-page .mk-policy-article > section,
+.dark .mk-page .mk-policy-fields,
+.dark .mk-page .mk-policy-fields > div { border-color: var(--mk-line); }
+.dark .mk-page .mk-blank-field { border-color: #7c8a70; }
+
+@media (min-width: 651px) {
+    .mk-policy-layout aside {
+        top: 112px;
+        max-height: calc(100vh - 136px);
+        max-height: calc(100dvh - 136px);
+        overflow-y: auto;
+    }
+}
+
+@media (max-width: 1150px) {
+    .mk-header-inner { gap: 20px; }
+    .mk-desktop-nav { display: none; }
+    .mk-header-actions { margin-left: auto; gap: 15px; }
+    .mk-mobile-menu { display: block; position: relative; }
+    .mk-mobile-menu summary {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+    }
+    .mk-mobile-menu summary::-webkit-details-marker { display: none; }
+    .mk-mobile-menu summary span { display: block; width: 21px; height: 1px; background: var(--mk-ink); }
+    .mk-mobile-menu nav {
+        position: absolute;
+        right: 0;
+        top: 51px;
+        display: grid;
+        background: var(--mk-surface);
+        border: 1px solid var(--mk-line);
+        border-radius: 6px;
+        box-shadow: 0 14px 35px #0002;
+        padding: 20px;
+        width: min(250px, calc(100vw - 40px));
+        max-height: calc(100vh - 104px);
+        max-height: calc(100dvh - 104px);
+        overflow-y: auto;
+        gap: 0;
+        font-size: 13px;
+    }
+    .mk-mobile-menu nav a { padding: 10px 4px; }
+}
+
+@media (max-width: 650px) {
+    .mk-header-inner { gap: 8px; }
+    .mk-header-actions { gap: 8px; }
+    .mk-header-actions .mk-button-small { padding-inline: 10px; gap: 7px; }
+    .mk-brand { flex-shrink: 0; }
+}
+
+@media (max-width: 370px) {
+    .mk-header-actions > .mk-button-small { display: none; }
+}
+
+@media (forced-colors: active) {
+    .mk-theme-toggle select { opacity: 1; color: ButtonText; background: ButtonFace; padding: 0 3px; }
+    .mk-theme-toggle { width: 84px; flex-basis: 84px; border-radius: 5px; }
+    .mk-theme-toggle > svg { display: none; }
+}
+
+@media (forced-colors: active) and (max-width: 650px) {
+    .mk-header-actions > .mk-button-small { display: none; }
+}

@@ -1,0 +1,206 @@
+.mk-people-section {
+    padding-block: 100px;
+    background: var(--mk-paper);
+    border-top: 1px solid var(--mk-line);
+}
+.mk-people-section .mk-section-heading {
+    margin-bottom: 25px;
+}
+.mk-stories-disclosure {
+    font-size: 10px;
+    color: var(--mk-muted);
+    margin-bottom: 28px !important;
+}
+.mk-stories-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+    align-items: start;
+}
+.mk-story {
+    min-width: 0;
+    border: 1px solid var(--mk-line);
+    border-radius: 7px;
+    overflow: hidden;
+    background: var(--mk-surface, #fffefa);
+}
+.mk-story-photo {
+    position: relative;
+    aspect-ratio: 1.22;
+    background: #d8d5c9;
+    overflow: hidden;
+}
+.mk-story-photo img {
+    object-fit: cover;
+    transition: transform 400ms ease;
+}
+.mk-story-portrait-mira img {
+    object-position: 50% 24%;
+}
+.mk-story-portrait-arjun img,
+.mk-story-portrait-leela img {
+    object-position: 50% 35%;
+}
+.mk-story-photo-label {
+    position: absolute;
+    bottom: 15px;
+    left: 17px;
+    color: #24362a;
+    background: #fbfaefef;
+    padding: 5px 8px;
+    border-radius: 2px;
+    font-size: 7px;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+.mk-story-content {
+    padding: 25px 25px 8px;
+}
+.mk-story-person {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    margin-bottom: 25px;
+}
+.mk-story-person > span {
+    background: var(--mk-elevated, #eef0e6);
+    color: var(--mk-ink);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+}
+.mk-story-person > div {
+    display: grid;
+    gap: 1px;
+}
+.mk-story-person strong {
+    font-weight: 600;
+    font-size: 12px;
+}
+.mk-story-person > div > span {
+    color: var(--mk-muted);
+    font-size: 9px;
+}
+.mk-story h3 {
+    font-weight: 500;
+    font-size: 25px;
+    line-height: 1.23;
+    letter-spacing: -0.85px;
+    margin-bottom: 16px;
+}
+.mk-story-content > p,
+.mk-story-details p,
+.mk-story-details li {
+    color: var(--mk-muted);
+    font-size: 12px;
+    line-height: 1.9;
+}
+.mk-story-details {
+    margin-top: 23px;
+    border-top: 1px solid var(--mk-line);
+}
+.mk-story-details summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-block: 16px;
+    list-style: none;
+    font-size: 11px;
+    font-weight: 550;
+}
+.mk-story-details summary::-webkit-details-marker {
+    display: none;
+}
+.mk-story-details[open] summary > svg {
+    transform: rotate(45deg);
+}
+.mk-story-details > div {
+    padding-bottom: 14px;
+}
+.mk-story-details ul {
+    list-style: disc;
+    padding-left: 16px;
+    margin: 15px 0 18px;
+}
+.mk-story-details li {
+    margin-block: 5px;
+    padding-left: 2px;
+}
+.mk-story-details .mk-text-link {
+    font-size: 11px;
+    line-height: 1.5;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .mk-story:hover .mk-story-photo img {
+        transform: scale(1.025);
+    }
+}
+@media (max-width: 1100px) {
+    .mk-story-content {
+        padding: 22px 20px 6px;
+    }
+    .mk-story h3 {
+        font-size: 23px;
+    }
+}
+@media (max-width: 900px) {
+    .mk-people-section {
+        padding-block: 75px;
+    }
+    .mk-stories-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+    }
+    .mk-story:last-child {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    .mk-story:last-child .mk-story-photo {
+        min-height: 330px;
+        aspect-ratio: auto;
+    }
+}
+@media (max-width: 650px) {
+    .mk-people-section {
+        padding-block: 65px;
+    }
+    .mk-stories-disclosure {
+        font-size: 10px;
+        line-height: 1.7;
+        max-width: 290px;
+    }
+    .mk-stories-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 27px;
+    }
+    .mk-story:last-child {
+        grid-column: auto;
+        display: block;
+    }
+    .mk-story:last-child .mk-story-photo {
+        min-height: 0;
+        aspect-ratio: 1.22;
+    }
+    .mk-story-content {
+        padding: 23px 24px 6px;
+    }
+    .mk-story h3 {
+        font-size: 27px;
+    }
+    .mk-story-person > div > span {
+        font-size: 10px;
+    }
+    .mk-story-content > p,
+    .mk-story-details p,
+    .mk-story-details li {
+        font-size: 13px;
+    }
+    .mk-story-details summary,
+    .mk-story-details .mk-text-link {
+        font-size: 12px;
+    }
+}

@@ -17,6 +17,8 @@ import {
 } from "lucide-react"
 import { MarketingShell } from "@/components/marketing/marketing-shell"
 import { AudienceExplorer } from "./audience-explorer"
+import { ChatShowcase } from "./chat-showcase"
+import { PeopleStories } from "./people-stories"
 
 const faqs = [
     [
@@ -368,6 +370,8 @@ export function HomeLanding() {
                         <AudienceExplorer />
                     </div>
                 </section>
+                <ChatShowcase />
+                <PeopleStories />
                 <section className="mk-studio-section mk-container">
                     <div className="mk-studio-copy">
                         <span className="mk-eyebrow">BEHIND YOUR PAGE</span>

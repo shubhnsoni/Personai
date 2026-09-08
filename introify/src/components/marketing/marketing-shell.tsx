@@ -1,7 +1,10 @@
 import Link from "next/link"
 import { ArrowUpRight } from "lucide-react"
 import type { ReactNode } from "react"
+import { ThemeToggle } from "./theme-toggle"
+import { MobileNav } from "./mobile-nav"
 import "./marketing.css"
+import "./marketing-theme.css"
 
 export function BrandMark() {
     return (
@@ -20,8 +23,8 @@ export function BrandMark() {
 
 const navigation = [
     ["Product", "/#product"],
-    ["For you", "/#for-you"],
-    ["How it works", "/#how-it-works"],
+    ["Conversations", "/#conversations"],
+    ["Stories", "/#stories"],
     ["Pricing", "/pricing"],
     ["FAQ", "/#faq"],
 ] as const
@@ -39,6 +42,7 @@ export function MarketingHeader() {
                     ))}
                 </nav>
                 <div className="mk-header-actions">
+                    <ThemeToggle />
                     <Link className="mk-sign-in" href="/sign-in">
                         Sign in
                     </Link>
@@ -46,20 +50,7 @@ export function MarketingHeader() {
                         Get started <ArrowUpRight size={15} />
                     </Link>
                 </div>
-                <details className="mk-mobile-menu">
-                    <summary aria-label="Open navigation">
-                        <span />
-                        <span />
-                    </summary>
-                    <nav aria-label="Mobile navigation">
-                        {navigation.map(([label, href]) => (
-                            <Link key={label} href={href}>
-                                {label}
-                            </Link>
-                        ))}
-                        <Link href="/sign-in">Sign in</Link>
-                    </nav>
-                </details>
+                <MobileNav links={navigation} />
             </div>
         </header>
     )
@@ -70,6 +61,8 @@ const footerGroups = [
         title: "Explore",
         links: [
             ["Product", "/#product"],
+            ["Chat examples", "/#conversations"],
+            ["Stories", "/#stories"],
             ["Pricing", "/pricing"],
             ["Example page", "/demo"],
             ["Create your page", "/sign-up"],

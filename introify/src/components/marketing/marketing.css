@@ -1,4 +1,4 @@
-/* The public site has its own light palette, independent of dashboard theme. */
+/* Public-page layout. Adaptive palette overrides live in marketing-theme.css. */
 .mk-page {
     --mk-paper: #f8f7f4;
     --mk-ink: #172523;
@@ -2334,7 +2334,7 @@
         gap: 12px;
     }
     .mk-hero h1 {
-        font-size: 54px;
+        font-size: clamp(43px, 14.5vw, 54px);
     }
     .mk-hero-ctas {
         gap: 13px;
