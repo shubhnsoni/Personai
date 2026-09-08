@@ -516,9 +516,9 @@
 [data-clerk-keyless],
 [data-clerk-keyless-prompt],
 iframe[title="Clerk Keyless Prompt"],
-.cl-internal-b3fm6y,
-.cl-footer,
-.cl-logoBox {
+.auth-clerk .cl-internal-b3fm6y,
+.auth-clerk .cl-footer,
+.auth-clerk .cl-logoBox {
   display: none !important;
 }
 

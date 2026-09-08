@@ -1,94 +1,133 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { useEffect, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { AnimatePresence, motion } from "framer-motion"
-import { Logo } from "@/components/brand/logo"
-
-type Mode = "sign-in" | "sign-up"
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ArrowLeft, ArrowUpRight, Check, Link2, Sparkles } from "lucide-react";
+import { BrandMark } from "@/components/marketing/marketing-shell";
+import { ThemeToggle } from "@/components/marketing/theme-toggle";
+import "./auth.css";
 
 const copy = {
-    "sign-in": {
-        title: "Welcome back",
-        subtitle: "Sign in to your account",
-        altHint: "Don't have an account?",
-        altLabel: "Sign up",
-    },
-    "sign-up": {
-        title: "Create account",
-        subtitle: "Sign up to get started",
-        altHint: "Already have an account?",
-        altLabel: "Sign in",
-    },
-} as const
-
-function modeFromPath(pathname: string): Mode {
-    return pathname.startsWith("/sign-up") ? "sign-up" : "sign-in"
-}
+  "sign-in": {
+    eyebrow: "YOUR NEXT CHAPTER IS WAITING",
+    title: "Good to have",
+    emphasis: "you back.",
+    description:
+      "A new idea. A small update. A conversation worth starting. Pick up where you left off.",
+    sectionLabel: "Sign in to Introify",
+  },
+  "sign-up": {
+    eyebrow: "A LITTLE MORE YOU. A LOT MORE POSSIBLE.",
+    title: "There’s more to you.",
+    emphasis: "Let’s show it.",
+    description:
+      "Give your story, services and ideas a place of their own. Start with a page. Make it yours.",
+    sectionLabel: "Create your Introify account",
+  },
+} as const;
 
 export function AuthScreen({ children }: { children: React.ReactNode }) {
-    const pathname = usePathname()
-    const router = useRouter()
-    const routeMode = modeFromPath(pathname)
-    const [mode, setMode] = useState<Mode>(routeMode)
+  const pathname = usePathname();
+  const mode = pathname.startsWith("/sign-up") ? "sign-up" : "sign-in";
+  const current = copy[mode];
 
-    useEffect(() => {
-        setMode(routeMode)
-    }, [routeMode])
-
-    function go(next: Mode) {
-        if (next === mode) return
-        setMode(next)
-        router.replace(next === "sign-up" ? "/sign-up" : "/sign-in", { scroll: false })
-    }
-
-    const current = copy[mode]
-
-    return (
-        <div className="auth-scene relative min-h-dvh overflow-hidden text-white">
-            <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-6 pt-[max(0.9rem,env(safe-area-inset-top))]">
-                <Logo className="from-white to-white/70" />
-                <Link href="/" className="text-sm text-white/35 hover:text-white">
-                    Home
-                </Link>
-            </header>
-
-            <main className="relative z-10 flex min-h-dvh items-center justify-center px-6 py-[max(4.5rem,env(safe-area-inset-top))]">
-                <div className="auth-glass w-full max-w-[21rem] px-7 py-8">
-                    <div className="relative z-10">
-                        <div className="mb-6 flex min-h-[4.25rem] flex-col items-center text-center">
-                            <AnimatePresence mode="wait" initial={false}>
-                                <motion.div
-                                    key={mode}
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -8 }}
-                                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                                >
-                                    <h1 className="text-[1.55rem] font-medium tracking-[-0.03em] text-white">
-                                        {current.title}
-                                    </h1>
-                                    <p className="mt-1.5 text-[13px] text-white/38">{current.subtitle}</p>
-                                </motion.div>
-                            </AnimatePresence>
-                        </div>
-
-                        <div className="auth-clerk relative w-full">{children}</div>
-
-                        <p className="mt-6 text-center text-[12px] text-white/35">
-                            {current.altHint}{" "}
-                            <button
-                                type="button"
-                                onClick={() => go(mode === "sign-in" ? "sign-up" : "sign-in")}
-                                className="font-medium text-[#00D7FF] hover:text-white"
-                            >
-                                {current.altLabel}
-                            </button>
-                        </p>
-                    </div>
-                </div>
-            </main>
+  return (
+    <div className="mk-page au-page">
+      <a className="mk-skip-link" href="#auth-content">
+        Skip to account form
+      </a>
+      <header className="au-header">
+        <BrandMark />
+        <div className="au-header-actions">
+          <ThemeToggle />
+          <Link href="/" className="au-home">
+            <ArrowLeft size={15} aria-hidden="true" />
+            <span>Back to home</span>
+          </Link>
         </div>
-    )
+      </header>
+
+      <main className="au-main">
+        <aside
+          className="au-editorial"
+          aria-label="Your next chapter with Introify"
+        >
+          <span className="au-eyebrow">{current.eyebrow}</span>
+          <p className="au-editorial-title">
+            {current.title}
+            <br />
+            <em>{current.emphasis}</em>
+          </p>
+          <p className="au-description">{current.description}</p>
+          <div className="au-story" aria-label="Illustrative creator page">
+            <div className="au-story-photo">
+              <Image
+                src="/marketing/ceramic-artist.png"
+                alt="Illustrative portrait of a ceramic artist in her studio"
+                fill
+                sizes="(max-width: 900px) 1px, (max-width: 1200px) 36vw, 440px"
+              />
+              <span className="au-story-label">A SPACE FOR WHAT YOU DO</span>
+            </div>
+            <div className="au-story-caption">
+              <div>
+                <strong>
+                  Mira Studio <span aria-hidden="true">✳</span>
+                </strong>
+                <span>CERAMICS & CREATIVE WORKSHOPS</span>
+              </div>
+              <ArrowUpRight size={22} aria-hidden="true" />
+            </div>
+            <div className="au-story-note">
+              <Link2 size={17} aria-hidden="true" />
+              <span>
+                Your work. Your story.
+                <br />
+                <strong>One place to begin.</strong>
+              </span>
+            </div>
+          </div>
+          <p className="au-example-note">
+            Illustrative profile and generated portrait.
+          </p>
+        </aside>
+
+        <section className="au-form-column" aria-label={current.sectionLabel}>
+          <div className="au-form-card" id="auth-content" tabIndex={-1}>
+            <div className="au-card-kicker">
+              <Sparkles size={15} aria-hidden="true" />
+              <span>
+                {mode === "sign-up"
+                  ? "MAKE YOUR INTRO"
+                  : "YOUR SPACE, RIGHT HERE"}
+              </span>
+            </div>
+            <div className="au-clerk">{children}</div>
+            <div className="au-card-note">
+              <Check size={14} aria-hidden="true" />
+              <span>
+                {mode === "sign-up"
+                  ? "Free early access. No card required."
+                  : "Your page and dashboard are a sign-in away."}
+              </span>
+            </div>
+          </div>
+          <p className="au-policy-note">
+            Learn how Introify works in our <Link href="/terms">Terms</Link> and{" "}
+            <Link href="/privacy">Privacy policy</Link>.
+          </p>
+        </section>
+      </main>
+
+      <footer className="au-footer">
+        <span>Good work deserves a great introduction.</span>
+        <nav aria-label="Account page links">
+          <Link href="/contact">Contact</Link>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+        </nav>
+      </footer>
+    </div>
+  );
 }
