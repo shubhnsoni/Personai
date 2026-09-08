@@ -7,6 +7,7 @@ import { arChargeCents, arCostCents, AR_CREDITS_PER_ITEM } from "@/lib/ar-price"
 import { createImageTo3dTask, downloadAsset, getImageTo3dTask, publicError } from "@/lib/meshy-internal"
 import { optimizeModelSet } from "@/lib/optimize-glb"
 import { arSizeFor } from "@/lib/ar-scale"
+import { readUploadedFile, uploadsDirectory } from "@/lib/uploads-storage"
 
 export type ArBuildStatus = "DRAFT" | "PAID" | "RUNNING" | "READY" | "FAILED"
 
@@ -80,6 +81,11 @@ function sniffMime(bytes: Buffer) {
 
 export async function imageToDataUri(url: string) {
     if (url.startsWith("data:image/")) return url
+    if (url.startsWith("/uploads/")) {
+        const bytes = await readUploadedFile(url.slice("/uploads/".length).split("/"))
+        const mime = sniffMime(bytes) || "image/jpeg"
+        return `data:${mime};base64,${bytes.toString("base64")}`
+    }
     if (url.startsWith("/")) {
         const base = resolve(process.cwd(), "public")
         const full = resolve(base, url.replace(/^\//, ""))
@@ -96,7 +102,7 @@ export async function imageToDataUri(url: string) {
 }
 
 async function persistBytes(profileId: string, filename: string, bytes: Buffer) {
-    const base = resolve(process.cwd(), "public", "uploads")
+    const base = uploadsDirectory()
     const owner = ownerDir(profileId)
     const directory = resolve(base, owner)
     const full = resolve(directory, filename)

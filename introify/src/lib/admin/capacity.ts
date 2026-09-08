@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { prisma } from "@/lib/prisma"
 import { env } from "@/lib/env"
+import { uploadsDirectory } from "@/lib/uploads-storage"
 import { loadPlatformAiSettings, providerConfigured } from "@/lib/admin/ai-settings"
 
 export type LoadBand = "ok" | "warm" | "hot"
@@ -163,7 +164,7 @@ export async function platformSetupChecks(): Promise<SetupCheck[]> {
     const dbUrl = process.env.DATABASE_URL || ""
     const appUrl = env.appUrl
     const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.S3_BUCKET || process.env.AWS_S3_BUCKET)
-    const uploads = blob || existsSync("public/uploads")
+    const uploads = blob || existsSync(uploadsDirectory())
     const pooled = /pooler|pgbouncer|connection_limit/i.test(dbUrl)
     const lastWebhook = await readOps().then((ops) => ops.lastStripeWebhookAt).catch(() => null)
     const heartbeat = await prisma.visitorSession.count({
@@ -176,7 +177,7 @@ export async function platformSetupChecks(): Promise<SetupCheck[]> {
         { id: "admins", label: "ADMIN_EMAILS", ok: Boolean(process.env.ADMIN_EMAILS?.trim()) },
         { id: "stripe", label: "Stripe keys", ok: env.hasStripe, hint: lastWebhook ? `last webhook ${lastWebhook}` : "no webhook seen yet" },
         { id: "appurl", label: "NEXT_PUBLIC_APP_URL is a real host", ok: Boolean(appUrl) && !/localhost|127\.0\.0\.1/i.test(appUrl), hint: appUrl },
-        { id: "uploads", label: "Uploads on blob/S3 (or local disk in dev)", ok: uploads, hint: blob ? "object storage" : "local public/uploads" },
+        { id: "uploads", label: "Upload storage", ok: uploads, hint: blob ? "object storage" : process.env.UPLOADS_DIR?.trim() ? "configured UPLOADS_DIR" : "local public/uploads" },
         { id: "ai", label: "An AI backend is configured and not killed", ok: (["codex", "xai", "openai"] as const).some((k) => providerConfigured(k) && !ai.kill[k]) },
         { id: "health", label: "HEALTH_DIAGNOSTICS_TOKEN", ok: Boolean(process.env.HEALTH_DIAGNOSTICS_TOKEN?.trim()) },
         { id: "pool", label: "Postgres pooler in the URL", ok: pooled || process.env.NODE_ENV !== "production", hint: pooled ? "pooled" : "add Neon/Supabase pooler before many shops" },

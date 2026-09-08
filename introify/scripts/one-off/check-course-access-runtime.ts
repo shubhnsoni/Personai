@@ -594,7 +594,7 @@ async function main() {
             perLessonAgreement.join("; ") || `${listAnswer.lessons.length} lessons compared`,
         )
         const readerSrc = readFileSync(join(__dirname, "../../src/app/library/courses/[id]/page.tsx"), "utf8")
-        const completionSrc = readFileSync(join(__dirname, "../../src/app/api/courses/complete-lesson/route.ts"), "utf8")
+        const completionSrc = readFileSync(join(__dirname, "../../src/app/api/courses/complete-lesson/handler.ts"), "utf8")
         checkInvertible(
             "MEASURED: the library content reader actually consults the access engine - tiers are enforced, not merely enforceable",
             /LearnerAccessService/.test(readerSrc) && /visibleLessons/.test(readerSrc),

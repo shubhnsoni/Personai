@@ -43,11 +43,18 @@ PostgreSQL migrations using the host's `DATABASE_URL`, creates missing welcome
 presets and the `/demo` profile, then builds Next.js. This bootstrap preserves
 existing records and skips an existing demo. Set the production Clerk keys and
 `NEXT_PUBLIC_APP_URL=https://introify.com` in Hostinger before building.
+Hostinger uses the native `.mjs` configuration and Webpack so Next.js can fall
+back to its WASM compiler when the host's older glibc cannot load native SWC.
 
-Runtime uploads are served from `public/uploads/`. Keep that directory writable
-and preserve it across deployments in the hosting storage configuration.
+Set `UPLOADS_DIR` to a writable, persistent directory outside Hostinger's
+deployment tree, such as `/home/<username>/domains/introify.com/uploads`.
+Uploads and generated QR/AR assets are written there while their public URLs stay
+`/uploads/...`. Reads prefer this directory and fall back to committed demo assets
+in `public/uploads/`. When unset, local development uses `public/uploads/` for both
+reads and writes. Relative values resolve against the app's working directory;
+use an absolute path on Hostinger so redeployments keep the same storage.
 
-Layout: `src/` app code, `prisma/` schema + seed + migrations, `scripts/one-off/` demo fillers, `docs/` handoff. User images go in `public/uploads/`.
+Layout: `src/` app code, `prisma/` schema + seed + migrations, `scripts/one-off/` demo fillers, `docs/` handoff. User images go in `UPLOADS_DIR`, or `public/uploads/` when unset.
 
 ## Environment (names only)
 
@@ -56,6 +63,7 @@ Set these in `.env`. Do not put real secrets in `.env.example` or the README.
 | Name | Notes |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string |
+| `UPLOADS_DIR` | Persistent upload directory; defaults to `public/uploads` locally |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
 | `CLERK_SECRET_KEY` | Clerk secret key |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/sign-in` |

@@ -1,5 +1,5 @@
-import { createImageTo3dRoute, type ImageTo3dRouteDependencies } from "../../src/app/api/image-to-3d/route"
-import { createUploadRoute, type UploadRouteDependencies } from "../../src/app/api/upload/route"
+import { createImageTo3dRoute, type ImageTo3dRouteDependencies } from "../../src/app/api/image-to-3d/handler"
+import { createUploadRoute, type UploadRouteDependencies } from "../../src/app/api/upload/handler"
 import {
   createOwnershipFoundation,
   ownershipRefusalResponse,

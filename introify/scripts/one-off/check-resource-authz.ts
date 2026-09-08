@@ -29,9 +29,9 @@ moduleInternals._resolveFilename = function resolveProjectAlias(request, parent,
 }
 
 type RouteModules = Readonly<{
-    course: typeof import('../../src/app/api/courses/complete-lesson/route')
-    booking: typeof import('../../src/app/api/calendar/event/[bookingId]/route')
-    stripe: typeof import('../../src/app/api/stripe/products/route')
+    course: typeof import('../../src/app/api/courses/complete-lesson/handler')
+    booking: typeof import('../../src/app/api/calendar/event/[bookingId]/handler')
+    stripe: typeof import('../../src/app/api/stripe/products/handler')
 }>
 
 const prisma = new PrismaClient()
@@ -253,9 +253,9 @@ async function runChecks(db: Prisma.TransactionClient, routes: RouteModules): Pr
 
 async function main(): Promise<void> {
     const [course, booking, stripe] = await Promise.all([
-        import('../../src/app/api/courses/complete-lesson/route'),
-        import('../../src/app/api/calendar/event/[bookingId]/route'),
-        import('../../src/app/api/stripe/products/route'),
+        import('../../src/app/api/courses/complete-lesson/handler'),
+        import('../../src/app/api/calendar/event/[bookingId]/handler'),
+        import('../../src/app/api/stripe/products/handler'),
     ])
     const routes: RouteModules = { course, booking, stripe }
 

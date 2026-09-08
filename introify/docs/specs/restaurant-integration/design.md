@@ -243,7 +243,7 @@ Operational details that SSE gets wrong if ignored:
 - **`Last-Event-ID`** replayed from `OrderEvent.seq`, satisfying requirement 2.3.
   Reconnect without replay is the failure mode where a board looks healthy and is
   silently stale.
-- The existing global `Cache-Control: no-store` in `next.config.ts` is already
+- The existing global `Cache-Control: no-store` in `next.config.mjs` is already
   correct for this.
 
 **Known limit, stated plainly:** this dies with a second instance or a move to

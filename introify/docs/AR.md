@@ -28,7 +28,7 @@ a preview.
    suppresses those buttons and says so.
 2. **`.usdz` must be served as `model/vnd.usdz+zip`.** As
    `application/octet-stream` Safari downloads the file and no AR session
-   starts. The header rule is in `next.config.ts`.
+   starts. The header rule is in `next.config.mjs`.
 
 ## In-session AR behaviour (WebXR path)
 

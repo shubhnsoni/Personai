@@ -1,7 +1,7 @@
-import { constants } from "node:fs"
-import { lstat, open, realpath, type FileHandle } from "node:fs/promises"
-import { extname, isAbsolute, relative, resolve, sep } from "node:path"
+import type { FileHandle } from "node:fs/promises"
+import { extname } from "node:path"
 import { Readable } from "node:stream"
+import { openStoredUploadFile, validUploadSegments } from "@/lib/uploads-storage"
 
 // Match the upload endpoint's accepted formats. HTML, script and arbitrary SVG
 // uploads are deliberately absent; generated payment QR SVGs are handled below.
@@ -19,19 +19,6 @@ const MEDIA_TYPES: Readonly<Record<string, string>> = {
     ".glb": "model/gltf-binary",
     ".gltf": "model/gltf+json",
     ".usdz": "model/vnd.usdz+zip",
-}
-
-function inside(root: string, candidate: string): boolean {
-    const path = relative(root, candidate)
-    return Boolean(path) && path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path)
-}
-
-function validSegments(segments: readonly string[]): boolean {
-    return segments.length > 0 && segments.every((segment) => (
-        /^[a-z0-9_-][a-z0-9._-]*$/i.test(segment)
-        && !segment.endsWith(".")
-        && !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(segment)
-    ))
 }
 
 function mediaType(segments: readonly string[]): string | undefined {
@@ -81,39 +68,17 @@ function unmodifiedSince(value: string, modifiedAt: number): boolean {
 }
 
 /** Serve files created after Next's public-file inventory was collected. */
-export async function serveUploadFile(request: Request, segments: readonly string[], uploadsDirectory: string): Promise<Response> {
+export async function serveUploadFile(request: Request, segments: readonly string[], uploadsDirectory: string | string[]): Promise<Response> {
     if (request.method !== "GET" && request.method !== "HEAD") return errorResponse(405, { Allow: "GET, HEAD" })
-    if (!validSegments(segments)) return errorResponse(404)
+    if (!validUploadSegments(segments)) return errorResponse(404)
     const type = mediaType(segments)
     if (!type) return errorResponse(404)
 
     let file: FileHandle | undefined
     try {
-        const root = resolve(uploadsDirectory)
-        const rootStat = await lstat(root)
-        if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) return errorResponse(404)
-        const realRoot = await realpath(root)
-        const candidate = resolve(root, ...segments)
-        if (!inside(root, candidate)) return errorResponse(404)
-
-        // Reject links in every component, including Windows directory junctions.
-        // realpath containment also catches a parent being redirected elsewhere.
-        let current = root
-        for (const segment of segments) {
-            current = resolve(current, segment)
-            if ((await lstat(current)).isSymbolicLink()) return errorResponse(404)
-        }
-        const realFile = await realpath(candidate)
-        if (!inside(realRoot, realFile)) return errorResponse(404)
-        const checkedStat = await lstat(realFile)
-        if (!checkedStat.isFile() || checkedStat.isSymbolicLink()) return errorResponse(404)
-
-        file = await open(realFile, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
-        const stat = await file.stat()
-        // Keep the checked file pinned to its descriptor while streaming, and
-        // refuse a replacement between the containment check and open().
-        if (!stat.isFile() || stat.dev !== checkedStat.dev || stat.ino !== checkedStat.ino) return errorResponse(404)
-        if (!inside(realRoot, await realpath(candidate))) return errorResponse(404)
+        const opened = await openStoredUploadFile(segments, typeof uploadsDirectory === "string" ? [uploadsDirectory] : uploadsDirectory)
+        file = opened.file
+        const stat = opened.stat
 
         const etag = `W/"${stat.size.toString(16)}-${stat.mtimeMs.toString(16)}"`
         const headers = new Headers({

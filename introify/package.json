@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "build:hostinger": "prisma migrate deploy && node scripts/bootstrap-hostinger.mjs && npm run build",
+    "build:hostinger": "prisma migrate deploy && node scripts/bootstrap-hostinger.mjs && npm run build -- --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

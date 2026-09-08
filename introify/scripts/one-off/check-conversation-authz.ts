@@ -10,8 +10,8 @@ import {
     conversationCapabilityCookieName,
     createChatPostHandler,
     issueConversationCapability,
-} from "../../src/app/api/chat/route"
-import { createLivePostHandler } from "../../src/app/api/live/route"
+} from "../../src/app/api/chat/handler"
+import { createLivePostHandler } from "../../src/app/api/live/handler"
 
 const REQUIRED_DATABASE = "personalink_phase0_rehearsal_20260826_210704"
 const TEST_CAPABILITY_KEY = "deterministic-test-key-with-no-production-value"
