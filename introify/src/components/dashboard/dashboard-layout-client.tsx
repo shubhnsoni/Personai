@@ -55,20 +55,21 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
                         Viewing {name} as support
                         <ExitImpersonateButton />
                     </div>
-                ) : isAdmin ? (
-                    <Link
-                        href="/admin"
-                        className="shrink-0 bg-muted px-3 py-1.5 text-center text-[11px] font-medium text-muted-foreground hover:text-foreground"
-                    >
-                        You are a platform admin · Open console
-                    </Link>
-                ) : slug.startsWith("try-") ? (
-                    <Link
-                        href="/qa"
-                        className="shrink-0 bg-cyan-400/15 px-3 py-1.5 text-center text-[11px] font-medium text-cyan-300"
-                    >
-                        Trying {role || "kit"} · back to all kits
-                    </Link>
+                ) : isAdmin || slug.startsWith("try-") ? (
+                    <div className="flex shrink-0 items-center justify-center gap-3 bg-muted px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+                        {isAdmin ? (
+                            <Link href="/admin" className="hover:text-foreground">
+                                Console
+                            </Link>
+                        ) : null}
+                        {slug.startsWith("try-") ? (
+                            <Link href="/admin/kits" className="hover:text-foreground">
+                                Trying {role || "kit"} · all kits
+                            </Link>
+                        ) : (
+                            <span>Platform admin</span>
+                        )}
+                    </div>
                 ) : null}
                 <Header slug={slug} liveHref={liveHref} role={role} extras={extras} onMenuClick={() => setMobileMenuOpen(true)} />
                 <main

@@ -1,8 +1,10 @@
 import Link from "next/link"
 import { BRAND } from "@/lib/brand"
+import { StudioSignOut } from "@/components/dashboard/studio-sign-out"
 
 const LINKS = [
     { href: "/admin", label: "Today" },
+    { href: "/admin/kits", label: "Kits" },
     { href: "/admin/money", label: "Money" },
     { href: "/admin/traffic", label: "Traffic" },
     { href: "/admin/shops", label: "Shops" },
@@ -12,7 +14,6 @@ const LINKS = [
     { href: "/admin/ai", label: "AI" },
     { href: "/admin/support", label: "Support" },
     { href: "/admin/audit", label: "Audit" },
-    { href: "/qa", label: "Kits" },
 ]
 
 export function AdminShell({
@@ -34,7 +35,8 @@ export function AdminShell({
                     ))}
                 </nav>
                 <span className="hidden truncate text-xs text-muted-foreground sm:block">{email}</span>
-                <Link href="/dashboard" className="text-xs text-muted-foreground hover:text-foreground">Studio</Link>
+                <Link href="/dashboard" className="shrink-0 text-xs text-muted-foreground hover:text-foreground">Studio</Link>
+                <StudioSignOut className="h-8 w-auto shrink-0 px-2 text-xs" />
             </header>
             <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6">{children}</main>
         </div>

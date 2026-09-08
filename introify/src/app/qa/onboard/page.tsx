@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
+import { userIsAdmin } from "@/lib/admin/allowlist"
 import { prisma } from "@/lib/prisma"
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard"
 import { needById, needByRole, type NeedId } from "@/lib/onboarding-needs"
@@ -13,6 +14,7 @@ export default async function QaOnboardPage({
 }) {
     const user = await syncUser()
     if (!user) redirect("/sign-in")
+    if (!userIsAdmin(user)) redirect("/dashboard")
 
     const q = await searchParams
     const picked = q.need ? needById(q.need) : q.role ? needByRole(q.role) : needById("page")

@@ -7,14 +7,16 @@ import { prisma } from "@/lib/prisma"
 import { syncUser } from "@/lib/auth-sync"
 import { ACTIVE_PROFILE_COOKIE, TRY_KITS, TRY_NOW_COOKIE } from "@/lib/try-kits"
 import { seedRole } from "@/lib/try-kit-seed"
+import { userIsAdmin } from "@/lib/admin/allowlist"
 
 export async function openTryKit(formData: FormData) {
     const role = String(formData.get("role") || "")
     const user = await syncUser()
     if (!user) redirect("/sign-in")
+    if (!userIsAdmin(user)) redirect("/dashboard")
 
     const kit = TRY_KITS.find((k) => k.role === role)
-    if (!kit) redirect("/qa")
+    if (!kit) redirect("/admin/kits")
 
     let profile = await prisma.profile.findFirst({
         where: { userId: user.id, slug: kit.slug },
@@ -56,5 +58,5 @@ export async function exitTryKit() {
     jar.delete(ACTIVE_PROFILE_COOKIE)
     jar.delete(TRY_NOW_COOKIE)
     revalidatePath("/dashboard")
-    redirect("/qa")
+    redirect("/admin/kits")
 }
