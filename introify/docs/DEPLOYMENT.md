@@ -34,11 +34,12 @@ email allowlist in Hostinger.
 
 ## Deferred configuration
 
-- Google OAuth setup awaits the owner's approval to accept Google's API Services
-  User Data Policy. Email sign-in is configured independently.
-- AI provider and Stripe credentials were intentionally skipped at the owner's
-  request. Configure and validate those integrations before relying on AI or
-  payments in production.
+- Google OAuth is enabled on the production Clerk instance. Email sign-in still
+  works independently.
+- Codex on production: set `CODEX_HOME` to a persistent directory outside the
+  deploy tree (sibling of uploads, not inside it) and `CODEX_AUTH_JSON` to the
+  local `~/.codex/auth.json` body. Never commit that file. Stripe is still
+  skipped.
 - The new production database contains the deployment bootstrap data. Existing
   local development records have not been copied to Neon.
 

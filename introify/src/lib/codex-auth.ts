@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { readFile, writeFile, mkdir } from "node:fs/promises"
@@ -24,6 +25,25 @@ export function codexAuthPath() {
 export function isCodexEnabled() {
     if (process.env.CODEX_DISABLED === "1" || process.env.CODEX_DISABLED === "true") return false
     return true
+}
+
+/** Raw ChatGPT `auth.json` body, or standard base64 of that JSON. Hostinger env. */
+export function codexAuthJsonFromEnv(): string | null {
+    const raw = process.env.CODEX_AUTH_JSON?.trim()
+    if (!raw) return null
+    if (raw.startsWith("{")) return raw
+    try {
+        const decoded = Buffer.from(raw, "base64").toString("utf8").trim()
+        return decoded.startsWith("{") ? decoded : null
+    } catch {
+        return null
+    }
+}
+
+export function hasCodexAuthSource() {
+    if (!isCodexEnabled()) return false
+    if (codexAuthJsonFromEnv()) return true
+    return existsSync(codexAuthPath())
 }
 
 function jwtClaims(token: string): Record<string, unknown> {
@@ -73,14 +93,23 @@ export function readCodexCredentialsFromObject(raw: unknown): CodexCredentials {
 }
 
 export async function loadCodexCredentials(path = codexAuthPath()): Promise<CodexCredentials> {
-    let text: string
+    let parsed: unknown = null
     try {
-        text = await readFile(path, "utf8")
+        parsed = JSON.parse(await readFile(path, "utf8"))
     } catch {
-        throw new CodexAuthError(`No ChatGPT credentials at ${path}; run \`codex login\`.`)
+        const fromEnv = codexAuthJsonFromEnv()
+        if (!fromEnv) {
+            throw new CodexAuthError(`No ChatGPT credentials at ${path}; run \`codex login\`.`)
+        }
+        try {
+            parsed = JSON.parse(fromEnv)
+        } catch {
+            throw new CodexAuthError("CODEX_AUTH_JSON is not valid JSON.")
+        }
+        await persistAuthPayload(path, parsed).catch(() => {})
     }
     try {
-        return readCodexCredentialsFromObject(JSON.parse(text))
+        return readCodexCredentialsFromObject(parsed)
     } catch (err) {
         if (err instanceof CodexAuthError) throw err
         throw new CodexAuthError(`Could not read ChatGPT credentials at ${path}.`)
@@ -129,12 +158,25 @@ export async function refreshCodexCredentials(
     return next
 }
 
+async function persistAuthPayload(path: string, parsed: unknown) {
+    const payload = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {}
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, JSON.stringify(payload, null, 2), { encoding: "utf8", mode: 0o600 })
+}
+
 async function persistRefreshedTokens(path: string, refreshed: Record<string, unknown>) {
     let payload: Record<string, unknown> = {}
     try {
         payload = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>
     } catch {
-        payload = {}
+        const fromEnv = codexAuthJsonFromEnv()
+        if (fromEnv) {
+            try {
+                payload = JSON.parse(fromEnv) as Record<string, unknown>
+            } catch {
+                payload = {}
+            }
+        }
     }
     const tokens = payload.tokens && typeof payload.tokens === "object"
         ? { ...(payload.tokens as Record<string, unknown>) }
@@ -145,8 +187,7 @@ async function persistRefreshedTokens(path: string, refreshed: Record<string, un
     }
     payload.tokens = tokens
     payload.last_refresh = new Date().toISOString()
-    await mkdir(dirname(path), { recursive: true })
-    await writeFile(path, JSON.stringify(payload, null, 2), { encoding: "utf8", mode: 0o600 })
+    await persistAuthPayload(path, payload)
 }
 
 export async function hasCodexCredentials() {

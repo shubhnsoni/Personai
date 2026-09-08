@@ -70,7 +70,9 @@ Set these in `.env`. Do not put real secrets in `.env.example` or the README.
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/sign-up` |
 | `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | `/dashboard` |
 | `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | `/onboarding` |
-| `OPENAI_API_KEY` | Chat + embeddings |
+| `OPENAI_API_KEY` | Chat + embeddings fallback |
+| `CODEX_HOME` | Directory containing `auth.json` (defaults to `~/.codex`) |
+| `CODEX_AUTH_JSON` | Optional. Full ChatGPT `auth.json` body (or base64) for hosts without a home login |
 | `STRIPE_SECRET_KEY` | Required for any payment path |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Required with the secret |
 | `STRIPE_WEBHOOK_SECRET` | Required to verify webhooks |

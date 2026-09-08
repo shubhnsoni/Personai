@@ -3,15 +3,14 @@
  * to gracefully degrade when services are unconfigured.
  */
 
-import { existsSync } from "node:fs"
-import { codexAuthPath, isCodexEnabled } from "@/lib/codex-auth"
+import { hasCodexAuthSource } from "@/lib/codex-auth"
 
 export const env = {
   get hasDatabase() {
     return !!process.env.DATABASE_URL
   },
   get hasCodex() {
-    return isCodexEnabled() && existsSync(codexAuthPath())
+    return hasCodexAuthSource()
   },
   get hasOpenAI() {
     return !!(process.env.XAI_API_KEY || process.env.OPENAI_API_KEY) || env.hasCodex

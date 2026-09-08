@@ -1,6 +1,5 @@
-import { existsSync } from "node:fs"
 import { prisma } from "@/lib/prisma"
-import { codexAuthPath, isCodexEnabled } from "@/lib/codex-auth"
+import { hasCodexAuthSource } from "@/lib/codex-auth"
 import { DEFAULT_CODEX_MODEL } from "@/lib/codex-chat"
 
 export type AiProviderKind = "codex" | "xai" | "openai"
@@ -87,7 +86,7 @@ export async function savePlatformAiSettings(settings: PlatformAiSettings) {
 }
 
 export function providerConfigured(kind: AiProviderKind) {
-    if (kind === "codex") return isCodexEnabled() && existsSync(codexAuthPath())
+    if (kind === "codex") return hasCodexAuthSource()
     if (kind === "xai") return Boolean(process.env.XAI_API_KEY?.trim())
     return Boolean(process.env.OPENAI_API_KEY?.trim())
 }

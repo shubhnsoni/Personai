@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
-import { accountIdFromTokens, readCodexCredentialsFromObject } from "@/lib/codex-auth"
+import { accountIdFromTokens, hasCodexAuthSource, loadCodexCredentials, readCodexCredentialsFromObject } from "@/lib/codex-auth"
 import { mapChatMessagesToCodex, mapChatToolsToCodex } from "@/lib/codex-chat"
 import { resolveChatModel, resolveLlm } from "@/lib/llm"
 
@@ -70,12 +70,15 @@ describe("Codex chat mapping", () => {
 describe("Codex model routing", () => {
     const previousHome = process.env.CODEX_HOME
     const previousDisabled = process.env.CODEX_DISABLED
+    const previousAuthJson = process.env.CODEX_AUTH_JSON
 
     afterEach(() => {
         if (previousHome === undefined) delete process.env.CODEX_HOME
         else process.env.CODEX_HOME = previousHome
         if (previousDisabled === undefined) delete process.env.CODEX_DISABLED
         else process.env.CODEX_DISABLED = previousDisabled
+        if (previousAuthJson === undefined) delete process.env.CODEX_AUTH_JSON
+        else process.env.CODEX_AUTH_JSON = previousAuthJson
     })
 
     it("prefers Codex when ~/.codex/auth.json is present", () => {
@@ -90,5 +93,21 @@ describe("Codex model routing", () => {
         expect(provider?.kind).toBe("codex")
         expect(resolveChatModel("gpt-4o-mini", provider!)).toBe(provider!.defaultModel)
         expect(resolveChatModel("gpt-5.6-sol", provider!)).toBe("gpt-5.6-sol")
+    })
+
+    it("treats CODEX_AUTH_JSON as a credential source and seeds auth.json", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "codex-env-"))
+        process.env.CODEX_HOME = dir
+        delete process.env.CODEX_DISABLED
+        process.env.CODEX_AUTH_JSON = JSON.stringify({
+            tokens: { access_token: "env-access", refresh_token: "env-refresh", account_id: "env-acct" },
+        })
+        expect(hasCodexAuthSource()).toBe(true)
+        const creds = await loadCodexCredentials()
+        expect(creds.accessToken).toBe("env-access")
+        expect(creds.accountId).toBe("env-acct")
+        const seeded = JSON.parse(readFileSync(join(dir, "auth.json"), "utf8"))
+        expect(seeded.tokens.access_token).toBe("env-access")
+        rmSync(dir, { recursive: true, force: true })
     })
 })
