@@ -63,6 +63,7 @@ Set these in `.env`. Do not put real secrets in `.env.example` or the README.
 | Name | Notes |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string |
+| `DIRECT_URL` | Optional direct database connection for Hostinger migrations; Neon pooled URLs derive a direct hostname when unset |
 | `UPLOADS_DIR` | Persistent upload directory; defaults to `public/uploads` locally |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
 | `CLERK_SECRET_KEY` | Clerk secret key |
@@ -73,6 +74,7 @@ Set these in `.env`. Do not put real secrets in `.env.example` or the README.
 | `OPENAI_API_KEY` | Chat + embeddings fallback |
 | `CODEX_HOME` | Directory containing `auth.json` (defaults to `~/.codex`) |
 | `CODEX_AUTH_JSON` | Optional. Full ChatGPT `auth.json` body (or base64) for hosts without a home login |
+| `CODEX_AUTH_REVISION` | Optional. Change to deliberately replace legacy persisted credentials from `CODEX_AUTH_JSON` |
 | `STRIPE_SECRET_KEY` | Required for any payment path |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Required with the secret |
 | `STRIPE_WEBHOOK_SECRET` | Required to verify webhooks |

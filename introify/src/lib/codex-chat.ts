@@ -169,6 +169,12 @@ async function* parseCodexSse(body: ReadableStream<Uint8Array>, model: string): 
                     continue
                 }
                 const type = String(event.type || "")
+                if (type === "error" || type === "response.failed" || type === "response.incomplete") {
+                    // Upstream bodies may contain account details. Keep the stream error generic.
+                    throw new CodexAuthError(type === "response.incomplete"
+                        ? "Codex chat ended before completing a response."
+                        : "Codex chat could not complete the response.")
+                }
                 if (type === "response.output_text.delta") {
                     const delta = String(event.delta || "")
                     if (delta) yield chunk(model, { content: delta })

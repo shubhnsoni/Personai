@@ -1,11 +1,17 @@
 import { existsSync } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
 import { homedir } from "node:os"
-import { dirname, join } from "node:path"
-import { readFile, writeFile, mkdir } from "node:fs/promises"
+import { dirname, join, resolve } from "node:path"
+import { readFile, writeFile, mkdir, rename, unlink } from "node:fs/promises"
 
 export const CODEX_OAUTH_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 export const CODEX_TOKEN_REFRESH_URL = "https://auth.openai.com/oauth/token"
 const AUTH_CLAIM = "https://api.openai.com/auth"
+const SOURCE_METADATA = "_introify_auth_source"
+const REFRESH_TIMEOUT_MS = 30_000
+type AuthPayload = Record<string, unknown>
+const authOperations = new Map<string, Promise<unknown>>()
+const refreshes = new Map<string, { accessToken: string; promise: Promise<CodexCredentials> }>()
 
 export type CodexCredentials = {
     accessToken: string
@@ -92,50 +98,123 @@ export function readCodexCredentialsFromObject(raw: unknown): CodexCredentials {
     }
 }
 
-export async function loadCodexCredentials(path = codexAuthPath()): Promise<CodexCredentials> {
-    let parsed: unknown = null
+// One app process must not rotate the same refresh token for concurrent visitors.
+// Use a dedicated CODEX_HOME for this app, not a directory shared with another client.
+function withAuthLock<T>(path: string, operation: () => Promise<T>): Promise<T> {
+    const key = resolve(path)
+    const previous = authOperations.get(key) || Promise.resolve()
+    const pending = previous.catch(() => {}).then(operation)
+    authOperations.set(key, pending)
+    const cleanup = () => {
+        if (authOperations.get(key) === pending) authOperations.delete(key)
+    }
+    pending.then(cleanup, cleanup)
+    return pending
+}
+
+async function loadAuthPayload(path: string): Promise<AuthPayload> {
+    let saved: AuthPayload | null = null
     try {
-        parsed = JSON.parse(await readFile(path, "utf8"))
-    } catch {
-        const fromEnv = codexAuthJsonFromEnv()
-        if (!fromEnv) {
-            throw new CodexAuthError(`No ChatGPT credentials at ${path}; run \`codex login\`.`)
-        }
+        const parsed = JSON.parse(await readFile(path, "utf8"))
+        readCodexCredentialsFromObject(parsed)
+        saved = parsed as AuthPayload
+    } catch { /* An explicit environment seed can recover a missing/invalid file. */ }
+
+    const fromEnv = codexAuthJsonFromEnv()
+    if (fromEnv) {
+        let seed: AuthPayload
         try {
-            parsed = JSON.parse(fromEnv)
+            seed = JSON.parse(fromEnv) as AuthPayload
         } catch {
             throw new CodexAuthError("CODEX_AUTH_JSON is not valid JSON.")
         }
-        await persistAuthPayload(path, parsed).catch(() => {})
+        readCodexCredentialsFromObject(seed)
+        delete seed[SOURCE_METADATA]
+        const source = {
+            fingerprint: createHash("sha256").update(JSON.stringify(seed)).digest("hex"),
+            revision: process.env.CODEX_AUTH_REVISION?.trim() || "",
+        }
+        const metadata = saved?.[SOURCE_METADATA]
+        const previous = metadata && typeof metadata === "object"
+            ? metadata as Record<string, unknown>
+            : null
+        const changed = previous
+            ? previous.fingerprint !== source.fingerprint || previous.revision !== source.revision
+            : Boolean(source.revision)
+        if (!saved || changed) {
+            saved = { ...seed, [SOURCE_METADATA]: source }
+            await persistAuthPayload(path, saved)
+        } else if (!previous) {
+            // Adopt pre-upgrade files without rolling back tokens they already refreshed.
+            // Set/change CODEX_AUTH_REVISION to explicitly replace such a legacy file.
+            saved = { ...saved, [SOURCE_METADATA]: source }
+            await persistAuthPayload(path, saved)
+        }
     }
-    try {
-        return readCodexCredentialsFromObject(parsed)
-    } catch (err) {
-        if (err instanceof CodexAuthError) throw err
-        throw new CodexAuthError(`Could not read ChatGPT credentials at ${path}.`)
+    if (!saved) {
+        throw new CodexAuthError(`No ChatGPT credentials at ${path}; run \`codex login\`.`)
     }
+    return saved
 }
 
-export async function refreshCodexCredentials(
+export function loadCodexCredentials(path = codexAuthPath()): Promise<CodexCredentials> {
+    return withAuthLock(path, async () => readCodexCredentialsFromObject(await loadAuthPayload(path)))
+}
+
+export function refreshCodexCredentials(
     credentials: CodexCredentials,
     path = codexAuthPath(),
+): Promise<CodexCredentials> {
+    const key = resolve(path)
+    const pending = refreshes.get(key)
+    if (pending?.accessToken === credentials.accessToken) return pending.promise
+    const promise = withAuthLock(path, async () => {
+        const payload = await loadAuthPayload(path)
+        const latest = readCodexCredentialsFromObject(payload)
+        // A prior request may have rotated this token before this 401 reached us.
+        if (latest.accessToken !== credentials.accessToken) return latest
+        return refreshAndPersist(latest, path, payload)
+    })
+    refreshes.set(key, { accessToken: credentials.accessToken, promise })
+    const cleanup = () => {
+        if (refreshes.get(key)?.promise === promise) refreshes.delete(key)
+    }
+    promise.then(cleanup, cleanup)
+    return promise
+}
+
+async function refreshAndPersist(
+    credentials: CodexCredentials,
+    path: string,
+    payload: AuthPayload,
 ): Promise<CodexCredentials> {
     if (!credentials.refreshToken) {
         throw new CodexAuthError("ChatGPT access token was rejected; run `codex login`.")
     }
-    const res = await fetch(CODEX_TOKEN_REFRESH_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            client_id: CODEX_OAUTH_CLIENT_ID,
-            grant_type: "refresh_token",
-            refresh_token: credentials.refreshToken,
-        }),
-    })
-    if (!res.ok) {
-        throw new CodexAuthError(`ChatGPT token refresh failed (HTTP ${res.status}); run \`codex login\`.`)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS)
+    let refreshed: Record<string, unknown>
+    try {
+        const res = await fetch(CODEX_TOKEN_REFRESH_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+                client_id: CODEX_OAUTH_CLIENT_ID,
+                grant_type: "refresh_token",
+                refresh_token: credentials.refreshToken,
+            }),
+        })
+        if (!res.ok) {
+            throw new CodexAuthError(`ChatGPT token refresh failed (HTTP ${res.status}); run \`codex login\`.`)
+        }
+        refreshed = await res.json() as Record<string, unknown>
+    } catch (error) {
+        if (controller.signal.aborted) throw new CodexAuthError("ChatGPT token refresh timed out; try again.")
+        throw error
+    } finally {
+        clearTimeout(timeout)
     }
-    const refreshed = await res.json() as Record<string, unknown>
     const access = typeof refreshed.access_token === "string" ? refreshed.access_token.trim() : ""
     if (!access) throw new CodexAuthError("ChatGPT token refresh returned no access token.")
     const next: CodexCredentials = {
@@ -154,40 +233,38 @@ export async function refreshCodexCredentials(
             access_token: next.accessToken,
         })
     }
-    await persistRefreshedTokens(path, refreshed).catch(() => {})
-    return next
-}
-
-async function persistAuthPayload(path: string, parsed: unknown) {
-    const payload = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {}
-    await mkdir(dirname(path), { recursive: true })
-    await writeFile(path, JSON.stringify(payload, null, 2), { encoding: "utf8", mode: 0o600 })
-}
-
-async function persistRefreshedTokens(path: string, refreshed: Record<string, unknown>) {
-    let payload: Record<string, unknown> = {}
-    try {
-        payload = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>
-    } catch {
-        const fromEnv = codexAuthJsonFromEnv()
-        if (fromEnv) {
-            try {
-                payload = JSON.parse(fromEnv) as Record<string, unknown>
-            } catch {
-                payload = {}
-            }
-        }
-    }
     const tokens = payload.tokens && typeof payload.tokens === "object"
         ? { ...(payload.tokens as Record<string, unknown>) }
         : {}
-    for (const key of ["id_token", "access_token", "refresh_token"] as const) {
-        const value = refreshed[key]
-        if (typeof value === "string" && value) tokens[key] = value
+    payload.tokens = {
+        ...tokens,
+        access_token: next.accessToken,
+        refresh_token: next.refreshToken,
+        id_token: next.idToken,
+        account_id: next.accountId,
     }
-    payload.tokens = tokens
     payload.last_refresh = new Date().toISOString()
     await persistAuthPayload(path, payload)
+    return next
+}
+
+async function persistAuthPayload(path: string, payload: AuthPayload) {
+    const temporary = join(dirname(path), `.introify-auth-${randomUUID()}.tmp`)
+    try {
+        await mkdir(dirname(path), { recursive: true, mode: 0o700 })
+        await writeFile(temporary, JSON.stringify(payload, null, 2), {
+            encoding: "utf8", mode: 0o600, flag: "wx",
+        })
+        // Readers see either complete old JSON or complete new JSON, never a partial write.
+        await rename(temporary, path)
+    } catch {
+        if (process.env.NODE_ENV === "production") {
+            throw new CodexAuthError("Could not persist ChatGPT credentials; CODEX_HOME must be writable.")
+        }
+        // Preserve the local CLI's prior best-effort persistence behavior.
+    } finally {
+        await unlink(temporary).catch(() => {})
+    }
 }
 
 export async function hasCodexCredentials() {
