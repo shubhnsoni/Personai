@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import type { WebGLRenderer } from "three"
 import type { AboutWalkIn } from "@/lib/walk-in"
 
 export function WalkInStage({
@@ -19,7 +20,7 @@ export function WalkInStage({
         if (!canvas) return
         let dead = false
         let raf = 0
-        let renderer: { dispose: () => void; setSize: (w: number, h: number) => void; render: (s: unknown, c: unknown) => void; domElement: HTMLCanvasElement } | null = null
+        let renderer: WebGLRenderer | null = null
 
         const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
         const urls = photos.filter(Boolean).slice(0, 10)
@@ -40,9 +41,10 @@ export function WalkInStage({
         void (async () => {
             const THREE = await import("three")
             if (dead) return
-            renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" })
-            renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
-            renderer.setClearColor(0x000000, 0)
+            const stageRenderer: WebGLRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" })
+            renderer = stageRenderer
+            stageRenderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
+            stageRenderer.setClearColor(0x000000, 0)
             const scene = new THREE.Scene()
             scene.fog = new THREE.FogExp2(0x050608, 0.045)
             const camera = new THREE.PerspectiveCamera(58, 1, 0.05, 2000)
@@ -52,7 +54,7 @@ export function WalkInStage({
             const size = () => {
                 const w = canvas.clientWidth || 1
                 const h = canvas.clientHeight || 1
-                renderer!.setSize(w, h, false)
+                stageRenderer.setSize(w, h, false)
                 camera.aspect = w / h
                 camera.updateProjectionMatrix()
             }
@@ -151,7 +153,7 @@ export function WalkInStage({
                     camera.position.y = mode === "model" ? 1.2 + pitch * 0.4 : 0.15 + pitch * 0.35
                     camera.lookAt(0, mode === "model" ? 0.4 : 0, 0)
                 }
-                renderer!.render(scene, camera)
+                stageRenderer.render(scene, camera)
                 raf = window.requestAnimationFrame(tick)
             }
             tick()

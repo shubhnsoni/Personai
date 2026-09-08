@@ -5,7 +5,7 @@ function newTableCode() {
     return randomBytes(18).toString("base64url")
 }
 
-async function withReserved(profileId: string, rows: Array<{ id: string }>) {
+async function withReserved<T extends { id: string }>(profileId: string, rows: T[]) {
     const flags = await prisma.$queryRaw<Array<{ id: string; isReserved: boolean }>>`
         SELECT id, "isReserved" FROM "RestaurantTable" WHERE "profileId" = ${profileId}
     `

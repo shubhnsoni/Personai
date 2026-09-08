@@ -59,7 +59,7 @@ export function YouStudio({
 
             <StudioDock>
                 <DockTabs
-                    value={tab === "story" ? "profile" : tab}
+                    value={tab}
                     tabs={[
                         { id: "profile", label: "Profile", icon: <User />, onClick: () => setTab("profile") },
                         { id: "knowledge", label: "Knowledge", icon: <Brain />, onClick: () => setTab("knowledge") },

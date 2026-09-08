@@ -45,7 +45,7 @@ export function useLiveOrders(slug: string) {
                 }
             }))
             if (stop) return
-            const live = rows.filter((row): row is LiveOrder => Boolean(row))
+            const live = rows.filter((row): row is NonNullable<typeof row> => row !== null)
                 .sort((a, b) => b.number - a.number)
             for (const token of tokens) {
                 if (!live.some((row) => row.token === token)) dropLiveOrderToken(slug, token)

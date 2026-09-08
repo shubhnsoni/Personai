@@ -183,8 +183,9 @@ export async function seedRole(profileId: string, role: string) {
             const acc = items.find((i) => i.sku === "CEM-ACC-50")
             const tmt = items.find((i) => i.sku === "STL-TMT-12")
             if (acc && tmt) {
-                const { writeDistroMeta } = await import("@/lib/distribute/meta")
+                const { parseDistroMeta, writeDistroMeta } = await import("@/lib/distribute/meta")
                 const meta = {
+                    ...parseDistroMeta(),
                     salesman: "SUNNY",
                     location: "Ranchi",
                     dealer: "Sharma Traders",

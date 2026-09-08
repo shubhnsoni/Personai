@@ -63,7 +63,7 @@ export async function RestaurantOrdersDashboard({ profileId, slug }: { profileId
             SELECT id, "dueAt", "staffNote" FROM "Order" WHERE "profileId" = ${profileId}
         `.catch(() => []),
     ])
-    const dueById = new Map(dueRows.map((row) => [row.id, row]))
+    const dueById = new Map(dueRows.map((row) => [row.id, row] as const))
     const paidOrders = orders.filter((order) => order.status === "PAID" && order.payStatus === "PAID")
     const itemsSold = paidOrders.reduce(
         (sum, order) => sum + order.lines.reduce((lineSum, line) => lineSum + line.qty, 0),

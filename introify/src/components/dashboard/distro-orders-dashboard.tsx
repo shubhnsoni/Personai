@@ -310,19 +310,19 @@ export function DistroOrdersDashboard({ profileId }: { profileId: string }) {
                         <div className="flex flex-wrap gap-2 pt-1">
                             {canApprove && tab === "pending" ? (
                                 <>
-                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "APPROVED" as DistroApproval).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>Approve</Tiny>
-                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "ON_HOLD" as DistroApproval).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>Hold</Tiny>
-                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "NOT_APPROVED" as DistroApproval).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>Reject</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "APPROVED" as DistroApproval).then(reload).catch((e) => { toast.error(e instanceof Error ? e.message : "Denied") }))} disabled={pending}>Approve</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "ON_HOLD" as DistroApproval).then(reload).catch((e) => { toast.error(e instanceof Error ? e.message : "Denied") }))} disabled={pending}>Hold</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroApproval(profileId, order.id, "NOT_APPROVED" as DistroApproval).then(reload).catch((e) => { toast.error(e instanceof Error ? e.message : "Denied") }))} disabled={pending}>Reject</Tiny>
                                 </>
                             ) : null}
                             {canWarehouse && tab === "approved" ? (
                                 <>
-                                    <Tiny onClick={() => start(() => setDistroWarehouse(profileId, order.id, "DISPATCHED" as DistroWarehouse).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>Dispatch</Tiny>
-                                    <Tiny onClick={() => start(() => setDistroWarehouse(profileId, order.id, "NO_STOCK" as DistroWarehouse).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>No stock</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroWarehouse(profileId, order.id, "DISPATCHED" as DistroWarehouse).then(reload).catch((e) => { toast.error(e instanceof Error ? e.message : "Denied") }))} disabled={pending}>Dispatch</Tiny>
+                                    <Tiny onClick={() => start(() => setDistroWarehouse(profileId, order.id, "NO_STOCK" as DistroWarehouse).then(reload).catch((e) => { toast.error(e instanceof Error ? e.message : "Denied") }))} disabled={pending}>No stock</Tiny>
                                 </>
                             ) : null}
                             {canAccounts && (tab === "dispatch" || tab === "approved") ? (
-                                <Tiny onClick={() => start(() => setDistroAccounts(profileId, order.id, "BILLED" as DistroAccounts, `INV-${order.number}`).then(reload).catch((e) => toast.error(e instanceof Error ? e.message : "Denied")))} disabled={pending}>
+                                <Tiny onClick={() => start(() => setDistroAccounts(profileId, order.id, "BILLED" as DistroAccounts, `INV-${order.number}`).then(reload).catch((e) => { toast.error(e instanceof Error ? e.message : "Denied") }))} disabled={pending}>
                                     Bill INV-{order.number}
                                 </Tiny>
                             ) : null}

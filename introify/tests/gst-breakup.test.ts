@@ -80,6 +80,7 @@ describe("buyer GSTIN state preference", () => {
         })
         expect(stamp?.rateBps).toBe(300)
         expect(stamp?.mode).toBe("igst")
-        expect(stamp?.taxablePaise + stamp!.gstPaise).toBe(10300)
+        expect(stamp).not.toBeNull()
+        expect(stamp!.taxablePaise + stamp!.gstPaise).toBe(10300)
     })
 })

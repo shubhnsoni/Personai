@@ -37,6 +37,16 @@ npx prisma db seed
 
 Schema and `migration_lock.toml` are PostgreSQL. Hostinger shared MySQL is not a database for this app — use Neon/Supabase Postgres.
 
+For Hostinger Node.js, select this `introify/` directory, Node 20, build command
+`npm run build:hostinger`, and start command `npm start`. The build applies tracked
+PostgreSQL migrations using the host's `DATABASE_URL`, creates missing welcome
+presets and the `/demo` profile, then builds Next.js. This bootstrap preserves
+existing records and skips an existing demo. Set the production Clerk keys and
+`NEXT_PUBLIC_APP_URL=https://introify.com` in Hostinger before building.
+
+Runtime uploads are served from `public/uploads/`. Keep that directory writable
+and preserve it across deployments in the hosting storage configuration.
+
 Layout: `src/` app code, `prisma/` schema + seed + migrations, `scripts/one-off/` demo fillers, `docs/` handoff. User images go in `public/uploads/`.
 
 ## Environment (names only)

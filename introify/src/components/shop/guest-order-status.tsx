@@ -117,7 +117,7 @@ export function GuestOrderStatus({ initial }: { initial: GuestOrder }) {
     useEffect(() => {
         if (!unpaid || !payHref) { setUpiQr(null); return }
         drawQrCard({ url: payHref, name: `Pay ${order.shopName}`, style: "ink", size: 720 })
-            .then(setUpiQr)
+            .then((canvas) => setUpiQr(canvas.toDataURL("image/png")))
             .catch(() => setUpiQr(null))
     }, [unpaid, payHref, order.shopName])
 

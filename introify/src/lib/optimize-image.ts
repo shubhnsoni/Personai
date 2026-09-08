@@ -16,7 +16,7 @@ export function isWebRasterKind(kind: string): boolean {
 
 export async function optimizeWebImage(bytes: Buffer): Promise<OptimizedWebImage | null> {
     if (bytes.length < 32) return null
-    let sharp: typeof import("sharp")
+    let sharp: typeof import("sharp")["default"]
     try {
         sharp = (await import("sharp")).default
     } catch {

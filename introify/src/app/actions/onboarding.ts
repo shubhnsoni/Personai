@@ -57,7 +57,7 @@ const DEFAULT_SERVICE_BY_ROLE: Readonly<Record<string, { name: string; descripti
 async function slugTaken(candidate: string, exceptProfileId?: string) {
     const [profile, workspace] = await Promise.all([
         prisma.profile.findUnique({ where: { slug: candidate }, select: { id: true } }),
-        prisma.workspace.findUnique({ where: { slug: candidate }, select: { id: true } }),
+        prisma.workspace.findUnique({ where: { slug: candidate }, select: { profileId: true } }),
     ])
     if (profile && profile.id !== exceptProfileId) return true
     if (workspace && workspace.profileId !== exceptProfileId) return true

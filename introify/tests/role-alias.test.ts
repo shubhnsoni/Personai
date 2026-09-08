@@ -19,7 +19,7 @@ describe("QA flavor roles", () => {
     })
 
     it("lists every flavor role as a try kit", () => {
-        const kitRoles = new Set(TRY_KITS.map((k) => k.role))
+        const kitRoles = new Set<string>(TRY_KITS.map((k) => k.role))
         for (const flavor of Object.keys(ROLE_ALIAS)) {
             expect(kitRoles.has(flavor)).toBe(true)
         }

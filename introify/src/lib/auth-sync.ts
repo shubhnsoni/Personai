@@ -14,7 +14,8 @@ import { IMPERSONATE_COOKIE } from "@/lib/admin/impersonate"
  * provider), while the `User.email` column stays unique. Looking the user up by
  * `clerkId` alone therefore used to fall through to `create` and crash with a
  * unique constraint violation on `email`. We now fall back to an email lookup
- * and re-link the row to the current Clerk id instead.
+ * and re-link the row to the current Clerk id instead, but only after Clerk
+ * has verified ownership of that email address.
  */
 export async function syncUser() {
     const user = await currentUser()
@@ -26,7 +27,9 @@ export async function syncUser() {
         user.emailAddresses[0]
 
     const email = primaryEmail?.emailAddress
-    if (!email) return null
+    // Email identifies existing accounts and can grant admin access. An address
+    // attached to a Clerk user is not proof of ownership until it is verified.
+    if (!email || primaryEmail.verification?.status !== "verified") return null
 
     const name =
         `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'User'
@@ -83,13 +86,14 @@ export async function syncUser() {
         }))
     } catch (error) {
         // Two concurrent requests can both reach `create` for a new user; the
-        // loser of that race just reads the row the winner inserted.
+        // loser can recover only a row bound to this authenticated Clerk ID.
+        // An email collision alone must never return another account's row.
         if (
             error instanceof Prisma.PrismaClientKnownRequestError &&
             error.code === 'P2002'
         ) {
-            const raced = await prisma.user.findFirst({
-                where: { OR: [{ clerkId: user.id }, { email }] },
+            const raced = await prisma.user.findUnique({
+                where: { clerkId: user.id },
                 include: { profiles: true },
             })
 

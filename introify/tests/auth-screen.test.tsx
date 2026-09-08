@@ -15,7 +15,7 @@ vi.mock("framer-motion", async () => await import("./helpers/framer-motion-mock"
 const { AuthScreen } = await import("@/components/auth/auth-screen")
 
 function ssrHtml() {
-    return renderToString(<AuthScreen />)
+    return renderToString(<AuthScreen>{null}</AuthScreen>)
 }
 
 describe("AuthScreen", () => {
@@ -42,7 +42,7 @@ describe("AuthScreen", () => {
         const recoverableErrors: unknown[] = []
         let root: ReturnType<typeof hydrateRoot> | undefined
         await act(async () => {
-            root = hydrateRoot(container, <AuthScreen />, {
+            root = hydrateRoot(container, <AuthScreen>{null}</AuthScreen>, {
                 onRecoverableError: (error) => recoverableErrors.push(error),
             })
             await Promise.resolve()
