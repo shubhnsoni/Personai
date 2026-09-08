@@ -696,7 +696,7 @@
     padding-block: 15px;
   }
   .au-header .mk-brand {
-    font-size: 27px;
+    width: 108px;
   }
   .au-header-actions {
     gap: 12px;
@@ -741,11 +741,7 @@
 }
 @media (max-width: 370px) {
   .au-header .mk-brand {
-    font-size: 25px;
-  }
-  .au-header .mk-brand svg {
-    width: 23px;
-    height: 23px;
+    width: 100px;
   }
   .au-header-actions {
     gap: 10px;

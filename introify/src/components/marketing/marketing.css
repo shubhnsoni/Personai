@@ -77,23 +77,19 @@
     gap: 40px;
 }
 .mk-brand {
+    --brand-accent: #4e7425;
     display: inline-flex;
     align-items: center;
-    gap: 9px;
-    font-size: 30px;
-    font-weight: 740;
-    letter-spacing: -1.9px;
+    flex-shrink: 0;
+    width: 132px;
+    max-width: 100%;
     line-height: 1;
-    color: var(--mk-ink);
-    white-space: nowrap;
+    color: #073d30;
 }
 .mk-brand svg {
-    width: 27px;
-    height: 27px;
-}
-.mk-brand-dot {
-    color: var(--mk-blue);
-    margin-left: -9px;
+    display: block;
+    width: 100%;
+    height: auto;
 }
 .mk-desktop-nav {
     display: flex;
@@ -1831,11 +1827,7 @@
         gap: 20px;
     }
     .mk-brand {
-        font-size: 27px;
-    }
-    .mk-brand svg {
-        width: 23px;
-        height: 23px;
+        width: 108px;
     }
     .mk-header-actions {
         gap: 0;

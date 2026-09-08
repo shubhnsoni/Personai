@@ -3,20 +3,14 @@ import { ArrowUpRight } from "lucide-react"
 import type { ReactNode } from "react"
 import { ThemeToggle } from "./theme-toggle"
 import { MobileNav } from "./mobile-nav"
+import { IntroifyWordmark } from "@/components/brand/wordmark"
 import "./marketing.css"
 import "./marketing-theme.css"
 
 export function BrandMark() {
     return (
         <Link href="/" className="mk-brand" aria-label="Introify home">
-            <svg viewBox="0 0 32 32" aria-hidden="true">
-                <path
-                    d="M6 5h8v8H6zM18 5h8v8h-8zM6 17h8v10H6zM18 17h8v10h-8z"
-                    fill="currentColor"
-                />
-                <path d="M14 13h4v4h-4z" fill="currentColor" />
-            </svg>
-            introify<span className="mk-brand-dot">.</span>
+            <IntroifyWordmark decorative />
         </Link>
     )
 }

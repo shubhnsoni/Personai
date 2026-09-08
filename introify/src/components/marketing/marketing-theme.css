@@ -57,6 +57,11 @@
     color-scheme: dark;
 }
 
+.dark .mk-page .mk-brand {
+    --brand-accent: #a3db42;
+    color: #fdfdfd;
+}
+
 .dark .mk-page .mk-button { background: var(--mk-action); border-color: var(--mk-action); color: #fff; }
 .dark .mk-page .mk-button:hover { background: var(--mk-action-hover); border-color: var(--mk-action-hover); }
 .dark .mk-page .mk-button-outline { background: transparent; border-color: #65786a; color: var(--mk-ink); }

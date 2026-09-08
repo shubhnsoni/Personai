@@ -21,7 +21,7 @@ export function AuthShell({
     return (
         <div data-auth-look={look} className="auth-scene relative min-h-dvh overflow-hidden text-white">
             <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-6 pt-[max(0.9rem,env(safe-area-inset-top))]">
-                <Logo className="from-white to-white/70" />
+                <Logo />
                 <Link href="/" className="text-sm text-white/35 hover:text-white">
                     Home
                 </Link>
