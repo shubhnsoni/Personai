@@ -38,6 +38,61 @@ async function readReply() {
 }
 
 describe("Codex stream completion status", () => {
+    it("aborts a provider that never responds within the request deadline", async () => {
+        vi.useFakeTimers()
+        try {
+            vi.mocked(fetch).mockImplementationOnce((_url, options) => new Promise((_resolve, reject) => {
+                options?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true })
+            }))
+            const result = readReply()
+            const assertion = expect(result).rejects.toThrow("aborted")
+            // Credentials are loaded from the isolated file before dispatch.
+            await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+            await vi.advanceTimersByTimeAsync(45_000)
+            await assertion
+            expect(vi.mocked(fetch).mock.calls[0][1]?.signal?.aborted).toBe(true)
+        } finally { vi.useRealTimers() }
+    })
+    it("recognizes credential errors before dispatch as unspent", async () => {
+        await writeFile(join(directory, "auth.json"), "{}")
+        await expect(readReply()).rejects.toMatchObject({ providerNotDispatched: true })
+        expect(fetch).not.toHaveBeenCalled()
+    })
+
+    it("releases an explicit401 when the login cannot be refreshed", async () => {
+        vi.mocked(fetch).mockResolvedValueOnce(new Response("unauthorized", { status: 401 }))
+        await expect(readReply()).rejects.toMatchObject({ status: 401, message: "Codex login needs renewal." })
+        expect(fetch).toHaveBeenCalledTimes(1)
+    })
+    it("rejects a truncated stream even after receiving text", async () => {
+        mockEvents([{ type: "response.output_text.delta", delta: "partial" }])
+        await expect(readReply()).rejects.toThrow("ended before completing")
+    })
+
+    it("emits measured usage from the final event, including an unterminated final line", async () => {
+        vi.mocked(fetch).mockResolvedValueOnce(new Response('data: {"type":"response.completed","response":{"model":"actual-model","usage":{"input_tokens":120,"output_tokens":30,"total_tokens":150,"output_tokens_details":{"reasoning_tokens":10}}}}'))
+        const response = await streamCodexChat({ model: "test-model", stream: true, messages: [{ role: "user", content: "ping" }] })
+        const chunks: unknown[] = []
+        for await (const chunk of response) chunks.push(chunk)
+        expect(chunks).toEqual([expect.objectContaining({ model: "actual-model", choices: [], usage: expect.objectContaining({ prompt_tokens: 120, completion_tokens: 30, completion_tokens_details: { reasoning_tokens: 10 } }) })])
+    })
+
+    it("cancels an oversized reply", async () => {
+        mockEvents([{ type: "response.output_text.delta", delta: "x".repeat(20_000) }, { type: "response.completed" }])
+        await expect(readReply()).rejects.toThrow("response limit")
+        expect(vi.mocked(fetch).mock.calls[0][1]?.signal?.aborted).toBe(true)
+    })
+
+    it("preserves an explicit rejection status without echoing upstream secrets", async () => {
+        vi.mocked(fetch).mockResolvedValueOnce(new Response("private upstream account details", { status: 429 }))
+        await expect(readReply()).rejects.toMatchObject({ status: 429, message: "Codex chat failed (HTTP 429)." })
+    })
+
+    it("aborts upstream when the reader disconnects", async () => {
+        mockEvents([{ type: "response.output_text.delta", delta: "hello" }, { type: "response.completed" }])
+        for await (const _chunk of await streamCodexChat({ model: "test-model", stream: true, messages: [{ role: "user", content: "ping" }] })) break
+        expect(vi.mocked(fetch).mock.calls[0][1]?.signal?.aborted).toBe(true)
+    })
     it.each(["error", "response.failed", "response.incomplete"])("rejects upstream %s events without exposing upstream details", async (type) => {
         mockEvents([{ type, error: { message: "private upstream account details" } }])
         await expect(readReply()).rejects.toThrow(type === "response.incomplete"

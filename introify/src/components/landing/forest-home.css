@@ -1,6 +1,6 @@
 /* The homepage's forest, lime and warm-paper palette follows the supplied wordmark. */
 .brand-home { --fh-paper:#f7f7ef; --fh-ink:#12392d; --fh-muted:#617065; --fh-accent:#426c32; --fh-line:#dce2d4; --fh-surface:#fffef8; --fh-soft:#edf1e5; --fh-lime:#a3db42; --fh-forest:#073d30; --mk-paper:var(--fh-paper); background:var(--fh-paper); color:var(--fh-ink); }
-.dark .brand-home { --fh-paper:#101d17; --fh-ink:#f4f5e9; --fh-muted:#aebead; --fh-accent:#b5e077; --fh-line:#304638; --fh-surface:#172b20; --fh-soft:#203528; --mk-paper:var(--fh-paper); }
+.dark .brand-home { --fh-paper:#07080a; --fh-ink:var(--mk-ink); --fh-muted:var(--mk-muted); --fh-accent:var(--mk-accent); --fh-line:var(--mk-line); --fh-surface:var(--mk-surface); --fh-soft:var(--mk-elevated); --fh-lime:var(--mk-action); --fh-forest:var(--mk-action); --mk-paper:var(--fh-paper); }
 .brand-home .mk-header { background:var(--fh-paper); border-color:var(--fh-line); }
 .brand-home .mk-header-inner { height:86px; }
 .brand-home .mk-button { border-radius:8px; }
@@ -467,3 +467,72 @@
     .brand-home .fh-person-photo img,.brand-home .fh-button,.brand-home .fh-button svg,.brand-home .fh-text-link svg,.brand-home .fh-faq-list summary svg { transition:none; }
     .brand-home .fh-person:hover .fh-person-photo img,.brand-home .fh-button:hover { transform:none; }
 }
+
+/* Dark presentation shares the dashboard palette; the logo and orb keep their own brand colours. */
+.dark .brand-home .fh-button,
+.dark .brand-home .fh-hero .fh-button { background:var(--mk-action); border-color:var(--mk-action); color:var(--mk-action-ink); }
+.dark .brand-home .fh-button:hover { background:var(--mk-action-hover); border-color:var(--mk-action-hover); box-shadow:0 5px 18px #0003; }
+.dark .brand-home .fh-status-dot { background:var(--fh-accent); box-shadow:0 0 0 4px #00d7ff18; }
+.dark .brand-home .fh-profile-window,
+.dark .brand-home .fh-profile-note,
+.dark .brand-home .fh-calendar,
+.dark .brand-home .fh-offer-label,
+.dark .brand-home .fh-name-card { background:var(--fh-surface); border-color:var(--fh-line); color:var(--fh-ink); box-shadow:0 20px 50px #0004; }
+.dark .brand-home .fh-profile-address,
+.dark .brand-home .fh-profile-note > span,
+.dark .brand-home .fh-link-stack > div,
+.dark .brand-home .fh-stack-icon,
+.dark .brand-home .fh-share-chip { background:var(--fh-soft); border-color:var(--fh-line); color:var(--fh-ink); }
+.dark .brand-home .fh-profile-address i { background:#555b66; }
+.dark .brand-home .fh-profile-intro h2 { color:var(--fh-ink); }
+.dark .brand-home .fh-profile-intro h2 em,
+.dark .brand-home .fh-profile-spark,
+.dark .brand-home .fh-possibilities svg,
+.dark .brand-home .fh-feature-story .fh-feature-top > svg,
+.dark .brand-home .fh-feature-end,
+.dark .brand-home .fh-stack-icon,
+.dark .brand-home .fh-share-copy h2 em,
+.dark .brand-home .fh-final h2 em,
+.dark .brand-home .fh-faq-flower,
+.dark .brand-home .fh-final-flower { color:var(--fh-accent); }
+.dark .brand-home .fh-profile-intro p,
+.dark .brand-home .fh-profile-panels [role="tabpanel"] > p,
+.dark .brand-home .fh-profile-work small,
+.dark .brand-home .fh-profile-connect small,
+.dark .brand-home .fh-profile-note p,
+.dark .brand-home .fh-profile-tabs button,
+.dark .brand-home .fh-feature-story .fh-index,
+.dark .brand-home .fh-feature > p,
+.dark .brand-home .fh-link-stack small,
+.dark .brand-home .fh-calendar > div:first-child > span,
+.dark .brand-home .fh-calendar-days span,
+.dark .brand-home .fh-offer-label > span,
+.dark .brand-home .fh-share-copy > .fh-eyebrow,
+.dark .brand-home .fh-share-copy > p:not(.fh-eyebrow),
+.dark .brand-home .fh-name-card > span,
+.dark .brand-home .fh-name-card-bottom > span,
+.dark .brand-home .fh-final .fh-eyebrow,
+.dark .brand-home .fh-final-note { color:var(--fh-muted); }
+.dark .brand-home .fh-profile-tabs,
+.dark .brand-home .fh-slots span,
+.dark .brand-home .fh-share-orbit { border-color:var(--fh-line); }
+.dark .brand-home .fh-profile-tabs button[aria-selected="true"] { color:var(--fh-accent); }
+.dark .brand-home .fh-profile-tabs button[aria-selected="true"]::after { background:var(--fh-accent); }
+.dark .brand-home .fh-profile-window :focus-visible { outline-color:var(--fh-accent); }
+.dark .brand-home .fh-profile-panels a,
+.dark .brand-home .fh-profile-connect > svg,
+.dark .brand-home .fh-guide-avatar,
+.dark .brand-home .fh-guide-question { background:#14232b; color:#b9f4ff; }
+.dark .brand-home .fh-profile-sticker,
+.dark .brand-home .fh-calendar-days .is-chosen { background:var(--mk-action); color:var(--mk-action-ink); }
+.dark .brand-home .fh-calendar-days .is-chosen span { color:var(--mk-action-ink); }
+.dark .brand-home .fh-feature { background:var(--fh-surface); color:var(--fh-ink); box-shadow:inset 0 0 0 1px var(--fh-line); }
+.dark .brand-home .fh-feature-story { background:var(--fh-soft); }
+.dark .brand-home .fh-share-section,
+.dark .brand-home .fh-final { background:#050607; color:var(--fh-ink); }
+.dark .brand-home .fh-name-card > svg { --brand-accent:#a3db42; }
+.dark .brand-home .fh-profile-cover > span,
+.dark .brand-home .fh-person-tags span { background:#101114ed; color:var(--fh-ink); }
+.dark .brand-home .fh-person-photo > span { background:#10111480; }
+.dark .brand-home .fh-person-photo::after { background:linear-gradient(transparent,#05060780); }
+.dark .brand-home .fh-guide-chat { box-shadow:0 18px 50px #0003; }

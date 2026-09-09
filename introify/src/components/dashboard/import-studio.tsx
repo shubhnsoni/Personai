@@ -9,13 +9,15 @@ import { applyImportBundle, ingestFile, ingestText, ingestUrl } from "@/app/acti
 import type { ImportBundle, ImportItem, ImportKind } from "@/lib/import-extract"
 import { acceptForHint, placeholderForHint, type SourceHint } from "@/lib/import-classify"
 import { fieldOn, hasSurface, shopNavLabel, type Surface } from "@/lib/surfaces"
+import { restaurantImportsAllowed } from "@/lib/import-business-access"
+import { resolveKitRole } from "@/lib/role-alias"
 import { cn } from "@/lib/utils"
 import { FilterChips } from "@/components/dashboard/catalog-chrome"
 import { Check, Upload, X } from "lucide-react"
 
 const ALL_DESTINATIONS: { id: SourceHint; label: string; blurb: string; file: string; surface?: "shop" | "courses" | "services" | "events" }[] = [
     { id: "cv", label: "You", blurb: "CV, about page, or jobs", file: "PDF or TXT" },
-    { id: "shop", label: "Shop / Menu", blurb: "CSV, paste, or a Google Business / Swiggy / Zomato / Uber Eats link", file: "CSV or TXT", surface: "shop" },
+    { id: "shop", label: "Shop", blurb: "CSV, pasted products, or your business website", file: "CSV or TXT", surface: "shop" },
     { id: "course", label: "Courses", blurb: "Outline or course URL", file: "TXT", surface: "courses" },
     { id: "services", label: "Services", blurb: "Offers and prices", file: "TXT or CSV", surface: "services" },
     { id: "events", label: "Events", blurb: "Event list or calendar", file: "ICS or CSV", surface: "events" },
@@ -85,6 +87,7 @@ function looksLikeUrl(raw: string) {
 
 function defaultHintFor(role?: string | null, initial?: SourceHint): SourceHint {
     if (initial) return initial
+    role = resolveKitRole(role)
     if (role === "RESTAURANT" || role === "SHOP" || role === "JEWELRY_RETAIL" || role === "JEWELRY_WHOLESALE" || role === "DISTRIBUTOR" || role === "PHARMACY" || role === "AUTO_PARTS") return "shop"
     if (role === "COACH") return "course"
     if (role === "CONSULTANT" || role === "CA") return "services"
@@ -115,9 +118,10 @@ export function ImportStudio({
     lockHint?: boolean
     embedded?: boolean
 }) {
+    const restaurant = restaurantImportsAllowed(role)
     const DESTINATIONS = ALL_DESTINATIONS
         .filter((d) => !d.surface || hasSurface(role, d.surface as Surface, extras))
-        .map((d) => d.id === "shop" ? { ...d, label: shopNavLabel(role) } : d)
+        .map((d) => d.id === "shop" ? { ...d, label: shopNavLabel(role), blurb: restaurant ? "CSV, paste, or a Google Business / Swiggy / Zomato / Uber Eats link" : d.blurb } : d)
     const KINDS = ALL_KINDS.filter((k) => {
         if (k.surface && !hasSurface(role, k.surface, extras)) return false
         if (k.pack && !fieldOn(role, k.pack, extras)) return false
@@ -271,7 +275,7 @@ export function ImportStudio({
                         />
                     ) : null}
 
-                    {hint === "shop" ? (
+                    {hint === "shop" && restaurant ? (
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                             {MENU_LINKS.map((src) => (
                                 <button
@@ -320,15 +324,15 @@ export function ImportStudio({
                             value={draft}
                             onChange={(e) => setDraft(e.target.value)}
                             placeholder={
-                                linkFocus === "google"
+                                restaurant && linkFocus === "google"
                                     ? "Paste your Google Business or Maps listing…"
-                                    : linkFocus === "swiggy"
+                                    : restaurant && linkFocus === "swiggy"
                                         ? "Paste your Swiggy restaurant link…"
-                                        : linkFocus === "zomato"
+                                        : restaurant && linkFocus === "zomato"
                                             ? "Paste your Zomato restaurant link…"
-                                            : linkFocus === "ubereats"
+                                            : restaurant && linkFocus === "ubereats"
                                                 ? "Paste your Uber Eats store link…"
-                                                : placeholderForHint(hint)
+                                                : placeholderForHint(hint, role)
                             }
                             className="min-h-[10.5rem] resize-none rounded-none border-0 bg-transparent px-3.5 py-3.5 shadow-none focus-visible:ring-0"
                             onKeyDown={(e) => {

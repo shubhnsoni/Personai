@@ -387,3 +387,6 @@
         transition: none;
     }
 }
+
+.dark .mk-page .mk-chat-visitor p,
+.dark .mk-page .mk-chat-next:not(:disabled) { color:var(--mk-action-ink); }

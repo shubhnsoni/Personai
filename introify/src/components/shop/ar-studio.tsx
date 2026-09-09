@@ -340,8 +340,8 @@ export function ArStudio({
                                         <Sparkles className="h-4 w-4" />
                                     </span>
                                     <span>
-                                        <span className="block text-sm font-medium text-white">Photoreal 3D · Premium</span>
-                                        <span className="block text-[12px] text-zinc-400">Textured 3D models. Paid plans coming soon.</span>
+                                        <span className="block text-sm font-medium text-white">Photoreal 3D · Plan allowance</span>
+                                        <span className="block text-[12px] text-zinc-400">Review your trial, paid-plan allowance and current generation availability.</span>
                                     </span>
                                 </button>
                             ) : null}

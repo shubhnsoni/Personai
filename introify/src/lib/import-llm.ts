@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { apiClient, boundedXaiResponse, xaiResponseText, boundedChatInput, clipUtf8, usageMetadata } from "@/lib/ai-runtime"
+import { apiClient, boundedCodexResponse, boundedXaiResponse, xaiResponseText, boundedChatInput, clipUtf8, usageMetadata } from "@/lib/ai-runtime"
 import { prepareAiUsage, finishAiUsage, providerRejectedWithoutSpend } from "@/lib/ai-usage"
 import type { ImportItem, ImportKind } from "@/lib/import-extract"
 import { item } from "@/lib/import-extract"
@@ -19,9 +19,9 @@ export async function extractWithModel(profileId: string, text: string): Promise
     const bounded = boundedChatInput(recipe, prompt, [{ role: "user", content: clipped }], [])
     const { stream_options: _streamOptions, ...input } = bounded
     try {
-        const client = apiClient(recipe)
         const request = { ...input, stream: false as const, response_format: { type: "json_object" as const } }
-        const response = recipe.provider === "xai" ? await boundedXaiResponse(bounded, recipe, true) : await client.chat.completions.create(request)
+        const response = recipe.provider === "codex" ? await boundedCodexResponse(bounded, recipe)
+            : recipe.provider === "xai" ? await boundedXaiResponse(bounded, recipe, true) : await apiClient(recipe).chat.completions.create(request)
         const isResponses = "output" in response
         const inputTokens = response.usage ? ("input_tokens" in response.usage ? response.usage.input_tokens : response.usage.prompt_tokens) : null
         const outputTokens = response.usage ? ("output_tokens" in response.usage ? response.usage.output_tokens : response.usage.completion_tokens) : null

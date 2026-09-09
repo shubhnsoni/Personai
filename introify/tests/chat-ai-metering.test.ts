@@ -40,6 +40,34 @@ beforeEach(() => {
 })
 
 describe("metered public chat", () => {
+    it("cancels provider work on disconnect and does not execute a pending business tool", async () => {
+        let release!: () => void
+        const pending = new Promise<void>(resolve => { release = resolve })
+        let finished!: () => void
+        const done = new Promise<void>(resolve => { finished = resolve })
+        complete.mockResolvedValue({ async *[Symbol.asyncIterator]() {
+            try {
+                yield chunk({ content: "Checking" })
+                await pending
+                yield chunk({ tool_calls: [{ index: 0, id: "tool", function: { name: "collectLead", arguments: '{"name":"Ada","email":"ada@example.test"}' } }] })
+            } finally { finished() }
+        } })
+        const response = await handler()(request({ messages: [{ role: "user", content: "Ada ada@example.test" }] }))
+        const reader = response.body!.getReader()
+        await reader.read()
+        await reader.cancel()
+        expect(complete.mock.calls[0][2].aborted).toBe(true)
+        release()
+        await done
+        expect(db.visitorLead.create).not.toHaveBeenCalled()
+        expect(settle).not.toHaveBeenCalled()
+        expect(db.message.create).toHaveBeenCalledTimes(1)
+    })
+    it("releases a credential failure that occurred before any provider dispatch", async () => {
+        complete.mockRejectedValue(Object.assign(new Error("login unavailable"), { providerNotDispatched: true }))
+        expect((await handler()(request())).status).toBe(502)
+        expect(settle).toHaveBeenCalledWith("reservation", "RELEASE", { reason: "provider_rejected" })
+    })
     it.each([402, 403, 409, 503])("fails closed at allowance refusal %s before retrieval or any write", async status => {
         reserve.mockRejectedValue(new AiAccessError(status, "ai_blocked", "Unavailable"))
         expect((await handler()(request())).status).toBe(status)

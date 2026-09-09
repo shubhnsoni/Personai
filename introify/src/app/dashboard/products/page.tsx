@@ -3,6 +3,7 @@ import { syncUser } from "@/lib/auth-sync"
 import { ProductsList } from "@/components/dashboard/products-list"
 import { requireSurface } from "@/lib/require-surface"
 import { extrasOf } from "@/lib/surfaces"
+import { restaurantImportsAllowed } from "@/lib/import-business-access"
 import { isJewelryKit, isJewelryRetail, isJewelryWholesale } from "@/lib/metal/math"
 import { goldBoardFromConfig } from "@/lib/metal/board"
 import { GoldBoardCard, GoldShopToggles } from "@/components/shop/gold-board-card"
@@ -59,7 +60,7 @@ export default async function DashboardProductsPage({
                 profileId={profile.id}
                 slug={profile.slug}
                 whatsapp={profile.whatsapp}
-                restaurant={profile.roleTemplate === "RESTAURANT"}
+                restaurant={restaurantImportsAllowed(profile.roleTemplate)}
                 jewelry={isJewelryRetail(profile.roleTemplate)}
                 role={profile.roleTemplate}
                 extras={extrasOf(profile)}

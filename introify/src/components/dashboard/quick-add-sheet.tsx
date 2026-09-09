@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, Sparkles } from "lucide-react"
 import { galleryToJson, parseGallery } from "@/lib/commerce"
 import { PhotoStage } from "@/components/shop/photo-stage"
 import type { DigitalProduct } from "@prisma/client"
@@ -547,7 +547,13 @@ export function QuickAddSheet({
                             </label>
                         ) : null}
                         {showAr ? (
-                            <ArTrigger hasModel={Boolean(arModelUrl)} restaurant={restaurant} onClick={() => setArOpen(true)} />
+                            <div className="space-y-2">
+                                <ArTrigger hasModel={Boolean(arModelUrl)} restaurant={restaurant} onClick={() => setArOpen(true)} />
+                                {onPhotoreal ? <button type="button" disabled={busy} onClick={onPhotoreal} className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-border/70 px-3 py-3 text-left disabled:opacity-50">
+                                    <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                                    <span><span className="block text-sm font-medium">Photoreal 3D</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">Uses the saved product photo. Save photo changes first, then review your generation allowance and availability.</span></span>
+                                </button> : <p className="px-1 text-xs leading-relaxed text-muted-foreground">Save this product with a photo to use Photoreal 3D. Your catalog has the generation panel.</p>}
+                            </div>
                         ) : null}
 
                         <button

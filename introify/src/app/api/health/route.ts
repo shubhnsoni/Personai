@@ -32,7 +32,7 @@ async function databaseDiagnostic(): Promise<"ok" | "unavailable"> {
 export async function GET(request: NextRequest) {
   const requestedDetails = request.nextUrl.searchParams.get("details") === "1"
   if (!requestedDetails || !isOperatorAuthorized(request)) {
-    return NextResponse.json(publicLiveness)
+    return NextResponse.json(publicLiveness, { headers: { "x-introify-release": process.env.INTROIFY_RELEASE_SHA || "unknown", "Cache-Control": "no-store" } })
   }
 
   const database = await databaseDiagnostic()

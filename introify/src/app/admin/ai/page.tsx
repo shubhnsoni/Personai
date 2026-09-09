@@ -26,14 +26,14 @@ export default async function AdminAiPage() {
     const stopped = process.env.INTROIFY_AI_DISABLED === "true"
     return (
         <div className="space-y-5">
-            <AdminPageHead title="AI" hint="Published assistants use explicit commercial API mappings and account credits." />
+            <AdminPageHead title="AI" hint="Published assistants use an explicitly connected provider and account credits." />
             <AdminPanel title="Published assistant configuration">
                 <p className="mb-3 text-sm text-muted-foreground">{stopped ? "Commercial AI is disabled by INTROIFY_AI_DISABLED=true." : "Configuration readiness below does not verify provider access or account credit availability."}</p>
                 {Object.values(AI_MODES).map(mode => {
                     const recipe = resolveApiRecipe(mode.id)
                     return <AdminRow key={mode.id}><span className="flex-1 text-sm">{mode.name} · {mode.credits} {mode.credits === 1 ? "credit" : "credits"}</span><span className="text-xs text-muted-foreground">{commercial[mode.id] && recipe ? `${recipe.provider} · ${recipe.model}` : "Unavailable"}</span></AdminRow>
                 })}
-                <p className="mt-3 text-xs text-muted-foreground">Set INTROIFY_AI_PROVIDER and INTROIFY_AI_FAST_MODEL, INTROIFY_AI_SMART_MODEL, INTROIFY_AI_REASONING_MODEL in the server environment. INTROIFY_AI_DISABLED=true stops published AI and import enrichment. API keys stay on the server. Personal Codex sessions and the legacy settings below do not authorize customer replies.</p>
+                <p className="mt-3 text-xs text-muted-foreground">Set INTROIFY_AI_PROVIDER to codex, openai or xai and map each mode in the server environment. INTROIFY_AI_DISABLED=true stops published AI and import enrichment. Codex requires a dedicated persistent CODEX_HOME and server login; its account limits are shared across assistants. Credentials stay on the server. The legacy settings below do not change these mappings.</p>
             </AdminPanel>
             <h2 className="text-sm font-medium">Legacy admin diagnostics</h2>
             <p className="text-xs text-muted-foreground">These saved defaults, fallbacks, provider disable switches and shop overrides apply only to the legacy diagnostic path. They do not select or stop the commercial runtime above. Diagnostic pings can incur provider charges and are not customer credit operations.</p>

@@ -1,9 +1,11 @@
 import OpenAI from "openai"
 import type { AiMode } from "@/lib/billing/catalog"
+import { hasCodexAuthSource } from "@/lib/codex-auth"
+import { streamCodexChat } from "@/lib/codex-chat"
 
 export type ApiRecipe = {
     mode: AiMode
-    provider: "openai" | "xai"
+    provider: "openai" | "xai" | "codex"
     model: string
     inputBudget: number
     outputBudget: number
@@ -12,6 +14,11 @@ export type ApiRecipe = {
 }
 
 const APPROVED_MODELS = {
+    codex: {
+        fast: ["gpt-5.6-luna"],
+        smart: ["gpt-5.6-terra"],
+        reasoning: ["gpt-5.6-sol"],
+    },
     openai: {
         fast: ["gpt-5.6-luna", "gpt-4o-mini", "gpt-4.1-mini"],
         smart: ["gpt-5.6-terra", "gpt-4o", "gpt-4.1"],
@@ -29,20 +36,24 @@ function costSetting(name: string): number | null {
     return Number.isFinite(value) && value > 0 ? value : null
 }
 
-/** Commercial traffic only uses an explicitly mapped, supported API integration. */
+/** All visitor providers require an explicit mode mapping; never silently fall back. */
 export function resolveApiRecipe(mode: AiMode): ApiRecipe | null {
     if (process.env.INTROIFY_AI_DISABLED === "true") return null
     const provider = process.env.INTROIFY_AI_PROVIDER?.trim()
-    if (provider !== "openai" && provider !== "xai") return null
+    if (provider !== "openai" && provider !== "xai" && provider !== "codex") return null
     const key = provider === "openai" ? process.env.OPENAI_API_KEY : process.env.XAI_API_KEY
     const model = process.env[`INTROIFY_AI_${mode.toUpperCase()}_MODEL`]?.trim()
-    if (!key?.trim() || key.trim().length < 12 || /placeholder|your[_-]|dummy|replace[_-]/i.test(key) || !model || !(APPROVED_MODELS[provider][mode] as readonly string[]).includes(model)) return null
+    if (!model || !(APPROVED_MODELS[provider][mode] as readonly string[]).includes(model)) return null
+    if (provider === "codex") {
+        // Production must use the application's dedicated persistent credential directory.
+        if (!hasCodexAuthSource() || (process.env.NODE_ENV === "production" && !process.env.CODEX_HOME?.trim())) return null
+    } else if (!key?.trim() || key.trim().length < 12 || /placeholder|your[_-]|dummy|replace[_-]/i.test(key)) return null
     return {
         mode, provider, model,
         inputBudget: mode === "fast" ? 2000 : 4000,
         outputBudget: mode === "fast" ? 500 : 1000,
-        inputUsdPerMillion: costSetting(`INTROIFY_AI_${mode.toUpperCase()}_INPUT_USD_PER_MTOK`),
-        outputUsdPerMillion: costSetting(`INTROIFY_AI_${mode.toUpperCase()}_OUTPUT_USD_PER_MTOK`),
+        inputUsdPerMillion: provider === "codex" ? null : costSetting(`INTROIFY_AI_${mode.toUpperCase()}_INPUT_USD_PER_MTOK`),
+        outputUsdPerMillion: provider === "codex" ? null : costSetting(`INTROIFY_AI_${mode.toUpperCase()}_OUTPUT_USD_PER_MTOK`),
     }
 }
 
@@ -51,6 +62,7 @@ export function getAiAvailability() {
 }
 
 export function apiClient(recipe: ApiRecipe) {
+    if (recipe.provider === "codex") throw new Error("Codex uses the server-side streaming adapter")
     // Re-check rather than permitting a stale or caller-invented recipe/model.
     const current = resolveApiRecipe(recipe.mode)
     if (!current || current.provider !== recipe.provider || current.model !== recipe.model) throw new Error("ai_not_configured")
@@ -60,6 +72,25 @@ export function apiClient(recipe: ApiRecipe) {
         maxRetries: 0,
         timeout: 45_000,
     })
+}
+
+/** Only supplied business tools can run; Codex gets no shell, filesystem or browser tools. */
+export async function boundedCodexChatStream(input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming, recipe: ApiRecipe, signal?: AbortSignal) {
+    const current = resolveApiRecipe(recipe.mode)
+    if (!current || current.provider !== "codex" || current.model !== recipe.model || input.model !== recipe.model) throw new Error("ai_not_configured")
+    return streamCodexChat({ ...input, max_completion_tokens: recipe.outputBudget, parallel_tool_calls: false }, { signal })
+}
+
+export async function boundedCodexResponse(input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming, recipe: ApiRecipe): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+    let content = ""
+    let usage: OpenAI.Completions.CompletionUsage | undefined
+    let model = recipe.model
+    for await (const event of await boundedCodexChatStream(input, recipe)) {
+        content += event.choices[0]?.delta.content || ""
+        if (event.usage) usage = event.usage
+        if (event.model) model = event.model
+    }
+    return { id: "codex", object: "chat.completion", created: Math.floor(Date.now() / 1000), model, usage, choices: [{ index: 0, finish_reason: "stop", logprobs: null, message: { role: "assistant", content, refusal: null } }] }
 }
 
 /** UTF-8 bytes provide a deliberately conservative text-token ceiling. */

@@ -24,6 +24,7 @@ import {
     type ImportKind,
 } from "@/lib/import-extract"
 import { classifyFile, classifyUrl, type SourceHint } from "@/lib/import-classify"
+import { assertImportSourceAccess, isRestaurantImportUrl, restaurantImportsAllowed } from "@/lib/import-business-access"
 import { extractWithModel } from "@/lib/import-llm"
 import { createCourse, createCourseLesson, createCourseModule } from "@/app/actions/courses"
 import { createProduct } from "@/app/actions/products"
@@ -45,7 +46,7 @@ export async function ingestText(claimedProfileId: string, raw: string, hint: So
     const text = raw.trim()
     if (!text) throw new Error("Paste some text first.")
     let bundle = bundleFromText(text, hint === "auto" ? "Pasted text" : `${hint} paste`)
-    if (/(?:₹|Rs\.?|INR)\s*\d/i.test(text)) {
+    if (restaurantImportsAllowed(ownedProfile.roleTemplate) && /(?:₹|Rs\.?|INR)\s*\d/i.test(text)) {
         const { extractRupeeMenu } = await import("@/lib/menu-import")
         const dishes = extractRupeeMenu(text)
         if (dishes.length >= 2) {
@@ -67,6 +68,8 @@ export async function ingestUrl(claimedProfileId: string, url: string): Promise<
     const { profile: ownedProfile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId }))
     try {
         const target = normalizeUrl(url)
+        const restaurant = restaurantImportsAllowed(ownedProfile.roleTemplate)
+        assertImportSourceAccess(ownedProfile.roleTemplate, target)
         const kind = classifyUrl(target)
         if (kind === "youtube") {
             const yt = await fetchYoutube(target)
@@ -75,11 +78,7 @@ export async function ingestUrl(claimedProfileId: string, url: string): Promise<
         const community = detectCommunity(target)
         let html = ""
         try {
-            const res = await fetch(target, {
-                headers: PAGE_HEADERS,
-                redirect: "follow",
-                signal: AbortSignal.timeout(12000),
-            })
+            const res = await fetchImportPage(target, ownedProfile.roleTemplate)
             if (!res.ok) throw new Error(`Could not fetch that page (${res.status})`)
             const type = res.headers.get("content-type") || ""
             if (!/html|xml|text|json/i.test(type) && type) {
@@ -100,7 +99,7 @@ export async function ingestUrl(claimedProfileId: string, url: string): Promise<
         }
         let bundle = bundleFromHtml(html, target)
         const { extractMenuFromHtml, isMenuHost, isGoogleBusinessHost, discoverMenuUrls, googleListingName, MENU_IMPORT_WARNING } = await import("@/lib/menu-import")
-        if (isGoogleBusinessHost(target)) {
+        if (restaurant && isGoogleBusinessHost(target)) {
             const dishes = extractMenuFromHtml(html, target)
             const linked: string[] = discoverMenuUrls(html)
             const extraMenus: ImportItem[] = [...dishes]
@@ -110,14 +109,14 @@ export async function ingestUrl(claimedProfileId: string, url: string): Promise<
                     `https://www.zomato.com/search?q=${encodeURIComponent(place)}`,
                     `https://www.swiggy.com/search?query=${encodeURIComponent(place)}`,
                 ]) {
-                    const page = await fetchPageHtml(href)
+                    const page = await fetchPageHtml(href, ownedProfile.roleTemplate)
                     if (!page) continue
                     linked.push(...discoverMenuUrls(page.html))
                     extraMenus.push(...extractMenuFromHtml(page.html, page.url))
                 }
             }
             for (const href of [...new Set(linked)].slice(0, 4)) {
-                const page = await fetchPageHtml(href)
+                const page = await fetchPageHtml(href, ownedProfile.roleTemplate)
                 if (!page) continue
                 extraMenus.push(...extractMenuFromHtml(page.html, page.url))
             }
@@ -134,7 +133,7 @@ export async function ingestUrl(claimedProfileId: string, url: string): Promise<
             } else {
                 bundle = { ...bundle, sourceLabel: place || bundle.sourceLabel, warning: MENU_IMPORT_WARNING }
             }
-        } else if (isMenuHost(target)) {
+        } else if (restaurant && isMenuHost(target)) {
             const dishes = extractMenuFromHtml(html, target)
             if (!dishes.length && !bundle.items.some((i) => i.kind === "product")) {
                 throw new Error("That page is blocked. Paste the menu or upload a CSV.")
@@ -150,9 +149,9 @@ export async function ingestUrl(claimedProfileId: string, url: string): Promise<
                 bundle = { ...bundle, warning: MENU_IMPORT_WARNING }
             }
         }
-        const extras = isMenuHost(target) ? [] : relatedPageUrls(html, target)
+        const extras = isMenuHost(target) ? [] : relatedPageUrls(html, target).filter(href => restaurant || !isRestaurantImportUrl(href))
         if (extras.length) {
-            const pages = await Promise.all(extras.slice(0, 5).map((href) => fetchPageHtml(href)))
+            const pages = await Promise.all(extras.slice(0, 5).map((href) => fetchPageHtml(href, ownedProfile.roleTemplate)))
             for (const page of pages) {
                 if (!page) continue
                 const more = bundleFromHtml(page.html, page.url)
@@ -476,13 +475,30 @@ const PAGE_HEADERS = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-async function fetchPageHtml(url: string): Promise<{ url: string; html: string } | null> {
+async function fetchImportPage(url: string, role: string | null | undefined, timeoutMs = 12000) {
+    let target = url
+    const signal = AbortSignal.timeout(timeoutMs)
+    for (let redirects = 0; redirects <= 5; redirects++) {
+        assertImportSourceAccess(role, target)
+        const parsed = new URL(target)
+        if (!["https:", "http:"].includes(parsed.protocol)) throw new Error("Use a public HTTP or HTTPS page.")
+        const res = await fetch(target, { headers: PAGE_HEADERS, redirect: "manual", signal })
+        if (![301, 302, 303, 307, 308].includes(res.status)) {
+            // Also check the final URL supplied by a fetch adapter.
+            assertImportSourceAccess(role, res.url || target)
+            return res
+        }
+        const location = res.headers.get("location")
+        await res.body?.cancel()
+        if (!location) throw new Error("That page redirected without a destination.")
+        target = new URL(location, target).toString()
+    }
+    throw new Error("That page redirected too many times. Use its direct link instead.")
+}
+
+async function fetchPageHtml(url: string, role: string | null | undefined): Promise<{ url: string; html: string } | null> {
     try {
-        const res = await fetch(url, {
-            headers: PAGE_HEADERS,
-            redirect: "follow",
-            signal: AbortSignal.timeout(10000),
-        })
+        const res = await fetchImportPage(url, role, 10000)
         if (!res.ok) return null
         return { url: res.url || url, html: (await res.text()).slice(0, 500_000) }
     } catch {

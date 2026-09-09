@@ -108,7 +108,7 @@ function headersFor(credentials: CodexCredentials) {
     return headers
 }
 
-export async function streamCodexChat(input: ChatParams): Promise<AsyncIterable<ChatChunk>> {
+export async function streamCodexChat(input: ChatParams, options: { signal?: AbortSignal } = {}): Promise<AsyncIterable<ChatChunk>> {
     const model = (typeof input.model === "string" && input.model.trim()) || DEFAULT_CODEX_MODEL
     const mapped = mapChatMessagesToCodex(input.messages)
     const payload = {
@@ -117,45 +117,71 @@ export async function streamCodexChat(input: ChatParams): Promise<AsyncIterable<
         input: mapped.input,
         tools: mapChatToolsToCodex(input.tools),
         tool_choice: "auto",
-        parallel_tool_calls: true,
+        parallel_tool_calls: false,
         store: false,
         stream: true,
         include: ["reasoning.encrypted_content"],
-        reasoning: { effort: "low", summary: "auto" },
+        reasoning: { effort: "low" },
     }
 
-    let credentials = await loadCodexCredentials()
+    // This subscription endpoint does not accept max_output_tokens. Bound wall time
+    // and delivered bytes, and cancel upstream on the cap or consumer disconnect.
+    const controller = new AbortController()
+    const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal
+    const timeout = setTimeout(() => controller.abort(), 45_000)
+    const outputBytes = Math.min(16_000, Math.max(512, Number(input.max_completion_tokens || 1000) * 8))
+    try {
+    let credentials: CodexCredentials
+    try { credentials = await loadCodexCredentials() }
+    catch (error) { throw Object.assign(new CodexAuthError("Codex login is unavailable."), { providerNotDispatched: true, cause: error }) }
+    if (signal.aborted) throw Object.assign(new CodexAuthError("Codex request was cancelled."), { providerNotDispatched: true })
     let response = await fetch(CODEX_RESPONSES_URL, {
         method: "POST",
         headers: headersFor(credentials),
         body: JSON.stringify(payload),
+        signal,
     })
     if (response.status === 401) {
-        credentials = await refreshCodexCredentials(credentials)
+        await response.body?.cancel()
+        try { credentials = await refreshCodexCredentials(credentials) }
+        catch { throw Object.assign(new CodexAuthError("Codex login needs renewal."), { status: 401 }) }
+        if (signal.aborted) throw Object.assign(new CodexAuthError("Codex request was cancelled."), { providerNotDispatched: true })
         response = await fetch(CODEX_RESPONSES_URL, {
             method: "POST",
             headers: headersFor(credentials),
             body: JSON.stringify(payload),
+            signal,
         })
     }
     if (!response.ok || !response.body) {
-        const detail = await response.text().catch(() => "")
-        throw new CodexAuthError(`Codex chat failed (HTTP ${response.status})${detail ? `: ${detail.slice(0, 240)}` : ""}`)
+        await response.body?.cancel()
+        throw Object.assign(new CodexAuthError(`Codex chat failed (HTTP ${response.status}).`), { status: response.status })
     }
 
-    return parseCodexSse(response.body, model)
+    const body = response.body
+    return { async *[Symbol.asyncIterator]() {
+        try { yield* parseCodexSse(body, model, outputBytes) }
+        finally { clearTimeout(timeout); controller.abort() }
+    } }
+    } catch (error) {
+        clearTimeout(timeout)
+        controller.abort()
+        throw error
+    }
 }
 
-async function* parseCodexSse(body: ReadableStream<Uint8Array>, model: string): AsyncIterable<ChatChunk> {
+async function* parseCodexSse(body: ReadableStream<Uint8Array>, model: string, outputBytes: number): AsyncIterable<ChatChunk> {
     const reader = body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
     const tools = new Map<string, { index: number; id: string; name: string }>()
+    let completed = false
+    let deliveredBytes = 0
     try {
         while (true) {
             const { done, value } = await reader.read()
-            if (done) break
-            buffer += decoder.decode(value, { stream: true })
+            buffer += done ? decoder.decode() + "\n" : decoder.decode(value, { stream: true })
+            if (buffer.length > 1_048_576) throw new CodexAuthError("Codex returned an oversized stream event.")
             const lines = buffer.split(/\r?\n/)
             buffer = lines.pop() || ""
             for (const line of lines) {
@@ -169,6 +195,15 @@ async function* parseCodexSse(body: ReadableStream<Uint8Array>, model: string): 
                     continue
                 }
                 const type = String(event.type || "")
+                if (type === "response.completed") {
+                    completed = true
+                    const response = event.response as { model?: string; usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number; output_tokens_details?: { reasoning_tokens?: number } } } | undefined
+                    const usage = response?.usage
+                    if (typeof usage?.input_tokens === "number" && typeof usage.output_tokens === "number") {
+                        yield { ...chunk(response?.model || model, {}, "stop"), choices: [], usage: { prompt_tokens: usage.input_tokens, completion_tokens: usage.output_tokens, total_tokens: usage.total_tokens ?? usage.input_tokens + usage.output_tokens, completion_tokens_details: { reasoning_tokens: usage.output_tokens_details?.reasoning_tokens } } }
+                    }
+                    return
+                }
                 if (type === "error" || type === "response.failed" || type === "response.incomplete") {
                     // Upstream bodies may contain account details. Keep the stream error generic.
                     throw new CodexAuthError(type === "response.incomplete"
@@ -177,6 +212,8 @@ async function* parseCodexSse(body: ReadableStream<Uint8Array>, model: string): 
                 }
                 if (type === "response.output_text.delta") {
                     const delta = String(event.delta || "")
+                    deliveredBytes += Buffer.byteLength(delta)
+                    if (deliveredBytes > outputBytes) throw new CodexAuthError("Codex reply exceeded the response limit.")
                     if (delta) yield chunk(model, { content: delta })
                     continue
                 }
@@ -203,6 +240,8 @@ async function* parseCodexSse(body: ReadableStream<Uint8Array>, model: string): 
                     const fragment = String(event.delta || "")
                     const tool = tools.get(key)
                     if (tool && fragment) {
+                        deliveredBytes += Buffer.byteLength(fragment)
+                        if (deliveredBytes > outputBytes) throw new CodexAuthError("Codex reply exceeded the response limit.")
                         yield chunk(model, {
                             tool_calls: [{
                                 index: tool.index,
@@ -214,8 +253,11 @@ async function* parseCodexSse(body: ReadableStream<Uint8Array>, model: string): 
                     }
                 }
             }
+            if (done) break
         }
+        if (!completed) throw new CodexAuthError("Codex chat ended before completing a response.")
     } finally {
+        await reader.cancel().catch(() => {})
         reader.releaseLock()
     }
 }

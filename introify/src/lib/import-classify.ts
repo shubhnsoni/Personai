@@ -1,4 +1,5 @@
 import type { ImportSourceKind } from "@/lib/import-extract"
+import { restaurantImportsAllowed } from "@/lib/import-business-access"
 
 export type SourceHint = "auto" | "cv" | "site" | "shop" | "course" | "events" | "services"
 
@@ -36,12 +37,14 @@ export function acceptForHint(hint: SourceHint) {
     return ".pdf,.txt,.md,.csv,.ics,application/pdf,text/plain,text/csv,text/calendar"
 }
 
-export function placeholderForHint(hint: SourceHint) {
+export function placeholderForHint(hint: SourceHint, role?: string | null) {
     switch (hint) {
         case "cv":
             return "Paste a CV, about page, or https://…"
         case "shop":
-            return "https://maps.google.com/…\nhttps://www.zomato.com/…\nhttps://www.swiggy.com/…\nor paste dishes: Paneer tikka, 220, Starters, Veg"
+            return restaurantImportsAllowed(role)
+                ? "https://maps.google.com/…\nhttps://www.zomato.com/…\nhttps://www.swiggy.com/…\nor paste dishes: Paneer tikka, 220, Starters, Veg"
+                : "https://yourbusiness.com/products\nor paste products: Ceramic cup, 24, Homeware"
         case "course":
             return "Module: Cadence\n- Weekly stack (12m, free)\nor a course URL"
         case "events":

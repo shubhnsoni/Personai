@@ -148,3 +148,19 @@
 @media(max-width:900px) { .plan-comparison-hint { display:block; } }
 @media(max-width:540px) { .plan-audience { min-height:0; font-size:9px; }.plan-includes { min-height:0; }.plan-value-benefits { min-height:0; }.plan-benefits li { font-size:13px; }.plan-benefits small { font-size:11px; }.billing-feature-disclosure > summary { padding-inline:18px; }.billing-feature-disclosure > .plan-footnote { padding-inline:18px; }.plan-feature-table { min-width:790px; }.plan-feature-table th:first-child { width:170px; } }
 @media(prefers-reduced-motion:reduce) { .billing-design * { transition:none!important; scroll-behavior:auto!important; } }
+
+/* Public pricing inherits the studio-style marketing palette without changing dashboard billing. */
+.dark .mk-page .billing-design { --bl-paper:var(--mk-paper); --bl-card:var(--mk-surface); --bl-ink:var(--mk-ink); --bl-muted:var(--mk-muted); --bl-line:var(--mk-line); --bl-soft:var(--mk-elevated); --bl-lime:var(--mk-action); --bl-forest:#191b20; }
+.dark .mk-page .billing-design :is(a,button,select):focus-visible,
+.dark .mk-page .billing-feature-disclosure > summary:focus-visible,
+.dark .mk-page .billing-comparison-scroll:focus-visible { outline-color:var(--mk-accent); }
+.dark .mk-page .plan-interval button[aria-pressed="true"] { background:var(--mk-action); color:var(--mk-action-ink); box-shadow:none; }
+.dark .mk-page .plan-interval small,
+.dark .mk-page .plan-badge { color:var(--mk-action-ink); }
+.dark .mk-page .plan-card[data-featured="true"] { border-color:var(--mk-accent); }
+.dark .mk-page .billing-button { background:var(--mk-action); border-color:var(--mk-action); color:var(--mk-action-ink)!important; }
+.dark .mk-page .billing-button:hover { background:var(--mk-action-hover); border-color:var(--mk-action-hover); }
+.dark .mk-page .billing-button-secondary { background:transparent; border-color:var(--bl-line); color:var(--bl-ink)!important; }
+.dark .mk-page .billing-button-secondary:hover { background:var(--bl-soft); border-color:var(--mk-muted); }
+.dark .mk-page .plan-card[data-featured="true"] .billing-button { color:var(--mk-action-ink)!important; }
+.dark .mk-page .plan-feature-table thead th { background:var(--bl-soft); color:var(--bl-ink); }

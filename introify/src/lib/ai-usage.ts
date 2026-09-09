@@ -45,6 +45,7 @@ export const finishAiUsage = settleUsage
 
 /** Rejections prove no generation was accepted; timeouts and stream failures do not. */
 export function providerRejectedWithoutSpend(error: unknown): boolean {
+    if (error && typeof error === "object" && "providerNotDispatched" in error && error.providerNotDispatched === true) return true
     const status = error && typeof error === "object" && "status" in error ? Number(error.status) : NaN
     return [400, 401, 403, 404, 413, 422, 429].includes(status)
 }

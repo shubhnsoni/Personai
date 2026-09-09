@@ -1,5 +1,14 @@
+import { execFileSync } from "node:child_process";
+
+let release = process.env.INTROIFY_RELEASE_SHA || "";
+if (!/^[a-f0-9]{40}$/.test(release)) {
+  try { release = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); }
+  catch { release = "unknown"; }
+}
+
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+  env: { INTROIFY_RELEASE_SHA: /^[a-f0-9]{40}$/.test(release) ? release : "unknown" },
   transpilePackages: ["three"],
   allowedDevOrigins: [
     "localhost",

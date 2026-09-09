@@ -18,12 +18,12 @@
   background: radial-gradient(ellipse at 8% 28%, var(--au-glow), transparent 52%), var(--mk-paper);
 }
 .dark .au-page {
-  --au-accent-soft: #304526;
-  --au-glow: #5b7d2821;
-  --au-action: #24553e;
-  --au-action-hover: #2c6247;
+  --au-accent-soft: #14232b;
+  --au-glow: #00d7ff0d;
+  --au-action: var(--mk-action);
+  --au-action-hover: var(--mk-action-hover);
   --au-danger: #ff9d9d;
-  --au-success: #b8db9c;
+  --au-success: #86efac;
 }
 .au-header,
 .au-footer {
@@ -808,3 +808,8 @@
     white-space: nowrap;
   }
 }
+
+.dark .au-page .au-cl-primary { color:var(--mk-action-ink); }
+.dark .au-page .au-story-label { background:#101114ed; color:var(--au-ink); }
+.dark .au-page .au-story-note { border-color:var(--au-line); background:var(--au-elevated); color:var(--au-ink); box-shadow:0 7px 20px #0003; }
+.dark .au-page .au-story-note > svg { color:var(--au-accent); }

@@ -12,6 +12,7 @@ import { countForHref, type NavCounts } from "@/lib/nav-counts"
 import { isActivePath, visibleNavItems } from "./sidebar"
 import { Logo } from "@/components/brand/logo"
 import { StudioSignOut } from "@/components/dashboard/studio-sign-out"
+import { BusinessSwitcher, type BusinessOption } from "./business-switcher"
 
 interface MobileSidebarProps {
     open: boolean
@@ -19,9 +20,11 @@ interface MobileSidebarProps {
     counts?: NavCounts
     role?: string | null
     extras?: import("@/lib/surfaces").SurfaceExtras | null
+    businesses?: BusinessOption[]
+    activeProfileId?: string
 }
 
-export function MobileSidebar({ open, onOpenChange, counts, role, extras }: MobileSidebarProps) {
+export function MobileSidebar({ open, onOpenChange, counts, role, extras, businesses, activeProfileId }: MobileSidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
 
@@ -37,10 +40,13 @@ export function MobileSidebar({ open, onOpenChange, counts, role, extras }: Mobi
                     <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/30" />
                     <div className="flex h-12 items-center px-4 pr-12">
                         <SheetTitle className="sr-only">Menu</SheetTitle>
-                        <Logo href="/dashboard" size="sm" />
+                        <Logo href="/dashboard" size="sm" className="w-[88px]" />
                     </div>
                 </SheetHeader>
                 <div className="min-h-0 overflow-y-auto px-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                    {businesses && activeProfileId && (
+                        <BusinessSwitcher businesses={businesses} activeId={activeProfileId} variant="drawer" onNavigate={() => onOpenChange(false)} />
+                    )}
                     <div className="grid grid-cols-2 gap-2.5">
                         {visibleNavItems(role, extras).map((item) => {
                             const active = isActivePath(pathname, item)

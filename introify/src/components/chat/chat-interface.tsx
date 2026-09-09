@@ -270,7 +270,7 @@ export function ChatInterface({
                     updated[lastIdx] = {
                         ...updated[lastIdx],
                         content: notice || (isAiNotConfigured
-                            ? "🚀 AI chat is coming soon! The creator is still setting things up."
+                            ? "The AI assistant is temporarily unavailable. Please use this business's contact or booking options."
                             : "This reply could not be completed. Check the conversation before retrying.")
                     }
                 }

@@ -12,7 +12,7 @@ import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { createOwnershipFoundation, ownershipRefusalResponse } from "@/lib/security"
 import { getRequestCurrency } from "@/lib/request-currency"
-import { apiClient, boundedXaiChatStream, boundedChatInput, clipUtf8, resolveApiRecipe, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
+import { apiClient, boundedCodexChatStream, boundedXaiChatStream, boundedChatInput, clipUtf8, resolveApiRecipe, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
 import { AiAccessError, prepareAiUsage, finishAiUsage, providerRejectedWithoutSpend, type AiReservation } from "@/lib/ai-usage"
 import {
     CONVERSATION_CAPABILITY_TTL_SECONDS,
@@ -50,7 +50,7 @@ type ChatRouteDependencies = Readonly<{
     retrieve: typeof vectorRetrieval
     buildPrompt: typeof buildSystemPrompt
     requestCurrency: () => Promise<DisplayCurrency>
-    createCompletion: (input: StreamingCompletionInput, recipe?: ApiRecipe) => Promise<AsyncIterable<StreamingChunk>>
+    createCompletion: (input: StreamingCompletionInput, recipe?: ApiRecipe, signal?: AbortSignal) => Promise<AsyncIterable<StreamingChunk>>
     summarizeConversation: (conversationId: string) => Promise<unknown>
     providerConfigured: () => boolean
     capabilitySecret: () => string | null
@@ -109,10 +109,11 @@ const productionDependencies: ChatRouteDependencies = {
     retrieve: vectorRetrieval,
     buildPrompt: buildSystemPrompt,
     requestCurrency: getRequestCurrency,
-    createCompletion: async (input, recipe) => {
+    createCompletion: async (input, recipe, signal) => {
         if (!recipe) throw new Error("ai_not_configured")
+        if (recipe.provider === "codex") return boundedCodexChatStream(input, recipe, signal)
         if (recipe.provider === "xai") return boundedXaiChatStream(input, recipe)
-        return apiClient(recipe).chat.completions.create(input)
+        return apiClient(recipe).chat.completions.create(input, { signal })
     },
     summarizeConversation: maybeSummarizeConversation,
     providerConfigured: () => ["fast", "smart", "reasoning"].some(mode => resolveApiRecipe(mode as "fast" | "smart" | "reasoning")),
@@ -257,7 +258,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         const restaurantDesk = profile.roleTemplate === "RESTAURANT"
         if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk && liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED")) {
             return new Response(
-                JSON.stringify({ error: "ai_not_configured", message: "AI chat is coming soon! The creator hasn't set up AI yet." }),
+                JSON.stringify({ error: "ai_not_configured", message: "The AI assistant is temporarily unavailable. You can still use this business's contact and booking options." }),
                 { status: 503, headers: { "Content-Type": "application/json" } },
             )
         }
@@ -821,7 +822,9 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
     try {
         if (req.signal.aborted) { await settle("RELEASE", { reason: "cancelled_before_dispatch" }); return new Response(null, { status: 499 }) }
         providerStarted = true
-        const response = await createCompletion(input, recipe)
+        const responseAbort = new AbortController()
+        const responseSignal = AbortSignal.any([req.signal, responseAbort.signal])
+        const response = await createCompletion(input, recipe, responseSignal)
         const encoder = new TextEncoder()
         let fullResponse = ""
         let cancelled = false
@@ -831,6 +834,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 const emit = (text: string) => { if (!cancelled) controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`)) }
                 try {
                     for await (const chunk of response) {
+                        if (responseSignal.aborted || cancelled) return
                         if (chunk.model) returnedModel = chunk.model
                         if (chunk.usage) { inputTokens = chunk.usage.prompt_tokens; outputTokens = chunk.usage.completion_tokens; reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens ?? null }
                         const delta = chunk.choices[0]?.delta
@@ -846,6 +850,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                             if (call.function?.arguments) toolCall.arguments = (toolCall.arguments + call.function.arguments).slice(0, 2048)
                         }
                     }
+                    if (responseSignal.aborted || cancelled) return
                     if (toolCall?.name && offeredTools.has(toolCall.name) && allowedTools.has(toolCall.name)) {
                         let args: Record<string, unknown> | null = null
                         try { const parsed = JSON.parse(toolCall.arguments || "{}"); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) args = parsed } catch { /* invalid tool arguments do not execute */ }
@@ -873,7 +878,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                     if (!cancelled) controller.error(new Error("The reply could not be completed. Please check the conversation before retrying."))
                 }
             },
-            cancel() { cancelled = true },
+            cancel() { cancelled = true; responseAbort.abort() },
         })
         return new Response(stream, { headers: responseHeaders() })
     } catch (error) {

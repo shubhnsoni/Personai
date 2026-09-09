@@ -2,6 +2,62 @@
 
 Production URL: https://introify.com
 
+## One-click deployment from Windows
+
+Double-click **`deploy.cmd` in the repository root** after saving your changes.
+It validates the release, commits the selected changes on `main`, and pushes
+to `shubhnsoni/Personai`. Hostinger must have automatic deployment enabled for
+that branch. The launcher waits for `/api/health` to return the exact commit in
+its `x-introify-release` header, then checks the homepage and sign-in page.
+A successful push alone is not reported as a live deployment. Missing or stale
+release headers stop verification after the timeout; inspect Hostinger build logs.
+
+The launcher requires Git, Windows PowerShell 5.1+, and Node 24 for UI tests.
+It finds or provisions pinned Node 20.20.2 for the production Webpack build.
+Its default scope includes modified tracked app files, new source/tests/public
+assets, and the root deployment scripts. It excludes local secrets and output,
+new uploads, `.env.example`, historical untracked documentation, and the old
+`_edge_cdp.py` utility. It refuses another branch, an unexpected origin, an
+unfinished Git operation, or already staged work. It never uses `git add .`.
+New migrations, maintenance scripts, or app configuration outside the automatic
+scope stop the launcher for explicit file selection, so a schema change cannot
+silently ship without its new migration.
+
+For a precise release, run PowerShell from the repository root:
+
+```powershell
+./scripts/deploy.ps1 -Files @(
+  'introify/src/components/dashboard/mobile-sidebar.tsx',
+  'introify/tests/mobile-business-navigation.test.tsx'
+) -Message 'Improve the mobile menu' -NoPause
+```
+
+Include every file needed by your change. `-Files` takes literal file paths;
+`.env.example` is permitted only when explicitly selected. `-Tests` optionally
+sets the focused unit/UI test list using app-relative `tests/...test.tsx` paths;
+changed unit/UI tests are also included. Database integration suites run separately,
+outside this deployment launcher. The normal default checks dashboard access,
+business switching, and page transitions. `-NoPause` is for terminal/agent use;
+double-click mode keeps its result visible until Enter is pressed.
+
+Before committing, the launcher archives the prospective Git tree into ignored
+`.local/release-*`, supplies dummy validation configuration, disables providers,
+and runs tests plus a Node 20 Webpack build. It does not load a local `.env`, use
+production credentials, migrate a database, or bootstrap production data. Existing
+dependencies are shared only after checking the lockfile and generated Prisma
+schema. If that check fails, it performs an independent `npm ci` and Prisma client
+generation inside the snapshot; `-InstallDependencies` also forces this path.
+Generated client files
+in the working app are never changed through the shared dependency junction.
+
+The selected files and branch are checked again before staging and committing;
+edits made during validation require another run. Validation snapshots remain
+under `.local` for inspection. A failed check does not push. A rejected push or
+Hostinger timeout leaves any already created local commit available for review
+and a later retry. Production migrations and bootstrap run only in Hostinger's
+configured hosting build below. Live provider, payment, and signed-in workflow
+checks still follow the launch checklist.
+
 ## Hosting
 
 - Hostinger website: `introify.com`
@@ -68,10 +124,11 @@ email allowlist in Hostinger.
 - The new production database contains the deployment bootstrap data. Existing
   local development records have not been copied to Neon.
 
-## Commercial AI configuration
+## API provider configuration
 
-Published business assistants and metered import enrichment use explicit
-OpenAI or xAI API configuration from [`ai-runtime.ts`](../src/lib/ai-runtime.ts).
+Published business assistants and metered import enrichment share the explicit
+provider configuration in [`ai-runtime.ts`](../src/lib/ai-runtime.ts). For API
+access, configure OpenAI or xAI below; the Codex connection follows this section.
 Use [`.env.example`](../.env.example) for variable names and configure their real
 values privately in Hostinger. Do not put keys or personal authentication files
 in source control, public uploads or this document.
@@ -97,11 +154,38 @@ in source control, public uploads or this document.
    behavior. Configuration badges and the public Fast-mode availability summary
    do not prove provider health or Smart/Reasoning availability.
 
-The legacy diagnostic controls at `/admin/ai` are separate. Personal Codex
-authentication, saved diagnostic defaults and diagnostic pings do not select
-or activate the commercial visitor runtime. Diagnostic pings can incur provider
-charges and do not test customer credit accounting. Do not copy a personal
-Codex login to enable public AI.
+### Codex connection
+
+The owner requested the existing local Codex connection for production. Set
+`INTROIFY_AI_PROVIDER=codex`, Fast to `gpt-5.6-luna`, Smart to `gpt-5.6-terra`
+and Reasoning to `gpt-5.6-sol`. A login alone does not activate visitor replies:
+the explicit mappings and `INTROIFY_AI_DISABLED=false` are still required.
+Plan entitlements, credit reservations, idempotency and business permissions
+apply to Codex exactly as they do to API providers.
+
+Use a dedicated writable persistent `CODEX_HOME`, outside the repository,
+web root and uploads; the Hostinger path is `/home/u323815761/.introify-codex`.
+Seed it privately with `CODEX_AUTH_JSON` (JSON or base64 of a Codex `auth.json`)
+and a `CODEX_AUTH_REVISION`. New or rotated logins must change the revision.
+The server persists refreshed tokens with private file permissions and serializes
+refreshes inside the app process. Do not share this directory with another
+process/replica. Never commit a login, expose it in browser code, or log tokens.
+[OpenAI's headless authentication guide](https://learn.chatgpt.com/docs/auth#login-on-headless-devices)
+documents device login and private auth-cache transfer.
+
+Codex account limits are shared across assistants; subscription access does not
+provide unlimited capacity. This existing adapter requests streamed responses
+with only the offered business tool, no shell/filesystem/browser tools. It caps
+request time at 45 seconds and delivered output bytes, cancels on disconnect,
+and requires a completed event. The Codex endpoint does not support the API's
+token-output cap; reasoning tokens can exceed the delivered-text budget. Actual
+token usage is recorded when returned, and dollar cost remains unknown rather
+than applying API prices to subscription access. Monitor provider limits and
+held reservations before increasing traffic.
+
+The legacy diagnostic controls at `/admin/ai` remain separate. Saved defaults
+and diagnostic pings do not select the visitor runtime or test customer credit
+accounting. Verify a real published reply and its ledger settlement after deployment.
 
 For subscription/pack webhooks, legal approval, durable worker/storage and 3D
 provider activation, follow [BILLING_LAUNCH_CHECKLIST.md](BILLING_LAUNCH_CHECKLIST.md).

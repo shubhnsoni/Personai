@@ -16,6 +16,7 @@ import {
     Upload,
     ExternalLink,
     Gift,
+    Sparkles,
 } from "lucide-react"
 import { deleteProduct, setAllPrepMinutes, setProductActive } from "@/app/actions/products"
 import { StudioDock } from "@/components/dashboard/studio-dock"
@@ -32,6 +33,7 @@ import { fitmentLine } from "@/lib/autoparts/fitment"
 import { useMoney } from "@/components/pricing-provider"
 import { isPhysical, parseGallery, stockLabel, whatsappHref } from "@/lib/commerce"
 import { fieldOn, type SurfaceExtras } from "@/lib/surfaces"
+import { restaurantImportsAllowed } from "@/lib/import-business-access"
 
 type CatalogProduct = DigitalProduct & { prepMinutes?: number | null }
 
@@ -56,7 +58,8 @@ const typeIcon: Record<string, typeof FileText> = {
     PHYSICAL: Package,
 }
 
-export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, role, extras, products, arBatch, goldBoard }: ProductsListProps) {
+export function ProductsList({ slug, profileId, whatsapp, jewelry, role, extras, products, arBatch, goldBoard }: ProductsListProps) {
+    const restaurant = restaurantImportsAllowed(role)
     const [view, setViewPersist] = useCatalogView("pl-shop-view")
     const [q, setQ] = useState("")
     const [filter, setFilter] = useState<"all" | "on" | "off" | "free" | "low">("all")
@@ -146,6 +149,15 @@ export function ProductsList({ slug, profileId, whatsapp, restaurant, jewelry, r
                 </button>
             ) : null}
 
+
+            {showAr && <button
+                type="button"
+                onClick={() => { setArIds(undefined); setArOpen(true) }}
+                className="studio-panel flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left"
+            >
+                <Sparkles className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                <span className="min-w-0"><span className="block text-sm font-semibold">Photoreal 3D</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">Create textured models from saved product photos. Review your trial, plan allowance and service availability.</span></span>
+            </button>}
 
             <div className="flex items-center gap-3 lg:gap-2 lg:py-2.5">
                 <CatalogSearch value={q} onChange={setQ} />

@@ -51,6 +51,8 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
                 counts={counts}
                 role={role}
                 extras={extras}
+                businesses={businesses}
+                activeProfileId={activeProfileId}
             />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                 {impersonating ? (
@@ -74,7 +76,11 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
                         )}
                     </div>
                 ) : null}
-                {businesses && activeProfileId && <BusinessSwitcher businesses={businesses} activeId={activeProfileId} />}
+                {businesses && activeProfileId && (
+                    <div className="hidden shrink-0 md:block">
+                        <BusinessSwitcher businesses={businesses} activeId={activeProfileId} />
+                    </div>
+                )}
                 <Header slug={slug} liveHref={liveHref} role={role} extras={extras} onMenuClick={() => setMobileMenuOpen(true)} />
                 <main
                     className={cn(
