@@ -2,7 +2,6 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
-import { BrandLoadingVisual } from "./brand-loading"
 
 type Transition = { id: number; phase: "opening" | "leaving" }
 const TransitionContext = createContext<(href: string) => void>(() => {})
@@ -16,8 +15,9 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
     const pathname = usePathname()
     const previousPath = useRef(pathname)
     const sequence = useRef(0)
-    const beganAt = useRef(0)
     const active = useRef(false)
+    const visible = useRef(false)
+    const contentAnimation = useRef<Animation | null>(null)
     const destinationPath = useRef<string | null>(null)
     const supersededPaths = useRef(new Set<string>())
     const timers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -32,20 +32,19 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
         if (!active.current) return
         clearTimers()
         const id = sequence.current
-        const reduced = prefersReducedMotion()
-        // Only the decoration finishes its beat. Routing and interactions never wait.
-        const remaining = reduced ? 0 : Math.max(0, 280 - (performance.now() - beganAt.current))
-        timers.current.push(setTimeout(() => {
+        const reset = () => {
             if (sequence.current !== id) return
-            setTransition({ id, phase: "leaving" })
-            timers.current.push(setTimeout(() => {
-                if (sequence.current !== id) return
-                active.current = false
-                destinationPath.current = null
-                supersededPaths.current.clear()
-                setTransition(null)
-            }, reduced ? 0 : 320))
-        }, remaining))
+            active.current = false
+            visible.current = false
+            destinationPath.current = null
+            supersededPaths.current.clear()
+            setTransition(null)
+        }
+        // Fast routes never show a loader. Visible feedback only fades away;
+        // there is no minimum display time and routing never waits for it.
+        if (!visible.current || prefersReducedMotion()) { reset(); return }
+        setTransition({ id, phase: "leaving" })
+        timers.current.push(setTimeout(reset, 120))
     }, [clearTimers])
 
     const start = useCallback((href: string) => {
@@ -60,30 +59,42 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
         supersededPaths.current.delete(destination.pathname)
         destinationPath.current = destination.pathname
         const id = ++sequence.current
-        beganAt.current = performance.now()
         active.current = true
-        setTransition({ id, phase: "opening" })
-        // A canceled navigation or network failure must never leave a permanent veil.
+        if (visible.current) {
+            setTransition({ id, phase: "opening" })
+        } else {
+            timers.current.push(setTimeout(() => {
+                if (sequence.current !== id || !active.current) return
+                visible.current = true
+                setTransition({ id, phase: "opening" })
+            }, 180))
+        }
+        // A canceled navigation or network failure cannot leave stale feedback.
         timers.current.push(setTimeout(finish, 8000))
     }, [clearTimers, finish])
 
     useEffect(() => {
         if (previousPath.current === pathname) return
         previousPath.current = pathname
+        // Cancel the delayed reveal at commit, before the next animation frame.
+        // Ignore superseded commits while still accepting server redirects.
+        if (!pathname || !supersededPaths.current.has(pathname) || pathname === destinationPath.current) finish()
         const frame = requestAnimationFrame(() => {
-            // Ignore a superseded route's late commit, but allow server redirects
-            // to complete at a destination different from the clicked URL.
-            if (!pathname || !supersededPaths.current.has(pathname) || pathname === destinationPath.current) finish()
             // Animate the content without wrapping it in a transformed ancestor:
             // fixed navigation, dialogs and mobile drawers keep their positioning.
             if (!prefersReducedMotion()) {
-                document.querySelector("main")?.animate?.(
-                    [{ opacity: 0.88 }, { opacity: 1 }],
-                    { duration: 320, easing: "ease-out" },
-                )
+                contentAnimation.current?.cancel?.()
+                contentAnimation.current = document.querySelector("main")?.animate?.(
+                    [{ opacity: 0.96 }, { opacity: 1 }],
+                    { duration: 120, easing: "ease-out" },
+                ) ?? null
             }
         })
-        return () => cancelAnimationFrame(frame)
+        return () => {
+            cancelAnimationFrame(frame)
+            contentAnimation.current?.cancel?.()
+            contentAnimation.current = null
+        }
     }, [pathname, finish])
 
     useEffect(() => {
@@ -103,8 +114,7 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
             {children}
             {transition && (
                 <div key={transition.id} className="page-transit" data-phase={transition.phase} role="status" aria-live="polite">
-                    <div className="page-transit-wash" aria-hidden="true" />
-                    <div className="page-transit-center"><BrandLoadingVisual /></div>
+                    <span className="page-transit-progress" aria-hidden="true" />
                     <span className="sr-only">Loading page</span>
                 </div>
             )}

@@ -1,9 +1,45 @@
 import { fireEvent, render, screen, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { PlanComparison } from "@/components/billing/plan-comparison"
+import { PlanFeatureMatrix } from "@/components/billing/plan-feature-matrix"
 import { AiCreditGuide, PricingFaq, PublicCreditPacks } from "@/components/billing/pricing-details"
 
 describe("Introify plan comparison", () => {
+    it("keeps the actual tier benefits visible in compact homepage cards", () => {
+        render(<PlanComparison compact />)
+        const features = (name: string) => within(screen.getByRole("list", { name: `${name} features` }))
+        expect(features("Starter").getByText("Remove the Introify footer")).toBeTruthy()
+        expect(features("Starter").getByText("Your assistant, your instructions")).toBeTruthy()
+        expect(features("Pro").getByText("30-day trends & traffic sources")).toBeTruthy()
+        expect(features("Pro").getByText("Conversion funnel overview")).toBeTruthy()
+        expect(features("Pro").getByText("Individual team roles")).toBeTruthy()
+        expect(features("Business").getByText("3 separate business workspaces")).toBeTruthy()
+        expect(features("Scale").getByText("10 separate business workspaces")).toBeTruthy()
+        for (const name of ["Business", "Scale"]) expect(features(name).getByText("Assign people by business")).toBeTruthy()
+    })
+
+    it("opens the native feature disclosure with five named plan columns and accurate entitlements", () => {
+        render(<PlanFeatureMatrix />)
+        const summary = screen.getByText("Compare all features").closest("summary")!
+        const disclosure = summary.closest("details")!
+        expect(disclosure.open).toBe(false)
+        fireEvent.click(summary)
+        expect(disclosure.open).toBe(true)
+
+        const table = screen.getByRole("table", { name: "Features and limits for the Free, Starter, Pro, Business and Scale plans." })
+        expect(within(table).getAllByRole("columnheader").map(header => header.textContent)).toEqual(["Feature", "Free", "Starter", "Pro", "Business", "Scale"])
+        const expectRow = (label: RegExp, values: string[]) => {
+            const row = within(table).getByRole("rowheader", { name: label }).closest("tr")!
+            const cells = within(row).getAllByRole("cell")
+            expect(cells).toHaveLength(5)
+            cells.forEach((cell, index) => expect(within(cell).getByText(values[index], { exact: true })).toBeTruthy())
+        }
+        expectRow(/^Custom orb & brand styles$/, ["Not included", "Included", "Included", "Included", "Included"])
+        expectRow(/^30-day trends, traffic sources & funnel/, ["Not included", "Not included", "Included", "Included", "Included"])
+        expectRow(/^Published offerings/, ["10", "100", "500", "1,500", "5,000"])
+        expectRow(/^Photoreal 3D generations/, ["1 lifetime trial", "3 / month", "10 / month", "20 / month", "50 / month"])
+    })
+
     it("shows the annual total and monthly equivalent without changing monthly allowances", () => {
         render(<PlanComparison />)
         const starter = screen.getByRole("article", { name: "Starter" })

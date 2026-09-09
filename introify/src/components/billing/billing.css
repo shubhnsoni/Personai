@@ -21,13 +21,14 @@
 .plan-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:13px; align-items:stretch; }
 .plan-card { position:relative; display:flex; min-width:0; flex-direction:column; border:1px solid var(--bl-line); border-radius:16px; background:var(--bl-card); padding:25px 20px 21px; }
 .plan-card[data-featured="true"] { border:2px solid #638f38; padding:24px 19px 20px; }
-.plan-card-topline { min-height:27px; display:flex; align-items:flex-start; gap:6px; justify-content:space-between; margin-bottom:11px; }
+.plan-card-topline { min-height:27px; display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; justify-content:space-between; margin-bottom:11px; }
+.plan-audience { min-height:28px; margin-bottom:10px!important; color:var(--bl-muted); font-size:8px; font-weight:700; line-height:1.6; letter-spacing:.1em; }
 .billing-design .plan-card h3 { font-size:18px; font-weight:650; line-height:1.4; letter-spacing:-.02em; color:var(--bl-ink); }
 .plan-badge { flex-shrink:0; padding:4px 6px; border-radius:4px; font-size:8px; font-weight:750; line-height:1.6; color:#244223; background:var(--bl-lime); letter-spacing:.03em; text-transform:uppercase; }
-.plan-description { min-height:57px; color:var(--bl-muted); font-size:12px; line-height:1.7; }
+.plan-description { min-height:65px; color:var(--bl-muted); font-size:12px; line-height:1.7; text-wrap:pretty; }
 .plan-price { display:flex; align-items:baseline; gap:4px; margin-top:18px; font-size:12px; color:var(--bl-muted); }
 .plan-price strong { color:var(--bl-ink); font-size:43px; line-height:1.15; letter-spacing:-.055em; font-weight:600; }
-.plan-bill { min-height:44px; margin-top:8px!important; font-size:11px; color:var(--bl-muted); line-height:1.6; }
+.plan-bill { min-height:34px; margin-top:8px!important; font-size:11px; color:var(--bl-muted); line-height:1.6; }
 .plan-card hr { margin:21px 0; border:0; border-top:1px solid var(--bl-line); }
 .plan-benefits { list-style:none; margin:0 0 25px; padding:0; display:grid; gap:14px; }
 .plan-benefits li { display:flex; gap:8px; align-items:flex-start; font-size:12px; line-height:1.6; min-width:0; }
@@ -35,6 +36,13 @@
 .dark .plan-benefits svg { color:var(--bl-lime); }
 .plan-benefits strong { font-weight:650; }
 .plan-benefits small { display:block; font-size:10px; color:var(--bl-muted); line-height:1.65; }
+.plan-includes { min-height:34px; margin-bottom:13px!important; font-size:11px; font-weight:700; line-height:1.6; }
+.plan-value-benefits { min-height:244px; align-content:start; gap:13px; margin-bottom:20px; }
+.plan-value-benefits li { font-weight:550; }
+.plan-value-benefits small { font-weight:400; }
+.plan-allowance-heading { padding-top:17px; margin-bottom:15px; border-top:1px solid var(--bl-line); font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--bl-muted); }
+.plan-allowances { margin-bottom:23px; }
+.plan-limit-note { margin:-8px 0 18px!important; font-size:11px; color:var(--bl-muted); line-height:1.7; }
 .billing-button { display:inline-flex; justify-content:center; align-items:center; gap:9px; min-height:44px; padding:12px 16px; border:1px solid var(--bl-forest); border-radius:8px; background:var(--bl-forest); color:#fff!important; font:inherit; font-size:12px; font-weight:650; text-decoration:none!important; cursor:pointer; line-height:1.5; text-align:center; transition:background .15s; }
 .billing-button:hover { background:#15523e; }
 .billing-button:disabled { cursor:not-allowed; opacity:.55; }
@@ -111,8 +119,32 @@
 .billing-invoices strong { font-size:17px; font-weight:600; }
 .billing-invoices strong span { font-size:10px; color:var(--bl-muted); }
 .billing-invoices a { display:inline-flex; align-items:center; gap:7px; min-height:44px; font-size:12px; text-decoration:underline; text-underline-offset:4px; }
+.billing-feature-disclosure { border:1px solid var(--bl-line); border-radius:14px; background:var(--bl-card); overflow:hidden; }
+.billing-feature-disclosure > summary { display:flex; justify-content:space-between; align-items:center; gap:16px; list-style:none; min-height:64px; padding:20px 24px; cursor:pointer; font-size:14px; font-weight:650; }
+.billing-feature-disclosure > summary::-webkit-details-marker { display:none; }
+.billing-feature-disclosure > summary:focus-visible,.billing-comparison-scroll:focus-visible { outline:3px solid #649f3c; outline-offset:-4px; }
+.billing-feature-disclosure > summary svg { flex-shrink:0; transition:transform .2s; }
+.billing-feature-disclosure[open] > summary { border-bottom:1px solid var(--bl-line); }
+.billing-feature-disclosure[open] > summary svg { transform:rotate(180deg); }
+.billing-feature-disclosure > .plan-footnote { padding-inline:24px; }
+.billing-feature-disclosure > .plan-footnote:last-child { margin-bottom:24px!important; }
+.billing-comparison-scroll { position:relative; width:100%; max-width:100%; max-height:min(72vh,720px); overflow:auto; overscroll-behavior-inline:contain; margin-top:24px; scrollbar-color:var(--bl-muted) var(--bl-soft); }
+.plan-comparison-hint { display:none; padding-inline:18px; margin-top:16px!important; color:var(--bl-muted); font-size:11px; line-height:1.7; text-align:center; }
+.plan-feature-table { border-collapse:separate; border-spacing:0; width:100%; min-width:860px; table-layout:fixed; font-size:12px; line-height:1.65; }
+.plan-feature-table th,.plan-feature-table td { padding:17px 14px; border-bottom:1px solid var(--bl-line); vertical-align:middle; text-align:center; overflow-wrap:anywhere; }
+.plan-feature-table th:first-child { width:27%; text-align:left; }
+.plan-feature-table thead th { position:sticky; top:0; z-index:2; background:var(--bl-forest); color:#fff; font-size:13px; font-weight:650; }
+.plan-feature-table thead th:first-child { left:0; z-index:3; }
+.plan-feature-table th[scope="row"] { position:sticky; left:0; z-index:1; background:var(--bl-card); font-weight:550; border-right:1px solid var(--bl-line); }
+.plan-feature-table th small { display:block; margin-top:5px; color:var(--bl-muted); font-size:10px; font-weight:400; line-height:1.7; }
+.plan-feature-table .plan-feature-group th { padding-block:12px; background:var(--bl-soft); font-size:10px; text-transform:uppercase; letter-spacing:.09em; font-weight:700; }
+.plan-feature-value { color:var(--bl-ink); }
+.plan-feature-value svg { display:inline-block; vertical-align:middle; color:#58812e; }
+.dark .plan-feature-value svg { color:var(--bl-lime); }
 @media(min-width:1151px) and (max-width:1300px) { .plan-card { padding-inline:15px; }.plan-card[data-featured="true"] { padding-inline:14px; }.plan-badge { font-size:7px; } }
 @media(max-width:1150px) { .plan-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }.plan-description { min-height:41px; }.billing-container { width:calc(100% - 48px); } }
 @media(max-width:800px) { .plan-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.billing-model-grid,.billing-pack-grid { grid-template-columns:1fr; }.billing-usage-grid { grid-template-columns:1fr; }.billing-model,.billing-pack { padding:22px; }.billing-faq { grid-template-columns:1fr; }.billing-page { padding-top:46px; }.billing-teaser { padding-block:65px; }.billing-current { padding:22px; } }
 @media(max-width:540px) { .billing-container { width:calc(100% - 32px); }.plan-grid { grid-template-columns:1fr; gap:16px; }.plan-card { padding:24px; }.plan-card[data-featured="true"] { padding:23px; }.plan-description { min-height:0; }.plan-card-topline { margin-bottom:5px; }.plan-badge { font-size:9px; }.plan-bill { min-height:0; }.plan-price { margin-top:15px; }.billing-page-heading { margin-bottom:30px; }.billing-page-heading > p:last-child { font-size:14px; }.billing-section { margin-top:45px; }.billing-current-actions,.billing-current-actions .billing-button { width:100%; }.billing-dashboard { padding:20px 16px; }.billing-dashboard-header h1 { font-size:28px; }.billing-account-select { width:100%; }.plan-interval button { padding-inline:12px; } }
+@media(max-width:900px) { .plan-comparison-hint { display:block; } }
+@media(max-width:540px) { .plan-audience { min-height:0; font-size:9px; }.plan-includes { min-height:0; }.plan-value-benefits { min-height:0; }.plan-benefits li { font-size:13px; }.plan-benefits small { font-size:11px; }.billing-feature-disclosure > summary { padding-inline:18px; }.billing-feature-disclosure > .plan-footnote { padding-inline:18px; }.plan-feature-table { min-width:790px; }.plan-feature-table th:first-child { width:170px; } }
 @media(prefers-reduced-motion:reduce) { .billing-design * { transition:none!important; scroll-behavior:auto!important; } }

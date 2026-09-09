@@ -1,22 +1,9 @@
-import { IntroifyWordmark } from "@/components/brand/wordmark"
 import { cn } from "@/lib/utils"
 
-/** A small companion to the owner's wordmark, drawn from its dot and upright. */
+/** Quiet feedback for actual streamed loading states. */
 export function BrandLoadingVisual({ compact = false }: { compact?: boolean }) {
     return (
         <div className={cn("brand-loading-visual", compact && "brand-loading-visual--compact")} aria-hidden="true">
-            <div className="brand-loading-orbit">
-                <span className="brand-loading-halo" />
-                <span className="brand-loading-satellite" />
-                <div className="brand-loading-orb">
-                    <svg viewBox="0 0 64 64" fill="none" focusable="false">
-                        <circle className="brand-loading-dot" cx="32" cy="19" r="5" />
-                        <path d="M27.5 29h9v21h-9z" fill="currentColor" />
-                    </svg>
-                    <span className="brand-loading-shine" />
-                </div>
-            </div>
-            <IntroifyWordmark decorative className="brand-loading-wordmark" />
             <span className="brand-loading-track"><span /></span>
         </div>
     )
