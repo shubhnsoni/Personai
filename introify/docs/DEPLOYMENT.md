@@ -28,6 +28,24 @@ Direct connections preserve the session needed by migration advisory locks;
 see [Neon's pooling limitations](https://neon.com/docs/connect/connection-pooling).
 The wrapper keeps locking enabled and reports failures without blindly retrying.
 
+### Missing ArBuild migration prerequisite
+
+`20260909110000_ar_build_foundation` adds the legacy `ArBuild` table that was
+present in the Prisma schema but missing from the tracked migration chain.
+It runs before the unchanged `20260909120000_platform_billing` migration.
+An existing AR table, its rows and foreign-key policies are preserved.
+
+The hosting build first runs `scripts/recover-billing-baseline.mjs`. This handles
+only the verified first-statement billing failure: PostgreSQL `42P01` for the
+missing `ArBuild` table, the expected migration checksum, zero applied steps,
+the required legacy tables, and no billing tables, indexes, sequence or added
+columns. After those checks it uses Prisma's supported `migrate resolve --rolled-back`
+command to clear that failed record; normal migration deployment
+then applies the prerequisite and billing migration. With no failed record it
+does nothing. Any different or partially applied state stops for review.
+The original billing SQL stays immutable. This recovery does not reset the
+database, delete business data or roll back existing schema changes.
+
 ## Services
 
 - Neon project: `introify` (`icy-boat-80075899`), AWS Singapore, production branch.

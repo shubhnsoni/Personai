@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "build:hostinger": "node scripts/migrate-hostinger.mjs && node scripts/bootstrap-hostinger.mjs && npm run build -- --webpack",
+    "build:hostinger": "node scripts/recover-billing-baseline.mjs && node scripts/migrate-hostinger.mjs && node scripts/bootstrap-hostinger.mjs && npm run build -- --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
