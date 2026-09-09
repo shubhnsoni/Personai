@@ -72,7 +72,7 @@ describe("AuthScreen", () => {
         expect(screen.getByRole("region", { name: "Create your Introify account" })).toBeTruthy()
         expect(screen.getByText("There’s more to you.")).toBeTruthy()
         expect(screen.getByText("Let’s show it.")).toBeTruthy()
-        expect(screen.getByText("Free early access. No card required.")).toBeTruthy()
+        expect(screen.getByText("Start on Free. No card required.")).toBeTruthy()
 
         nav.pathname = "/sign-in/factor-one"
         view.rerender(<AuthFrame />)

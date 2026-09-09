@@ -14,7 +14,7 @@ const syncUserIdentity: ServerIdentitySource<SyncedProfile> = {
   async resolve(): Promise<SecurityUser<SyncedProfile> | null> {
     const user = await syncUser()
     if (!user) return null
-    return user
+    return { ...user, activeProfileId: user.activeProfile?.id ?? null }
   },
 }
 

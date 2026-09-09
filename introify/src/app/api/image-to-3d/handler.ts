@@ -111,43 +111,50 @@ async function consumeDurableUsage(profileId: string, operation: string, max: nu
 }
 
 async function persistOwnedArtifact(input: Readonly<{ profileId: string; filename: string; bytes: Buffer }>): Promise<Readonly<{ url: string }>> {
-  const { prisma } = await import("../../../lib/prisma")
+  const { getProfileBilling, withAccountLimit } = await import("../../../lib/billing/service")
+  const context = await getProfileBilling(input.profileId)
   const baseDirectory = uploadsDirectory()
   const owner = ownerDirectory(input.profileId)
   const directory = resolve(baseDirectory, owner)
   const fullPath = resolve(directory, input.filename)
   if (!directory.startsWith(`${baseDirectory}${sep}`) || dirname(fullPath) !== directory) throw new Error("Unsafe artifact path")
 
-  await mkdir(directory, { recursive: true })
-  let bytes = input.bytes
+  const artifacts: Array<{ path: string; bytes: Buffer }> = [{ path: fullPath, bytes: input.bytes }]
   try {
     const { optimizeModelSet } = await import("../../../lib/optimize-glb")
     const set = await optimizeModelSet(input.bytes)
-    bytes = set.web
-    if (set.ar) {
-      const arPath = fullPath.replace(/\.glb$/i, "-ar.glb")
-      await writeFile(arPath, set.ar)
-    }
-    if (set.usdz) {
-      const usdzPath = fullPath.replace(/\.glb$/i, ".usdz")
-      await writeFile(usdzPath, set.usdz)
-    }
+    artifacts[0].bytes = set.web
+    if (set.ar) artifacts.push({ path: fullPath.replace(/\.glb$/i, "-ar.glb"), bytes: set.ar })
+    if (set.usdz) artifacts.push({ path: fullPath.replace(/\.glb$/i, ".usdz"), bytes: set.usdz })
   } catch {
-    bytes = input.bytes
+    // Preserve the already-validated basic model if optional optimization fails.
   }
-  await writeFile(fullPath, bytes, { flag: "wx" })
   const url = `/uploads/${owner}/${input.filename}`
+  const written: string[] = []
   try {
-    await prisma.profileEvent.create({
-      data: {
-        profileId: input.profileId,
-        name: ARTIFACT_EVENT,
-        path: url,
-        meta: JSON.stringify({ mediaType: "model/gltf-binary", size: bytes.length, source: "sf3d" }),
-      },
+    await withAccountLimit(context.accountId, "storageBytes", artifacts.reduce((sum, artifact) => sum + artifact.bytes.length, 0), async tx => {
+      const profile = await tx.profile.findUniqueOrThrow({ where: { id: input.profileId }, select: { billingAccountId: true } })
+      if (profile.billingAccountId !== context.accountId) throw new Error("The business billing account changed.")
+      await mkdir(directory, { recursive: true })
+      for (const artifact of artifacts) {
+        if (dirname(artifact.path) !== directory) throw new Error("Unsafe artifact path")
+        if (!written.includes(artifact.path)) {
+          await writeFile(artifact.path, artifact.bytes, { flag: "wx" })
+          written.push(artifact.path)
+        }
+        await tx.billingStorageObject.create({ data: {
+          accountId: context.accountId, profileId: input.profileId,
+          path: `/uploads/${owner}/${artifact.path.slice(directory.length + 1)}`,
+          bytes: BigInt(artifact.bytes.length),
+        } })
+      }
+      await tx.profileEvent.create({ data: {
+        profileId: input.profileId, name: ARTIFACT_EVENT, path: url,
+        meta: JSON.stringify({ mediaType: "model/gltf-binary", size: artifacts[0].bytes.length, source: "sf3d" }),
+      } })
     })
   } catch (error) {
-    await unlink(fullPath).catch(() => undefined)
+    await Promise.all(written.map(path => unlink(path).catch(() => undefined)))
     throw error
   }
   return Object.freeze({ url })
@@ -155,8 +162,8 @@ async function persistOwnedArtifact(input: Readonly<{ profileId: string; filenam
 
 const productionDependencies: ImageTo3dRouteDependencies = Object.freeze({
   async authorize(claimedProfileId) {
-    const { ownershipRefusalResponse, requireOwnedProfile } = await import("../../../lib/security")
-    const result = await requireOwnedProfile({ claimedProfileId })
+    const { ownershipRefusalResponse, requireProfileAccess } = await import("../../../lib/security")
+    const result = await requireProfileAccess({ claimedProfileId, permission: "content.write" })
     return result.ok
       ? Object.freeze({ ok: true as const, profileId: result.value.profile.id })
       : Object.freeze({ ok: false as const, response: ownershipRefusalResponse(result.refusal) })

@@ -19,6 +19,7 @@ import {
     Ticket,
     UserPlus,
     Boxes,
+    CreditCard,
 } from "lucide-react"
 
 export type NavItem = { name: string; href: string; icon: typeof LayoutDashboard; prefixes?: string[] }
@@ -63,6 +64,7 @@ export const navGroups: { label: string | null; items: NavItem[] }[] = [
                 prefixes: ["/dashboard/money", "/dashboard/orders", "/dashboard/payments"],
             },
             { name: "Business OS", href: "/dashboard/business-os", icon: Boxes },
+            { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
         ],
     },
 ]

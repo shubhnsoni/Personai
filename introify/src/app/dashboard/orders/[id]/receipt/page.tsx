@@ -19,7 +19,8 @@ function money(cents: number, currency: string) {
 export default async function OrderReceiptPage({ params }: { params: Promise<{ id: string }> }) {
     const user = await syncUser()
     if (!user) redirect("/sign-in")
-    const profile = user.profiles[0]
+    if (!user.activeProfile) redirect("/onboarding")
+    const profile = user.activeProfile
     if (!profile) redirect("/onboarding")
     requireSurface(profile.roleTemplate, "shop", profile)
     const { id } = await params

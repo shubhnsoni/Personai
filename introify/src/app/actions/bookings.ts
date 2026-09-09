@@ -1,8 +1,9 @@
 "use server"
 
+import { withBillingLimit } from "@/lib/billing/service"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 
 export async function getAvailableSlots(
     profileId: string,
@@ -86,12 +87,15 @@ export async function getAvailableSlots(
 }
 
 export async function ensureTableService(profileId: string) {
-    const existing = await prisma.serviceOffering.findFirst({
+    return withBillingLimit(profileId, "offerings", async (tx) =>
+        await tx.serviceOffering.findFirst({ where: { profileId, kind: "TABLE", isActive: true }, select: { id: true } }) ? 0 : 1,
+    async (tx) => {
+    const existing = await tx.serviceOffering.findFirst({
         where: { profileId, kind: "TABLE", isActive: true },
         orderBy: { createdAt: "asc" },
     })
     if (existing) return existing
-    return prisma.serviceOffering.create({
+    return tx.serviceOffering.create({
         data: {
             profileId,
             name: "Reserve a table",
@@ -104,6 +108,7 @@ export async function ensureTableService(profileId: string) {
             kind: "TABLE",
             covers: 20,
         },
+    })
     })
 }
 
@@ -177,9 +182,8 @@ export async function createBooking(data: {
 }
 
 export async function setBookingStatus(bookingId: string, status: "CONFIRMED" | "CANCELLED") {
-    const user = await syncUser()
-    const profileId = user?.profiles[0]?.id
-    if (!profileId) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "operations.write" }))
+    const profileId = profile.id
 
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
     if (!booking || booking.profileId !== profileId) throw new Error("Not found")
@@ -194,9 +198,7 @@ export async function setBookingStatus(bookingId: string, status: "CONFIRMED" | 
 }
 
 export async function createHold(startIso: string, minutes = 30, note = "Blocked") {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!profile) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "operations.write" }))
 
     const start = new Date(startIso)
     const end = new Date(start.getTime() + minutes * 60000)

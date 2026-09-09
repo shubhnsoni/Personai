@@ -95,7 +95,7 @@ export const policyDocuments: Record<
         sections: [
             {
                 id: "operator", title: "The service and its operator",
-                paragraphs: ["Introify provides software for a public profile, business information and enabled tools such as enquiries, listings, bookings and content access. The legal operator details below and the final commercial terms are awaiting approval. This draft does not announce a paid plan or a trial."],
+                paragraphs: ["Introify provides software for a public profile, business information and enabled tools such as enquiries, listings, bookings and content access. Plan prices and allowances are described on the pricing page. The legal operator details below and the final commercial terms are awaiting approval; paid checkout must remain unavailable until these details and applicable purchase terms are complete."],
                 fields: operatorFields,
             },
             {

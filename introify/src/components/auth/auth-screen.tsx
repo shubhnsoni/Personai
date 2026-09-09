@@ -108,7 +108,7 @@ export function AuthScreen({ children }: { children: React.ReactNode }) {
               <Check size={14} aria-hidden="true" />
               <span>
                 {mode === "sign-up"
-                  ? "Free early access. No card required."
+                  ? "Start on Free. No card required."
                   : "Your page and dashboard are a sign-in away."}
               </span>
             </div>
@@ -123,6 +123,7 @@ export function AuthScreen({ children }: { children: React.ReactNode }) {
       <footer className="au-footer">
         <span>Good work deserves a great introduction.</span>
         <nav aria-label="Account page links">
+          <Link href="/pricing">Compare plans</Link>
           <Link href="/contact">Contact</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>

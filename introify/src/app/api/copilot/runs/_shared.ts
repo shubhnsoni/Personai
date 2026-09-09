@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess } from "@/lib/security"
 import {
   CopilotExecutionService,
   CopilotRuntimeError,
@@ -14,20 +14,9 @@ export const executionService = new CopilotExecutionService(
 )
 
 export async function requireCopilotRunAccess() {
-  const user = await syncUser()
-  if (!user) {
-    return {
-      ok: false as const,
-      response: errorResponse("UNAUTHORIZED", "Sign in to use copilot runs.", 401),
-    }
-  }
-  const profile = user.profiles[0]
-  if (!profile) {
-    return {
-      ok: false as const,
-      response: errorResponse("FORBIDDEN", "This account has no active profile.", 403),
-    }
-  }
+  const access = await requireProfileAccess({ permission: "settings.write" })
+  if (!access.ok) return { ok: false as const, response: errorResponse(access.refusal.code, access.refusal.message, access.refusal.status) }
+  const { actor, profile } = access.value
   if (!hasSurface(profile.roleTemplate, "businessOs", extrasOf(profile))) {
     return {
       ok: false as const,
@@ -36,7 +25,7 @@ export async function requireCopilotRunAccess() {
   }
   return {
     ok: true as const,
-    scope: { profileId: profile.id, actorId: user.id },
+    scope: { profileId: profile.id, actorId: actor.userId },
   }
 }
 

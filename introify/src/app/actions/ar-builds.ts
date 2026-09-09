@@ -1,130 +1,51 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
-import { arQuote } from "@/lib/ar-price"
-import { meshyConfigured } from "@/lib/meshy-internal"
-import { env } from "@/lib/env"
-import {
-    createBatch,
-    listBatch,
-    markBatchPaid,
-    photoForProduct,
-    publicBuild,
-    tickBatch,
-} from "@/lib/ar-builds"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
+import { getPhotorealAccess, requirePhotorealGenerationAccess } from "@/lib/billing/photoreal-access"
+import { getAccountBalances, getProfileBilling } from "@/lib/billing/service"
+import { enqueueArBatch, isOwnedProductPhoto, listBatch, photoForProduct, publicBuild } from "@/lib/ar-builds"
 
-export async function quoteArBuilds(productIds: string[], photos?: Record<string, string>) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile())
-    const ids = [...new Set(productIds.filter(Boolean))].slice(0, 80)
-    const products = await prisma.digitalProduct.findMany({
-        where: { profileId: profile.id, id: { in: ids } },
-        select: { id: true, title: true, thumbnailUrl: true, galleryUrls: true, arModelUrl: true },
-    })
-    const items = products.map((p) => ({
-        id: p.id,
-        title: p.title,
-        photo: photos?.[p.id] || photoForProduct(p),
-        has3d: Boolean(p.arModelUrl),
-    }))
-    const ready = items.filter((i) => i.photo)
-    return {
-        studioReady: meshyConfigured(),
-        paymentsReady: env.hasStripe,
-        quote: arQuote(ready.length),
-        items,
-    }
+async function studioContext() {
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "read" }))
+    const billing = await getProfileBilling(profile.id)
+    const [balances, writeAccess] = await Promise.all([getAccountBalances(billing.accountId), requireProfileAccess({ permission: "content.write", claimedProfileId: profile.id })])
+    return { profile, billing, balance: balances.photoreal, canGenerate: writeAccess.ok }
 }
 
-export async function catalogArItems() {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile())
-    const products = await prisma.digitalProduct.findMany({
-        where: { profileId: profile.id },
-        orderBy: { createdAt: "desc" },
-        select: { id: true, title: true, thumbnailUrl: true, galleryUrls: true, arModelUrl: true, isActive: true },
-    })
-    return products.map((p) => ({
-        id: p.id,
-        title: p.title,
-        photo: photoForProduct(p),
-        has3d: Boolean(p.arModelUrl),
-        live: p.isActive,
-    }))
+export async function getArStudio() {
+    const context = await studioContext()
+    const products = await prisma.digitalProduct.findMany({ where: { profileId: context.profile.id }, orderBy: { createdAt: "desc" }, select: { id: true, title: true, thumbnailUrl: true, galleryUrls: true, arModelUrl: true, isActive: true } })
+    const jobs = await prisma.arBuild.findMany({ where: { profileId: context.profile.id }, select: { batchId: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 30 })
+    return { access: getPhotorealAccess(), canGenerate: context.canGenerate, plan: { id: context.billing.planId, name: context.billing.plan.name }, balance: context.balance, items: products.map(product => ({ id: product.id, title: product.title, photo: photoForProduct(product), canGenerate: isOwnedProductPhoto(context.profile.id, photoForProduct(product)), has3d: Boolean(product.arModelUrl), live: product.isActive })), recentBatchIds: [...new Set(jobs.map(job => job.batchId))].slice(0, 5) }
 }
 
-export async function startArCheckout(input: { productIds: string[]; photos?: Record<string, string> }) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile())
-    const ids = [...new Set(input.productIds.filter(Boolean))].slice(0, 80)
-    if (!ids.length) throw new Error("Pick at least one item.")
-    if (!meshyConfigured()) throw new Error("3D studio isn’t connected yet.")
+export async function quoteArBuilds(productIds: string[]) {
+    const studio = await getArStudio()
+    const ids = new Set(productIds)
+    const items = studio.items.filter(item => ids.has(item.id))
+    return { access: studio.access, canGenerate: studio.canGenerate, plan: studio.plan, balance: studio.balance, unitsRequired: items.length, items }
+}
 
-    const products = await prisma.digitalProduct.findMany({
-        where: { profileId: profile.id, id: { in: ids } },
-        select: { id: true, thumbnailUrl: true, galleryUrls: true },
-    })
-    const items = products.map((p) => {
-        const imageUrl = input.photos?.[p.id] || photoForProduct(p)
-        if (!imageUrl) return null
-        return { productId: p.id, imageUrl }
-    }).filter(Boolean) as { productId: string; imageUrl: string }[]
-    if (!items.length) throw new Error("Add a photo for each item first.")
+export async function catalogArItems() { return (await getArStudio()).items }
 
-    const batchId = await createBatch({ profileId: profile.id, items })
-    const totalCents = arQuote(items.length).totalCents
-
-    if (!env.hasStripe) {
-        await markBatchPaid(batchId, "local")
-        await tickBatch(batchId, profile.id)
-        const { recordMoneyEvent } = await import("@/lib/admin/money")
-        await recordMoneyEvent({
-            profileId: profile.id,
-            kind: "AR",
-            subjectId: batchId,
-            amountCents: totalCents,
-            currency: "USD",
-            payMethod: "STRIPE",
-            payStatus: "PAID",
-        })
-        return { batchId, checkoutUrl: null as string | null, totalCents }
+/** Name retained for old entry points; this now reserves allowance, never creates per-item checkout. */
+export async function startArCheckout(input: { productIds: string[]; requestKey: string }) {
+    const { profile, actor } = unwrapOwnershipResult(await requireProfileAccess({ permission: "content.write" }))
+    requirePhotorealGenerationAccess()
+    const billing = await getProfileBilling(profile.id)
+    try {
+        const batch = await enqueueArBatch({ profileId: profile.id, accountId: billing.accountId, actorId: actor.userId, productIds: input.productIds, requestKey: input.requestKey })
+        return { ...batch, error: undefined }
+    } catch (error) {
+        const message = error instanceof Error && /^(?:Choose between|Upload a|One or more selected|A selected product|This request key|The business billing|Not enough|Verify your email|Today's trial|Your .+ plan allows|Photoreal generation|A valid generation|The prior generation)/.test(error.message)
+            ? error.message : "Your generation could not be queued. Check the status before retrying."
+        return { error: message, batchId: undefined, replayed: false }
     }
-
-    const { getUncachableStripeClient } = await import("@/lib/stripe")
-    const stripe = await getUncachableStripeClient()
-    const { getRequestCurrency } = await import("@/lib/request-currency")
-    const { convertUsdCents, stripeCurrency } = await import("@/lib/pricing")
-    const currency = await getRequestCurrency()
-    const amount = convertUsdCents(totalCents, currency)
-    const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        success_url: `${env.appUrl}/dashboard/products?ar=${batchId}`,
-        cancel_url: `${env.appUrl}/dashboard/products?ar=cancel`,
-        metadata: { itemType: "ar-build", itemId: batchId, profileId: profile.id },
-        line_items: [{
-            quantity: 1,
-            price_data: {
-                currency: stripeCurrency(currency),
-                unit_amount: amount,
-                product_data: {
-                    name: `Photoreal 3D · ${items.length} item${items.length === 1 ? "" : "s"}`,
-                    description: "Table-ready 3D models from your photos",
-                },
-            },
-        }],
-    })
-    await prisma.$executeRaw`
-        UPDATE "ArBuild" SET "stripeSessionId" = ${session.id}, "updatedAt" = CURRENT_TIMESTAMP WHERE "batchId" = ${batchId}
-    `
-    return { batchId, checkoutUrl: session.url, totalCents }
 }
 
 export async function pollArBatch(batchId: string) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile())
-    const rows = await tickBatch(batchId, profile.id)
-    return { batchId, items: rows }
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "read" }))
+    return { batchId, items: (await listBatch(batchId, profile.id)).map(publicBuild) }
 }
-
-export async function getArBatch(batchId: string) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile())
-    const rows = await listBatch(batchId, profile.id)
-    return { batchId, items: rows.map(publicBuild) }
-}
+export async function getArBatch(batchId: string) { return pollArBatch(batchId) }

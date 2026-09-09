@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
     create: vi.fn(),
     update: vi.fn(),
     profileFindUnique: vi.fn(),
+    profileFindMany: vi.fn(),
+    membershipFindMany: vi.fn(),
+    accountMemberFindMany: vi.fn(),
     cookies: vi.fn(),
     isAdminEmail: vi.fn(),
 }))
@@ -23,7 +26,9 @@ vi.mock("@/lib/prisma", () => ({
             create: mocks.create,
             update: mocks.update,
         },
-        profile: { findUnique: mocks.profileFindUnique },
+        profile: { findUnique: mocks.profileFindUnique, findMany: mocks.profileFindMany },
+        membership: { findMany: mocks.membershipFindMany },
+        billingAccountMember: { findMany: mocks.accountMemberFindMany },
     },
 }))
 
@@ -51,6 +56,7 @@ function localUser(clerkId = "clerk-current", email = "owner@example.com") {
         clerkId,
         email,
         name: "Account Owner",
+        emailVerifiedAt: new Date("2026-01-01"),
         image: "https://example.com/avatar.png",
         role: "USER",
         profiles: [{ id: "owned-profile", slug: "owner", updatedAt: new Date("2026-01-01") }],
@@ -68,6 +74,9 @@ beforeEach(() => {
     vi.resetAllMocks()
     mocks.currentUser.mockResolvedValue(clerkUser())
     mocks.findUnique.mockResolvedValue(null)
+    mocks.membershipFindMany.mockResolvedValue([])
+    mocks.accountMemberFindMany.mockResolvedValue([])
+    mocks.profileFindMany.mockResolvedValue([])
     mocks.cookies.mockResolvedValue({ get: vi.fn() })
     mocks.isAdminEmail.mockImplementation((email) => email === "admin@example.com")
 })
@@ -158,6 +167,7 @@ describe("verified Clerk email synchronization", () => {
         expect(mocks.create.mock.calls[0][0].data).toEqual({
             clerkId: "clerk-current",
             email: "owner@example.com",
+            emailVerifiedAt: expect.any(Date),
             name: "Account Owner",
             image: "https://example.com/avatar.png",
         })
@@ -196,5 +206,42 @@ describe("concurrent account creation isolation", () => {
 
         await expect(syncUser()).rejects.toBe(failure)
         expect(mocks.findUnique).toHaveBeenCalledTimes(2)
+    })
+})
+
+
+describe("workspace membership and ownership isolation", () => {
+    const shared = { id: "shared-profile", slug: "shared", updatedAt: new Date("2026-08-01") }
+    function membership(role = "STAFF", locationIds: string[] = []) {
+        return { workspace: { id: "workspace-shared", profileId: shared.id, billingAccountId: "payer-shared" }, role, membershipLocations: locationIds.map((locationId) => ({ locationId })) }
+    }
+    it("selects an invited business without adding it to the ownership list", async () => {
+        mocks.findUnique.mockResolvedValue(localUser())
+        mocks.membershipFindMany.mockResolvedValue([membership()])
+        mocks.accountMemberFindMany.mockResolvedValue([{ accountId: "payer-shared" }])
+        mocks.profileFindMany.mockResolvedValue([shared])
+        const user = await syncUser()
+        expect(user?.activeProfile?.id).toBe(shared.id)
+        expect(user?.profiles.map((profile) => profile.id)).toEqual(["owned-profile"])
+        expect(user?.profileAccess[shared.id]).toEqual({ workspaceId: "workspace-shared", role: "STAFF", owner: false, locationIds: [] })
+    })
+    it("ignores a forged active-business cookie", async () => {
+        mocks.findUnique.mockResolvedValue(localUser())
+        mocks.cookies.mockResolvedValue({ get: () => ({ value: "foreign-private-profile" }) })
+        expect((await syncUser())?.activeProfile?.id).toBe("owned-profile")
+        expect(mocks.profileFindUnique).not.toHaveBeenCalled()
+    })
+    it("revoked account membership cannot restore workspace access through a stale membership", async () => {
+        mocks.findUnique.mockResolvedValue(localUser())
+        mocks.membershipFindMany.mockResolvedValue([membership()])
+        const user = await syncUser()
+        expect(user?.accessibleProfiles.map((profile) => profile.id)).toEqual(["owned-profile"])
+        expect(mocks.profileFindMany).not.toHaveBeenCalled()
+    })
+    it("does not expose whole-business legacy views to a location-limited colleague", async () => {
+        mocks.findUnique.mockResolvedValue(localUser())
+        mocks.membershipFindMany.mockResolvedValue([membership("MANAGER", ["location-one"])])
+        mocks.accountMemberFindMany.mockResolvedValue([{ accountId: "payer-shared" }])
+        expect((await syncUser())?.accessibleProfiles.map((profile) => profile.id)).toEqual(["owned-profile"])
     })
 })

@@ -1,3 +1,4 @@
+import { publicAnimationConfig } from "@/lib/profile-branding"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
@@ -30,6 +31,7 @@ export default async function CourseSalesPage({ params }: { params: Promise<{ sl
     try {
         config = course.profile.animationStyle?.config ? JSON.parse(course.profile.animationStyle.config) : {}
     } catch {}
+    config = await publicAnimationConfig(course.profile.id, config)
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
     const outcomes: string[] = (() => {
         try {

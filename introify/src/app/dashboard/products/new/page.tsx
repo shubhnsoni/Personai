@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic"
 export default async function NewProductPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")
-    if (!user.profiles[0]) redirect("/onboarding")
+    if (!user.activeProfile) redirect("/onboarding")
+    if (!user.activeProfile) redirect("/onboarding")
     redirect("/dashboard/products")
 }

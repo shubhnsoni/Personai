@@ -30,7 +30,7 @@ function check(name: string, condition: unknown, central = false): void {
 }
 
 function jsonRequest(path: string, body: unknown, cookie = "", signal?: AbortSignal): Request {
-    const headers = new Headers({ "content-type": "application/json" })
+    const headers = new Headers({ "content-type": "application/json", "Idempotency-Key": randomUUID() })
     if (cookie) headers.set("cookie", cookie)
     return new Request(`http://lane-d.invalid${path}`, {
         method: "POST",
@@ -253,6 +253,8 @@ async function main(): Promise<void> {
                 },
                 buildPrompt: () => "stubbed system prompt",
                 requestCurrency: async () => "USD",
+                reserveAi: async () => ({ id: "injected-reservation", autoMemory: false, customInstructions: true, recipe: { mode: "fast", provider: "openai", model: "gpt-4o-mini", inputBudget: 2000, outputBudget: 500, inputUsdPerMillion: null, outputUsdPerMillion: null } }),
+                settleAi: async () => {},
                 createCompletion: async () => {
                     providerCalls += 1
                     return fakeCompletionStream()

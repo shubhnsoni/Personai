@@ -56,6 +56,7 @@ export const adminNavGroups: AdminNavGroup[] = [
     {
         label: "Platform",
         items: [
+            { name: "Billing", href: "/admin/billing", icon: Wallet },
             { name: "AI", href: "/admin/ai", icon: Sparkles },
             { name: "Capacity", href: "/admin/capacity", icon: Gauge },
             { name: "Audit", href: "/admin/audit", icon: ScrollText },

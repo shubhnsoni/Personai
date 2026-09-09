@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import {
-    requireOwnedProfile,
+    requireProfileAccess,
     unwrapOwnershipResult,
 } from "@/lib/security"
 import { revalidatePath } from "next/cache"
@@ -40,7 +40,8 @@ export type ApplyResult = {
 }
 
 export async function ingestText(claimedProfileId: string, raw: string, hint: SourceHint = "auto"): Promise<ImportBundle> {
-    unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId }))
+    const { profile: ownedProfile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId }))
+    if (raw.length > 1_000_000) throw new Error("Import at most one million characters at a time.")
     const text = raw.trim()
     if (!text) throw new Error("Paste some text first.")
     let bundle = bundleFromText(text, hint === "auto" ? "Pasted text" : `${hint} paste`)
@@ -59,11 +60,11 @@ export async function ingestText(claimedProfileId: string, raw: string, hint: So
     if (hint === "events") bundle = preferKinds(bundle, ["event"])
     if (hint === "services") bundle = preferKinds(bundle, ["service"])
     if (hint === "cv" || hint === "site") bundle = preferKinds(bundle, ["profile", "experience", "project", "service"])
-    return serializeBundle(await enrichWithModel(bundle, text))
+    return serializeBundle(await enrichWithModel(ownedProfile.id, bundle, text))
 }
 
 export async function ingestUrl(claimedProfileId: string, url: string): Promise<ImportBundle> {
-    unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId }))
+    const { profile: ownedProfile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId }))
     try {
         const target = normalizeUrl(url)
         const kind = classifyUrl(target)
@@ -166,7 +167,7 @@ export async function ingestUrl(claimedProfileId: string, url: string): Promise<
             ...bundle.items.map((i) => `${i.kind}: ${i.title} ${i.fields.description || ""}`),
         ].join("\n").slice(0, 9000)
         console.info("[import]", target, "items", bundle.items.length, "related", extras.length)
-        return serializeBundle(await enrichWithModel(bundle, excerpt))
+        return serializeBundle(await enrichWithModel(ownedProfile.id, bundle, excerpt))
     } catch (e) {
         if (e instanceof Error) throw e
         throw new Error("Could not read that link. Paste the text instead.")
@@ -174,9 +175,10 @@ export async function ingestUrl(claimedProfileId: string, url: string): Promise<
 }
 
 export async function ingestFile(claimedProfileId: string, formData: FormData, hint: SourceHint = "auto"): Promise<ImportBundle> {
-    unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId }))
+    const { profile: ownedProfile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId }))
     const file = formData.get("file")
     if (!(file instanceof File)) throw new Error("No file")
+    if (file.size > 10 * 1024 * 1024) throw new Error("Import files must be 10 MB or smaller.")
     const buf = Buffer.from(await file.arrayBuffer())
     const name = file.name || "upload"
     const source = classifyFile(name, file.type)
@@ -186,7 +188,7 @@ export async function ingestFile(claimedProfileId: string, formData: FormData, h
     if (source === "pdf") {
         const text = await extractPdfText(buf)
         if (!text.trim()) throw new Error("Could not read text from that PDF. Paste the CV instead.")
-        return serializeBundle(await enrichWithModel(bundleFromText(text, name, "pdf"), text))
+        return serializeBundle(await enrichWithModel(ownedProfile.id, bundleFromText(text, name, "pdf"), text))
     }
     const text = buf.toString("utf8")
     if (!text.trim()) throw new Error("That file was empty.")
@@ -223,7 +225,7 @@ function sanitizeDeep<T>(value: T): T {
 }
 
 export async function applyImportBundle(claimedProfileId: string, items: ImportItem[]): Promise<ApplyResult> {
-    const { profile: ownedProfile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId }))
+    const { profile: ownedProfile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId }))
     const profileId = ownedProfile.id
     const selected = sanitizeDeep(items).filter((i) => i.selected)
     if (!selected.length) throw new Error("Select at least one item.")
@@ -455,9 +457,9 @@ export async function applyImportBundle(claimedProfileId: string, items: ImportI
     return { wrote, skipped, destinations }
 }
 
-async function enrichWithModel(bundle: ImportBundle, text: string): Promise<ImportBundle> {
+async function enrichWithModel(profileId: string, bundle: ImportBundle, text: string): Promise<ImportBundle> {
     try {
-        const extra = await extractWithModel(text)
+        const extra = await extractWithModel(profileId, text)
         if (extra.length) bundle = { ...bundle, items: mergeModelItems(bundle.items, extra) }
     } catch {
         // deterministic result is enough

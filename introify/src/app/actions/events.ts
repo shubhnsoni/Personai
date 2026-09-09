@@ -1,7 +1,8 @@
 "use server"
 
+import { withOfferingLimit } from "@/lib/billing/resource-limits"
 import { prisma } from "@/lib/prisma"
-import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
+import { executeProfileResourceWrite, requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { revalidatePath } from "next/cache"
 
 export interface EventData {
@@ -39,25 +40,25 @@ function eventWrite(data: EventData) {
 }
 
 export async function createEvent(profileId: string, data: EventData) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
-    await prisma.event.create({
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
+    await withOfferingLimit(profile.id, "event", null, data.isActive, (tx) => tx.event.create({
         data: {
             profileId: profile.id,
             ...eventWrite(data),
             currency: "USD",
         },
-    })
+    }))
     revalidatePath("/dashboard/events")
 }
 
 export async function updateEvent(eventId: string, data: EventData) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: eventId,
         writeOwned: async ({ resourceId, profile }) => {
-            const updated = await prisma.event.updateMany({
+            const updated = await withOfferingLimit(profile.id, "event", resourceId, data.isActive, (tx) => tx.event.updateMany({
                 where: { id: resourceId, profileId: profile.id },
                 data: eventWrite(data),
-            })
+            }))
             return updated.count === 1 ? true : null
         },
     }))
@@ -65,7 +66,7 @@ export async function updateEvent(eventId: string, data: EventData) {
 }
 
 export async function deleteEvent(eventId: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: eventId,
         writeOwned: async ({ resourceId, profile }) => {
             const deleted = await prisma.event.deleteMany({
@@ -78,13 +79,13 @@ export async function deleteEvent(eventId: string) {
 }
 
 export async function setEventActive(eventId: string, isActive: boolean) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: eventId,
         writeOwned: async ({ resourceId, profile }) => {
-            const updated = await prisma.event.updateMany({
+            const updated = await withOfferingLimit(profile.id, "event", resourceId, isActive, (tx) => tx.event.updateMany({
                 where: { id: resourceId, profileId: profile.id },
                 data: { isActive },
-            })
+            }))
             return updated.count === 1 ? true : null
         },
     }))

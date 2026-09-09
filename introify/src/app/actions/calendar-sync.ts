@@ -2,13 +2,11 @@
 
 import { randomBytes } from "crypto"
 import { prisma } from "@/lib/prisma"
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { revalidatePath } from "next/cache"
 
 export async function ensureCalendarToken() {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!profile) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "settings.write" }))
 
     const existing = await prisma.$queryRaw<Array<{ calendarToken: string | null }>>`
         SELECT "calendarToken" FROM "Profile" WHERE "id" = ${profile.id}
@@ -25,9 +23,7 @@ export async function ensureCalendarToken() {
 }
 
 export async function rotateCalendarToken() {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!profile) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "settings.write" }))
     const next = randomBytes(18).toString("base64url")
     await prisma.$executeRaw`
         UPDATE "Profile" SET "calendarToken" = ${next} WHERE "id" = ${profile.id}

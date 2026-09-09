@@ -7,8 +7,9 @@ export const dynamic = 'force-dynamic'
 export default async function DashboardPaymentsPage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")
+    if (!user.activeProfile) redirect("/onboarding")
 
-    const profile = user.profiles[0]
+    const profile = user.activeProfile
     if (!profile) redirect("/onboarding")
 
     const { prisma } = await import("@/lib/prisma")

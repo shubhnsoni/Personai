@@ -13,6 +13,7 @@ import { addContent, deleteContent, syncKnowledgeFromChats, updateContent } from
 import { ImportStudio } from "@/components/dashboard/import-studio"
 import type { SurfaceExtras } from "@/lib/surfaces"
 import { toast } from "sonner"
+import { isPrivateChatDocument } from "@/lib/memory-privacy"
 import { cn } from "@/lib/utils"
 
 type Filter = "all" | "notes" | "links" | "chats" | "import"
@@ -54,9 +55,9 @@ export function ContentManager({
     const rows = useMemo(() => {
         return documents.filter((d) => {
             if (d.type === "VISITOR_MEMORY") return false
-            if (filter === "notes") return d.sourceType !== "URL" && d.sourceType !== "CHAT_SUMMARY"
+            if (filter === "notes") return d.sourceType !== "URL" && !isPrivateChatDocument(d)
             if (filter === "links") return d.sourceType === "URL"
-            if (filter === "chats") return d.sourceType === "CHAT_SUMMARY"
+            if (filter === "chats") return isPrivateChatDocument(d)
             return true
         })
     }, [documents, filter])
@@ -91,9 +92,9 @@ export function ContentManager({
         try {
             const res = await syncKnowledgeFromChats(profileId)
             if (!res.added) toast.message("No chat notes yet")
-            else toast.success(`Pulled ${res.count} conversations`)
+            else toast.success(`Saved private notes from ${res.count} conversations`)
         } catch {
-            toast.error("Could not sync chats")
+            toast.error("Could not save private chat notes")
         } finally {
             setSyncing(false)
         }
@@ -102,8 +103,8 @@ export function ContentManager({
     return (
         <div className="space-y-3">
             <div>
-                <p className="text-sm font-medium">What your AI knows</p>
-                <p className="text-xs text-muted-foreground">Notes, links, imports, and chat. This is what it can answer from.</p>
+                <p className="text-sm font-medium">Knowledge and private notes</p>
+                <p className="text-xs text-muted-foreground">Notes, links and imports can inform public answers. Chat notes stay private and are excluded from shared knowledge.</p>
             </div>
 
             <div className="flex flex-wrap gap-1.5">
@@ -111,7 +112,7 @@ export function ContentManager({
                     ["all", "All"],
                     ["notes", "Notes"],
                     ["links", "Links"],
-                    ["chats", "Chats"],
+                    ["chats", "Private chats"],
                     ["import", "Import"],
                 ] as const).map(([id, label]) => (
                     <button
@@ -135,7 +136,7 @@ export function ContentManager({
                     <div className="flex gap-2">
                         <Button type="button" variant="outline" className="h-9 rounded-full" onClick={syncChats} disabled={syncing}>
                             <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
-                            {syncing ? "Syncing…" : "Sync from chat"}
+                            {syncing ? "Saving…" : "Save private chat notes"}
                         </Button>
                         <Button type="button" variant="outline" className="h-9 rounded-full" onClick={() => setFilter("import")}>
                             <Upload className="mr-1.5 h-3.5 w-3.5" />
@@ -148,7 +149,7 @@ export function ContentManager({
                             <EmptyState
                                 icon={<Brain />}
                                 title="Nothing in the brain yet"
-                                description="Add a note, paste a URL, import a file, or sync what people already asked in chat."
+                                description="Add a note, paste a URL or import a file for public answers. You can also save private notes from conversations."
                             />
                         </div>
                     ) : (
@@ -156,10 +157,11 @@ export function ContentManager({
                             {rows.map((doc) => (
                                 <div key={doc.id} className="flex items-start gap-3 border-b border-border/50 px-3 py-3 last:border-b-0">
                                     <span className="mt-0.5 text-muted-foreground">
-                                        {doc.sourceType === "CHAT_SUMMARY" ? <MessageCircle className="h-4 w-4" /> : doc.sourceType === "URL" ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                                        {isPrivateChatDocument(doc) ? <MessageCircle className="h-4 w-4" /> : doc.sourceType === "URL" ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                                     </span>
                                     <button type="button" className="min-w-0 flex-1 text-left" onClick={() => openEdit(doc)}>
                                         <p className="truncate text-sm font-medium">{doc.title}</p>
+                                        {isPrivateChatDocument(doc) && <p className="text-[10px] font-medium text-muted-foreground">Private · excluded from public answers</p>}
                                         <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                                             {doc.sourceType === "URL" ? doc.url : doc.rawText}
                                         </p>
@@ -181,7 +183,7 @@ export function ContentManager({
                 <DialogContent className="rounded-t-3xl sm:rounded-3xl">
                     <DialogHeader>
                         <DialogTitle>{editing ? "Edit note" : "Add to the brain"}</DialogTitle>
-                        <DialogDescription>Text or a link. Your chat can use this.</DialogDescription>
+                        <DialogDescription>{editing && isPrivateChatDocument(editing) ? "These private notes stay excluded from public answers." : "Text or a link for your public assistant. Avoid adding visitor personal details."}</DialogDescription>
                     </DialogHeader>
                     <div className="flex gap-1.5">
                         {(["text", "url"] as const).map((id) => (

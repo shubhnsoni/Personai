@@ -1,3 +1,4 @@
+import { publicAnimationConfig } from "@/lib/profile-branding"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
@@ -28,6 +29,7 @@ export default async function EventsCatalogPage({ params }: { params: Promise<{ 
     try {
         config = profile.animationStyle?.config ? JSON.parse(profile.animationStyle.config) : {}
     } catch { /* ignore */ }
+    config = await publicAnimationConfig(profile.id, config)
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
     const logo = (profile as { shopLogoUrl?: string | null }).shopLogoUrl
 

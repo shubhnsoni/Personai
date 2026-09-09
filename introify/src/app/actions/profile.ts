@@ -1,9 +1,12 @@
 "use server"
 
+import { getProfileBilling } from "@/lib/billing/service"
+import { allowedAiModes } from "@/lib/billing/catalog"
+import { validateAiSettings } from "@/lib/ai-settings"
 import { prisma } from "@/lib/prisma"
 import {
-    executeOwnedResourceWrite,
-    requireOwnedProfile,
+    executeProfileResourceWrite,
+    requireProfileAccess,
     unwrapOwnershipResult,
 } from "@/lib/security"
 import { revalidatePath } from "next/cache"
@@ -56,11 +59,20 @@ export type ProjectData = {
     link?: string | null
 }
 
+export async function getProfileAiAccess(profileId: string) {
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId, permission: "settings.write" }))
+    const billing = await getProfileBilling(profile.id)
+    return { customBranding: billing.features.customBranding, modes: [...allowedAiModes(billing.planId)], autoMemory: billing.features.autoMemory, customInstructions: billing.features.customInstructions }
+}
+
 export async function updateProfile(profileId: string, data: ProfileUpdateData) {
-    const result = unwrapOwnershipResult(await executeOwnedResourceWrite({
+    const result = unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: profileId,
         claimedProfileId: profileId,
-        writeOwned: async ({ resourceId, actor }) => {
+        permission: "settings.write",
+        writeOwned: async ({ resourceId, profile }) => {
+            const billing = await getProfileBilling(resourceId)
+            const aiSettings = validateAiSettings(billing.planId, data)
             let slug = data.slug
             if (slug) {
                 slug = normalizeUsername(slug)
@@ -79,7 +91,7 @@ export async function updateProfile(profileId: string, data: ProfileUpdateData) 
             }
 
             const updated = await prisma.profile.updateMany({
-                where: { id: resourceId, userId: actor.userId },
+                where: { id: resourceId, userId: profile.userId },
                 data: {
                     displayName: data.displayName,
                     headline: data.headline,
@@ -90,16 +102,16 @@ export async function updateProfile(profileId: string, data: ProfileUpdateData) 
                     primaryGoal: data.primaryGoal,
                     language: data.language,
                     timezone: data.timezone,
-                    animationStyleId: data.animationStyleId,
+                    animationStyleId: billing.features.customBranding ? data.animationStyleId : undefined,
                     isPublic: data.isPublic,
                     welcomeMessageOverride: data.welcomeMessageOverride,
                     contentDisplayMode: data.contentDisplayMode,
-                    personalityConfig: data.personalityConfig,
-                    aiModel: data.aiModel,
+                    personalityConfig: aiSettings.personalityConfig,
+                    aiModel: aiSettings.aiModel,
                     imageUrl: data.imageUrl || null,
                     shopLogoUrl: data.shopLogoUrl || null,
                     chatAvatarMode: data.chatAvatarMode === "IMAGE" ? "IMAGE" : "ORB",
-                    autoMemoryEnabled: Boolean(data.autoMemoryEnabled),
+                    autoMemoryEnabled: aiSettings.autoMemoryEnabled,
                     liveChatEnabled: Boolean(data.liveChatEnabled),
                     liveChatSlaMinutes: Number(data.liveChatSlaMinutes) || 10,
                     whatsapp: data.whatsapp?.trim() || null,
@@ -118,7 +130,7 @@ export async function updateProfile(profileId: string, data: ProfileUpdateData) 
 }
 
 export async function createWorkExperience(profileId: string, data: WorkExperienceData) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
     await prisma.workExperience.create({
         data: {
             profileId: profile.id,
@@ -134,7 +146,7 @@ export async function createWorkExperience(profileId: string, data: WorkExperien
 }
 
 export async function updateWorkExperience(id: string, data: WorkExperienceData) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: id,
         writeOwned: async ({ resourceId, profile }) => {
             const updated = await prisma.workExperience.updateMany({
@@ -155,7 +167,7 @@ export async function updateWorkExperience(id: string, data: WorkExperienceData)
 }
 
 export async function deleteWorkExperience(id: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: id,
         writeOwned: async ({ resourceId, profile }) => {
             const deleted = await prisma.workExperience.deleteMany({
@@ -168,7 +180,7 @@ export async function deleteWorkExperience(id: string) {
 }
 
 export async function createProject(profileId: string, data: ProjectData) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
     await prisma.project.create({
         data: {
             profileId: profile.id,
@@ -184,7 +196,7 @@ export async function createProject(profileId: string, data: ProjectData) {
 }
 
 export async function updateProject(id: string, data: ProjectData) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: id,
         writeOwned: async ({ resourceId, profile }) => {
             const updated = await prisma.project.updateMany({
@@ -205,7 +217,7 @@ export async function updateProject(id: string, data: ProjectData) {
 }
 
 export async function deleteProject(id: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: id,
         writeOwned: async ({ resourceId, profile }) => {
             const deleted = await prisma.project.deleteMany({

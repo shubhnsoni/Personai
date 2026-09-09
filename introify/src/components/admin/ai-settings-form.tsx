@@ -23,10 +23,10 @@ export function AiSettingsForm({
                     <label key={kind} className="rounded-xl border p-4 text-sm">
                         <div className="flex items-center justify-between">
                             <span className="font-medium">{kind === "xai" ? "SpaceXAI" : kind === "codex" ? "Codex" : "OpenAI"}</span>
-                            <span className="text-xs text-muted-foreground">{status[kind] ? "keys ok" : "not configured"}</span>
+                            <span className="text-xs text-muted-foreground">{status[kind] ? "credential source present" : "not configured"}</span>
                         </div>
                         <label className="mt-3 flex items-center justify-between text-xs">
-                            Kill
+                            Disable diagnostics
                             <input
                                 type="checkbox"
                                 checked={draft.kill[kind]}
@@ -43,7 +43,7 @@ export function AiSettingsForm({
             </div>
             <div className="flex flex-wrap items-center gap-3">
                 <label className="text-sm">
-                    Default
+                    Diagnostic default
                     <select
                         className="ml-2 h-9 rounded-md border bg-background px-2"
                         value={draft.defaultProvider}
@@ -55,7 +55,7 @@ export function AiSettingsForm({
                     </select>
                 </label>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span>Fallbacks</span>
+                    <span>Diagnostic fallbacks</span>
                     {draft.fallback.map((kind, index) => (
                         <span key={`${kind}-${index}`} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
                             {kind}
@@ -86,7 +86,7 @@ export function AiSettingsForm({
                         </span>
                     ))}
                 </div>
-                <Button disabled={pending} onClick={() => start(() => saveAdminAiSettings(draft))}>Save</Button>
+                <Button disabled={pending} onClick={() => start(() => saveAdminAiSettings(draft))}>Save diagnostics</Button>
                 <Button
                     variant="outline"
                     disabled={pending}
@@ -95,7 +95,7 @@ export function AiSettingsForm({
                         setPing(result.ok ? `${result.provider} ${result.ms}ms · ${result.preview}` : `${result.provider} fail · ${result.error}`)
                     })}
                 >
-                    Test chat
+                    Run diagnostic ping
                 </Button>
                 {ping ? <span className="text-xs text-muted-foreground">{ping}</span> : null}
             </div>

@@ -17,11 +17,13 @@ export type SecurityProfile = Readonly<{
 export type SecurityUser<Profile extends SecurityProfile = SecurityProfile> = Readonly<{
   id: string
   profiles: readonly Profile[]
+  activeProfileId?: string | null
 }>
 
 export type AuthenticatedActor<Profile extends SecurityProfile = SecurityProfile> = Readonly<{
   userId: string
   profiles: readonly Profile[]
+  activeProfileId?: string | null
 }>
 
 export type OwnedProfile<Profile extends SecurityProfile = SecurityProfile> = Readonly<{
@@ -110,6 +112,7 @@ export function createOwnershipFoundation<Profile extends SecurityProfile>(
     return allow(Object.freeze({
       userId: user.id,
       profiles: Object.freeze([...user.profiles]),
+      ...(user.activeProfileId !== undefined ? { activeProfileId: user.activeProfileId } : {}),
     }))
   }
 
@@ -126,7 +129,9 @@ export function createOwnershipFoundation<Profile extends SecurityProfile>(
 
     const profile = normalizedClaim
       ? authenticated.value.profiles.find((candidate) => opaqueId(candidate.id) === normalizedClaim)
-      : authenticated.value.profiles[0]
+      : authenticated.value.activeProfileId !== undefined
+        ? authenticated.value.profiles.find((candidate) => candidate.id === authenticated.value.activeProfileId)
+        : authenticated.value.profiles[0]
 
     if (!profile || !opaqueId(profile.id)) return refuse(ACCESS_DENIED)
     if (entitlement && !await entitlement(profile, authenticated.value)) return refuse(ACCESS_DENIED)

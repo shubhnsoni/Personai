@@ -1,7 +1,8 @@
 "use server"
 
+import { withOfferingLimit } from "@/lib/billing/resource-limits"
 import { prisma } from "@/lib/prisma"
-import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
+import { executeProfileResourceWrite, requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { revalidatePath } from "next/cache"
 
 export interface CommunityData {
@@ -27,25 +28,25 @@ function communityWrite(data: CommunityData) {
 }
 
 export async function createCommunity(profileId: string, data: CommunityData) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
-    await prisma.community.create({
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
+    await withOfferingLimit(profile.id, "community", null, data.isActive, (tx) => tx.community.create({
         data: {
             profileId: profile.id,
             ...communityWrite(data),
             currency: "USD",
         },
-    })
+    }))
     revalidatePath("/dashboard/community")
 }
 
 export async function updateCommunity(communityId: string, data: CommunityData) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: communityId,
         writeOwned: async ({ resourceId, profile }) => {
-            const updated = await prisma.community.updateMany({
+            const updated = await withOfferingLimit(profile.id, "community", resourceId, data.isActive, (tx) => tx.community.updateMany({
                 where: { id: resourceId, profileId: profile.id },
                 data: communityWrite(data),
-            })
+            }))
             return updated.count === 1 ? true : null
         },
     }))
@@ -53,7 +54,7 @@ export async function updateCommunity(communityId: string, data: CommunityData) 
 }
 
 export async function deleteCommunity(communityId: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: communityId,
         writeOwned: async ({ resourceId, profile }) => {
             const deleted = await prisma.community.deleteMany({

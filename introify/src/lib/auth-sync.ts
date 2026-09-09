@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { ACTIVE_PROFILE_COOKIE, TRY_NOW_COOKIE } from "@/lib/try-kits"
 import { isAdminEmail } from "@/lib/admin/allowlist"
 import { IMPERSONATE_COOKIE } from "@/lib/admin/impersonate"
+import { canAccessProfile, chooseActiveProfile, type ProfileAccess } from "@/lib/workspace-access"
 
 /**
  * Syncs the signed-in Clerk user into the local database.
@@ -36,6 +37,7 @@ export async function syncUser() {
 
     const data = {
         email,
+        emailVerifiedAt: new Date(),
         name,
         image: user.imageUrl,
         ...(isAdminEmail(email) ? { role: "ADMIN" as const } : {}),
@@ -48,6 +50,7 @@ export async function syncUser() {
 
     if (existingByClerkId) {
         if (
+            !existingByClerkId.emailVerifiedAt ||
             existingByClerkId.email !== email ||
             existingByClerkId.name !== name ||
             existingByClerkId.image !== user.imageUrl ||
@@ -104,34 +107,70 @@ export async function syncUser() {
     }
 }
 
-async function withActiveProfile<T extends { role?: string | null; email?: string | null; profiles: { id: string; slug: string; updatedAt: Date }[] }>(dbUser: T): Promise<T> {
-    if (!dbUser.profiles.length) return dbUser
-    const real = dbUser.profiles.filter((p) => !p.slug.startsWith("try-"))
-    const latestReal = [...real].sort((a, b) => +b.updatedAt - +a.updatedAt)[0]
+type SyncedDatabaseUser = Prisma.UserGetPayload<{ include: { profiles: true } }>
+
+async function withActiveProfile(dbUser: SyncedDatabaseUser) {
+    // Ownership remains an explicit, separate list. A workspace invitation must
+    // never let an owner-only action treat a colleague as the legal owner.
+    const profileAccess: Record<string, ProfileAccess> = Object.fromEntries(dbUser.profiles.map((p) => [p.id, {
+        workspaceId: null, role: "OWNER", owner: true, locationIds: [],
+    }]))
+    const memberships = await prisma.membership.findMany({
+        where: { userId: dbUser.id },
+        include: {
+            workspace: { select: { id: true, profileId: true, billingAccountId: true } },
+            membershipLocations: { select: { locationId: true } },
+        },
+    })
+    const accountMemberships = await prisma.billingAccountMember.findMany({
+        where: { userId: dbUser.id, status: "ACTIVE" }, select: { accountId: true },
+    })
+    const activeAccounts = new Set(accountMemberships.map((member) => member.accountId))
+    for (const membership of memberships) {
+        const profileId = membership.workspace.profileId
+        if (!profileId) continue
+        const owner = dbUser.profiles.some((p) => p.id === profileId)
+        if (!owner && membership.workspace.billingAccountId && !activeAccounts.has(membership.workspace.billingAccountId)) continue
+        profileAccess[profileId] = {
+            workspaceId: membership.workspace.id,
+            role: owner ? "OWNER" : membership.role,
+            owner,
+            locationIds: owner ? [] : membership.membershipLocations.map((link) => link.locationId),
+        }
+    }
+    const sharedIds = Object.keys(profileAccess).filter((id) => !dbUser.profiles.some((p) => p.id === id) && canAccessProfile(profileAccess[id], "read"))
+    const shared = sharedIds.length ? await prisma.profile.findMany({ where: { id: { in: sharedIds } } }) : []
+    const accessibleProfiles = [...dbUser.profiles, ...shared]
+    let activeId: string | undefined
+    let trying = false
     try {
         const jar = await cookies()
+        activeId = jar.get(ACTIVE_PROFILE_COOKIE)?.value
+        trying = Boolean(jar.get(TRY_NOW_COOKIE)?.value)
         if (dbUser.role === "ADMIN" || isAdminEmail(dbUser.email)) {
             const impersonateId = jar.get(IMPERSONATE_COOKIE)?.value
             if (impersonateId) {
                 const foreign = await prisma.profile.findUnique({ where: { id: impersonateId } })
                 if (foreign) {
-                    const rest = dbUser.profiles.filter((p) => p.id !== foreign.id)
-                    return { ...dbUser, profiles: [foreign as T["profiles"][number], ...rest] }
+                    profileAccess[foreign.id] = { workspaceId: null, role: "OWNER", owner: true, locationIds: [] }
+                    return {
+                        ...dbUser,
+                        profiles: [foreign, ...dbUser.profiles.filter((p) => p.id !== foreign.id)],
+                        accessibleProfiles: [foreign, ...accessibleProfiles.filter((p) => p.id !== foreign.id)],
+                        activeProfile: foreign,
+                        profileAccess,
+                    }
                 }
             }
         }
-        const activeId = jar.get(ACTIVE_PROFILE_COOKIE)?.value
-        const trying = jar.get(TRY_NOW_COOKIE)?.value
-        const fromCookie = dbUser.profiles.find((p) => p.id === activeId)
-        const honorCookie = fromCookie && (trying || !fromCookie.slug.startsWith("try-"))
-        const chosen = honorCookie ? fromCookie : latestReal || fromCookie || dbUser.profiles[0]
-        const next = dbUser.profiles.filter((p) => p.id !== chosen.id)
-        next.unshift(chosen)
-        return { ...dbUser, profiles: next }
-    } catch {
-        const chosen = latestReal || dbUser.profiles[0]
-        const next = dbUser.profiles.filter((p) => p.id !== chosen.id)
-        next.unshift(chosen)
-        return { ...dbUser, profiles: next }
+    } catch { /* Server contexts without cookies use the most recent accessible business. */ }
+    const activeProfile = chooseActiveProfile(accessibleProfiles, activeId, trying)
+    const ownedActive = chooseActiveProfile(dbUser.profiles, activeId, trying)
+    return {
+        ...dbUser,
+        profiles: ownedActive ? [ownedActive, ...dbUser.profiles.filter((p) => p.id !== ownedActive.id)] : [],
+        accessibleProfiles,
+        activeProfile,
+        profileAccess,
     }
 }

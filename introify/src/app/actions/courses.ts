@@ -1,10 +1,11 @@
 "use server"
 
+import { withOfferingLimit } from "@/lib/billing/resource-limits"
 import { prisma } from "@/lib/prisma"
 import {
-    executeOwnedResourceWrite,
-    requireOwnedProfile,
-    requireOwnedResource,
+    executeProfileResourceWrite,
+    requireProfileAccess,
+    requireProfileResource,
     unwrapOwnershipResult,
 } from "@/lib/security"
 import { revalidatePath } from "next/cache"
@@ -40,7 +41,7 @@ function courseWrite(data: CourseData) {
 }
 
 async function ownedCourse(courseId: string) {
-    const owned = unwrapOwnershipResult(await requireOwnedResource({
+    const owned = unwrapOwnershipResult(await requireProfileResource({
         resourceId: courseId,
         findOwned: ({ resourceId, profile }) => prisma.course.findFirst({
             where: { id: resourceId, profileId: profile.id },
@@ -53,7 +54,7 @@ async function ownedCourse(courseId: string) {
 }
 
 async function ownedModule(moduleId: string) {
-    const owned = unwrapOwnershipResult(await requireOwnedResource({
+    const owned = unwrapOwnershipResult(await requireProfileResource({
         resourceId: moduleId,
         findOwned: ({ resourceId, profile }) => prisma.courseModule.findFirst({
             where: { id: resourceId, course: { profileId: profile.id } },
@@ -82,26 +83,26 @@ async function recountCourse(courseId: string, profileId: string) {
 }
 
 export async function createCourse(profileId: string, data: CourseData) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
-    const course = await prisma.course.create({
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
+    const course = await withOfferingLimit(profile.id, "course", null, data.isActive && data.isPublished, (tx) => tx.course.create({
         data: {
             profileId: profile.id,
             ...courseWrite(data),
             currency: "USD",
         },
-    })
+    }))
     revalidatePath("/dashboard/courses")
     return course
 }
 
 export async function updateCourse(courseId: string, data: CourseData) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: courseId,
         writeOwned: async ({ resourceId, profile }) => {
-            const updated = await prisma.course.updateMany({
+            const updated = await withOfferingLimit(profile.id, "course", resourceId, data.isActive && data.isPublished, (tx) => tx.course.updateMany({
                 where: { id: resourceId, profileId: profile.id },
                 data: courseWrite(data),
-            })
+            }))
             return updated.count === 1 ? true : null
         },
     }))
@@ -109,7 +110,7 @@ export async function updateCourse(courseId: string, data: CourseData) {
 }
 
 export async function deleteCourse(courseId: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: courseId,
         writeOwned: async ({ resourceId, profile }) => {
             const deleted = await prisma.course.deleteMany({
@@ -122,7 +123,7 @@ export async function deleteCourse(courseId: string) {
 }
 
 export async function setCoursePublished(courseId: string, published: boolean) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: courseId,
         writeOwned: async ({ resourceId, profile }) => {
             const updated = await prisma.course.updateMany({
@@ -156,7 +157,7 @@ export async function createCourseModule(courseId: string, data: { title: string
 }
 
 export async function updateCourseModule(moduleId: string, data: { title: string; description?: string }) {
-    const result = unwrapOwnershipResult(await executeOwnedResourceWrite({
+    const result = unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: moduleId,
         writeOwned: async ({ resourceId, profile }) => prisma.$transaction(async (tx) => {
             const updated = await tx.courseModule.updateMany({
@@ -175,7 +176,7 @@ export async function updateCourseModule(moduleId: string, data: { title: string
 }
 
 export async function deleteCourseModule(moduleId: string) {
-    const result = unwrapOwnershipResult(await executeOwnedResourceWrite({
+    const result = unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: moduleId,
         writeOwned: async ({ resourceId, profile }) => prisma.$transaction(async (tx) => {
             const courseModule = await tx.courseModule.findFirst({
@@ -195,7 +196,7 @@ export async function deleteCourseModule(moduleId: string) {
 }
 
 export async function moveCourseModule(moduleId: string, direction: -1 | 1) {
-    const result = unwrapOwnershipResult(await executeOwnedResourceWrite({
+    const result = unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: moduleId,
         writeOwned: async ({ resourceId, profile }) => prisma.$transaction(async (tx) => {
             const current = await tx.courseModule.findFirst({
@@ -272,7 +273,7 @@ export async function createCourseLesson(moduleId: string, data: LessonData) {
 }
 
 export async function updateCourseLesson(lessonId: string, data: LessonData) {
-    const result = unwrapOwnershipResult(await executeOwnedResourceWrite({
+    const result = unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: lessonId,
         writeOwned: async ({ resourceId, profile }) => prisma.$transaction(async (tx) => {
             const updated = await tx.courseLesson.updateMany({
@@ -314,7 +315,7 @@ export async function importModulesIntoCourse(courseId: string, outline: string)
 }
 
 export async function moveCourseLesson(lessonId: string, direction: -1 | 1) {
-    const result = unwrapOwnershipResult(await executeOwnedResourceWrite({
+    const result = unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: lessonId,
         writeOwned: async ({ resourceId, profile }) => prisma.$transaction(async (tx) => {
             const current = await tx.courseLesson.findFirst({
@@ -347,7 +348,7 @@ export async function moveCourseLesson(lessonId: string, direction: -1 | 1) {
 }
 
 export async function deleteCourseLesson(lessonId: string) {
-    const result = unwrapOwnershipResult(await executeOwnedResourceWrite({
+    const result = unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: lessonId,
         writeOwned: async ({ resourceId, profile }) => prisma.$transaction(async (tx) => {
             const lesson = await tx.courseLesson.findFirst({

@@ -6,8 +6,6 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ensureModelViewer } from "@/lib/model-viewer"
-import { arChargeCents } from "@/lib/ar-price"
-import { useMoney } from "@/components/pricing-provider"
 
 type Mode = "pick" | "camera" | "preview"
 
@@ -40,8 +38,6 @@ export function ArStudio({
     const [preview, setPreview] = useState<string | null>(existing || null)
     const [status, setStatus] = useState("")
     const [ask3d, setAsk3d] = useState(false)
-    const money = useMoney()
-    const priceLabel = money(arChargeCents(1), "USD")
 
     useEffect(() => {
         if (open) {
@@ -159,7 +155,7 @@ export function ArStudio({
             })
             const json = await res.json() as { url?: string; error?: string }
             if (res.status === 429) {
-                toast.error("This hour’s 3D quota is used. Try photoreal 3D, or wait and retry.")
+                toast.error("This hour’s basic 3D quota is used. Please wait and retry.")
                 return
             }
             if (!res.ok || !json.url) throw new Error(json.error || "3D studio couldn’t build this photo")
@@ -190,7 +186,7 @@ export function ArStudio({
                     <SheetHeader className="space-y-1 p-0 pr-12 text-left">
                         <SheetTitle className="text-lg text-white">{restaurant ? "AR dish" : "AR object"}</SheetTitle>
                         <SheetDescription>
-                            Take a photo or pick one from the gallery. We build 3D with the studio for {priceLabel}.
+                            Take a photo or pick one from the gallery to create a basic 3D model. Hourly limits apply.
                         </SheetDescription>
                     </SheetHeader>
                 </div>
@@ -229,7 +225,7 @@ export function ArStudio({
                                 <span>
                                     <span className="block text-sm font-medium">Take photo</span>
                                     <span className="block text-[12px] text-white/50">
-                                        Then we’ll ask to turn it into 3D for {priceLabel}.
+                                        Then choose whether to create a basic 3D model.
                                     </span>
                                 </span>
                             </button>
@@ -279,7 +275,7 @@ export function ArStudio({
                                     <img src={sourcePhotos[0]} alt="" className="h-12 w-12 rounded-xl object-cover" />
                                     <span>
                                         <span className="block text-sm font-medium">Use the photo already on this item</span>
-                                        <span className="block text-[12px] text-white/50">We’ll ask to build 3D for {priceLabel}.</span>
+                                        <span className="block text-[12px] text-white/50">Choose a photo for a basic 3D model.</span>
                                     </span>
                                 </button>
                             ) : null}
@@ -306,7 +302,7 @@ export function ArStudio({
                                 <div className="space-y-2 rounded-[1.35rem] border border-cyan-400/35 bg-cyan-400/10 p-4">
                                     <p className="text-sm font-medium">Turn this photo into 3D?</p>
                                     <p className="text-[12px] text-white/60">
-                                        Uses the in-house 3D studio. Current price {priceLabel}.
+                                        Creates a basic 3D model. Results depend on your photo; hourly limits apply.
                                     </p>
                                     <div className="flex gap-2 pt-1">
                                         <Button
@@ -325,7 +321,7 @@ export function ArStudio({
                                             onClick={() => void buildFromPhoto(photo)}
                                         >
                                             <Sparkles className="mr-1.5 h-4 w-4" />
-                                            {busy ? status || "Building…" : `Make 3D · ${priceLabel}`}
+                                            {busy ? status || "Building…" : "Make basic 3D"}
                                         </Button>
                                     </div>
                                 </div>
@@ -344,8 +340,8 @@ export function ArStudio({
                                         <Sparkles className="h-4 w-4" />
                                     </span>
                                     <span>
-                                        <span className="block text-sm font-medium text-white">Photoreal 3D — upgrade</span>
-                                        <span className="block text-[12px] text-zinc-400">Paid. Sharper model from the same photo.</span>
+                                        <span className="block text-sm font-medium text-white">Photoreal 3D · Premium</span>
+                                        <span className="block text-[12px] text-zinc-400">Textured 3D models. Paid plans coming soon.</span>
                                     </span>
                                 </button>
                             ) : null}
@@ -361,7 +357,7 @@ export function ArStudio({
                             onClick={() => void buildFromPhoto()}
                         >
                             <Sparkles className="mr-1.5 h-4 w-4" />
-                            {busy ? status || "Building 3D…" : `Make 3D · ${priceLabel}`}
+                            {busy ? status || "Building 3D…" : "Make basic 3D"}
                         </Button>
                     </div>
                 ) : null}

@@ -45,6 +45,7 @@ interface ChatInterfaceProps {
         slug: string
         imageUrl?: string | null
         chatAvatarMode?: string | null
+        autoMemoryEnabled?: boolean
         roleTemplate?: string | null
     }
     welcome?: ReactNode
@@ -72,6 +73,7 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState("")
+    const [memoryConsent, setMemoryConsent] = useState(false)
     const [inputFocused, setInputFocused] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [conversationId, setConversationId] = useState<string | null>(null)
@@ -156,7 +158,7 @@ export function ChatInterface({
         abortControllerRef.current = new AbortController()
 
         const userMessage: ChatMessage = {
-            id: Date.now().toString(),
+            id: crypto.randomUUID(),
             role: "user",
             content: messageContent
         }
@@ -178,9 +180,11 @@ export function ChatInterface({
         try {
             const response = await fetch("/api/chat", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", "Idempotency-Key": userMessage.id },
                 body: JSON.stringify({
-                    messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+                    messages: newMessages.slice(-10).map(m => ({ role: m.role, content: m.content.slice(0, 2000) })),
+                    requestId: userMessage.id,
+                    memoryConsent,
                     profileId: profile.id,
                     conversationId,
                     visitorId
@@ -191,13 +195,10 @@ export function ChatInterface({
             if (response.status === 429) {
                 throw new Error("rate_limit")
             }
-            if (response.status === 503) {
-                const data = await response.json()
-                if (data.error === "ai_not_configured") {
-                    throw new Error("ai_not_configured")
-                }
+            if (!response.ok) {
+                const data = await response.json().catch(() => null)
+                throw new Error(data?.message ? `assistant_notice:${String(data.message)}` : "Chat request failed")
             }
-            if (!response.ok) throw new Error("Chat request failed")
 
             const newConversationId = response.headers.get("X-Conversation-Id")
             const openId = newConversationId || conversationId
@@ -210,19 +211,20 @@ export function ChatInterface({
 
             const decoder = new TextDecoder()
             let fullContent = ""
+            let pending = ""
 
             while (true) {
                 const { done, value } = await reader.read()
                 if (done) break
 
-                const chunk = decoder.decode(value, { stream: true })
-                const lines = chunk.split("\n").filter(Boolean)
+                pending += decoder.decode(value, { stream: true })
+                const lines = pending.split("\n")
+                pending = lines.pop() || ""
 
                 for (const line of lines) {
                     if (line.startsWith('0:"')) {
-                        const content = line.slice(3, -1)
-                            .replace(/\\n/g, "\n")
-                            .replace(/\\"/g, '"')
+                        let content = ""
+                        try { content = JSON.parse(line.slice(2)) } catch { continue }
                         fullContent += content
 
                         setMessages(prev => {
@@ -247,16 +249,17 @@ export function ChatInterface({
             console.error("Chat error:", error)
 
             const errorMsg = (error as Error).message
+            const notice = errorMsg.startsWith("assistant_notice:") ? errorMsg.slice("assistant_notice:".length) : null
             const isRateLimit = errorMsg === "rate_limit"
             const isAiNotConfigured = errorMsg === "ai_not_configured"
             toast.error(
-                isRateLimit ? "Slow down!" : isAiNotConfigured ? "AI Chat Coming Soon" : "Connection issue",
+                notice ? "Assistant unavailable" : isRateLimit ? "Slow down!" : isAiNotConfigured ? "AI Chat Coming Soon" : "Connection issue",
                 {
-                    description: isRateLimit
+                    description: notice || (isRateLimit
                         ? "Too many messages. Please wait a moment."
                         : isAiNotConfigured
                         ? "AI chat hasn't been set up yet. Check back later!"
-                        : "Having trouble connecting. Please try again.",
+                        : "Having trouble connecting. Check the conversation before retrying."),
                 }
             )
 
@@ -266,9 +269,9 @@ export function ChatInterface({
                 if (updated[lastIdx]?.role === "assistant" && !updated[lastIdx].content) {
                     updated[lastIdx] = {
                         ...updated[lastIdx],
-                        content: isAiNotConfigured
+                        content: notice || (isAiNotConfigured
                             ? "🚀 AI chat is coming soon! The creator is still setting things up."
-                            : "I'm having trouble responding right now. Please try again."
+                            : "This reply could not be completed. Check the conversation before retrying.")
                     }
                 }
                 return updated
@@ -277,7 +280,7 @@ export function ChatInterface({
         } finally {
             setIsLoading(false)
         }
-    }, [messages, profile.id, conversationId, visitorId, isLoading, chatMode])
+    }, [messages, profile.id, conversationId, visitorId, isLoading, chatMode, memoryConsent])
 
     const handleSubmit = (e?: React.FormEvent, overrideInput?: string) => {
         e?.preventDefault()
@@ -661,6 +664,12 @@ export function ChatInterface({
                         </div>
                     )}
 
+                    {profile.autoMemoryEnabled && (
+                        <label className="mb-2 flex items-start gap-2 text-xs text-profile-mute">
+                            <input type="checkbox" checked={memoryConsent} onChange={event => setMemoryConsent(event.target.checked)} className="mt-0.5" />
+                            <span>Allow private notes for this conversation. Your choice applies to the next reply; unchecking deletes its saved notes then.</span>
+                        </label>
+                    )}
                     <form
                         onSubmit={(e) => handleSubmit(e)}
                         className="relative flex items-center group w-full"

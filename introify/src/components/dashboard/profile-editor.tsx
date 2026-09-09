@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -13,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { TRY_KITS } from "@/lib/try-kits"
 import { User, Briefcase, FolderKanban, Palette, Sparkles, Globe, BookOpen, ChevronDown, Check, MapPin } from "lucide-react"
@@ -28,7 +29,8 @@ import {
     type BloubPick,
 } from "@/lib/bloub/catalog"
 import { BloubCustomizerSheet } from "@/components/dashboard/bloub-customizer-sheet"
-import { updateProfile } from "@/app/actions/profile"
+import { AI_MODES, resolveAiMode, type AiMode } from "@/lib/billing/catalog"
+import { updateProfile, getProfileAiAccess } from "@/app/actions/profile"
 import { ExperienceEditor } from "./experience-editor"
 import { ProjectEditor } from "./project-editor"
 import { toast } from "sonner"
@@ -87,6 +89,12 @@ interface ProfileEditorProps {
 
 export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "general" }: ProfileEditorProps) {
     const router = useRouter()
+    const [aiAccess, setAiAccess] = useState<{ modes: AiMode[]; autoMemory: boolean; customInstructions: boolean; customBranding: boolean }>({ modes: [], autoMemory: false, customInstructions: false, customBranding: false })
+    useEffect(() => {
+        let active = true
+        getProfileAiAccess(profile.id).then(access => { if (active) setAiAccess(access) }).catch(() => {})
+        return () => { active = false }
+    }, [profile.id])
     const [, setIsSaving] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [blobOpen, setBlobOpen] = useState(false)
@@ -122,7 +130,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
             welcomeMessageOverride: profile.welcomeMessageOverride || "",
             contentDisplayMode: profile.contentDisplayMode || "POPUP",
             personalityConfig: profile.personalityConfig || "",
-            aiModel: profile.aiModel || "gpt-4o-mini",
+            aiModel: (() => { try { return resolveAiMode(profile.aiModel) } catch { return "fast" } })(),
             imageUrl: profile.imageUrl || "",
             shopLogoUrl: profile.shopLogoUrl || "",
             chatAvatarMode: profile.chatAvatarMode || "ORB",
@@ -143,7 +151,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
         } catch { return {} }
     })()
 
-    const updatePersonalityField = (field: string, value: string) => {
+    const updatePersonalityField = (field: string, value: string | boolean) => {
         const current = (() => {
             try { return JSON.parse(watch("personalityConfig") || "{}") }
             catch { return {} }
@@ -435,6 +443,10 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                         )}
                     </Section>
                     <Section title="Welcome aura" description="The face on your public page.">
+                        {!aiAccess.customBranding && <p className="text-sm text-muted-foreground">Your free page uses the Introify style. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Starter adds custom styles and brand removal.</Link></p>}
+                        <ToggleRow title="Hide Introify footer" description="Your business name, photo and logo are available on every plan.">
+                            <Switch aria-label="Hide Introify footer" disabled={!aiAccess.customBranding} checked={aiAccess.customBranding && Boolean(personalityConfig.hideIntroifyBrand)} onCheckedChange={value => updatePersonalityField("hideIntroifyBrand", value)} />
+                        </ToggleRow>
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                             {[...presets].sort((a, b) => {
                                 const look = (p: WelcomeAnimationPreset) => {
@@ -458,12 +470,13 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                     <button
                                         key={preset.id}
                                         type="button"
+                                        disabled={!aiAccess.customBranding}
                                         onClick={() => {
                                             setValue("animationStyleId", preset.id, { shouldDirty: true })
                                             if (isBlob) setBlobOpen(true)
                                         }}
                                         className={cn(
-                                            "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-colors",
+                                            "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                                             selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40"
                                         )}
                                     >
@@ -507,7 +520,8 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                         length={personalityConfig.responseLength || "medium"}
                         language={personalityConfig.language || ""}
                         instructions={personalityConfig.customInstructions || ""}
-                        model={watch("aiModel") || "gpt-4o-mini"}
+                        model={watch("aiModel") || "fast"}
+                        access={aiAccess}
                         memory={Boolean(watch("autoMemoryEnabled"))}
                         live={Boolean(watch("liveChatEnabled"))}
                         onTone={(v) => updatePersonalityField("tone", v)}
@@ -765,31 +779,6 @@ const LENGTHS = [
     { id: "long", label: "Long" },
 ]
 
-const MODEL_GROUPS = [
-    {
-        label: "Codex (ChatGPT)",
-        models: [
-            { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
-            { id: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
-            { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
-            { id: "gpt-5.5", label: "GPT-5.5" },
-        ],
-    },
-    {
-        label: "Fast",
-        models: [
-            { id: "gpt-4.1", label: "GPT-4.1" },
-            { id: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
-        ],
-    },
-    {
-        label: "Classic",
-        models: [
-            { id: "gpt-4o", label: "GPT-4o" },
-            { id: "gpt-4o-mini", label: "GPT-4o Mini" },
-        ],
-    },
-]
 
 function Section({
     title,
@@ -884,6 +873,7 @@ function ChoiceRow({
 }
 
 function AiStudio({
+    access,
     name,
     tone,
     length,
@@ -901,6 +891,7 @@ function AiStudio({
     onLive,
     slaRegister,
 }: {
+    access: { modes: AiMode[]; autoMemory: boolean; customInstructions: boolean }
     name: string
     tone: string
     length: string
@@ -930,13 +921,8 @@ function AiStudio({
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent align="end" className="min-w-[12rem]">
-                        {MODEL_GROUPS.map((group) => (
-                            <SelectGroup key={group.label}>
-                                <SelectLabel>{group.label}</SelectLabel>
-                                {group.models.map((m) => (
-                                    <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                                ))}
-                            </SelectGroup>
+                        {Object.values(AI_MODES).map(mode => (
+                            <SelectItem key={mode.id} value={mode.id} disabled={!access.modes.includes(mode.id)}>{mode.name} · {mode.credits} {mode.credits === 1 ? "credit" : "credits"}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
@@ -969,9 +955,11 @@ function AiStudio({
                 </div>
 
                 <div className="space-y-2">
-                    <p className="text-sm font-medium">Always</p>
+                    <p className="text-sm font-medium">Custom instructions</p>
+                    {!access.customInstructions && <p className="text-xs text-muted-foreground">Available on Starter and above.</p>}
                     <Textarea
-                        value={instructions}
+                        disabled={!access.customInstructions}
+                        value={access.customInstructions ? instructions : ""}
                         onChange={(e) => onInstructions(e.target.value)}
                         placeholder="Be direct. Offer a fit call when they are ready."
                         rows={5}
@@ -993,10 +981,10 @@ function AiStudio({
             <div className="divide-y border-t">
                 <div className="flex items-center justify-between gap-4 px-5 py-4">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">Learn from chats</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">Private summaries. Not used to train a public model.</p>
+                        <p className="text-sm font-medium">Private conversation memory</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Pro and above. With visitor consent, keep short private notes for that conversation only.</p>
                     </div>
-                    <Switch checked={memory} onCheckedChange={onMemory} />
+                    <Switch checked={access.autoMemory && memory} disabled={!access.autoMemory} onCheckedChange={onMemory} />
                 </div>
                 <div className="flex items-center justify-between gap-4 px-5 py-4">
                     <div className="min-w-0">

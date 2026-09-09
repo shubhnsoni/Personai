@@ -28,8 +28,8 @@ describe("marketing metadata and indexing", () => {
             expect(metadata.openGraph?.url).toBe(expectedUrl)
             expect(metadata.robots).toEqual({ index: route.index, follow: true })
         }
-        expect(MARKETING_ROUTES.filter((route) => route.index).map((route) => route.path)).toEqual(["/"])
-        expect(MARKETING_ROUTES.filter((route) => !route.index)).toHaveLength(10)
+        expect(MARKETING_ROUTES.filter((route) => route.index).map((route) => route.path)).toEqual(["/", "/pricing"])
+        expect(MARKETING_ROUTES.filter((route) => !route.index)).toHaveLength(9)
         expect(() => marketingMetadata({ title: "Unsafe", description: "", path: "//foreign.example.test" })).toThrow()
     })
 
@@ -79,6 +79,7 @@ describe("marketing metadata and indexing", () => {
         ])
         expect(await sitemap()).toEqual([
             { url: "https://example.test/" },
+            { url: "https://example.test/pricing" },
             { url: "https://example.test/ada-lovelace", lastModified: updatedAt },
         ])
         expect(db.findMany).toHaveBeenCalledWith({ where: { isPublic: true }, select: { slug: true, updatedAt: true } })

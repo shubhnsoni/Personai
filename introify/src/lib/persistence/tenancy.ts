@@ -47,13 +47,17 @@ export class PersistedTenancy {
         const memberships = await this.db.membership.findMany({
             where: { userId: user.id },
             include: {
-                workspace: { select: { id: true, profileId: true, name: true, slug: true } },
+                workspace: { select: { id: true, profileId: true, name: true, slug: true, billingAccountId: true } },
                 membershipLocations: { select: { locationId: true } },
             },
             orderBy: [{ workspace: { name: "asc" } }, { id: "asc" }],
         })
 
-        return memberships.map((membership) => Object.freeze({
+        const accountMembers = await this.db.billingAccountMember.findMany({
+            where: { userId: user.id, status: "ACTIVE" }, select: { accountId: true },
+        })
+        const allowedAccounts = new Set(accountMembers.map((member) => member.accountId))
+        return memberships.filter((membership) => !membership.workspace.billingAccountId || allowedAccounts.has(membership.workspace.billingAccountId)).map((membership) => Object.freeze({
             id: membership.workspace.id,
             profileId: membership.workspace.profileId,
             name: membership.workspace.name,
@@ -77,9 +81,16 @@ export class PersistedTenancy {
 
         const membership = await this.db.membership.findUnique({
             where: { workspaceId_userId: { workspaceId: normalizedWorkspaceId, userId: user.id } },
-            include: { membershipLocations: { select: { locationId: true } } },
+            include: { membershipLocations: { select: { locationId: true } }, workspace: { select: { billingAccountId: true } } },
         })
         if (!membership) throw new PersistenceError("FORBIDDEN", "Workspace access is forbidden")
+        if (membership.workspace.billingAccountId) {
+            const accountMember = await this.db.billingAccountMember.findUnique({
+                where: { accountId_userId: { accountId: membership.workspace.billingAccountId, userId: user.id } },
+                select: { status: true },
+            })
+            if (accountMember?.status !== "ACTIVE") throw new PersistenceError("FORBIDDEN", "Account membership is not active")
+        }
         if (!hasPermission(membership.role, permission)) {
             throw new PersistenceError("FORBIDDEN", `Permission ${permission} is required`)
         }

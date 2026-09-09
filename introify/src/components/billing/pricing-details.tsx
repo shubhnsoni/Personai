@@ -1,0 +1,32 @@
+import Link from "next/link"
+import { ArrowUpRight, BrainCircuit, Plus, Sparkles, Zap } from "lucide-react"
+import { AI_MODES, CREDIT_PACKS } from "@/lib/billing/catalog"
+import { dollars } from "./format"
+
+export function AiCreditGuide() {
+    const icons = { fast: Zap, smart: Sparkles, reasoning: BrainCircuit }
+    const availability = { fast: "Every plan, including Free", smart: "Starter and above", reasoning: "Pro and above" }
+    return <section className="billing-section" aria-labelledby="ai-credit-guide"><div className="billing-section-heading"><div><p className="billing-eyebrow">THE RIGHT HELP FOR THE QUESTION</p><h2 id="ai-credit-guide">One balance. Three ways to think.</h2></div><p>Choose a mode to match the task. Each reply uses credits from the same account balance.</p></div><div className="billing-model-grid">{Object.values(AI_MODES).map(mode => {
+        const Icon = icons[mode.id]
+        return <article className="billing-model" key={mode.id}><Icon size={25} aria-hidden="true" /><h3>{mode.name}</h3><p>{mode.description}.</p><p><strong>{mode.credits} {mode.credits === 1 ? "credit" : "credits"}</strong> per standard reply</p><small>{availability[mode.id]}</small></article>
+    })}</div><p className="plan-footnote">50 credits can cover up to 50 Fast replies. A conversation with ten replies uses ten charges. Long requests, extra context or paid tools need a higher quote before running. Model access and remaining credits are shown in your dashboard.</p></section>
+}
+
+export function PublicCreditPacks() {
+    return <section className="billing-section" id="photoreal-3d" aria-labelledby="generation-packs"><div className="billing-section-heading"><div><p className="billing-eyebrow">A LITTLE EXTRA, WHEN YOU NEED IT</p><h2 id="generation-packs">More room for a busy month.</h2></div><p>One-time packs add to an active paid plan. AI credits and 3D generations stay in separate balances.</p></div><div className="billing-pack-grid">{CREDIT_PACKS.map(pack => <article className="billing-pack" key={pack.id}><h3>{pack.name}</h3><div className="billing-pack-price"><strong>{dollars(pack.priceCents)}</strong><span>one time</span></div><p>{pack.unit === "AI" ? "Use with the AI modes included in your plan." : "One unit covers one successfully delivered standard textured model."}</p><Link href="/dashboard/billing" className="billing-button billing-button-secondary">View in billing <ArrowUpRight size={15} aria-hidden="true" /></Link></article>)}</div><p className="plan-footnote">Packs do not renew automatically. Purchased units do not expire while your account exists; unused units pause on Free and resume with an active paid plan. Your dashboard shows purchase availability. Existing model views and downloads use no new generation.</p></section>
+}
+
+const questions = [
+    ["What do I get on Free?", "A shareable page, one business and one owner seat, with 50 AI credits each month and one lifetime trial photoreal generation per eligible user. The trial does not reset when you create another account or business. AI and generation are available when enabled for your account; check the billing dashboard for their current status."],
+    ["How does annual billing work?", "An annual subscription costs 10% less than twelve monthly payments, paid as one yearly charge. Your included AI credits and 3D generations still renew monthly, not as one yearly bundle. Included monthly units do not roll over."],
+    ["Are allowances shared between businesses?", "Yes. One billing account pays for its businesses and shares its AI credits, 3D generations, publishing capacity and knowledge allowance across them. Seats count distinct team members, including the owner, even when one person works in several businesses."],
+    ["What counts as a 3D generation?", "One successfully delivered standard textured model from your source image. Its normal GLB and AR derivatives belong to the same generation. Viewing or downloading it uses no new generation. Requesting another generation uses another unit; a technical failure returns the reserved unit. Results depend on the source image and are not guaranteed exact replicas."],
+    ["What happens when I run out?", "New AI replies or generations stop when their available balance runs out. You can wait for the next included allowance, choose an eligible pack or review a higher plan. There are no automatic overage charges or automatic pack purchases."],
+    ["Can I cancel my subscription?", "You can turn off renewal from Billing when your subscription is active. The confirmed paid period continues until its displayed end date. Purchased pack units pause on Free and resume if you reactivate a paid plan. Review the cancellation and refund policy before paying; cancellation does not itself promise a refund."],
+    ["Does my plan include customer payment processing?", "Your Introify subscription pays for the platform. It is separate from what customers pay your business for products, services or bookings. Customer payment options depend on the methods enabled by each business, with their own prices, delivery terms and any gateway fees."],
+    ["Is every feature and integration available now?", "No. Custom domains, advanced automation, the platform API and some extended reporting tools are planned features. They are not included as currently working capabilities. AI, 3D and checkout availability is shown in Billing; SMS and voice services require separate activation and pricing."],
+] as const
+
+export function PricingFaq() {
+    return <section className="billing-section" aria-labelledby="pricing-questions"><div className="billing-section-heading"><div><p className="billing-eyebrow">KNOW WHAT YOU’RE CHOOSING</p><h2 id="pricing-questions">Clear limits. Fewer surprises.</h2></div></div><div className="billing-faq">{questions.map(([question, answer]) => <details key={question}><summary>{question}<Plus size={18} aria-hidden="true" /></summary><p>{answer}</p></details>)}</div><div className="billing-planned"><strong>On the roadmap, with no delivery date promised.</strong><p>Custom domains, advanced automations, consolidated conversion reports, bulk approvals and a platform API. Choose a plan for its available capabilities and published limits.</p></div><nav className="billing-legal" aria-label="Billing policies"><Link href="/terms">Terms of service</Link><Link href="/refund-policy">Cancellation and refunds</Link><Link href="/privacy">Privacy policy</Link><Link href="/contact">Contact details</Link></nav></section>
+}

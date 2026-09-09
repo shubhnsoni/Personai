@@ -56,7 +56,7 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
                 </AdminPanel>
                 <AdminPanel title="AI">
                     <div className="space-y-3 px-4 py-3">
-                        <p className="text-xs text-muted-foreground">Model on the shop: {shop.aiModel}. Provider override is yours.</p>
+                        <p className="text-xs text-muted-foreground">Stored AI mode: {shop.aiModel}. This legacy override does not control published replies; commercial mappings are shown in Admin AI.</p>
                         <ShopAiOverrideSelect profileId={shop.id} value={shop.aiProviderOverride} />
                         <p className="text-xs text-muted-foreground">{live} visitor{live === 1 ? "" : "s"} live now · 24h GMV {formatAdminMoney(gmv._sum.amountCents || 0)}</p>
                         <div className="flex gap-2">

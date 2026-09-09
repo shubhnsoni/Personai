@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         }
         await embedDocument(documentId)
-        return NextResponse.json({ success: true, message: "Document embedded" })
+        return NextResponse.json({ success: true, mode: "local", message: "Document is available to local search; external indexing is paused." })
     }
 
     if (profileId) {
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         }
         const count = await embedProfileDocuments(profileId)
-        return NextResponse.json({ success: true, message: `Embedded ${count} documents` })
+        return NextResponse.json({ success: true, mode: "local", indexed: count, message: "Documents are available to local search; external indexing is paused." })
     }
 
     return NextResponse.json({ error: "Provide documentId or profileId" }, { status: 400 })

@@ -8,12 +8,13 @@ import { writeExtras } from "@/lib/surfaces"
 import { writeGoldBoard } from "@/lib/metal/board"
 import { citySlug, displayCity } from "@/lib/metal/city"
 import { DEFAULT_GOLD_RATES } from "@/lib/onboarding-chat"
-import { seedRole } from "@/lib/try-kit-seed"
+import { ensureDefaultBillingAccount, withAccountLimit, assertAccountLimit } from "@/lib/billing/service"
 import { ACTIVE_PROFILE_COOKIE } from "@/lib/try-kits"
 import { requireAuthenticatedUser, unwrapOwnershipResult } from "@/lib/security"
 import { normalizeUsername, usernameError } from "@/lib/username"
 
 export interface CreateProfileData {
+    billingAccountId?: string
     displayName: string
     headline?: string
     bio?: string
@@ -85,6 +86,11 @@ export async function checkUsername(raw: string) {
 
 export async function createProfile(data: CreateProfileData): Promise<CreateProfileResult> {
     const actor = unwrapOwnershipResult(await requireAuthenticatedUser())
+    if (data.seedSample) throw new Error("Sample businesses are available through the admin kit preview.")
+    const account = data.billingAccountId
+        ? await prisma.billingAccount.findUnique({ where: { id: data.billingAccountId } })
+        : await ensureDefaultBillingAccount(actor.userId)
+    if (!account || account.ownerUserId !== actor.userId) throw new Error("Only the billing account owner can add a business.")
     const displayName = data.displayName.trim()
     if (!displayName) throw new TypeError("Profile display name is required")
 
@@ -122,10 +128,13 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             lastCheckedAt: new Date().toISOString(),
         })
     }
-    const profile = await prisma.$transaction(async (tx) => {
+    const profile = await withAccountLimit(account.id, "businesses", 1, async (tx) => {
+        const hasDefaultOffering = Boolean(defaultService || data.roleTemplate === "RESTAURANT" || data.addons?.includes("services"))
+        if (hasDefaultOffering) await assertAccountLimit(tx, account.id, "offerings", 1)
         const created = await tx.profile.create({
             data: {
                 userId: actor.userId,
+                billingAccountId: account.id,
                 slug,
                 displayName,
                 headline: data.headline,
@@ -147,6 +156,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
         const workspace = await tx.workspace.create({
             data: {
                 profileId: created.id,
+                billingAccountId: account.id,
                 name: created.displayName,
                 slug: created.slug,
             },
@@ -229,9 +239,6 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
         return created
     })
 
-    if (data.seedSample) {
-        await seedRole(profile.id, data.roleTemplate)
-    }
 
     revalidatePath("/dashboard")
     if (data.activate) {

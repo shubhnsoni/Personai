@@ -1,3 +1,4 @@
+import { publicAnimationConfig } from "@/lib/profile-branding"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { ProfileView } from "@/components/profile/profile-view"
@@ -64,6 +65,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
         const bag = JSON.parse(profile.personalityConfig || "{}") as { orb?: { shape?: string; expression?: string; color?: string } }
         if (bag.orb) animationConfig = { ...animationConfig, ...bag.orb }
     } catch { /* keep preset config */ }
+    animationConfig = await publicAnimationConfig(profile.id, animationConfig)
     const colors = animationConfig.colors || ["#00D7FF", "#07104D"]
     const story = await import("@/app/actions/story").then((m) => m.publishedStoryForSlug(slug))
 

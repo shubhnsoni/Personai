@@ -3,14 +3,12 @@
 import { randomBytes } from "node:crypto"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { STORY_CATEGORIES, type StoryCategory, type StoryFrame } from "@/lib/story"
 import { writeWalkIn, type AboutWalkIn } from "@/lib/walk-in"
 
 async function owner() {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!user || !profile) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "content.write" }))
     return profile
 }
 

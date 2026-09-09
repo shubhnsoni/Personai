@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { render } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import type { HomeStats } from "@/lib/analytics"
 
 vi.mock("next/link", () => ({
@@ -32,6 +32,17 @@ const stats: HomeStats = {
 }
 
 describe("HomePulse KPIs", () => {
+    it("offers Pro for advanced reports while retaining the basic KPI strip", () => {
+        render(<HomePulse stats={{ ...stats, advancedAnalytics: false }} slug="studio" />)
+        expect(screen.getByRole("link", { name: "Explore Pro" }).getAttribute("href")).toBe("/dashboard/billing")
+        expect(screen.queryByText("Funnel")).toBeNull()
+        expect(screen.getByText("Visits")).toBeTruthy()
+    })
+    it("shows paid reports only when entitled", () => {
+        render(<HomePulse stats={{ ...stats, advancedAnalytics: true }} slug="studio" />)
+        expect(screen.getByText("Funnel")).toBeTruthy()
+        expect(screen.queryByRole("link", { name: "Explore Pro" })).toBeNull()
+    })
     it("renders a single compact strip like the leads counts", () => {
         const { container } = render(<HomePulse stats={stats} slug="studio" />)
         const strip = container.querySelector(".divide-x")

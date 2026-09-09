@@ -1,5 +1,6 @@
 "use server"
 
+import { withOfferingLimit } from "@/lib/billing/resource-limits"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { parseDiet } from "@/lib/menu"
@@ -8,7 +9,7 @@ import { parseProductMetal, writeProductMetal } from "@/lib/metal/product"
 import { canPurchaseRxSku, formatRxBuyerNote, isRxRequired, writeBuyerPrescription, writeMedicine, type MedicineBatch } from "@/lib/pharmacy/batch"
 import { writeFitment, type VehicleFitment } from "@/lib/autoparts/fitment"
 import { parsePdpDisplay, writePdpDisplay, type PdpDisplay } from "@/lib/shop/pdp-display"
-import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
+import { executeProfileResourceWrite, requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 
 export interface ProductData {
     title: string
@@ -94,16 +95,16 @@ function productWrite(data: ProductData) {
 }
 
 export async function createProduct(profileId: string, data: ProductData) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
     const write = productWrite(data)
-    const created = await prisma.digitalProduct.create({
+    const created = await withOfferingLimit(profile.id, "product", null, data.isActive, (tx) => tx.digitalProduct.create({
         data: {
             profileId: profile.id,
             ...write,
             currency: write.currency || "USD",
             variantsJson: write.variantsJson ?? null,
         },
-    })
+    }))
     if (data.prepMinutes && data.prepMinutes > 0) {
         await prisma.$executeRaw`UPDATE "DigitalProduct" SET "prepMinutes" = ${Math.min(90, Math.floor(data.prepMinutes))} WHERE id = ${created.id}`
     }
@@ -112,13 +113,13 @@ export async function createProduct(profileId: string, data: ProductData) {
 }
 
 export async function updateProduct(productId: string, data: ProductData) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: productId,
         writeOwned: async ({ resourceId, profile }) => {
-            const updated = await prisma.digitalProduct.updateMany({
+            const updated = await withOfferingLimit(profile.id, "product", resourceId, data.isActive, (tx) => tx.digitalProduct.updateMany({
                 where: { id: resourceId, profileId: profile.id },
                 data: productWrite(data),
-            })
+            }))
             return updated.count === 1 ? true : null
         },
     }))
@@ -130,14 +131,14 @@ export async function updateProduct(productId: string, data: ProductData) {
 }
 
 export async function setAllPrepMinutes(profileId: string, minutes: number) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
     const n = Math.max(1, Math.min(90, Math.floor(minutes)))
     await prisma.$executeRaw`UPDATE "DigitalProduct" SET "prepMinutes" = ${n} WHERE "profileId" = ${profile.id}`
     revalidatePath("/dashboard/products")
 }
 
 export async function deleteProduct(productId: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: productId,
         writeOwned: async ({ resourceId, profile }) => {
             const deleted = await prisma.digitalProduct.deleteMany({
@@ -150,7 +151,7 @@ export async function deleteProduct(productId: string) {
 }
 
 export async function setProductActive(productId: string, isActive: boolean) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: productId,
         writeOwned: async ({ resourceId, profile }) => {
             const updated = await prisma.digitalProduct.updateMany({
@@ -271,7 +272,7 @@ export async function placeCartOrder(input: {
 }
 
 export async function confirmProductOrder(purchaseId: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: purchaseId,
         writeOwned: async ({ resourceId, profile }) => prisma.$transaction(async (tx) => {
             const purchase = await tx.productPurchase.findFirst({
@@ -323,7 +324,7 @@ export async function confirmProductOrder(purchaseId: string) {
 }
 
 export async function rejectProductOrder(purchaseId: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: purchaseId,
         writeOwned: async ({ resourceId, profile }) => {
             const updated = await prisma.productPurchase.updateMany({

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { ArrowDown, ArrowRight, ArrowUpRight, Check, CalendarDays, Link2, Plus, ScanLine, Sparkles } from "lucide-react"
 import { MarketingShell } from "@/components/marketing/marketing-shell"
 import { IntroifyWordmark } from "@/components/brand/wordmark"
+import { PricingTeaser } from "@/components/billing/pricing-teaser"
 import { LandingMotion, MotionToggle } from "./brand-motion"
 import { ProfilePreview } from "./profile-preview"
 import { IntroifyGuide } from "./introify-guide"
@@ -12,9 +13,9 @@ const faqs = [
     ["What is Introify?", "Introify is a home for your work on the web. Bring your profile, links, services, products and bookings into one shareable page, so visitors can understand what you do and find their next step."],
     ["Who can make an Introify page?", "Creators, independent professionals, consultants, coaches and local businesses. Whether you’re sharing a portfolio, offering a service or building a shop, start with the parts that fit your work."],
     ["Do I need a website or coding experience?", "Neither. Create your account, choose your page name and add your content from the dashboard. If you already have a website, link to it from your page. Introify works as a focused starting point alongside the places you already share your work."],
-    ["How much does it cost?", "Introify is free during early access, with no card required to create your page. Any future paid plans, limits or charges will be shown before you choose a paid service. Prices you set for your own offerings are separate."],
-    ["Can visitors pay or book through my page?", "You can add services and let visitors request available booking slots. Product pages can offer payment and fulfillment methods provided by the page owner, including manual UPI, cash on delivery or WhatsApp ordering. Online card checkout is not currently enabled. Each offering’s details and terms apply."],
-    ["Does the page include an AI assistant?", "An AI assistant is on our roadmap. In the current release, you can build your profile, share your offerings and use the supported booking and business tools. We’ll share availability as new features are ready."],
+    ["How much does it cost?", "Start on Free with no card required. Paid plans are listed from $10 per month, with 10% off annual billing. Each plan has clear AI, 3D and business limits. Compare prices and check purchase availability in your billing dashboard before upgrading. What customers pay your business is separate."],
+    ["Can visitors pay or book through my page?", "You can add services and let visitors request available booking slots. Product pages can offer payment and fulfillment methods enabled by the page owner, including manual UPI, cash on delivery or WhatsApp ordering. Online checkout depends on the business’s enabled payment methods. Each offering’s details and terms apply."],
+    ["Does the page include an AI assistant?", "Each plan includes a monthly AI credit allowance: Free starts with 50 credits for Fast replies. Starter adds Smart mode, and Pro and above add Reasoning. Your assistant uses the information you provide; check replies for accuracy. AI availability, mode access and the remaining balance are shown in your billing dashboard."],
     ["Can I update my page later?", "Of course. Edit your introduction, links and offerings from your dashboard as your work evolves. Keep sharing the same page address—your latest updates are there when visitors arrive."],
 ] as const
 
@@ -40,7 +41,7 @@ export function HomeLanding() {
                                 <h1 id="fh-hero-title">Big things<br />start with a<br /><em>good intro.</em><Flower className="fh-heading-flower" /></h1>
                                 <p className="fh-hero-description">Your story. Your work. Your next opportunity.<br className="fh-desktop-break" /> Bring them together in one beautiful page—with a clear way to explore, book or get in touch.</p>
                                 <div className="fh-hero-actions"><Link className="fh-button" href="/sign-up">Make your intro <ArrowUpRight size={19} /></Link><Link className="fh-text-link" href="#product">See what’s possible <ArrowDown size={17} /></Link></div>
-                                <div className="fh-hero-notes"><span><Check size={13} /> Free early access</span><span><Check size={13} /> No card needed</span><span><Check size={13} /> Yours to make</span></div>
+                                <div className="fh-hero-notes"><span><Check size={13} /> Start on Free</span><span><Check size={13} /> No card needed</span><span><Check size={13} /> Yours to make</span></div>
                             </div>
                             <div className="fh-hero-art"><ProfilePreview /><div className="fh-art-caption"><span>ONE LINK. A LITTLE MORE YOU.</span><MotionToggle /></div></div>
                         </div>
@@ -79,13 +80,14 @@ export function HomeLanding() {
                         </div>
                     </section>
                     <IntroifyGuide />
+                    <PricingTeaser />
                     <section className="fh-how fh-section" id="how-it-works" aria-labelledby="fh-how-title"><div className="fh-container"><div className="fh-section-heading" data-reveal><div><p className="fh-eyebrow">FROM “ONE DAY” TO DAY ONE</p><h2 id="fh-how-title">A little setup.<br /><em>A lot of you.</em></h2></div><Link href="/sign-up" className="fh-text-link">Let’s get you started <ArrowUpRight size={19} /></Link></div><div className="fh-steps">{[
                         ["01", "Say a proper hello.", "Choose your page name. Add a photo and an introduction that tells people what you do and why it matters."],
                         ["02", "Bring your good stuff.", "Add the links, services and offerings that fit your work. Start with one clear next step. Build from there."],
                         ["03", "Put yourself out there.", "Share your link in your bio, messages or QR card. Keep it fresh from your dashboard as your work grows."],
                     ].map(([number, title, text]) => <article key={number} data-reveal><span>{number}<ArrowRight size={25} /></span><h3>{title}</h3><p>{text}</p></article>)}</div></div></section>
                     <section className="fh-faq fh-section" id="faq" aria-labelledby="fh-faq-title"><div className="fh-container fh-faq-grid"><div data-reveal><p className="fh-eyebrow">A LITTLE CLARITY</p><h2 id="fh-faq-title">Good questions.<br /><em>Clear answers.</em></h2><p>Before your next chapter begins.</p><Flower className="fh-faq-flower" /></div><div className="fh-faq-list">{faqs.map(([question, answer], i) => <details key={question} data-reveal><summary><span>0{i + 1}</span><h3>{question}</h3><Plus size={20} /></summary><p>{answer}</p></details>)}</div></div></section>
-                    <section className="fh-final" aria-labelledby="fh-final-title"><div className="fh-container" data-reveal><p className="fh-eyebrow">YOU’VE GOT SOMETHING GOOD GOING.</p><h2 id="fh-final-title">Let’s make<br /><em>the introduction.</em></h2><Link className="fh-button fh-button-lime" href="/sign-up">Make your intro <ArrowUpRight size={20} /></Link><p className="fh-final-note">Free early access. No card needed. A page that’s yours.</p><Flower className="fh-final-flower" /></div></section>
+                    <section className="fh-final" aria-labelledby="fh-final-title"><div className="fh-container" data-reveal><p className="fh-eyebrow">YOU’VE GOT SOMETHING GOOD GOING.</p><h2 id="fh-final-title">Let’s make<br /><em>the introduction.</em></h2><Link className="fh-button fh-button-lime" href="/sign-up">Make your intro <ArrowUpRight size={20} /></Link><p className="fh-final-note">Start on Free. No card needed. A page that’s yours.</p><Flower className="fh-final-flower" /></div></section>
                 </main>
             </LandingMotion>
         </MarketingShell>

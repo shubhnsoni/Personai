@@ -2,14 +2,13 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { LEAD_STATUSES, leadStatusLabel } from "@/lib/lead-status"
 import { parseLeadTags, pushActivity } from "@/lib/lead-meta"
 
 async function ownedLead(leadId: string) {
-    const user = await syncUser()
-    const profileId = user?.profiles[0]?.id
-    if (!profileId) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "inbox.write" }))
+    const profileId = profile.id
     const lead = await prisma.visitorLead.findUnique({ where: { id: leadId } })
     if (!lead || lead.profileId !== profileId) throw new Error("Not found")
     return { profileId, lead }
@@ -60,9 +59,8 @@ export async function createLead(data: {
     budgetRange?: string
     note?: string
 }) {
-    const user = await syncUser()
-    const profileId = user?.profiles[0]?.id
-    if (!profileId) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "inbox.write" }))
+    const profileId = profile.id
     const email = data.email.trim().toLowerCase()
     if (!data.name.trim() || !email.includes("@")) throw new Error("Name and email required")
 

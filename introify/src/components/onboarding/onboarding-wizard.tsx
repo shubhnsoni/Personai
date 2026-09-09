@@ -38,6 +38,8 @@ import {
     type OnboardBeat,
 } from "@/lib/onboarding-chat"
 import { cn } from "@/lib/utils"
+import Link from "next/link"
+import { PLAN_CATALOG } from "@/lib/billing/catalog"
 
 type Line = { id: string; role: "bot" | "user"; text: string; sub?: string }
 
@@ -73,11 +75,13 @@ export function OnboardingWizard({
     suggestedName,
     initialNeed,
     activate = false,
+    billingAccountId,
 }: {
     presets: WelcomeAnimationPreset[]
     suggestedName?: string
     initialNeed?: NeedId
     activate?: boolean
+    billingAccountId?: string
 }) {
     const router = useRouter()
     const scroller = useRef<HTMLDivElement>(null)
@@ -173,6 +177,7 @@ export function OnboardingWizard({
         setBusy(true)
         try {
             const result = await createProfile({
+                billingAccountId,
                 roleTemplate: picked.role,
                 primaryGoal: picked.goal,
                 displayName: name.trim(),
@@ -195,8 +200,8 @@ export function OnboardingWizard({
             })
             toast.success("You're live")
             router.push(result?.next || picked.next)
-        } catch {
-            toast.error("Could not create your page")
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not create your page")
             setBusy(false)
         }
     }
@@ -340,6 +345,7 @@ export function OnboardingWizard({
                     </div>
                 </div>
 
+                <p className="mb-5 text-xs leading-relaxed text-white/60">Start on Free with {PLAN_CATALOG.free.aiCredits} monthly AI credits and one eligible trial 3D generation. Service availability is shown in Billing. <Link href="/pricing" target="_blank" rel="noopener noreferrer" className="text-lime-300 underline underline-offset-4">Compare plans<span className="sr-only"> (opens in a new tab)</span></Link></p>
                 <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto" role="log" aria-live="polite">
                     <div className="flex flex-col gap-4 pb-4">
                         {history.map((line) => (
@@ -491,23 +497,15 @@ export function OnboardingWizard({
 
                     {beat === "ready" ? (
                         <div className="mt-3 space-y-2">
-                            <p className="text-[12px] text-white/40">{COPY.ready.helper}</p>
+                            <p className="text-[12px] text-white/40">Your business starts with the details you entered. You can add products and content from your dashboard.</p>
                             <div className="flex flex-col gap-2 sm:flex-row">
-                                <button
-                                    type="button"
-                                    disabled={busy}
-                                    onClick={() => void launch(true)}
-                                    className="h-12 flex-1 rounded-full bg-cyan-400 text-sm font-medium text-zinc-950 hover:bg-cyan-300 disabled:opacity-50"
-                                >
-                                    {busy ? "Launching…" : COPY.ready.trySample}
-                                </button>
                                 <button
                                     type="button"
                                     disabled={busy}
                                     onClick={() => void launch(false)}
                                     className="h-12 flex-1 rounded-full border border-white/15 text-sm font-medium text-white/80 hover:bg-white/5 disabled:opacity-50"
                                 >
-                                    {COPY.ready.empty}
+                                    {busy ? "Launching…" : "Create my business"}
                                 </button>
                             </div>
                         </div>

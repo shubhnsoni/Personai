@@ -7,8 +7,9 @@ export const dynamic = 'force-dynamic'
 export default async function NewCoursePage() {
     const user = await syncUser()
     if (!user) redirect("/sign-in")
+    if (!user.activeProfile) redirect("/onboarding")
 
-    const profile = user.profiles[0]
+    const profile = user.activeProfile
     if (!profile) redirect("/onboarding")
 
     return (

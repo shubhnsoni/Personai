@@ -10,7 +10,7 @@ import {
     type GooglePlaceWeeklyHours,
 } from "@/lib/google-place"
 import { prisma } from "@/lib/prisma"
-import { requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { socialsFromConfig, writeSocials } from "@/lib/socials"
 import {
     venueFromConfig,
@@ -317,7 +317,7 @@ function toPreview(place: GooglePlaceInfo, timezone: string | null, usedNameSear
 }
 
 async function loadOwnedProfile() {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile())
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess())
     return profile
 }
 

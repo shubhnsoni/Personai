@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess, ownershipRefusalResponse } from "@/lib/security"
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!profile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const access = await requireProfileAccess({ permission: "inbox.write" })
+    if (!access.ok) return ownershipRefusalResponse(access.refusal)
+    const { profile } = access.value
 
     const rows = await prisma.conversation.findMany({
         where: { profileId: profile.id, mode: "LIVE_REQUESTED" },

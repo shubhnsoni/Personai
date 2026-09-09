@@ -70,7 +70,7 @@ export function MobileSidebar({ open, onOpenChange, counts, role, extras }: Mobi
                                         >
                                             <item.icon className="h-4 w-4" />
                                         </div>
-                                        {item.href !== "/dashboard" && (
+                                        {item.href !== "/dashboard" && item.href !== "/dashboard/billing" && (
                                             <div className="text-right">
                                                 <p className="text-xl font-semibold leading-none tabular-nums">{value}</p>
                                                 {stat?.fresh ? (

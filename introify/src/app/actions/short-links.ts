@@ -1,7 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
+import { executeProfileResourceWrite, requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { revalidatePath } from "next/cache"
 
 export interface ShortLinkData {
@@ -31,7 +31,7 @@ async function ensureUniqueCode(code: string): Promise<string> {
 }
 
 export async function createShortLink(profileId: string, data: ShortLinkData) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
     const code = data.code?.trim() || generateCode()
     const uniqueCode = await ensureUniqueCode(code)
 
@@ -50,7 +50,7 @@ export async function createShortLink(profileId: string, data: ShortLinkData) {
 export async function updateShortLink(linkId: string, data: ShortLinkData) {
     const requestedCode = data.code?.trim()
     try {
-        unwrapOwnershipResult(await executeOwnedResourceWrite({
+        unwrapOwnershipResult(await executeProfileResourceWrite({
             resourceId: linkId,
             writeOwned: async ({ resourceId, profile }) => {
                 const updated = await prisma.shortLink.updateMany({
@@ -75,7 +75,7 @@ export async function updateShortLink(linkId: string, data: ShortLinkData) {
 }
 
 export async function deleteShortLink(linkId: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: linkId,
         writeOwned: async ({ resourceId, profile }) => {
             const deleted = await prisma.shortLink.deleteMany({

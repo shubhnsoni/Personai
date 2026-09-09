@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { isReservedSlug } from "./slugs"
 
 export const BRAND_NAME = "Introify"
-export const BRAND_DESCRIPTION = "Give your work a home. Create one page for your profile, links, services, products and bookings, then share it anywhere. Start free with Introify."
+export const BRAND_DESCRIPTION = "Create one page for your profile, services, products and bookings. Start free with Introify and explore plans with AI credits, 3D generations and room for your team."
 
 // Draft pages stay out of search and the sitemap until their public details
 // and policies are ready. Page metadata and the sitemap use the same registry.
@@ -10,7 +10,7 @@ export const MARKETING_ROUTES = [
     { path: "/", index: true },
     { path: "/about", index: false },
     { path: "/contact", index: false },
-    { path: "/pricing", index: false },
+    { path: "/pricing", index: true },
     { path: "/privacy", index: false },
     { path: "/terms", index: false },
     { path: "/refund-policy", index: false },

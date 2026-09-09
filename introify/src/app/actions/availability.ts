@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 
 const db = prisma as typeof prisma & {
     calendarOverride: {
@@ -20,9 +20,7 @@ const db = prisma as typeof prisma & {
 }
 
 async function ownerProfile() {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!profile) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "operations.write" }))
     return profile
 }
 

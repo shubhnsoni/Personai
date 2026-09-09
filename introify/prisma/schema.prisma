@@ -162,6 +162,7 @@ model User {
   image                  String?
   role                   String   @default("CREATOR") // "CREATOR" | "ADMIN"
   stripeConnectAccountId String? // Stripe Connect account for payouts
+  emailVerifiedAt        DateTime?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
@@ -171,6 +172,8 @@ model User {
 
 model Profile {
   id                     String                  @id @default(cuid())
+  billingAccountId       String?
+  billingAccount         BillingAccount?         @relation(fields: [billingAccountId], references: [id], onDelete: Restrict)
   userId                 String
   user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   slug                   String                  @unique
@@ -1230,9 +1233,9 @@ model ProfileImage {
 model ArBuild {
   id               String         @id
   profileId        String
-  profile          Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profile          Profile        @relation(fields: [profileId], references: [id], onDelete: Restrict)
   productId        String
-  product          DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product          DigitalProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
   batchId          String
   imageUrl         String
   status           String
@@ -1243,12 +1246,228 @@ model ArBuild {
   costCents        Int
   chargeCents      Int
   stripeSessionId  String?
+  reservationId   String? @unique
+  requestKey      String? @unique
+  recipe          String?
+  attempts        Int @default(0)
+  nextAttemptAt   DateTime?
+  leaseUntil      DateTime?
   error            String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
   @@index([batchId])
   @@index([profileId, createdAt])
+}
+
+/// Introify subscription payer. Merchant sale/payout records remain separate.
+model BillingAccount {
+  id               String @id @default(cuid())
+  name             String
+  ownerUserId      String
+  defaultForUserId String? @unique
+  status           String @default("ACTIVE")
+  currency         String @default("usd")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  profiles         Profile[]
+  workspaces       Workspace[]
+  members          BillingAccountMember[]
+  invitations      BillingInvitation[]
+  subscription     PlatformSubscription?
+  grants           BillingCreditGrant[]
+  reservations     BillingReservation[]
+  storage          BillingStorageObject[]
+  checkouts        BillingCheckout[]
+  @@index([ownerUserId])
+}
+
+model BillingAccountMember {
+  id        String @id @default(cuid())
+  accountId String
+  account   BillingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  userId    String
+  role      String @default("MEMBER")
+  status    String @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([accountId, userId])
+  @@index([userId, status])
+}
+
+model BillingInvitation {
+  id            String @id @default(cuid())
+  accountId     String
+  account       BillingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  email         String
+  emailKey      String
+  tokenHash     String @unique
+  workspaceIds  Json
+  workspaceRole String @default("VIEWER")
+  accountRole   String @default("MEMBER")
+  status        String @default("PENDING")
+  expiresAt     DateTime
+  invitedBy     String
+  acceptedBy    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([accountId, emailKey, status])
+}
+
+model PlatformSubscription {
+  id                   String @id @default(cuid())
+  accountId            String @unique
+  account              BillingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  provider             String @default("stripe")
+  providerCustomerId   String?
+  providerSubscriptionId String? @unique
+  providerScheduleId   String?
+  providerPriceId      String?
+  planId               String @default("free")
+  planVersion          String @default("2026-09-09")
+  cadence              String @default("monthly")
+  status               String @default("FREE")
+  paidThrough          DateTime?
+  periodStart          DateTime?
+  periodEnd            DateTime?
+  allowanceAnchor      DateTime?
+  cancelAtPeriodEnd    Boolean @default(false)
+  pendingPlanId        String?
+  pendingCadence       String?
+  lastProviderEventAt  DateTime?
+  lastObservationId    BigInt @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model BillingCreditGrant {
+  id          String @id @default(cuid())
+  accountId   String
+  account     BillingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  unit        String
+  kind        String
+  sourceKey   String @unique
+  quantity    Int
+  remaining   Int
+  startsAt    DateTime @default(now())
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  @@index([accountId, unit, expiresAt])
+}
+
+model BillingReservation {
+  id           String @id @default(cuid())
+  accountId    String
+  account      BillingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  profileId    String?
+  actorId      String?
+  unit         String
+  amount       Int
+  operationKey String
+  state        String @default("RESERVED")
+  allocations  Json
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@unique([accountId, unit, operationKey])
+  @@index([accountId, state])
+}
+
+model BillingLedgerEntry {
+  id            String @id @default(cuid())
+  accountId     String
+  unit          String
+  kind          String
+  amount        Int
+  operationKey  String @unique
+  reservationId String?
+  grantId       String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  @@index([accountId, createdAt])
+}
+
+model BillingTrialClaim {
+  id          String @id @default(cuid())
+  userId      String @unique
+  accountId   String
+  grantId     String? @unique
+  status      String @default("CLAIMED")
+  createdAt   DateTime @default(now())
+}
+
+model BillingStorageObject {
+  id        String @id @default(cuid())
+  accountId String
+  account   BillingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  profileId String?
+  path      String @unique
+  bytes     BigInt
+  createdAt DateTime @default(now())
+  @@index([accountId])
+}
+
+model BillingCheckout {
+  id              String @id @default(cuid())
+  accountId       String
+  account         BillingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  actorId         String
+  kind            String
+  offerId         String
+  cadence         String?
+  planVersion     String @default("2026-09-09")
+  amountCents     Int
+  currency        String @default("usd")
+  status          String @default("PENDING")
+  providerSessionId String? @unique
+  providerPaymentId String? @unique
+  providerUrl     String?
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([accountId, status])
+}
+
+model BillingProviderEvent {
+  id             String @id
+  provider       String @default("stripe")
+  liveMode       Boolean
+  type           String
+  payload        Json
+  status         String @default("PENDING")
+  attempts       Int @default(0)
+  error          String?
+  leaseUntil     DateTime?
+  createdAt      DateTime @default(now())
+  processedAt    DateTime?
+  @@index([status, createdAt])
+}
+
+model PlatformInvoice {
+  id                    String @id @default(cuid())
+  accountId             String
+  providerInvoiceId     String @unique
+  providerPaymentId     String?
+  providerSubscriptionId String?
+  amountCents           Int
+  currency              String
+  status                String
+  hostedUrl             String?
+  periodStart           DateTime?
+  periodEnd             DateTime?
+  createdAt             DateTime @default(now())
+  @@index([accountId, createdAt])
+}
+
+model BillingAuditEvent {
+  id        String @id @default(cuid())
+  accountId String
+  actorId   String?
+  kind      String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  @@index([accountId, createdAt])
 }
 
 model CourseEnrollment {
@@ -1351,6 +1570,8 @@ enum MembershipRole {
 
 model Workspace {
   id        String   @id @default(cuid())
+  billingAccountId String?
+  billingAccount BillingAccount? @relation(fields: [billingAccountId], references: [id], onDelete: Restrict)
   profileId String?  @unique
   name      String
   slug      String   @unique

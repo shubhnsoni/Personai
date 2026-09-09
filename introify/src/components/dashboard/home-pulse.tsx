@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { AnalyticsCharts } from "@/components/dashboard/analytics-charts"
 import { StudioPulse } from "@/components/dashboard/studio-pulse"
 import { StudioKpi, StudioKpiStrip, StudioPanel } from "@/components/dashboard/studio-ui"
@@ -57,6 +58,12 @@ export function HomePulse({ stats, slug }: { stats: HomeStats; slug: string }) {
                 ))}
             </StudioKpiStrip>
 
+            {!stats.advancedAnalytics ? (
+                <StudioPanel className="flex flex-wrap items-center justify-between gap-4 p-5">
+                    <div><p className="font-medium">See what brings people to your business</p><p className="mt-1 text-sm text-muted-foreground">Pro adds 30-day trends, traffic sources and conversion reports. Your activity totals stay available above.</p></div>
+                    <Link href="/dashboard/billing" className="rounded-full bg-[#032e24] px-4 py-2 text-sm font-medium text-[#b2ef63]">Explore Pro</Link>
+                </StudioPanel>
+            ) : <>
             <div className="lg:hidden">
                 <StudioPulse
                     data={chartData}
@@ -110,6 +117,7 @@ export function HomePulse({ stats, slug }: { stats: HomeStats; slug: string }) {
                     </div>
                 </StudioPanel>
             </div>
+            </>}
         </>
     )
 }

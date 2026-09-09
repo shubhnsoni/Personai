@@ -12,9 +12,10 @@ export default async function DashboardProfilePage({
 }) {
     const user = await syncUser()
     if (!user) redirect("/sign-in")
+    if (!user.activeProfile) redirect("/onboarding")
 
     const profile = await prisma.profile.findUnique({
-        where: { id: user.profiles[0].id },
+        where: { id: user.activeProfile.id },
         include: {
             workExperiences: true,
             projects: true,

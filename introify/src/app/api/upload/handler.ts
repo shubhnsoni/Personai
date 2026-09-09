@@ -186,7 +186,8 @@ async function persistOwnedArtifact(input: Readonly<{
   bytes: Buffer
   mediaType: string
 }>): Promise<PersistedArtifact> {
-  const { prisma } = await import("../../../lib/prisma")
+  const { getProfileBilling, withBillingLimit } = await import("../../../lib/billing/service")
+  const context = await getProfileBilling(input.profileId)
   const baseDirectory = uploadsDirectory()
   const owner = ownerDirectory(input.profileId)
   const directory = resolve(baseDirectory, owner)
@@ -195,32 +196,40 @@ async function persistOwnedArtifact(input: Readonly<{
   if (dirname(fullPath) !== directory) throw new Error("Unsafe artifact path")
   assertInside(directory, fullPath)
 
-  await mkdir(directory, { recursive: true })
-  let bytes = input.bytes
+  const artifacts: Array<{ path: string; bytes: Buffer }> = [{ path: fullPath, bytes: input.bytes }]
   if (input.filename.toLowerCase().endsWith(".glb")) {
     try {
       const { optimizeModelSet } = await import("../../../lib/optimize-glb")
       const set = await optimizeModelSet(input.bytes)
-      bytes = set.web
-      await writeFile(fullPath.replace(/\.glb$/i, "-ar.glb"), set.ar)
-      if (set.usdz) await writeFile(fullPath.replace(/\.glb$/i, ".usdz"), set.usdz)
-    } catch {
-      bytes = input.bytes
-    }
+      artifacts[0].bytes = set.web
+      artifacts.push({ path: fullPath.replace(/\.glb$/i, "-ar.glb"), bytes: set.ar })
+      if (set.usdz) artifacts.push({ path: fullPath.replace(/\.glb$/i, ".usdz"), bytes: set.usdz })
+    } catch { /* Preserve the validated source if optional optimization is unavailable. */ }
   }
-  await writeFile(fullPath, bytes, { flag: "wx" })
   const url = `/uploads/${owner}/${input.filename}`
+  const written: string[] = []
   try {
-    await prisma.profileEvent.create({
-      data: {
-        profileId: input.profileId,
-        name: ARTIFACT_EVENT,
-        path: url,
-        meta: JSON.stringify({ mediaType: input.mediaType, size: bytes.length }),
-      },
+    await withBillingLimit(input.profileId, "storageBytes", artifacts.reduce((sum, artifact) => sum + artifact.bytes.length, 0), async (tx) => {
+      await mkdir(directory, { recursive: true })
+      for (const artifact of artifacts) {
+        assertInside(directory, artifact.path)
+        if (!written.includes(artifact.path)) {
+          await writeFile(artifact.path, artifact.bytes, { flag: "wx" })
+          written.push(artifact.path)
+        }
+        await tx.billingStorageObject.create({ data: {
+          accountId: context.accountId, profileId: input.profileId,
+          path: `/uploads/${owner}/${artifact.path.slice(directory.length + 1)}`,
+          bytes: BigInt(artifact.bytes.length),
+        } })
+      }
+      await tx.profileEvent.create({ data: {
+        profileId: input.profileId, name: ARTIFACT_EVENT, path: url,
+        meta: JSON.stringify({ mediaType: input.mediaType, size: artifacts[0].bytes.length }),
+      } })
     })
   } catch (error) {
-    await unlink(fullPath).catch(() => undefined)
+    await Promise.all(written.map((path) => unlink(path).catch(() => undefined)))
     throw error
   }
   return Object.freeze({ url, filename: input.filename })
@@ -228,8 +237,8 @@ async function persistOwnedArtifact(input: Readonly<{
 
 const productionDependencies: UploadRouteDependencies = Object.freeze({
   async authorize(claimedProfileId) {
-    const { ownershipRefusalResponse, requireOwnedProfile } = await import("../../../lib/security")
-    const result = await requireOwnedProfile({ claimedProfileId })
+    const { ownershipRefusalResponse, requireProfileAccess } = await import("../../../lib/security")
+    const result = await requireProfileAccess({ claimedProfileId })
     return result.ok
       ? Object.freeze({ ok: true as const, profileId: result.value.profile.id })
       : Object.freeze({ ok: false as const, response: ownershipRefusalResponse(result.refusal) })

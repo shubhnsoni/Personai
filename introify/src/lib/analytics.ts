@@ -1,3 +1,4 @@
+import { getProfileBilling } from "@/lib/billing/service"
 import { prisma } from "@/lib/prisma"
 import { calendarNoun, extrasOf, hasSurface } from "@/lib/surfaces"
 
@@ -10,6 +11,7 @@ export type HomeSeriesPoint = {
 }
 
 export type HomeStats = {
+    advancedAnalytics?: boolean
     visits: number
     visits7: number
     chats: number
@@ -54,6 +56,7 @@ export async function buildHomeStats(profile: {
     roleTemplate: string
     personalityConfig?: string | null
 }): Promise<HomeStats> {
+    const advancedAnalytics = await getProfileBilling(profile.id).then(billing => billing.features.advancedAnalytics).catch(() => false)
     const extras = extrasOf(profile)
     const role = profile.roleTemplate
     const now = new Date()
@@ -104,21 +107,21 @@ export async function buildHomeStats(profile: {
         showCourses
             ? prisma.courseEnrollment.count({ where: { course: { profileId: profile.id }, status: { in: ["ACTIVE", "COMPLETED"] } } })
             : Promise.resolve(0),
-        prisma.profileEvent.findMany({
+        advancedAnalytics ? prisma.profileEvent.findMany({
             where: { profileId: profile.id, name: "visit", createdAt: { gte: thirty } },
             select: { createdAt: true },
-        }).catch(() => [] as { createdAt: Date }[]),
-        prisma.conversation.findMany({
+        }).catch(() => [] as { createdAt: Date }[]) : Promise.resolve([] as { createdAt: Date }[]),
+        advancedAnalytics ? prisma.conversation.findMany({
             where: { profileId: profile.id, startedAt: { gte: thirty } },
             select: { startedAt: true },
-        }),
-        showLeads
+        }) : Promise.resolve([] as { startedAt: Date }[]),
+        showLeads && advancedAnalytics
             ? prisma.visitorLead.findMany({
                 where: { profileId: profile.id, createdAt: { gte: thirty } },
                 select: { createdAt: true },
             })
             : Promise.resolve([] as { createdAt: Date }[]),
-        showSales
+        showSales && advancedAnalytics
             ? prisma.payment.findMany({
                 where: { profileId: profile.id, status: "SUCCEEDED", createdAt: { gte: thirty } },
                 select: { amountCents: true, createdAt: true },
@@ -128,10 +131,10 @@ export async function buildHomeStats(profile: {
             where: { profileId: profile.id, lastMessageAt: { gte: thirty } },
             select: { messages: { take: 1, orderBy: { createdAt: "desc" }, select: { role: true } } },
         }),
-        prisma.profileEvent.findMany({
+        advancedAnalytics ? prisma.profileEvent.findMany({
             where: { profileId: profile.id, createdAt: { gte: thirty } },
             select: { ref: true },
-        }).catch(() => [] as { ref: string | null }[]),
+        }).catch(() => [] as { ref: string | null }[]) : Promise.resolve([] as { ref: string | null }[]),
         restaurant
             ? prisma.profileEvent.count({ where: { profileId: profile.id, name: "menu_view" } }).catch(() => 0)
             : Promise.resolve(0),
@@ -173,6 +176,7 @@ export async function buildHomeStats(profile: {
     const sales = purchases + enrollments
 
     return {
+        advancedAnalytics,
         visits,
         visits7,
         chats,
@@ -187,9 +191,9 @@ export async function buildHomeStats(profile: {
         menuViews: restaurant && showShop ? menuViews : undefined,
         reserves: restaurant && showCal ? reserves : undefined,
         enrollments: showCourses ? enrollments : undefined,
-        series,
-        funnel: { visits, chats, leads: leadCount, buys: sales },
-        sources,
+        series: advancedAnalytics ? series : [],
+        funnel: advancedAnalytics ? { visits, chats, leads: leadCount, buys: sales } : { visits: 0, chats: 0, leads: 0, buys: 0 },
+        sources: advancedAnalytics ? sources : [],
         unanswered,
     }
 }

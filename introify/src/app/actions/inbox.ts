@@ -2,19 +2,17 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { sendEmail } from "@/lib/email"
 
 async function ownedConversation(conversationId: string) {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!profile) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "inbox.write" }))
     const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
         include: { profile: { include: { user: true } } },
     })
     if (!conversation || conversation.profileId !== profile.id) throw new Error("Not found")
-    return { user, profile, conversation }
+    return { profile, conversation }
 }
 
 export async function sendOwnerMessage(conversationId: string, text: string) {

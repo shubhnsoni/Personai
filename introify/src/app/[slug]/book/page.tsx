@@ -1,3 +1,4 @@
+import { publicAnimationConfig } from "@/lib/profile-branding"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
@@ -34,6 +35,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
     try {
         config = profile.animationStyle?.config ? JSON.parse(profile.animationStyle.config) : {}
     } catch { /* ignore */ }
+    config = await publicAnimationConfig(profile.id, config)
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
     const logo = (profile as { shopLogoUrl?: string | null }).shopLogoUrl
 

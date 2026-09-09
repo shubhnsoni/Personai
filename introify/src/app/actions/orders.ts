@@ -3,7 +3,7 @@
 import { Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { publish } from "@/lib/realtime"
 import { createRestaurantOrderRecord } from "@/lib/restaurant-order-service"
 import {
@@ -90,10 +90,8 @@ export async function createRestaurantOrder(input: CreateRestaurantOrderInput) {
 }
 
 async function requireOrderOwner() {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!user || !profile) throw new Error("Unauthorized")
-    return { actorId: user.id, profileId: profile.id }
+    const { actor, profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "operations.write" }))
+    return { actorId: actor.userId, profileId: profile.id }
 }
 
 function assertOwned(profileId: string, actualProfileId: string) {

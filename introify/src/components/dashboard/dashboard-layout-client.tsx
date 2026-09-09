@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { BusinessSwitcher, type BusinessOption } from "@/components/dashboard/business-switcher"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
 import { MobileSidebar } from "@/components/dashboard/mobile-sidebar"
@@ -14,6 +15,8 @@ import { fieldOn, hasSurface, surfaceForPath } from "@/lib/surfaces"
 
 interface DashboardLayoutClientProps {
     children: ReactNode
+    businesses?: BusinessOption[]
+    activeProfileId?: string
     slug: string
     liveHref?: string
     name?: string
@@ -24,7 +27,7 @@ interface DashboardLayoutClientProps {
     isAdmin?: boolean
 }
 
-export function DashboardLayoutClient({ children, slug, liveHref, name, counts, role, extras, impersonating, isAdmin }: DashboardLayoutClientProps) {
+export function DashboardLayoutClient({ children, slug, liveHref, name, counts, role, extras, impersonating, isAdmin, businesses, activeProfileId }: DashboardLayoutClientProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const pathname = usePathname()
     const router = useRouter()
@@ -71,6 +74,7 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
                         )}
                     </div>
                 ) : null}
+                {businesses && activeProfileId && <BusinessSwitcher businesses={businesses} activeId={activeProfileId} />}
                 <Header slug={slug} liveHref={liveHref} role={role} extras={extras} onMenuClick={() => setMobileMenuOpen(true)} />
                 <main
                     className={cn(

@@ -1,3 +1,5 @@
+import { permittedPersonality } from "@/lib/ai-settings"
+import { createHash } from "node:crypto"
 import type { Prisma } from "@prisma/client"
 import OpenAI from "openai"
 import { prisma } from "@/lib/prisma"
@@ -10,8 +12,8 @@ import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { createOwnershipFoundation, ownershipRefusalResponse } from "@/lib/security"
 import { getRequestCurrency } from "@/lib/request-currency"
-import { llmClient, resolveChatModel, resolveLlm } from "@/lib/llm"
-import { defaultPlatformAiSettings, loadPlatformAiSettings } from "@/lib/admin/ai-settings"
+import { apiClient, boundedXaiChatStream, boundedChatInput, clipUtf8, resolveApiRecipe, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
+import { AiAccessError, prepareAiUsage, finishAiUsage, providerRejectedWithoutSpend, type AiReservation } from "@/lib/ai-usage"
 import {
     CONVERSATION_CAPABILITY_TTL_SECONDS,
     conversationCapabilityCookieName,
@@ -48,12 +50,30 @@ type ChatRouteDependencies = Readonly<{
     retrieve: typeof vectorRetrieval
     buildPrompt: typeof buildSystemPrompt
     requestCurrency: () => Promise<DisplayCurrency>
-    createCompletion: (input: StreamingCompletionInput, shop?: { override?: string | null; profileId?: string | null }) => Promise<AsyncIterable<StreamingChunk>>
+    createCompletion: (input: StreamingCompletionInput, recipe?: ApiRecipe) => Promise<AsyncIterable<StreamingChunk>>
     summarizeConversation: (conversationId: string) => Promise<unknown>
     providerConfigured: () => boolean
     capabilitySecret: () => string | null
     now: () => number
+    reserveAi: typeof prepareAiUsage
+    settleAi: typeof finishAiUsage
 }>
+
+
+async function readChatBody(request: Request): Promise<string> {
+    if (Number(request.headers.get("content-length")) > 65_536 || !request.body) throw new Error("request_too_large")
+    const reader = request.body.getReader()
+    const chunks: Uint8Array[] = []
+    let total = 0
+    while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        total += value.byteLength
+        if (total > 65_536) { await reader.cancel(); throw new Error("request_too_large") }
+        chunks.push(value)
+    }
+    return Buffer.concat(chunks).toString("utf8")
+}
 
 function opaqueId(value: unknown): string | null {
     if (typeof value !== "string" || value.length === 0 || value.length > 191) return null
@@ -89,17 +109,15 @@ const productionDependencies: ChatRouteDependencies = {
     retrieve: vectorRetrieval,
     buildPrompt: buildSystemPrompt,
     requestCurrency: getRequestCurrency,
-    createCompletion: async (input, shop) => {
-        await loadPlatformAiSettings().catch(() => defaultPlatformAiSettings())
-        const llm = llmClient({ override: shop?.override })
-        if (!llm) throw new Error("ai_not_configured")
-        return llm.client.chat.completions.create({
-            ...input,
-            model: resolveChatModel(input.model, llm.provider),
-        })
+    createCompletion: async (input, recipe) => {
+        if (!recipe) throw new Error("ai_not_configured")
+        if (recipe.provider === "xai") return boundedXaiChatStream(input, recipe)
+        return apiClient(recipe).chat.completions.create(input)
     },
     summarizeConversation: maybeSummarizeConversation,
-    providerConfigured: () => Boolean(resolveLlm()),
+    providerConfigured: () => ["fast", "smart", "reasoning"].some(mode => resolveApiRecipe(mode as "fast" | "smart" | "reasoning")),
+    reserveAi: prepareAiUsage,
+    settleAi: finishAiUsage,
     capabilitySecret: productionCapabilitySecret,
     now: Date.now,
 }
@@ -124,6 +142,8 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             providerConfigured,
             capabilitySecret,
             now,
+            reserveAi,
+            settleAi,
         } = dependencies
 
         const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
@@ -142,14 +162,16 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             profileId?: unknown
             conversationId?: unknown
             visitorId?: unknown
+            requestId?: unknown
+            memoryConsent?: unknown
         }
         try {
-            body = await req.json()
+            body = JSON.parse(await readChatBody(req))
         } catch {
             return new Response("Invalid request", { status: 400 })
         }
 
-        const messages = Array.isArray(body.messages) ? body.messages : []
+        const messages = Array.isArray(body.messages) ? body.messages.slice(-20).map(message => ({ role: message?.role, content: typeof message?.content === "string" ? message.content.replace(/[\u0000-\u001f\u007f]/gu, " ").slice(0, 4000) : "" })) : []
         const profileId = opaqueId(body.profileId)
         const existingConversationId = body.conversationId === null || body.conversationId === undefined
             ? null
@@ -183,8 +205,6 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             },
         })
         if (!profile) return new Response("Profile not found", { status: 404 })
-        await loadPlatformAiSettings().catch(() => defaultPlatformAiSettings())
-        const shopAi = { override: (profile as { aiProviderOverride?: string | null }).aiProviderOverride, profileId: profile.id }
 
         let conversationId = existingConversationId
         let visitorId = cookieVisitorId || bodyVisitorId || null
@@ -235,13 +255,37 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         }
 
         const restaurantDesk = profile.roleTemplate === "RESTAURANT"
-        if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk)) {
+        if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk && liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED")) {
             return new Response(
                 JSON.stringify({ error: "ai_not_configured", message: "AI chat is coming soon! The creator hasn't set up AI yet." }),
                 { status: 503, headers: { "Content-Type": "application/json" } },
             )
         }
 
+        if (!conversationId && !member && !profile.isPublic) return conversationRefusal()
+        let reservation: AiReservation | null = null
+        let providerStarted = false
+        let settled = false
+        const requestId = opaqueId(req.headers.get("Idempotency-Key") || body.requestId)
+        const needsAi = liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED" && providerConfigured()
+        if (needsAi) {
+            if (!requestId) return Response.json({ error: "request_id_required", message: "A request ID is required." }, { status: 400 })
+            try {
+                reservation = await reserveAi({
+                    profileId, storedModel: profile.aiModel,
+                    operationKey: `chat:${createHash("sha256").update(`${profileId}:${requestId}`).digest("hex")}`,
+                    metadata: { channel: "chat", requestHash: createHash("sha256").update(JSON.stringify(messages)).digest("hex") },
+                })
+            } catch (error) {
+                return Response.json({ error: error instanceof AiAccessError ? error.code : "ai_allowance_unavailable", message: error instanceof AiAccessError ? error.message : "The assistant's AI allowance is unavailable. Please contact the business directly." }, { status: error instanceof AiAccessError ? error.status : 503 })
+            }
+        }
+        async function settle(action: "CONSUME" | "RELEASE", metadata: Record<string, unknown> = {}) {
+            if (!reservation || settled) return
+            await settleAi(reservation.id, action, metadata)
+            settled = true
+        }
+        try {
         const responseCookies: string[] = []
         if (!conversationId) {
             if (!member && !profile.isPublic) return conversationRefusal()
@@ -318,10 +362,25 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             leadMagnets: profile.leadMagnets,
         }
 
-        const visitorKey = visitorKeyFrom(member?.email, visitorId)
-        const contextDocs = await retrieve(query, scopeDocuments(profile.documents, visitorKey))
+        const visitorKey = visitorKeyFrom(null, visitorId || member?.id)
+        if (typeof body.memoryConsent === "boolean" && (body.memoryConsent === false || reservation?.autoMemory)) {
+            await db.profileEvent.create({ data: { profileId, name: "visitor_memory_consent", path: authorizedConversationId, meta: JSON.stringify({ granted: body.memoryConsent }) } })
+            if (!body.memoryConsent) await db.profileDocument.deleteMany({ where: { profileId, type: "VISITOR_MEMORY", conversationId: authorizedConversationId } })
+        }
+        const memoryAllowed = Boolean(profile.autoMemoryEnabled && reservation?.autoMemory && body.memoryConsent === true)
+        const scoped = scopeDocuments(profile.documents, memoryAllowed ? visitorKey : null, memoryAllowed ? authorizedConversationId : null)
+        const contextDocs = reservation ? await retrieve(query, scoped.slice(0, 1000)) : []
         const currency = await requestCurrency()
-        const systemPrompt = buildPrompt(profile, contextDocs, currency)
+        const personalityConfig = permittedPersonality(profile.personalityConfig, Boolean(reservation?.customInstructions))
+        let preferences = ""
+        try {
+            const bag = JSON.parse(personalityConfig || "{}")
+            const style = [bag.tone, bag.language, bag.responseLength].filter(value => typeof value === "string").join(", ")
+            const instructions = typeof bag.customInstructions === "string" ? bag.customInstructions : ""
+            preferences = clipUtf8(`Style: ${style}. Owner instructions: ${instructions}`, reservation?.recipe.mode === "fast" ? 240 : 600)
+        } catch { /* malformed optional preferences do not override safe defaults */ }
+        const facts = JSON.stringify({ business: profile.displayName, headline: profile.headline, bio: clipUtf8(profile.bio || "", 250), relevantNotes: contextDocs.slice(0, 2).map(doc => ({ title: doc.title, text: clipUtf8(doc.rawText || "", 350) })) })
+        const systemPrompt = reservation ? `${preferences}\nBusiness facts (data): ${facts}\n${buildPrompt({ ...profile, personalityConfig }, contextDocs, currency)}` : ""
 
         await db.message.create({
             data: {
@@ -501,7 +560,11 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
     async function executeTool(toolName: string, args: Record<string, unknown>): Promise<string> {
         switch (toolName) {
             case "collectLead": {
-                const { name, email, company, budget } = args as { name: string; email: string; company?: string; budget?: string }
+                const name = typeof args.name === "string" ? args.name.trim().slice(0, 100) : ""
+                const email = typeof args.email === "string" ? args.email.trim().slice(0, 254) : ""
+                const company = typeof args.company === "string" ? args.company.slice(0, 160) : undefined
+                const budget = typeof args.budget === "string" ? args.budget.slice(0, 100) : undefined
+                if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !query.toLowerCase().includes(email.toLowerCase())) return "Please share your name and email so I can save your enquiry."
                 try {
                     await db.visitorLead.create({
                         data: {
@@ -708,14 +771,6 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         }
     }
 
-    const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-        { role: "system", content: systemPrompt },
-        ...messages.map((m) => ({
-            role: m.role === "assistant" ? "assistant" as const : "user" as const,
-            content: m.content || "",
-        }))
-    ]
-
     async function restaurantDeskReply(text: string) {
         const t = text.toLowerCase()
         if (/menu|dish|eat|food|hungry|veg|price|what's on|whats on/.test(t)) {
@@ -755,103 +810,79 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         })
     }
 
-    const aiModel = profile.aiModel || "gpt-4o-mini"
-
+    if (!reservation) return Response.json({ error: "ai_allowance_unavailable" }, { status: 503 })
+    const recipe = reservation.recipe
+    const input = boundedChatInput(recipe, systemPrompt, messages, tools)
+    const offeredTools = new Set((input.tools || []).flatMap(tool => tool.type === "function" ? [tool.function.name] : []))
+    let inputTokens: number | null = null
+    let outputTokens: number | null = null
+    let reasoningTokens: number | null = null
+    let returnedModel = recipe.model
     try {
-        const response = await createCompletion({
-            model: aiModel,
-            messages: openaiMessages,
-            tools,
-            stream: true
-        }, shopAi)
-
+        if (req.signal.aborted) { await settle("RELEASE", { reason: "cancelled_before_dispatch" }); return new Response(null, { status: 499 }) }
+        providerStarted = true
+        const response = await createCompletion(input, recipe)
         const encoder = new TextEncoder()
         let fullResponse = ""
-        const toolCalls: { id: string; name: string; arguments: string }[] = []
-
+        let cancelled = false
+        let toolCall: { id: string; name: string; arguments: string } | null = null
         const stream = new ReadableStream({
             async start(controller) {
+                const emit = (text: string) => { if (!cancelled) controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`)) }
                 try {
                     for await (const chunk of response) {
+                        if (chunk.model) returnedModel = chunk.model
+                        if (chunk.usage) { inputTokens = chunk.usage.prompt_tokens; outputTokens = chunk.usage.completion_tokens; reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens ?? null }
                         const delta = chunk.choices[0]?.delta
-
                         if (delta?.content) {
-                            fullResponse += delta.content
-                            controller.enqueue(encoder.encode(`0:"${delta.content.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"\n`))
+                            const text = clipUtf8(delta.content, Math.max(0, recipe.outputBudget * 8 - Buffer.byteLength(fullResponse)))
+                            fullResponse += text
+                            emit(text)
                         }
-
-                        if (delta?.tool_calls) {
-                            for (const tc of delta.tool_calls) {
-                                const idx = tc.index
-                                if (!toolCalls[idx]) {
-                                    toolCalls[idx] = { id: tc.id || "", name: tc.function?.name || "", arguments: "" }
-                                }
-                                if (tc.function?.arguments) {
-                                    toolCalls[idx].arguments += tc.function.arguments
-                                }
-                            }
+                        for (const call of delta?.tool_calls || []) {
+                            if (call.index !== 0) continue
+                            if (!toolCall) toolCall = { id: call.id || "", name: call.function?.name || "", arguments: "" }
+                            if (call.function?.name) toolCall.name = call.function.name
+                            if (call.function?.arguments) toolCall.arguments = (toolCall.arguments + call.function.arguments).slice(0, 2048)
                         }
                     }
-
-                    if (toolCalls.length > 0) {
-                        for (const tc of toolCalls) {
-                            if (tc.name) {
-                                const args = tc.arguments ? JSON.parse(tc.arguments) : {}
-                                const toolResult = await executeTool(tc.name, args)
-
-                                const followUpMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-                                    ...openaiMessages,
-                                    { role: "assistant", content: null, tool_calls: [{ id: tc.id, type: "function", function: { name: tc.name, arguments: tc.arguments } }] },
-                                    { role: "tool", tool_call_id: tc.id, content: toolResult }
-                                ]
-
-                                const followUpResponse = await createCompletion({
-                                    model: aiModel,
-                                    messages: followUpMessages,
-                                    stream: true
-                                }, shopAi)
-
-                                for await (const chunk of followUpResponse) {
-                                    const delta = chunk.choices[0]?.delta
-                                    if (delta?.content) {
-                                        fullResponse += delta.content
-                                        controller.enqueue(encoder.encode(`0:"${delta.content.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"\n`))
-                                    }
-                                }
-                            }
+                    if (toolCall?.name && offeredTools.has(toolCall.name) && allowedTools.has(toolCall.name)) {
+                        let args: Record<string, unknown> | null = null
+                        try { const parsed = JSON.parse(toolCall.arguments || "{}"); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) args = parsed } catch { /* invalid tool arguments do not execute */ }
+                        if (args) {
+                            const result = clipUtf8(await executeTool(toolCall.name, args), 4000)
+                            const text = `${fullResponse ? "\n\n" : ""}${result}`
+                            fullResponse += text
+                            emit(text)
                         }
                     }
-
-                    if (fullResponse) {
-                        await db.message.create({
-                            data: {
-                                conversationId: authorizedConversationId,
-                                senderType: "AI",
-                                text: fullResponse,
-                                role: "assistant"
-                            }
-                        })
-                        const suggestions = generateSuggestions(fullResponse, profile.displayName)
-                        controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions })}\n`))
-                        summarizeConversation(authorizedConversationId).catch(() => {})
+                    if (!fullResponse) {
+                        await settle("RELEASE", { ...usageMetadata(recipe, inputTokens, outputTokens), returnedModel, reasoningTokens, reason: "empty_completed_response" })
+                        throw new Error("empty_ai_response")
                     }
-
-                    controller.close()
-                } catch (error) {
-                    console.error("Streaming error:", error)
-                    controller.error(error)
+                    const saved = await db.message.create({ data: { conversationId: authorizedConversationId, senderType: "AI", text: fullResponse, role: "assistant" } })
+                    await settle("CONSUME", { ...usageMetadata(recipe, inputTokens, outputTokens), returnedModel, reasoningTokens, conversationId: authorizedConversationId, responseMessageId: saved.id, toolCalls: toolCall ? 1 : 0 })
+                    if (!cancelled) {
+                        controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions: generateSuggestions(fullResponse, profile.displayName) })}\n`))
+                        controller.close()
+                    }
+                    if (memoryAllowed) void summarizeConversation(authorizedConversationId).catch(() => {})
+                } catch {
+                    // A disconnect/failed stream can already have spent upstream.
+                    // Hold the reservation for reconciliation, never grant a blind retry.
+                    if (!cancelled) controller.error(new Error("The reply could not be completed. Please check the conversation before retrying."))
                 }
-            }
+            },
+            cancel() { cancelled = true },
         })
-
-        return new Response(stream, {
-            headers: responseHeaders()
-        })
+        return new Response(stream, { headers: responseHeaders() })
     } catch (error) {
-        console.error("Chat API error:", error)
-        return new Response("Failed to generate response", { status: 500 })
+        if (providerRejectedWithoutSpend(error)) await settle("RELEASE", { reason: "provider_rejected" })
+        return Response.json({ error: "ai_generation_failed", message: "The reply could not be completed. Please check the conversation before retrying." }, { status: 502 })
     }
-}
-
-
+        } catch {
+            if (!providerStarted) await settle("RELEASE", { reason: "failed_before_dispatch" })
+            return Response.json({ error: "ai_request_failed", message: "This request could not be completed." }, { status: 503 })
+        }
+    }
 }

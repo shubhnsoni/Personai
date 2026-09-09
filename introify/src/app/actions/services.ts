@@ -1,7 +1,8 @@
 "use server"
 
+import { withOfferingLimit } from "@/lib/billing/resource-limits"
 import { prisma } from "@/lib/prisma"
-import { executeOwnedResourceWrite, requireOwnedProfile, unwrapOwnershipResult } from "@/lib/security"
+import { executeProfileResourceWrite, requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { revalidatePath } from "next/cache"
 
 type ServiceData = {
@@ -36,20 +37,20 @@ function serviceWrite(data: ServiceData, preserveKind = false) {
 }
 
 export async function addService(profileId: string, data: ServiceData) {
-    const { profile } = unwrapOwnershipResult(await requireOwnedProfile({ claimedProfileId: profileId }))
-    await prisma.serviceOffering.create({
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
+    await withOfferingLimit(profile.id, "service", null, true, (tx) => tx.serviceOffering.create({
         data: {
             profileId: profile.id,
             ...serviceWrite(data),
             currency: "USD",
             isActive: true,
         },
-    })
+    }))
     revalidatePath("/dashboard/services")
 }
 
 export async function updateService(serviceId: string, data: ServiceData) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: serviceId,
         writeOwned: async ({ resourceId, profile }) => {
             const updated = await prisma.serviceOffering.updateMany({
@@ -63,7 +64,7 @@ export async function updateService(serviceId: string, data: ServiceData) {
 }
 
 export async function deleteService(serviceId: string) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: serviceId,
         writeOwned: async ({ resourceId, profile }) => {
             const deleted = await prisma.serviceOffering.deleteMany({
@@ -76,13 +77,13 @@ export async function deleteService(serviceId: string) {
 }
 
 export async function setServiceActive(serviceId: string, isActive: boolean) {
-    unwrapOwnershipResult(await executeOwnedResourceWrite({
+    unwrapOwnershipResult(await executeProfileResourceWrite({
         resourceId: serviceId,
         writeOwned: async ({ resourceId, profile }) => {
-            const updated = await prisma.serviceOffering.updateMany({
+            const updated = await withOfferingLimit(profile.id, "service", resourceId, isActive, (tx) => tx.serviceOffering.updateMany({
                 where: { id: resourceId, profileId: profile.id },
                 data: { isActive },
-            })
+            }))
             return updated.count === 1 ? true : null
         },
     }))

@@ -3,13 +3,11 @@
 import { randomBytes } from "node:crypto"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { syncUser } from "@/lib/auth-sync"
+import { requireProfileAccess, unwrapOwnershipResult } from "@/lib/security"
 import { tablesForProfile } from "@/lib/restaurant-tables"
 
 async function restaurantOwner() {
-    const user = await syncUser()
-    const profile = user?.profiles[0]
-    if (!user || !profile) throw new Error("Unauthorized")
+    const { profile } = unwrapOwnershipResult(await requireProfileAccess({ permission: "operations.write" }))
     if (profile.roleTemplate !== "RESTAURANT") throw new Error("Tables are for restaurant profiles.")
     return profile
 }
