@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowUpRight, CheckCircle2, Clock3, Info } from "lucide-react"

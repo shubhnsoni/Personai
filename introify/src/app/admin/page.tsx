@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { prisma } from "@/lib/prisma"
 import { shopSetupChecks } from "@/lib/admin/setup-score"
 import { loadPlatformAiSettings, providerConfigured } from "@/lib/admin/ai-settings"

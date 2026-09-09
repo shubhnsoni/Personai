@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { cn } from "@/lib/utils"
 
 export function StudioPanel({

@@ -1,6 +1,6 @@
 import { publicAnimationConfig } from "@/lib/profile-branding"
 import { notFound } from "next/navigation"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { prisma } from "@/lib/prisma"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { CatalogHeader } from "@/components/shop/catalog-header"

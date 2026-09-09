@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { ArrowLeft, ArrowUpRight, FileText } from "lucide-react"
 import { MarketingShell } from "./marketing-shell"
 import type { PolicyDocument } from "@/lib/marketing-policies"

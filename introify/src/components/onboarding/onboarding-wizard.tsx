@@ -38,7 +38,7 @@ import {
     type OnboardBeat,
 } from "@/lib/onboarding-chat"
 import { cn } from "@/lib/utils"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { PLAN_CATALOG } from "@/lib/billing/catalog"
 
 type Line = { id: string; role: "bot" | "user"; text: string; sub?: string }

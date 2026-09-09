@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
 import { Skeleton } from "@/components/ui/skeleton"
+import { BrandLoading } from "@/components/navigation/brand-loading"
 
 /**
  * Structural skeleton mirroring BusinessOsShell's layout (header, four stat
@@ -10,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 export default function BusinessOsLoading() {
     return (
         <div className="flex-1 space-y-6" aria-busy="true" aria-label="Loading Business OS">
+            <BrandLoading label="Loading Business OS" compact />
             <PageHeader
                 title="Business OS"
                 description="Versioned blueprints composed from the shared operating engines."

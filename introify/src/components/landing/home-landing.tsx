@@ -1,5 +1,5 @@
 import Image from "next/image"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { ArrowDown, ArrowRight, ArrowUpRight, Check, CalendarDays, Link2, Plus, ScanLine, Sparkles } from "lucide-react"
 import { MarketingShell } from "@/components/marketing/marketing-shell"
 import { IntroifyWordmark } from "@/components/brand/wordmark"

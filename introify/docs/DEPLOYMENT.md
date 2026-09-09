@@ -44,36 +44,52 @@ email allowlist in Hostinger.
 
 - Google OAuth is enabled on the production Clerk instance. Email sign-in still
   works independently.
-- Codex on production: set `CODEX_HOME` to a persistent directory outside the
-  deploy tree (sibling of uploads, not inside it) and `CODEX_AUTH_JSON` to the
-  local `~/.codex/auth.json` body. Never commit that file. Stripe is still
-  skipped.
+- Commercial AI, platform payments and photoreal generation require the provider
+  activation checks below and in [the billing launch checklist](BILLING_LAUNCH_CHECKLIST.md).
+  Implemented integrations and configured credentials do not establish live readiness.
 - The new production database contains the deployment bootstrap data. Existing
   local development records have not been copied to Neon.
 
-## Codex credential persistence
+## Commercial AI configuration
 
-`CODEX_AUTH_JSON` accepts JSON or standard base64 and seeds a private `auth.json`
-under `CODEX_HOME`. Keep this directory outside both the deployment and public
-uploads. The production process must be able to create and atomically replace
-the file; a persistence failure stops credential loading or refresh.
+Published business assistants and metered import enrichment use explicit
+OpenAI or xAI API configuration from [`ai-runtime.ts`](../src/lib/ai-runtime.ts).
+Use [`.env.example`](../.env.example) for variable names and configure their real
+values privately in Hostinger. Do not put keys or personal authentication files
+in source control, public uploads or this document.
 
-An unchanged environment seed preserves tokens refreshed by the app. Changing
-the seed replaces saved credentials once. Existing files from before seed
-tracking keep their current tokens; set or change `CODEX_AUTH_REVISION` only when
-deliberately replacing such a login. Never commit credential payloads.
+1. Choose and fund the provider account. Set `INTROIFY_AI_PROVIDER` to `openai`
+   or `xai`, and supply the corresponding `OPENAI_API_KEY` or `XAI_API_KEY`.
+2. Set `INTROIFY_AI_FAST_MODEL`, `INTROIFY_AI_SMART_MODEL` and
+   `INTROIFY_AI_REASONING_MODEL` explicitly for every mode being offered.
+   Each model must be in the selected provider's approved mode list in
+   `ai-runtime.ts` and available to that provider account. Missing or unsupported
+   mappings leave that mode unavailable; a key by itself does not activate it.
+3. Keep `INTROIFY_AI_DISABLED=true` while the service should be unavailable.
+   Set it to `false` when the provider and operating checks are complete. This
+   flag controls the commercial runtime independently of legacy diagnostic settings.
+4. For cost reporting, supply verified per-model input/output rates using
+   `INTROIFY_AI_<MODE>_INPUT_USD_PER_MTOK` and
+   `INTROIFY_AI_<MODE>_OUTPUT_USD_PER_MTOK`, where `<MODE>` is `FAST`, `SMART`
+   or `REASONING`. Unset rates are reported as unknown, not zero.
+5. Restart/redeploy after configuration. Check the commercial-mode section at
+   `/admin/ai`, then use authorized test profiles with the appropriate plan
+   entitlements to verify each advertised mode through the published assistant.
+   Confirm real replies, usage reservations/settlement, and unavailable/error
+   behavior. Configuration badges and the public Fast-mode availability summary
+   do not prove provider health or Smart/Reasoning availability.
 
-Refresh requests are coordinated within one app process. Copying a desktop
-login to the server still shares the same OAuth session and account allowance;
-separate machines or processes can race token rotation. A private `CODEX_HOME`
-does not create an independent session. For general public API integrations,
-OpenAI recommends Platform API keys; see the [authentication guidance](https://learn.chatgpt.com/docs/auth).
+The legacy diagnostic controls at `/admin/ai` are separate. Personal Codex
+authentication, saved diagnostic defaults and diagnostic pings do not select
+or activate the commercial visitor runtime. Diagnostic pings can incur provider
+charges and do not test customer credit accounting. Do not copy a personal
+Codex login to enable public AI.
 
-After configuration, use **Test chat** at `/admin/ai` and confirm a nonempty reply
-plus a successful Codex entry in Recent calls. Then send a separate message on
-`/demo` and verify its reply. Public profile chats do not currently create
-`AiCallLog` entries. Configured badges and capacity rows show credential presence,
-not provider health. Provider selection fallbacks do not retry failed requests.
+For subscription/pack webhooks, legal approval, durable worker/storage and 3D
+provider activation, follow [BILLING_LAUNCH_CHECKLIST.md](BILLING_LAUNCH_CHECKLIST.md).
+Use [BILLING_IMPLEMENTATION.md](BILLING_IMPLEMENTATION.md) for current plans and
+accounting behavior and [PENDING_ITEMS.md](PENDING_ITEMS.md) for the consolidated
+remaining work. AI setup does not by itself enable paid checkout or photoreal generation.
 
 ## Redeployment checks
 

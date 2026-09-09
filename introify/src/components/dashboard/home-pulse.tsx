@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { AnalyticsCharts } from "@/components/dashboard/analytics-charts"
 import { StudioPulse } from "@/components/dashboard/studio-pulse"
 import { StudioKpi, StudioKpiStrip, StudioPanel } from "@/components/dashboard/studio-ui"

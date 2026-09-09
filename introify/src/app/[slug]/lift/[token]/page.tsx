@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { notFound } from "next/navigation"
 import { peekSaleToken } from "@/lib/metal/ledger"
 import { touchPercent } from "@/lib/metal/touch"

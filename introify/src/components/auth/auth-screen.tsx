@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/navigation/transition-link";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, Check, Link2, Sparkles } from "lucide-react";
 import { BrandMark } from "@/components/marketing/marketing-shell";

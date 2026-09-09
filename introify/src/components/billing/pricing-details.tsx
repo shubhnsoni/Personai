@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { ArrowUpRight, BrainCircuit, Plus, Sparkles, Zap } from "lucide-react"
 import { AI_MODES, CREDIT_PACKS } from "@/lib/billing/catalog"
 import { dollars } from "./format"

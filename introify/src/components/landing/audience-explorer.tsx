@@ -1,6 +1,6 @@
 "use client"
 import { useId, useRef, useState } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import {
     ArrowUpRight,
     Check,

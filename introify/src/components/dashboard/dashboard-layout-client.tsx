@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, type ReactNode } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { usePathname, useRouter } from "next/navigation"
 import { BusinessSwitcher, type BusinessOption } from "@/components/dashboard/business-switcher"
 import { Sidebar } from "@/components/dashboard/sidebar"

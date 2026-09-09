@@ -1,0 +1,98 @@
+.brand-loading, .page-transit {
+  --transit-ink: #123e30;
+  --transit-accent: #648c26;
+  --transit-surface: #f7f9f0;
+  --transit-wash: rgb(247 249 240 / 86%);
+  --transit-line: rgb(36 76 45 / 13%);
+  color: var(--transit-ink);
+}
+.dark .brand-loading, .dark .page-transit, .auth-scene .brand-loading {
+  --transit-ink: #f0f5e8;
+  --transit-accent: #a3db42;
+  --transit-surface: #08291f;
+  --transit-wash: rgb(5 28 21 / 88%);
+  --transit-line: rgb(186 219 158 / 15%);
+}
+.brand-loading {
+  display: flex;
+  min-height: min(55dvh, 420px);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px 20px;
+}
+.brand-loading--page { min-height: 100dvh; background: var(--transit-surface); }
+.brand-loading--compact { min-height: 200px; gap: 20px; padding: 24px 12px; }
+.brand-loading-label { font-size: 12px; line-height: 1.5; letter-spacing: .015em; opacity: .65; text-align: center; }
+.brand-loading-visual { display: flex; align-items: center; flex-direction: column; gap: 24px; }
+.brand-loading-orbit { position: relative; display: grid; place-items: center; width: 126px; height: 126px; }
+.brand-loading-halo {
+  position: absolute; inset: 2px; border: 1px solid var(--transit-line); border-radius: 50%;
+  box-shadow: 0 0 0 14px color-mix(in srgb, var(--transit-accent) 3%, transparent);
+  animation: introify-halo 2.4s ease-in-out infinite;
+}
+.brand-loading-satellite { position: absolute; inset: 2px; animation: introify-orbit 3.2s linear infinite; }
+.brand-loading-satellite::before {
+  content: ""; position: absolute; width: 5px; height: 5px; left: calc(50% - 2.5px); top: -2px;
+  border-radius: 50%; background: var(--transit-accent); box-shadow: 0 0 12px rgb(163 219 66 / 40%);
+}
+.brand-loading-orb {
+  position: relative; display: grid; place-items: center; width: 82px; height: 82px; border-radius: 50%; overflow: hidden;
+  color: #f8fcef; border: 1px solid rgb(207 240 171 / 26%);
+  background: radial-gradient(ellipse at 27% 14%, #7eaa50 0%, #386b39 22%, #104933 47%, #052c22 78%);
+  box-shadow: inset 0 1px 3px rgb(228 255 183 / 45%), inset -7px -11px 15px rgb(0 16 11 / 35%), 0 12px 24px rgb(3 42 25 / 17%), 0 0 30px rgb(163 219 66 / 12%);
+  animation: introify-breathe 2.4s ease-in-out infinite;
+}
+.brand-loading-orb svg { position: relative; z-index: 1; width: 60px; height: 60px; }
+.brand-loading-dot { fill: #b7ec62; animation: introify-dot 2.4s ease-in-out infinite; }
+.brand-loading-shine {
+  position: absolute; inset: -35%; transform: translateX(-90%) rotate(-25deg);
+  background: linear-gradient(90deg, transparent 35%, rgb(233 255 206 / 18%) 50%, transparent 65%);
+  animation: introify-shine 3.2s ease-in-out infinite;
+}
+.brand-loading-wordmark { width: 106px; height: auto; --brand-accent: var(--transit-accent); }
+.brand-loading-track { position: relative; overflow: hidden; width: 48px; height: 2px; border-radius: 2px; background: var(--transit-line); }
+.brand-loading-track > span { position: absolute; inset: 0; background: var(--transit-accent); border-radius: inherit; animation: introify-track 1.5s ease-in-out infinite; }
+.brand-loading-visual--compact { gap: 16px; }
+.brand-loading-visual--compact .brand-loading-orbit { width: 96px; height: 96px; }
+.brand-loading-visual--compact .brand-loading-orb { width: 64px; height: 64px; }
+.brand-loading-visual--compact .brand-loading-orb svg { width: 48px; height: 48px; }
+.brand-loading-visual--compact .brand-loading-wordmark { width: 88px; }
+.page-transit {
+  position: fixed; inset: 0; z-index: 90; isolation: isolate;
+  display: grid; place-items: center; pointer-events: none;
+  animation: introify-transit-in 150ms ease-out both;
+}
+.page-transit-wash {
+  position: absolute; inset: 0; z-index: -1; background: var(--transit-wash);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+}
+.page-transit-wash::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 47%, rgb(163 219 66 / 9%), transparent 45%);
+}
+.page-transit-center { padding: 24px; animation: introify-mark-in 260ms cubic-bezier(.2,.7,.2,1) both; }
+.page-transit[data-phase="leaving"] { animation: introify-transit-out 320ms ease-out both; }
+.page-transit[data-phase="leaving"] .page-transit-center { animation: introify-mark-out 280ms ease-in both; }
+/* Avoid a second mark if a streamed route fallback is underneath the transition. */
+body:has(.page-transit) .brand-loading { visibility: hidden; }
+@keyframes introify-orbit { to { transform: rotate(360deg); } }
+@keyframes introify-breathe { 0%, 100% { transform: translateY(1px) scale(.97); } 50% { transform: translateY(-2px) scale(1); } }
+@keyframes introify-halo { 0%, 100% { opacity: .55; transform: scale(.97); } 50% { opacity: 1; transform: scale(1.025); } }
+@keyframes introify-dot { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
+@keyframes introify-shine { 0%, 15% { transform: translateX(-90%) rotate(-25deg); } 65%, 100% { transform: translateX(90%) rotate(-25deg); } }
+@keyframes introify-track { 0% { transform: translateX(-105%) scaleX(.4); } 50% { transform: translateX(0) scaleX(.7); } 100% { transform: translateX(105%) scaleX(.4); } }
+@keyframes introify-transit-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes introify-transit-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes introify-mark-in { from { opacity: 0; transform: translateY(7px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes introify-mark-out { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(-5px) scale(1.025); } }
+@media (max-width: 600px) { .page-transit-wash { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .page-transit, .page-transit-center, .page-transit[data-phase="leaving"], .page-transit[data-phase="leaving"] .page-transit-center,
+  .brand-loading-halo, .brand-loading-satellite, .brand-loading-orb, .brand-loading-dot, .brand-loading-shine, .brand-loading-track > span {
+    animation: none; transform: none;
+  }
+  .brand-loading-shine, .brand-loading-satellite { display: none; }
+  .page-transit-wash { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}

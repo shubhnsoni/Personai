@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { useRouter } from "next/navigation"
 import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"

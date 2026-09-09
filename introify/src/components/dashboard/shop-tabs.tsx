@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 

@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { useId, useRef, useState, type KeyboardEvent } from "react"
 import { ArrowUpRight, ArrowRight, Globe2, Sparkles, CalendarDays } from "lucide-react"
 

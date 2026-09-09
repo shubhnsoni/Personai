@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { animate, motion, useMotionTemplate, useMotionValue } from "framer-motion"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { useSearchParams } from "next/navigation"
 import { ChatInterface, type ChatChip } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"

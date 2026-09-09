@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { useState } from "react"
 import { ArrowUpRight, ArrowDownLeft, Sparkles } from "lucide-react"
 import { BrandOrb } from "./brand-orb"

@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { ArrowUpRight } from "lucide-react"
 import { PlanComparison } from "./plan-comparison"
 import { getPublicBillingAvailability } from "@/lib/billing/config"

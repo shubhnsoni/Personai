@@ -1,5 +1,5 @@
 import Image from "next/image"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { ArrowUpRight, Coffee, Palette, Plus, Users } from "lucide-react"
 import "./people-stories.css"
 

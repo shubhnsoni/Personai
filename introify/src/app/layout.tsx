@@ -9,6 +9,8 @@ import { PricingProvider } from "@/components/pricing-provider";
 import { getRequestCurrency } from "@/lib/request-currency";
 import { Toaster } from "sonner";
 import { BRAND_DESCRIPTION, marketingOrigin } from "@/lib/marketing-seo";
+import { PageTransitionProvider } from "@/components/navigation/page-transition";
+import "@/components/navigation/page-transition.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -68,7 +70,7 @@ export default async function RootLayout({
             disableTransitionOnChange
           >
             <PricingProvider currency={currency}>
-              {children}
+              <PageTransitionProvider>{children}</PageTransitionProvider>
               <ClerkChrome />
               <Toaster theme="system" />
             </PricingProvider>

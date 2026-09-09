@@ -1,5 +1,7 @@
 # Introify launch readiness
 
+**9 September 2026 update:** Use [PENDING_ITEMS.md](PENDING_ITEMS.md) for the current consolidated actions and [BILLING_IMPLEMENTATION.md](BILLING_IMPLEMENTATION.md) for implemented behavior. The Free, Starter, Pro, Business and Scale catalog and platform billing are now implemented; provider activation and approved legal/commercial terms remain pending. `/pricing` is indexable, while the other nine supporting routes remain `noindex`. These facts supersede the earlier free-early-access launch assumptions. The detailed legal, privacy, support and messaging requirements below still apply; implementation is not evidence of production activation.
+
 Reviewed: 8 September 2026. Status: **draft business details and policies; payment-gateway and SMS activation remain pending**.
 
 The requested website pages are implemented. Their presence does not complete legal review, gateway onboarding or telecom registration. The operator name, email, address and refund window have deliberately been left blank at the owner's request. No secrets, private account contacts, registration numbers or commercial terms should be inferred from hosting accounts or example environment values.
@@ -30,13 +32,13 @@ The single source of public business details is `src/lib/marketing-business.ts`.
 | Retention schedule and deletion owner | | Account, analytics, chats, orders, uploads, logs and backups |
 | Messaging provider, purposes, frequency and withdrawal method | | Functional SMS launch plan |
 
-Keep `policiesApproved: false` until the facts, processes and text have been reviewed. Flipping this value does **not** implement a refund process, consent controls, a mailbox or a messaging service. Policy text containing draft/pending statements must also be revised after completion. All ten supporting routes intentionally set `index: false`; update their metadata and the shared `MARKETING_ROUTES` registry only after approval. Noindex is a search preference, not access control.
+Keep `policiesApproved: false` until the facts, processes and text have been reviewed. Flipping this value does **not** implement a refund process, consent controls, a mailbox or a messaging service. Policy text containing draft/pending statements must also be revised after completion. The nine supporting routes other than `/pricing` intentionally set `index: false`; update their metadata and the shared `MARKETING_ROUTES` registry only after approval. Noindex is a search preference, not access control.
 
 ## 2. Public pages delivered
 
 | Route | Purpose | Remaining approval |
 | --- | --- | --- |
-| `/pricing` | Current free early access to Introify, separate from merchant prices | Future paid-plan amounts, billing and commercial terms; gateway activation |
+| `/pricing` | Implemented Free, Starter, Pro, Business and Scale plans, separate from merchant prices | Approved commercial/tax/refund terms and gateway activation |
 | `/about` | Product scope and operator identification | Verified operator details |
 | `/contact` | Platform, merchant and grievance contact routes | Real monitored email/phone/address; no inert form |
 | `/privacy` | Actual data categories, purposes, sharing and choices | Operator, provider inventory, retention and working request channel |
@@ -49,7 +51,7 @@ Keep `policiesApproved: false` until the facts, processes and text have been rev
 
 Content is in `src/lib/marketing-policies.ts`; shared presentation is in `src/components/marketing/policy-page.tsx`. Draft warnings and blank business fields are deliberate. These pages do not claim company incorporation, licensing, GST registration, guaranteed gateway approval or an active SMS programme.
 
-The separate `/pricing` page states the current free early-access offer for Introify. It does not establish a paid plan or a timed free trial. Prices set by independent merchants on their pages are separate from the cost of using Introify; a merchant's goods or services are not made free by the platform's early-access offer. Final paid terms remain pending.
+The separate `/pricing` page uses the implemented five-plan catalog. Free includes a once-only verified-user photoreal trial, not a timed trial of a paid subscription. Prices set by independent merchants on their pages remain separate from the cost of using Introify; a merchant's goods or services are not made free by the platform's Free plan. Final paid terms and provider activation remain pending.
 
 ## 3. Payment-gateway activation
 
@@ -57,7 +59,7 @@ The separate `/pricing` page states the current free early-access offer for Intr
 - [ ] Complete public operator/contact fields and provide verified KYC/bank/business documentation privately in the gateway's portal. Match the website, legal identity, business category and settlement beneficiary.
 - [ ] Publish accurate product/service descriptions, actual pricing, currency, taxes, fulfilment and approved cancellation/refund terms. Show the applicable terms before payment and preserve the accepted version with the transaction.
 - [ ] Have the operator/legal adviser confirm applicable consumer, tax, marketplace, intermediary and regulated-business obligations. Do not offer pharmacy, health or other regulated workflows solely because a kit exists in source.
-- [ ] Implement the selected gateway integration and server-side payment verification. Test successful, failed, abandoned, duplicate and refunded transactions; signed webhooks; idempotency; amounts/currency; receipts; fulfilment and support recovery in the provider's authorised test environment.
+- [ ] Validate the selected gateway integration and server-side payment verification in the actual provider account. Introify's platform Stripe adapter is implemented; a different gateway needs its own implementation. Test successful, failed, abandoned, duplicate and refunded transactions; signed webhooks; idempotency; amounts/currency; receipts; fulfilment and support recovery in the provider's authorised test environment.
 - [ ] Check approved refunds can actually be issued and reconciled, including partial refunds or renewals if offered. Do not publish a return window as a substitute for a working process.
 - [ ] Recheck the public website and live gateway status after deployment. These draft pages do not justify changing payment feature flags by themselves.
 

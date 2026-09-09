@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { usePathname } from "next/navigation"
 import { Logo } from "@/components/brand/logo"
 import { StudioSignOut } from "@/components/dashboard/studio-sign-out"

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState, useTransition } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { Course } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"

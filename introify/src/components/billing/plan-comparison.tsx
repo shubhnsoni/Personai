@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { useId, useState } from "react"
 import { ArrowUpRight, Check, Info } from "lucide-react"
 import { AI_MODES, PLANS, type BillingCadence, type PlanId } from "@/lib/billing/catalog"

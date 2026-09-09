@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 
 import { CourseViewer } from "@/components/courses/course-viewer"
 import { LearnerAccessService } from "@/lib/cohorts/access"

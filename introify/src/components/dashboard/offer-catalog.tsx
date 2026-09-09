@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StudioDock } from "@/components/dashboard/studio-dock"

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { Box, Mic, Minus, Plus, Search, ShoppingBag, UtensilsCrossed, X } from "lucide-react"
 import { formatStoredPrice, type DisplayCurrency } from "@/lib/pricing"
 import { whatsappHref } from "@/lib/commerce"

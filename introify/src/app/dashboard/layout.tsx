@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { DashboardLayoutClient } from "@/components/dashboard/dashboard-layout-client"

@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { ShoppingBag } from "lucide-react"
 import { ConfirmOrderButton } from "@/components/dashboard/confirm-order-button"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { useMoney } from "@/components/pricing-provider"
 
 export type MoneyItem = {

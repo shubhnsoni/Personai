@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { prisma } from "@/lib/prisma"
 import { UserAdminButtons } from "@/components/admin/admin-actions"
 import { AdminEmpty, AdminPageHead, AdminPanel, AdminTable } from "@/components/admin/admin-ui"

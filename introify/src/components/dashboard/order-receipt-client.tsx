@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { ReceiptPrinter } from "@/components/shop/receipt-printer"
 import type { ReceiptData } from "@/lib/receipt"
 

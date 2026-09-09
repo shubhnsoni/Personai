@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { getMemberFromSession } from "@/lib/members"
 import { prisma } from "@/lib/prisma"
 import { logoutLibrary } from "@/app/actions/library"

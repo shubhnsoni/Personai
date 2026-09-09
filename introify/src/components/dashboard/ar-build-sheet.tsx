@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { ArrowUpRight, Box, Check, CircleAlert, LoaderCircle, Sparkles } from "lucide-react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { getArStudio, pollArBatch, startArCheckout } from "@/app/actions/ar-builds"

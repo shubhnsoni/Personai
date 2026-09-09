@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { createPortal } from "react-dom"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { Clock3, X } from "lucide-react"
 import { useLiveOrders, type LiveOrder } from "@/components/shop/use-live-order"
 import { cn } from "@/lib/utils"

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState, useTransition } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { Calendar, Copy, Download, Link2, Mail, MessageSquare, Plus, Search, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"

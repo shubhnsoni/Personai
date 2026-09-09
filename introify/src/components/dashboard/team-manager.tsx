@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { createTeamInvitation, removeAccountMember, revokeTeamInvitation, type getTeamManagement } from "@/app/actions/billing-team"

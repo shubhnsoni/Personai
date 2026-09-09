@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { cn } from "@/lib/utils"
 import { IntroifyWordmark } from "./wordmark"
 

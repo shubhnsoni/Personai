@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "@/components/navigation/transition-link"
 import { syncUser } from "@/lib/auth-sync"
 import { AcceptInvitation } from "@/components/dashboard/accept-invitation"
 
