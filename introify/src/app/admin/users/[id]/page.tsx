@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/admin/require-admin"
 import { ImpersonateButton, UserAdminButtons } from "@/components/admin/admin-actions"
 import { formatAdminMoney } from "@/lib/admin/money"
+import { AdminEmpty, AdminPageHead, AdminPanel, AdminRow } from "@/components/admin/admin-ui"
 
 export const dynamic = "force-dynamic"
 
@@ -31,34 +32,29 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
         : { _sum: { amountCents: 0 }, _count: 0 }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <Link href="/admin/users" className="text-xs text-muted-foreground">People</Link>
-                    <h1 className="text-2xl font-semibold tracking-tight">{user.name || user.email}</h1>
-                    <p className="text-sm text-muted-foreground">{user.email} · {user.role} · 7d GMV {formatAdminMoney(gmv._sum.amountCents || 0)}</p>
-                </div>
-                <UserAdminButtons
-                    userId={user.id}
-                    role={user.role}
-                    suspended={user.profiles.some((p) => Boolean(p.suspendedAt))}
-                />
-            </div>
-            <section className="rounded-xl border">
-                <div className="border-b px-4 py-3 text-sm font-medium">Shops</div>
-                <div className="divide-y">
-                    {user.profiles.map((shop) => (
-                        <div key={shop.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                            <Link href={`/admin/shops/${shop.id}`} className="min-w-0 hover:underline">
-                                <span className="block truncate font-medium">{shop.displayName}</span>
-                                <span className="block text-xs text-muted-foreground">/{shop.slug} · {shop.suspendedAt ? "Suspended" : shop.isPublic ? "Public" : "Private"}</span>
-                            </Link>
-                            <ImpersonateButton profileId={shop.id} />
-                        </div>
-                    ))}
-                    {user.profiles.length === 0 ? <p className="px-4 py-8 text-sm text-muted-foreground">No shops.</p> : null}
-                </div>
-            </section>
+        <div className="space-y-5">
+            <AdminPageHead
+                title={user.name || user.email}
+                hint={`${user.email} · ${user.role} · 7d GMV ${formatAdminMoney(gmv._sum.amountCents || 0)}`}
+                action={(
+                    <UserAdminButtons
+                        userId={user.id}
+                        role={user.role}
+                        suspended={user.profiles.some((p) => Boolean(p.suspendedAt))}
+                    />
+                )}
+            />
+            <AdminPanel title="Shops">
+                {user.profiles.length === 0 ? <AdminEmpty>No shops.</AdminEmpty> : user.profiles.map((shop) => (
+                    <AdminRow key={shop.id}>
+                        <Link href={`/admin/shops/${shop.id}`} className="min-w-0 flex-1 hover:underline">
+                            <span className="block truncate font-medium">{shop.displayName}</span>
+                            <span className="block text-xs text-muted-foreground">/{shop.slug} · {shop.suspendedAt ? "Suspended" : shop.isPublic ? "Public" : "Private"}</span>
+                        </Link>
+                        <ImpersonateButton profileId={shop.id} />
+                    </AdminRow>
+                ))}
+            </AdminPanel>
         </div>
     )
 }

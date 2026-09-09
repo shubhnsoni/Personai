@@ -1,44 +1,63 @@
-import Link from "next/link"
-import { BRAND } from "@/lib/brand"
-import { StudioSignOut } from "@/components/dashboard/studio-sign-out"
+"use client"
 
-const LINKS = [
-    { href: "/admin", label: "Today" },
-    { href: "/admin/kits", label: "Kits" },
-    { href: "/admin/money", label: "Money" },
-    { href: "/admin/traffic", label: "Traffic" },
-    { href: "/admin/shops", label: "Shops" },
-    { href: "/admin/users", label: "People" },
-    { href: "/admin/growth", label: "Growth" },
-    { href: "/admin/capacity", label: "Capacity" },
-    { href: "/admin/ai", label: "AI" },
-    { href: "/admin/support", label: "Support" },
-    { href: "/admin/audit", label: "Audit" },
-]
+import { useState, type ReactNode } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Menu } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ModeToggle } from "@/components/mode-toggle"
+import { AdminSidebar } from "@/components/admin/admin-sidebar"
+import { AdminMobileNav } from "@/components/admin/admin-mobile-nav"
+import { adminPageTitle } from "@/components/admin/admin-nav"
 
 export function AdminShell({
     children,
     email,
+    supportCount = 0,
 }: {
-    children: React.ReactNode
+    children: ReactNode
     email?: string | null
+    supportCount?: number
 }) {
+    const pathname = usePathname()
+    const title = adminPageTitle(pathname)
+    const [menuOpen, setMenuOpen] = useState(false)
+
     return (
-        <div className="flex min-h-dvh flex-col bg-background">
-            <header className="flex h-14 items-center gap-4 border-b px-4 md:px-6">
-                <Link href="/admin" className="font-semibold tracking-tight">{BRAND.name}</Link>
-                <nav className="flex min-w-0 flex-1 gap-3 overflow-x-auto text-sm">
-                    {LINKS.map((link) => (
-                        <Link key={link.href} href={link.href} className="shrink-0 text-muted-foreground hover:text-foreground">
-                            {link.label}
+        <div className="studio-shell flex h-dvh overflow-hidden">
+            <AdminSidebar email={email} supportCount={supportCount} />
+            <AdminMobileNav
+                open={menuOpen}
+                onOpenChange={setMenuOpen}
+                email={email}
+                supportCount={supportCount}
+            />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <header className="flex h-12 shrink-0 items-center gap-2 border-b border-white/8 bg-background/70 px-3 backdrop-blur-md md:h-14 md:px-5">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 md:hidden"
+                        onClick={() => setMenuOpen(true)}
+                        aria-label="Open menu"
+                    >
+                        <Menu className="h-4 w-4" />
+                    </Button>
+                    <h1 className="min-w-0 flex-1 truncate text-[15px] font-medium tracking-tight">{title}</h1>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                        <Link
+                            href="/dashboard"
+                            className="inline-flex h-8 items-center rounded-full border border-white/10 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                            Studio
                         </Link>
-                    ))}
-                </nav>
-                <span className="hidden truncate text-xs text-muted-foreground sm:block">{email}</span>
-                <Link href="/dashboard" className="shrink-0 text-xs text-muted-foreground hover:text-foreground">Studio</Link>
-                <StudioSignOut className="h-8 w-auto shrink-0 px-2 text-xs" />
-            </header>
-            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6">{children}</main>
+                        <ModeToggle />
+                    </div>
+                </header>
+                <main className="min-h-0 flex-1 overflow-auto px-3 pt-4 pb-6 md:px-6 md:pt-6 md:pb-8 lg:px-8 lg:py-7">
+                    <div className="mx-auto w-full max-w-6xl">{children}</div>
+                </main>
+            </div>
         </div>
     )
 }

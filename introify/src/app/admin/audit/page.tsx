@@ -1,12 +1,31 @@
-import Link from "next/link"
 import { prisma } from "@/lib/prisma"
-import { requireAdmin } from "@/lib/admin/require-admin"
+import { AdminEmpty, AdminPageHead, AdminPanel, AdminRow } from "@/components/admin/admin-ui"
 
 export const dynamic = "force-dynamic"
 
-export default async function AdminAuditPage() {
-    await requireAdmin()
+const ACTION_LABEL: Record<string, string> = {
+    impersonate_start: "Impersonated a shop",
+    impersonate_stop: "Stopped impersonation",
+    publish: "Published a shop",
+    unpublish: "Unpublished a shop",
+    suspend: "Suspended a shop",
+    unsuspend: "Unsuspended a shop",
+    suspend_user: "Suspended a user",
+    unsuspend_user: "Unsuspended a user",
+    promote_admin: "Made admin",
+    demote_admin: "Demoted admin",
+    ai_settings: "Changed AI settings",
+    shop_ai_override: "Set shop AI override",
+}
+
+export default async function AdminAuditPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ action?: string }>
+}) {
+    const { action } = await searchParams
     const rows = await prisma.auditEvent.findMany({
+        where: action ? { action } : {},
         orderBy: { createdAt: "desc" },
         take: 80,
     })
@@ -22,35 +41,39 @@ export default async function AdminAuditPage() {
     ])
     const email = new Map(actors.map((u) => [u.id, u.email] as const))
     const shop = new Map(shops.map((p) => [p.id, p.displayName] as const))
+    const actions = [...new Set(rows.map((row) => row.action))]
 
     return (
         <div className="space-y-5">
-            <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Platform</p>
-                <h1 className="text-2xl font-semibold tracking-tight">Audit</h1>
-                <p className="text-sm text-muted-foreground">Impersonate, publish, suspend, AI switches, role changes.</p>
-            </div>
-            <div className="divide-y rounded-xl border">
-                {rows.map((row) => (
-                    <div key={row.id} className="flex flex-wrap items-start justify-between gap-2 px-4 py-3 text-sm">
-                        <div className="min-w-0">
-                            <p className="font-medium">{row.action}</p>
-                            <p className="text-xs text-muted-foreground">
+            <AdminPageHead title="Audit" hint="Impersonate, publish, suspend, AI switches, role changes." />
+            {actions.length > 1 ? (
+                <div className="flex flex-wrap gap-2 text-xs">
+                    <a href="/admin/audit" className={!action ? "rounded-full bg-cyan-400/10 px-2.5 py-1 font-medium" : "rounded-full px-2.5 py-1 text-muted-foreground"}>All</a>
+                    {actions.map((name) => (
+                        <a
+                            key={name}
+                            href={`/admin/audit?action=${encodeURIComponent(name)}`}
+                            className={action === name ? "rounded-full bg-cyan-400/10 px-2.5 py-1 font-medium" : "rounded-full px-2.5 py-1 text-muted-foreground"}
+                        >
+                            {ACTION_LABEL[name] || name}
+                        </a>
+                    ))}
+                </div>
+            ) : null}
+            <AdminPanel>
+                {rows.length === 0 ? <AdminEmpty>No audit rows yet.</AdminEmpty> : rows.map((row) => (
+                    <AdminRow key={row.id} href={row.profileId ? `/admin/shops/${row.profileId}` : undefined}>
+                        <span className="min-w-0 flex-1">
+                            <span className="block font-medium">{ACTION_LABEL[row.action] || row.action}</span>
+                            <span className="block text-xs text-muted-foreground">
                                 {email.get(row.actorUserId) || row.actorUserId}
-                                {row.profileId ? (
-                                    <>
-                                        {" · "}
-                                        <Link href={`/admin/shops/${row.profileId}`} className="hover:underline">{shop.get(row.profileId) || row.profileId}</Link>
-                                    </>
-                                ) : null}
-                                {row.meta ? ` · ${row.meta}` : null}
-                            </p>
-                        </div>
-                        <span className="text-xs text-muted-foreground">{row.createdAt.toISOString().replace("T", " ").slice(0, 16)}</span>
-                    </div>
+                                {row.profileId ? ` · ${shop.get(row.profileId) || row.profileId}` : ""}
+                            </span>
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">{row.createdAt.toISOString().replace("T", " ").slice(0, 16)}</span>
+                    </AdminRow>
                 ))}
-                {rows.length === 0 ? <p className="px-4 py-8 text-center text-sm text-muted-foreground">No audit rows yet.</p> : null}
-            </div>
+            </AdminPanel>
         </div>
     )
 }

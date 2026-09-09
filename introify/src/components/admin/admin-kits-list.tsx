@@ -1,4 +1,4 @@
-import { openTryKit } from "@/app/actions/try-kits"
+import { openTryKit, resetTryKit } from "@/app/actions/try-kits"
 import { TRY_KITS } from "@/lib/try-kits"
 import { surfacesFor, leadsNavLabel, salesNavLabel, shopNavLabel } from "@/lib/surfaces"
 
@@ -27,7 +27,7 @@ export function AdminKitsList({
     owned,
     activeId,
 }: {
-    owned: Array<{ id: string; roleTemplate: string | null }>
+    owned: Array<{ id: string; slug?: string; roleTemplate: string | null }>
     activeId?: string | null
 }) {
     const byRole = new Map(owned.map((p) => [p.roleTemplate, p]))
@@ -69,8 +69,8 @@ export function AdminKitsList({
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="mt-3 flex gap-2">
-                                        <form action={openTryKit} className="flex-1">
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <form action={openTryKit} className="min-w-[5.5rem] flex-1">
                                             <input type="hidden" name="role" value={kit.role} />
                                             <button type="submit" className="h-9 w-full rounded-full bg-foreground text-xs font-medium text-background">
                                                 Studio
@@ -78,10 +78,28 @@ export function AdminKitsList({
                                         </form>
                                         <a
                                             href={`/qa/onboard?role=${kit.role}`}
-                                            className="inline-flex h-9 flex-1 items-center justify-center rounded-full border border-border/70 text-xs font-medium"
+                                            className="inline-flex h-9 min-w-[5.5rem] flex-1 items-center justify-center rounded-full border border-border/70 text-xs font-medium"
                                         >
                                             Onboarding
                                         </a>
+                                        {existing ? (
+                                            <>
+                                                <a
+                                                    href={`/${existing.slug ?? kit.slug}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex h-9 items-center justify-center rounded-full border border-border/70 px-3 text-xs font-medium"
+                                                >
+                                                    Live
+                                                </a>
+                                                <form action={resetTryKit}>
+                                                    <input type="hidden" name="role" value={kit.role} />
+                                                    <button type="submit" className="h-9 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground">
+                                                        Reset
+                                                    </button>
+                                                </form>
+                                            </>
+                                        ) : null}
                                     </div>
                                 </div>
                             )

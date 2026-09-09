@@ -1,4 +1,3 @@
-import { requireAdmin } from "@/lib/admin/require-admin"
 import {
     TIER_COPY,
     dependencyHealth,
@@ -8,12 +7,11 @@ import {
     suggestedTier,
 } from "@/lib/admin/capacity"
 import { prisma } from "@/lib/prisma"
-import { AdminStat } from "@/components/admin/admin-stat"
+import { AdminKpi, AdminKpiStrip, AdminPageHead, AdminPanel, AdminRow, AdminStatus } from "@/components/admin/admin-ui"
 
 export const dynamic = "force-dynamic"
 
 export default async function AdminCapacityPage() {
-    await requireAdmin()
     const [snap, health, checks, samples] = await Promise.all([
         measureCapacity(),
         dependencyHealth(),
@@ -35,59 +33,47 @@ export default async function AdminCapacityPage() {
     ]
 
     return (
-        <div className="space-y-6">
-            <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Platform</p>
-                <h1 className="text-2xl font-semibold tracking-tight">Capacity</h1>
-                <p className="text-sm text-muted-foreground">Health, current load, launch checklist, and what to buy when the band goes warm or hot.</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <AdminStat label="Band" value={snap.band.toUpperCase()} hint={`DB ${snap.dbMs}ms`} />
-                <AdminStat label="Live visitors" value={String(snap.liveVisitors)} hint={`heartbeat ~${snap.heartbeatQps.toFixed(1)}/s`} />
-                <AdminStat label="Poll load" value={`${snap.pollQps.toFixed(1)}/s`} hint={`live chat ${snap.liveChatPollQps.toFixed(1)} · orders ${snap.orderPollQps.toFixed(1)}`} />
-                <AdminStat label="LLM 5m" value={String(snap.llmCalls5m)} hint={snap.llmP95Ms != null ? `p95 ${snap.llmP95Ms}ms · ${snap.llmErrors5m} fail` : "no calls"} />
-            </div>
-            <section className="rounded-xl border p-4">
-                <h2 className="text-sm font-medium">Dependencies</h2>
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="space-y-5">
+            <AdminPageHead title="Capacity" hint="Health, current load, launch checklist, and what to buy when the band goes warm or hot." />
+            <AdminKpiStrip columns={4}>
+                <AdminKpi title="Band" value={snap.band.toUpperCase()} subtitle={`DB ${snap.dbMs}ms`} hot={snap.band !== "ok"} />
+                <AdminKpi title="Live visitors" value={snap.liveVisitors} subtitle={`heartbeat ~${snap.heartbeatQps.toFixed(1)}/s`} />
+                <AdminKpi title="Poll load" value={`${snap.pollQps.toFixed(1)}/s`} subtitle={`live chat ${snap.liveChatPollQps.toFixed(1)} · orders ${snap.orderPollQps.toFixed(1)}`} />
+                <AdminKpi title="LLM 5m" value={snap.llmCalls5m} subtitle={snap.llmP95Ms != null ? `p95 ${snap.llmP95Ms}ms · ${snap.llmErrors5m} fail` : "no calls"} />
+            </AdminKpiStrip>
+            <AdminPanel title="Dependencies">
+                <div className="grid gap-1 sm:grid-cols-2">
                     {deps.map((row) => (
-                        <li key={row.label} className="flex justify-between gap-2 text-sm">
-                            <span>{row.ok ? "●" : "○"} {row.label}</span>
-                            <span className="truncate text-xs text-muted-foreground">{row.hint || (row.ok ? "ok" : "missing")}</span>
-                        </li>
+                        <AdminRow key={row.label}>
+                            <AdminStatus ok={row.ok} label={row.label} />
+                            <span className="ml-auto truncate text-xs text-muted-foreground">{row.hint || (row.ok ? "ok" : "missing")}</span>
+                        </AdminRow>
                     ))}
-                </ul>
-            </section>
-            <section className="rounded-xl border p-4">
-                <h2 className="text-sm font-medium">Server setup requirements</h2>
-                <ul className="mt-3 space-y-1.5 text-sm">
-                    {checks.map((row) => (
-                        <li key={row.id} className={row.ok ? "text-foreground" : "text-muted-foreground"}>
-                            {row.ok ? "●" : "○"} {row.label}
-                            {row.hint ? <span className="ml-2 text-xs text-muted-foreground">{row.hint}</span> : null}
-                        </li>
-                    ))}
-                </ul>
-            </section>
-            <section className="rounded-xl border p-4">
-                <h2 className="text-sm font-medium">{copy.title}</h2>
-                <p className="mt-1 text-xs text-muted-foreground">Suggested from the current band. Tune after you have real samples.</p>
-                <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
+                </div>
+            </AdminPanel>
+            <AdminPanel title="Server setup">
+                {checks.map((row) => (
+                    <AdminRow key={row.id}>
+                        <AdminStatus ok={row.ok} label={row.label} />
+                        {row.hint ? <span className="ml-auto truncate text-xs text-muted-foreground">{row.hint}</span> : null}
+                    </AdminRow>
+                ))}
+            </AdminPanel>
+            <AdminPanel title={copy.title}>
+                <p className="px-4 pt-3 text-xs text-muted-foreground">Suggested from the current band. Tune after you have real samples.</p>
+                <ul className="space-y-1 px-4 py-3 text-sm">
                     {copy.items.map((item) => <li key={item}>{item}</li>)}
                 </ul>
-            </section>
+            </AdminPanel>
             {samples.length > 0 ? (
-                <section className="rounded-xl border p-4">
-                    <h2 className="text-sm font-medium">Recent samples</h2>
-                    <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                        {samples.map((row) => (
-                            <li key={row.id} className="flex justify-between gap-2">
-                                <span>{row.at.toISOString().replace("T", " ").slice(0, 16)}</span>
-                                <span>{row.band} · {row.liveVisitors} live · DB {row.dbMs}ms</span>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
+                <AdminPanel title="Recent samples">
+                    {samples.map((row) => (
+                        <AdminRow key={row.id}>
+                            <span className="flex-1 text-xs text-muted-foreground">{row.at.toISOString().replace("T", " ").slice(0, 16)}</span>
+                            <span className="text-xs">{row.band} · {row.liveVisitors} live · DB {row.dbMs}ms</span>
+                        </AdminRow>
+                    ))}
+                </AdminPanel>
             ) : null}
         </div>
     )

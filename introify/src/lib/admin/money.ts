@@ -70,6 +70,25 @@ export async function moneyTotals(since?: Date, kinds: MoneyKind[] = CONSUMER_KI
     return { amountCents: agg._sum.amountCents || 0, count }
 }
 
+export async function moneyTotalsByCurrency(since?: Date, kinds: MoneyKind[] = CONSUMER_KINDS) {
+    const where = {
+        kind: { in: kinds },
+        ...PAID,
+        ...(since ? { createdAt: { gte: since } } : {}),
+    }
+    const rows = await prisma.moneyEvent.groupBy({
+        by: ["currency"],
+        where,
+        _sum: { amountCents: true },
+        _count: true,
+    }).catch((): Array<{ currency: string; _sum: { amountCents: number | null }; _count: number }> => [])
+    return rows.map((row) => ({
+        currency: (row.currency || "USD").toUpperCase(),
+        amountCents: row._sum.amountCents || 0,
+        count: row._count,
+    }))
+}
+
 export async function backfillMoneyEvents() {
     const existing = await prisma.moneyEvent.count().catch(() => -1)
     if (existing !== 0) return existing

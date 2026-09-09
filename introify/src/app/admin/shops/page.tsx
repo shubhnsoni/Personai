@@ -1,10 +1,12 @@
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
-import { requireAdmin } from "@/lib/admin/require-admin"
 import { shopSetupChecks } from "@/lib/admin/setup-score"
 import { formatAdminMoney, shopPipeline } from "@/lib/admin/money"
+import { AdminEmpty, AdminPageHead, AdminPanel, AdminTable } from "@/components/admin/admin-ui"
 
 export const dynamic = "force-dynamic"
+
+const PAGE_SIZE = 40
 
 const FILTERS = [
     { id: "", label: "All" },
@@ -12,39 +14,51 @@ const FILTERS = [
     { id: "selling", label: "Selling" },
     { id: "silent", label: "Silent" },
     { id: "dormant", label: "Dormant" },
+    { id: "setup", label: "Setup" },
+    { id: "suspended", label: "Suspended" },
 ]
+
+function shopsHref(input: { q?: string; filter?: string; page?: number }) {
+    const params = new URLSearchParams()
+    if (input.q) params.set("q", input.q)
+    if (input.filter) params.set("filter", input.filter)
+    if (input.page && input.page > 1) params.set("page", String(input.page))
+    const qs = params.toString()
+    return qs ? `/admin/shops?${qs}` : "/admin/shops"
+}
 
 export default async function AdminShopsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ q?: string; filter?: string; qa?: string }>
+    searchParams: Promise<{ q?: string; filter?: string; page?: string }>
 }) {
-    await requireAdmin()
-    const { q, filter, qa } = await searchParams
-    const showQa = qa === "1"
+    const { q, filter, page: pageRaw } = await searchParams
     const query = q?.trim() || ""
+    const page = Math.max(1, Number(pageRaw) || 1)
     const day = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     const fortnight = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+    const where = {
+        slug: { not: { startsWith: "try-" } },
+        ...(query
+            ? {
+                OR: [
+                    { slug: { contains: query, mode: "insensitive" as const } },
+                    { displayName: { contains: query, mode: "insensitive" as const } },
+                    { user: { email: { contains: query, mode: "insensitive" as const } } },
+                ],
+            }
+            : {}),
+    }
     const shops = await prisma.profile.findMany({
-        where: {
-            ...(showQa ? {} : { slug: { not: { startsWith: "try-" } } }),
-            ...(query
-                ? {
-                    OR: [
-                        { slug: { contains: query, mode: "insensitive" } },
-                        { displayName: { contains: query, mode: "insensitive" } },
-                        { user: { email: { contains: query, mode: "insensitive" } } },
-                    ],
-                }
-                : {}),
-        },
+        where,
         include: {
             user: { select: { email: true } },
             _count: { select: { digitalProducts: true, conversations: true } },
         },
         orderBy: { updatedAt: "desc" },
-        take: 80,
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
     })
     const ids = shops.map((s) => s.id)
     type SumRow = { profileId: string; _sum: { amountCents: number | null } }
@@ -72,7 +86,7 @@ export default async function AdminShopsPage({
             where: { profileId: { in: ids }, startedAt: { gte: week } },
             _count: true,
         }).catch((): CountRow[] => emptyCount) : emptyCount,
-        prisma.profile.count({ where: showQa ? {} : { slug: { not: { startsWith: "try-" } } } }),
+        prisma.profile.count({ where }),
     ])
     const gmvMap = new Map(gmv24.map((r) => [r.profileId, r._sum.amountCents || 0] as const))
     const paid7 = new Map(gmv7.map((r) => [r.profileId, r._count] as const))
@@ -101,59 +115,53 @@ export default async function AdminShopsPage({
 
     return (
         <div className="space-y-5">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Platform</p>
-                    <h1 className="text-2xl font-semibold tracking-tight">Shops</h1>
-                    <p className="text-sm text-muted-foreground">{total} total</p>
-                </div>
-                <form className="flex gap-2">
-                    <input name="q" defaultValue={query} placeholder="Search email or slug" className="h-9 rounded-md border bg-background px-3 text-sm" />
-                    <button className="h-9 rounded-md border px-3 text-sm" type="submit">Search</button>
-                </form>
-            </div>
-            <div className="flex flex-wrap gap-3 text-xs">
+            <AdminPageHead
+                title="Shops"
+                hint={`${total} tenants`}
+                action={(
+                    <form className="flex gap-2">
+                        {filter ? <input type="hidden" name="filter" value={filter} /> : null}
+                        <input name="q" defaultValue={query} placeholder="Search email or slug" className="h-8 rounded-full border border-white/10 bg-transparent px-3 text-xs" />
+                        <button className="h-8 rounded-full border border-white/10 px-3 text-xs" type="submit">Search</button>
+                    </form>
+                )}
+            />
+            <div className="flex flex-wrap gap-2 text-xs">
                 {FILTERS.map((item) => (
                     <Link
                         key={item.id || "all"}
-                        href={item.id ? `/admin/shops?filter=${item.id}` : "/admin/shops"}
-                        className={filter === item.id || (!filter && !item.id) ? "font-medium" : "text-muted-foreground"}
+                        href={shopsHref({ q: query, filter: item.id || undefined })}
+                        className={filter === item.id || (!filter && !item.id)
+                            ? "rounded-full bg-cyan-400/10 px-2.5 py-1 font-medium text-foreground"
+                            : "rounded-full px-2.5 py-1 text-muted-foreground hover:text-foreground"}
                     >
                         {item.label}
                     </Link>
                 ))}
-                <Link href={showQa ? "/admin/shops" : "/admin/shops?qa=1"} className={showQa ? "font-medium" : "text-muted-foreground"}>
-                    {showQa ? "Hide try-kits" : "Show try-kits"}
-                </Link>
             </div>
-            <div className="overflow-hidden rounded-xl border">
-                <table className="w-full text-sm">
-                    <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
-                        <tr>
-                            <th className="px-3 py-2 font-medium">Shop</th>
-                            <th className="px-3 py-2 font-medium">Owner</th>
-                            <th className="px-3 py-2 font-medium">Setup</th>
-                            <th className="px-3 py-2 font-medium">24h GMV</th>
-                            <th className="px-3 py-2 font-medium">Pipeline</th>
+            <AdminPanel>
+                <AdminTable columns={["Shop", "Owner", "Setup", "24h GMV", "Pipeline"]}>
+                    {rows.map(({ shop, setup, pipeline, gmv }) => (
+                        <tr key={shop.id} className="border-t border-white/8">
+                            <td className="px-4 py-2.5">
+                                <Link href={`/admin/shops/${shop.id}`} className="font-medium hover:underline">{shop.displayName}</Link>
+                                <p className="text-xs text-muted-foreground">/{shop.slug}</p>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs">{shop.user.email}</td>
+                            <td className="px-4 py-2.5 text-xs tabular-nums">{setup.score}%</td>
+                            <td className="px-4 py-2.5 text-xs tabular-nums">{gmv ? formatAdminMoney(gmv) : "—"}</td>
+                            <td className="px-4 py-2.5 text-xs">{shop.suspendedAt ? "suspended" : pipeline}</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {rows.map(({ shop, setup, pipeline, gmv }) => (
-                            <tr key={shop.id} className="border-t">
-                                <td className="px-3 py-2">
-                                    <Link href={`/admin/shops/${shop.id}`} className="font-medium hover:underline">{shop.displayName}</Link>
-                                    <p className="text-xs text-muted-foreground">/{shop.slug}</p>
-                                </td>
-                                <td className="px-3 py-2 text-xs">{shop.user.email}</td>
-                                <td className="px-3 py-2 text-xs">{setup.score}%</td>
-                                <td className="px-3 py-2 text-xs">{gmv ? formatAdminMoney(gmv) : "—"}</td>
-                                <td className="px-3 py-2 text-xs">{shop.suspendedAt ? "suspended" : pipeline}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {rows.length === 0 ? <p className="px-3 py-8 text-center text-sm text-muted-foreground">No shops.</p> : null}
-            </div>
+                    ))}
+                </AdminTable>
+                {rows.length === 0 ? <AdminEmpty>No shops.</AdminEmpty> : null}
+            </AdminPanel>
+            {total > PAGE_SIZE ? (
+                <div className="flex justify-end gap-2 text-xs">
+                    {page > 1 ? <Link href={shopsHref({ q: query, filter, page: page - 1 })} className="text-muted-foreground hover:text-foreground">Previous</Link> : null}
+                    {page * PAGE_SIZE < total ? <Link href={shopsHref({ q: query, filter, page: page + 1 })} className="text-muted-foreground hover:text-foreground">Next</Link> : null}
+                </div>
+            ) : null}
         </div>
     )
 }

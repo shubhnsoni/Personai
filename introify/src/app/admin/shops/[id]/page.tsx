@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/admin/require-admin"
 import { shopSetupChecks } from "@/lib/admin/setup-score"
 import { ImpersonateButton, ShopAdminButtons, ShopAiOverrideSelect } from "@/components/admin/admin-actions"
 import { formatAdminMoney } from "@/lib/admin/money"
+import { AdminEmpty, AdminPageHead, AdminPanel, AdminRow, AdminStatus } from "@/components/admin/admin-ui"
 
 export const dynamic = "force-dynamic"
 
@@ -39,61 +40,48 @@ export default async function AdminShopPage({ params }: { params: Promise<{ id: 
     ])
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <Link href="/admin/shops" className="text-xs text-muted-foreground">Shops</Link>
-                    <h1 className="text-2xl font-semibold tracking-tight">{shop.displayName}</h1>
-                    <p className="text-sm text-muted-foreground">{shop.user.email} · /{shop.slug} · {shop.roleTemplate}</p>
-                </div>
-                <ShopAdminButtons profileId={shop.id} isPublic={shop.isPublic} suspended={Boolean(shop.suspendedAt)} />
-            </div>
+        <div className="space-y-5">
+            <AdminPageHead
+                title={shop.displayName}
+                hint={`${shop.user.email} · /${shop.slug} · ${shop.roleTemplate}`}
+                action={<ShopAdminButtons profileId={shop.id} isPublic={shop.isPublic} suspended={Boolean(shop.suspendedAt)} />}
+            />
             <div className="grid gap-4 md:grid-cols-2">
-                <section className="rounded-xl border p-4">
-                    <h2 className="text-sm font-medium">Setup {setup.score}%</h2>
-                    <ul className="mt-3 space-y-1.5 text-sm">
-                        {setup.checks.map((check) => (
-                            <li key={check.id} className={check.ok ? "text-foreground" : "text-muted-foreground"}>
-                                {check.ok ? "●" : "○"} {check.label}
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-                <section className="space-y-3 rounded-xl border p-4">
-                    <h2 className="text-sm font-medium">AI</h2>
-                    <p className="text-xs text-muted-foreground">Model on the shop: {shop.aiModel}. Provider override is yours.</p>
-                    <ShopAiOverrideSelect profileId={shop.id} value={shop.aiProviderOverride} />
-                    <p className="text-xs text-muted-foreground">{live} visitor{live === 1 ? "" : "s"} live now · 24h GMV {formatAdminMoney(gmv._sum.amountCents || 0)}</p>
-                    <div className="flex gap-2">
-                        <Link href={`/${shop.slug}`} className="text-xs underline" target="_blank">Open public page</Link>
-                        <ImpersonateButton profileId={shop.id} href="/dashboard/inbox" label="Inbox" />
+                <AdminPanel title={`Setup ${setup.score}%`}>
+                    {setup.checks.map((check) => (
+                        <AdminRow key={check.id}>
+                            <AdminStatus ok={check.ok} label={check.label} />
+                        </AdminRow>
+                    ))}
+                </AdminPanel>
+                <AdminPanel title="AI">
+                    <div className="space-y-3 px-4 py-3">
+                        <p className="text-xs text-muted-foreground">Model on the shop: {shop.aiModel}. Provider override is yours.</p>
+                        <ShopAiOverrideSelect profileId={shop.id} value={shop.aiProviderOverride} />
+                        <p className="text-xs text-muted-foreground">{live} visitor{live === 1 ? "" : "s"} live now · 24h GMV {formatAdminMoney(gmv._sum.amountCents || 0)}</p>
+                        <div className="flex gap-2">
+                            <Link href={`/${shop.slug}`} className="text-xs underline" target="_blank">Open public page</Link>
+                            <ImpersonateButton profileId={shop.id} href="/dashboard/inbox" label="Inbox" />
+                        </div>
                     </div>
-                </section>
+                </AdminPanel>
             </div>
-            <section className="rounded-xl border p-4">
-                <h2 className="text-sm font-medium">Money tape</h2>
-                <div className="mt-2 divide-y">
-                    {tape.map((row) => (
-                        <div key={row.id} className="flex justify-between py-2 text-sm">
-                            <span>{row.kind} · {row.payMethod || "—"}</span>
-                            <span className="text-xs text-muted-foreground">{formatAdminMoney(row.amountCents, row.currency)}</span>
-                        </div>
-                    ))}
-                    {tape.length === 0 ? <p className="py-4 text-sm text-muted-foreground">No money events.</p> : null}
-                </div>
-            </section>
-            <section className="rounded-xl border p-4">
-                <h2 className="text-sm font-medium">Recent chats</h2>
-                <div className="mt-2 divide-y">
-                    {shop.conversations.map((row) => (
-                        <div key={row.id} className="flex justify-between py-2 text-sm">
-                            <span>{row.visitorName || "Visitor"}</span>
-                            <span className="text-xs text-muted-foreground">{row.mode}</span>
-                        </div>
-                    ))}
-                    {shop.conversations.length === 0 ? <p className="py-4 text-sm text-muted-foreground">No chats yet.</p> : null}
-                </div>
-            </section>
+            <AdminPanel title="Money tape">
+                {tape.length === 0 ? <AdminEmpty>No money events.</AdminEmpty> : tape.map((row) => (
+                    <AdminRow key={row.id}>
+                        <span className="flex-1">{row.kind} · {row.payMethod || "—"}</span>
+                        <span className="text-xs text-muted-foreground">{formatAdminMoney(row.amountCents, row.currency)}</span>
+                    </AdminRow>
+                ))}
+            </AdminPanel>
+            <AdminPanel title="Recent chats">
+                {shop.conversations.length === 0 ? <AdminEmpty>No chats yet.</AdminEmpty> : shop.conversations.map((row) => (
+                    <AdminRow key={row.id}>
+                        <span className="flex-1">{row.visitorName || "Visitor"}</span>
+                        <span className="text-xs text-muted-foreground">{row.mode}</span>
+                    </AdminRow>
+                ))}
+            </AdminPanel>
         </div>
     )
 }

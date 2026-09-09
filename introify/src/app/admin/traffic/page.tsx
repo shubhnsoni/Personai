@@ -1,6 +1,5 @@
-import Link from "next/link"
 import { prisma } from "@/lib/prisma"
-import { requireAdmin } from "@/lib/admin/require-admin"
+import { AdminEmpty, AdminKpi, AdminKpiStrip, AdminPageHead, AdminPanel, AdminRow } from "@/components/admin/admin-ui"
 
 export const dynamic = "force-dynamic"
 
@@ -12,7 +11,6 @@ function median(values: number[]) {
 }
 
 export default async function AdminTrafficPage() {
-    await requireAdmin()
     const liveSince = new Date(Date.now() - 2 * 60 * 1000)
     const day = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -61,59 +59,59 @@ export default async function AdminTrafficPage() {
     const eventMap = Object.fromEntries(events.map((e) => [e.name, e._count]))
     const medianDwell = median(dwell.map((d) => d.ms || 0))
 
+    const funnel = [
+        { label: "Land", n: eventMap.visit || dayCount },
+        { label: "Shop", n: eventMap.shop_view || 0 },
+        { label: "PDP", n: eventMap.pdp_view || 0 },
+        { label: "Chat", n: eventMap.chat_open || 0 },
+        { label: "WA", n: eventMap.wa_tap || 0 },
+    ]
+    const funnelMax = Math.max(...funnel.map((step) => step.n), 1)
+
     return (
-        <div className="space-y-6">
-            <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Platform</p>
-                <h1 className="text-2xl font-semibold tracking-tight">Traffic</h1>
-                <p className="text-sm text-muted-foreground">
-                    {liveCount} live · {dayCount} sessions 24h · {weekCount} / 7d · median dwell {Math.round(medianDwell / 1000)}s
-                </p>
-            </div>
-            <section className="rounded-xl border p-4">
-                <h2 className="text-sm font-medium">Funnel 24h</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    land {eventMap.visit || dayCount} → shop {eventMap.shop_view || 0} → PDP {eventMap.pdp_view || 0} → chat {eventMap.chat_open || 0} → WA {eventMap.wa_tap || 0} · live {eventMap.live_requested || 0}
-                </p>
-            </section>
-            <section className="rounded-xl border p-4">
-                <h2 className="text-sm font-medium">Live now</h2>
-                <div className="mt-2 divide-y">
-                    {live.map((row) => (
-                        <div key={row.id} className="flex justify-between gap-3 py-2 text-sm">
-                            <Link href={`/admin/shops/${row.profileId}`} className="font-medium hover:underline">{row.profile.displayName}</Link>
-                            <Link
-                                href={`/admin/visitors/${encodeURIComponent(row.visitorId)}?shop=${row.profileId}`}
-                                className="truncate text-xs text-muted-foreground hover:underline"
-                            >
-                                {row.pages[0]?.path || row.landPath || "/"} · {row.country || row.device || "—"}
-                            </Link>
+        <div className="space-y-5">
+            <AdminPageHead title="Traffic" hint={`${liveCount} live · ${dayCount} sessions 24h · ${weekCount} / 7d · median dwell ${Math.round(medianDwell / 1000)}s`} />
+            <AdminKpiStrip columns={4}>
+                <AdminKpi title="Live" value={liveCount} />
+                <AdminKpi title="24h sessions" value={dayCount} />
+                <AdminKpi title="7d sessions" value={weekCount} />
+                <AdminKpi title="Median dwell" value={`${Math.round(medianDwell / 1000)}s`} />
+            </AdminKpiStrip>
+            <AdminPanel title="Funnel 24h">
+                <div className="grid grid-cols-5 gap-2 px-4 py-3">
+                    {funnel.map((step) => (
+                        <div key={step.label} className="min-w-0">
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{step.label}</p>
+                            <p className="text-sm font-semibold tabular-nums">{step.n}</p>
+                            <div className="mt-2 h-1 rounded-full bg-white/8">
+                                <div className="h-1 rounded-full bg-[#00D7FF]" style={{ width: `${Math.round((step.n / funnelMax) * 100)}%` }} />
+                            </div>
                         </div>
                     ))}
-                    {live.length === 0 ? <p className="py-4 text-sm text-muted-foreground">Nobody on a public page right now.</p> : null}
                 </div>
-            </section>
+            </AdminPanel>
+            <AdminPanel title="Live now">
+                {live.length === 0 ? <AdminEmpty>Nobody on a public page right now.</AdminEmpty> : live.map((row) => (
+                    <AdminRow key={row.id} href={`/admin/visitors/${encodeURIComponent(row.visitorId)}?shop=${row.profileId}`}>
+                        <span className="flex-1 truncate font-medium">{row.profile.displayName}</span>
+                        <span className="truncate text-xs text-muted-foreground">{row.pages[0]?.path || row.landPath || "/"} · {row.country || row.device || "—"}</span>
+                    </AdminRow>
+                ))}
+            </AdminPanel>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Top title="Paths" rows={byPath} />
                 <Top title="Referrers" rows={byRef} />
                 <Top title="Countries" rows={byCountry} />
                 <Top title="UTM" rows={byUtm} />
             </div>
-            <section className="rounded-xl border p-4">
-                <h2 className="text-sm font-medium">Recent sessions</h2>
-                <div className="mt-2 divide-y">
-                    {recent.slice(0, 20).map((row) => (
-                        <Link
-                            key={row.id}
-                            href={`/admin/visitors/${encodeURIComponent(row.visitorId)}?shop=${row.profileId}`}
-                            className="flex justify-between gap-3 py-2 text-sm hover:bg-muted/30"
-                        >
-                            <span className="truncate">{row.profile.displayName} · {row.pages[0]?.path || row.landPath || "/"}</span>
-                            <span className="shrink-0 text-xs text-muted-foreground">{row.utmSource || row.referrerHost || row.country || "direct"}</span>
-                        </Link>
-                    ))}
-                </div>
-            </section>
+            <AdminPanel title="Recent sessions">
+                {recent.length === 0 ? <AdminEmpty>No sessions in the last 24 hours.</AdminEmpty> : recent.slice(0, 20).map((row) => (
+                    <AdminRow key={row.id} href={`/admin/visitors/${encodeURIComponent(row.visitorId)}?shop=${row.profileId}`}>
+                        <span className="min-w-0 flex-1 truncate">{row.profile.displayName} · {row.pages[0]?.path || row.landPath || "/"}</span>
+                        <span className="text-xs text-muted-foreground">{row.utmSource || row.referrerHost || row.country || "direct"}</span>
+                    </AdminRow>
+                ))}
+            </AdminPanel>
         </div>
     )
 }
@@ -121,17 +119,13 @@ export default async function AdminTrafficPage() {
 function Top({ title, rows }: { title: string; rows: Record<string, number> }) {
     const list = Object.entries(rows).sort((a, b) => b[1] - a[1]).slice(0, 8)
     return (
-        <section className="rounded-xl border p-4">
-            <h2 className="text-sm font-medium">{title}</h2>
-            <ul className="mt-2 space-y-1 text-sm">
-                {list.map(([key, n]) => (
-                    <li key={key} className="flex justify-between gap-2">
-                        <span className="truncate">{key}</span>
-                        <span className="text-muted-foreground">{n}</span>
-                    </li>
-                ))}
-                {list.length === 0 ? <li className="text-muted-foreground">No data yet.</li> : null}
-            </ul>
-        </section>
+        <AdminPanel title={title}>
+            {list.length === 0 ? <AdminEmpty>No data yet.</AdminEmpty> : list.map(([key, n]) => (
+                <AdminRow key={key}>
+                    <span className="min-w-0 flex-1 truncate">{key}</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{n}</span>
+                </AdminRow>
+            ))}
+        </AdminPanel>
     )
 }

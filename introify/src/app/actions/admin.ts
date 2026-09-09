@@ -22,7 +22,9 @@ async function audit(actorUserId: string, action: string, profileId?: string | n
             profileId: profileId || null,
             meta: meta ? JSON.stringify(meta).slice(0, 2000) : null,
         },
-    }).catch(() => {})
+    }).catch((err) => {
+        console.error("audit write failed", action, err)
+    })
 }
 
 export async function unpublishShop(profileId: string) {

@@ -15,6 +15,7 @@ import {
     unsuspendUser,
 } from "@/app/actions/admin"
 import { Button } from "@/components/ui/button"
+import { AdminConfirm } from "@/components/admin/admin-confirm"
 
 export function ImpersonateButton({
     profileId,
@@ -59,14 +60,24 @@ export function ShopAdminButtons({
                     Unsuspend
                 </Button>
             ) : (
-                <Button size="sm" variant="outline" disabled={pending} onClick={() => start(() => suspendShop(profileId))}>
-                    Suspend
-                </Button>
+                <AdminConfirm
+                    title="Suspend this shop?"
+                    description="The public page goes down until you unsuspend it."
+                    confirmLabel="Suspend"
+                    onConfirm={() => suspendShop(profileId)}
+                >
+                    <Button size="sm" variant="outline" disabled={pending}>Suspend</Button>
+                </AdminConfirm>
             )}
             {isPublic ? (
-                <Button size="sm" variant="outline" disabled={pending} onClick={() => start(() => unpublishShop(profileId))}>
-                    Unpublish
-                </Button>
+                <AdminConfirm
+                    title="Unpublish this shop?"
+                    description="Visitors will see Profile Not Found until you publish again."
+                    confirmLabel="Unpublish"
+                    onConfirm={() => unpublishShop(profileId)}
+                >
+                    <Button size="sm" variant="outline" disabled={pending}>Unpublish</Button>
+                </AdminConfirm>
             ) : (
                 <Button size="sm" variant="outline" disabled={pending || suspended} onClick={() => start(() => publishShop(profileId))}>
                     Publish
@@ -130,9 +141,14 @@ export function UserAdminButtons({
     return (
         <div className="flex flex-wrap gap-2">
             {role === "ADMIN" ? (
-                <Button size="sm" variant="outline" disabled={pending} onClick={() => start(() => setUserRole(userId, "CREATOR"))}>
-                    Demote
-                </Button>
+                <AdminConfirm
+                    title="Demote this admin?"
+                    description="They will lose /admin. Allowlisted emails cannot be demoted."
+                    confirmLabel="Demote"
+                    onConfirm={() => setUserRole(userId, "CREATOR")}
+                >
+                    <Button size="sm" variant="outline" disabled={pending}>Demote</Button>
+                </AdminConfirm>
             ) : (
                 <Button size="sm" variant="outline" disabled={pending} onClick={() => start(() => setUserRole(userId, "ADMIN"))}>
                     Make admin
@@ -143,9 +159,14 @@ export function UserAdminButtons({
                     Unsuspend shops
                 </Button>
             ) : (
-                <Button size="sm" variant="outline" disabled={pending} onClick={() => start(() => suspendUser(userId))}>
-                    Suspend shops
-                </Button>
+                <AdminConfirm
+                    title="Suspend all shops for this user?"
+                    description="Every public page they own will go down."
+                    confirmLabel="Suspend shops"
+                    onConfirm={() => suspendUser(userId)}
+                >
+                    <Button size="sm" variant="outline" disabled={pending}>Suspend shops</Button>
+                </AdminConfirm>
             )}
         </div>
     )

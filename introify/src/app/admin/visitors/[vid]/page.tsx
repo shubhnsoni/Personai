@@ -1,6 +1,5 @@
-import Link from "next/link"
 import { prisma } from "@/lib/prisma"
-import { requireAdmin } from "@/lib/admin/require-admin"
+import { AdminEmpty, AdminPageHead, AdminPanel, AdminRow } from "@/components/admin/admin-ui"
 
 export const dynamic = "force-dynamic"
 
@@ -11,7 +10,6 @@ export default async function AdminVisitorPage({
     params: Promise<{ vid: string }>
     searchParams: Promise<{ shop?: string }>
 }) {
-    await requireAdmin()
     const { vid } = await params
     const { shop } = await searchParams
     const visitorId = decodeURIComponent(vid)
@@ -38,44 +36,31 @@ export default async function AdminVisitorPage({
     const shopName = sessions[0]?.profile.displayName
 
     return (
-        <div className="space-y-6">
-            <div>
-                <Link href="/admin/traffic" className="text-xs text-muted-foreground">Traffic</Link>
-                <h1 className="text-2xl font-semibold tracking-tight">Visitor</h1>
-                <p className="text-sm text-muted-foreground">{visitorId.slice(0, 12)}… {shopName ? `· ${shopName}` : ""}</p>
-            </div>
+        <div className="space-y-5">
+            <AdminPageHead title="Visitor" hint={`${visitorId.slice(0, 12)}…${shopName ? ` · ${shopName}` : ""}`} />
             {sessions.map((session) => (
-                <section key={session.id} className="rounded-xl border p-4">
-                    <div className="flex justify-between gap-3 text-sm">
-                        <Link href={`/admin/shops/${session.profileId}`} className="font-medium hover:underline">{session.profile.displayName}</Link>
-                        <span className="text-xs text-muted-foreground">{session.device || "—"} · {session.country || "—"} · {session.utmSource || session.referrerHost || "direct"}</span>
-                    </div>
-                    <ol className="mt-3 space-y-1 text-sm">
-                        {session.pages.map((page) => (
-                            <li key={page.id} className="flex justify-between gap-2">
-                                <span className="truncate">{page.path}</span>
-                                <span className="text-xs text-muted-foreground">{page.ms != null ? `${Math.round(page.ms / 1000)}s` : "open"}</span>
-                            </li>
-                        ))}
-                        {session.pages.length === 0 ? <li className="text-muted-foreground">No pageviews stored.</li> : null}
-                    </ol>
-                </section>
-            ))}
-            <section className="rounded-xl border p-4">
-                <h2 className="text-sm font-medium">Named events</h2>
-                <ul className="mt-2 space-y-1 text-sm">
-                    {events.map((row) => (
-                        <li key={row.id} className="flex justify-between gap-2">
-                            <span>{row.name}{row.path ? ` · ${row.path}` : ""}</span>
-                            <span className="text-xs text-muted-foreground">{row.createdAt.toISOString().slice(11, 19)}</span>
-                        </li>
+                <AdminPanel
+                    key={session.id}
+                    title={session.profile.displayName}
+                    action={<span className="text-[11px] text-muted-foreground">{session.device || "—"} · {session.country || "—"}</span>}
+                >
+                    {session.pages.length === 0 ? <AdminEmpty>No pageviews stored.</AdminEmpty> : session.pages.map((page) => (
+                        <AdminRow key={page.id}>
+                            <span className="min-w-0 flex-1 truncate">{page.path}</span>
+                            <span className="text-xs text-muted-foreground">{page.ms != null ? `${Math.round(page.ms / 1000)}s` : "open"}</span>
+                        </AdminRow>
                     ))}
-                    {events.length === 0 ? <li className="text-muted-foreground">No named events for this visitor.</li> : null}
-                </ul>
-            </section>
-            {sessions.length === 0 && events.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No sessions for this id.</p>
-            ) : null}
+                </AdminPanel>
+            ))}
+            <AdminPanel title="Named events">
+                {events.length === 0 ? <AdminEmpty>No named events for this visitor.</AdminEmpty> : events.map((row) => (
+                    <AdminRow key={row.id}>
+                        <span className="flex-1 truncate">{row.name}{row.path ? ` · ${row.path}` : ""}</span>
+                        <span className="text-xs text-muted-foreground">{row.createdAt.toISOString().slice(11, 19)}</span>
+                    </AdminRow>
+                ))}
+            </AdminPanel>
+            {sessions.length === 0 && events.length === 0 ? <AdminEmpty>No sessions for this id.</AdminEmpty> : null}
         </div>
     )
 }

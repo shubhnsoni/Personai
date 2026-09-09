@@ -182,7 +182,7 @@ export async function platformSetupChecks(): Promise<SetupCheck[]> {
         { id: "health", label: "HEALTH_DIAGNOSTICS_TOKEN", ok: Boolean(process.env.HEALTH_DIAGNOSTICS_TOKEN?.trim()) },
         { id: "pool", label: "Postgres pooler in the URL", ok: pooled || process.env.NODE_ENV !== "production", hint: pooled ? "pooled" : "add Neon/Supabase pooler before many shops" },
         { id: "ingest", label: "Session heartbeats last 5 min", ok: heartbeat > 0 || process.env.NODE_ENV !== "production", hint: `${heartbeat} sessions` },
-        { id: "resend", label: "Resend (optional until you email owners)", ok: env.hasResend || true, hint: env.hasResend ? "configured" : "console fallback" },
+        { id: "resend", label: "Resend (optional until you email owners)", ok: env.hasResend, hint: env.hasResend ? "configured" : "console fallback" },
     ]
 }
 

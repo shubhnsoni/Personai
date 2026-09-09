@@ -60,3 +60,26 @@ export async function exitTryKit() {
     revalidatePath("/dashboard")
     redirect("/admin/kits")
 }
+
+export async function resetTryKit(formData: FormData) {
+    const role = String(formData.get("role") || "")
+    const user = await syncUser()
+    if (!user) redirect("/sign-in")
+    if (!userIsAdmin(user)) redirect("/dashboard")
+    const kit = TRY_KITS.find((k) => k.role === role)
+    if (!kit) redirect("/admin/kits")
+    const profile = await prisma.profile.findFirst({
+        where: { userId: user.id, slug: { startsWith: kit.slug } },
+        select: { id: true },
+    })
+    if (profile) {
+        await prisma.profile.delete({ where: { id: profile.id } }).catch(() => {})
+        const jar = await cookies()
+        if (jar.get(ACTIVE_PROFILE_COOKIE)?.value === profile.id) {
+            jar.delete(ACTIVE_PROFILE_COOKIE)
+            jar.delete(TRY_NOW_COOKIE)
+        }
+    }
+    revalidatePath("/admin/kits")
+    redirect("/admin/kits")
+}
