@@ -530,7 +530,7 @@
 .dark .brand-home .fh-feature-story { background:var(--fh-soft); }
 .dark .brand-home .fh-share-section,
 .dark .brand-home .fh-final { background:#050607; color:var(--fh-ink); }
-.dark .brand-home .fh-name-card > svg { --brand-accent:#a3db42; }
+.dark .brand-home .fh-name-card > svg { --brand-accent:var(--mk-action); }
 .dark .brand-home .fh-profile-cover > span,
 .dark .brand-home .fh-person-tags span { background:#101114ed; color:var(--fh-ink); }
 .dark .brand-home .fh-person-photo > span { background:#10111480; }

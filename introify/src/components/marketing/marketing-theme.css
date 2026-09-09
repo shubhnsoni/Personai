@@ -61,7 +61,7 @@
 }
 
 .dark .mk-page .mk-brand {
-    --brand-accent: #a3db42;
+    --brand-accent: var(--mk-action);
     color: #fdfdfd;
 }
 
