@@ -190,13 +190,13 @@ describe("ProfileView - intro chips follow contentDisplayMode", () => {
                 colors={["#52E8FF"]}
             />,
         )
+        const open = vi.spyOn(window, "open").mockImplementation(() => null)
         fireEvent.click(screen.getByRole("button", { name: "About" }))
         act(() => {
             vi.advanceTimersByTime(1)
         })
-        const stage = document.querySelector("[data-content-stage]")
-        expect(stage?.getAttribute("data-desktop-surface")).toBe("sidebar")
-        expect(screen.getByText("About Ada Lovelace")).toBeTruthy()
+        expect(open).toHaveBeenCalledWith("/ada/story", "_self")
+        open.mockRestore()
 
         fireEvent.click(screen.getByRole("button", { name: "See services" }))
         act(() => {
@@ -206,7 +206,7 @@ describe("ProfileView - intro chips follow contentDisplayMode", () => {
         expect(screen.getByText("Services & Pricing")).toBeTruthy()
     })
 
-    it("opens About as a centred popup when the owner saved POPUP", () => {
+    it("sends About to the dedicated about page instead of a photo wall", () => {
         render(
             <ProfileView
                 profile={{ ...PROFILE, contentDisplayMode: "POPUP" }}
@@ -214,12 +214,12 @@ describe("ProfileView - intro chips follow contentDisplayMode", () => {
                 colors={["#52E8FF"]}
             />,
         )
+        const open = vi.spyOn(window, "open").mockImplementation(() => null)
         fireEvent.click(screen.getByRole("button", { name: "About" }))
         act(() => {
             vi.advanceTimersByTime(1)
         })
-        const stage = document.querySelector("[data-content-stage]")
-        expect(stage?.getAttribute("data-desktop-surface")).toBe("popup")
-        expect(stage?.className).toMatch(/\bmd:items-center\b/)
+        expect(open).toHaveBeenCalledWith("/ada/story", "_self")
+        open.mockRestore()
     })
 })

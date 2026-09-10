@@ -2,9 +2,17 @@ const PRIORITY_SLUGS = [
     "aura-fitness-ranchi",
     "fit24-ranchi",
     "fitness-addiction-doranda",
+    "churuwala-upper-bazar",
     "kaveri-main-road",
     "mk-jewellers",
 ]
+
+export const FORCE_REFRESH_SLUGS = new Set([
+    "aura-fitness-ranchi",
+    "fit24-ranchi",
+    "skydine-cafe",
+    "churuwala-upper-bazar",
+])
 
 export function orderedDemoShops<T extends { slug: string }>(shops: T[]): T[] {
     const bySlug = new Map(shops.map((shop) => [shop.slug, shop]))
@@ -27,12 +35,13 @@ export function catalogSize(shop: { products?: unknown[]; services?: unknown[] }
 }
 
 export function shouldSkipPopulated(
-    shop: { products?: unknown[]; services?: unknown[] },
+    shop: { slug?: string; products?: unknown[]; services?: unknown[] },
     productCount: number,
     serviceCount: number,
     replace: boolean,
 ) {
     if (replace) return false
+    if (shop.slug && FORCE_REFRESH_SLUGS.has(shop.slug)) return false
     const expected = catalogSize(shop)
     if (expected <= 0) return false
     return productCount + serviceCount >= expected

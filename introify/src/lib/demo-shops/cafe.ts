@@ -2,6 +2,33 @@ import { SKYDINE_AR_BY_TITLE } from "./ar"
 import { SKYDINE_MENU_RAW } from "./skydine-menu"
 import { everydayHours, type DemoProduct, type DemoShop } from "./types"
 
+const DISH = "/uploads/skydine-dishes"
+
+export function dishThumb(category: string, title: string) {
+    const t = `${category} ${title}`.toLowerCase()
+    if (/soup/.test(t) && /chicken|non veg|prawn/.test(t)) return `${DISH}/soup-chicken.jpg`
+    if (/soup/.test(t)) return `${DISH}/soup-veg.jpg`
+    if (/salad/.test(t)) return `${DISH}/salad.jpg`
+    if (/fries|wedges|potato/.test(t)) return `${DISH}/fries.jpg`
+    if (/pizza/.test(t)) return `${DISH}/pizza.jpg`
+    if (/burger/.test(t)) return `${DISH}/burger.jpg`
+    if (/momo/.test(t)) return `${DISH}/momos.jpg`
+    if (/coffee|cappuccino|latte|espresso|americano|mocha/.test(t)) return `${DISH}/coffee.jpg`
+    if (/shake|frappe|mocktail|mojito|cooler|lassi/.test(t)) return `${DISH}/shake.jpg`
+    if (/brownie|dessert|pastry|cake|ice cream|sundae|cookie/.test(t)) return `${DISH}/brownie.jpg`
+    if (/pasta|spaghetti|penne|lasagna/.test(t)) return `${DISH}/pasta.jpg`
+    if (/wing/.test(t)) return `${DISH}/wings.jpg`
+    if (/garlic bread|bruschetta/.test(t)) return `${DISH}/garlic-bread.jpg`
+    if (/pancake|waffle|french toast/.test(t)) return `${DISH}/pancake.jpg`
+    if (/avocado/.test(t)) return `${DISH}/avocado.jpg`
+    if (/noodle|hakka|chowmein|manchurian|chilli chicken/.test(t)) return `${DISH}/noodles.jpg`
+    if (/sandwich|wrap|taco/.test(t)) return `${DISH}/sandwich.jpg`
+    if (/biryani|pulao|fried rice/.test(t)) return `${DISH}/biryani.jpg`
+    if (/tandoor|tikka|kebab|grill/.test(t)) return `${DISH}/tandoor.jpg`
+    if (/naan|dal|roti|thali|curry|butter chicken|paneer|sabzi/.test(t)) return `${DISH}/naan-dal.jpg`
+    return `${DISH}/tandoor.jpg`
+}
+
 function menuProducts(): DemoProduct[] {
     return SKYDINE_MENU_RAW.trim().split("\n").map((line) => {
         const [category, diet, title, description, price] = line.split("|")
@@ -21,15 +48,7 @@ function menuProducts(): DemoProduct[] {
             fulfillment: "PHYSICAL",
             shipMode: "PICKUP",
             allowCod: true,
-            thumbnailUrl: SKYDINE_AR_BY_TITLE[title]
-                ? undefined
-                : category.startsWith("Coffee")
-                    ? "/uploads/blu-cafe/cup-coffee.jpg"
-                    : category.startsWith("Shakes")
-                        ? "/uploads/blu-cafe/frappe.jpg"
-                        : category.startsWith("Desserts")
-                            ? "/uploads/blu-cafe/cookie-chocolate.jpg"
-                            : "/uploads/skydine-cafe/plates.jpg",
+            thumbnailUrl: dishThumb(category, title),
         }
     })
 }
@@ -84,16 +103,7 @@ Call 092622 68837. Find us near Paintwala, North Ranchi.`,
         { name: "Hall four", description: "Indoor table for four. 90 minutes. High chair on request.", durationMinutes: 90, priceRupees: 0, kind: "TABLE", covers: 4 },
         { name: "Terrace six", description: "Rooftop table with the runway behind you. 2 hours. Evenings fill first.", durationMinutes: 120, priceRupees: 0, kind: "TABLE", covers: 6 },
     ],
-    story: [
-        { url: "/uploads/skydine-cafe/terrace-dusk.jpg", title: "SkyDine Cafe, Hinoo", body: "A rooftop cafe on Hinoo Main Road where the Birsa Munda runway sits in the background. Come for Chinese and North Indian plates, stay for the planes.", category: "AMBIENCE" },
-        { url: "/uploads/skydine-cafe/terrace-night.jpg", title: "Lights over the terrace", body: "Evening on the terrace. Teal sofas, umbrellas, open sky, and the airport lights in the distance.", category: "AMBIENCE" },
-        { url: "/uploads/skydine-cafe/storefront.jpg", title: "Hinoo Main Road", body: "Hinoo Main Road, Hindpiri, near Paintwala. Ranchi 834002. Open noon to 11pm, every day.", category: "INTERIOR" },
-        { url: "/uploads/skydine-cafe/interior.jpg", title: "Inside", body: "Teal chairs, the geometric counter, and a window onto Hinoo. Indoor seating when the terrace is full.", category: "INTERIOR" },
-        { url: "/uploads/skydine-cafe/plates.jpg", title: "The plate", body: "Pasta, chilli chicken, garlic bread, momos, and North Indian thalis. Veg and non-veg. Customisable, pocket-friendly.", category: "FOOD" },
-        { url: "/uploads/skydine-cafe/table.jpg", title: "For the table", body: "Known for family crowds, students, good music, and an elaborate menu. Book ahead for groups.", category: "TEAM" },
-        { url: "/uploads/skydine-cafe/counter.jpg", title: "The counter", body: "Blue faceted bar, yellow walls, teal velvet. The indoor floor for lunch, birthdays, and rainy evenings.", category: "INTERIOR" },
-        { url: "/uploads/skydine-cafe/chilli.jpg", title: "Chinese plates", body: "Chilli chicken, momos, noodles, and the rest of the Chinese board. Best eaten on the terrace with a plane going over.", category: "FOOD" },
-    ],
+    story: [],
     documents: [
         {
             type: "BIO",

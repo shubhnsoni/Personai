@@ -57,7 +57,7 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                 {impersonating ? (
                     <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-400 px-3 py-1.5 text-[11px] font-medium text-zinc-950">
-                        Viewing {name} as support
+                        Editing {name} — changes save to this account
                         <ExitImpersonateButton />
                     </div>
                 ) : isAdmin || slug.startsWith("try-") ? (

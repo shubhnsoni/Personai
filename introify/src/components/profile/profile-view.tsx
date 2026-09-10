@@ -557,8 +557,7 @@ function buildGoalChips(
             label: "About",
             available: true,
             icon: <User className="w-3.5 h-3.5" />,
-            href: profile.hasStory ? storyPath(profile.slug) : undefined,
-            onSelect: profile.hasStory ? undefined : () => actions.openContent("about"),
+            href: storyPath(profile.slug),
         },
         guide: {
             id: "guide",

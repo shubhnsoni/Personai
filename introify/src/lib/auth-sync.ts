@@ -152,13 +152,17 @@ async function withActiveProfile(dbUser: SyncedDatabaseUser) {
             if (impersonateId) {
                 const foreign = await prisma.profile.findUnique({ where: { id: impersonateId } })
                 if (foreign) {
-                    profileAccess[foreign.id] = { workspaceId: null, role: "OWNER", owner: true, locationIds: [] }
+                    const targetShops = await prisma.profile.findMany({ where: { userId: foreign.userId } })
+                    const ordered = [foreign, ...targetShops.filter((p) => p.id !== foreign.id)]
+                    const impersonationAccess: Record<string, ProfileAccess> = Object.fromEntries(ordered.map((p) => [p.id, {
+                        workspaceId: null, role: "OWNER" as const, owner: true, locationIds: [] as string[],
+                    }]))
                     return {
                         ...dbUser,
-                        profiles: [foreign, ...dbUser.profiles.filter((p) => p.id !== foreign.id)],
-                        accessibleProfiles: [foreign, ...accessibleProfiles.filter((p) => p.id !== foreign.id)],
+                        profiles: ordered,
+                        accessibleProfiles: ordered,
                         activeProfile: foreign,
-                        profileAccess,
+                        profileAccess: impersonationAccess,
                     }
                 }
             }

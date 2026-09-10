@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { shopSetupChecks } from "@/lib/admin/setup-score"
 import { formatAdminMoney, shopPipeline } from "@/lib/admin/money"
 import { AdminEmpty, AdminPageHead, AdminPanel, AdminTable } from "@/components/admin/admin-ui"
+import { ImpersonateButton } from "@/components/admin/admin-actions"
 
 export const dynamic = "force-dynamic"
 
@@ -140,7 +141,7 @@ export default async function AdminShopsPage({
                 ))}
             </div>
             <AdminPanel>
-                <AdminTable columns={["Shop", "Owner", "Setup", "24h GMV", "Pipeline"]}>
+                <AdminTable columns={["Shop", "Owner", "Setup", "24h GMV", "Pipeline", ""]}>
                     {rows.map(({ shop, setup, pipeline, gmv }) => (
                         <tr key={shop.id} className="border-t border-white/8">
                             <td className="px-4 py-2.5">
@@ -151,6 +152,9 @@ export default async function AdminShopsPage({
                             <td className="px-4 py-2.5 text-xs tabular-nums">{setup.score}%</td>
                             <td className="px-4 py-2.5 text-xs tabular-nums">{gmv ? formatAdminMoney(gmv) : "—"}</td>
                             <td className="px-4 py-2.5 text-xs">{shop.suspendedAt ? "suspended" : pipeline}</td>
+                            <td className="px-4 py-2.5 text-right">
+                                <ImpersonateButton profileId={shop.id} />
+                            </td>
                         </tr>
                     ))}
                 </AdminTable>

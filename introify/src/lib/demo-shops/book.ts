@@ -23,8 +23,11 @@ const photo = {
     counter: "/uploads/skydine-cafe/counter.jpg",
     table: "/uploads/skydine-cafe/table.jpg",
     plates: "/uploads/skydine-cafe/plates.jpg",
-    coffee: "/uploads/blu-cafe/cup-coffee.jpg",
-    muffin: "/uploads/blu-cafe/muffin.jpg",
+    coffee: "/uploads/demo/creatine.jpg",
+    muffin: "/uploads/demo/whey.jpg",
+    whey: "/uploads/demo/whey.jpg",
+    creatine: "/uploads/demo/creatine.jpg",
+    floor: "/uploads/demo/gym-floor.jpg",
 }
 
 export const JK_SHARMA_CLINIC: DemoShop = {
@@ -458,7 +461,7 @@ export const AURA_FITNESS: DemoShop = {
     headline: "Kanke Road floor in Maru Tower — strength, classes, and a named trainer hour.",
     bio: `Aura Fitness Ranchi sits at 704 Maru Tower, Kanke Road, Ranchi 834008 — Adalhatu side, toward Morabadi and the university. Independent gym. The mark on the door is the one we had drawn for the floor: a quiet A, not a chain badge.
 
-Morning strength, evening classes, and a first sitting with a trainer before anyone talks membership. Open every day 5:30am–10:00pm. The desk books the name, not a walk-in queue at peak.
+Morning strength, aerobics and yoga hours, and a first sitting with a trainer before anyone talks membership. Google lists the floor 6:00am–8:00pm most days (Friday often closes earlier). The desk books the name, not a walk-in queue at peak.
 
 Call 077660 05931. Ask for a floor walk, a trainer hour, or what is on the shelf.`,
     welcome: "Ask for a floor walk, a trainer hour, or an evening class at Maru Tower.",
@@ -466,8 +469,8 @@ Call 077660 05931. Ask for a floor walk, a trainer hour, or what is on the shelf
     speakerRole: "trainer desk",
     whatsapp: "917766005931",
     upiId: "aurafitnessranchi@upi",
-    imageUrl: photo.rohan,
-    shopLogoUrl: photo.brand,
+    imageUrl: photo.floor,
+    shopLogoUrl: "/uploads/aura-fitness-ranchi/logo.png",
     venue: {
         address: {
             formatted: "704 Maru Tower, Kanke Road, Adalhatu, Ranchi 834008",
@@ -478,12 +481,12 @@ Call 077660 05931. Ask for a floor walk, a trainer hour, or what is on the shelf
             country: "IN",
         },
         phone: { e164: "+917766005931", display: "077660 05931" },
-        categories: ["Gym", "Strength", "Classes"],
+        categories: ["Gym", "Aerobics", "Yoga"],
     },
     socials: {
         maps: "https://www.google.com/maps/search/?api=1&query=The+Aura+704+Maru+Tower+Kanke+Road+Ranchi",
     },
-    hours: everydayHours("05:30", "22:00"),
+    hours: everydayHours("06:00", "20:00"),
     services: [
         { name: "Floor walk", description: "Thirty minutes. Machines, lockers, and how the morning batch works. No membership pitch in the first ten minutes.", durationMinutes: 30, priceRupees: 0, kind: "SESSION" },
         { name: "Intro session", description: "Forty-five minutes with a trainer. First lifts and a note for the week.", durationMinutes: 45, priceRupees: 499, kind: "SESSION" },
@@ -499,25 +502,21 @@ Call 077660 05931. Ask for a floor walk, a trainer hour, or what is on the shelf
         { name: "Kavya", kind: "STAFF", capacity: 1 },
     ],
     products: [
-        { title: "Whey protein 1kg", description: "Pickup at Maru Tower. Desk will not write a medical claim.", category: "Supplements", priceRupees: 2400, sku: "AF-WHEY", stock: 10, thumbnailUrl: photo.packaging, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Creatine 300g", description: "Micronised. Scoop size at the desk.", category: "Supplements", priceRupees: 890, sku: "AF-CRE", stock: 12, thumbnailUrl: photo.brand, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Pre-workout 250g", description: "Evening batch only if you already train here.", category: "Supplements", priceRupees: 1250, sku: "AF-PRE", stock: 7, thumbnailUrl: photo.mug, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Shaker 700ml", description: "Aura mark on the bottle. Pickup with the session.", category: "Gear", priceRupees: 280, sku: "AF-SHK", stock: 18, thumbnailUrl: photo.coffee, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Lifting straps", description: "One pair. For the heavy pulls.", category: "Gear", priceRupees: 220, sku: "AF-STR", stock: 14, thumbnailUrl: photo.tote, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Wrist wraps", description: "One pair. Press days.", category: "Gear", priceRupees: 260, sku: "AF-WRP", stock: 11, thumbnailUrl: photo.brand, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Gym towel", description: "Small. Bring it back or buy another.", category: "Gear", priceRupees: 180, sku: "AF-TOW", stock: 20, thumbnailUrl: photo.tote, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Energy bar box", description: "Six bars. Desk shelf.", category: "Food", priceRupees: 390, sku: "AF-BAR", stock: 9, thumbnailUrl: photo.muffin, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Whey protein 1kg", description: "Pickup at Maru Tower. Desk will not write a medical claim.", category: "Supplements", priceRupees: 2400, sku: "AF-WHEY", stock: 10, thumbnailUrl: photo.whey, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Creatine 300g", description: "Micronised. Scoop size at the desk.", category: "Supplements", priceRupees: 890, sku: "AF-CRE", stock: 12, thumbnailUrl: photo.creatine, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Pre-workout 250g", description: "Evening batch only if you already train here.", category: "Supplements", priceRupees: 1250, sku: "AF-PRE", stock: 7, thumbnailUrl: photo.whey, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Shaker 700ml", description: "Aura mark on the bottle. Pickup with the session.", category: "Gear", priceRupees: 280, sku: "AF-SHK", stock: 18, thumbnailUrl: photo.creatine, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Lifting straps", description: "One pair. For the heavy pulls.", category: "Gear", priceRupees: 220, sku: "AF-STR", stock: 14, thumbnailUrl: photo.floor, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Wrist wraps", description: "One pair. Press days.", category: "Gear", priceRupees: 260, sku: "AF-WRP", stock: 11, thumbnailUrl: photo.floor, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Gym towel", description: "Small. Bring it back or buy another.", category: "Gear", priceRupees: 180, sku: "AF-TOW", stock: 20, thumbnailUrl: photo.floor, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Energy bar box", description: "Six bars. Desk shelf.", category: "Food", priceRupees: 390, sku: "AF-BAR", stock: 9, thumbnailUrl: photo.whey, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
     ],
-    story: [
-        { url: photo.workshop, title: "Maru Tower", body: "704, Kanke Road. The mark on the door is ours.", category: "INTERIOR" },
-        { url: photo.rohan, title: "The floor", body: "Morning strength, evening class. Book the name.", category: "TEAM" },
-        { url: photo.brand, title: "The mark", body: "Independent gym. Not a franchise board.", category: "AMBIENCE" },
-    ],
+    story: [],
     documents: [
-        { type: "BIO", title: "About Aura Fitness", rawText: "Aura Fitness Ranchi, 704 Maru Tower, Kanke Road, Ranchi 834008. Independent gym on the Adalhatu / Kanke Road stretch. Open 5:30am–10:00pm every day. Phone 077660 05931. Floor walk is free. Intro ₹499. Personal training ₹900. Strength class ₹350. Conditioning ₹300. Trainers: Aman, Nisha, Rohit, Kavya. Membership after the first sitting, at the desk." },
+        { type: "BIO", title: "About Aura Fitness", rawText: "Aura Fitness Ranchi, 704 Maru Tower, Kanke Road, Ranchi 834008. Independent gym on the Adalhatu / Kanke Road stretch. Typical hours 6:00am–8:00pm. Phone 077660 05931. Floor walk is free. Intro ₹499. Personal training ₹900. Strength class ₹350. Conditioning ₹300. Aerobics and yoga hours at the desk. Trainers: Aman, Nisha, Rohit, Kavya. Membership after the first sitting, at the desk." },
         { type: "FAQ", title: "Floor, classes, retail", rawText: "Book a floor walk before you pay. Peak evening is 6:30–8:30 — named slots beat a walk-in. Sunday is open. Retail is whey, creatine, pre-workout, shaker, straps, wraps, towel, bars — pickup at Maru Tower. We do not write a medical diet. We are not Anytime Fitness, not Gold's Gym, not Talwalkars. One floor, Kanke Road." },
     ],
-    customInstructions: "You are the desk at Aura Fitness Ranchi, 704 Maru Tower, Kanke Road, Ranchi 834008. Help with floor walks, trainer hours, classes, and retail pickup. Open 5:30–22:00 every day. Prices in rupees. Staff are Aman, Nisha, Rohit, Kavya. Never prescribe a diet as medicine. Never send people to Anytime Fitness, Gold's Gym, or Talwalkars. Never invent a second branch. The gym is independent; the mark on the door is theirs.",
+    customInstructions: "You are the desk at Aura Fitness Ranchi, 704 Maru Tower, Kanke Road, Ranchi 834008. Help with floor walks, trainer hours, aerobics, yoga, and retail pickup. Typical hours 6:00–20:00. Prices in rupees. Staff are Aman, Nisha, Rohit, Kavya. Never prescribe a diet as medicine. Never send people to Anytime Fitness, Gold's Gym, or Talwalkars. Never invent a second branch. The gym is independent; the mark on the door is theirs.",
     tone: "direct",
 }
 
@@ -537,8 +536,8 @@ Ask for a night-access briefing, a trainer hour, or an intro before you talk mem
     speakerName: "Night desk",
     speakerRole: "trainer desk",
     upiId: "fit24ranchi@upi",
-    imageUrl: photo.kabir,
-    shopLogoUrl: photo.atlas,
+    imageUrl: photo.floor,
+    shopLogoUrl: "/uploads/fit24/logo.jpg",
     venue: {
         address: {
             formatted: "Ranchi, Jharkhand",
@@ -563,19 +562,15 @@ Ask for a night-access briefing, a trainer hour, or an intro before you talk mem
         { name: "Night desk", kind: "STAFF", capacity: 1 },
     ],
     products: [
-        { title: "Whey protein 1kg", description: "Desk shelf. Pickup with your session.", category: "Supplements", priceRupees: 2300, sku: "F24-WHEY", stock: 9, thumbnailUrl: photo.packaging, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Creatine 300g", description: "Scoop at the desk. Not a medical claim.", category: "Supplements", priceRupees: 870, sku: "F24-CRE", stock: 11, thumbnailUrl: photo.brand, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Shaker 700ml", description: "Fit24 mark on the bottle.", category: "Gear", priceRupees: 260, sku: "F24-SHK", stock: 16, thumbnailUrl: photo.coffee, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Lifting gloves", description: "One pair. Size at the desk.", category: "Gear", priceRupees: 300, sku: "F24-GLV", stock: 13, thumbnailUrl: photo.tote, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Access band", description: "Replacement night band if you lose yours. Members only.", category: "Gear", priceRupees: 150, sku: "F24-BAND", stock: 20, thumbnailUrl: photo.brand, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: false },
-        { title: "Gym towel", description: "Bring it. Or buy one.", category: "Gear", priceRupees: 160, sku: "F24-TOW", stock: 18, thumbnailUrl: photo.tote, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
-        { title: "Energy bar box", description: "Six bars for the late session.", category: "Food", priceRupees: 360, sku: "F24-BAR", stock: 8, thumbnailUrl: photo.muffin, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Whey protein 1kg", description: "Desk shelf. Pickup with your session.", category: "Supplements", priceRupees: 2300, sku: "F24-WHEY", stock: 9, thumbnailUrl: photo.whey, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Creatine 300g", description: "Scoop at the desk. Not a medical claim.", category: "Supplements", priceRupees: 870, sku: "F24-CRE", stock: 11, thumbnailUrl: photo.creatine, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Shaker 700ml", description: "Fit24 mark on the bottle.", category: "Gear", priceRupees: 260, sku: "F24-SHK", stock: 16, thumbnailUrl: photo.creatine, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Lifting gloves", description: "One pair. Size at the desk.", category: "Gear", priceRupees: 300, sku: "F24-GLV", stock: 13, thumbnailUrl: photo.floor, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Access band", description: "Replacement night band if you lose yours. Members only.", category: "Gear", priceRupees: 150, sku: "F24-BAND", stock: 20, thumbnailUrl: photo.floor, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: false },
+        { title: "Gym towel", description: "Bring it. Or buy one.", category: "Gear", priceRupees: 160, sku: "F24-TOW", stock: 18, thumbnailUrl: photo.floor, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
+        { title: "Energy bar box", description: "Six bars for the late session.", category: "Food", priceRupees: 360, sku: "F24-BAR", stock: 8, thumbnailUrl: photo.whey, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true },
     ],
-    story: [
-        { url: photo.workshop, title: "Late floor", body: "The mark on the glass is Fit24. Last PT starts at nine.", category: "INTERIOR" },
-        { url: photo.kabir, title: "Trainers", body: "Vikash, Pooja, Arjun. Night desk after ten.", category: "TEAM" },
-        { url: photo.atlas, title: "The mark", body: "Independent. Not a 24-hour franchise plate.", category: "AMBIENCE" },
-    ],
+    story: [],
     documents: [
         { type: "BIO", title: "About Fit24", rawText: "Fit24, Ranchi. Independent gym. Floor 5:00am through late night. Staffed morning and evening; night access briefing for members. Intro is free. Personal training ₹850, last PT 9:00pm. Strength class ₹320. Trainers: Vikash, Pooja, Arjun. Night desk after 10pm. Membership and replacement access band at the desk." },
         { type: "FAQ", title: "Night access and retail", rawText: "New people take the intro first. Night access is for members who have done the briefing — door, CCTV, emergency button. Last personal-training slot starts 9:00pm. Retail is whey, creatine, shaker, gloves, towel, bars, and a replacement access band. We do not write a medical diet. We are not Anytime Fitness. One Ranchi floor, Fit24 on the glass." },

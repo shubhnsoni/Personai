@@ -348,6 +348,61 @@ Ask for a 500g box, a wedding tray, or what came out of the kadhai this morning.
     tone: "warm",
 }
 
+export const CHURUWALA: DemoShop = {
+    flavor: "SWEETS",
+    engine: "SHOP",
+    goal: "SELL_PRODUCTS",
+    slug: "churuwala-upper-bazar",
+    name: "Churuwala's",
+    headline: "Upper Bazar mithai counter since 1949 — kachori, rasgulla, and festival trays.",
+    bio: `Churuwala sits on JJ Road, East Market, Upper Bazar, Ranchi 834001 — one of the city’s oldest sweet shops. Families have been buying kilos here since 1949.
+
+Kaju katli, barfi, peda, laddoo, gulab jamun, rasgulla, samosa, and the kachori people still name in reviews. About ₹250 for two at the snack counter. Open from early morning through evening.
+
+Call 081973 60379. Ask for a kilo, a wedding tray, or what’s fresh from the kadhai.`,
+    welcome: "Ask for today’s mithai, a kachori, or a festival tray from Upper Bazar.",
+    speakerName: "Churuwala desk",
+    speakerRole: "counter",
+    whatsapp: "918197360379",
+    upiId: "churuwalaupperbazar@upi",
+    gstin: "20AGJPS6768E1Z7",
+    deliveryNote: "Pickup at Upper Bazar, JJ Road. Trays need a day. Card usually above ₹200.",
+    imageUrl: "/uploads/demo/kaju-katli.jpg",
+    shopLogoUrl: "/uploads/churuwala/logo.jpg",
+    venue: {
+        address: {
+            formatted: "East Market, JJ Road, Upper Bazar, Ranchi 834001",
+            line1: "East Market, JJ Road, Upper Bazar",
+            locality: "Ranchi",
+            region: "Jharkhand",
+            postalCode: "834001",
+            country: "IN",
+        },
+        phone: { e164: "+918197360379", display: "081973 60379" },
+        categories: ["Mithai", "Sweet shop", "Snacks"],
+    },
+    hours: everydayHours("07:00", "22:00"),
+    products: [
+        { title: "Kaju katli 500g", description: "Cashew, silver leaf. Scale at the counter.", category: "Mithai", priceRupees: 420, diet: "VEG", stock: 20, thumbnailUrl: "/uploads/demo/kaju-katli.jpg", sku: "CW-KAJU", weightGrams: 500, allowCod: true, shipMode: "PICKUP" },
+        { title: "Gulab jamun 500g", description: "Warm syrup. Packed so they do not crush.", category: "Mithai", priceRupees: 180, diet: "VEG", stock: 24, thumbnailUrl: "/uploads/demo/gulab-jamun.jpg", sku: "CW-GJ", weightGrams: 500, allowCod: true, shipMode: "PICKUP" },
+        { title: "Rasgulla 500g", description: "Spongy, light syrup. The big ones people still ask for.", category: "Mithai", priceRupees: 160, diet: "VEG", stock: 22, thumbnailUrl: "/uploads/demo/rasgulla.jpg", sku: "CW-RAS", weightGrams: 500, allowCod: true, shipMode: "PICKUP" },
+        { title: "Motichoor laddoo 500g", description: "Festival default.", category: "Mithai", priceRupees: 200, diet: "VEG", stock: 18, thumbnailUrl: "/uploads/demo/kaju-katli.jpg", sku: "CW-LAD", weightGrams: 500, allowCod: true, shipMode: "PICKUP" },
+        { title: "Mixed mithai 1kg", description: "Katli, barfi, laddoo. Gift box.", category: "Trays", priceRupees: 620, diet: "VEG", stock: 10, thumbnailUrl: "/uploads/demo/kaju-katli.jpg", sku: "CW-MIX", weightGrams: 1000, allowCod: true, shipMode: "BOTH" },
+        { title: "Wedding tray 2kg", description: "Write the names. Needs a day.", category: "Trays", priceRupees: 1400, diet: "VEG", stock: 4, thumbnailUrl: "/uploads/demo/gulab-jamun.jpg", sku: "CW-WED", weightGrams: 2000, allowCod: false, shipMode: "PICKUP" },
+        { title: "Samosa", description: "Two pieces, afternoon fry.", category: "Namkeen", priceRupees: 30, diet: "VEG", stock: 40, thumbnailUrl: "/uploads/skydine-dishes/fries.jpg", sku: "CW-SAM", allowCod: true, shipMode: "PICKUP" },
+        { title: "Kachori", description: "The one Upper Bazar still names.", category: "Namkeen", priceRupees: 25, diet: "VEG", stock: 36, thumbnailUrl: "/uploads/skydine-dishes/fries.jpg", sku: "CW-KAC", allowCod: true, shipMode: "PICKUP" },
+        { title: "Dahi kachori", description: "Breakfast plate. Ask if the dahi is fresh.", category: "Namkeen", priceRupees: 60, diet: "VEG", stock: 20, thumbnailUrl: "/uploads/demo/rasgulla.jpg", sku: "CW-DAHI", allowCod: true, shipMode: "PICKUP" },
+        { title: "Namkeen mix 250g", description: "Bhujia and sev.", category: "Namkeen", priceRupees: 70, diet: "VEG", stock: 25, thumbnailUrl: "/uploads/demo/kaju-katli.jpg", sku: "CW-NAM", weightGrams: 250, allowCod: true, shipMode: "PICKUP" },
+    ],
+    story: [],
+    documents: [
+        { type: "BIO", title: "About Churuwala's", rawText: "Churuwala's, East Market, JJ Road, Upper Bazar, Ranchi 834001. Sweet shop since 1949. GSTIN 20AGJPS6768E1Z7. Phone 081973 60379. Open about 7:00am–10:00pm. Kilos, trays, samosa, kachori. About ₹250 for two at the snack counter. Pickup on JJ Road." },
+        { type: "FAQ", title: "Trays and snacks", rawText: "Wedding trays need a day. Mixed 1kg is ready. Kachori and samosa are the afternoon fry. Sugar-free is not stocked unless you ask two days ahead. Card usually above ₹200." },
+    ],
+    customInstructions: "You are Churuwala's on JJ Road, Upper Bazar, Ranchi — the 1949 mithai counter. Help with kilos, trays, kachori, and samosa. Prices in rupees. Pickup. Do not invent a second branch in another city. Do not invent sugar-free stock.",
+    tone: "warm",
+}
+
 export const FOOD_SHOPS: DemoShop[] = [
     SKYDINE_CAFE,
     KAVERI_RESTAURANT,
@@ -356,4 +411,5 @@ export const FOOD_SHOPS: DemoShop[] = [
     RANCHI_CATERER,
     BAKERS_FRESH,
     SAMRIDDHI_SWEETS,
+    CHURUWALA,
 ]

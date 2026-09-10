@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic"
 export default async function StoryPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params
     const story = await publishedStoryForSlug(slug)
-    if (!story || story.frames.length === 0) notFound()
+    if (!story) notFound()
     const { profile, frames } = story
     const hoursLabel = profile.availability.length ? hoursToday(profile.availability) : null
     return (

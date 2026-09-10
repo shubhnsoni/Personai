@@ -22,7 +22,7 @@ import { PLANS, type PlanId } from "@/lib/billing/catalog"
 export function ImpersonateButton({
     profileId,
     href = "/dashboard",
-    label = "Open as support",
+    label = "Login as this account",
 }: {
     profileId: string
     href?: string
