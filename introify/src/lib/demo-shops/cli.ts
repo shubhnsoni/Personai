@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { DEMO_SHOPS } from "./index"
 import { applyDemoShop } from "./apply"
+import { orderedDemoShops, seedBudgetMs, shouldSkipPopulated } from "./seed-order"
 
 function databaseTarget() {
     const raw = process.env.DATABASE_URL || ""
@@ -32,9 +33,18 @@ async function ownerUserId() {
 
 async function main() {
     const target = databaseTarget()
-    console.log(`Demo shop seed: ${DEMO_SHOPS.length} catalogs → ${target.host}/${target.name}`)
+    const shops = orderedDemoShops(DEMO_SHOPS)
+    const budgetMs = seedBudgetMs()
+    const deadline = Date.now() + budgetMs
+    console.log(`Demo shop seed: ${shops.length} catalogs → ${target.host}/${target.name} (${Math.round(budgetMs / 1000)}s budget)`)
     const userId = await ownerUserId()
-    for (const shop of DEMO_SHOPS) {
+    let filled = 0
+    let skipped = 0
+    for (const shop of shops) {
+        if (Date.now() >= deadline) {
+            console.log(`seed budget reached after ${filled} filled, ${skipped} skipped; remaining shops wait for the next deploy`)
+            break
+        }
         let profile = await prisma.profile.findUnique({ where: { slug: shop.slug } })
         if (!profile) {
             const clash = await prisma.profile.findFirst({ where: { userId, slug: shop.slug } })
@@ -51,9 +61,18 @@ async function main() {
                 },
             })
         }
+        const productCount = await prisma.digitalProduct.count({ where: { profileId: profile.id } })
+        const serviceCount = await prisma.serviceOffering.count({ where: { profileId: profile.id } })
+        if (shouldSkipPopulated(shop, productCount, serviceCount, process.env.INTROIFY_SEED_REPLACE === "1")) {
+            console.log("skip existing", shop.flavor, shop.slug)
+            skipped++
+            continue
+        }
         await applyDemoShop(prisma, profile.id, shop, { replaceCatalog: true })
         console.log("filled", shop.flavor, shop.slug)
+        filled++
     }
+    console.log(`Demo shop seed done: ${filled} filled, ${skipped} skipped`)
 }
 
 main()

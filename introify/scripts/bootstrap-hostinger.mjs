@@ -158,9 +158,15 @@ function seedDemoShops() {
         env: process.env,
         stdio: "inherit",
         windowsHide: true,
+        timeout: 210_000,
+        killSignal: "SIGKILL",
     })
+    if (result.error) {
+        console.error("Demo shop seed did not finish:", result.error.message)
+        return
+    }
     if (result.status !== 0) {
-        throw new Error(`Demo shop seed failed with status ${result.status ?? "unknown"}.`)
+        console.error(`Demo shop seed exited ${result.status ?? "unknown"}; continuing Hostinger build.`)
     }
 }
 
