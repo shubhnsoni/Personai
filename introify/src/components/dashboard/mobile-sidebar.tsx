@@ -39,7 +39,7 @@ export function MobileSidebar({ open, onOpenChange, counts, role, extras, busine
             >
                 <SheetHeader className="relative shrink-0 space-y-0 p-0 pr-12">
                     <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/30" />
-                    <div className="flex h-12 items-center gap-2 px-3 pr-12">
+                    <div className="flex items-center gap-3 pb-2 pl-5 pr-12 pt-6">
                         <SheetTitle className="sr-only">Menu</SheetTitle>
                         <Logo href="/dashboard" size="sm" className="w-[88px] shrink-0" />
                         {businesses && activeProfileId ? (
