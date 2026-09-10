@@ -128,8 +128,42 @@ try {
     Assert-Repository
     $localRoot = Join-Path $repoRoot '.local'
     $null = New-Item -ItemType Directory -Path $localRoot -Force
-    try { $lockHandle = [IO.File]::Open((Join-Path $localRoot 'deploy.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }
-    catch { throw 'Another deployment launcher is already running.' }
+    $lockPath = Join-Path $localRoot 'deploy.lock'
+    $lockMetaPath = Join-Path $localRoot 'deploy.lock.meta.json'
+    $lockDeadline = (Get-Date).AddMinutes(2)
+    while ($null -eq $lockHandle) {
+        try {
+            $lockHandle = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        } catch {
+            $holder = $null
+            if (Test-Path -LiteralPath $lockMetaPath) {
+                try { $holder = Get-Content -LiteralPath $lockMetaPath -Raw | ConvertFrom-Json } catch { $holder = $null }
+            }
+            $alive = $false
+            $ageMinutes = $null
+            if ($holder -and $holder.pid) {
+                $alive = [bool](Get-Process -Id ([int]$holder.pid) -ErrorAction SilentlyContinue)
+                if ($holder.started) {
+                    try { $ageMinutes = [math]::Round(((Get-Date) - [datetime]$holder.started).TotalMinutes, 1) } catch { $ageMinutes = $null }
+                }
+            }
+            if (-not $alive) {
+                Start-Sleep -Seconds 2
+                if ((Get-Date) -gt $lockDeadline) {
+                    throw 'Deploy lock is held with no living launcher. Close leftover PowerShell hosts, delete .local/deploy.lock if it is unused, then run deploy.ps1 again.'
+                }
+                continue
+            }
+            if ($ageMinutes -and $ageMinutes -gt 25) {
+                throw "Deploy lock is stale: pid $($holder.pid) has been running for $ageMinutes minutes. Stop that process if it is stuck, then retry."
+            }
+            if ((Get-Date) -gt $lockDeadline) {
+                throw "Another deployment launcher is already running (pid $($holder.pid)). Wait for it to finish, then retry."
+            }
+            Start-Sleep -Seconds 3
+        }
+    }
+    @{ pid = $PID; started = (Get-Date).ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath $lockMetaPath -Encoding UTF8
     $runRoot = Join-Path $localRoot ('release-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
     $null = New-Item -ItemType Directory -Path $runRoot
     $baseline = Invoke-Git @('rev-parse', 'HEAD')
@@ -275,6 +309,7 @@ if (context) await context.close(); else process.exitCode = 1;
     Write-Host ('Deployment stopped: ' + $_.Exception.Message) -ForegroundColor Red
 } finally {
     if ($null -ne $lockHandle) { $lockHandle.Dispose() }
+    if ($lockMetaPath -and (Test-Path -LiteralPath $lockMetaPath)) { Remove-Item -LiteralPath $lockMetaPath -Force -ErrorAction SilentlyContinue }
     if (-not $NoPause) { $null = Read-Host 'Press Enter to close' }
 }
 exit $exitStatus

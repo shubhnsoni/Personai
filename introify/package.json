@@ -16,6 +16,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "seed:demos": "npx --yes tsx src/lib/demo-shops/cli.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

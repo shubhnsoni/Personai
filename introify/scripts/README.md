@@ -8,13 +8,22 @@ Excluded from `tsc` via `tsconfig.json`. Run from `introify/`.
 | `test-import.ts` | Import extractor smoke tests |
 | `one-off/` | One-shot demo/debug and guarded data-maintenance scripts |
 | `fill-skydine.mjs` | Demo seed for SkyDine Cafe only — not product defaults |
+| `npm run seed:demos` | Upsert every kit field demo (`src/lib/demo-shops`) onto public slugs |
 | `optimize-ar-assets.ts` | Compress GLBs; default dir `public/uploads/skydine-ar` |
 
 One-off scripts are not part of `npm run dev`. Most expect `DATABASE_URL` in `.env`.
 
 ## Demo fixture (SkyDine Cafe)
 
-SkyDine Cafe (Hinoo, Ranchi, slug `skydine-cafe`) is a **demo restaurant**. Seed it with `fill-skydine.mjs`. Assets live in `public/uploads/skydine-cafe/` and `public/uploads/skydine-ar/`.
+SkyDine Cafe (Hinoo, Ranchi, slug `skydine-cafe`) is the **cafe** field demo. Its full Hinoo menu and AR plates live in `src/lib/demo-shops/cafe.ts`. Other kits have Ranchi-area prospect catalogs in the same folder.
+
+```powershell
+npm run seed:demos
+```
+
+That upserts public slugs (SkyDine, Kaveri, Nanak Dhaba, MK Jewellers, …) for the owner of `skydine-cafe`. Opening a kit from `/admin/kits` also fills that kit if the catalog is empty.
+
+Assets: `public/uploads/skydine-cafe/`, `public/uploads/skydine-ar/`. Do not copy Hinoo hours into shared UI.
 
 Do not copy Hinoo address, hours, Instagram, or printer chrome into shared UI. Other kits read `personalityConfig.venue`, `AvailabilitySchedule`, and `src/lib/kit-copy.ts`.
 

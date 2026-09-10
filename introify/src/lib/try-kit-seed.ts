@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { resolveKitRole } from "@/lib/role-alias"
+import { demoShopByFlavor } from "@/lib/demo-shops"
+import { applyDemoShop } from "@/lib/demo-shops/apply"
 import { goldBoardFromConfig, writeGoldBoard } from "@/lib/metal/board"
 import { K22_BPS, rupeesPerGramToPaisePer10g, ticketPaise } from "@/lib/metal/math"
 import { writeProductMetal } from "@/lib/metal/product"
@@ -47,6 +49,16 @@ async function writeBoard(profileId: string, fallbackCity: string, fallbackSlug:
 
 /** Sample catalog for a kit. Not a server action — call only from trusted server code. */
 export async function seedRole(profileId: string, role: string) {
+    const flavor = role
+    const demo = demoShopByFlavor(flavor)
+    if (demo) {
+        await applyDemoShop(prisma, profileId, demo, { replaceCatalog: false })
+        const engine = resolveKitRole(flavor) || flavor
+        if (engine === "JEWELRY_RETAIL" || engine === "JEWELRY_WHOLESALE") {
+            await writeBoard(profileId, "Ranchi", "ranchi")
+        }
+        return
+    }
     role = resolveKitRole(role) || role
     if (role === "RESTAURANT") {
         const existing = await prisma.serviceOffering.count({ where: { profileId } })
