@@ -1,4 +1,4 @@
-import { publicAnimationConfig } from "@/lib/profile-branding"
+import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
@@ -47,11 +47,8 @@ export default async function ShopPage({
     })
     if (!profile || !profile.isPublic) notFound()
 
-    let config: { colors?: string[]; variant?: string } = {}
-    try {
-        config = profile.animationStyle?.config ? JSON.parse(profile.animationStyle.config) : {}
-    } catch { /* ignore */ }
-    config = await publicAnimationConfig(profile.id, config)
+    const config = await publicAnimationConfig(profile.id, configuredProfileAnimation(profile))
+    const retro = config.theme === "retro-lcd"
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
     const logo = (profile as { shopLogoUrl?: string | null }).shopLogoUrl || profile.imageUrl
     const restaurant = isRestaurant(profile.roleTemplate)
@@ -71,7 +68,7 @@ export default async function ShopPage({
 
     if (restaurant) {
         return (
-            <div className="min-h-dvh bg-background text-foreground">
+            <div data-public-catalog-theme={retro ? "retro-lcd" : undefined} className="min-h-dvh bg-background text-foreground">
                 <Tracker slug={slug} name="menu_view" />
                 <SessionProbe slug={slug} />
                 <CatalogHeader
@@ -120,8 +117,9 @@ export default async function ShopPage({
 
     return (
         <div
+            data-public-catalog-theme={retro ? "retro-lcd" : undefined}
             className="min-h-dvh bg-background text-foreground"
-            style={{ ["--pl-aurora" as string]: theme.accent, ["--pl-brand-foreground" as string]: theme.onAccent }}
+            style={retro ? undefined : { ["--pl-aurora" as string]: theme.accent, ["--pl-brand-foreground" as string]: theme.onAccent }}
         >
             <Tracker slug={slug} name="shop_view" />
             <SessionProbe slug={slug} />
@@ -137,7 +135,7 @@ export default async function ShopPage({
                     slug={slug}
                     shopName={profile.displayName}
                     currency={jewelry || wholesale ? "INR" : currency}
-                    accent={theme.mid || theme.accent}
+                    accent={retro ? "var(--pl-aurora)" : theme.mid || theme.accent}
                     whatsapp={profile.whatsapp}
                     upiId={profile.upiId}
                     restaurant={restaurant}

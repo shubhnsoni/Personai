@@ -18,6 +18,9 @@ import { ChatMarkdown } from "@/components/chat/chat-markdown"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { wantsLiveSupport } from "@/lib/live-support"
 import { toast } from "sonner"
+import { resolveBloubTheme } from "@/lib/bloub/catalog"
+import type { PublicAnimationConfig } from "@/lib/profile-branding"
+import "@/components/profile/retro-lcd-theme.css"
 
 interface ChatMessage {
     id: string
@@ -54,7 +57,7 @@ interface ChatInterfaceProps {
     quickQuestions?: string[]
     onShowContent?: (type: "about" | "experience" | "projects" | "services" | "products" | "courses" | "events" | "communities") => void
     colors?: string[]
-    animationConfig?: { speed?: number; intensity?: number; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: string }
+    animationConfig?: PublicAnimationConfig
     isPanelOpen?: boolean
     onIntroStage?: (stage: "hi" | "type" | "orb" | "ready") => void
 }
@@ -94,6 +97,8 @@ export function ChatInterface({
 
     const orbColors = colors.length >= 2 ? (colors as [string, string]) : undefined
     const orbTheme = ORB_THEMES[resolveOrbVariant(colors, animationConfig.variant)]
+    const botTheme = resolveBloubTheme(animationConfig.theme)
+    const retro = botTheme === "retro-lcd"
 
     useEffect(() => {
         fetch(`/api/conversations?profileId=${profile.id}`, { credentials: "include" })
@@ -386,8 +391,9 @@ export function ChatInterface({
 
     return (
         <div
+            data-chat-theme={botTheme}
             className="flex flex-col h-full w-full relative text-profile-text"
-            style={{
+            style={retro ? undefined : {
                 ["--pl-orb-from" as string]: orbTheme.bright,
                 ["--pl-orb-to" as string]: orbTheme.deep,
                 ["--pl-aurora" as string]: orbTheme.accent,
@@ -412,6 +418,7 @@ export function ChatInterface({
                         expression={animationConfig.expression}
                         color={animationConfig.color}
                         aura={animationConfig.aura}
+                        theme={botTheme}
                         speed={animationConfig.speed}
                         intensity={animationConfig.intensity}
                         gaze={typingGaze}
@@ -459,6 +466,7 @@ export function ChatInterface({
                                 expression={animationConfig.expression}
                                 color={animationConfig.color}
                                 aura={animationConfig.aura}
+                                theme={botTheme}
                                 speed={animationConfig.speed}
                                 intensity={animationConfig.intensity}
                                 mood="greeting"
@@ -466,10 +474,10 @@ export function ChatInterface({
                             />
                         }
                         accent={orbTheme.accent}
-                        bare={animationConfig.look === "pixel" || animationConfig.look === "bloub" || animationConfig.look === "blob"}
+                        bare={retro || animationConfig.look === "pixel" || animationConfig.look === "bloub" || animationConfig.look === "blob"}
                         onReady={() => setIntroReady(true)}
                         onStage={onIntroStage}
-                        skipIntro={profile.roleTemplate === "RESTAURANT"}
+                        skipIntro={retro || profile.roleTemplate === "RESTAURANT"}
                     />
                 )}
 
@@ -520,6 +528,7 @@ export function ChatInterface({
                                                 expression={animationConfig.expression}
                                                 color={animationConfig.color}
                                                 aura={animationConfig.aura}
+                                                theme={botTheme}
                                                 speed={animationConfig.speed}
                                                 intensity={animationConfig.intensity}
                                                 mood={orbMood}
@@ -540,7 +549,7 @@ export function ChatInterface({
                                             {isOwner ? profile.displayName : `${profile.displayName}'s AI`}
                                         </p>
                                     )}
-                                    <div className={cn(
+                                    <div data-chat-bubble={isUser ? "visitor" : isOwner ? "owner" : "assistant"} className={cn(
                                         "text-base leading-relaxed break-words",
                                         isUser
                                             ? "rounded-2xl rounded-br-sm px-4 py-2.5 text-[var(--chat-on-accent)] shadow-md"

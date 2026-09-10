@@ -22,6 +22,9 @@ import { toast } from "sonner"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { Tracker, track } from "@/components/profile/tracker"
 import { SessionProbe } from "@/components/profile/session-probe"
+import { resolveBloubTheme } from "@/lib/bloub/catalog"
+import type { PublicAnimationConfig } from "@/lib/profile-branding"
+import "./retro-lcd-theme.css"
 
 interface ProfileViewProps {
     profile: {
@@ -118,7 +121,7 @@ interface ProfileViewProps {
             title: string
         }>
     }
-    animationConfig: { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: string }
+    animationConfig: PublicAnimationConfig
     colors: string[]
 }
 
@@ -212,11 +215,14 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
         }
     })
     const theme = ORB_THEMES[resolveOrbVariant(colors, animationConfig.variant)]
+    const botTheme = resolveBloubTheme(animationConfig.theme)
+    const retro = botTheme === "retro-lcd"
 
     return (
         <div
+            data-public-profile-theme={botTheme}
             className="flex h-screen w-full bg-profile text-profile-text overflow-hidden relative"
-            style={{
+            style={retro ? undefined : {
                 ["--pl-orb-from" as string]: theme.bright,
                 ["--pl-orb-to" as string]: theme.deep,
                 ["--pl-aurora" as string]: theme.accent,
@@ -243,13 +249,13 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                 </div>
             )}
 
-            <div
+            {!retro && <div
                 className="absolute inset-0 pointer-events-none z-0 transition-opacity duration-[1600ms] ease-out"
                 style={{
                     opacity: introStage === "hi" || introStage === "type" ? 0 : 0.1,
                     background: `radial-gradient(circle at 30% 30%, ${theme.bright}, transparent 60%), radial-gradient(circle at 70% 70%, ${theme.deep}, transparent 60%)`
                 }}
-            />
+            />}
 
             <div className="absolute right-3 top-3 z-30 flex items-center gap-1.5">
                 {socials.instagram ? (
@@ -282,7 +288,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
 
             <Tracker slug={profile.slug} />
             <SessionProbe slug={profile.slug} />
-            {restaurant ? null : <IntroVeil stage={introStage} />}
+            {restaurant || retro ? null : <IntroVeil stage={introStage} />}
 
             <div className="relative z-10 flex h-full min-w-0 w-full flex-1 flex-col">
                 <div className="relative mx-auto h-full w-full flex-1 overflow-hidden">

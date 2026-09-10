@@ -15,6 +15,7 @@ export function ChatAvatar({
     expression,
     color,
     aura,
+    theme,
     speed,
     intensity,
     gaze,
@@ -34,6 +35,7 @@ export function ChatAvatar({
     expression?: string
     color?: string
     aura?: string
+    theme?: string
     speed?: number
     intensity?: number
     gaze?: { x: number; y: number } | null
@@ -74,6 +76,7 @@ export function ChatAvatar({
             expression={expression}
             color={color}
             aura={aura}
+            theme={theme}
             speed={speed || 1}
             intensity={intensity || 1}
             gaze={gaze}
