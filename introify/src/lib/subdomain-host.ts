@@ -1,8 +1,10 @@
 import { MARKETING_ROUTES } from "./marketing-seo"
+import { RESERVED_UI_LOCALES } from "./ui-locale"
 
 const SKIP = /^\/(api|_next|uploads|sign-in|sign-up|dashboard|onboarding|admin|qa|library|l\/|o\/|favicon\.ico)/i
 const GLOBAL_ROUTES = new Set<string>([
     ...MARKETING_ROUTES.filter((route) => route.path !== "/").map((route) => route.path),
+    ...RESERVED_UI_LOCALES.map((code) => `/${code}`),
     "/robots.txt",
     "/sitemap.xml",
     "/opengraph-image",

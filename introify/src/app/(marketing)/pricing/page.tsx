@@ -4,6 +4,9 @@ import { PlanFeatureMatrix } from "@/components/billing/plan-feature-matrix"
 import { AiCreditGuide, PricingFaq, PublicCreditPacks } from "@/components/billing/pricing-details"
 import { marketingMetadata } from "@/lib/marketing-seo"
 import { getPublicBillingAvailability } from "@/lib/billing/config"
+import { fill } from "@/lib/ui-locale"
+import { getRequestLocale } from "@/lib/ui-locale-request"
+import { messagesFor } from "@/lib/ui-messages"
 
 export const metadata = marketingMetadata({
     title: "Plans & pricing — start free, grow your business",
@@ -11,15 +14,17 @@ export const metadata = marketingMetadata({
     path: "/pricing",
 })
 
-export default function PricingPage() {
+export default async function PricingPage() {
+    const locale = await getRequestLocale()
+    const copy = messagesFor(locale).pricing
     const availability = getPublicBillingAvailability()
-    return <MarketingShell><main id="main-content" className="billing-design billing-page"><div className="billing-container">
-        <header className="billing-page-heading"><p className="billing-eyebrow">YOUR NEXT CHAPTER, AT YOUR PACE</p><h1>Start with your story.<br /><em>Grow from there.</em></h1><p>Publish your work. Keep enquiries moving. Manage bookings and learn what brings people in. Choose the branding, intelligence and team access your business needs.</p></header>
-        <PlanComparison billingAvailable={availability.billing} />
-        <p className="plan-footnote">Current service status: AI {availability.ai ? "available where enabled on your page" : "not available yet"} · Photoreal 3D {availability.photoreal ? "available for eligible accounts" : "not available yet"}.</p>
-        <PlanFeatureMatrix />
-        <AiCreditGuide />
-        <PublicCreditPacks />
-        <PricingFaq />
+    return <MarketingShell locale={locale}><main id="main-content" className="billing-design billing-page"><div className="billing-container">
+        <header className="billing-page-heading"><p className="billing-eyebrow">{copy.pageEyebrow}</p><h1>{copy.pageTitle}<br /><em>{copy.pageTitleEm}</em></h1><p>{copy.pageLead}</p></header>
+        <PlanComparison billingAvailable={availability.billing} locale={locale} />
+        <p className="plan-footnote">{fill(copy.status, { ai: availability.ai ? copy.available : copy.notAvailable, photoreal: availability.photoreal ? copy.availableEligible : copy.notAvailable })}</p>
+        <PlanFeatureMatrix locale={locale} />
+        <AiCreditGuide locale={locale} />
+        <PublicCreditPacks locale={locale} />
+        <PricingFaq locale={locale} />
     </div></main></MarketingShell>
 }

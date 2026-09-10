@@ -28,7 +28,7 @@ describe("marketing metadata and indexing", () => {
             expect(metadata.openGraph?.url).toBe(expectedUrl)
             expect(metadata.robots).toEqual({ index: route.index, follow: true })
         }
-        expect(MARKETING_ROUTES.filter((route) => route.index).map((route) => route.path)).toEqual(["/", "/pricing"])
+        expect(MARKETING_ROUTES.filter((route) => route.index).map((route) => route.path)).toEqual(["/", "/hi", "/pricing"])
         expect(MARKETING_ROUTES.filter((route) => !route.index)).toHaveLength(9)
         expect(() => marketingMetadata({ title: "Unsafe", description: "", path: "//foreign.example.test" })).toThrow()
     })
@@ -37,7 +37,7 @@ describe("marketing metadata and indexing", () => {
         for (const route of MARKETING_ROUTES.filter((route) => route.path !== "/")) {
             const slug = route.path.slice(1)
             expect(isReservedSlug(slug)).toBe(true)
-            expect(usernameError(slug)).toMatch(/reserved/)
+            expect(usernameError(slug)).toMatch(slug.length < 3 ? /3/ : /reserved/)
             expect(isIndexableProfileSlug(slug)).toBe(false)
         }
         expect(usernameError("ada-lovelace")).toBeNull()
@@ -77,8 +77,14 @@ describe("marketing metadata and indexing", () => {
             { slug: "privacy", updatedAt },
             { slug: "admin", updatedAt },
         ])
+        const languages = {
+            en: "https://example.test/",
+            hi: "https://example.test/hi",
+            "x-default": "https://example.test/",
+        }
         expect(await sitemap()).toEqual([
-            { url: "https://example.test/" },
+            { url: "https://example.test/", alternates: { languages } },
+            { url: "https://example.test/hi", alternates: { languages } },
             { url: "https://example.test/pricing" },
             { url: "https://example.test/ada-lovelace", lastModified: updatedAt },
         ])

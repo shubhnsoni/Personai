@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og"
 import { prisma } from "@/lib/prisma"
+import { isReservedUiLocale } from "@/lib/ui-locale"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -23,18 +24,22 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     let headline = FALLBACK_HEADLINE
     let handle = slug
 
-    try {
-        const profile = await prisma.profile.findUnique({
-            where: { slug },
-            select: { displayName: true, headline: true, slug: true, isPublic: true },
-        })
-        if (profile?.isPublic) {
-            displayName = profile.displayName
-            headline = profile.headline?.trim() || `Chat with ${profile.displayName}'s AI clone`
-            handle = profile.slug
+    if (!isReservedUiLocale(slug)) {
+        try {
+            const profile = await prisma.profile.findUnique({
+                where: { slug },
+                select: { displayName: true, headline: true, slug: true, isPublic: true },
+            })
+            if (profile?.isPublic) {
+                displayName = profile.displayName
+                headline = profile.headline?.trim() || `Chat with ${profile.displayName}'s AI clone`
+                handle = profile.slug
+            }
+        } catch {
+            // Render the branded fallback if the database is unavailable.
         }
-    } catch {
-        // Render the branded fallback if the database is unavailable.
+    } else {
+        handle = slug === "hi" ? "hi" : ""
     }
 
     return new ImageResponse(

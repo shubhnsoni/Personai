@@ -8,6 +8,7 @@ export const BRAND_DESCRIPTION = "Create one page for your profile, services, pr
 // and policies are ready. Page metadata and the sitemap use the same registry.
 export const MARKETING_ROUTES = [
     { path: "/", index: true },
+    { path: "/hi", index: true },
     { path: "/about", index: false },
     { path: "/contact", index: false },
     { path: "/pricing", index: true },
@@ -30,11 +31,20 @@ export function marketingOrigin(value = process.env.NEXT_PUBLIC_APP_URL): string
     }
 }
 
-export function marketingMetadata({ title, description, path, index }: {
+export function homeLanguageAlternates(origin = marketingOrigin()) {
+    return {
+        en: new URL("/", origin).href,
+        hi: new URL("/hi", origin).href,
+        "x-default": new URL("/", origin).href,
+    }
+}
+
+export function marketingMetadata({ title, description, path, index, languages }: {
     title: string
     description: string
     path: string
     index?: boolean
+    languages?: boolean
 }): Metadata {
     const origin = marketingOrigin()
     if (!path.startsWith("/") || path.startsWith("//") || /[?#\\]/.test(path)) {
@@ -43,10 +53,14 @@ export function marketingMetadata({ title, description, path, index }: {
     const canonical = new URL(path, origin).href
     const canIndex = index ?? MARKETING_ROUTES.find((route) => route.path === path)?.index ?? false
     const pageTitle = title.includes(BRAND_NAME) ? title : `${title} | ${BRAND_NAME}`
+    const withLanguages = languages ?? (path === "/" || path === "/hi")
     return {
         title: { absolute: pageTitle },
         description,
-        alternates: { canonical },
+        alternates: {
+            canonical,
+            ...(withLanguages ? { languages: homeLanguageAlternates(origin) } : {}),
+        },
         robots: { index: canIndex, follow: true },
         openGraph: {
             type: "website",

@@ -3,102 +3,115 @@ import { ArrowUpRight } from "lucide-react"
 import type { ReactNode } from "react"
 import { ThemeToggle } from "./theme-toggle"
 import { MobileNav } from "./mobile-nav"
+import { LanguageSwitcher } from "./language-switcher"
 import { IntroifyWordmark } from "@/components/brand/wordmark"
 import { cn } from "@/lib/utils"
+import { homeHash, localeHomePath, type UiLocale } from "@/lib/ui-locale"
+import { messagesFor } from "@/lib/ui-messages"
 import "./marketing.css"
 import "./marketing-theme.css"
 
-export function BrandMark() {
+export function BrandMark({ locale = "en" }: { locale?: UiLocale }) {
+    const chrome = messagesFor(locale).chrome
     return (
-        <Link href="/" className="mk-brand" aria-label="Introify home">
+        <Link href={localeHomePath(locale)} className="mk-brand" aria-label={chrome.home}>
             <IntroifyWordmark decorative />
         </Link>
     )
 }
 
-const navigation = [
-    ["Product", "/#product"],
-    ["For you", "/#stories"],
-    ["How it works", "/#how-it-works"],
-    ["Pricing", "/pricing"],
-    ["FAQ", "/#faq"],
-] as const
+function marketingNav(locale: UiLocale) {
+    const nav = messagesFor(locale).chrome.nav
+    return [
+        [nav.product, homeHash(locale, "product")],
+        [nav.forYou, homeHash(locale, "stories")],
+        [nav.how, homeHash(locale, "how-it-works")],
+        [nav.pricing, "/pricing"],
+        [nav.faq, homeHash(locale, "faq")],
+    ] as [string, string][]
+}
 
-export function MarketingHeader() {
+export function MarketingHeader({ locale = "en" }: { locale?: UiLocale }) {
+    const chrome = messagesFor(locale).chrome
+    const navigation = marketingNav(locale)
     return (
         <header className="mk-header">
             <div className="mk-container mk-header-inner">
-                <BrandMark />
+                <BrandMark locale={locale} />
                 <nav className="mk-desktop-nav" aria-label="Main navigation">
                     {navigation.map(([label, href]) => (
-                        <Link key={label} href={href}>
+                        <Link key={href} href={href}>
                             {label}
                         </Link>
                     ))}
                 </nav>
                 <div className="mk-header-actions">
+                    <LanguageSwitcher locale={locale} label={chrome.language} />
                     <ThemeToggle />
                     <Link className="mk-sign-in" href="/sign-in">
-                        Sign in
+                        {chrome.signIn}
                     </Link>
                     <Link className="mk-button mk-button-small" href="/sign-up">
-                        Get started <ArrowUpRight size={15} />
+                        {chrome.getStarted} <ArrowUpRight size={15} />
                     </Link>
                 </div>
-                <MobileNav links={navigation} />
+                <MobileNav
+                    links={navigation}
+                    getStarted={chrome.getStarted}
+                    signIn={chrome.signIn}
+                    menuLabel={chrome.menu}
+                />
             </div>
         </header>
     )
 }
 
-const footerGroups = [
-    {
-        title: "Explore",
-        links: [
-            ["Product", "/#product"],
-            ["For you", "/#stories"],
-            ["How it works", "/#how-it-works"],
-            ["Pricing", "/pricing"],
-            ["FAQ", "/#faq"],
-            ["Explore a page", "/demo"],
-            ["Create your page", "/sign-up"],
-            ["Sign in", "/sign-in"],
-        ],
-    },
-    {
-        title: "Introify",
-        links: [
-            ["About", "/about"],
-            ["Contact", "/contact"],
-            ["Acceptable use", "/acceptable-use"],
-            ["SMS policy", "/sms-policy"],
-        ],
-    },
-    {
-        title: "Policies",
-        links: [
-            ["Privacy policy", "/privacy"],
-            ["Terms & conditions", "/terms"],
-            ["Refunds & cancellations", "/refund-policy"],
-            ["Delivery & fulfillment", "/delivery-policy"],
-            ["Cookie policy", "/cookie-policy"],
-        ],
-    },
-]
-
-export function MarketingFooter() {
+export function MarketingFooter({ locale = "en" }: { locale?: UiLocale }) {
+    const chrome = messagesFor(locale).chrome
+    const footerGroups = [
+        {
+            title: chrome.footer.explore,
+            links: [
+                ...marketingNav(locale),
+                [chrome.footer.demo, "/demo"],
+                [chrome.footer.create, "/sign-up"],
+                [chrome.signIn, "/sign-in"],
+            ],
+        },
+        {
+            title: chrome.footer.introify,
+            links: [
+                [chrome.footer.about, "/about"],
+                [chrome.footer.contact, "/contact"],
+                [chrome.footer.acceptableUse, "/acceptable-use"],
+                [chrome.footer.sms, "/sms-policy"],
+            ],
+        },
+        {
+            title: chrome.footer.policies,
+            links: [
+                [chrome.footer.privacy, "/privacy"],
+                [chrome.footer.terms, "/terms"],
+                [chrome.footer.refunds, "/refund-policy"],
+                [chrome.footer.delivery, "/delivery-policy"],
+                [chrome.footer.cookies, "/cookie-policy"],
+            ],
+        },
+    ]
+    const [taglineLead, taglineTail] = chrome.tagline.split("\n")
     return (
         <footer className="mk-footer">
             <div className="mk-container">
                 <div className="mk-footer-top">
                     <div className="mk-footer-brand">
-                        <BrandMark />
+                        <BrandMark locale={locale} />
                         <p>
-                            Good work deserves
-                            <br />a great introduction.
+                            {taglineLead}
+                            <br />
+                            {taglineTail}
                         </p>
                         <span className="mk-small-label">
-                            YOUR WORK. ONE LINK.
+                            {chrome.kicker}
                         </span>
                     </div>
                     {footerGroups.map((group) => (
@@ -107,35 +120,37 @@ export function MarketingFooter() {
                             aria-label={`${group.title} footer links`}
                         >
                             <h2>{group.title}</h2>
-                            {group.links.map(([label, href]) => (
-                                <Link key={href} href={href}>
-                                    {label}
-                                </Link>
-                            ))}
+                            {group.links.map(link => {
+                                const [label, href] = link
+                                return (
+                                    <Link key={`${group.title}:${href}`} href={href}>
+                                        {label}
+                                    </Link>
+                                )
+                            })}
                         </nav>
                     ))}
                 </div>
                 <div className="mk-footer-bottom">
                     <span>© {new Date().getFullYear()} Introify</span>
-                    <span>
-                        Made for people building something of their own.
-                    </span>
-                    <Link href="/#top">Back to top ↑</Link>
+                    <span>{chrome.madeFor}</span>
+                    <Link href="#top">{chrome.backToTop}</Link>
                 </div>
             </div>
         </footer>
     )
 }
 
-export function MarketingShell({ children, className }: { children: ReactNode; className?: string }) {
+export function MarketingShell({ children, className, locale = "en" }: { children: ReactNode; className?: string; locale?: UiLocale }) {
+    const chrome = messagesFor(locale).chrome
     return (
-        <div className={cn("mk-page", className)} id="top">
+        <div className={cn("mk-page", className)} id="top" lang={locale === "hi" ? "hi" : undefined}>
             <a className="mk-skip-link" href="#main-content">
-                Skip to content
+                {chrome.skip}
             </a>
-            <MarketingHeader />
+            <MarketingHeader locale={locale} />
             {children}
-            <MarketingFooter />
+            <MarketingFooter locale={locale} />
         </div>
     )
 }

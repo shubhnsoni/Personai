@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { tenantFromHost, subdomainRoute } from "@/lib/subdomain-host";
+import { persistLocaleHomeCookie, uiLocaleRequestHeaders } from "@/lib/ui-locale-request";
 
 /**
  * Protected route patterns, exported so tests assert against the REAL patterns
@@ -37,6 +38,7 @@ function apexHostname() {
 }
 
 export const proxy = clerkMiddleware(async (auth, req) => {
+  const requestHeaders = uiLocaleRequestHeaders(req)
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || ""
   const tenant = tenantFromHost(host, apexHostname())
   if (tenant) {
@@ -44,12 +46,12 @@ export const proxy = clerkMiddleware(async (auth, req) => {
     if (route.type === "redirect") {
       const url = req.nextUrl.clone()
       url.pathname = route.pathname
-      return NextResponse.redirect(url)
+      return persistLocaleHomeCookie(req, NextResponse.redirect(url))
     }
     if (route.type === "rewrite") {
       const url = req.nextUrl.clone()
       url.pathname = route.pathname
-      return NextResponse.rewrite(url)
+      return persistLocaleHomeCookie(req, NextResponse.rewrite(url, { request: { headers: requestHeaders } }))
     }
   }
   if (isProtectedRoute(req)) {
@@ -57,6 +59,7 @@ export const proxy = clerkMiddleware(async (auth, req) => {
       unauthenticatedUrl: new URL("/sign-in", req.url).toString(),
     });
   }
+  return persistLocaleHomeCookie(req, NextResponse.next({ request: { headers: requestHeaders } }))
 });
 
 export default proxy;

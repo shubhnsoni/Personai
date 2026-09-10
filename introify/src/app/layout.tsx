@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { clerkAppearance } from "@/lib/clerk-appearance";
@@ -10,6 +10,8 @@ import { getRequestCurrency } from "@/lib/request-currency";
 import { Toaster } from "sonner";
 import { BRAND_DESCRIPTION, marketingOrigin } from "@/lib/marketing-seo";
 import { PageTransitionProvider } from "@/components/navigation/page-transition";
+import { getRequestLocale } from "@/lib/ui-locale-request";
+import { htmlLang } from "@/lib/ui-locale";
 import "@/components/navigation/page-transition.css";
 
 const geistSans = Geist({
@@ -20,6 +22,11 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const notoDevanagari = Noto_Sans_Devanagari({
+  variable: "--font-noto-devanagari",
+  subsets: ["devanagari", "latin"],
 });
 
 export const dynamic = 'force-dynamic'
@@ -46,11 +53,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const currency = await getRequestCurrency()
+  const [currency, locale] = await Promise.all([getRequestCurrency(), getRequestLocale()])
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={htmlLang(locale)} dir="ltr" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${notoDevanagari.variable} antialiased`}
         suppressHydrationWarning
       >
         <ClerkProvider

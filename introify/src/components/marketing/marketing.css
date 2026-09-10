@@ -10,7 +10,7 @@
     --mk-lime: #dcecba;
     background: var(--mk-paper);
     color: var(--mk-ink);
-    font-family: var(--font-geist-sans), Arial, sans-serif;
+    font-family: var(--font-sans), var(--font-geist-sans), Arial, sans-serif;
     font-size: 15px;
     line-height: 1.6;
     overflow: clip;
@@ -41,6 +41,13 @@
     font-family: Georgia, "Times New Roman", serif;
     font-weight: 400;
     letter-spacing: -0.045em;
+}
+html[lang="hi-IN"] .mk-page em,
+.mk-page[lang="hi"] em {
+    font-family: var(--font-noto-devanagari), var(--font-geist-sans), sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    letter-spacing: 0;
 }
 .mk-page :focus-visible {
     outline: 3px solid var(--mk-accent);

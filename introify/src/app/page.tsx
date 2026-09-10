@@ -9,6 +9,7 @@ export const metadata = marketingMetadata({
     title: "Introify — Your personal page, work & bookings in one link",
     description: BRAND_DESCRIPTION,
     path: "/",
+    languages: true,
 })
 
 export default function Home() {
@@ -23,7 +24,7 @@ export default function Home() {
                     ),
                 }}
             />
-            <HomeLanding />
+            <HomeLanding locale="en" />
         </>
     )
 }

@@ -1,14 +1,32 @@
 import { publicAnimationConfig } from "@/lib/profile-branding"
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { ProfileView } from "@/components/profile/profile-view"
 import { Metadata } from "next"
-import { isIndexableProfileSlug, marketingOrigin } from "@/lib/marketing-seo"
+import { isIndexableProfileSlug, marketingMetadata, marketingOrigin, marketingStructuredData } from "@/lib/marketing-seo"
+import { HomeLanding } from "@/components/landing/home-landing"
+import { isLocaleHomeSlug, isReservedUiLocale } from "@/lib/ui-locale"
+import { messagesFor } from "@/lib/ui-messages"
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProfilePage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params
+    if (slug === "en") permanentRedirect("/")
+    if (isLocaleHomeSlug(slug)) {
+        return (
+            <>
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify(marketingStructuredData()).replace(/</g, "\\u003c"),
+                    }}
+                />
+                <HomeLanding locale={slug} />
+            </>
+        )
+    }
+    if (isReservedUiLocale(slug)) notFound()
     const profile = await prisma.profile.findUnique({
         where: { slug },
         include: {
@@ -91,6 +109,18 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
     const { slug } = await params
+    if (isLocaleHomeSlug(slug)) {
+        const meta = messagesFor(slug).meta
+        return marketingMetadata({
+            title: meta.homeTitle,
+            description: meta.homeDescription,
+            path: `/${slug}`,
+            languages: true,
+        })
+    }
+    if (isReservedUiLocale(slug)) {
+        return { title: "Not Found", robots: { index: false, follow: false } }
+    }
     const profile = await prisma.profile.findUnique({
         where: { slug },
         select: { displayName: true, headline: true, bio: true, slug: true, isPublic: true }

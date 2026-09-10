@@ -1,4 +1,4 @@
-import { PolicyPage } from "@/components/marketing/policy-page"
+import { LocalizedPolicyPage } from "@/components/marketing/localized-policy"
 import { policyDocuments } from "@/lib/marketing-policies"
 import { marketingMetadata } from "@/lib/marketing-seo"
 
@@ -12,5 +12,5 @@ export const metadata = marketingMetadata({
 })
 
 export default function AcceptableUsePage() {
-    return <PolicyPage document={document} />
+    return <LocalizedPolicyPage document={document} />
 }

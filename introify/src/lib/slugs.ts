@@ -1,5 +1,8 @@
+import { RESERVED_UI_LOCALES } from "./ui-locale"
+
 /** App routes and product words that must never be a profile slug. */
 export const RESERVED = [
+    ...RESERVED_UI_LOCALES,
     "dashboard",
     "onboarding",
     "admin",

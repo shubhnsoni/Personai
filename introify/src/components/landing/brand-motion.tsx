@@ -123,13 +123,19 @@ export function LandingMotion({ children }: { children: ReactNode }) {
     )
 }
 
-export function MotionToggle() {
+export function MotionToggle({
+    pause = "Pause animations",
+    resume = "Resume animations",
+}: {
+    pause?: string
+    resume?: string
+}) {
     const { enabled, toggle } = useLandingMotion()
     const Icon = enabled ? Pause : Play
     return (
         <button className="bm-motion-toggle" type="button" onClick={toggle}>
             <Icon size={13} strokeWidth={1.8} aria-hidden />
-            <span>{enabled ? "Pause animations" : "Resume animations"}</span>
+            <span>{enabled ? pause : resume}</span>
         </button>
     )
 }

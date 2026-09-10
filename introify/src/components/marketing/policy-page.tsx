@@ -2,14 +2,17 @@ import Link from "@/components/navigation/transition-link"
 import { ArrowLeft, ArrowUpRight, FileText } from "lucide-react"
 import { MarketingShell } from "./marketing-shell"
 import type { PolicyDocument } from "@/lib/marketing-policies"
+import { fill, localeHomePath, type UiLocale } from "@/lib/ui-locale"
+import { messagesFor } from "@/lib/ui-messages"
 
-export function PolicyPage({ document }: { document: PolicyDocument }) {
+export function PolicyPage({ document, locale = "en" }: { document: PolicyDocument; locale?: UiLocale }) {
+    const policy = messagesFor(locale).chrome.policy
     return (
-        <MarketingShell>
+        <MarketingShell locale={locale}>
             <main id="main-content" className="mk-policy-main">
                 <div className="mk-container">
-                    <Link href="/" className="mk-back">
-                        <ArrowLeft size={15} /> Back to Introify
+                    <Link href={localeHomePath(locale)} className="mk-back">
+                        <ArrowLeft size={15} /> {policy.back}
                     </Link>
                     <div className="mk-policy-heading">
                         <span className="mk-eyebrow">{document.kicker}</span>
@@ -19,26 +22,22 @@ export function PolicyPage({ document }: { document: PolicyDocument }) {
                             <span>
                                 <FileText size={14} />{" "}
                                 {document.draft
-                                    ? "Draft for review"
-                                    : "Published policy"}
+                                    ? policy.draftBadge
+                                    : policy.publishedBadge}
                             </span>
-                            <span>Updated {document.updatedOn}</span>
+                            <span>{fill(policy.updated, { date: document.updatedOn })}</span>
                         </div>
                     </div>
                     {document.draft && (
                         <div className="mk-draft-notice">
-                            <strong>Details are still being completed.</strong>
-                            <p>
-                                This page is a draft. Blank business and policy
-                                fields will be completed before payment or SMS
-                                services are activated.
-                            </p>
+                            <strong>{policy.draftTitle}</strong>
+                            <p>{policy.draftBody}</p>
                         </div>
                     )}
                     <div className="mk-policy-layout">
                         <aside>
-                            <nav aria-label="On this page">
-                                <h2>On this page</h2>
+                            <nav aria-label={policy.onThisPage}>
+                                <h2>{policy.onThisPage}</h2>
                                 {document.sections.map((section, index) => (
                                     <a key={section.id} href={`#${section.id}`}>
                                         <span>
@@ -49,7 +48,7 @@ export function PolicyPage({ document }: { document: PolicyDocument }) {
                                 ))}
                             </nav>
                             <Link href="/contact" className="mk-policy-help">
-                                Need to get in touch? <ArrowUpRight size={16} />
+                                {policy.contactCta} <ArrowUpRight size={16} />
                             </Link>
                         </aside>
                         <article className="mk-policy-article">
@@ -80,8 +79,7 @@ export function PolicyPage({ document }: { document: PolicyDocument }) {
                                                         {field.value || (
                                                             <span className="mk-blank-field">
                                                                 <span className="sr-only">
-                                                                    Not yet
-                                                                    provided
+                                                                    {policy.notProvided}
                                                                 </span>
                                                                 &nbsp;
                                                             </span>

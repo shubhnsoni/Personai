@@ -10,6 +10,40 @@
 .mk-header { position: sticky; top: 0; }
 .mk-header-inner { gap: 28px; }
 .mk-header-actions { gap: 16px; }
+.mk-language {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 44px;
+    min-width: 44px;
+    border: 1px solid var(--mk-line);
+    border-radius: 999px;
+    color: var(--mk-ink);
+    background: var(--mk-surface);
+    padding-inline: 10px 28px;
+}
+.mk-language > svg {
+    position: absolute;
+    left: 12px;
+    pointer-events: none;
+}
+.mk-language select {
+    display: block;
+    appearance: none;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--mk-ink);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    padding-left: 22px;
+    cursor: pointer;
+}
+.mk-language option { background: var(--mk-surface); color: var(--mk-ink); }
+.mk-language:hover { border-color: var(--mk-blue); }
+.mk-language:focus-within { outline: 3px solid var(--mk-blue); outline-offset: 3px; }
+.mk-language select:focus-visible { outline: none; }
 .mk-theme-toggle {
     position: relative;
     flex: 0 0 44px;
@@ -241,12 +275,22 @@
 
 @media (max-width: 480px) {
     .mk-header-actions > .mk-button-small { display: none; }
+    .mk-language { padding-inline: 8px; min-width: 44px; }
+    .mk-language > svg { position: static; }
+    .mk-language select {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        padding: 0;
+    }
 }
 
 @media (forced-colors: active) {
     .mk-theme-toggle select { opacity: 1; color: ButtonText; background: ButtonFace; padding: 0 3px; }
     .mk-theme-toggle { width: 84px; flex-basis: 84px; border-radius: 5px; }
     .mk-theme-toggle > svg { display: none; }
+    .mk-language { border-radius: 5px; }
+    .mk-language select { color: ButtonText; background: ButtonFace; }
 }
 
 @media (forced-colors: active) and (max-width: 650px) {

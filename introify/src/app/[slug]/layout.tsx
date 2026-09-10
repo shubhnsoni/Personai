@@ -2,9 +2,11 @@ import type { ReactNode } from "react"
 import Link from "@/components/navigation/transition-link"
 import { prisma } from "@/lib/prisma"
 import { canHideIntroifyBrand, publicBrandingAccess } from "@/lib/profile-branding"
+import { isReservedUiLocale } from "@/lib/ui-locale"
 
 export default async function PublicBusinessLayout({ children, params }: { children: ReactNode; params: Promise<{ slug: string }> }) {
     const { slug } = await params
+    if (isReservedUiLocale(slug)) return children
     const profile = await prisma.profile.findUnique({ where: { slug }, select: { id: true, isPublic: true, personalityConfig: true } })
     const hideBrand = profile?.isPublic && canHideIntroifyBrand(await publicBrandingAccess(profile.id), profile.personalityConfig)
     return <>{children}{profile?.isPublic && !hideBrand && (
