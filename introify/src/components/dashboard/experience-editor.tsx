@@ -71,7 +71,7 @@ export function ExperienceEditor({ profileId, experiences }: ExperienceEditorPro
                     </div>
                 ) : !isCreating ? (
                     <p className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
-                        No roles yet.
+                        Add roles the assistant can talk about.
                     </p>
                 ) : null}
 

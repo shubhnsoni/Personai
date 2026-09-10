@@ -71,7 +71,7 @@ export function ProjectEditor({ profileId, projects }: ProjectEditorProps) {
                     </div>
                 ) : !isCreating ? (
                     <p className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
-                        No projects yet.
+                        Add work the assistant can walk through.
                     </p>
                 ) : null}
 

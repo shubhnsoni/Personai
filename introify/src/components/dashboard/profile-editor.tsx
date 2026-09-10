@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WelcomeOrb } from "@/components/welcome-orb"
-import { User, Briefcase, FolderKanban, Palette, Sparkles, Globe, BookOpen, ChevronDown, Check, MapPin } from "lucide-react"
+import { User, Briefcase, Palette, Sparkles, Globe, BookOpen, ChevronDown, Check, MapPin } from "lucide-react"
 import { KitPicker } from "@/components/dashboard/kit-picker"
 import { previewListing, applyListing } from "@/app/actions/listing"
 import { OfferSheet, LiveRow } from "@/components/dashboard/offer-sheet"
@@ -84,7 +84,7 @@ interface ProfileEditorProps {
     profile: Profile & { workExperiences?: WorkExperience[]; projects?: Project[] }
     presets: WelcomeAnimationPreset[]
     onSavingChange?: (saving: boolean) => void
-    defaultTab?: "general" | "about" | "appearance" | "ai" | "public"
+    defaultTab?: "general" | "about" | "appearance" | "ai" | "public" | "work"
 }
 
 export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "general" }: ProfileEditorProps) {
@@ -98,6 +98,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
     const [, setIsSaving] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [blobOpen, setBlobOpen] = useState(false)
+    const [auraOpen, setAuraOpen] = useState(false)
     const [googleOpen, setGoogleOpen] = useState(false)
     const [paymentQrUrl, setPaymentQrUrl] = useState(() => paymentQrUrlFromConfig(profile.personalityConfig))
     const [payMode, setPayMode] = useState(() => payModeFromConfig(profile.personalityConfig))
@@ -159,7 +160,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
         current[field] = value || undefined
         // Remove empty keys
         Object.keys(current).forEach(k => { if (!current[k]) delete current[k] })
-        setValue("personalityConfig", Object.keys(current).length > 0 ? JSON.stringify(current) : "")
+        setValue("personalityConfig", Object.keys(current).length > 0 ? JSON.stringify(current) : "", { shouldDirty: true })
     }
 
     const selectedAnimationId = watch("animationStyleId")
@@ -173,7 +174,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
         } catch {
             return {}
         }
-    })() as { look?: string; shape?: string; expression?: string; color?: string }
+    })() as { look?: string; shape?: string; expression?: string; color?: string; colors?: string[] }
     const blobSelected = selectedPresetConfig.look === "bloub" || selectedPresetConfig.look === "blob"
     const liveOrb: BloubPick = {
         shape: resolveBloubShape(orbPick.shape || selectedPresetConfig.shape),
@@ -197,6 +198,14 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
     const imageUrl = watch("imageUrl")
     const shopLogoUrl = watch("shopLogoUrl")
     const chatAvatarMode = watch("chatAvatarMode") || "ORB"
+    const roleTemplate = watch("roleTemplate")
+    const extras = extrasOf(personalityRaw)
+    const hasPortfolio = fieldOn(roleTemplate, "portfolio", extras)
+    const hasMenu = fieldOn(roleTemplate, "menuDish", extras)
+    const hasPay = fieldOn(roleTemplate, "whatsappUpi", extras) || hasSurface(roleTemplate, "shop", extras)
+    const socialCount = [socials.instagram, socials.facebook, socials.youtube, socials.maps, hasMenu ? socials.zomato : ""].filter((value) => value && value.trim()).length
+    const selectedPreset = presets.find((preset) => preset.id === selectedAnimationId)
+    const tabBtn = "px-2.5 [&>span]:ml-1.5 [&>span]:max-w-[8rem] [&>span]:opacity-100"
 
     const handlePhotoUpload = async (file?: File, field: "imageUrl" | "shopLogoUrl" = "imageUrl") => {
         if (!file) return
@@ -243,56 +252,42 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
 
     return (
         <>
-        <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-            <Tabs defaultValue={defaultTab} className="w-full gap-3">
-                <TabsList>
-                    <TabsTrigger value="general"><User /><span>General</span></TabsTrigger>
-                    <TabsTrigger value="about"><BookOpen /><span>About</span></TabsTrigger>
-                    {fieldOn(watch("roleTemplate"), "portfolio", extrasOf(watch("personalityConfig"))) ? <TabsTrigger value="experience"><Briefcase /><span>Experience</span></TabsTrigger> : null}
-                    {fieldOn(watch("roleTemplate"), "portfolio", extrasOf(watch("personalityConfig"))) ? <TabsTrigger value="projects"><FolderKanban /><span>Projects</span></TabsTrigger> : null}
-                    <TabsTrigger value="appearance"><Palette /><span>Appearance</span></TabsTrigger>
-                    <TabsTrigger value="ai"><Sparkles /><span>AI</span></TabsTrigger>
-                    <TabsTrigger value="public"><Globe /><span>Public</span></TabsTrigger>
-                </TabsList>
+        <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <Tabs defaultValue={defaultTab === "work" ? "work" : defaultTab} className="w-full gap-4">
+                <div className="sticky top-0 z-20 bg-background/90 pb-3 pt-1 backdrop-blur-md">
+                    <TabsList aria-label="Profile sections">
+                        <TabsTrigger value="general" className={tabBtn}><User /><span>General</span></TabsTrigger>
+                        <TabsTrigger value="about" className={tabBtn}><BookOpen /><span>About</span></TabsTrigger>
+                        {hasPortfolio ? <TabsTrigger value="work" className={tabBtn}><Briefcase /><span>Work</span></TabsTrigger> : null}
+                        <TabsTrigger value="appearance" className={tabBtn}><Palette /><span>Look</span></TabsTrigger>
+                        <TabsTrigger value="ai" className={tabBtn}><Sparkles /><span>AI</span></TabsTrigger>
+                        <TabsTrigger value="public" className={tabBtn}><Globe /><span>Page</span></TabsTrigger>
+                    </TabsList>
+                </div>
 
-                <TabsContent value="general">
-                    <div className="overflow-hidden rounded-2xl border bg-card">
-                        <div className="flex flex-col gap-3 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0">
-                                <p className="text-sm font-medium">Google listing</p>
-                                <p className="text-xs text-muted-foreground">Name, address, hours, and photos from Maps. Fill is free.</p>
-                            </div>
-                            <Button
-                                type="button"
-                                onClick={() => setGoogleOpen(true)}
-                                className="h-11 shrink-0 gap-2 rounded-full border border-[#00D7FF]/40 bg-[#00D7FF]/10 text-[#00D7FF] backdrop-blur hover:bg-[#00D7FF]/20"
-                            >
-                                <MapPin className="h-4 w-4" />
+                <TabsContent value="general" className="space-y-3">
+                    <Section
+                        title="Identity"
+                        description="What guests read first on your page."
+                        action={
+                            <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 gap-1.5 rounded-full px-2 text-xs text-muted-foreground" onClick={() => setGoogleOpen(true)}>
+                                <MapPin className="h-3.5 w-3.5" />
                                 Fill from Google
                             </Button>
-                        </div>
-                        <div className="space-y-4 px-5 py-5">
-                            <GhostField label="Name" error={errors.displayName?.message}>
-                                <Input id="displayName" className={cn(ghostInput, "text-base font-medium")} {...register("displayName")} />
-                            </GhostField>
-                            <GhostField label="Headline">
-                                <Input
-                                    id="headline"
-                                    className={ghostInput}
-                                    placeholder="Executive coach for first-time founders"
-                                    {...register("headline")}
-                                />
-                            </GhostField>
-                            <GhostField label="Bio">
-                                <Textarea
-                                    id="bio"
-                                    rows={4}
-                                    className={cn(ghostInput, "min-h-[96px] resize-y")}
-                                    {...register("bio")}
-                                />
-                            </GhostField>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 border-t px-5 py-5 sm:grid-cols-2">
+                        }
+                    >
+                        <GhostField label="Name" error={errors.displayName?.message}>
+                            <Input id="displayName" className={cn(ghostInput, "text-base font-medium")} {...register("displayName")} />
+                        </GhostField>
+                        <GhostField label="Headline">
+                            <Input id="headline" className={ghostInput} placeholder="Executive coach for first-time founders" {...register("headline")} />
+                        </GhostField>
+                        <GhostField label="Bio">
+                            <Textarea id="bio" rows={4} className={cn(ghostInput, "min-h-[96px] resize-y")} {...register("bio")} />
+                        </GhostField>
+                    </Section>
+                    <Section title="Contact" description="How people reach you. Language is for the assistant.">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <GhostField label="WhatsApp">
                                 <Input className={ghostInput} placeholder="91xxxxxxxxxx" {...register("whatsapp")} />
                             </GhostField>
@@ -303,207 +298,189 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 <Input id="timezone" className={ghostInput} placeholder="Asia/Kolkata" {...register("timezone")} />
                             </GhostField>
                         </div>
-                        <div className="space-y-4 border-t px-5 py-5">
+                    </Section>
+                    <details className="group rounded-2xl border border-border/70 bg-card">
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                            <span>Social links{socialCount ? ` · ${socialCount}` : ""}</span>
+                            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Instagram, Maps, and more</span>
+                        </summary>
+                        <div className="grid gap-4 border-t border-border/60 px-4 py-4 sm:grid-cols-2">
                             <GhostField label="Instagram">
-                                <Input
-                                    className={ghostInput}
-                                    placeholder="https://instagram.com/yourpage"
-                                    value={socials.instagram || ""}
-                                    onChange={(e) => setSocials((cur) => ({ ...cur, instagram: e.target.value }))}
-                                />
+                                <Input className={ghostInput} placeholder="https://instagram.com/yourpage" value={socials.instagram || ""} onChange={(e) => setSocials((cur) => ({ ...cur, instagram: e.target.value }))} />
                             </GhostField>
                             <GhostField label="Facebook">
-                                <Input
-                                    className={ghostInput}
-                                    placeholder="https://facebook.com/..."
-                                    value={socials.facebook || ""}
-                                    onChange={(e) => setSocials((cur) => ({ ...cur, facebook: e.target.value }))}
-                                />
+                                <Input className={ghostInput} placeholder="https://facebook.com/..." value={socials.facebook || ""} onChange={(e) => setSocials((cur) => ({ ...cur, facebook: e.target.value }))} />
                             </GhostField>
                             <GhostField label="YouTube">
-                                <Input
-                                    className={ghostInput}
-                                    placeholder="https://youtube.com/..."
-                                    value={socials.youtube || ""}
-                                    onChange={(e) => setSocials((cur) => ({ ...cur, youtube: e.target.value }))}
-                                />
+                                <Input className={ghostInput} placeholder="https://youtube.com/..." value={socials.youtube || ""} onChange={(e) => setSocials((cur) => ({ ...cur, youtube: e.target.value }))} />
                             </GhostField>
                             <GhostField label="Google Maps">
-                                <Input
-                                    className={ghostInput}
-                                    placeholder="https://maps.google.com/..."
-                                    value={socials.maps || ""}
-                                    onChange={(e) => setSocials((cur) => ({ ...cur, maps: e.target.value }))}
-                                />
+                                <Input className={ghostInput} placeholder="https://maps.google.com/..." value={socials.maps || ""} onChange={(e) => setSocials((cur) => ({ ...cur, maps: e.target.value }))} />
                             </GhostField>
-                            {fieldOn(watch("roleTemplate"), "menuDish", extrasOf(watch("personalityConfig"))) ? (
+                            {hasMenu ? (
                                 <GhostField label="Zomato">
-                                    <Input
-                                        className={ghostInput}
-                                        placeholder="https://zomato.com/yourpage"
-                                        value={socials.zomato || ""}
-                                        onChange={(e) => setSocials((cur) => ({ ...cur, zomato: e.target.value }))}
-                                    />
+                                    <Input className={ghostInput} placeholder="https://zomato.com/yourpage" value={socials.zomato || ""} onChange={(e) => setSocials((cur) => ({ ...cur, zomato: e.target.value }))} />
                                 </GhostField>
                             ) : null}
                         </div>
-                    </div>
+                    </details>
                 </TabsContent>
 
                 <TabsContent value="about">
-                    <StoryStudio slug={profile.slug} role={watch("roleTemplate")} personalityConfig={profile.personalityConfig} />
+                    <StoryStudio slug={profile.slug} role={roleTemplate} personalityConfig={profile.personalityConfig} />
                 </TabsContent>
 
-                {fieldOn(watch("roleTemplate"), "portfolio", extrasOf(watch("personalityConfig"))) ? (
-                    <>
-                        <TabsContent value="experience" className="space-y-3">
-                            <ExperienceEditor
-                                profileId={profile.id}
-                                experiences={profile.workExperiences || []}
-                            />
-                        </TabsContent>
-                        <TabsContent value="projects" className="space-y-3">
-                            <ProjectEditor
-                                profileId={profile.id}
-                                projects={profile.projects || []}
-                            />
-                        </TabsContent>
-                    </>
+                {hasPortfolio ? (
+                    <TabsContent value="work" className="space-y-3">
+                        <ExperienceEditor profileId={profile.id} experiences={profile.workExperiences || []} />
+                        <ProjectEditor profileId={profile.id} projects={profile.projects || []} />
+                    </TabsContent>
                 ) : null}
 
                 <TabsContent value="appearance" className="space-y-3">
-                    <Section title="Photo" description="Shown on About. If Photo is on, the chat top bar uses it instead of the orb.">
-                        <div className="flex items-center gap-3">
-                            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border bg-muted">
-                                {imageUrl ? (
-                                    <img src={imageUrl} alt="" className="h-full w-full object-cover" />
-                                ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-sm font-medium text-muted-foreground">
-                                        {watch("displayName")?.charAt(0) || "?"}
+                    <Section title="Face" description="Photo on About. Logo on the live shop. Chat can use the photo in the top bar.">
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <div className="space-y-3">
+                                <p className="text-xs font-medium text-muted-foreground">Photo</p>
+                                <div className="flex items-center gap-3">
+                                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border bg-muted">
+                                        {imageUrl ? (
+                                            <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                                        ) : (
+                                            <div className="flex h-full w-full items-center justify-center text-sm font-medium text-muted-foreground">
+                                                {watch("displayName")?.charAt(0) || "?"}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                        <FileField accept="image/jpeg,image/png,image/webp,image/gif" disabled={isUploading} onFile={(file) => handlePhotoUpload(file)} />
+                                        <Input placeholder="or paste an image URL" value={imageUrl || ""} onChange={(e) => setValue("imageUrl", e.target.value, { shouldDirty: true })} />
+                                    </div>
+                                </div>
                             </div>
-                            <div className="min-w-0 flex-1 space-y-2">
-                                <FileField
-                                    accept="image/jpeg,image/png,image/webp,image/gif"
-                                    disabled={isUploading}
-                                    onFile={(file) => handlePhotoUpload(file)}
-                                />
-                                <Input
-                                    placeholder="or paste an image URL"
-                                    value={imageUrl || ""}
-                                    onChange={(e) => setValue("imageUrl", e.target.value, { shouldDirty: true })}
-                                />
+                            <div className="space-y-3">
+                                <p className="text-xs font-medium text-muted-foreground">Shop logo</p>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted px-2">
+                                        {shopLogoUrl ? (
+                                            <img src={shopLogoUrl} alt="" className="max-h-10 max-w-full object-contain" />
+                                        ) : (
+                                            <span className="truncate text-xs font-medium">{watch("displayName")}</span>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                        <FileField accept="image/jpeg,image/png,image/webp,image/gif" disabled={isUploading} onFile={(file) => handlePhotoUpload(file, "shopLogoUrl")} />
+                                        <Input placeholder="or paste a logo URL" value={shopLogoUrl || ""} onChange={(e) => setValue("shopLogoUrl", e.target.value, { shouldDirty: true })} />
+                                    </div>
+                                </div>
+                                {shopLogoUrl ? (
+                                    <Button type="button" variant="ghost" size="sm" className="h-8 px-0" onClick={() => setValue("shopLogoUrl", "", { shouldDirty: true })}>
+                                        Use name instead
+                                    </Button>
+                                ) : null}
                             </div>
                         </div>
                         <ToggleRow
                             title="Chat face"
-                            description={chatAvatarMode === "IMAGE"
-                                ? "Top bar tile uses your photo. The orb stays in the rest of chat."
-                                : "Top bar tile uses the orb."}
+                            description={chatAvatarMode === "IMAGE" ? "Top bar uses your photo. The orb stays in the rest of chat." : "Top bar uses the orb."}
                         >
                             <div className="flex items-center gap-2 text-xs">
                                 <span className={chatAvatarMode !== "IMAGE" ? "font-medium" : "text-muted-foreground"}>Orb</span>
-                                <Switch
-                                    checked={chatAvatarMode === "IMAGE"}
-                                    disabled={!imageUrl}
-                                    onCheckedChange={(checked) => setValue("chatAvatarMode", checked ? "IMAGE" : "ORB")}
-                                />
+                                <Switch checked={chatAvatarMode === "IMAGE"} disabled={!imageUrl} onCheckedChange={(checked) => setValue("chatAvatarMode", checked ? "IMAGE" : "ORB", { shouldDirty: true })} />
                                 <span className={chatAvatarMode === "IMAGE" ? "font-medium" : "text-muted-foreground"}>Photo</span>
                             </div>
                         </ToggleRow>
-                        {isUploading && <p className="text-xs text-muted-foreground">Uploading…</p>}
-                    </Section>
-                    <Section title="Shop logo" description="Shown at the top of your live shop. If empty, your name is used.">
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted px-2">
-                                {shopLogoUrl ? (
-                                    <img src={shopLogoUrl} alt="" className="max-h-10 max-w-full object-contain" />
-                                ) : (
-                                    <span className="truncate text-xs font-medium">{watch("displayName")}</span>
-                                )}
-                            </div>
-                            <div className="min-w-0 flex-1 space-y-2">
-                                <FileField
-                                    accept="image/jpeg,image/png,image/webp,image/gif"
-                                    disabled={isUploading}
-                                    onFile={(file) => handlePhotoUpload(file, "shopLogoUrl")}
-                                />
-                                <Input
-                                    placeholder="or paste a logo URL"
-                                    value={shopLogoUrl || ""}
-                                    onChange={(e) => setValue("shopLogoUrl", e.target.value, { shouldDirty: true })}
-                                />
-                            </div>
-                        </div>
-                        {shopLogoUrl && (
-                            <Button type="button" variant="ghost" size="sm" className="h-8 px-0" onClick={() => setValue("shopLogoUrl", "", { shouldDirty: true })}>
-                                Use name instead
-                            </Button>
-                        )}
+                        {isUploading ? <p className="text-xs text-muted-foreground">Uploading…</p> : null}
                     </Section>
                     <Section title="Welcome aura" description="The face on your public page.">
-                        {!aiAccess.customBranding && <p className="text-sm text-muted-foreground">Your free page uses the Introify style. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Pro adds custom styles and brand removal.</Link></p>}
+                        {!aiAccess.customBranding ? (
+                            <p className="text-sm text-muted-foreground">Your free page uses the Introify style. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Pro adds custom styles and brand removal.</Link></p>
+                        ) : null}
                         <ToggleRow title="Hide Introify footer" description="Your business name, photo and logo are available on every plan.">
                             <Switch aria-label="Hide Introify footer" disabled={!aiAccess.customBranding} checked={aiAccess.customBranding && Boolean(personalityConfig.hideIntroifyBrand)} onCheckedChange={value => updatePersonalityField("hideIntroifyBrand", value)} />
                         </ToggleRow>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            {[...presets].sort((a, b) => {
-                                const look = (p: WelcomeAnimationPreset) => {
-                                    try {
-                                        const cfg = typeof p.config === "string" ? JSON.parse(p.config) : p.config
-                                        return cfg?.look === "bloub" || cfg?.look === "blob" ? 1 : 0
-                                    } catch {
-                                        return 0
-                                    }
-                                }
-                                return look(b) - look(a)
-                            }).map((preset) => {
-                                let config: { colors?: string[]; variant?: string; look?: string; skin?: string; speed?: number; intensity?: number; shape?: string; expression?: string; color?: string } = {}
-                                try {
-                                    config = typeof preset.config === "string" ? JSON.parse(preset.config) : preset.config
-                                } catch { /* keep empty */ }
-                                const colors = (config.colors || ["#00D7FF", "#07104D"]) as [string, string]
-                                const selected = selectedAnimationId === preset.id
-                                const isBlob = config.look === "bloub" || config.look === "blob"
-                                return (
-                                    <button
-                                        key={preset.id}
-                                        type="button"
-                                        disabled={!aiAccess.customBranding}
-                                        onClick={() => {
-                                            setValue("animationStyleId", preset.id, { shouldDirty: true })
-                                            if (isBlob) setBlobOpen(true)
-                                        }}
-                                        className={cn(
-                                            "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                                            selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40"
-                                        )}
-                                    >
-                                        <div className="flex h-[72px] w-full items-center justify-center">
-                                            <WelcomeOrb
-                                                size={64}
-                                                colors={colors}
-                                                variant={config.variant}
-                                                look={config.look}
-                                                skin={config.skin}
-                                                shape={isBlob ? liveOrb.shape : config.shape}
-                                                expression={isBlob ? liveOrb.expression : config.expression}
-                                                color={isBlob ? liveOrb.color : config.color}
-                                                speed={config.speed || 1}
-                                                intensity={config.intensity || 1}
-                                            />
-                                        </div>
-                                        <span className="text-xs font-medium">{preset.name}</span>
-                                        {isBlob ? (
-                                            <span className="text-[10px] text-muted-foreground">
-                                                {selected ? "Tap to customise" : "Custom"}
-                                            </span>
-                                        ) : null}
+                        <div className="flex items-center gap-4 rounded-2xl border border-border/70 bg-muted/15 px-4 py-3.5">
+                            <WelcomeOrb
+                                still
+                                size={72}
+                                colors={(selectedPresetConfig.colors as [string, string] | undefined) || ["#00D7FF", "#07104D"]}
+                                look={blobSelected ? "bloub" : selectedPresetConfig.look}
+                                shape={liveOrb.shape}
+                                expression={liveOrb.expression}
+                                color={liveOrb.color}
+                            />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium">{selectedPreset?.name || "Introify look"}</p>
+                                <p className="text-xs text-muted-foreground">{blobSelected ? "Custom orb on your page." : "Current welcome face."}</p>
+                            </div>
+                            {aiAccess.customBranding ? (
+                                <div className="flex shrink-0 flex-col gap-1.5">
+                                    <button type="button" onClick={() => setAuraOpen((open) => !open)} className="h-8 rounded-full border border-border px-3 text-xs font-medium">
+                                        {auraOpen ? "Done" : "Change look"}
                                     </button>
-                                )
-                            })}
+                                    {blobSelected ? (
+                                        <button type="button" onClick={() => setBlobOpen(true)} className="h-8 rounded-full px-3 text-xs font-medium text-muted-foreground hover:text-foreground">
+                                            Customise
+                                        </button>
+                                    ) : null}
+                                </div>
+                            ) : null}
                         </div>
+                        {auraOpen && aiAccess.customBranding ? (
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                {[...presets].sort((a, b) => {
+                                    const look = (p: WelcomeAnimationPreset) => {
+                                        try {
+                                            const cfg = typeof p.config === "string" ? JSON.parse(p.config) : p.config
+                                            return cfg?.look === "bloub" || cfg?.look === "blob" ? 1 : 0
+                                        } catch {
+                                            return 0
+                                        }
+                                    }
+                                    return look(b) - look(a)
+                                }).map((preset) => {
+                                    let config: { colors?: string[]; variant?: string; look?: string; skin?: string; speed?: number; intensity?: number; shape?: string; expression?: string; color?: string } = {}
+                                    try {
+                                        config = typeof preset.config === "string" ? JSON.parse(preset.config) : preset.config
+                                    } catch { /* keep empty */ }
+                                    const colors = (config.colors || ["#00D7FF", "#07104D"]) as [string, string]
+                                    const selected = selectedAnimationId === preset.id
+                                    const isBlob = config.look === "bloub" || config.look === "blob"
+                                    return (
+                                        <button
+                                            key={preset.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setValue("animationStyleId", preset.id, { shouldDirty: true })
+                                                if (isBlob) setBlobOpen(true)
+                                            }}
+                                            className={cn(
+                                                "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-colors",
+                                                selected ? "border-aurora/50 bg-aurora/10" : "hover:bg-muted/40"
+                                            )}
+                                        >
+                                            <div className="flex h-[72px] w-full items-center justify-center">
+                                                <WelcomeOrb
+                                                    still
+                                                    size={64}
+                                                    colors={colors}
+                                                    variant={config.variant}
+                                                    look={config.look}
+                                                    skin={config.skin}
+                                                    shape={isBlob ? liveOrb.shape : config.shape}
+                                                    expression={isBlob ? liveOrb.expression : config.expression}
+                                                    color={isBlob ? liveOrb.color : config.color}
+                                                    speed={config.speed || 1}
+                                                    intensity={config.intensity || 1}
+                                                />
+                                            </div>
+                                            <span className="text-xs font-medium">{preset.name}</span>
+                                            {isBlob ? <span className="text-[10px] text-muted-foreground">{selected ? "Tap to customise" : "Custom"}</span> : null}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        ) : null}
                     </Section>
                     <BloubCustomizerSheet
                         open={blobOpen}
@@ -536,85 +513,89 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                 </TabsContent>
 
                 <TabsContent value="public" className="space-y-3">
-                    <Section title="Public page" description="Visibility, URL, and first-screen copy.">
-                        <ToggleRow
-                            title="Public"
-                            description="Anyone can open your page and chat."
-                        >
-                            <Switch
-                                checked={watch("isPublic")}
-                                onCheckedChange={(checked) => setValue("isPublic", checked)}
-                            />
+                    <Section title="Share" description="Your public link, first line, and QR.">
+                        <ToggleRow title="Public" description="Anyone can open your page and chat.">
+                            <Switch checked={watch("isPublic")} onCheckedChange={(checked) => setValue("isPublic", checked, { shouldDirty: true })} />
                         </ToggleRow>
-                        <Field label="Username" error={errors.slug?.message}>
-                            <div className="flex items-center gap-2">
-                                <span className="shrink-0 text-xs text-muted-foreground">@</span>
-                                <Input id="slug" {...register("slug")} />
+                        <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+                            <div className="space-y-3">
+                                <Field label="Username" error={errors.slug?.message}>
+                                    <div className="flex items-center gap-2">
+                                        <span className="shrink-0 text-xs text-muted-foreground">@</span>
+                                        <Input id="slug" {...register("slug")} />
+                                    </div>
+                                </Field>
+                                <Field label="Link style" hint="Both links work. This is the one you share.">
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {(["PATH", "SUBDOMAIN"] as const).map((style) => {
+                                            const slug = watch("slug") || profile.slug
+                                            const on = watch("linkStyle") === style
+                                            return (
+                                                <button
+                                                    key={style}
+                                                    type="button"
+                                                    onClick={() => setValue("linkStyle", style, { shouldDirty: true })}
+                                                    className={cn(
+                                                        "rounded-xl border px-3 py-2.5 text-left text-sm",
+                                                        on ? "border-aurora/50 bg-aurora/10" : "border-border text-muted-foreground",
+                                                    )}
+                                                >
+                                                    <span className="block font-medium text-foreground">{style === "PATH" ? "Path" : "Subdomain"}</span>
+                                                    <span className="mt-0.5 block truncate text-xs">{formatShopLink(slug, style)}</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </Field>
+                                <Field label="Welcome line" hint="Shown under the intro. Keep it to one line.">
+                                    <Input id="welcomeMessage" {...register("welcomeMessageOverride")} placeholder="Ask about coaching or book a call." />
+                                </Field>
+                                {hasPortfolio ? (
+                                    <Field label="Content opens as" hint="How experience and projects appear from chat.">
+                                        <Select defaultValue={profile.contentDisplayMode || "POPUP"} onValueChange={(val) => setValue("contentDisplayMode", val, { shouldDirty: true })}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select display mode" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="POPUP">Popup</SelectItem>
+                                                <SelectItem value="SIDE_PANEL">Side panel</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
+                                ) : null}
                             </div>
-                        </Field>
-                        <Field label="Link style" hint="Both links work. This is the one you share.">
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                {(["PATH", "SUBDOMAIN"] as const).map((style) => {
-                                    const slug = watch("slug") || profile.slug
-                                    const on = watch("linkStyle") === style
-                                    return (
-                                        <button
-                                            key={style}
-                                            type="button"
-                                            onClick={() => setValue("linkStyle", style, { shouldDirty: true })}
-                                            className={cn(
-                                                "rounded-xl border px-3 py-2.5 text-left text-sm",
-                                                on ? "border-foreground bg-muted/40" : "border-border text-muted-foreground",
-                                            )}
-                                        >
-                                            <span className="block font-medium text-foreground">{style === "PATH" ? "Path" : "Subdomain"}</span>
-                                            <span className="mt-0.5 block truncate text-xs">{formatShopLink(slug, style)}</span>
-                                        </button>
-                                    )
-                                })}
+                            <div className="lg:w-[16rem]">
+                                <QrCard
+                                    compact
+                                    name={watch("displayName") || profile.displayName}
+                                    slug={watch("slug") || profile.slug}
+                                    url={publicShopUrl(watch("slug") || profile.slug, parseLinkStyle(watch("linkStyle")))}
+                                />
                             </div>
-                        </Field>
-                        <Field label="Welcome line" hint="Shown under the intro. Keep it to one line.">
-                            <Input id="welcomeMessage" {...register("welcomeMessageOverride")} placeholder="Ask about coaching or book a call." />
-                        </Field>
-                        <Field label="Content opens as" hint="How experience and projects appear from chat.">
-                            <Select
-                                defaultValue={profile.contentDisplayMode || "POPUP"}
-                                onValueChange={(val) => setValue("contentDisplayMode", val)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select display mode" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="POPUP">Popup</SelectItem>
-                                    <SelectItem value="SIDE_PANEL">Side panel</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </Field>
+                        </div>
                     </Section>
                     <Section title="This page is" description="Choose a kit that matches the work. Extra tools can be added without leaving it.">
                         <KitPicker
-                            role={watch("roleTemplate")}
+                            role={roleTemplate}
                             goal={watch("primaryGoal")}
-                            extras={extrasOf(watch("personalityConfig"))}
+                            extras={extras}
                             onRole={(nextRole, nextGoal) => {
                                 setValue("roleTemplate", nextRole, { shouldDirty: true })
                                 setValue("primaryGoal", nextGoal, { shouldDirty: true })
-                                const extra = extrasOf(watch("personalityConfig"))
+                                const extra = extrasOf(personalityRaw)
                                 const keep = (extra.addons || []).filter((id) => !suggestedAddons(nextRole).includes(id as AddonId)) as AddonId[]
-                                setValue("personalityConfig", writeExtras(watch("personalityConfig"), extrasFromAddons(nextRole, [...suggestedAddons(nextRole), ...keep])), { shouldDirty: true })
+                                setValue("personalityConfig", writeExtras(personalityRaw, extrasFromAddons(nextRole, [...suggestedAddons(nextRole), ...keep])), { shouldDirty: true })
                             }}
                             onGoal={(nextGoal) => setValue("primaryGoal", nextGoal, { shouldDirty: true })}
-                            onAddons={(addons) => setValue("personalityConfig", writeExtras(watch("personalityConfig"), extrasFromAddons(watch("roleTemplate"), addons)), { shouldDirty: true })}
+                            onAddons={(addons) => setValue("personalityConfig", writeExtras(personalityRaw, extrasFromAddons(roleTemplate, addons)), { shouldDirty: true })}
                         />
                     </Section>
+                    {hasPay ? (
                     <Section title="Reach" description="How guests pay.">
-                        {fieldOn(watch("roleTemplate"), "whatsappUpi", extrasOf(watch("personalityConfig"))) || hasSurface(watch("roleTemplate"), "shop", extrasOf(watch("personalityConfig"))) ? (
-                            <>
                                 <Field label="UPI ID">
                                     <Input placeholder="shop@okaxis" {...register("upiId")} />
                                 </Field>
-                                {watch("roleTemplate") === "RESTAURANT" ? (
+                                {roleTemplate === "RESTAURANT" ? (
                                     <>
                                         <Field label="Guest payment">
                                             <div className="flex gap-2">
@@ -684,16 +665,8 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 <Field label="Delivery note">
                                     <Input placeholder="We deliver in the area" {...register("deliveryNote")} />
                                 </Field>
-                            </>
-                        ) : null}
-                        <div className="max-w-sm">
-                            <QrCard
-                                name={watch("displayName") || profile.displayName}
-                                slug={watch("slug") || profile.slug}
-                                url={publicShopUrl(watch("slug") || profile.slug, parseLinkStyle(watch("linkStyle")))}
-                            />
-                        </div>
                     </Section>
+                    ) : null}
                 </TabsContent>
             </Tabs>
         </form>
@@ -739,17 +712,24 @@ const LENGTHS = [
 function Section({
     title,
     description,
+    action,
     children,
 }: {
     title: string
     description?: string
+    action?: ReactNode
     children: ReactNode
 }) {
     return (
         <Card className="gap-4 py-4 shadow-none">
             <CardHeader className="px-4">
-                <CardTitle className="text-sm font-medium">{title}</CardTitle>
-                {description ? <CardDescription>{description}</CardDescription> : null}
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                        {description ? <CardDescription>{description}</CardDescription> : null}
+                    </div>
+                    {action}
+                </div>
             </CardHeader>
             <CardContent className="space-y-3 px-4">{children}</CardContent>
         </Card>
@@ -852,29 +832,27 @@ function AiStudio({
             </div>
 
             <div className="space-y-5 px-5 py-5">
-                <div className="space-y-2">
-                    <p className="text-sm font-medium">Tone</p>
-                    <StackSelect
-                        value={tone}
-                        onChange={onTone}
-                        options={VOICES}
-                    />
-                </div>
-
-                <div className="flex rounded-full bg-muted p-0.5">
-                    {LENGTHS.map((opt) => (
-                        <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => onLength(opt.id)}
-                            className={cn(
-                                "h-8 flex-1 rounded-full text-xs font-medium transition-colors",
-                                length === opt.id ? "bg-background shadow-sm" : "text-muted-foreground"
-                            )}
-                        >
-                            {opt.label}
-                        </button>
-                    ))}
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium">Voice</p>
+                        <p className="text-xs text-muted-foreground">Tone and how long it talks.</p>
+                        <StackSelect value={tone} onChange={onTone} options={VOICES} />
+                    </div>
+                    <div className="flex rounded-full bg-muted p-0.5">
+                        {LENGTHS.map((opt) => (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => onLength(opt.id)}
+                                className={cn(
+                                    "h-8 flex-1 rounded-full text-xs font-medium transition-colors",
+                                    length === opt.id ? "bg-background shadow-sm" : "text-muted-foreground"
+                                )}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 <div className="space-y-2">

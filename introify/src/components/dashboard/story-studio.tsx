@@ -57,20 +57,71 @@ export function StoryStudio({ slug, role, personalityConfig }: { slug: string; r
         }
     }
 
+    const composer = (
+            <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                    <div className="h-16 w-16 overflow-hidden rounded-xl bg-muted">
+                        {url ? <img src={url} alt="" className="h-full w-full object-cover" /> : null}
+                    </div>
+                    <FileField
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        disabled={uploading}
+                        onFile={(file) => { void upload(file) }}
+                        buttonLabel={uploading ? "Uploading…" : "Photo"}
+                    />
+                </div>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="A line of title" />
+                <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="The story that sits with this picture" rows={3} />
+                <div className="flex flex-wrap gap-1.5">
+                    {STORY_CATEGORIES.map((id) => (
+                        <button
+                            key={id}
+                            type="button"
+                            onClick={() => setCategory(id)}
+                            className={cn(
+                                "h-8 rounded-full border px-3 text-xs font-medium",
+                                category === id ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground",
+                            )}
+                        >
+                            {storyCategoryLabel(role, id)}
+                        </button>
+                    ))}
+                </div>
+                <Button
+                    type="button"
+                    className="rounded-full"
+                    disabled={pending || !url}
+                    onClick={() => start(async () => {
+                        try {
+                            await addStoryFrame({ url, title, body, category })
+                            setUrl(""); setTitle(""); setBody("")
+                            toast.success("Added")
+                            setFrames(await listStoryFrames())
+                        } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Could not add")
+                        }
+                    })}
+                >
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Add
+                </Button>
+            </div>
+    )
+
     return (
-        <div className="space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <p className="text-sm font-semibold">{copy.page}</p>
-                    <p className="text-xs text-muted-foreground">
-                        The public about page — walk-in, photos, and a few lines about {copy.verb}. Guests open it from chat or {storyPath(slug)}.
+        <div className="space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border/70 bg-card px-4 py-3.5">
+                <div className="min-w-0">
+                    <p className="text-sm font-medium">{copy.page}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                        Walk-in, photos, and a few lines about {copy.verb}. Guests open it from chat or {storyPath(slug)}.
                     </p>
                 </div>
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-9 rounded-full"
+                    className="h-8 rounded-full"
                     onClick={async () => {
                         try {
                             await navigator.clipboard.writeText(share)
@@ -88,7 +139,7 @@ export function StoryStudio({ slug, role, personalityConfig }: { slug: string; r
             <div className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
                 <div>
                     <p className="text-sm font-medium">Walk-in</p>
-                    <p className="text-[12px] text-muted-foreground">A 360 photo becomes a sphere guests can drag around. A GLB is a 3D room they can orbit. Saved on this page.</p>
+                    <p className="text-[12px] text-muted-foreground">A 360 photo becomes a sphere guests can drag around. A GLB is a 3D room they can orbit.</p>
                 </div>
                 {walkIn ? (
                     <p className="truncate text-[12px] text-muted-foreground">{walkIn.kind === "model" ? "3D room" : "360 sphere"} · {walkIn.url}</p>
@@ -142,59 +193,26 @@ export function StoryStudio({ slug, role, personalityConfig }: { slug: string; r
                 </div>
             </div>
 
-            <div className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
-                <div className="flex items-center gap-3">
-                    <div className="h-16 w-16 overflow-hidden rounded-xl bg-muted">
-                        {url ? <img src={url} alt="" className="h-full w-full object-cover" /> : null}
+            {frames.length === 0 ? (
+                <div className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
+                    <div>
+                        <p className="text-sm font-medium">Add a photo</p>
+                        <p className="text-[12px] text-muted-foreground">A picture and a few lines. Guests see these as the story.</p>
                     </div>
-                    <FileField
-                        accept="image/jpeg,image/png,image/webp,image/gif"
-                        disabled={uploading}
-                        onFile={(file) => { void upload(file) }}
-                        buttonLabel={uploading ? "Uploading…" : "Photo"}
-                    />
+                    {composer}
                 </div>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="A line of title" />
-                <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="The story that sits with this picture" rows={3} />
-                <div className="flex flex-wrap gap-1.5">
-                    {STORY_CATEGORIES.map((id) => (
-                        <button
-                            key={id}
-                            type="button"
-                            onClick={() => setCategory(id)}
-                            className={cn(
-                                "h-8 rounded-full border px-3 text-xs font-medium",
-                                category === id ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground",
-                            )}
-                        >
-                            {storyCategoryLabel(role, id)}
-                        </button>
-                    ))}
-                </div>
-                <Button
-                    type="button"
-                    className="rounded-full"
-                    disabled={pending || !url}
-                    onClick={() => start(async () => {
-                        try {
-                            await addStoryFrame({ url, title, body, category })
-                            setUrl(""); setTitle(""); setBody("")
-                            toast.success("Added")
-                            setFrames(await listStoryFrames())
-                        } catch (err) {
-                            toast.error(err instanceof Error ? err.message : "Could not add")
-                        }
-                    })}
-                >
-                    <Plus className="mr-1 h-3.5 w-3.5" />
-                    Add
-                </Button>
-            </div>
+            ) : (
+                <details className="group rounded-2xl border border-border/70 bg-card">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                        <span>Add a photo</span>
+                        <span className="text-xs font-normal text-muted-foreground group-open:hidden">New frame</span>
+                    </summary>
+                    <div className="border-t border-border/60 px-4 py-4">{composer}</div>
+                </details>
+            )}
 
             <div className="space-y-2">
-                {frames.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">No frames yet. Add a photo and a few lines.</p>
-                ) : frames.map((frame, i) => (
+                {frames.map((frame, i) => (
                     <article key={frame.id} className={cn("flex gap-3 rounded-2xl border border-border/70 p-3", !frame.isPublished && "opacity-60")}>
                         <img src={frame.url} alt="" className="h-20 w-16 shrink-0 rounded-xl object-cover" />
                         <div className="min-w-0 flex-1 space-y-2">
