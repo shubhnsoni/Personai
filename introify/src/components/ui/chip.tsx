@@ -22,7 +22,7 @@ const chipVariants = cva(
       },
       size: {
         default: "min-h-10 px-3 sm:min-h-11 sm:px-4",
-        sm: "min-h-9 px-2.5 text-micro",
+        sm: "min-h-9 px-2.5 text-xs tracking-[0.02em]",
       },
     },
     defaultVariants: {

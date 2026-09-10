@@ -14,7 +14,7 @@ import { CheckoutSheet, type CheckoutItem } from "@/components/checkout/checkout
 import { TipSheet } from "@/components/profile/tip-sheet"
 import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, Instagram, Facebook, Youtube, MapPin } from "lucide-react"
 import { storyLabel, storyPath } from "@/lib/story"
-import { socialsFromConfig } from "@/lib/socials"
+import { hasSocials, socialsFromConfig } from "@/lib/socials"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { useLiveOrders } from "@/components/shop/use-live-order"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -221,7 +221,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
     return (
         <div
             data-public-profile-theme={botTheme}
-            className="flex h-screen w-full bg-profile text-profile-text overflow-hidden relative"
+            className="relative flex h-full min-h-0 w-full flex-1 overflow-hidden bg-profile text-profile-text"
             style={retro ? undefined : {
                 ["--pl-orb-from" as string]: theme.bright,
                 ["--pl-orb-to" as string]: theme.deep,
@@ -257,41 +257,12 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                 }}
             />}
 
-            <div className="absolute right-3 top-3 z-30 flex items-center gap-1.5">
-                {socials.instagram ? (
-                    <a href={socials.instagram} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Instagram">
-                        <Instagram className="h-3.5 w-3.5" />
-                    </a>
-                ) : null}
-                {socials.facebook ? (
-                    <a href={socials.facebook} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Facebook">
-                        <Facebook className="h-3.5 w-3.5" />
-                    </a>
-                ) : null}
-                {socials.youtube ? (
-                    <a href={socials.youtube} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="YouTube">
-                        <Youtube className="h-3.5 w-3.5" />
-                    </a>
-                ) : null}
-                {socials.maps ? (
-                    <a href={socials.maps} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Maps">
-                        <MapPin className="h-3.5 w-3.5" />
-                    </a>
-                ) : null}
-                {socials.zomato ? (
-                    <a href={socials.zomato} target="_blank" rel="noreferrer" className="flex h-8 items-center rounded-full border border-black/10 bg-profile-chip px-2 text-[11px] font-medium text-profile-text dark:border-white/10">
-                        Zomato
-                    </a>
-                ) : null}
-                <ModeToggle />
-            </div>
-
             <Tracker slug={profile.slug} />
             <SessionProbe slug={profile.slug} />
             {restaurant || retro ? null : <IntroVeil stage={introStage} />}
 
-            <div className="relative z-10 flex h-full min-w-0 flex-1 flex-col">
-                <div className="relative mx-auto h-full w-full flex-1 overflow-hidden">
+            <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
+                <div className="relative mx-auto flex min-h-0 w-full flex-1 overflow-hidden">
                     <ChatInterface
                         profile={profile}
                         colors={colors}
@@ -301,6 +272,34 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                         chips={chips}
                         topics={welcomeTopics(profile)}
                         onIntroStage={setIntroStage}
+                        headerActions={<ModeToggle />}
+                        headerLinks={hasSocials(socials) ? <>
+                            {socials.instagram ? (
+                                <a href={socials.instagram} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Instagram">
+                                    <Instagram className="h-3.5 w-3.5" />
+                                </a>
+                            ) : null}
+                            {socials.facebook ? (
+                                <a href={socials.facebook} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Facebook">
+                                    <Facebook className="h-3.5 w-3.5" />
+                                </a>
+                            ) : null}
+                            {socials.youtube ? (
+                                <a href={socials.youtube} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="YouTube">
+                                    <Youtube className="h-3.5 w-3.5" />
+                                </a>
+                            ) : null}
+                            {socials.maps ? (
+                                <a href={socials.maps} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Maps">
+                                    <MapPin className="h-3.5 w-3.5" />
+                                </a>
+                            ) : null}
+                            {socials.zomato ? (
+                                <a href={socials.zomato} target="_blank" rel="noreferrer" className="flex h-8 items-center rounded-full border border-black/10 bg-profile-chip px-2 text-[11px] font-medium text-profile-text dark:border-white/10">
+                                    Zomato
+                                </a>
+                            ) : null}
+                        </> : undefined}
                     />
                 </div>
             </div>

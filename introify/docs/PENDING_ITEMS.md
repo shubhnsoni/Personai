@@ -1,8 +1,14 @@
 # Introify pending items
 
-Updated: 9 September 2026. Current deployed release: **7f1f6d8e4babb0de47573dcab01e8ddb238ad5a2**. This verification record is maintained locally after deployment.
+Updated: 10 September 2026. Read the `x-introify-release` header from `/api/health` for the version currently serving production. The 9 September deployment evidence below is historical; owner-dependent activation items remain listed separately.
 
 ## 1. Latest release and remaining verification
+
+The 10 September chat update includes a single bounded conversation viewport, aligned header actions, readable small action chips, preserved reading position during streaming, a darker Retro LCD palette, mode-aware browser canvas/theme metadata, and mobile keyboard/safe-area handling. The root deploy launcher validates the exact selected source before publishing and rejects files changed by another editor during validation.
+
+All application changes and ready regression tests belong in the release queue. The historical Codex operator handoff and authenticated browser helper are intentionally local-only because they contain private account details. The older AR stash is preserved as historical work; it is not part of this application's deployment queue.
+
+### Historical verification — 9 September 2026, release `7f1f6d8e4babb0de47573dcab01e8ddb238ad5a2`
 
 The root **deploy.cmd** launcher validated an isolated copy, committed the selected files, pushed main and verified the exact production commit through the health response header. Hostinger marked this release **Completed / Current at 15:04 IST**, after 6m27s. Its build compiled in 72s, passed TypeScript in 34.4s, reported no pending migrations and zero dependency vulnerabilities.
 

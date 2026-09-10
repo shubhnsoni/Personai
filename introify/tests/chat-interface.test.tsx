@@ -111,6 +111,55 @@ afterEach(() => {
     localStorage.clear()
 })
 
+describe("ChatInterface - mobile keyboard", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        stubChatFetch()
+    })
+
+    it("hides About and shrinks the blob into the remaining viewport", () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        const viewport = new EventTarget()
+        Object.defineProperties(viewport, {
+            height: { value: 410, configurable: true },
+            scale: { value: 1, configurable: true },
+        })
+        vi.stubGlobal("visualViewport", viewport)
+        vi.stubGlobal("innerHeight", 780)
+        renderChat({
+            chips: [{ id: "about", label: "About", onSelect: () => {} }],
+        })
+        expect(document.body.textContent).toContain(INTRO_LINE)
+        expect(document.querySelector("[data-welcome-orb]")?.getAttribute("data-compact")).toBe("")
+        expect(document.querySelector("[data-welcome-chips]")).toBeNull()
+
+        Object.defineProperty(viewport, "height", { value: 780, configurable: true })
+        act(() => { viewport.dispatchEvent(new Event("resize")) })
+        expect(document.querySelector("[data-welcome-orb]")?.hasAttribute("data-compact")).toBe(false)
+        expect(document.querySelector("[data-welcome-chips]")?.textContent).toMatch(/About/)
+
+        Object.defineProperty(viewport, "height", { value: 410, configurable: true })
+        act(() => { viewport.dispatchEvent(new Event("resize")) })
+        expect(document.querySelector("[data-welcome-chips]")).toBeNull()
+    })
+
+    it("keeps About and the full blob when the keyboard is away", () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        const viewport = new EventTarget()
+        Object.defineProperties(viewport, {
+            height: { value: 780, configurable: true },
+            scale: { value: 1, configurable: true },
+        })
+        vi.stubGlobal("visualViewport", viewport)
+        vi.stubGlobal("innerHeight", 780)
+        renderChat({
+            chips: [{ id: "about", label: "About", onSelect: () => {} }],
+        })
+        expect(document.querySelector("[data-welcome-orb]")?.hasAttribute("data-compact")).toBe(false)
+        expect(document.querySelector("[data-welcome-chips]")?.textContent).toMatch(/About/)
+    })
+})
+
 describe("ChatInterface - reduced motion", () => {
     it("reaches the finished intro line when Reduce Motion is on", () => {
         installMatchMedia({ [REDUCE_MOTION]: true })

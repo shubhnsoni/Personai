@@ -11,15 +11,17 @@ import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Chip } from "@/components/ui/chip"
 import { Input } from "@/components/ui/input"
-import { ArrowUp, ChevronRight } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ChatAvatar } from "@/components/chat/chat-avatar"
+import { ChatHeader } from "@/components/chat/chat-header"
 import { ChatMarkdown } from "@/components/chat/chat-markdown"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { wantsLiveSupport } from "@/lib/live-support"
 import { toast } from "sonner"
 import { resolveBloubTheme } from "@/lib/bloub/catalog"
 import type { PublicAnimationConfig } from "@/lib/profile-branding"
+import { subscribeVisualKeyboard, visualKeyboardOpen } from "@/lib/visual-keyboard"
 import "@/components/profile/retro-lcd-theme.css"
 
 interface ChatMessage {
@@ -60,6 +62,8 @@ interface ChatInterfaceProps {
     animationConfig?: PublicAnimationConfig
     isPanelOpen?: boolean
     onIntroStage?: (stage: "hi" | "type" | "orb" | "ready") => void
+    headerActions?: ReactNode
+    headerLinks?: ReactNode
 }
 
 type RichContentType = "experience" | "projects" | "about" | "services" | "products" | "courses" | "events" | "communities"
@@ -73,6 +77,8 @@ export function ChatInterface({
     colors = [],
     animationConfig = {},
     onIntroStage,
+    headerActions,
+    headerLinks,
 }: ChatInterfaceProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState("")
@@ -91,6 +97,9 @@ export function ChatInterface({
     const [streamSuggestions, setStreamSuggestions] = useState<string[]>([])
     const [orbReact, setOrbReact] = useState(0)
     const scrollRef = useRef<HTMLDivElement>(null)
+    const contentRef = useRef<HTMLDivElement>(null)
+    const followLatest = useRef(true)
+    const [showLatest, setShowLatest] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
     const chipLock = useRef(false)
@@ -99,6 +108,7 @@ export function ChatInterface({
     const orbTheme = ORB_THEMES[resolveOrbVariant(colors, animationConfig.variant)]
     const botTheme = resolveBloubTheme(animationConfig.theme)
     const retro = botTheme === "retro-lcd"
+    const keyboardOpen = useSyncExternalStore(subscribeVisualKeyboard, visualKeyboardOpen, () => false)
 
     useEffect(() => {
         fetch(`/api/conversations?profileId=${profile.id}`, { credentials: "include" })
@@ -136,11 +146,24 @@ export function ChatInterface({
         return () => clearInterval(tick)
     }, [chatMode, profile.id])
 
+    const scrollToLatest = useCallback(() => {
+        const viewport = scrollRef.current
+        if (viewport) viewport.scrollTop = viewport.scrollHeight
+    }, [])
+
     useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-        }
-    }, [messages, isLoading])
+        if (followLatest.current) scrollToLatest()
+    }, [messages, isLoading, scrollToLatest])
+
+    useEffect(() => {
+        if (typeof ResizeObserver === "undefined") return
+        const observer = new ResizeObserver(() => {
+            if (followLatest.current) scrollToLatest()
+        })
+        if (scrollRef.current) observer.observe(scrollRef.current)
+        if (contentRef.current) observer.observe(contentRef.current)
+        return () => observer.disconnect()
+    }, [scrollToLatest])
 
     const restaurant = profile.roleTemplate === "RESTAURANT"
     const getRichContent = (content: string): RichContentType | null => {
@@ -158,6 +181,9 @@ export function ChatInterface({
 
     const sendMessage = useCallback(async (messageContent: string): Promise<string | null> => {
         if (!messageContent.trim() || isLoading) return null
+
+        followLatest.current = true
+        setShowLatest(false)
 
         abortControllerRef.current?.abort()
         const abort = new AbortController()
@@ -392,7 +418,7 @@ export function ChatInterface({
     return (
         <div
             data-chat-theme={botTheme}
-            className="flex flex-col h-full w-full relative text-profile-text"
+            className="relative flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden text-profile-text"
             style={retro ? undefined : {
                 ["--pl-orb-from" as string]: orbTheme.bright,
                 ["--pl-orb-to" as string]: orbTheme.deep,
@@ -403,60 +429,74 @@ export function ChatInterface({
                 ["--chat-on-accent" as string]: orbTheme.onAccent,
             }}
         >
-            {hasStarted && (
-                <div className="shrink-0 z-20 px-3 py-2 flex items-center gap-2 border-b border-black/5 min-w-0 dark:border-white/5 sm:px-6">
-                    <ChatAvatar
-                        size={36}
-                        name={profile.displayName}
-                        imageUrl={profile.imageUrl}
-                        mode={profile.chatAvatarMode}
-                        colors={orbColors}
-                        variant={animationConfig.variant}
-                        look={animationConfig.look}
-                        skin={animationConfig.skin}
-                        shape={animationConfig.shape}
-                        expression={animationConfig.expression}
-                        color={animationConfig.color}
-                        aura={animationConfig.aura}
-                        theme={botTheme}
-                        speed={animationConfig.speed}
-                        intensity={animationConfig.intensity}
-                        gaze={typingGaze}
-                        mood={orbMood}
-                        reactToken={orbReact}
-                    />
+            <ChatHeader
+                identity={hasStarted ? <>
+                    <div className="shrink-0">
+                        <ChatAvatar
+                            size={36}
+                            name={profile.displayName}
+                            imageUrl={profile.imageUrl}
+                            mode={profile.chatAvatarMode}
+                            colors={orbColors}
+                            variant={animationConfig.variant}
+                            look={animationConfig.look}
+                            skin={animationConfig.skin}
+                            shape={animationConfig.shape}
+                            expression={animationConfig.expression}
+                            color={animationConfig.color}
+                            aura={animationConfig.aura}
+                            theme={botTheme}
+                            speed={animationConfig.speed}
+                            intensity={animationConfig.intensity}
+                            gaze={typingGaze}
+                            mood={orbMood}
+                            reactToken={orbReact}
+                        />
+                    </div>
                     <span className="font-semibold text-ui text-profile-text truncate min-w-0">
                         {chatMode === "LIVE" ? profile.displayName : `${profile.displayName}'s AI`}
                     </span>
-                    {primaryChip && (
-                        <Chip
-                            className="ml-auto shrink-0"
-                            variant="profile"
-                            size="sm"
-                            highlighted={primaryChip.highlighted}
-                            icon={primaryChip.icon}
-                            label={primaryChip.label}
-                            onClick={() => handleChip(primaryChip)}
-                        />
-                    )}
-                </div>
-            )}
+                </> : undefined}
+                primaryAction={hasStarted && !keyboardOpen && primaryChip ? (
+                    <Chip
+                        variant="profile"
+                        size="sm"
+                        highlighted={primaryChip.highlighted}
+                        icon={primaryChip.icon}
+                        label={primaryChip.label}
+                        onClick={() => handleChip(primaryChip)}
+                    />
+                ) : undefined}
+                actions={headerActions}
+                links={headerLinks}
+            />
 
             <div
                 ref={scrollRef}
-                className="flex-1 min-h-0 overflow-y-auto scroll-smooth"
+                data-chat-scroll
+                role="region"
+                aria-label="Conversation"
+                tabIndex={0}
+                onScroll={(event) => {
+                    const viewport = event.currentTarget
+                    const nearEnd = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop < 80
+                    followLatest.current = nearEnd
+                    setShowLatest(!nearEnd)
+                }}
+                className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
             >
-                <div className={cn(hasStarted ? "mx-auto w-full max-w-3xl px-3 py-3 space-y-5 sm:px-6 sm:py-4 sm:space-y-8" : "h-full")}>
+                <div ref={contentRef} className={cn(hasStarted ? "mx-auto w-full max-w-3xl px-3 py-3 space-y-5 sm:px-6 sm:py-4 sm:space-y-8" : "grid min-h-full")}>
                 {!hasStarted && (
                     <WelcomeIntro
                         name={profile.displayName}
                         welcome={profile.welcomeMessageOverride}
                         topics={topics}
                         chips={emptyChips}
+                        compact={keyboardOpen}
                         onChip={handleChip}
                         orb={
                             <ChatAvatar
-                                size={168}
+                                size={keyboardOpen ? 96 : 168}
                                 name={profile.displayName}
                                 colors={orbColors}
                                 variant={animationConfig.variant}
@@ -619,14 +659,29 @@ export function ChatInterface({
                 </div>
             </div>
 
-            <div className={cn(
-                "relative shrink-0 w-full bg-profile pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] transition-opacity duration-500",
+            <div data-chat-composer className={cn(
+                "relative shrink-0 w-full bg-profile pt-2 transition-opacity duration-500",
+                keyboardOpen ? "pb-2" : "pb-[max(0.5rem,env(safe-area-inset-bottom))]",
                 !hasStarted && !introReady && "pointer-events-none opacity-0"
             )}>
                 <div
                     aria-hidden
-                    className="pointer-events-none absolute inset-x-0 -top-16 h-16 bg-gradient-to-t from-profile to-transparent"
+                    className="pointer-events-none absolute inset-x-0 -top-4 h-4 bg-gradient-to-t from-profile to-transparent"
                 />
+                {showLatest && hasStarted && (
+                    <button
+                        type="button"
+                        className="absolute bottom-full left-1/2 z-10 mb-3 flex min-h-10 -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-profile-elev px-4 text-sm text-profile-text shadow-md"
+                        onClick={() => {
+                            followLatest.current = true
+                            setShowLatest(false)
+                            scrollToLatest()
+                        }}
+                    >
+                        <ArrowDown className="h-4 w-4" />
+                        Latest messages
+                    </button>
+                )}
                 <div className="relative mx-auto w-full max-w-3xl px-3 sm:px-6 flex flex-col gap-2 sm:gap-3">
                     {chatMode === "LIVE_REQUESTED" && (
                         <div className="rounded-2xl border border-black/10 bg-profile-elev px-3 py-2 text-xs text-profile-mute dark:border-white/10">
@@ -706,12 +761,14 @@ export function ChatInterface({
                             onFocus={() => setInputFocused(true)}
                             onBlur={() => setInputFocused(false)}
                             placeholder="Tell me more about..."
+                            aria-label="Message"
                             className="w-full h-12 sm:h-14 pl-4 sm:pl-6 pr-12 sm:pr-14 rounded-full bg-profile-elev border-black/10 text-profile-text placeholder:text-profile-mute shadow-2xl backdrop-blur-xl focus-visible:ring-1 focus-visible:ring-profile-ring focus-visible:border-brand/50 transition-all text-base dark:border-white/10"
                             disabled={isLoading}
                         />
                         <Button
                             size="icon"
                             type="submit"
+                            aria-label="Send message"
                             disabled={isLoading || !input.trim()}
                             className="absolute right-1.5 sm:right-2 h-9 w-9 sm:h-10 sm:w-10 rounded-full shadow-lg transition-all disabled:opacity-50 touch-manipulation"
                             style={{ background: "var(--chat-accent)", color: "var(--chat-on-accent)" }}
@@ -750,6 +807,7 @@ function WelcomeIntro({
     welcome,
     topics,
     chips,
+    compact = false,
     onChip,
     orb,
     accent,
@@ -762,6 +820,7 @@ function WelcomeIntro({
     welcome?: string | null
     topics?: string[]
     chips: ChatChip[]
+    compact?: boolean
     onChip: (chip: ChatChip) => void
     orb: ReactNode
     accent: string
@@ -833,14 +892,16 @@ function WelcomeIntro({
     const typedRest = visibleTyped.slice(prefix.length)
 
     return (
-        <div className="relative flex h-full flex-col items-center justify-center gap-7 px-3 py-4">
+        <div className={cn("relative flex min-h-full flex-col items-center px-3", compact ? "justify-end gap-3 py-2" : "justify-center gap-7 py-4")}>
             <AnimatePresence>
                 {(visibleStage === "orb" || visibleStage === "ready") && (
                     <motion.div
                         key="orb-slot"
-                        className="relative z-[1] flex h-[180px] w-[180px] items-center justify-center overflow-visible"
+                        data-welcome-orb
+                        data-compact={compact ? "" : undefined}
+                        className={cn("relative z-[1] flex items-center justify-center overflow-visible", compact ? "h-24 w-24" : "h-[180px] w-[180px]")}
                         initial={skip ? false : { opacity: 0, height: 0, marginBottom: -36 }}
-                        animate={{ opacity: 1, height: 180, marginBottom: 0 }}
+                        animate={{ opacity: 1, height: compact ? 96 : 180, marginBottom: 0 }}
                         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                     >
                         {!bare && (
@@ -921,7 +982,7 @@ function WelcomeIntro({
                                     />
                                 )}
                             </h1>
-                            {visibleStage === "ready" ? (
+                            {visibleStage === "ready" && !compact ? (
                                 <AskAboutLine welcome={welcome} topics={topics} />
                             ) : null}
                         </motion.div>
@@ -929,7 +990,7 @@ function WelcomeIntro({
                 </AnimatePresence>
             </div>
 
-            <div className="relative z-[1] flex min-h-[2.75rem] flex-wrap justify-center gap-2 max-w-xl">
+            {!compact && <div data-welcome-chips className="relative z-[1] flex min-h-[2.75rem] flex-wrap justify-center gap-2 max-w-xl">
                 {visibleStage === "ready" && chips.map((chip, i) => (
                     <motion.div
                         key={chip.id}
@@ -946,7 +1007,7 @@ function WelcomeIntro({
                         />
                     </motion.div>
                 ))}
-            </div>
+            </div>}
         </div>
     )
 }

@@ -48,13 +48,8 @@
   [data-chat-theme="retro-lcd"],
   body:has([data-public-business-theme="retro-lcd"], [data-public-profile-theme="retro-lcd"]) > [data-slot="sheet-content"]
 ) {
-  --retro-paper: #253021;
+  --retro-paper: #10170f;
   --retro-ink: #c4d58a;
-}
-
-[data-public-profile-theme="retro-lcd"] {
-  min-height: 100dvh;
-  height: 100dvh;
 }
 
 [data-chat-theme="retro-lcd"] :is(h1, [data-slot="chip"]) {

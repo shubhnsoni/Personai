@@ -8,7 +8,7 @@
 
 .dark .retro-lcd-orb,
 [data-lcd-mode="dark"] .retro-lcd-orb {
-  --lcd-paper: #253021;
+  --lcd-paper: #10170f;
   --lcd-ink: #c4d58a;
 }
 

@@ -1,0 +1,32 @@
+/* Paint the first server-rendered frame too; :has removes the canvas tint when leaving. */
+html:has([data-public-browser-theme="retro-lcd"]),
+body:has([data-public-browser-theme="retro-lcd"]) {
+  background-color: #c4d58a;
+}
+
+html.dark:has([data-public-browser-theme="retro-lcd"]),
+html.dark body:has([data-public-browser-theme="retro-lcd"]) {
+  background-color: #10170f;
+}
+
+/* The frame owns every safe-area edge, keeping the footer and composer above the indicator. */
+[data-profile-viewport] {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+[data-profile-viewport] [data-chat-composer] {
+  padding-bottom: 0.5rem;
+}
+
+/* Keyboard: drop the brand footer so the composer sits on the visual viewport, not above a dead strip. */
+[data-profile-viewport][data-keyboard] {
+  padding-bottom: 0;
+}
+
+[data-profile-viewport][data-keyboard] > footer {
+  display: none;
+}

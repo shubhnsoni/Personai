@@ -87,13 +87,17 @@ describe("v4 onboarding chat", () => {
         expect(screen.getByText("Salon")).toBeTruthy()
     })
 
-    it("shows a large labeled Gold city picker on extras", async () => {
-        start()
+    async function goldExtras() {
         await nameThenUsername("City Gold")
         fireEvent.click(screen.getByText(COPY.who.skip))
         fireEvent.click(screen.getByText("Gold & jewellery wholesale"))
         fireEvent.click(screen.getByText(COPY.features.confirm))
         expect(screen.getByText(COPY.extras.goldWholesale.h)).toBeTruthy()
+    }
+
+    it("shows a large labeled Gold city picker on extras", async () => {
+        start()
+        await goldExtras()
         expect(screen.getByText(COPY.extras.cityLabel)).toBeTruthy()
         for (const city of GOLD_CITIES) {
             expect(screen.getByText(city)).toBeTruthy()
@@ -101,6 +105,38 @@ describe("v4 onboarding chat", () => {
         const ranchi = screen.getByText("Ranchi")
         expect(ranchi.tagName).toBe("BUTTON")
         expect(ranchi.className).toMatch(/min-h-12/)
+    })
+
+    it("lets you type a city or pick one, then continue without WhatsApp", async () => {
+        start()
+        await goldExtras()
+        const cityBox = screen.getByLabelText(COPY.extras.cityEnter)
+        expect(cityBox).toBeTruthy()
+        fireEvent.change(cityBox, { target: { value: "Patna" } })
+        expect((cityBox as HTMLInputElement).value).toBe("Patna")
+        fireEvent.click(screen.getByText("Jamshedpur"))
+        expect((screen.getByLabelText(COPY.extras.cityEnter) as HTMLInputElement).value).toBe("Jamshedpur")
+        fireEvent.click(screen.getByRole("button", { name: COPY.extras.continue }))
+        expect(screen.getByText(COPY.look.h)).toBeTruthy()
+    })
+
+    it("shows phone and email on extras instead of a Skip pile", async () => {
+        start()
+        await goldExtras()
+        expect(screen.queryByRole("button", { name: /^Skip$/ })).toBeNull()
+        expect(screen.getByLabelText(COPY.extras.phoneLabel)).toBeTruthy()
+        expect(screen.getByLabelText(COPY.extras.emailLabel)).toBeTruthy()
+        expect(screen.getAllByText(COPY.extras.continue)).toHaveLength(1)
+    })
+
+    it("pins the step rail so only the chat column scrolls", async () => {
+        start()
+        const rail = screen.getByLabelText("Onboarding steps").closest("aside")
+        const shell = rail?.parentElement
+        expect(shell?.className).toMatch(/\bh-dvh\b/)
+        expect(shell?.className).toMatch(/\boverflow-hidden\b/)
+        expect(rail?.className).toMatch(/\bh-full\b/)
+        expect(screen.getByRole("log").className).toMatch(/\boverflow-y-auto\b/)
     })
 
     it("lets a free shop customise colour, mood and aura then preview the live page", async () => {
@@ -115,7 +151,8 @@ describe("v4 onboarding chat", () => {
         expect(screen.getByText("Pulse")).toBeTruthy()
         expect(screen.queryByText("Aqua")).toBeNull()
         expect(screen.queryByText("Ember")).toBeNull()
-        fireEvent.click(screen.getByLabelText("Pebble, premium"))
+        fireEvent.click(screen.getByLabelText("Pebble"))
+        fireEvent.click(screen.getByLabelText("Cloud, premium"))
         expect(toast.message).toHaveBeenCalledWith("This is a premium bot")
         fireEvent.click(screen.getByText("Happy"))
         fireEvent.click(screen.getByText(COPY.look.continue))

@@ -1,0 +1,159 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { act, cleanup, render } from "@testing-library/react"
+
+const state = vi.hoisted(() => ({ pathname: "/custom", resolvedTheme: "light" as string | undefined, forcedTheme: undefined as string | undefined }))
+vi.mock("next/navigation", () => ({ usePathname: () => state.pathname }))
+vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: state.resolvedTheme, forcedTheme: state.forcedTheme }) }))
+const { PublicBusinessFrame } = await import("@/components/profile/public-business-frame")
+
+const defaultMeta: HTMLMetaElement[] = []
+const root = () => document.documentElement
+const chromeMeta = () => document.head.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+
+function contents(theme = "retro-lcd") {
+    return (
+        <PublicBusinessFrame profilePath="/custom" theme={theme}>
+            <main>Conversation</main>
+            <footer>Made with Introify</footer>
+        </PublicBusinessFrame>
+    )
+}
+
+beforeEach(() => {
+    state.pathname = "/custom"
+    state.resolvedTheme = "light"
+    state.forcedTheme = undefined
+    root().className = ""
+    root().style.cssText = "background-color: rgb(8, 18, 35); color-scheme: light;"
+    document.body.style.cssText = "background-color: rgb(9, 19, 36) !important; color-scheme: light dark; overflow-y: auto;"
+    for (const [mode, color] of [["light", "#ffffff"], ["dark", "#050505"]]) {
+        const meta = document.createElement("meta")
+        meta.name = "theme-color"
+        meta.media = `(prefers-color-scheme: ${mode})`
+        meta.content = color
+        document.head.append(meta)
+        defaultMeta.push(meta)
+    }
+})
+
+afterEach(() => {
+    cleanup()
+    defaultMeta.splice(0).forEach(meta => meta.remove())
+    root().style.cssText = ""
+    root().className = ""
+    document.body.style.cssText = ""
+})
+
+describe("Public business browser chrome", () => {
+    it("uses the selected light mode rather than the operating system's dark appearance", () => {
+        // The root theme metadata still has both OS queries; the active app choice wins.
+        const { unmount } = render(contents())
+        expect(chromeMeta()?.content).toBe("#c4d58a")
+        expect(chromeMeta()?.hasAttribute("media")).toBe(false)
+        expect(root().style.backgroundColor).toBe("rgb(196, 213, 138)")
+        expect(document.body.style.backgroundColor).toBe("rgb(196, 213, 138)")
+        expect(document.body.style.colorScheme).toBe("light")
+        expect(document.head.querySelector<HTMLMetaElement>('meta[name="color-scheme"]')?.content).toBe("light")
+        expect(defaultMeta.map(meta => meta.content)).toEqual(["#ffffff", "#050505"])
+        unmount()
+    })
+
+    it("updates to near-black dark mode immediately and does not accumulate metadata tags", () => {
+        const { rerender, unmount } = render(contents())
+        state.resolvedTheme = "dark"
+        root().classList.add("dark")
+        // This property belongs to next-themes and must not be restored to an old mode later.
+        root().style.colorScheme = "dark"
+        rerender(contents())
+        expect(chromeMeta()?.content).toBe("#10170f")
+        expect(root().style.backgroundColor).toBe("rgb(16, 23, 15)")
+        expect(document.body.style.backgroundColor).toBe("rgb(16, 23, 15)")
+        expect(document.body.style.colorScheme).toBe("dark")
+        expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(2)
+        unmount()
+        expect(root().style.colorScheme).toBe("dark")
+        expect(root().classList.contains("dark")).toBe(true)
+    })
+
+    it("keeps the palette across catalogues then restores styles and root metadata on leaving", () => {
+        const { container, rerender } = render(contents())
+        const frame = container.firstElementChild as HTMLElement
+        state.pathname = "/custom/shop/product-one"
+        rerender(contents())
+        expect(frame.hasAttribute("data-profile-viewport")).toBe(false)
+        expect(frame.getAttribute("data-public-browser-theme")).toBe("retro-lcd")
+        expect(chromeMeta()?.content).toBe("#c4d58a")
+        expect(document.body.style.overflowY).toBe("auto")
+        expect(frame.style.height).toBe("")
+
+        state.pathname = "/dashboard"
+        rerender(contents())
+        expect(frame.hasAttribute("data-public-browser-theme")).toBe(false)
+        expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(0)
+        expect(chromeMeta()).toBe(defaultMeta[0])
+        expect(root().style.backgroundColor).toBe("rgb(8, 18, 35)")
+        expect(document.body.style.backgroundColor).toBe("rgb(9, 19, 36)")
+        expect(document.body.style.getPropertyPriority("background-color")).toBe("important")
+        expect(document.body.style.colorScheme).toBe("light dark")
+        expect(document.body.style.overflowY).toBe("auto")
+    })
+
+    it("uses the early root mode before next-themes resolves and respects a forced mode", () => {
+        state.resolvedTheme = undefined
+        root().classList.add("dark")
+        const { rerender } = render(contents())
+        expect(chromeMeta()?.content).toBe("#10170f")
+        state.forcedTheme = "light"
+        state.resolvedTheme = "dark"
+        rerender(contents())
+        expect(chromeMeta()?.content).toBe("#c4d58a")
+        expect(document.body.style.colorScheme).toBe("light")
+    })
+
+    it("does not overwrite a newer page's background or metadata during cleanup", () => {
+        const { unmount } = render(contents())
+        root().style.backgroundColor = "rgb(22, 33, 44)"
+        document.body.style.backgroundColor = "rgb(55, 66, 77)"
+        defaultMeta[0].content = "#123456"
+        unmount()
+        expect(root().style.backgroundColor).toBe("rgb(22, 33, 44)")
+        expect(document.body.style.backgroundColor).toBe("rgb(55, 66, 77)")
+        expect(chromeMeta()?.content).toBe("#123456")
+        expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(0)
+    })
+
+    it("re-reads Classic CSS after next-themes applies its root class later in the commit", async () => {
+        const stylesheet = document.createElement("style")
+        stylesheet.textContent = `
+            [data-public-business-theme="classic"] { --profile-bg: oklch(0.97 0.008 240); }
+            .dark [data-public-business-theme="classic"] { --profile-bg: oklch(0.08 0.02 250); }
+        `
+        document.head.append(stylesheet)
+        try {
+            // The context is dark already, but the provider has not committed its root class yet.
+            state.resolvedTheme = "dark"
+            const { rerender, unmount } = render(contents("classic"))
+            expect(chromeMeta()?.content).toBe("oklch(0.97 0.008 240)")
+            await act(async () => { root().classList.add("dark") })
+            expect(chromeMeta()?.content).toBe("oklch(0.08 0.02 250)")
+            expect(document.body.style.backgroundColor).toBe("oklch(0.08 0.02 250)")
+            expect(root().style.backgroundColor).toBe("oklch(0.08 0.02 250)")
+
+            state.resolvedTheme = "light"
+            rerender(contents("classic"))
+            await act(async () => { root().classList.remove("dark") })
+            expect(chromeMeta()?.content).toBe("oklch(0.97 0.008 240)")
+            expect(document.body.style.backgroundColor).toBe("oklch(0.97 0.008 240)")
+            expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(2)
+
+            unmount()
+            await act(async () => { root().classList.add("dark") })
+            expect(chromeMeta()).toBe(defaultMeta[0])
+            expect(document.body.style.backgroundColor).toBe("rgb(9, 19, 36)")
+            expect(document.body.style.getPropertyPriority("background-color")).toBe("important")
+            expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(0)
+        } finally {
+            stylesheet.remove()
+        }
+    })
+})
