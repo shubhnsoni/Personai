@@ -6,6 +6,7 @@ import { IntroifyWordmark } from "@/components/brand/wordmark"
 import { PricingTeaser } from "@/components/billing/pricing-teaser"
 import { LandingMotion, MotionToggle } from "./brand-motion"
 import { ProfilePreview } from "./profile-preview"
+import { FeaturePlay } from "./feature-play"
 import { IntroifyGuide } from "./introify-guide"
 import { type UiLocale } from "@/lib/ui-locale"
 import { messagesFor } from "@/lib/ui-messages"
@@ -17,7 +18,7 @@ function Flower({ className = "" }: { className?: string }) {
 
 export function HomeLanding({ locale = "en" }: { locale?: UiLocale }) {
     const home = messagesFor(locale).home
-    const { hero, product, share, people, how, faq, final: closing, possibilities } = home
+    const { hero, product, share, people, how, faq, final: closing, possibilities, promise } = home
     return (
         <MarketingShell className="brand-home" locale={locale}>
             <LandingMotion>
@@ -28,13 +29,38 @@ export function HomeLanding({ locale = "en" }: { locale?: UiLocale }) {
                                 <p className="fh-eyebrow"><span className="fh-status-dot" /> {hero.eyebrow}</p>
                                 <h1 id="fh-hero-title">{hero.title}<br />{hero.titleMid}<br /><em>{hero.titleEm}</em><Flower className="fh-heading-flower" /></h1>
                                 <p className="fh-hero-description">{hero.description}<br className="fh-desktop-break" /> {hero.descriptionMore}</p>
-                                <div className="fh-hero-actions"><Link className="fh-button" href="/sign-up">{hero.cta} <ArrowUpRight size={19} /></Link><Link className="fh-text-link" href="#product">{hero.secondary} <ArrowDown size={17} /></Link></div>
+                                <div className="fh-hero-actions"><Link className="fh-button" href="/sign-up">{hero.cta} <ArrowUpRight size={19} /></Link><Link className="fh-text-link" href="#in-action">{hero.secondary} <ArrowDown size={17} /></Link></div>
                                 <div className="fh-hero-notes"><span><Check size={13} /> {hero.free}</span><span><Check size={13} /> {hero.noCard}</span><span><Check size={13} /> {hero.yours}</span></div>
                             </div>
                             <div className="fh-hero-art"><ProfilePreview /><div className="fh-art-caption"><span>{hero.caption}</span><MotionToggle pause={home.pauseAnimations} resume={home.resumeAnimations} /></div></div>
                         </div>
                     </section>
                     <div className="fh-possibilities"><div className="fh-container"><p>{possibilities.lead}<br /><strong>{possibilities.em}</strong></p><div><span>{possibilities.story}</span><Flower /><span>{possibilities.services}</span><Flower /><span>{possibilities.products}</span><Flower /><span>{possibilities.chapter}</span></div></div></div>
+                    <section className="fh-promise fh-section" id="promise" aria-labelledby="fh-promise-title">
+                        <div className="fh-container">
+                            <div className="fh-section-heading" data-reveal>
+                                <div>
+                                    <p className="fh-eyebrow">{promise.eyebrow}</p>
+                                    <h2 id="fh-promise-title">{promise.title}<br /><em>{promise.titleEm}</em></h2>
+                                </div>
+                                <p>{promise.lead}</p>
+                            </div>
+                            <div className="fh-promise-grid">
+                                {([
+                                    [promise.whoLabel, promise.whoTitle, promise.whoBody],
+                                    [promise.whatLabel, promise.whatTitle, promise.whatBody],
+                                    [promise.howLabel, promise.howTitle, promise.howBody],
+                                ] as const).map(([label, title, body], index) => (
+                                    <article className="fh-promise-card" key={label} data-reveal>
+                                        <span>0{index + 1} / {label}</span>
+                                        <h3>{title}</h3>
+                                        <p>{body}</p>
+                                    </article>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+                    <FeaturePlay locale={locale} />
                     <section className="fh-product fh-section" id="product" aria-labelledby="fh-product-title">
                         <div className="fh-container">
                             <div className="fh-section-heading" data-reveal><div><p className="fh-eyebrow">{product.eyebrow}</p><h2 id="fh-product-title">{product.title}<br /><em>{product.titleEm}</em></h2></div><p>{product.lead}</p></div>

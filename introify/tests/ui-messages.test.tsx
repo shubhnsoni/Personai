@@ -28,7 +28,7 @@ describe("UI message catalogs", () => {
 
     it("renders the Hindi homepage from the catalog, not leftover English chrome", () => {
         render(<HomeLanding locale="hi" />)
-        expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/परिचय/)
+        expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/व्यापार/)
         expect(screen.getAllByRole("link", { name: "Introify होम" }).every(link => link.getAttribute("href") === "/hi")).toBe(true)
         expect(screen.getAllByRole("link", { name: "प्रॉडक्ट" }).every(link => link.getAttribute("href") === "/hi#product")).toBe(true)
         expect(screen.getByLabelText("भाषा")).toBeTruthy()

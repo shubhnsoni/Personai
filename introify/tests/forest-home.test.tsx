@@ -171,8 +171,28 @@ describe("Introify product guide", () => {
     it("presents the homepage and shared shell without stale demo or fictional-story labels", () => {
         const { container } = render(<HomeLanding />)
         expect(container.textContent).not.toMatch(/\b(?:fictional|demo|scripted|illustrative)\b/i)
-        expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/Big things[\s\S]*good intro/)
+        expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/Your business[\s\S]*ready to grow/)
         expect(screen.getByRole("main").id).toBe("main-content")
+        expect(screen.getByRole("heading", { name: /How the page/ }).textContent).toMatch(/earns its keep/)
+        expect(screen.getByText("Owners who need a front door")).toBeTruthy()
+        expect(screen.getByRole("heading", { name: /Watch a visitor/ })).toBeTruthy()
+    })
+})
+
+describe("homepage features in action", () => {
+    it("steps through a shop conversation then switches business without sending anything", () => {
+        const fetch = vi.fn()
+        vi.stubGlobal("fetch", fetch)
+        render(<HomeLanding />)
+        expect(screen.getByText("Is the 22K chain available today?")).toBeTruthy()
+        expect(screen.getByText("Step 1 of 2")).toBeTruthy()
+        fireEvent.click(screen.getByRole("button", { name: "Next step" }))
+        expect(screen.getByText(/hold it for this evening/)).toBeTruthy()
+        expect(screen.getByText(/Open the 22K rope chain/)).toBeTruthy()
+        fireEvent.click(screen.getByRole("tab", { name: /Café/ }))
+        expect(screen.getByText(/vegetarian plates/)).toBeTruthy()
+        expect(screen.getByText("Step 1 of 2")).toBeTruthy()
+        expect(fetch).not.toHaveBeenCalled()
     })
 })
 

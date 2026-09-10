@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { isReservedSlug } from "./slugs"
 
 export const BRAND_NAME = "Introify"
-export const BRAND_DESCRIPTION = "Create one page for your profile, services, products and bookings. Start free with Introify and explore plans with AI credits, 3D generations and room for your team."
+export const BRAND_DESCRIPTION = "Give your shop, service or studio one public page. Visitors get answers, bookings and a catalog. You get the work back in one studio. Start free with Introify."
 
 // Draft pages stay out of search and the sitemap until their public details
 // and policies are ready. Page metadata and the sitemap use the same registry.
