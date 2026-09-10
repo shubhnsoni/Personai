@@ -40,8 +40,21 @@ export function shouldSkipPopulated(
 
 export function seedBudgetMs(env: Record<string, string | undefined> = process.env) {
     const raw = env.INTROIFY_SEED_BUDGET_MS
-    if (raw === undefined || raw === "") return 180_000
+    if (raw === undefined || raw === "") return 300_000
     const n = Number(raw)
-    if (!Number.isFinite(n) || n < 5_000) return 180_000
+    if (!Number.isFinite(n) || n < 5_000) return 300_000
     return Math.min(n, 5 * 60_000)
+}
+
+export async function runPool<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>) {
+    let index = 0
+    const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
+        while (true) {
+            const current = index
+            index += 1
+            if (current >= items.length) return
+            await fn(items[current])
+        }
+    })
+    await Promise.all(workers)
 }

@@ -4,6 +4,7 @@ import { DEMO_SHOPS } from "@/lib/demo-shops"
 import {
     catalogSize,
     orderedDemoShops,
+    runPool,
     seedBudgetMs,
     shouldSkipPopulated,
 } from "@/lib/demo-shops/seed-order"
@@ -25,9 +26,17 @@ describe("demo shop seed order", () => {
         expect(shouldSkipPopulated({ products: [], services: [] }, 0, 0, false)).toBe(false)
     })
 
-    it("keeps Hostinger bootstrap under a 3 minute seed budget by default", () => {
-        expect(seedBudgetMs({})).toBe(180_000)
+    it("keeps Hostinger bootstrap under a 5 minute seed budget by default", () => {
+        expect(seedBudgetMs({})).toBe(300_000)
         expect(seedBudgetMs({ INTROIFY_SEED_BUDGET_MS: "15000" })).toBe(15_000)
-        expect(seedBudgetMs({ INTROIFY_SEED_BUDGET_MS: "not-a-number" })).toBe(180_000)
+        expect(seedBudgetMs({ INTROIFY_SEED_BUDGET_MS: "not-a-number" })).toBe(300_000)
+    })
+
+    it("runs leftover shops concurrently without dropping items", async () => {
+        const seen: number[] = []
+        await runPool([1, 2, 3, 4, 5], 3, async (n) => {
+            seen.push(n)
+        })
+        expect(seen.sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5])
     })
 })

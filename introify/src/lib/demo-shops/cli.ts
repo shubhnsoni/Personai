@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { DEMO_SHOPS } from "./index"
 import { applyDemoShop } from "./apply"
-import { orderedDemoShops, seedBudgetMs, shouldSkipPopulated } from "./seed-order"
+import { orderedDemoShops, runPool, seedBudgetMs, shouldSkipPopulated } from "./seed-order"
 
 function databaseTarget() {
     const raw = process.env.DATABASE_URL || ""
@@ -40,12 +40,10 @@ async function main() {
     const userId = await ownerUserId()
     let filled = 0
     let skipped = 0
+    const pending: { shop: (typeof shops)[number]; profileId: string; fresh: boolean }[] = []
     for (const shop of shops) {
-        if (Date.now() >= deadline) {
-            console.log(`seed budget reached after ${filled} filled, ${skipped} skipped; remaining shops wait for the next deploy`)
-            break
-        }
         let profile = await prisma.profile.findUnique({ where: { slug: shop.slug } })
+        let fresh = false
         if (!profile) {
             const clash = await prisma.profile.findFirst({ where: { userId, slug: shop.slug } })
             profile = clash || await prisma.profile.create({
@@ -60,6 +58,7 @@ async function main() {
                     isPublic: true,
                 },
             })
+            fresh = !clash
         }
         const productCount = await prisma.digitalProduct.count({ where: { profileId: profile.id } })
         const serviceCount = await prisma.serviceOffering.count({ where: { profileId: profile.id } })
@@ -68,9 +67,16 @@ async function main() {
             skipped++
             continue
         }
-        await applyDemoShop(prisma, profile.id, shop, { replaceCatalog: true })
-        console.log("filled", shop.flavor, shop.slug)
+        pending.push({ shop, profileId: profile.id, fresh: fresh || productCount + serviceCount === 0 })
+    }
+    await runPool(pending, 3, async (row) => {
+        if (Date.now() >= deadline) return
+        await applyDemoShop(prisma, row.profileId, row.shop, { replaceCatalog: true, fresh: row.fresh })
+        console.log("filled", row.shop.flavor, row.shop.slug)
         filled++
+    })
+    if (filled + skipped < shops.length) {
+        console.log(`seed budget reached after ${filled} filled, ${skipped} skipped; remaining shops wait for the next deploy`)
     }
     console.log(`Demo shop seed done: ${filled} filled, ${skipped} skipped`)
 }

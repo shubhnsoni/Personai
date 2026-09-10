@@ -158,7 +158,7 @@ function seedDemoShops() {
         env: process.env,
         stdio: "inherit",
         windowsHide: true,
-        timeout: 210_000,
+        timeout: 330_000,
         killSignal: "SIGKILL",
     })
     if (result.error) {

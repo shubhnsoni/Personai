@@ -19,9 +19,10 @@ export async function applyDemoShop(
     db: PrismaClient,
     profileId: string,
     shop: DemoShop,
-    opts: { replaceCatalog?: boolean } = {},
+    opts: { replaceCatalog?: boolean; fresh?: boolean } = {},
 ) {
     const replace = opts.replaceCatalog !== false
+    const fresh = Boolean(opts.fresh)
     const suggested = suggestedAddons(shop.flavor)
     let personality = "{}"
     const row = await db.profile.findUnique({ where: { id: profileId }, select: { personalityConfig: true } })
@@ -65,24 +66,28 @@ export async function applyDemoShop(
         },
     })
 
-    if (!replace) {
+    if (!replace && !fresh) {
         const products = await db.digitalProduct.count({ where: { profileId } })
         const services = await db.serviceOffering.count({ where: { profileId } })
         if (products > 0 || services > 0) return
     }
 
-    await db.booking.deleteMany({ where: { profileId } }).catch(() => {})
-    await db.availabilitySchedule.deleteMany({ where: { profileId } })
-    await db.serviceOffering.deleteMany({ where: { profileId } }).catch(() => {})
-    await db.digitalProduct.deleteMany({ where: { profileId } }).catch(() => {})
-    await db.profileDocument.deleteMany({ where: { profileId } })
-    await db.workExperience.deleteMany({ where: { profileId } })
-    await db.project.deleteMany({ where: { profileId } })
-    await db.leadMagnet.deleteMany({ where: { profileId } })
-    await db.event.deleteMany({ where: { profileId } })
-    await db.course.deleteMany({ where: { profileId } })
-    await db.appointmentResource.deleteMany({ where: { profileId } })
-    await db.profileImage.deleteMany({ where: { profileId } })
+    if (!fresh) {
+        await Promise.all([
+            db.booking.deleteMany({ where: { profileId } }).catch(() => {}),
+            db.availabilitySchedule.deleteMany({ where: { profileId } }),
+            db.serviceOffering.deleteMany({ where: { profileId } }).catch(() => {}),
+            db.digitalProduct.deleteMany({ where: { profileId } }).catch(() => {}),
+            db.profileDocument.deleteMany({ where: { profileId } }),
+            db.workExperience.deleteMany({ where: { profileId } }),
+            db.project.deleteMany({ where: { profileId } }),
+            db.leadMagnet.deleteMany({ where: { profileId } }),
+            db.event.deleteMany({ where: { profileId } }),
+            db.course.deleteMany({ where: { profileId } }),
+            db.appointmentResource.deleteMany({ where: { profileId } }),
+            db.profileImage.deleteMany({ where: { profileId } }),
+        ])
+    }
 
     await db.availabilitySchedule.createMany({
         data: shop.hours.map((hour) => ({ profileId, ...hour })),
