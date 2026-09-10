@@ -1,29 +1,30 @@
 .au-page {
-  --au-ink: var(--mk-ink);
-  --au-muted: var(--mk-muted);
-  --au-surface: var(--mk-surface);
-  --au-elevated: var(--mk-elevated);
-  --au-line: var(--mk-line);
-  --au-accent: var(--mk-accent);
-  --au-accent-soft: #e6efce;
-  --au-glow: #d8e6b84d;
-  --au-action: #073d30;
-  --au-action-hover: #0d503e;
+  --au-ink: var(--foreground);
+  --au-muted: var(--muted-foreground);
+  --au-surface: var(--card);
+  --au-elevated: var(--muted);
+  --au-line: var(--border);
+  --au-accent: #00D7FF;
+  --au-accent-soft: color-mix(in srgb, #00D7FF 16%, var(--background));
+  --au-glow: #00d7ff1a;
+  --au-action: #00D7FF;
+  --au-action-hover: #4ae3ff;
   --au-danger: #b42335;
-  --au-success: #35733f;
+  --au-success: #00D7FF;
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
   overflow: visible;
-  background: radial-gradient(ellipse at 8% 28%, var(--au-glow), transparent 52%), var(--mk-paper);
+  color: var(--au-ink);
+  background: radial-gradient(ellipse at 8% 28%, var(--au-glow), transparent 52%), var(--background);
 }
 .dark .au-page {
-  --au-accent-soft: #14232b;
-  --au-glow: #00d7ff0d;
-  --au-action: var(--mk-action);
-  --au-action-hover: var(--mk-action-hover);
+  --au-accent-soft: color-mix(in srgb, #00D7FF 12%, var(--background));
+  --au-glow: #00d7ff14;
+  --au-action: #00D7FF;
+  --au-action-hover: #4ae3ff;
   --au-danger: #ff9d9d;
-  --au-success: #86efac;
+  --au-success: #00D7FF;
 }
 .au-header,
 .au-footer {
@@ -162,10 +163,10 @@
   align-items: center;
   gap: 12px;
   padding: 15px 19px;
-  border: 1px solid #b8cc79;
+  border: 1px solid color-mix(in srgb, #00D7FF 45%, var(--border));
   border-radius: 12px;
-  background: var(--mk-lime);
-  color: #233321;
+  background: color-mix(in srgb, #00D7FF 18%, var(--card));
+  color: var(--foreground);
   transform: rotate(3deg);
   box-shadow: 0 7px 20px #17252316;
 }

@@ -43,6 +43,8 @@ describe("mobile business navigation", () => {
         render(<><BusinessSwitcher businesses={businesses} activeId="owned" /><Drawer /></>)
         const dialog = screen.getByRole("dialog", { name: "Menu" })
         const select = within(dialog).getByRole("combobox", { name: "Business" }) as HTMLSelectElement
+        const logo = within(dialog).getByRole("link", { name: "Introify home" })
+        expect(logo.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(select.value).toBe("owned")
         expect(Array.from(select.options).map(option => option.text)).toEqual(["My studio · owner", "Partner studio · viewer"])
         const selectors = Array.from(document.querySelectorAll("select"))

@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils"
 import { countForHref, type NavCounts } from "@/lib/nav-counts"
 import { isActivePath, visibleNavItems } from "./sidebar"
+import Link from "@/components/navigation/transition-link"
 import { Logo } from "@/components/brand/logo"
 import { StudioSignOut } from "@/components/dashboard/studio-sign-out"
 import { BusinessSwitcher, type BusinessOption } from "./business-switcher"
@@ -38,15 +39,20 @@ export function MobileSidebar({ open, onOpenChange, counts, role, extras, busine
             >
                 <SheetHeader className="relative shrink-0 space-y-0 p-0 pr-12">
                     <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/30" />
-                    <div className="flex h-12 items-center px-4 pr-12">
+                    <div className="flex h-12 items-center gap-2 px-3 pr-12">
                         <SheetTitle className="sr-only">Menu</SheetTitle>
-                        <Logo href="/dashboard" size="sm" className="w-[88px]" />
+                        <Logo href="/dashboard" size="sm" className="w-[88px] shrink-0" />
+                        {businesses && activeProfileId ? (
+                            <BusinessSwitcher businesses={businesses} activeId={activeProfileId} variant="drawer" onNavigate={() => onOpenChange(false)} />
+                        ) : null}
                     </div>
                 </SheetHeader>
                 <div className="min-h-0 overflow-y-auto px-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                    {businesses && activeProfileId && (
-                        <BusinessSwitcher businesses={businesses} activeId={activeProfileId} variant="drawer" onNavigate={() => onOpenChange(false)} />
-                    )}
+                    {businesses && activeProfileId ? (
+                        <Link href="/dashboard/team" onNavigate={() => onOpenChange(false)} className="mb-3 inline-flex min-h-8 items-center text-xs text-muted-foreground underline-offset-4 hover:underline">
+                            Businesses &amp; team
+                        </Link>
+                    ) : null}
                     <div className="grid grid-cols-2 gap-2.5">
                         {visibleNavItems(role, extras).map((item) => {
                             const active = isActivePath(pathname, item)

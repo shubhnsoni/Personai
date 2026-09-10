@@ -21,11 +21,11 @@ export function BusinessSwitcher({ businesses, activeId, variant = "bar", onNavi
     const router = useRouter()
     const drawer = variant === "drawer"
     return <div className={drawer
-        ? "mb-3 grid min-w-0 gap-2 rounded-2xl border border-border/70 bg-muted/30 p-3 text-xs"
+        ? "flex min-w-0 flex-1 items-center"
         : "flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-3 py-2 text-xs md:px-5"}>
-        <label htmlFor={selectId} className="text-muted-foreground">Business</label>
+        <label htmlFor={selectId} className={drawer ? "sr-only" : "text-muted-foreground"}>Business</label>
         <select id={selectId} value={activeId} disabled={pending} className={drawer
-            ? "min-h-11 w-full min-w-0 rounded-xl border bg-background px-3 py-2 text-base"
+            ? "h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm"
             : "min-w-0 max-w-[60vw] flex-1 rounded-md border bg-background px-2 py-1.5 md:max-w-72"} onChange={(event) => {
             const id = event.target.value
             startTransition(async () => {
@@ -35,8 +35,6 @@ export function BusinessSwitcher({ businesses, activeId, variant = "bar", onNavi
         }}>
             {businesses.map((business) => <option key={business.id} value={business.id}>{business.name} · {business.role.toLowerCase()}</option>)}
         </select>
-        <Link href="/dashboard/team" onNavigate={onNavigate} className={drawer
-            ? "inline-flex min-h-9 items-center justify-self-start underline-offset-4 hover:underline"
-            : "ml-auto whitespace-nowrap underline-offset-4 hover:underline"}>Businesses &amp; team</Link>
+        {drawer ? null : <Link href="/dashboard/team" onNavigate={onNavigate} className="ml-auto whitespace-nowrap underline-offset-4 hover:underline">Businesses &amp; team</Link>}
     </div>
 }

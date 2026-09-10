@@ -18,7 +18,7 @@ export function Logo({ className, href = "/", size = "md" }: LogoProps) {
     const mark = (
         <span
             className={cn(
-                "inline-flex max-w-full shrink-0 items-center text-[#073d30] [--brand-accent:#4e7425] dark:text-[#fdfdfd] dark:[--brand-accent:var(--mk-action,#00d7ff)] [.auth-scene_&]:text-[#fdfdfd] [.auth-scene_&]:[--brand-accent:#a3db42] dark:[.auth-scene_&]:[--brand-accent:var(--mk-action,#00d7ff)]",
+                "inline-flex max-w-full shrink-0 items-center text-foreground [--brand-accent:#00D7FF] dark:text-[#fdfdfd] dark:[--brand-accent:#00D7FF] [.auth-scene_&]:text-[#fdfdfd] [.auth-scene_&]:[--brand-accent:#00D7FF]",
                 sizeClass[size],
                 className,
             )}

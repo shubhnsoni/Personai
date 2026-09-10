@@ -1,15 +1,15 @@
 .brand-loading, .page-transit {
-  --transit-ink: #123e30;
-  --transit-accent: #648c26;
-  --transit-surface: #f7f9f0;
-  --transit-line: rgb(36 76 45 / 13%);
+  --transit-ink: var(--foreground);
+  --transit-accent: #00D7FF;
+  --transit-surface: var(--background);
+  --transit-line: var(--border);
   color: var(--transit-ink);
 }
 .dark .brand-loading, .dark .page-transit, .auth-scene .brand-loading {
-  --transit-ink: #f0f5e8;
-  --transit-accent: #a3db42;
-  --transit-surface: #101d17;
-  --transit-line: rgb(186 219 158 / 15%);
+  --transit-ink: var(--foreground);
+  --transit-accent: #00D7FF;
+  --transit-surface: var(--background);
+  --transit-line: var(--studio-line, var(--border));
 }
 .brand-loading {
   display: flex;
