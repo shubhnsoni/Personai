@@ -21,7 +21,7 @@ SkyDine Cafe (Hinoo, Ranchi, slug `skydine-cafe`) is the **cafe** field demo. It
 npm run seed:demos
 ```
 
-That upserts public slugs (SkyDine, Kaveri, Nanak Dhaba, MK Jewellers, …) for the owner of `skydine-cafe`. Opening a kit from `/admin/kits` also fills that kit if the catalog is empty.
+Hostinger `build:hostinger` runs the same seed after database bootstrap, unless `INTROIFY_SEED_DEMOS=false`. Loopback URLs are refused unless `INTROIFY_SEED_LOCAL=1`.
 
 Assets: `public/uploads/skydine-cafe/`, `public/uploads/skydine-ar/`. Do not copy Hinoo hours into shared UI.
 

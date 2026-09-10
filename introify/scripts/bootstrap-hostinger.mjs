@@ -1,5 +1,6 @@
-import { resolve } from "node:path"
-import { pathToFileURL } from "node:url"
+import { resolve, dirname } from "node:path"
+import { pathToFileURL, fileURLToPath } from "node:url"
+import { spawnSync } from "node:child_process"
 import { PrismaClient } from "@prisma/client"
 
 // A create-only counterpart to prisma/seed.ts. The legacy seed intentionally
@@ -146,12 +147,30 @@ export async function bootstrapDatabase(prisma) {
     throw new Error("Database bootstrap retry limit reached")
 }
 
+function seedDemoShops() {
+    if (process.env.INTROIFY_SEED_DEMOS === "false" || process.env.INTROIFY_SEED_DEMOS === "0") {
+        console.log("Demo shop seed skipped.")
+        return
+    }
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+    const result = spawnSync(process.execPath, ["--import", "tsx", "src/lib/demo-shops/cli.ts"], {
+        cwd: root,
+        env: process.env,
+        stdio: "inherit",
+        windowsHide: true,
+    })
+    if (result.status !== 0) {
+        throw new Error(`Demo shop seed failed with status ${result.status ?? "unknown"}.`)
+    }
+}
+
 async function main() {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for database bootstrap")
     const prisma = new PrismaClient()
     try {
         const result = await bootstrapDatabase(prisma)
         console.log(`Database bootstrap: ${result.presetsCreated} presets created; demo ${result.demo}.`)
+        seedDemoShops()
     } finally {
         await prisma.$disconnect()
     }

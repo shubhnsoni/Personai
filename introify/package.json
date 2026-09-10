@@ -53,6 +53,7 @@
     "stripe": "^20.0.0",
     "tailwind-merge": "^3.4.0",
     "three": "^0.170.0",
+    "tsx": "^4.23.13",
     "zod": "^4.1.13"
   },
   "devDependencies": {
