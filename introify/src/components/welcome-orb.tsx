@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils"
 import { ORB_VARIANTS, resolveOrbVariant, type OrbVariantId } from "@/lib/orb-variants"
 import { resolveOrbLook, resolvePixelSkin, type OrbLook, type PixelSkin } from "@/lib/pixel-skins"
 import { BloubOrb } from "@/components/bloub-orb"
+import { COLOR_BY_ID } from "@/lib/bloub/skins"
+import { resolveBloubAura, resolveBloubColor, type AuraId } from "@/lib/bloub/catalog"
 import "./welcome-orb.css"
 import "./welcome-pixel.css"
 
@@ -19,6 +21,7 @@ interface WelcomeOrbProps {
     shape?: string
     expression?: string
     color?: string
+    aura?: AuraId | string
     speed?: number
     intensity?: number
     className?: string
@@ -41,6 +44,7 @@ export function WelcomeOrb({
     shape,
     expression,
     color,
+    aura,
     speed = 1,
     className,
     gaze = null,
@@ -164,6 +168,7 @@ export function WelcomeOrb({
             style={{
                 ["--orb-s" as string]: `${size}px`,
                 ["--orb-speed" as string]: String(Math.max(speed, 0.35)),
+                ["--orb-aura" as string]: COLOR_BY_ID.get(resolveBloubColor(color))?.hex || "#f7f7f8",
                 ["--gaze-x" as string]: `${look.x * size * 0.06}px`,
                 ["--gaze-y" as string]: `${-look.y * size * 0.07}px`,
                 ["--pix-gx" as string]: pixGx,
@@ -173,6 +178,11 @@ export function WelcomeOrb({
             }}
             aria-hidden
         >
+            {resolvedLook === "bloub" && resolveBloubAura(aura) !== "still" ? (
+                <span className="pl-orb-aura" data-rhythm={resolveBloubAura(aura)} aria-hidden>
+                    <i /><i /><i />
+                </span>
+            ) : null}
             {resolvedLook === "bloub" ? (
                 <BloubOrb
                     size={size}

@@ -23,6 +23,7 @@ import type { EyeCfg } from './states'
  */
 /** Enumeres pour que la couche i18n verifie leurs traductions a la compilation. */
 export type ExpressionId =
+  | 'centre'
   | 'neutre'
   | 'attentif'
   | 'surpris'
@@ -57,6 +58,12 @@ const pair = (w: number, h: number, tilt = 0, open = 1): [EyeCfg, EyeCfg] => [
 ]
 
 export const EXPRESSIONS: BotExpression[] = [
+  {
+    id: 'centre',
+    gaze: { yaw: 0, pitch: 0, roll: 0 },
+    split: EYE_SPLIT,
+    eyes: [eye(EYE_W, EYE_H), eye(EYE_W, EYE_H)]
+  },
   {
     // la pose relev├⌐e image par image sur la vid├⌐o de r├⌐f├⌐rence
     id: 'neutre',
@@ -168,7 +175,7 @@ export const EXPRESSIONS: BotExpression[] = [
 ]
 
 export const EXPRESSION_BY_ID = new Map<string, BotExpression>(EXPRESSIONS.map((e) => [e.id, e]))
-export const DEFAULT_EXPRESSION = 'surpris'
+export const DEFAULT_EXPRESSION = 'centre'
 
 const lerpEyeCfg = (a: EyeCfg, b: EyeCfg, t: number): EyeCfg => ({
   w: lerp(a.w, b.w, t),

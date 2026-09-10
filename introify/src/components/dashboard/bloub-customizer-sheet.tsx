@@ -2,7 +2,8 @@
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { WelcomeOrb } from "@/components/welcome-orb"
-import { BLOUB_COLORS, BLOUB_EXPRESSIONS, BLOUB_SHAPES, type BloubPick } from "@/lib/bloub/catalog"
+import { toast } from "sonner"
+import { BLOUB_AURAS, BLOUB_COLORS, BLOUB_MOODS, PREMIUM_BLOUB_BOTS, isPremiumBloubShape, type BloubPick } from "@/lib/bloub/catalog"
 import { cn } from "@/lib/utils"
 
 export function BloubCustomizerSheet({
@@ -10,11 +11,13 @@ export function BloubCustomizerSheet({
     onClose,
     value,
     onChange,
+    premium = false,
 }: {
     open: boolean
     onClose: () => void
     value: BloubPick
     onChange: (next: Partial<BloubPick>) => void
+    premium?: boolean
 }) {
     return (
         <Sheet open={open} onOpenChange={(next) => { if (!next) onClose() }}>
@@ -30,10 +33,11 @@ export function BloubCustomizerSheet({
                             shape={value.shape}
                             expression={value.expression}
                             color={value.color}
+                            aura={value.aura}
                         />
                         <div className="min-w-0 text-left">
                             <SheetTitle>Customise blob</SheetTitle>
-                            <SheetDescription>Colour, face, then shape.</SheetDescription>
+                            <SheetDescription>One colour, a mood, and an aura.</SheetDescription>
                         </div>
                     </div>
                 </SheetHeader>
@@ -60,9 +64,9 @@ export function BloubCustomizerSheet({
                     </section>
 
                     <section className="space-y-2">
-                        <p className="text-xs font-medium">Expression</p>
-                        <div className="grid grid-cols-4 gap-2">
-                            {BLOUB_EXPRESSIONS.map((item) => (
+                        <p className="text-xs font-medium">Mood</p>
+                        <div className="grid grid-cols-3 gap-2">
+                            {BLOUB_MOODS.map((item) => (
                                 <button
                                     key={item.id}
                                     type="button"
@@ -73,11 +77,13 @@ export function BloubCustomizerSheet({
                                     )}
                                 >
                                     <WelcomeOrb
+                                        still
                                         size={44}
                                         look="bloub"
                                         shape={value.shape}
                                         expression={item.id}
                                         color={value.color}
+                                        aura="still"
                                     />
                                     <span className="text-[10px] font-medium">{item.label}</span>
                                 </button>
@@ -86,26 +92,57 @@ export function BloubCustomizerSheet({
                     </section>
 
                     <section className="space-y-2">
-                        <p className="text-xs font-medium">Shape</p>
-                        <div className="grid grid-cols-4 gap-2">
-                            {BLOUB_SHAPES.map((item) => (
+                        <p className="text-xs font-medium">Aura</p>
+                        <div className="flex flex-wrap gap-2">
+                            {BLOUB_AURAS.map((item) => (
                                 <button
                                     key={item.id}
                                     type="button"
-                                    onClick={() => onChange({ shape: item.id })}
+                                    onClick={() => onChange({ aura: item.id })}
                                     className={cn(
-                                        "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
-                                        value.shape === item.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40"
+                                        "rounded-full border px-3.5 py-2 text-xs",
+                                        value.aura === item.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40"
                                     )}
                                 >
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+
+                    <section className="space-y-2">
+                        <p className="text-xs font-medium">More bots</p>
+                        <div className="grid grid-cols-5 gap-2">
+                            {PREMIUM_BLOUB_BOTS.map((bot) => (
+                                <button
+                                    key={bot.id}
+                                    type="button"
+                                    onClick={() => {
+                                        if (!premium || isPremiumBloubShape(bot.id)) {
+                                            if (!premium) {
+                                                toast.message("This is a premium bot")
+                                                return
+                                            }
+                                        }
+                                        onChange({ shape: bot.id, expression: bot.expression, color: bot.color })
+                                    }}
+                                    className={cn(
+                                        "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                        value.shape === bot.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                                        !premium && "opacity-60",
+                                    )}
+                                    aria-label={premium ? bot.label : `${bot.label}, premium`}
+                                >
                                     <WelcomeOrb
+                                        still
                                         size={44}
                                         look="bloub"
-                                        shape={item.id}
-                                        expression={value.expression}
-                                        color={value.color}
+                                        shape={bot.id}
+                                        expression={bot.expression}
+                                        color={bot.color}
+                                        aura="still"
                                     />
-                                    <span className="text-[10px] font-medium">{item.label}</span>
+                                    <span className="text-[10px] font-medium">{bot.label}</span>
                                 </button>
                             ))}
                         </div>

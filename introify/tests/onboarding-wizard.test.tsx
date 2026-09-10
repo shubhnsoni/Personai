@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { toast } from "sonner"
 import { COPY, GOLD_CITIES } from "@/lib/onboarding-chat"
 
 vi.mock("next/navigation", () => ({
@@ -22,6 +23,8 @@ vi.mock("@/app/actions/onboarding", () => ({
     createProfile: vi.fn(),
     checkUsername: vi.fn(async (value: string) => ({ ok: true, slug: value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") })),
 }))
+
+vi.mock("@/components/welcome-orb", () => ({ WelcomeOrb: () => <div data-testid="orb" /> }))
 
 const { OnboardingWizard } = await import("@/components/onboarding/onboarding-wizard")
 
@@ -98,5 +101,29 @@ describe("v4 onboarding chat", () => {
         const ranchi = screen.getByText("Ranchi")
         expect(ranchi.tagName).toBe("BUTTON")
         expect(ranchi.className).toMatch(/min-h-12/)
+    })
+
+    it("lets a free shop customise colour, mood and aura then preview the live page", async () => {
+        start()
+        await nameThenUsername("Powehi")
+        fireEvent.click(screen.getByText(COPY.who.skip))
+        fireEvent.click(screen.getAllByText(COPY.type.else)[0])
+        fireEvent.click(screen.getByText("Optics"))
+        fireEvent.click(screen.getByText(COPY.features.confirm))
+        expect(screen.getByText(COPY.look.h)).toBeTruthy()
+        expect(screen.getByText("Calm")).toBeTruthy()
+        expect(screen.getByText("Pulse")).toBeTruthy()
+        expect(screen.queryByText("Aqua")).toBeNull()
+        expect(screen.queryByText("Ember")).toBeNull()
+        fireEvent.click(screen.getByLabelText("Pebble, premium"))
+        expect(toast.message).toHaveBeenCalledWith("This is a premium bot")
+        fireEvent.click(screen.getByText("Happy"))
+        fireEvent.click(screen.getByText(COPY.look.continue))
+        expect(screen.getByText(COPY.ready.h)).toBeTruthy()
+        expect(screen.getByText("Live page")).toBeTruthy()
+        expect(screen.getByText("Save and go to dashboard")).toBeTruthy()
+        expect(screen.getByText("Keep modifying")).toBeTruthy()
+        fireEvent.click(screen.getByText("Keep modifying"))
+        expect(screen.getByText(COPY.look.h)).toBeTruthy()
     })
 })

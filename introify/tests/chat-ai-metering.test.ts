@@ -29,7 +29,13 @@ beforeEach(() => {
     vi.clearAllMocks()
     db.profile.findUnique.mockResolvedValue(profile)
     db.conversation.create.mockResolvedValue({ id: "conversation" })
-    db.conversation.findFirst.mockResolvedValue({ id: "conversation", mode: "AI", visitorId: "visitor" })
+    db.conversation.findFirst.mockImplementation(async (args: { where?: { id?: string; profileId?: string; visitorId?: string | null } } = {}) => {
+        const where = args.where || {}
+        if (where.id && where.id !== "conversation") return null
+        if (where.profileId && where.profileId !== "shop") return null
+        if (where.visitorId && where.visitorId !== "visitor") return null
+        return { id: "conversation", mode: "AI", visitorId: "visitor" }
+    })
     db.conversation.updateMany.mockResolvedValue({ count: 1 })
     db.message.create.mockResolvedValue({ id: "saved-message" })
     db.profileEvent.create.mockResolvedValue({})
@@ -65,8 +71,27 @@ describe("metered public chat", () => {
     })
     it("releases a credential failure that occurred before any provider dispatch", async () => {
         complete.mockRejectedValue(Object.assign(new Error("login unavailable"), { providerNotDispatched: true }))
-        expect((await handler()(request())).status).toBe(502)
+        const response = await handler()(request())
+        expect(response.status).toBe(200)
+        await response.text().catch(() => "")
         expect(settle).toHaveBeenCalledWith("reservation", "RELEASE", { reason: "provider_rejected" })
+    })
+    it("continues a visitor conversation after the capability cookie expires", async () => {
+        const response = await handler()(request({ conversationId: "conversation" }, "pl_vid=visitor"))
+        expect(response.status).toBe(200)
+        expect(await response.text()).toContain("A grounded answer")
+        expect(reserve).toHaveBeenCalledOnce()
+        expect(complete).toHaveBeenCalledOnce()
+        expect(db.conversation.create).not.toHaveBeenCalled()
+    })
+    it("answers from business facts when the provider completes without text", async () => {
+        complete.mockResolvedValue(stream(chunk({}, true)))
+        const response = await handler()(request())
+        const text = await response.text()
+        expect(response.status).toBe(200)
+        expect(text).toContain("Studio")
+        expect(settle).toHaveBeenCalledWith("reservation", "RELEASE", expect.objectContaining({ reason: "empty_completed_response" }))
+        expect(db.message.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: "assistant" }) }))
     })
     it.each([402, 403, 409, 503])("fails closed at allowance refusal %s before retrieval or any write", async status => {
         reserve.mockRejectedValue(new AiAccessError(status, "ai_blocked", "Unavailable"))
@@ -125,12 +150,16 @@ describe("metered public chat", () => {
     })
     it("releases when the provider explicitly rejects before generation", async () => {
         complete.mockRejectedValue({ status: 429 })
-        expect((await handler()(request())).status).toBe(502)
+        const response = await handler()(request())
+        expect(response.status).toBe(200)
+        await response.text().catch(() => "")
         expect(settle).toHaveBeenCalledWith("reservation", "RELEASE", { reason: "provider_rejected" })
     })
     it("holds unknown dispatch outcomes for reconciliation", async () => {
         complete.mockRejectedValue(new Error("network timeout"))
-        expect((await handler()(request())).status).toBe(502)
+        const response = await handler()(request())
+        expect(response.status).toBe(200)
+        await response.text().catch(() => "")
         expect(settle).not.toHaveBeenCalled()
     })
     it("holds a failed partial stream and prevents a blind credit release", async () => {

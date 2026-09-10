@@ -71,7 +71,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
         profile.serviceOfferings = [table, ...profile.serviceOfferings]
     }
 
-    let animationConfig: { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string } = {}
+    let animationConfig: { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: string } = {}
     try {
         animationConfig = typeof profile.animationStyle?.config === 'string'
             ? JSON.parse(profile.animationStyle.config)
@@ -80,7 +80,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
         console.error("Failed to parse animation config", e)
     }
     try {
-        const bag = JSON.parse(profile.personalityConfig || "{}") as { orb?: { shape?: string; expression?: string; color?: string } }
+        const bag = JSON.parse(profile.personalityConfig || "{}") as { orb?: { shape?: string; expression?: string; color?: string; aura?: string } }
         if (bag.orb) animationConfig = { ...animationConfig, ...bag.orb }
     } catch { /* keep preset config */ }
     animationConfig = await publicAnimationConfig(profile.id, animationConfig)

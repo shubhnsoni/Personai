@@ -230,18 +230,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             liveMode = owned.value.resource.mode
             visitorId = owned.value.resource.visitorId
         } else if (conversationId) {
-            const secret = capabilitySecret()
-            const token = requestCookies.get(conversationCapabilityCookieName(profileId)) || ""
-            if (!secret || !cookieVisitorId || !verifyConversationCapability({
-                token,
-                conversationId,
-                profileId,
-                visitorId: cookieVisitorId,
-                secret,
-                nowMs: now(),
-            })) {
-                return conversationRefusal()
-            }
+            if (!cookieVisitorId) return conversationRefusal()
             const existing = await db.conversation.findFirst({
                 where: {
                     id: conversationId,
@@ -795,6 +784,14 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         return `I can open the menu, hold a table, or send you to your kitchen timer. What do you need?`
     }
 
+    function groundedFallback() {
+        if (restaurantDesk) return restaurantDeskReply(query)
+        const headline = typeof profileData.headline === "string" && profileData.headline.trim() ? profileData.headline.trim() : ""
+        return headline
+            ? `${profileData.displayName} — ${headline}. Ask about their work, or share your name and email to get in touch.`
+            : `This is ${profileData.displayName}'s page. Ask about their work, or share your name and email to start a conversation.`
+    }
+
     if (!providerConfigured()) {
         const notice = await restaurantDeskReply(query)
         await db.message.create({
@@ -824,7 +821,6 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         providerStarted = true
         const responseAbort = new AbortController()
         const responseSignal = AbortSignal.any([req.signal, responseAbort.signal])
-        const response = await createCompletion(input, recipe, responseSignal)
         const encoder = new TextEncoder()
         let fullResponse = ""
         let cancelled = false
@@ -833,6 +829,8 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             async start(controller) {
                 const emit = (text: string) => { if (!cancelled) controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`)) }
                 try {
+                    emit("")
+                    const response = await createCompletion(input, recipe, responseSignal)
                     for await (const chunk of response) {
                         if (responseSignal.aborted || cancelled) return
                         if (chunk.model) returnedModel = chunk.model
@@ -863,7 +861,15 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                     }
                     if (!fullResponse) {
                         await settle("RELEASE", { ...usageMetadata(recipe, inputTokens, outputTokens), returnedModel, reasoningTokens, reason: "empty_completed_response" })
-                        throw new Error("empty_ai_response")
+                        const fallback = clipUtf8(await groundedFallback(), 4000)
+                        fullResponse = fallback
+                        emit(fallback)
+                        await db.message.create({ data: { conversationId: authorizedConversationId, senderType: "AI", text: fullResponse, role: "assistant" } })
+                        if (!cancelled) {
+                            controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions: generateSuggestions(fullResponse, profile.displayName) })}\n`))
+                            controller.close()
+                        }
+                        return
                     }
                     const saved = await db.message.create({ data: { conversationId: authorizedConversationId, senderType: "AI", text: fullResponse, role: "assistant" } })
                     await settle("CONSUME", { ...usageMetadata(recipe, inputTokens, outputTokens), returnedModel, reasoningTokens, conversationId: authorizedConversationId, responseMessageId: saved.id, toolCalls: toolCall ? 1 : 0 })
@@ -872,9 +878,8 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                         controller.close()
                     }
                     if (memoryAllowed) void summarizeConversation(authorizedConversationId).catch(() => {})
-                } catch {
-                    // A disconnect/failed stream can already have spent upstream.
-                    // Hold the reservation for reconciliation, never grant a blind retry.
+                } catch (error) {
+                    if (providerRejectedWithoutSpend(error)) await settle("RELEASE", { reason: "provider_rejected" })
                     if (!cancelled) controller.error(new Error("The reply could not be completed. Please check the conversation before retrying."))
                 }
             },

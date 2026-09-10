@@ -2,7 +2,7 @@ import type { AddonId, NeedId } from "@/lib/onboarding-needs"
 import { NEEDS, needById, suggestedAddons } from "@/lib/onboarding-needs"
 import { rupeesPerGramToPaisePer10g } from "@/lib/metal/math"
 
-export type OnboardBeat = "name" | "username" | "who" | "type" | "features" | "extras" | "ready"
+export type OnboardBeat = "name" | "username" | "who" | "type" | "features" | "extras" | "look" | "ready"
 
 export const KIT_CHIPS: { id: NeedId; chip: string; line: string }[] = [
     { id: "pharmacy", chip: "Pharmacy", line: "Medicines & pharmacy" },
@@ -82,12 +82,20 @@ export const COPY = {
         waPlaceholder: "WhatsApp for orders",
         upiPlaceholder: "UPI (optional)",
     },
+    look: {
+        h: "Give it a face",
+        s: "Circle, centred eyes, one colour. Mood and aura are yours.",
+        continue: "Looks right",
+        premium: "This is a premium bot",
+    },
     ready: {
-        h: "You're ready",
-        s: "Open a sample shop or start empty.",
+        h: "Save this look?",
+        s: "This is how it will appear on your live page.",
         trySample: "Try sample shop",
         empty: "Start empty",
         helper: "Chat home stays as-is — this only sets up your shop.",
+        save: "Save and go to dashboard",
+        modify: "Keep modifying",
     },
 } as const
 

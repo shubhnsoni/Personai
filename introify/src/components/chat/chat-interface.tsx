@@ -54,7 +54,7 @@ interface ChatInterfaceProps {
     quickQuestions?: string[]
     onShowContent?: (type: "about" | "experience" | "projects" | "services" | "products" | "courses" | "events" | "communities") => void
     colors?: string[]
-    animationConfig?: { speed?: number; intensity?: number; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string }
+    animationConfig?: { speed?: number; intensity?: number; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: string }
     isPanelOpen?: boolean
     onIntroStage?: (stage: "hi" | "type" | "orb" | "ready") => void
 }
@@ -155,7 +155,8 @@ export function ChatInterface({
         if (!messageContent.trim() || isLoading) return null
 
         abortControllerRef.current?.abort()
-        abortControllerRef.current = new AbortController()
+        const abort = new AbortController()
+        abortControllerRef.current = abort
 
         const userMessage: ChatMessage = {
             id: crypto.randomUUID(),
@@ -178,26 +179,38 @@ export function ChatInterface({
         setMessages([...newMessages, assistantMessage])
 
         try {
-            const response = await fetch("/api/chat", {
+            const postChat = (openId: string | null) => fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Idempotency-Key": userMessage.id },
+                credentials: "include",
                 body: JSON.stringify({
                     messages: newMessages.slice(-10).map(m => ({ role: m.role, content: m.content.slice(0, 2000) })),
                     requestId: userMessage.id,
                     memoryConsent,
                     profileId: profile.id,
-                    conversationId,
+                    conversationId: openId,
                     visitorId
                 }),
-                signal: abortControllerRef.current.signal
+                signal: abort.signal
             })
+
+            let response = await postChat(conversationId)
+            if (response.status === 403 && conversationId) {
+                setConversationId(null)
+                response = await postChat(null)
+            }
 
             if (response.status === 429) {
                 throw new Error("rate_limit")
             }
             if (!response.ok) {
-                const data = await response.json().catch(() => null)
-                throw new Error(data?.message ? `assistant_notice:${String(data.message)}` : "Chat request failed")
+                const data = await response.json().catch(() => null) as { message?: unknown; error?: { message?: unknown } | string } | null
+                const notice = typeof data?.message === "string"
+                    ? data.message
+                    : typeof data?.error === "object" && data.error && typeof data.error.message === "string"
+                        ? data.error.message
+                        : null
+                throw new Error(notice ? `assistant_notice:${notice}` : "Chat request failed")
             }
 
             const newConversationId = response.headers.get("X-Conversation-Id")
@@ -398,6 +411,7 @@ export function ChatInterface({
                         shape={animationConfig.shape}
                         expression={animationConfig.expression}
                         color={animationConfig.color}
+                        aura={animationConfig.aura}
                         speed={animationConfig.speed}
                         intensity={animationConfig.intensity}
                         gaze={typingGaze}
@@ -444,6 +458,7 @@ export function ChatInterface({
                                 shape={animationConfig.shape}
                                 expression={animationConfig.expression}
                                 color={animationConfig.color}
+                                aura={animationConfig.aura}
                                 speed={animationConfig.speed}
                                 intensity={animationConfig.intensity}
                                 mood="greeting"
@@ -504,6 +519,7 @@ export function ChatInterface({
                                                 shape={animationConfig.shape}
                                                 expression={animationConfig.expression}
                                                 color={animationConfig.color}
+                                                aura={animationConfig.aura}
                                                 speed={animationConfig.speed}
                                                 intensity={animationConfig.intensity}
                                                 mood={orbMood}

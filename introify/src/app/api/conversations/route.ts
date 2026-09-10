@@ -2,6 +2,12 @@ import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { getMemberFromSession } from "@/lib/members"
+import {
+    CONVERSATION_CAPABILITY_TTL_SECONDS,
+    conversationCapabilityCookieName,
+    issueConversationCapability,
+    productionCapabilitySecret,
+} from "@/lib/conversation-capability"
 
 export const dynamic = "force-dynamic"
 
@@ -106,24 +112,36 @@ export async function GET(req: NextRequest) {
         })
         : 0
 
-    return withVisitorCookie(
-        NextResponse.json({
-            conversationId: conversation.id,
-            visitorId,
-            mode: conversation.mode,
-            liveRequestedAt: conversation.liveRequestedAt,
-            liveChatEnabled: conversation.profile.liveChatEnabled,
-            isMember: Boolean(member),
-            slaMinutes: conversation.profile.liveChatSlaMinutes || 10,
-            queuePosition: waitingAhead + 1,
-            messages: conversation.messages.map((m) => ({
-                id: m.id,
-                role: m.role as "user" | "assistant",
-                content: m.text,
-                senderType: m.senderType,
-            })),
-        }),
+    const payload = NextResponse.json({
+        conversationId: conversation.id,
         visitorId,
-        setCookie,
-    )
+        mode: conversation.mode,
+        liveRequestedAt: conversation.liveRequestedAt,
+        liveChatEnabled: conversation.profile.liveChatEnabled,
+        isMember: Boolean(member),
+        slaMinutes: conversation.profile.liveChatSlaMinutes || 10,
+        queuePosition: waitingAhead + 1,
+        messages: conversation.messages.map((m) => ({
+            id: m.id,
+            role: m.role as "user" | "assistant",
+            content: m.text,
+            senderType: m.senderType,
+        })),
+    })
+    const secret = productionCapabilitySecret()
+    if (!member && secret && profileId && conversation.visitorId === visitorId) {
+        payload.cookies.set(conversationCapabilityCookieName(profileId), issueConversationCapability({
+            conversationId: conversation.id,
+            profileId,
+            visitorId,
+            secret,
+        }), {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+            path: "/api",
+            maxAge: CONVERSATION_CAPABILITY_TTL_SECONDS,
+        })
+    }
+    return withVisitorCookie(payload, visitorId, setCookie)
 }

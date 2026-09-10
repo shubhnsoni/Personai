@@ -118,7 +118,7 @@ interface ProfileViewProps {
             title: string
         }>
     }
-    animationConfig: { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string }
+    animationConfig: { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: string }
     colors: string[]
 }
 

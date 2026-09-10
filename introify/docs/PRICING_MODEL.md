@@ -1,6 +1,8 @@
 # Introify pricing model and capability assessment
 
-9 September 2026. Internal assessment of the implementation deployed in `026c2da`; pricing presentation may evolve separately. **Keep the approved prices, 10% annual discount, allowances and existing entitlement rules.** This document proposes packaging and copy, not new functionality or additional restrictions. No provider prices, revenue or margins have been assumed.
+9 September 2026. Internal assessment of the capability foundation deployed in `026c2da`, with the expanded pricing presentation deployed in **`bba5220b4259ea40bacd054d449f609df8f16543`** at **14:25 IST**. **The approved prices, 10% annual discount, allowances and existing entitlement rules are unchanged.** This assessment guides packaging and copy, not new functionality or additional restrictions. No provider prices, revenue or margins have been assumed.
+
+Release status: Hostinger Completed / Current; HTTP checks at **14:26 IST** confirmed expanded tier benefits, the comparison, unchanged five prices/AI/3D allowances and unavailable-service states. Scoped live Edge checks around **14:27 IST** verified expanded cards, annual equivalents/totals, comparison opening, readable light/dark mobile views and fast navigation without the former overlay. The capability audit remains applicable; publication of plan value does not activate paid checkout, AI or photoreal providers. See [`DEPLOYMENT_VERIFICATION.md`](DEPLOYMENT_VERIFICATION.md) for current/historical evidence and remaining limits. This status edit is local only, with no new commit/push.
 
 ## Position the tiers around the work they support
 

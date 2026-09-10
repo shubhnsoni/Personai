@@ -8,6 +8,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: {
 import { buildHomeStats } from "@/lib/analytics"
 import { publicAnimationConfig, INTROIFY_PUBLIC_STYLE, canHideIntroifyBrand } from "@/lib/profile-branding"
 import { validateAiSettings } from "@/lib/ai-settings"
+import { gradientForColor } from "@/lib/bloub/catalog"
 beforeEach(() => {
     vi.clearAllMocks()
     mocks.billing.mockResolvedValue({ features: { advancedAnalytics: false, customBranding: false } })
@@ -52,7 +53,30 @@ describe("paid presentation features", () => {
         expect(canHideIntroifyBrand(true)).toBe(false)
     })
     it("strips paid theme and footer-removal fields on direct Free settings writes", () => {
-        const saved = validateAiSettings("free", { personalityConfig: '{"orb":{"color":"rouge"},"hideIntroifyBrand":true,"socials":{"website":"https://example.test"}}' })
-        expect(JSON.parse(saved.personalityConfig!)).toEqual({ socials: { website: "https://example.test" } })
+        const saved = validateAiSettings("free", { personalityConfig: '{"orb":{"color":"rouge","shape":"galet","expression":"heureux","aura":"breathe"},"hideIntroifyBrand":true,"socials":{"website":"https://example.test"}}' })
+        expect(JSON.parse(saved.personalityConfig!)).toEqual({
+            orb: { shape: "cercle", expression: "heureux", color: "rouge", aura: "breathe" },
+            socials: { website: "https://example.test" },
+        })
+    })
+    it("keeps Free colour, mood and aura on the live page while locking premium shapes", async () => {
+        expect(await publicAnimationConfig("shop", {
+            look: "bloub",
+            variant: "ember",
+            shape: "galet",
+            expression: "heureux",
+            color: "rouge",
+            aura: "breathe",
+            colors: ["#ff0000", "#330000"],
+        })).toEqual({
+            look: "bloub",
+            shape: "cercle",
+            expression: "heureux",
+            color: "rouge",
+            aura: "breathe",
+            colors: gradientForColor("rouge"),
+            speed: 1,
+            intensity: 1,
+        })
     })
 })

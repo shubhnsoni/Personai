@@ -10,6 +10,7 @@ import {
     Check,
     ChevronLeft,
     Layers,
+    Smile,
     SlidersHorizontal,
     Sparkles,
     Store,
@@ -40,6 +41,8 @@ import {
 import { cn } from "@/lib/utils"
 import Link from "@/components/navigation/transition-link"
 import { PLAN_CATALOG } from "@/lib/billing/catalog"
+import { DEFAULT_BLOUB_PICK, writeOrbBag, type BloubPick } from "@/lib/bloub/catalog"
+import { BlobLookStudio } from "@/components/onboarding/blob-look"
 
 type Line = { id: string; role: "bot" | "user"; text: string; sub?: string }
 
@@ -50,6 +53,7 @@ const RAIL: { beat: OnboardBeat; label: string; icon: typeof Store }[] = [
     { beat: "type", label: "Kit", icon: Sparkles },
     { beat: "features", label: "Features", icon: Layers },
     { beat: "extras", label: "Extras", icon: SlidersHorizontal },
+    { beat: "look", label: "Look", icon: Smile },
     { beat: "ready", label: "Ready", icon: Check },
 ]
 
@@ -67,6 +71,7 @@ function botFor(beat: OnboardBeat, need: NeedId | null): Line {
         const x = extrasCopy(need)
         return { id: uid(), role: "bot", text: x.h, sub: x.s }
     }
+    if (beat === "look") return { id: uid(), role: "bot", text: COPY.look.h, sub: COPY.look.s }
     return { id: uid(), role: "bot", text: COPY.ready.h, sub: COPY.ready.s }
 }
 
@@ -105,6 +110,7 @@ export function OnboardingWizard({
     const [inviteDesks, setInviteDesks] = useState(true)
     const [emailSkipped, setEmailSkipped] = useState(false)
     const [busy, setBusy] = useState(false)
+    const [orb, setOrb] = useState<BloubPick>({ ...DEFAULT_BLOUB_PICK })
 
     const picked = needById(need)
     const suggested = need ? defaultAddons(need) : []
@@ -134,9 +140,10 @@ export function OnboardingWizard({
 
     function back() {
         if (beat === "name" || history.length < 3) return
-        const order: OnboardBeat[] = ["name", "username", "who", "type", "features", "extras", "ready"]
+        const order: OnboardBeat[] = ["name", "username", "who", "type", "features", "extras", "look", "ready"]
         const prev = (() => {
-            if (beat === "ready") return hasExtrasBeat(need) ? "extras" : "features"
+            if (beat === "ready") return "look"
+            if (beat === "look") return hasExtrasBeat(need) ? "extras" : "features"
             const i = order.indexOf(beat)
             return order[Math.max(0, i - 1)]
         })()
@@ -153,7 +160,7 @@ export function OnboardingWizard({
     }
 
     function afterFeatures() {
-        const next = hasExtrasBeat(need) ? "extras" : "ready"
+        const next = hasExtrasBeat(need) ? "extras" : "look"
         const label = addons.length ? ADDONS.filter((a) => addons.includes(a.id)).map((a) => a.action).join(" · ") : "Just a page"
         push(label, next)
     }
@@ -169,7 +176,7 @@ export function OnboardingWizard({
             gstin.trim() ? `GSTIN ${gstin.trim()}` : "",
             need === "distribute" ? (inviteDesks ? COPY.extras.desksInvite : COPY.extras.desksJustMe) : "",
         ].filter(Boolean)
-        push(bits.join(" · ") || COPY.extras.continue, "ready")
+        push(bits.join(" · ") || COPY.extras.continue, "look")
     }
 
     async function launch(seedSample: boolean) {
@@ -196,6 +203,7 @@ export function OnboardingWizard({
                 upiId: upi.trim() || undefined,
                 goldCity: need === "goldWholesale" ? goldCity : undefined,
                 distroInviteDesks: need === "distribute" ? inviteDesks : undefined,
+                personalityConfig: writeOrbBag(undefined, orb, false),
                 seedSample,
             })
             toast.success("You're live")
@@ -495,20 +503,33 @@ export function OnboardingWizard({
                         </div>
                     ) : null}
 
+                    {beat === "look" ? (
+                        <BlobLookStudio
+                            name={name}
+                            value={orb}
+                            onChange={(next) => setOrb((cur) => ({ ...cur, ...next, shape: "cercle" }))}
+                            phase="edit"
+                            onContinue={() => push(COPY.look.continue, "ready")}
+                            onSave={() => void launch(false)}
+                            onModify={() => {}}
+                            busy={busy}
+                        />
+                    ) : null}
+
                     {beat === "ready" ? (
-                        <div className="mt-3 space-y-2">
-                            <p className="text-[12px] text-white/40">Your business starts with the details you entered. You can add products and content from your dashboard.</p>
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                                <button
-                                    type="button"
-                                    disabled={busy}
-                                    onClick={() => void launch(false)}
-                                    className="h-12 flex-1 rounded-full border border-white/15 text-sm font-medium text-white/80 hover:bg-white/5 disabled:opacity-50"
-                                >
-                                    {busy ? "Launching…" : "Create my business"}
-                                </button>
-                            </div>
-                        </div>
+                        <BlobLookStudio
+                            name={name}
+                            value={orb}
+                            onChange={(next) => setOrb((cur) => ({ ...cur, ...next, shape: "cercle" }))}
+                            phase="preview"
+                            onContinue={() => {}}
+                            onSave={() => void launch(false)}
+                            onModify={() => {
+                                setHistory((h) => h.slice(0, -2))
+                                setBeat("look")
+                            }}
+                            busy={busy}
+                        />
                     ) : null}
                 </div>
 

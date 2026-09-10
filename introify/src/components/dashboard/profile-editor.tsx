@@ -22,6 +22,7 @@ import { previewListing, applyListing } from "@/app/actions/listing"
 import { OfferSheet, LiveRow } from "@/components/dashboard/offer-sheet"
 import {
     parseOrbBag,
+    resolveBloubAura,
     resolveBloubColor,
     resolveBloubExpression,
     resolveBloubShape,
@@ -180,6 +181,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
         shape: resolveBloubShape(orbPick.shape || selectedPresetConfig.shape),
         expression: resolveBloubExpression(orbPick.expression || selectedPresetConfig.expression),
         color: resolveBloubColor(orbPick.color || selectedPresetConfig.color),
+        aura: resolveBloubAura(orbPick.aura),
     }
     const blobPresetId = presets.find((p) => {
         try {
@@ -394,7 +396,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                     </Section>
                     <Section title="Welcome aura" description="The face on your public page.">
                         {!aiAccess.customBranding ? (
-                            <p className="text-sm text-muted-foreground">Your free page uses the Introify style. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Pro adds custom styles and brand removal.</Link></p>
+                            <p className="text-sm text-muted-foreground">Colour, mood and aura are included. Extra bots and footer removal are on Pro. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Compare plans</Link></p>
                         ) : null}
                         <ToggleRow title="Hide Introify footer" description="Your business name, photo and logo are available on every plan.">
                             <Switch aria-label="Hide Introify footer" disabled={!aiAccess.customBranding} checked={aiAccess.customBranding && Boolean(personalityConfig.hideIntroifyBrand)} onCheckedChange={value => updatePersonalityField("hideIntroifyBrand", value)} />
@@ -404,27 +406,26 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 still
                                 size={72}
                                 colors={(selectedPresetConfig.colors as [string, string] | undefined) || ["#00D7FF", "#07104D"]}
-                                look={blobSelected ? "bloub" : selectedPresetConfig.look}
+                                look="bloub"
                                 shape={liveOrb.shape}
                                 expression={liveOrb.expression}
                                 color={liveOrb.color}
+                                aura={liveOrb.aura}
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">{selectedPreset?.name || "Introify look"}</p>
-                                <p className="text-xs text-muted-foreground">{blobSelected ? "Custom orb on your page." : "Current welcome face."}</p>
+                                <p className="text-sm font-medium">Your blob</p>
+                                <p className="text-xs text-muted-foreground">Circle, one colour, mood and aura.</p>
                             </div>
-                            {aiAccess.customBranding ? (
-                                <div className="flex shrink-0 flex-col gap-1.5">
-                                    <button type="button" onClick={() => setAuraOpen((open) => !open)} className="h-8 rounded-full border border-border px-3 text-xs font-medium">
-                                        {auraOpen ? "Done" : "Change look"}
+                            <div className="flex shrink-0 flex-col gap-1.5">
+                                <button type="button" onClick={() => setBlobOpen(true)} className="h-8 rounded-full border border-border px-3 text-xs font-medium">
+                                    Customise
+                                </button>
+                                {aiAccess.customBranding ? (
+                                    <button type="button" onClick={() => setAuraOpen((open) => !open)} className="h-8 rounded-full px-3 text-xs font-medium text-muted-foreground hover:text-foreground">
+                                        {auraOpen ? "Done" : "More bots"}
                                     </button>
-                                    {blobSelected ? (
-                                        <button type="button" onClick={() => setBlobOpen(true)} className="h-8 rounded-full px-3 text-xs font-medium text-muted-foreground hover:text-foreground">
-                                            Customise
-                                        </button>
-                                    ) : null}
-                                </div>
-                            ) : null}
+                                ) : null}
+                            </div>
                         </div>
                         {auraOpen && aiAccess.customBranding ? (
                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -487,6 +488,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                         onClose={() => setBlobOpen(false)}
                         value={liveOrb}
                         onChange={setOrb}
+                        premium={aiAccess.customBranding}
                     />
                 </TabsContent>
 
