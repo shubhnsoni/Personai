@@ -1,6 +1,7 @@
 import Link from "@/components/navigation/transition-link"
 import { prisma } from "@/lib/prisma"
-import { UserAdminButtons } from "@/components/admin/admin-actions"
+import { UserAdminButtons, UserPlanSelect } from "@/components/admin/admin-actions"
+import { assignedPlanId } from "@/lib/admin/plan-grant"
 import { AdminEmpty, AdminPageHead, AdminPanel, AdminTable } from "@/components/admin/admin-ui"
 
 export const dynamic = "force-dynamic"
@@ -27,6 +28,19 @@ export default async function AdminUsersPage({
         orderBy: { createdAt: "desc" },
         take: 80,
     })
+    const now = new Date()
+    const accounts = await prisma.billingAccount.findMany({
+        where: { defaultForUserId: { in: users.map((user) => user.id) } },
+        select: {
+            defaultForUserId: true,
+            subscription: { select: { planId: true, status: true, paidThrough: true } },
+        },
+    })
+    const planByUser = new Map(
+        accounts.flatMap((account) => account.defaultForUserId
+            ? [[account.defaultForUserId, assignedPlanId(account.subscription, now)] as const]
+            : []),
+    )
 
     return (
         <div className="space-y-5">
@@ -41,7 +55,7 @@ export default async function AdminUsersPage({
                 )}
             />
             <AdminPanel>
-                <AdminTable columns={["User", "Role", "Shops", "Joined", "Actions"]}>
+                <AdminTable columns={["User", "Role", "Plan", "Shops", "Joined", "Actions"]}>
                     {users.map((user) => (
                         <tr key={user.id} className="border-t border-white/8">
                             <td className="px-4 py-2.5">
@@ -49,6 +63,9 @@ export default async function AdminUsersPage({
                                 <p className="text-xs text-muted-foreground">{user.email}</p>
                             </td>
                             <td className="px-4 py-2.5 text-xs">{user.role}</td>
+                            <td className="px-4 py-2.5">
+                                <UserPlanSelect userId={user.id} planId={planByUser.get(user.id) || "free"} />
+                            </td>
                             <td className="px-4 py-2.5 text-xs tabular-nums">{user.profiles.length}</td>
                             <td className="px-4 py-2.5 text-xs text-muted-foreground">{user.createdAt.toISOString().slice(0, 10)}</td>
                             <td className="px-4 py-2.5">

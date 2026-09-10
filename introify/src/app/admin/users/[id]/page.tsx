@@ -3,8 +3,7 @@ import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/admin/require-admin"
 import { ImpersonateButton, UserAdminButtons, UserPlanSelect } from "@/components/admin/admin-actions"
-import { effectivePaidPlan } from "@/lib/billing/periods"
-import { isPlanId } from "@/lib/billing/catalog"
+import { assignedPlanId } from "@/lib/admin/plan-grant"
 import { formatAdminMoney } from "@/lib/admin/money"
 import { AdminEmpty, AdminPageHead, AdminPanel, AdminRow } from "@/components/admin/admin-ui"
 
@@ -27,8 +26,7 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
         where: { defaultForUserId: user.id },
         select: { subscription: { select: { planId: true, status: true, paidThrough: true } } },
     })
-    const paid = effectivePaidPlan(account?.subscription || null, new Date())
-    const planId = paid && isPlanId(account?.subscription?.planId) ? account.subscription.planId : "free"
+    const planId = assignedPlanId(account?.subscription || null, new Date())
     const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     const shopIds = user.profiles.map((p) => p.id)
     const gmv = shopIds.length

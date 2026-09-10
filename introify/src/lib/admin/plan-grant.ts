@@ -1,4 +1,5 @@
 import { isPlanId, type PlanId } from "@/lib/billing/catalog"
+import { effectivePaidPlan } from "@/lib/billing/periods"
 
 const COMPLIMENTARY_MS = 365 * 24 * 60 * 60 * 1000
 
@@ -15,6 +16,14 @@ export type AdminPlanWrite = {
     pendingPlanId: null
     providerSubscriptionId: null
     providerPriceId: null
+}
+
+export function assignedPlanId(
+    subscription: { planId: string; status: string; paidThrough: Date | null } | null | undefined,
+    now: Date,
+): PlanId {
+    if (!subscription || !effectivePaidPlan(subscription, now) || !isPlanId(subscription.planId)) return "free"
+    return subscription.planId
 }
 
 export function adminPlanWrite(planId: PlanId, now: Date): AdminPlanWrite {

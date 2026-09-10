@@ -55,7 +55,7 @@ export const policyDocuments: Record<
             },
             {
                 id: "activity", title: "Information from using a page",
-                paragraphs: ["On pages with analytics, Introify records visitor and session identifiers, page paths, interactions, referral and campaign information, device information, approximate country information when available, and visit timing. Session activity can be updated periodically while a page is open. Server and service providers may also process connection information to serve requests and maintain security.", "Cookies and browser storage support these features, member access and saved checkout details. The cookie policy explains the storage currently present. A separate analytics consent control is not yet implemented."],
+                paragraphs: ["On pages with analytics, Introify records visitor and session identifiers, page paths, interactions, referral and campaign information, device information, approximate country information when available, and visit timing. Session activity can be updated periodically while a page is open. Server and service providers may also process connection information to serve requests and maintain security.", "Cookies and browser storage support these features, member access and saved checkout details. Analytics cookies stay off until you allow analytics on the cookie policy page or the site-wide prompt."],
             },
             {
                 id: "purposes", title: "How the information is used",

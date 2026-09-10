@@ -8,6 +8,7 @@ import { whatsappHref } from "@/lib/commerce"
 import { createRestaurantOrder } from "@/app/actions/orders"
 import type { ModifierSelectionInput } from "@/lib/restaurant-orders"
 import { writeLiveOrderToken } from "@/lib/live-order"
+import { readBuyerMemory, writeBuyerMemory } from "@/lib/checkout-memory"
 import { OrderPlacedSplash } from "@/components/shop/order-placed-splash"
 import { LiveOrderCountButton } from "@/components/shop/live-order-button"
 import {
@@ -416,9 +417,9 @@ export function RestaurantMenu({
             </div>
 
             {nav ? (
-                <div className="fixed inset-0 z-50">
+                <div className="fixed inset-0 z-50 flex items-end justify-center p-3 md:items-center md:p-6">
                     <button type="button" className="absolute inset-0 bg-black/55" onClick={() => setNav(false)} aria-label="Close menu" />
-                    <div className="absolute bottom-5 left-3 right-3 max-h-[72dvh] overflow-auto rounded-[1.6rem] bg-[#171717] p-4 text-white shadow-2xl">
+                    <div className="relative z-10 w-full max-h-[72dvh] overflow-auto rounded-[1.6rem] bg-[#171717] p-4 text-white shadow-2xl md:max-w-lg">
                         <div className="mb-2 flex items-center justify-between px-1">
                             <p className="text-[15px] font-semibold text-white">Menu</p>
                             <button type="button" onClick={() => setNav(false)} className="rounded-full p-1 text-zinc-400" aria-label="Close">
@@ -621,9 +622,9 @@ function CustomizeSheet({
     }
 
     return (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-6">
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
-            <div className="absolute bottom-0 left-0 right-0 max-h-[86dvh] overflow-auto rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">
+            <div className="relative z-10 w-full max-h-[86dvh] overflow-auto rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl">
                 <div className="sticky top-0 flex items-center justify-between border-b border-border/50 bg-background px-4 py-3">
                     <div className="min-w-0">
                         <p className="truncate text-[15px] font-semibold">{item.title}</p>
@@ -751,8 +752,9 @@ function CartSheet({
         let nextName = ""
         let nextKey = ""
         try {
-            nextEmail = localStorage.getItem("pl_buyer_email") || ""
-            nextName = localStorage.getItem("pl_buyer_name") || ""
+            const remembered = readBuyerMemory(localStorage)
+            nextEmail = remembered?.email || ""
+            nextName = remembered?.name || ""
             const existing = sessionStorage.getItem(orderKeyStorage)
             nextKey = existing && /^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$/.test(existing)
                 ? existing
@@ -791,8 +793,7 @@ function CartSheet({
         setBusy(true)
         setError(null)
         try {
-            localStorage.setItem("pl_buyer_email", email.trim())
-            localStorage.setItem("pl_buyer_name", name.trim())
+            writeBuyerMemory(localStorage, { name: name.trim(), email: email.trim() })
             const result = await createRestaurantOrder({
                 profileSlug: slug,
                 idempotencyKey: ensureOrderKey(),
@@ -835,9 +836,9 @@ function CartSheet({
     }
 
     return (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-6">
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close cart" />
-            <div className="absolute bottom-0 left-0 right-0 max-h-[88dvh] overflow-auto rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">
+            <div className="relative z-10 w-full max-h-[88dvh] overflow-auto rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl">
                 <div className="sticky top-0 flex items-center justify-between border-b border-border/50 bg-background px-4 py-3">
                     <p className="text-[15px] font-semibold">Your order</p>
                     <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground" aria-label="Close">
