@@ -26,7 +26,7 @@ export function BusinessSwitcher({ businesses, activeId, variant = "bar", onNavi
         : "flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-3 py-2 text-xs md:px-5"}>
         <label htmlFor={selectId} className={drawer ? "sr-only" : "text-muted-foreground"}>Business</label>
         <select id={selectId} value={activeId} disabled={pending} className={drawer
-            ? "h-8 w-full min-w-0 cursor-pointer appearance-none border-0 bg-transparent py-0 pl-0 pr-4 text-right text-sm font-medium text-foreground outline-none disabled:opacity-60"
+            ? "h-8 w-full min-w-0 cursor-pointer appearance-none border-0 bg-transparent py-0 pl-0 pr-6 text-right text-sm font-medium text-foreground outline-none disabled:opacity-60"
             : "min-w-0 max-w-[60vw] flex-1 rounded-md border bg-background px-2 py-1.5 md:max-w-72"} onChange={(event) => {
             const id = event.target.value
             startTransition(async () => {

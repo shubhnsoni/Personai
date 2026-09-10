@@ -37,9 +37,9 @@ export function MobileSidebar({ open, onOpenChange, counts, role, extras, busine
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 onCloseAutoFocus={(e) => e.preventDefault()}
             >
-                <SheetHeader className="relative shrink-0 space-y-0 p-0 pr-12">
+                <SheetHeader className="relative shrink-0 space-y-0 p-0 pr-10">
                     <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/30" />
-                    <div className="flex items-center gap-3 pb-2 pl-5 pr-12 pt-6">
+                    <div className="flex items-center gap-3 pb-[5px] pl-5 pr-10 pt-[14px]">
                         <SheetTitle className="sr-only">Menu</SheetTitle>
                         <Logo href="/dashboard" size="sm" className="w-[88px] shrink-0" />
                         {businesses && activeProfileId ? (
