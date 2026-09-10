@@ -1,5 +1,5 @@
 import { Check, ChevronDown } from "lucide-react"
-import { AI_MODES, PLANS, type Plan } from "@/lib/billing/catalog"
+import { AI_MODES, PUBLIC_PLANS, type Plan } from "@/lib/billing/catalog"
 import { storageSize } from "./format"
 import { fill, type UiLocale } from "@/lib/ui-locale"
 import { messagesFor } from "@/lib/ui-messages"
@@ -101,12 +101,12 @@ export function PlanFeatureMatrix({ locale = "en" }: { locale?: UiLocale }) {
             <div className="billing-comparison-scroll" role="region" aria-label={copy.region} tabIndex={0}>
                 <table className="plan-feature-table">
                     <caption className="sr-only">{copy.caption}</caption>
-                    <thead><tr><th scope="col">{copy.feature}</th>{PLANS.map(plan => <th scope="col" key={plan.id}>{plan.name}</th>)}</tr></thead>
+                    <thead><tr><th scope="col">{copy.feature}</th>{PUBLIC_PLANS.map(plan => <th scope="col" key={plan.id}>{plan.name}</th>)}</tr></thead>
                     {groups.map(group => <tbody key={group.label}>
-                        <tr className="plan-feature-group"><th scope="rowgroup" colSpan={PLANS.length + 1}>{group.label}</th></tr>
+                        <tr className="plan-feature-group"><th scope="rowgroup" colSpan={PUBLIC_PLANS.length + 1}>{group.label}</th></tr>
                         {group.rows.map(row => <tr key={row.label}>
                             <th scope="row"><span>{row.label}</span>{row.note && <small>{row.note}</small>}</th>
-                            {PLANS.map(plan => <td className="plan-feature-value" key={plan.id}><FeatureValue value={row.value(plan)} included={copy.included} notIncluded={copy.notIncluded} /></td>)}
+                            {PUBLIC_PLANS.map(plan => <td className="plan-feature-value" key={plan.id}><FeatureValue value={row.value(plan)} included={copy.included} notIncluded={copy.notIncluded} /></td>)}
                         </tr>)}
                     </tbody>)}
                 </table>

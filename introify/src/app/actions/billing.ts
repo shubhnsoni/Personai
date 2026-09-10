@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { requireAuthenticatedUser, unwrapOwnershipResult } from "@/lib/security"
-import { getCreditPack, getPlan, isPlanId, PLAN_VERSION, type BillingCadence } from "@/lib/billing/catalog"
+import { canSelfServeCheckout, getCreditPack, getPlan, isPlanId, PLAN_VERSION, type BillingCadence } from "@/lib/billing/catalog"
 import { getPublicBillingAvailability, requirePlatformCheckout } from "@/lib/billing/config"
 import { accountUsage, billingTransaction, ensureDefaultBillingAccount, getAccountBalances, getAccountBilling, lockBillingAccount } from "@/lib/billing/service"
 import { billingOrigin, platformPortalConfiguration, platformPrice, platformStripe, reconcilePlatformSubscription, stripeId } from "@/lib/billing/stripe-platform"
@@ -67,6 +67,7 @@ export async function createPlanCheckout(input: { accountId: string; planId: str
         const { actor } = await accountAccess(input.accountId, true)
         const plan = getPlan(input.planId)
         if (plan.id === "free") throw new Error("Choose Turn off renewal to return to Free after your paid period.")
+        if (!canSelfServeCheckout(plan)) throw new Error("This plan is not available for self-serve checkout.")
         if (!["monthly", "yearly"].includes(input.cadence)) throw new Error("Choose monthly or yearly billing.")
         requirePlatformCheckout()
         const stripe = platformStripe()

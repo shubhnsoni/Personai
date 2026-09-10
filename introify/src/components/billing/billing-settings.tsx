@@ -5,7 +5,7 @@ import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowUpRight, CheckCircle2, Clock3, Info } from "lucide-react"
 import { cancelPlanRenewal, createBillingPortal, createPackCheckout, createPlanCheckout } from "@/app/actions/billing"
-import { AI_MODES, CREDIT_PACKS, getPlan, type BillingCadence, type PlanId } from "@/lib/billing/catalog"
+import { AI_MODES, canSelfServeCheckout, CREDIT_PACKS, getPlan, type BillingCadence, type PlanId } from "@/lib/billing/catalog"
 import type { BillingActionResult, BillingDashboard } from "@/lib/billing/types"
 import { PlanComparison } from "./plan-comparison"
 import { PlanFeatureMatrix } from "./plan-feature-matrix"
@@ -57,7 +57,9 @@ export function BillingSettings({ data, initialCadence, checkoutReturn }: { data
     }
 
     function choosePlan(planId: PlanId, cadence: BillingCadence) {
-        if (!data.canManageBilling || !data.availability.billing || planId === "free") return
+        if (!data.canManageBilling || !data.availability.billing) return
+        const selected = getPlan(planId)
+        if (!canSelfServeCheckout(selected)) return
         void perform(`plan-${planId}`, () => createPlanCheckout({ accountId: data.selectedAccountId, planId, cadence }))
     }
 

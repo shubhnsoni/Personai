@@ -13,14 +13,16 @@
 .billing-page-heading h1 em { font-family:Georgia,"Times New Roman",serif; font-weight:400; color:#00D7FF; }
 .dark .billing-page-heading h1 em { color:var(--bl-lime); }
 .billing-page-heading > p:last-child { max-width:610px; margin:auto; color:var(--bl-muted); line-height:1.85; font-size:16px; }
-.plan-controls { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px; margin-bottom:30px; }
+.plan-launch-note { margin:0 auto 28px; max-width:720px; }
+.plan-controls { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px; margin-bottom:12px; }
+.plan-save-hint { margin:0 auto 28px!important; text-align:center; color:var(--bl-muted); font-size:12px; line-height:1.7; }
 .plan-interval { display:inline-flex; padding:5px; gap:3px; border:1px solid var(--bl-line); border-radius:12px; background:var(--bl-soft); }
 .plan-interval button { display:flex; gap:8px; align-items:center; min-height:42px; padding:10px 16px; border:0; border-radius:8px; background:transparent; color:var(--bl-muted); font:inherit; font-size:13px; font-weight:650; cursor:pointer; }
 .plan-interval button[aria-pressed="true"] { background:var(--bl-forest); color:#fff; box-shadow:0 2px 4px rgb(0 215 255 / 12%); }
 .plan-interval small { color:#061018; background:var(--bl-lime); border-radius:4px; padding:2px 5px; font-size:10px; font-weight:700; white-space:nowrap; }
-.plan-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:13px; align-items:stretch; }
-.plan-card { position:relative; display:flex; min-width:0; flex-direction:column; border:1px solid var(--bl-line); border-radius:16px; background:var(--bl-card); padding:25px 20px 21px; }
-.plan-card[data-featured="true"] { border:2px solid #00D7FF; padding:24px 19px 20px; }
+.plan-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:22px; align-items:stretch; }
+.plan-card { position:relative; display:flex; min-width:0; flex-direction:column; border:1px solid var(--bl-line); border-radius:16px; background:var(--bl-card); padding:32px 26px 26px; }
+.plan-card[data-featured="true"] { border:2px solid #00D7FF; padding:31px 25px 25px; }
 .plan-card-topline { min-height:27px; display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; justify-content:space-between; margin-bottom:11px; }
 .plan-audience { min-height:28px; margin-bottom:10px!important; color:var(--bl-muted); font-size:8px; font-weight:700; line-height:1.6; letter-spacing:.1em; }
 .billing-design .plan-card h3 { font-size:18px; font-weight:650; line-height:1.4; letter-spacing:-.02em; color:var(--bl-ink); }
@@ -37,7 +39,7 @@
 .plan-benefits strong { font-weight:650; }
 .plan-benefits small { display:block; font-size:10px; color:var(--bl-muted); line-height:1.65; }
 .plan-includes { min-height:34px; margin-bottom:13px!important; font-size:11px; font-weight:700; line-height:1.6; }
-.plan-value-benefits { min-height:244px; align-content:start; gap:13px; margin-bottom:20px; }
+.plan-value-benefits { min-height:280px; align-content:start; gap:13px; margin-bottom:20px; }
 .plan-value-benefits li { font-weight:550; }
 .plan-value-benefits small { font-weight:400; }
 .plan-allowance-heading { padding-top:17px; margin-bottom:15px; border-top:1px solid var(--bl-line); font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--bl-muted); }
@@ -53,6 +55,14 @@
 .plan-card[data-featured="true"] .billing-button { background:var(--bl-lime); border-color:var(--bl-lime); color:#061018!important; }
 .plan-card-message { min-height:17px; margin-top:10px!important; text-align:center; color:var(--bl-muted); font-size:10px; line-height:1.6; }
 .plan-footnote { margin:20px auto 0!important; max-width:840px; text-align:center; color:var(--bl-muted); font-size:12px; line-height:1.8; }
+.plan-scale-cta { margin:28px auto 0; max-width:840px; padding:18px 22px; text-align:center; border:1px solid var(--bl-line); border-radius:12px; color:var(--bl-muted); font-size:13px; line-height:1.75; }
+.plan-scale-cta strong { color:var(--bl-ink); font-weight:650; }
+.plan-scale-cta a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
+.plan-ai-help { margin:18px auto 0; max-width:520px; text-align:center; color:var(--bl-muted); font-size:12px; line-height:1.7; }
+.plan-ai-help summary { cursor:pointer; text-decoration:underline; text-underline-offset:3px; list-style:none; }
+.plan-ai-help summary::-webkit-details-marker { display:none; }
+.plan-ai-help details[open] summary { font-weight:650; }
+.plan-ai-help details > p { margin-top:8px; }
 .billing-note { display:flex; align-items:flex-start; gap:11px; padding:17px 19px; background:var(--bl-soft); border:1px solid var(--bl-line); border-radius:10px; font-size:12px; line-height:1.75; }
 .billing-note > svg { margin-top:2px; flex-shrink:0; }
 .billing-note p + p { margin-top:6px; }
@@ -130,7 +140,7 @@
 .billing-feature-disclosure > .plan-footnote:last-child { margin-bottom:24px!important; }
 .billing-comparison-scroll { position:relative; width:100%; max-width:100%; max-height:min(72vh,720px); overflow:auto; overscroll-behavior-inline:contain; margin-top:24px; scrollbar-color:var(--bl-muted) var(--bl-soft); }
 .plan-comparison-hint { display:none; padding-inline:18px; margin-top:16px!important; color:var(--bl-muted); font-size:11px; line-height:1.7; text-align:center; }
-.plan-feature-table { border-collapse:separate; border-spacing:0; width:100%; min-width:860px; table-layout:fixed; font-size:12px; line-height:1.65; }
+.plan-feature-table { border-collapse:separate; border-spacing:0; width:100%; min-width:640px; table-layout:fixed; font-size:12px; line-height:1.65; }
 .plan-feature-table th,.plan-feature-table td { padding:17px 14px; border-bottom:1px solid var(--bl-line); vertical-align:middle; text-align:center; overflow-wrap:anywhere; }
 .plan-feature-table th:first-child { width:27%; text-align:left; }
 .plan-feature-table thead th { position:sticky; top:0; z-index:2; background:var(--bl-forest); color:#fff; font-size:13px; font-weight:650; }
@@ -141,12 +151,13 @@
 .plan-feature-value { color:var(--bl-ink); }
 .plan-feature-value svg { display:inline-block; vertical-align:middle; color:#00D7FF; }
 .dark .plan-feature-value svg { color:var(--bl-lime); }
-@media(min-width:1151px) and (max-width:1300px) { .plan-card { padding-inline:15px; }.plan-card[data-featured="true"] { padding-inline:14px; }.plan-badge { font-size:7px; } }
-@media(max-width:1150px) { .plan-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }.plan-description { min-height:41px; }.billing-container { width:calc(100% - 48px); } }
-@media(max-width:800px) { .plan-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.billing-model-grid,.billing-pack-grid { grid-template-columns:1fr; }.billing-usage-grid { grid-template-columns:1fr; }.billing-model,.billing-pack { padding:22px; }.billing-faq { grid-template-columns:1fr; }.billing-page { padding-top:46px; }.billing-teaser { padding-block:65px; }.billing-current { padding:22px; } }
-@media(max-width:540px) { .billing-container { width:calc(100% - 32px); }.plan-grid { grid-template-columns:1fr; gap:16px; }.plan-card { padding:24px; }.plan-card[data-featured="true"] { padding:23px; }.plan-description { min-height:0; }.plan-card-topline { margin-bottom:5px; }.plan-badge { font-size:9px; }.plan-bill { min-height:0; }.plan-price { margin-top:15px; }.billing-page-heading { margin-bottom:30px; }.billing-page-heading > p:last-child { font-size:14px; }.billing-section { margin-top:45px; }.billing-current-actions,.billing-current-actions .billing-button { width:100%; }.billing-dashboard { padding:20px 16px; }.billing-dashboard-header h1 { font-size:28px; }.billing-account-select { width:100%; }.plan-interval button { padding-inline:12px; } }
+@media(min-width:1151px) and (max-width:1300px) { .plan-card { padding-inline:22px; }.plan-card[data-featured="true"] { padding-inline:21px; } }
+@media(max-width:1150px) { .plan-description { min-height:41px; }.billing-container { width:calc(100% - 48px); } }
+@media(max-width:900px) { .plan-grid { grid-template-columns:1fr; gap:18px; }.plan-card[data-featured="true"] { order:-1; } }
+@media(max-width:800px) { .billing-model-grid,.billing-pack-grid { grid-template-columns:1fr; }.billing-usage-grid { grid-template-columns:1fr; }.billing-model,.billing-pack { padding:22px; }.billing-faq { grid-template-columns:1fr; }.billing-page { padding-top:46px; }.billing-teaser { padding-block:65px; }.billing-current { padding:22px; } }
+@media(max-width:540px) { .billing-container { width:calc(100% - 32px); }.plan-grid { gap:16px; }.plan-card { padding:24px; }.plan-card[data-featured="true"] { padding:23px; }.plan-description { min-height:0; }.plan-card-topline { margin-bottom:5px; }.plan-badge { font-size:9px; }.plan-bill { min-height:0; }.plan-price { margin-top:15px; }.billing-page-heading { margin-bottom:30px; }.billing-page-heading > p:last-child { font-size:14px; }.billing-section { margin-top:45px; }.billing-current-actions,.billing-current-actions .billing-button { width:100%; }.billing-dashboard { padding:20px 16px; }.billing-dashboard-header h1 { font-size:28px; }.billing-account-select { width:100%; }.plan-interval button { padding-inline:12px; } }
 @media(max-width:900px) { .plan-comparison-hint { display:block; } }
-@media(max-width:540px) { .plan-audience { min-height:0; font-size:9px; }.plan-includes { min-height:0; }.plan-value-benefits { min-height:0; }.plan-benefits li { font-size:13px; }.plan-benefits small { font-size:11px; }.billing-feature-disclosure > summary { padding-inline:18px; }.billing-feature-disclosure > .plan-footnote { padding-inline:18px; }.plan-feature-table { min-width:790px; }.plan-feature-table th:first-child { width:170px; } }
+@media(max-width:540px) { .plan-audience { min-height:0; font-size:9px; }.plan-includes { min-height:0; }.plan-value-benefits { min-height:0; }.plan-benefits li { font-size:13px; }.plan-benefits small { font-size:11px; }.billing-feature-disclosure > summary { padding-inline:18px; }.billing-feature-disclosure > .plan-footnote { padding-inline:18px; }.plan-feature-table { min-width:560px; }.plan-feature-table th:first-child { width:170px; } }
 @media(prefers-reduced-motion:reduce) { .billing-design * { transition:none!important; scroll-behavior:auto!important; } }
 
 /* Public pricing inherits the studio-style marketing palette without changing dashboard billing. */

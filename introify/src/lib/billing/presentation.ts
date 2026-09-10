@@ -4,11 +4,11 @@ import { messagesFor } from "../ui-messages"
 
 /** Customer-facing value; prices and entitlements stay in the billing catalog. */
 export const PLAN_POSITIONING: Record<PlanId, { audience: string; outcome: string; includes: string }> = {
-    free: { audience: "GET YOUR BUSINESS ONLINE", outcome: "Your first page, enquiries and bookings in one place.", includes: "Your everyday essentials" },
-    starter: { audience: "MAKE IT YOUR BRAND", outcome: "Your own look, a larger catalog and an assistant you can guide.", includes: "Everything in Free, plus" },
-    pro: { audience: "GROW WITH A SMALL TEAM", outcome: "See what converts. Give your team the tools to follow through.", includes: "Everything in Starter, plus" },
-    business: { audience: "RUN MULTIPLE BUSINESSES", outcome: "Separate businesses. The right people. One shared plan.", includes: "Everything in Pro, with" },
-    scale: { audience: "MANAGE YOUR PORTFOLIO", outcome: "Bring your business group together with room for a larger team.", includes: "Everything in Business, with" },
+    free: { audience: "FOR TRYING INTROIFY", outcome: "A first page, enquiries and bookings without a card.", includes: "Your everyday essentials" },
+    starter: { audience: "RETIRED PLAN", outcome: "Existing Starter subscriptions keep their recorded entitlements.", includes: "Recorded Starter allowance" },
+    pro: { audience: "FOR CREATORS, PROFESSIONALS AND SOLO BUSINESSES", outcome: "The default home for a professional page, team seats and full AI.", includes: "Everything in Free, plus" },
+    business: { audience: "FOR TEAMS AND MULTIPLE BRANDS", outcome: "Several businesses, more seats and higher AI and 3D room.", includes: "Everything in Pro, with" },
+    scale: { audience: "NEED MORE?", outcome: "More than five businesses, larger teams or higher AI usage.", includes: "Custom pricing" },
 }
 
 export function planPositioning(planId: PlanId, locale: UiLocale = "en") {
@@ -19,31 +19,17 @@ export type PlanBenefit = { label: string; detail?: string }
 
 export function planBenefits(plan: Plan, locale: UiLocale = "en"): PlanBenefit[] {
     const number = (value: number) => value.toLocaleString(locale === "hi" ? "hi-IN" : "en-US")
-    const b = messagesFor(locale).pricing.benefits
-    if (plan.id === "free") return [
-        { label: b.pageLinksQr },
-        { label: b.listings },
-        { label: b.bookingRequests },
-        { label: b.leadInbox, detail: b.leadInboxDetail },
-        { label: b.visitTotals },
-    ]
-    if (plan.id === "starter") return [
-        ...(plan.features.customBranding ? [{ label: b.customOrb }, { label: b.removeFooter }] : []),
-        ...(plan.features.customInstructions ? [{ label: b.assistant, detail: b.assistantDetail }] : []),
-        { label: fill(b.offerings, { n: number(plan.limits.offerings) }) },
-        { label: fill(b.knowledge, { n: number(plan.limits.knowledgeSources) }), detail: b.knowledgeDetail },
-    ]
-    if (plan.id === "pro") return [
-        ...(plan.features.advancedAnalytics ? [{ label: b.trends }, { label: b.funnel }] : []),
-        ...(plan.features.team ? [{ label: b.teamRoles, detail: b.teamRolesDetail }] : []),
-        ...(plan.features.autoMemory ? [{ label: b.memory, detail: b.memoryDetail }] : []),
-        { label: fill(b.offerings, { n: number(plan.limits.offerings) }) },
-    ]
+    const copy = messagesFor(locale).pricing
+    const b = copy.benefits
+    const aiModes = plan.aiModes.map(mode => mode[0].toUpperCase() + mode.slice(1)).join(" + ")
     return [
-        { label: fill(b.workspaces, { n: plan.limits.businesses }) },
-        { label: b.assignPeople, detail: b.assignDetail },
-        { label: b.sharedAi, detail: b.sharedAiDetail },
-        { label: fill(b.offerings, { n: number(plan.limits.offerings) }), detail: b.offeringsSharedDetail },
-        { label: fill(b.knowledge, { n: number(plan.limits.knowledgeSources) }) },
+        { label: fill(plan.limits.businesses === 1 ? copy.businessOne : copy.businessMany, { n: plan.limits.businesses }) },
+        { label: fill(plan.limits.seats === 1 ? copy.seatOne : copy.seatMany, { n: plan.limits.seats }) },
+        { label: fill(copy.creditsMonthFull, { n: number(plan.aiCredits) }), detail: plan.aiUsageHint },
+        { label: fill(b.offerings, { n: number(plan.limits.offerings) }) },
+        { label: fill(copy.aiModesLine, { modes: aiModes }) },
+        plan.freeTrialGenerations
+            ? { label: fill(copy.trial3d, { n: plan.freeTrialGenerations }), detail: copy.trialOnce }
+            : { label: fill(copy.gens3d, { n: plan.photorealGenerations }), detail: copy.gensMonthly },
     ]
 }

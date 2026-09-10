@@ -443,7 +443,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                         )}
                     </Section>
                     <Section title="Welcome aura" description="The face on your public page.">
-                        {!aiAccess.customBranding && <p className="text-sm text-muted-foreground">Your free page uses the Introify style. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Starter adds custom styles and brand removal.</Link></p>}
+                        {!aiAccess.customBranding && <p className="text-sm text-muted-foreground">Your free page uses the Introify style. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Pro adds custom styles and brand removal.</Link></p>}
                         <ToggleRow title="Hide Introify footer" description="Your business name, photo and logo are available on every plan.">
                             <Switch aria-label="Hide Introify footer" disabled={!aiAccess.customBranding} checked={aiAccess.customBranding && Boolean(personalityConfig.hideIntroifyBrand)} onCheckedChange={value => updatePersonalityField("hideIntroifyBrand", value)} />
                         </ToggleRow>
@@ -956,7 +956,7 @@ function AiStudio({
 
                 <div className="space-y-2">
                     <p className="text-sm font-medium">Custom instructions</p>
-                    {!access.customInstructions && <p className="text-xs text-muted-foreground">Available on Starter and above.</p>}
+                    {!access.customInstructions && <p className="text-xs text-muted-foreground">Available on Pro and above.</p>}
                     <Textarea
                         disabled={!access.customInstructions}
                         value={access.customInstructions ? instructions : ""}

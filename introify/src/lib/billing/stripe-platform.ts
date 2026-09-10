@@ -1,7 +1,7 @@
 import Stripe from "stripe"
 import { prisma } from "@/lib/prisma"
 import { billingMode, requirePlatformCheckout } from "./config"
-import { getCreditPack, getPlan, isPlanId, PLAN_VERSION, PLANS, type BillingCadence } from "./catalog"
+import { canSelfServeCheckout, checkoutPlans, getCreditPack, getPlan, isPlanId, PLAN_VERSION, type BillingCadence } from "./catalog"
 import { billingTransaction, ensureMonthlyGrants, issueGrant, lockBillingAccount } from "./service"
 
 export function platformStripe() {
@@ -15,6 +15,7 @@ export function billingOrigin() { return "https://introify.com" }
 export async function platformPrice(planId: string, cadence: BillingCadence) {
     const plan = getPlan(planId)
     if (plan.id === "free") throw new Error("Free does not require checkout.")
+    if (!canSelfServeCheckout(plan)) throw new Error("This plan is not available for self-serve checkout.")
     const stripe = platformStripe()
     const lookup = `introify_${PLAN_VERSION}_${plan.id}_${cadence}`
     const existing = (await stripe.prices.list({ lookup_keys: [lookup], limit: 1 })).data[0]
@@ -32,6 +33,7 @@ export function validatePrice(price: Stripe.Price) {
     const metadata = price.metadata
     if (metadata.purpose !== "introify-platform" || metadata.planVersion !== PLAN_VERSION || !isPlanId(metadata.planId) || metadata.planId === "free") throw new Error("Unrecognized subscription price.")
     const plan = getPlan(metadata.planId)
+    if (plan.customPricing) throw new Error("This plan is not available for self-serve checkout.")
     const cadence = metadata.cadence
     if (!["monthly", "yearly"].includes(cadence) || price.currency !== "usd" || price.unit_amount !== (cadence === "yearly" ? plan.yearlyCents : plan.monthlyCents) || price.recurring?.interval !== (cadence === "yearly" ? "year" : "month") || price.recurring.interval_count !== 1) throw new Error("Subscription price does not match the approved catalog.")
     return { planId: plan.id, cadence: cadence as BillingCadence, amountCents: price.unit_amount }
@@ -41,7 +43,7 @@ export function validatePrice(price: Stripe.Price) {
 export async function platformPortalConfiguration() {
     const stripe = platformStripe()
     const products: { product: string; prices: string[] }[] = []
-    for (const plan of PLANS.filter(p => p.id !== "free")) {
+    for (const plan of checkoutPlans()) {
         const prices = await Promise.all([platformPrice(plan.id, "monthly"), platformPrice(plan.id, "yearly")])
         products.push({ product: stripeId(prices[0].product)!, prices: prices.map(p => p.id) })
     }

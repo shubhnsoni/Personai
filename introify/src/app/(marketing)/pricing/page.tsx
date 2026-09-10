@@ -10,7 +10,7 @@ import { messagesFor } from "@/lib/ui-messages"
 
 export const metadata = marketingMetadata({
     title: "Plans & pricing — start free, grow your business",
-    description: "Compare Introify plans for business pages, bookings, custom branding, AI assistants, analytics and teams. Start free or choose paid plans from $10/month.",
+    description: "Compare Introify plans for business pages, bookings, custom branding, AI assistants, analytics and teams. Start free or choose Pro from $19/month.",
     path: "/pricing",
 })
 
