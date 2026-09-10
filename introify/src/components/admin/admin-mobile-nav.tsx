@@ -30,7 +30,7 @@ export function AdminMobileNav({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
-                className="z-[60] max-h-[80dvh] gap-0 rounded-t-3xl border-t p-0 sm:max-w-none"
+                className="z-[60] gap-0 p-0"
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 onCloseAutoFocus={(e) => e.preventDefault()}
             >

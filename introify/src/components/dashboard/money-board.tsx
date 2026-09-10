@@ -105,7 +105,7 @@ export function MoneyBoard({
             </div>
 
             <Sheet open={!!active} onOpenChange={(o) => !o && setOpenEmail(null)}>
-                <SheetContent side="bottom" className="max-h-[85dvh] overflow-auto rounded-t-2xl sm:max-w-none">
+                <SheetContent side="bottom" className="overflow-auto">
                     {active && (
                         <>
                             <SheetHeader>

@@ -290,14 +290,14 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
             <SessionProbe slug={profile.slug} />
             {restaurant || retro ? null : <IntroVeil stage={introStage} />}
 
-            <div className="relative z-10 flex h-full min-w-0 w-full flex-1 flex-col">
+            <div className="relative z-10 flex h-full min-w-0 flex-1 flex-col">
                 <div className="relative mx-auto h-full w-full flex-1 overflow-hidden">
                     <ChatInterface
                         profile={profile}
                         colors={colors}
                         animationConfig={animationConfig}
                         onShowContent={handleShowContent}
-                        isPanelOpen={false}
+                        isPanelOpen={!!activeContent}
                         chips={chips}
                         topics={welcomeTopics(profile)}
                         onIntroStage={setIntroStage}
@@ -334,6 +334,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                         hideParty={sheet.hideParty}
                         partyLabel={sheet.partyLabel}
                         confirmLabel={sheet.confirmLabel}
+                        displayMode={profile.contentDisplayMode}
                     />
                 )
             })()}
@@ -348,6 +349,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                     upiId={profile.upiId}
                     whatsapp={profile.whatsapp}
                     onClose={() => setTipOpen(false)}
+                    displayMode={profile.contentDisplayMode}
                 />
             ) : null}
         </div>

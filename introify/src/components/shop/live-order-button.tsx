@@ -25,9 +25,9 @@ function OrdersSheet({
     onClose: () => void
 }) {
     return (
-        <div className="fixed inset-0 z-[80]">
+        <div className="fixed inset-0 z-[80] flex items-end justify-center md:items-center md:p-6">
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
-            <div className="absolute bottom-0 left-0 right-0 z-[61] max-h-[70dvh] overflow-auto rounded-t-[1.6rem] bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">
+            <div className="relative z-[61] w-full max-h-[70dvh] overflow-auto rounded-t-[1.6rem] bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-w-lg md:rounded-2xl">
                 <div className="mb-3 flex items-center justify-between">
                     <p className="text-[15px] font-semibold">Your orders</p>
                     <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground" aria-label="Close">

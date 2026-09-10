@@ -218,9 +218,9 @@ export function QuickAddSheet({
         >
             <SheetContent
                 side="bottom"
-                className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-border/70 p-0"
+                className="flex flex-col gap-0 overflow-hidden border-border/70 p-0 md:max-w-2xl"
             >
-                <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/25" />
+                <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/25 md:hidden" />
                 <form
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={async (e) => {

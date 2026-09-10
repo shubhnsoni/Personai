@@ -33,12 +33,12 @@ export function MobileSidebar({ open, onOpenChange, counts, role, extras, busine
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
-                className="z-[60] max-h-[80dvh] gap-0 rounded-t-3xl border-t p-0 sm:max-w-none"
+                className="z-[60] gap-0 p-0"
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 onCloseAutoFocus={(e) => e.preventDefault()}
             >
                 <SheetHeader className="relative shrink-0 space-y-0 p-0 pr-10">
-                    <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/30" />
+                    <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/30 md:hidden" />
                     <div className="flex items-center gap-3 pb-[5px] pl-5 pr-10 pt-[14px]">
                         <SheetTitle className="sr-only">Menu</SheetTitle>
                         <Logo href="/dashboard" size="sm" className="w-[88px] shrink-0" />

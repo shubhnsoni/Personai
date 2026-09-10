@@ -302,11 +302,11 @@ function LeadDetail({
 
     return (
         <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-            <SheetContent side="bottom" className="max-h-[88dvh] gap-0 overflow-auto rounded-t-3xl p-0 sm:max-w-none">
+            <SheetContent side="bottom" className="gap-0 overflow-auto p-0 md:max-w-2xl">
                 {lead && (
                     <>
                         <SheetHeader className="relative space-y-0 border-b border-border/60 p-0 pr-12">
-                            <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/30" />
+                            <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/30 md:hidden" />
                             <div className="flex items-center gap-3 px-4 pb-3 pt-6 pr-12">
                                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-aurora/15 text-sm font-medium text-aurora">
                                     {initials(lead.name)}
@@ -541,7 +541,7 @@ function AddLeadSheet({
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="bottom" className="max-h-[88dvh] overflow-auto rounded-t-3xl sm:max-w-none">
+            <SheetContent side="bottom" className="overflow-auto md:max-w-2xl">
                 <SheetHeader>
                     <SheetTitle>Add lead</SheetTitle>
                     <SheetDescription>Someone you already talked to, or a name from elsewhere.</SheetDescription>

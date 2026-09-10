@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { act } from "react"
 import { recordSnapshots } from "./helpers/commits"
 import { installMatchMedia, REDUCE_MOTION } from "./helpers/match-media"
@@ -157,5 +157,69 @@ describe("ProfileView - the banner must be present in the first committed frame"
             snapshots[0],
             `banner-present per commit: ${JSON.stringify(snapshots)} - the first frame must already show it, both to avoid a flash after payment and because the force-dynamic server render contains it`,
         ).toBe(true)
+    })
+})
+
+describe("ProfileView - intro chips follow contentDisplayMode", () => {
+    beforeEach(() => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => ({ ok: true, json: async () => ({}) })) as unknown as typeof fetch,
+        )
+    })
+
+    it("opens About and services in the side panel when the owner saved SIDE_PANEL", () => {
+        render(
+            <ProfileView
+                profile={{
+                    ...PROFILE,
+                    contentDisplayMode: "SIDE_PANEL",
+                    serviceOfferings: [
+                        {
+                            id: "s1",
+                            name: "Consult",
+                            description: null,
+                            priceCents: 0,
+                            isFree: true,
+                            durationMinutes: 30,
+                            isActive: true,
+                        },
+                    ],
+                }}
+                animationConfig={{}}
+                colors={["#52E8FF"]}
+            />,
+        )
+        fireEvent.click(screen.getByRole("button", { name: "About" }))
+        act(() => {
+            vi.advanceTimersByTime(1)
+        })
+        const stage = document.querySelector("[data-content-stage]")
+        expect(stage?.getAttribute("data-desktop-surface")).toBe("sidebar")
+        expect(screen.getByText("About Ada Lovelace")).toBeTruthy()
+
+        fireEvent.click(screen.getByRole("button", { name: "See services" }))
+        act(() => {
+            vi.advanceTimersByTime(1)
+        })
+        expect(document.querySelector("[data-content-stage]")?.getAttribute("data-desktop-surface")).toBe("sidebar")
+        expect(screen.getByText("Services & Pricing")).toBeTruthy()
+    })
+
+    it("opens About as a centred popup when the owner saved POPUP", () => {
+        render(
+            <ProfileView
+                profile={{ ...PROFILE, contentDisplayMode: "POPUP" }}
+                animationConfig={{}}
+                colors={["#52E8FF"]}
+            />,
+        )
+        fireEvent.click(screen.getByRole("button", { name: "About" }))
+        act(() => {
+            vi.advanceTimersByTime(1)
+        })
+        const stage = document.querySelector("[data-content-stage]")
+        expect(stage?.getAttribute("data-desktop-surface")).toBe("popup")
+        expect(stage?.className).toMatch(/\bmd:items-center\b/)
     })
 })

@@ -272,7 +272,7 @@ export function ProductsList({ slug, profileId, whatsapp, jewelry, role, extras,
             <Sheet open={importOpen} onOpenChange={setImportOpen}>
                 <SheetContent
                     side="bottom"
-                    className="max-h-[92dvh] gap-0 overflow-y-auto rounded-t-3xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-w-none"
+                    className="gap-0 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))] md:max-w-2xl"
                 >
                     <SheetHeader className="border-b px-4 pb-4 pr-12">
                         <SheetTitle>{restaurant ? "Import menu" : "Import shop"}</SheetTitle>

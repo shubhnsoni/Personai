@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { X } from "lucide-react"
 import { placeTip } from "@/app/actions/products"
 import { whatsappHref } from "@/lib/commerce"
+import { ProfileStage } from "@/components/profile/profile-stage"
 
 export function TipSheet({
     profileId,
@@ -14,12 +15,14 @@ export function TipSheet({
     upiId,
     whatsapp,
     onClose,
+    displayMode,
 }: {
     profileId: string
     displayName: string
     upiId?: string | null
     whatsapp?: string | null
     onClose: () => void
+    displayMode?: string | null
 }) {
     const [name, setName] = useState("")
     const [email, setEmail] = useState("")
@@ -28,9 +31,8 @@ export function TipSheet({
     const [done, setDone] = useState<string | null>(null)
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
-            <button type="button" className="absolute inset-0 bg-black/70" onClick={onClose} />
-            <div className="relative w-full max-w-md rounded-t-3xl border border-white/10 bg-zinc-950 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-3xl">
+        <ProfileStage open onClose={onClose} mode={displayMode} zClass="z-[60]">
+            <div className="relative min-h-0 flex-1 overflow-y-auto p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
                 <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-sm font-medium">Tip {displayName}</h2>
                     <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400">
@@ -95,6 +97,6 @@ export function TipSheet({
                     </form>
                 )}
             </div>
-        </div>
+        </ProfileStage>
     )
 }

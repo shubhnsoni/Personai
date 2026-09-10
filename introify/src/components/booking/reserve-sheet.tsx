@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Loader2, CheckCircle } from "lucide-react"
+import { Loader2, CheckCircle, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { ProfileStage } from "@/components/profile/profile-stage"
 import { CalendarLinks } from "@/components/calendar/calendar-links"
 import { createBooking, getAvailableSlots } from "@/app/actions/bookings"
 import { localDateKey } from "@/lib/menu"
@@ -72,6 +72,7 @@ export function ReserveSheet({
     partyLabel,
     hideParty,
     confirmLabel,
+    displayMode,
 }: {
     open: boolean
     onClose: () => void
@@ -81,6 +82,7 @@ export function ReserveSheet({
     partyLabel?: string
     hideParty?: boolean
     confirmLabel?: ReserveConfirmLabel
+    displayMode?: string | null
 }) {
     const isSession = mode === "session"
     const copy = isSession ? sessionCopy(confirmLabel) : null
@@ -181,34 +183,34 @@ export function ReserveSheet({
                 ? `Request tables for ${partySize}`
                 : `Hold table for ${partySize}`
 
+    function handleClose() {
+        reset()
+        onClose()
+    }
+
     return (
-        <Sheet
-            open={open}
-            onOpenChange={(next) => {
-                if (!next) {
-                    reset()
-                    onClose()
-                }
-            }}
-        >
-            <SheetContent
-                side="bottom"
-                className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-white/10 bg-zinc-950 p-0 text-zinc-100"
-            >
-                <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/20" />
+        <ProfileStage open={open} onClose={handleClose} mode={displayMode} className="text-zinc-100">
+                <button
+                    type="button"
+                    onClick={handleClose}
+                    className="absolute top-3 right-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-white/10"
+                    aria-label="Close"
+                >
+                    <X className="h-4 w-4" />
+                </button>
                 {booked ? (
                     <div className="space-y-4 px-5 py-8 text-center">
                         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15">
                             <CheckCircle className="h-7 w-7 text-emerald-400" />
                         </div>
-                        <SheetHeader className="space-y-1 p-0 pr-12">
-                            <SheetTitle className="text-xl text-white">{isSession ? copy!.success : "Table reserved"}</SheetTitle>
-                            <SheetDescription className="text-zinc-400">
+                        <div className="space-y-1 p-0 pr-12">
+                            <h2 className="text-xl font-semibold text-white">{isSession ? copy!.success : "Table reserved"}</h2>
+                            <p className="text-sm text-zinc-400">
                                 {isSession
                                     ? `${profile.displayName} · ${service?.name || "Session"} · ${date} at ${time}`
                                     : `${profile.displayName} · table for ${partySize} · ${date} at ${time}`}
-                            </SheetDescription>
-                        </SheetHeader>
+                            </p>
+                        </div>
                         <CalendarLinks
                             event={{
                                 id: booked.id,
@@ -233,14 +235,14 @@ export function ReserveSheet({
                 ) : (
                     <div className="flex min-h-0 flex-1 flex-col">
                         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pt-3 pb-4">
-                            <SheetHeader className="space-y-1 p-0 pr-12 text-left">
-                                <SheetTitle className="text-lg text-white">{isSession ? copy!.title : "Reserve a table"}</SheetTitle>
-                                <SheetDescription>
+                            <div className="space-y-1 p-0 pr-12 text-left">
+                                <h2 className="text-lg font-semibold text-white">{isSession ? copy!.title : "Reserve a table"}</h2>
+                                <p className="text-sm text-zinc-400">
                                     {isSession
                                         ? [service?.name, service?.durationMinutes ? `${service.durationMinutes} min` : null, copy!.description].filter(Boolean).join(" · ")
                                         : "Party, time, phone. We hold it for you."}
-                                </SheetDescription>
-                            </SheetHeader>
+                                </p>
+                            </div>
 
                             <PartySizePicker
                                 value={partySize}
@@ -351,7 +353,6 @@ export function ReserveSheet({
                         </div>
                     </div>
                 )}
-            </SheetContent>
-        </Sheet>
+        </ProfileStage>
     )
 }

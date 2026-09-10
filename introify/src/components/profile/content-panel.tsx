@@ -12,6 +12,7 @@ import { useState } from "react"
 import { useMoney } from "@/components/pricing-provider"
 import { kitAbout } from "@/lib/kit-copy"
 import { shopNavLabel } from "@/lib/surfaces"
+import { ProfileStage } from "@/components/profile/profile-stage"
 
 interface ContentPanelProps {
     isOpen: boolean
@@ -111,7 +112,7 @@ export function ContentPanel({ isOpen, onClose, type, data, onBookService, onPur
     }
 
     const content = (
-        <div className="flex-1 relative h-full flex flex-col">
+        <div className="relative flex h-full min-h-0 flex-1 flex-col">
             <div className="flex items-center justify-between px-3 py-3 sm:p-5 border-b border-white/8 bg-black/40 backdrop-blur-md z-10">
                 <div className="flex items-center gap-4">
                     <Button 
@@ -183,41 +184,9 @@ export function ContentPanel({ isOpen, onClose, type, data, onBookService, onPur
     )
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <>
-                    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6 lg:hidden">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={onClose}
-                            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, y: 40 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 40 }}
-                            className="relative flex h-[min(88dvh,100%)] w-full min-h-0 flex-col overflow-hidden rounded-t-3xl border-t border-white/10 bg-zinc-950 shadow-2xl sm:h-[min(82dvh,40rem)] sm:max-w-lg sm:rounded-2xl sm:border"
-                        >
-                            {content}
-                        </motion.div>
-                    </div>
-
-                    <motion.aside
-                        initial={{ width: "0%" }}
-                        animate={{ width: "56%" }}
-                        exit={{ width: "0%" }}
-                        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-                        className="relative z-10 hidden h-full min-h-0 shrink-0 overflow-hidden border-l border-white/10 bg-zinc-950 lg:flex lg:flex-col"
-                    >
-                        <div className="flex h-full min-h-0 w-full min-w-[22rem] flex-col">
-                            {content}
-                        </div>
-                    </motion.aside>
-                </>
-            )}
-        </AnimatePresence>
+        <ProfileStage open={isOpen} onClose={onClose} mode={data.contentDisplayMode}>
+            {content}
+        </ProfileStage>
     )
 }
 
