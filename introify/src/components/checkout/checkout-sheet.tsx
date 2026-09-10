@@ -9,6 +9,9 @@ import { useMoney } from "@/components/pricing-provider"
 import { isPhysical, whatsappHref } from "@/lib/commerce"
 import { placeManualOrder } from "@/app/actions/products"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
+import { readBuyerMemory, writeBuyerMemory } from "@/lib/checkout-memory"
+import { confidentialUploadsEnabled } from "@/lib/private-upload-policy"
+import { ProfileStage } from "@/components/profile/profile-stage"
 
 export type CheckoutItem = {
     itemType: "product" | "course" | "event" | "community"
@@ -56,8 +59,11 @@ export function CheckoutSheet({
 
     useEffect(() => {
         try {
-            setEmail(localStorage.getItem("pl_buyer_email") || "")
-            setName(localStorage.getItem("pl_buyer_name") || "")
+            const remembered = readBuyerMemory(window.localStorage)
+            if (remembered) {
+                setEmail(remembered.email)
+                setName(remembered.name)
+            }
         } catch {}
     }, [])
 
@@ -78,6 +84,10 @@ export function CheckoutSheet({
             return
         }
         if (item.soldOut) return
+        if (item.requiresRx && !confidentialUploadsEnabled()) {
+            setError("Prescription collection is not available yet.")
+            return
+        }
         if (item.requiresRx && !rxUrl.trim() && !rxNote.trim()) {
             setError("Attach a prescription photo or enter a short Rx note.")
             return
@@ -85,8 +95,7 @@ export function CheckoutSheet({
         setBusy(true)
         setError(null)
         try {
-            localStorage.setItem("pl_buyer_email", email.trim())
-            localStorage.setItem("pl_buyer_name", name.trim())
+            writeBuyerMemory(window.localStorage, { name: name.trim(), email: email.trim() })
             if (item.itemType === "product" && payMethod !== "CARD") {
                 const order = await placeManualOrder({
                     productId: item.itemId,
@@ -149,9 +158,14 @@ export function CheckoutSheet({
     }
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
-            <button type="button" className="absolute inset-0 bg-black/40 backdrop-blur-sm dark:bg-black/70" onClick={onClose} />
-            <div className="relative max-h-[min(88dvh,100%)] w-full overflow-y-auto rounded-t-3xl border border-border bg-background text-foreground shadow-2xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-w-md sm:rounded-2xl">
+        <ProfileStage
+            open
+            onClose={onClose}
+            forcePopup
+            zClass="z-[60]"
+            className="bg-background text-foreground border-border"
+        >
+            <div className="relative min-h-0 flex-1 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <div className="flex h-12 items-center justify-between gap-2 border-b border-border px-2">
                     <h2 className="min-w-0 truncate px-2 text-sm font-medium">{item.title}</h2>
                     <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
@@ -200,13 +214,17 @@ export function CheckoutSheet({
                     {item.requiresRx ? (
                         <div className="space-y-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
                             <Label>Prescription</Label>
+                            {!confidentialUploadsEnabled() ? (
+                                <p className="text-[11px] text-muted-foreground">Prescription collection is not available yet. Private storage is required before confidential files can be uploaded.</p>
+                            ) : (
                             <p className="text-[11px] text-muted-foreground">Upload a photo or enter a short Rx note. Optional doctor name.</p>
-                            {rxUrl ? (
+                            )}
+                            {confidentialUploadsEnabled() && rxUrl ? (
                                 <div className="flex items-center justify-between gap-2">
                                     <a href={rxUrl} target="_blank" rel="noreferrer" className="truncate text-xs underline">View attached</a>
                                     <button type="button" className="text-xs text-muted-foreground" onClick={() => setRxUrl("")}>Remove</button>
                                 </div>
-                            ) : (
+                            ) : confidentialUploadsEnabled() ? (
                                 <Input
                                     type="file"
                                     accept="image/*"
@@ -231,7 +249,9 @@ export function CheckoutSheet({
                                         }
                                     }}
                                 />
-                            )}
+                            ) : null}
+                            {confidentialUploadsEnabled() ? (
+                                <>
                             <Input
                                 value={rxNote}
                                 onChange={(e) => setRxNote(e.target.value)}
@@ -244,6 +264,8 @@ export function CheckoutSheet({
                                 placeholder="Doctor name (optional)"
                                 className="h-10 rounded-xl"
                             />
+                                </>
+                            ) : null}
                         </div>
                     ) : null}
                     {item.itemType === "product" ? (
@@ -280,6 +302,6 @@ export function CheckoutSheet({
                 )}
                 </div>
             </div>
-        </div>
+        </ProfileStage>
     )
 }

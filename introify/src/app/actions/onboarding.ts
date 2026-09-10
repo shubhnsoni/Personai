@@ -32,6 +32,7 @@ export interface CreateProfileData {
     speakerName?: string
     speakerRole?: string
     whatsapp?: string
+    email?: string
     gstin?: string
     upiId?: string
     goldCity?: string
@@ -115,6 +116,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             }
         }
         if (data.distroInviteDesks) bag.distroDesk = "invite"
+        if (data.email?.trim()) bag.contactEmail = data.email.trim()
         personality = JSON.stringify(bag)
     } catch { /* keep extras-only bag */ }
     if (data.goldCity?.trim() && data.roleTemplate === "JEWELRY_WHOLESALE") {

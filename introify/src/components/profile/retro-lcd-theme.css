@@ -1,0 +1,164 @@
+/* Theme only the selected public page and its chat. The booking sheet portals
+   to body, so scope its variables to the presence of that public page as well.
+   No variables are installed on body: leaving the page restores other surfaces. */
+:is(
+  [data-public-business-theme="retro-lcd"],
+  [data-public-catalog-theme="retro-lcd"],
+  [data-public-profile-theme="retro-lcd"],
+  [data-chat-theme="retro-lcd"],
+  body:has([data-public-business-theme="retro-lcd"], [data-public-profile-theme="retro-lcd"]) > [data-slot="sheet-content"]
+) {
+  --retro-paper: #c4d58a;
+  --retro-ink: #253021;
+  --profile-bg: var(--retro-paper);
+  --profile-text: var(--retro-ink);
+  --profile-elev: color-mix(in srgb, var(--retro-paper) 95%, var(--retro-ink));
+  --profile-chip: color-mix(in srgb, var(--retro-paper) 91%, var(--retro-ink));
+  --profile-mute: color-mix(in srgb, var(--retro-ink) 83%, var(--retro-paper));
+  --profile-ring: var(--retro-ink);
+  --pl-aurora: var(--retro-ink);
+  --pl-brand-foreground: var(--retro-paper);
+  --chat-accent: var(--retro-ink);
+  --chat-on-accent: var(--retro-paper);
+  --background: var(--profile-bg);
+  --foreground: var(--profile-text);
+  --card: var(--profile-elev);
+  --card-foreground: var(--profile-text);
+  --popover: var(--profile-elev);
+  --popover-foreground: var(--profile-text);
+  --primary: var(--retro-ink);
+  --primary-foreground: var(--retro-paper);
+  --secondary: var(--profile-chip);
+  --secondary-foreground: var(--profile-text);
+  --muted: var(--profile-chip);
+  --muted-foreground: var(--profile-mute);
+  --accent: var(--profile-chip);
+  --accent-foreground: var(--profile-text);
+  --border: color-mix(in srgb, var(--retro-ink) 30%, var(--retro-paper));
+  --input: var(--border);
+  --ring: var(--retro-ink);
+  background-color: var(--profile-bg);
+  color: var(--profile-text);
+}
+
+.dark :is(
+  [data-public-business-theme="retro-lcd"],
+  [data-public-catalog-theme="retro-lcd"],
+  [data-public-profile-theme="retro-lcd"],
+  [data-chat-theme="retro-lcd"],
+  body:has([data-public-business-theme="retro-lcd"], [data-public-profile-theme="retro-lcd"]) > [data-slot="sheet-content"]
+) {
+  --retro-paper: #253021;
+  --retro-ink: #c4d58a;
+}
+
+[data-public-profile-theme="retro-lcd"] {
+  min-height: 100dvh;
+  height: 100dvh;
+}
+
+[data-chat-theme="retro-lcd"] :is(h1, [data-slot="chip"]) {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+[data-chat-theme="retro-lcd"] [data-slot="chip"] {
+  border-color: var(--border);
+  border-radius: 7px;
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--retro-ink) 20%, transparent);
+}
+
+[data-chat-theme="retro-lcd"] input:not([type="checkbox"]) {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--profile-elev);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--retro-ink) 16%, transparent);
+  backdrop-filter: none;
+}
+
+[data-chat-theme="retro-lcd"] [data-chat-bubble] {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+[data-chat-theme="retro-lcd"] [data-chat-bubble="assistant"] {
+  border-color: var(--border);
+  background: var(--profile-elev);
+  color: var(--profile-text);
+}
+
+[data-chat-theme="retro-lcd"] p.whitespace-nowrap {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Continue the chosen palette through booking, event and course catalogues.
+   Covers retain their original colours; only the surrounding UI is themed. */
+[data-public-catalog-theme="retro-lcd"] {
+  & :is(.text-zinc-100, .text-zinc-200, .text-zinc-300) {
+    color: var(--profile-text);
+  }
+  & :is(.text-zinc-400, .text-zinc-500) {
+    color: var(--profile-mute);
+  }
+  & :is([class~="bg-zinc-900/50"], [class~="bg-zinc-950/95"]) {
+    background-color: var(--profile-elev);
+  }
+  & [class~="border-white/10"] {
+    border-color: var(--border);
+  }
+  & :is(.bg-cyan-500, .bg-cyan-400) {
+    background-color: var(--retro-ink);
+    color: var(--retro-paper);
+  }
+  & header .text-cyan-400 {
+    color: var(--profile-text);
+  }
+}
+
+/* Product detail has its own palette; adapt its existing tokens, not its photos. */
+[data-public-business-theme="retro-lcd"] .pdp-v13.pdp-v13 {
+  --pdp-bg: var(--profile-bg);
+  --pdp-white: var(--profile-elev);
+  --pdp-ink: var(--profile-text);
+  --pdp-ink-soft: var(--profile-text);
+  --pdp-fog: var(--profile-mute);
+  --pdp-fog-dim: var(--profile-mute);
+  --pdp-line: var(--border);
+  --pdp-line-strong: var(--border);
+  --pdp-cyan: var(--retro-ink);
+  --pdp-cyan-ink: var(--retro-paper);
+  --pdp-blue-a: var(--retro-ink);
+  --pdp-blue-b: var(--retro-ink);
+  --pdp-sticky: var(--profile-bg);
+  --pdp-hero-0: var(--profile-elev);
+  --pdp-hero-1: var(--profile-elev);
+  --pdp-hero-2: var(--profile-elev);
+  --pdp-hero-3: var(--profile-elev);
+  --pdp-hero-wash: var(--profile-chip);
+  --pdp-blister: var(--profile-elev);
+}
+
+/* ReserveSheet's legacy fixed dark palette needs explicit scoped overrides.
+   Keep photo-backed portfolio panels in their existing legible presentation. */
+body:has([data-public-business-theme="retro-lcd"], [data-public-profile-theme="retro-lcd"]) > [data-slot="sheet-content"] {
+  border-color: var(--border);
+  & :is(.text-white, .text-zinc-100, .text-zinc-200, .text-zinc-300) {
+    color: var(--profile-text);
+  }
+  & :is(.text-zinc-400, .text-zinc-500) {
+    color: var(--profile-mute);
+  }
+  & :is([class~="bg-white/5"], [class~="bg-white/10"], .bg-zinc-900) {
+    background-color: var(--profile-chip);
+  }
+  & :is(input, select, textarea) {
+    color: var(--profile-text);
+    border-color: var(--border);
+    background-color: var(--profile-elev);
+  }
+  & :is(.bg-white, [class~="bg-white/90"]) {
+    background-color: var(--retro-ink);
+    color: var(--retro-paper);
+  }
+}

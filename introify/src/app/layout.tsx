@@ -10,6 +10,7 @@ import { getRequestCurrency } from "@/lib/request-currency";
 import { Toaster } from "sonner";
 import { BRAND_DESCRIPTION, marketingOrigin } from "@/lib/marketing-seo";
 import { PageTransitionProvider } from "@/components/navigation/page-transition";
+import { CookiePreferenceBar } from "@/components/privacy/cookie-preference";
 import { getRequestLocale } from "@/lib/ui-locale-request";
 import { htmlLang } from "@/lib/ui-locale";
 import "@/components/navigation/page-transition.css";
@@ -78,6 +79,7 @@ export default async function RootLayout({
           >
             <PricingProvider currency={currency}>
               <PageTransitionProvider>{children}</PageTransitionProvider>
+              <CookiePreferenceBar />
               <ClerkChrome />
               <Toaster theme="system" />
             </PricingProvider>

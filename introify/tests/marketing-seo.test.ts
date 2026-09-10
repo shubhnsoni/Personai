@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match"
 import nextConfig from "../next.config.mjs"
-import { isIndexableProfileSlug, MARKETING_ROUTES, marketingMetadata, marketingOrigin, marketingStructuredData } from "@/lib/marketing-seo"
+import { isIndexableProfileSlug, MARKETING_FOOTER_PATHS, MARKETING_ROUTES, marketingMetadata, marketingOrigin, marketingStructuredData } from "@/lib/marketing-seo"
 import { isReservedSlug } from "@/lib/slugs"
 import { usernameError } from "@/lib/username"
 import { subdomainRoute } from "@/lib/subdomain-host"
@@ -30,6 +30,8 @@ describe("marketing metadata and indexing", () => {
         }
         expect(MARKETING_ROUTES.filter((route) => route.index).map((route) => route.path)).toEqual(["/", "/hi", "/pricing"])
         expect(MARKETING_ROUTES.filter((route) => !route.index)).toHaveLength(9)
+        expect([...MARKETING_FOOTER_PATHS].sort()).toEqual(MARKETING_ROUTES.filter((route) => !route.index).map((route) => route.path).sort())
+        expect(MARKETING_FOOTER_PATHS.every((path) => MARKETING_ROUTES.some((route) => route.path === path))).toBe(true)
         expect(() => marketingMetadata({ title: "Unsafe", description: "", path: "//foreign.example.test" })).toThrow()
     })
 

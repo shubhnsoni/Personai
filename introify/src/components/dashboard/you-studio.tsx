@@ -41,8 +41,8 @@ export function YouStudio({
     }, [])
 
     return (
-        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="gap-0">
-            <TabsContent value="profile">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex h-full min-h-0 flex-col gap-0">
+            <TabsContent value="profile" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
                 <ProfileEditor
                     profile={profile}
                     presets={presets}
@@ -50,10 +50,10 @@ export function YouStudio({
                     defaultTab={defaultTab === "story" ? "about" : "general"}
                 />
             </TabsContent>
-            <TabsContent value="knowledge">
+            <TabsContent value="knowledge" className="min-h-0 flex-1 overflow-auto px-3 pt-4 pb-24 md:px-6 lg:px-8">
                 <ContentManager profileId={profile.id} documents={documents} onBindAdd={bindAdd} role={profile.roleTemplate} extras={extras} />
             </TabsContent>
-            <TabsContent value="import">
+            <TabsContent value="import" className="min-h-0 flex-1 overflow-auto px-3 pt-4 pb-24 md:px-6 lg:px-8">
                 <ImportStudio profileId={profile.id} role={profile.roleTemplate} extras={extras} onBindApply={setImportCtl} />
             </TabsContent>
 

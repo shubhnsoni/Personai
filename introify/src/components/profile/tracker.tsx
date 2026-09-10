@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { analyticsAllowed, readAnalyticsConsent } from "@/lib/analytics-consent"
 
 function vid() {
     try {
@@ -27,8 +28,13 @@ function refFrom() {
     }
 }
 
+function analyticsGranted() {
+    try { return analyticsAllowed(readAnalyticsConsent(window.localStorage)) } catch { return false }
+}
+
 export function track(slug: string, name: string, meta?: Record<string, unknown>) {
     if (typeof window === "undefined") return
+    if (!analyticsGranted()) return
     if (document.referrer.includes("/dashboard")) return
     const body = {
         slug,
@@ -50,6 +56,7 @@ export function track(slug: string, name: string, meta?: Record<string, unknown>
 export function Tracker({ slug, name = "visit" }: { slug: string; name?: string }) {
     useEffect(() => {
         try {
+            if (!analyticsGranted()) return
             const id = vid()
             if (id) document.cookie = `pl_vid=${id}; path=/; max-age=${60 * 60 * 24 * 180}; samesite=lax`
             const q = new URLSearchParams(window.location.search).get("ref")

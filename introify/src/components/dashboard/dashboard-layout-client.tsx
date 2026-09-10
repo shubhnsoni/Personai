@@ -39,8 +39,8 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
         if (blocked) router.replace("/dashboard")
     }, [blocked, router])
 
-    const fill = pathname === "/dashboard/inbox" || pathname === "/dashboard/calendar"
-    const flush = pathname === "/dashboard/inbox"
+    const fill = pathname === "/dashboard/inbox" || pathname === "/dashboard/calendar" || pathname === "/dashboard/profile"
+    const flush = pathname === "/dashboard/inbox" || pathname === "/dashboard/profile"
 
     return (
         <div className="studio-shell flex h-dvh overflow-hidden">
@@ -81,7 +81,7 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
                         <BusinessSwitcher businesses={businesses} activeId={activeProfileId} />
                     </div>
                 )}
-                <Header slug={slug} liveHref={liveHref} role={role} extras={extras} onMenuClick={() => setMobileMenuOpen(true)} />
+                <Header slug={slug} liveHref={liveHref} role={role} extras={extras} onMenuClick={() => setMobileMenuOpen(true)} flushBottom={pathname === "/dashboard/profile"} />
                 <main
                     className={cn(
                         "min-h-0 flex-1",

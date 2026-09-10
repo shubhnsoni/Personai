@@ -2,7 +2,9 @@ import Link from "@/components/navigation/transition-link"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/admin/require-admin"
-import { ImpersonateButton, UserAdminButtons } from "@/components/admin/admin-actions"
+import { ImpersonateButton, UserAdminButtons, UserPlanSelect } from "@/components/admin/admin-actions"
+import { effectivePaidPlan } from "@/lib/billing/periods"
+import { isPlanId } from "@/lib/billing/catalog"
 import { formatAdminMoney } from "@/lib/admin/money"
 import { AdminEmpty, AdminPageHead, AdminPanel, AdminRow } from "@/components/admin/admin-ui"
 
@@ -21,6 +23,12 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
         },
     })
     if (!user) notFound()
+    const account = await prisma.billingAccount.findUnique({
+        where: { defaultForUserId: user.id },
+        select: { subscription: { select: { planId: true, status: true, paidThrough: true } } },
+    })
+    const paid = effectivePaidPlan(account?.subscription || null, new Date())
+    const planId = paid && isPlanId(account?.subscription?.planId) ? account.subscription.planId : "free"
     const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     const shopIds = user.profiles.map((p) => p.id)
     const gmv = shopIds.length
@@ -35,7 +43,7 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
         <div className="space-y-5">
             <AdminPageHead
                 title={user.name || user.email}
-                hint={`${user.email} · ${user.role} · 7d GMV ${formatAdminMoney(gmv._sum.amountCents || 0)}`}
+                hint={`${user.email} · ${user.role} · ${planId} · 7d GMV ${formatAdminMoney(gmv._sum.amountCents || 0)}`}
                 action={(
                     <UserAdminButtons
                         userId={user.id}
@@ -44,6 +52,15 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
                     />
                 )}
             />
+            <AdminPanel title="Plan">
+                <AdminRow>
+                    <div className="min-w-0 flex-1">
+                        <span className="block font-medium">Complimentary or assigned plan</span>
+                        <span className="block text-xs text-muted-foreground">Does not charge Stripe. Live billing can later replace this assignment.</span>
+                    </div>
+                    <UserPlanSelect userId={user.id} planId={planId} />
+                </AdminRow>
+            </AdminPanel>
             <AdminPanel title="Shops">
                 {user.profiles.length === 0 ? <AdminEmpty>No shops.</AdminEmpty> : user.profiles.map((shop) => (
                     <AdminRow key={shop.id}>

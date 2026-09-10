@@ -15,23 +15,31 @@ describe("blob look bag", () => {
             expression: "centre",
             color: "blanc",
             aura: "pulse",
+            theme: "classic",
         })
         expect(parseOrbBag(null)).toEqual(DEFAULT_BLOUB_PICK)
     })
 
-    it("locks premium shapes on Free and keeps colour, mood and aura", () => {
+    it("includes Circle and Pebble on Free and locks other bots", () => {
         expect(clampOrbForPlan({
             shape: "galet",
             expression: "heureux",
             color: "rouge",
             aura: "breathe",
         }, false)).toEqual({
-            shape: "cercle",
+            shape: "galet",
             expression: "heureux",
             color: "rouge",
             aura: "breathe",
+            theme: "classic",
         })
-        expect(clampOrbForPlan({ shape: "galet", color: "bleu" }, true).shape).toBe("galet")
+        expect(clampOrbForPlan({
+            shape: "nuage",
+            expression: "excite",
+            color: "bleu",
+            aura: "still",
+        }, false).shape).toBe("cercle")
+        expect(clampOrbForPlan({ shape: "nuage", color: "bleu" }, true).shape).toBe("nuage")
     })
 
     it("builds one gradient from the chosen colour instead of a preset list", () => {
@@ -49,5 +57,28 @@ describe("blob look bag", () => {
             aura: "breathe",
             expression: "curieux",
         })
+    })
+
+    it("keeps Retro LCD on Free and round-trips it without losing other profile settings", () => {
+        const saved = writeOrbBag('{"customInstructions":"Be concise","socials":{"instagram":"https://instagram.com/studio"}}', {
+            theme: "retro-lcd", shape: "galet", expression: "curieux", color: "rose", aura: "breathe",
+        }, false)
+        expect(parseOrbBag(saved)).toEqual({
+            theme: "retro-lcd", shape: "cercle", expression: "curieux", color: "rose", aura: "breathe",
+        })
+        expect(JSON.parse(saved)).toMatchObject({ customInstructions: "Be concise", socials: { instagram: "https://instagram.com/studio" } })
+        expect(parseOrbBag(writeOrbBag(saved, { theme: "classic" }, false))).toMatchObject({
+            theme: "classic", color: "rose", expression: "curieux", aura: "breathe",
+        })
+    })
+
+    it("defaults legacy or unsupported themes to Classic", () => {
+        expect(parseOrbBag('{"orb":{"shape":"galet","color":"turquoise"}}')).toMatchObject({ theme: "classic", shape: "galet", color: "turquoise" })
+        expect(parseOrbBag('{"orb":{"theme":"untrusted-theme","shape":"cercle"}}')).toMatchObject({ theme: "classic", shape: "cercle" })
+        expect(parseOrbBag("broken JSON")).toEqual(DEFAULT_BLOUB_PICK)
+        expect(clampOrbForPlan({ theme: "retro-lcd", shape: "nuage" }, true).shape).toBe("cercle")
+        for (const malformed of ["null", "[]", '"old value"', "broken JSON"]) {
+            expect(parseOrbBag(writeOrbBag(malformed, { theme: "retro-lcd" }, false))).toMatchObject({ theme: "retro-lcd", shape: "cercle" })
+        }
     })
 })

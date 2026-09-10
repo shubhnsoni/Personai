@@ -75,6 +75,12 @@ describe("profile editor tabs", () => {
     it("keeps section labels visible and folds secondary fields", async () => {
         await act(async () => { render(<ProfileEditor profile={profile()} presets={presets} />) })
         const tabs = screen.getByRole("tablist", { name: "Profile sections" })
+        const rail = tabs.parentElement
+        expect(rail?.className).toMatch(/\bshrink-0\b/)
+        expect(rail?.className).not.toMatch(/\bsticky\b/)
+        expect(rail?.className).not.toMatch(/\bpt-1\b/)
+        expect(rail?.className).not.toMatch(/\bpt-2\b/)
+        expect(tabs.className).toMatch(/\brounded-none\b/)
         expect(tabs.textContent).toMatch(/General/)
         expect(tabs.textContent).toMatch(/About/)
         expect(tabs.textContent).toMatch(/Look/)
@@ -99,10 +105,18 @@ describe("profile editor tabs", () => {
         expect(screen.getByText("Add work the assistant can walk through.")).toBeTruthy()
     })
 
+    it("lets every kit choose popup vs side panel, not only portfolio kits", async () => {
+        await act(async () => { render(<ProfileEditor profile={profile("SHOP")} presets={presets} defaultTab="public" />) })
+        expect(await screen.findByText("Content opens as")).toBeTruthy()
+        expect(screen.getAllByText("Popup").length).toBeGreaterThan(0)
+    })
+
     it("does not dump every aura preset on Look", async () => {
         await act(async () => { render(<ProfileEditor profile={profile()} presets={presets} defaultTab="appearance" />) })
         expect(await screen.findByText("Welcome aura")).toBeTruthy()
-        expect(screen.getByText("Cyan")).toBeTruthy()
+        expect(screen.getByText("Your blob")).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Customise" })).toBeTruthy()
+        expect(screen.queryByText("Cyan")).toBeNull()
         expect(screen.queryByRole("button", { name: "Change look" })).toBeNull()
     })
 })

@@ -73,7 +73,7 @@ export const policyDocuments: Record<
             },
             {
                 id: "retention", title: "Retention and security",
-                paragraphs: ["Account, transaction, conversation and uploaded-content retention periods are awaiting an approved retention schedule. Expiry of a cookie or access token does not by itself delete the associated server records. Browser storage without an expiry remains until cleared by you, the browser or the application.", "Security depends on the feature and the providers involved. No service can promise absolute security. Access restrictions, sensitive uploads, backups, retention and incident procedures must be reviewed before confidential or regulated workflows are offered."],
+                paragraphs: ["Analytics events can be removed after 180 days as an operational measure. Account, chat, file and backup deletion still await an approved retention schedule and an assigned request owner. Expiry of a cookie or access token does not by itself delete the associated server records.", "Security depends on the feature and the providers involved. No service can promise absolute security. Access restrictions, sensitive uploads, backups, retention and incident procedures must be reviewed before confidential or regulated workflows are offered."],
             },
             {
                 id: "choices", title: "Your choices and privacy requests",
@@ -199,15 +199,15 @@ export const policyDocuments: Record<
             {
                 id: "analytics", title: "Page analytics and referrals",
                 bullets: ["pl_vid: a visitor identifier used on tracked profile pages. The cookie is set for 180 days. A local-storage copy has no automatic expiry, so clearing only the cookie may allow the identifier to be restored.", "pl_ref: a referral value stored in a cookie for 30 days when a referral parameter is present.", "Tracked profile pages send visit and interaction information to Introify. A session probe can update visit timing every 15 seconds while the page is open."],
-                paragraphs: ["Analytics currently runs on participating profile pages without a separate consent preference control. This draft does not claim that analytics is disabled until consent. The operator must decide and implement the appropriate notice, choice and retention controls before approving this policy."],
+                paragraphs: ["Analytics on participating profile pages stays off until a visitor allows it in the cookie preference control. Essential sign-in and interface storage still works. This draft still requires operator review of notice wording, retention and provider terms before the policy is approved."],
             },
             {
                 id: "access", title: "Access and form convenience",
-                bullets: ["pl_member: an HTTP-only cookie used for member-library access, with a 30-day lifetime. It is separate from account sign-in provided by a configured authentication service.", "pl_buyer_email and pl_buyer_name: local-storage values used to prefill checkout details. They have no automatic expiry in the current implementation.", "Other feature-specific browser values may support conversations and interface preferences. The operator must complete a deployment-level inventory, including configured providers, before approving this policy."],
+                bullets: ["pl_member: an HTTP-only cookie used for member-library access, with a 30-day lifetime. It is separate from account sign-in provided by a configured authentication service.", "pl_buyer: a local-storage record of checkout name and email that expires after 30 days. Legacy pl_buyer_email and pl_buyer_name values are no longer restored.", "Other feature-specific browser values may support conversations and interface preferences. The operator must complete a deployment-level inventory, including configured providers, before approving this policy."],
             },
             {
                 id: "control", title: "Managing browser storage",
-                paragraphs: ["Use your browser's site-data controls to inspect or clear cookies and local storage for Introify. On a shared device, clear saved checkout information and sign out after use. Blocking storage may affect sign-in, member access, saved fields or other features.", "Deleting browser storage does not delete order, account or analytics records already held on a server. A verified privacy-request channel is still pending in the privacy policy. A dedicated cookie settings panel is not currently offered."],
+                paragraphs: ["Use the cookie preference control on this page, or your browser's site-data controls, to inspect or clear cookies and local storage for Introify. On a shared device, clear saved checkout information and sign out after use. Blocking storage may affect sign-in, member access, saved fields or other features.", "Deleting browser storage does not delete order, account or analytics records already held on a server. A verified privacy-request channel is still pending owner assignment in the privacy policy."],
             },
         ],
     },

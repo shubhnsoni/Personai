@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({ billing: vi.fn(), count: vi.fn(), events: vi.fn(), conversations: vi.fn(), leads: vi.fn(), payments: vi.fn() }))
 vi.mock("@/lib/billing/service", () => ({ getProfileBilling: mocks.billing }))
+vi.mock("@/lib/billing/entitlements", () => ({ lookupProfileEntitlement: mocks.billing }))
 vi.mock("@/lib/prisma", () => ({ prisma: {
     profileEvent: { count: mocks.count, findMany: mocks.events }, conversation: { count: mocks.count, findMany: mocks.conversations }, visitorLead: { count: mocks.count, findMany: mocks.leads }, booking: { count: mocks.count }, payment: { aggregate: async () => ({ _sum: { amountCents: 1000 } }), findMany: mocks.payments }, productPurchase: { count: mocks.count }, courseEnrollment: { count: mocks.count },
 } }))
@@ -53,13 +54,13 @@ describe("paid presentation features", () => {
         expect(canHideIntroifyBrand(true)).toBe(false)
     })
     it("strips paid theme and footer-removal fields on direct Free settings writes", () => {
-        const saved = validateAiSettings("free", { personalityConfig: '{"orb":{"color":"rouge","shape":"galet","expression":"heureux","aura":"breathe"},"hideIntroifyBrand":true,"socials":{"website":"https://example.test"}}' })
+        const saved = validateAiSettings("free", { personalityConfig: '{"orb":{"color":"rouge","shape":"nuage","expression":"heureux","aura":"breathe"},"hideIntroifyBrand":true,"socials":{"website":"https://example.test"}}' })
         expect(JSON.parse(saved.personalityConfig!)).toEqual({
-            orb: { shape: "cercle", expression: "heureux", color: "rouge", aura: "breathe" },
+            orb: { shape: "cercle", expression: "heureux", color: "rouge", aura: "breathe", theme: "classic" },
             socials: { website: "https://example.test" },
         })
     })
-    it("keeps Free colour, mood and aura on the live page while locking premium shapes", async () => {
+    it("keeps the included Pebble bot on Free while locking other premium shapes", async () => {
         expect(await publicAnimationConfig("shop", {
             look: "bloub",
             variant: "ember",
@@ -70,7 +71,7 @@ describe("paid presentation features", () => {
             colors: ["#ff0000", "#330000"],
         })).toEqual({
             look: "bloub",
-            shape: "cercle",
+            shape: "galet",
             expression: "heureux",
             color: "rouge",
             aura: "breathe",
@@ -78,5 +79,13 @@ describe("paid presentation features", () => {
             speed: 1,
             intensity: 1,
         })
+        expect(await publicAnimationConfig("shop", {
+            look: "bloub",
+            shape: "nuage",
+            expression: "excite",
+            color: "bleu",
+            aura: "still",
+            colors: ["#0000ff", "#000033"],
+        }).then(config => config.shape)).toBe("cercle")
     })
 })

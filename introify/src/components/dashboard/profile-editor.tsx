@@ -182,6 +182,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
         expression: resolveBloubExpression(orbPick.expression || selectedPresetConfig.expression),
         color: resolveBloubColor(orbPick.color || selectedPresetConfig.color),
         aura: resolveBloubAura(orbPick.aura),
+        theme: orbPick.theme,
     }
     const blobPresetId = presets.find((p) => {
         try {
@@ -193,7 +194,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
     })?.id
 
     const setOrb = (patch: Partial<BloubPick>) => {
-        setValue("personalityConfig", writeOrbBag(personalityRaw, { ...liveOrb, ...patch }), { shouldDirty: true })
+        setValue("personalityConfig", writeOrbBag(personalityRaw, { ...liveOrb, ...patch }, aiAccess.customBranding), { shouldDirty: true })
         if (!blobSelected && blobPresetId) setValue("animationStyleId", blobPresetId, { shouldDirty: true })
     }
 
@@ -208,6 +209,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
     const socialCount = [socials.instagram, socials.facebook, socials.youtube, socials.maps, hasMenu ? socials.zomato : ""].filter((value) => value && value.trim()).length
     const selectedPreset = presets.find((preset) => preset.id === selectedAnimationId)
     const tabBtn = "px-2.5 [&>span]:ml-1.5 [&>span]:max-w-[8rem] [&>span]:opacity-100"
+    const tabPane = "min-h-0 flex-1 overflow-auto px-3 pt-3 pb-24 md:px-5 lg:px-8"
 
     const handlePhotoUpload = async (file?: File, field: "imageUrl" | "shopLogoUrl" = "imageUrl") => {
         if (!file) return
@@ -254,10 +256,10 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
 
     return (
         <>
-        <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Tabs defaultValue={defaultTab === "work" ? "work" : defaultTab} className="w-full gap-4">
-                <div className="sticky top-0 z-20 bg-background/90 pb-3 pt-1 backdrop-blur-md">
-                    <TabsList aria-label="Profile sections">
+        <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="flex h-full min-h-0 flex-col">
+            <Tabs defaultValue={defaultTab === "work" ? "work" : defaultTab} className="flex min-h-0 flex-1 flex-col gap-0">
+                <div className="shrink-0 border-b border-white/8 bg-background">
+                    <TabsList aria-label="Profile sections" className="h-12 rounded-none bg-transparent p-0 px-3 md:h-14 md:px-5 lg:px-8">
                         <TabsTrigger value="general" className={tabBtn}><User /><span>General</span></TabsTrigger>
                         <TabsTrigger value="about" className={tabBtn}><BookOpen /><span>About</span></TabsTrigger>
                         {hasPortfolio ? <TabsTrigger value="work" className={tabBtn}><Briefcase /><span>Work</span></TabsTrigger> : null}
@@ -267,7 +269,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                     </TabsList>
                 </div>
 
-                <TabsContent value="general" className="space-y-3">
+                <TabsContent value="general" className={cn(tabPane, "space-y-3")}>
                     <Section
                         title="Identity"
                         description="What guests read first on your page."
@@ -328,18 +330,18 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                     </details>
                 </TabsContent>
 
-                <TabsContent value="about">
+                <TabsContent value="about" className={tabPane}>
                     <StoryStudio slug={profile.slug} role={roleTemplate} personalityConfig={profile.personalityConfig} />
                 </TabsContent>
 
                 {hasPortfolio ? (
-                    <TabsContent value="work" className="space-y-3">
+                    <TabsContent value="work" className={cn(tabPane, "space-y-3")}>
                         <ExperienceEditor profileId={profile.id} experiences={profile.workExperiences || []} />
                         <ProjectEditor profileId={profile.id} projects={profile.projects || []} />
                     </TabsContent>
                 ) : null}
 
-                <TabsContent value="appearance" className="space-y-3">
+                <TabsContent value="appearance" className={cn(tabPane, "space-y-3")}>
                     <Section title="Face" description="Photo on About. Logo on the live shop. Chat can use the photo in the top bar.">
                         <div className="grid gap-5 sm:grid-cols-2">
                             <div className="space-y-3">
@@ -396,7 +398,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                     </Section>
                     <Section title="Welcome aura" description="The face on your public page.">
                         {!aiAccess.customBranding ? (
-                            <p className="text-sm text-muted-foreground">Colour, mood and aura are included. Extra bots and footer removal are on Pro. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Compare plans</Link></p>
+                            <p className="text-sm text-muted-foreground">Circle, Pebble and Retro LCD are included, with moods and light/dark themes. More bots and footer removal are on Pro. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Compare plans</Link></p>
                         ) : null}
                         <ToggleRow title="Hide Introify footer" description="Your business name, photo and logo are available on every plan.">
                             <Switch aria-label="Hide Introify footer" disabled={!aiAccess.customBranding} checked={aiAccess.customBranding && Boolean(personalityConfig.hideIntroifyBrand)} onCheckedChange={value => updatePersonalityField("hideIntroifyBrand", value)} />
@@ -411,10 +413,11 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 expression={liveOrb.expression}
                                 color={liveOrb.color}
                                 aura={liveOrb.aura}
+                                theme={liveOrb.theme}
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">Your blob</p>
-                                <p className="text-xs text-muted-foreground">Circle, one colour, mood and aura.</p>
+                                <p className="text-sm font-medium">{liveOrb.theme === "retro-lcd" ? "Retro LCD" : "Your blob"}</p>
+                                <p className="text-xs text-muted-foreground">{liveOrb.theme === "retro-lcd" ? "Pixel eyes. Classic green. Light and dark, in sync." : "Choose your bot, theme, mood and aura."}</p>
                             </div>
                             <div className="flex shrink-0 flex-col gap-1.5">
                                 <button type="button" onClick={() => setBlobOpen(true)} className="h-8 rounded-full border border-border px-3 text-xs font-medium">
@@ -453,6 +456,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                             type="button"
                                             onClick={() => {
                                                 setValue("animationStyleId", preset.id, { shouldDirty: true })
+                                                if (!isBlob) setValue("personalityConfig", writeOrbBag(personalityRaw, { theme: "classic" }), { shouldDirty: true })
                                                 if (isBlob) setBlobOpen(true)
                                             }}
                                             className={cn(
@@ -471,6 +475,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                                     shape={isBlob ? liveOrb.shape : config.shape}
                                                     expression={isBlob ? liveOrb.expression : config.expression}
                                                     color={isBlob ? liveOrb.color : config.color}
+                                                    theme={isBlob ? liveOrb.theme : "classic"}
                                                     speed={config.speed || 1}
                                                     intensity={config.intensity || 1}
                                                 />
@@ -492,7 +497,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                     />
                 </TabsContent>
 
-                <TabsContent value="ai">
+                <TabsContent value="ai" className={tabPane}>
                     <AiStudio
                         name={watch("displayName")}
                         tone={personalityConfig.tone || "professional"}
@@ -514,7 +519,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                     />
                 </TabsContent>
 
-                <TabsContent value="public" className="space-y-3">
+                <TabsContent value="public" className={cn(tabPane, "space-y-3")}>
                     <Section title="Share" description="Your public link, first line, and QR.">
                         <ToggleRow title="Public" description="Anyone can open your page and chat.">
                             <Switch checked={watch("isPublic")} onCheckedChange={(checked) => setValue("isPublic", checked, { shouldDirty: true })} />
@@ -552,19 +557,17 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 <Field label="Welcome line" hint="Shown under the intro. Keep it to one line.">
                                     <Input id="welcomeMessage" {...register("welcomeMessageOverride")} placeholder="Ask about coaching or book a call." />
                                 </Field>
-                                {hasPortfolio ? (
-                                    <Field label="Content opens as" hint="How experience and projects appear from chat.">
-                                        <Select defaultValue={profile.contentDisplayMode || "POPUP"} onValueChange={(val) => setValue("contentDisplayMode", val, { shouldDirty: true })}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select display mode" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="POPUP">Popup</SelectItem>
-                                                <SelectItem value="SIDE_PANEL">Side panel</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </Field>
-                                ) : null}
+                                <Field label="Content opens as" hint="How About, work, services, and booking open from chat. Side panel stays beside the chat on desktop. Phones still use a bottom sheet.">
+                                    <Select defaultValue={profile.contentDisplayMode || "POPUP"} onValueChange={(val) => setValue("contentDisplayMode", val, { shouldDirty: true })}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select display mode" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="POPUP">Popup</SelectItem>
+                                            <SelectItem value="SIDE_PANEL">Side panel</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
                             </div>
                             <div className="lg:w-[16rem]">
                                 <QrCard

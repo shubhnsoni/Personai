@@ -103,12 +103,11 @@ export function OnboardingWizard({
     const [elseOpen, setElseOpen] = useState(initialNeed === "page")
     const [elseQuery, setElseQuery] = useState("")
     const [whatsapp, setWhatsapp] = useState("")
+    const [email, setEmail] = useState("")
     const [gstin, setGstin] = useState("")
     const [upi, setUpi] = useState("")
-    const [waLater, setWaLater] = useState(false)
     const [goldCity, setGoldCity] = useState<string>("Ranchi")
     const [inviteDesks, setInviteDesks] = useState(true)
-    const [emailSkipped, setEmailSkipped] = useState(false)
     const [busy, setBusy] = useState(false)
     const [orb, setOrb] = useState<BloubPick>({ ...DEFAULT_BLOUB_PICK })
 
@@ -118,8 +117,7 @@ export function OnboardingWizard({
     const kitQuery = beat === "type" && !elseOpen ? draft : ""
     const visibleKits = filterKitChips(kitQuery)
     const visibleElse = matchElseChip(elseQuery)
-    const waOk = !!normalizeWhatsapp(whatsapp)
-    const extrasReady = !hasExtrasBeat(need) || waOk || waLater
+    const extrasReady = need !== "goldWholesale" || goldCity.trim().length >= 2
 
     useEffect(() => {
         const el = scroller.current
@@ -167,12 +165,13 @@ export function OnboardingWizard({
 
     function afterExtras() {
         if (!extrasReady) {
-            toast.message(COPY.extras.waWarn)
+            toast.message(COPY.extras.cityEnter)
             return
         }
         const bits = [
-            need === "goldWholesale" ? goldCity : "",
-            whatsapp ? `WA ${normalizeWhatsapp(whatsapp)}` : waLater ? "WA later" : "",
+            need === "goldWholesale" ? goldCity.trim() : "",
+            whatsapp ? `Phone ${normalizeWhatsapp(whatsapp) || whatsapp}` : "",
+            email.trim() ? email.trim() : "",
             gstin.trim() ? `GSTIN ${gstin.trim()}` : "",
             need === "distribute" ? (inviteDesks ? COPY.extras.desksInvite : COPY.extras.desksJustMe) : "",
         ].filter(Boolean)
@@ -199,6 +198,7 @@ export function OnboardingWizard({
                 speakerName: speakerName || undefined,
                 speakerRole: speakerRole || undefined,
                 whatsapp: normalizeWhatsapp(whatsapp) || undefined,
+                email: email.trim() || undefined,
                 gstin: gstin.trim() || undefined,
                 upiId: upi.trim() || undefined,
                 goldCity: need === "goldWholesale" ? goldCity : undefined,
@@ -269,52 +269,28 @@ export function OnboardingWizard({
             }
             return
         }
-        if (beat === "extras") {
-            if (!whatsapp && text) {
-                const n = normalizeWhatsapp(text)
-                if (n) {
-                    setWhatsapp(n)
-                    setDraft("")
-                    return
-                }
-                if (text.length >= 15) {
-                    setGstin(text.toUpperCase())
-                    setDraft("")
-                    return
-                }
-                if (text.includes("@")) {
-                    setUpi(text)
-                    setDraft("")
-                    return
-                }
-            }
-            afterExtras()
-        }
     }
 
     function toggleAddon(id: AddonId) {
         setAddons((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
     }
 
-    const composerOn = beat === "name" || beat === "username" || beat === "who" || beat === "type" || beat === "extras"
+    const composerOn = beat === "name" || beat === "username" || beat === "who" || beat === "type"
     const placeholder =
         beat === "name" ? COPY.name.placeholder
         : beat === "username" ? COPY.username.placeholder
         : beat === "who" ? COPY.who.placeholder
         : beat === "type" && elseOpen ? COPY.type.elsePlaceholder
         : beat === "type" ? "Filter kits"
-        : beat === "extras" && !waOk && !waLater ? COPY.extras.waPlaceholder
-        : beat === "extras" && (need === "pharmacy" || need === "distribute" || need === "goldWholesale") && !gstin ? COPY.extras.gstinPlaceholder
-        : beat === "extras" ? COPY.extras.upiPlaceholder
         : ""
 
     const railBeats = RAIL.filter((s) => s.beat !== "extras" || hasExtrasBeat(need) || beat === "extras")
     const beatIndex = railBeats.findIndex((s) => s.beat === beat)
 
     return (
-        <div className="relative isolate flex min-h-dvh auth-scene text-zinc-100">
-            <aside className="relative z-10 hidden w-16 shrink-0 flex-col items-center border-r border-white/10 py-5 lg:flex">
-                <Logo href="/" size="sm" className="text-base" />
+        <div className="relative isolate flex h-dvh overflow-hidden auth-scene text-zinc-100">
+            <aside className="relative z-10 sticky top-0 hidden h-full w-16 shrink-0 flex-col items-center overflow-hidden border-r border-white/10 py-5 lg:flex">
+                <Logo href="/" size="sm" className="w-10 text-base" />
                 <nav className="mt-8 flex flex-1 flex-col items-center gap-3" aria-label="Onboarding steps">
                     {railBeats.map((s, i) => {
                         const Icon = s.icon
@@ -337,8 +313,8 @@ export function OnboardingWizard({
                 <StudioSignOut compact className="text-white/50 hover:text-white" />
             </aside>
 
-            <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5 lg:px-10">
-                <div className="mb-4 flex items-center justify-between gap-3 lg:mb-6">
+            <div className="relative z-10 mx-auto flex h-full min-h-0 w-full max-w-3xl flex-1 flex-col overflow-hidden px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5 lg:px-10">
+                <div className="mb-4 flex shrink-0 items-center justify-between gap-3 lg:mb-6">
                     <div className="flex items-center gap-2">
                         {beat !== "name" ? (
                             <button type="button" onClick={back} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-white/70 hover:bg-white/5" aria-label="Back">
@@ -353,7 +329,7 @@ export function OnboardingWizard({
                     </div>
                 </div>
 
-                <p className="mb-5 text-xs leading-relaxed text-white/60">Start on Free with {PLAN_CATALOG.free.aiCredits} monthly AI credits and one eligible trial 3D generation. Service availability is shown in Billing. <Link href="/pricing" target="_blank" rel="noopener noreferrer" className="text-lime-300 underline underline-offset-4">Compare plans<span className="sr-only"> (opens in a new tab)</span></Link></p>
+                <p className="mb-5 shrink-0 text-xs leading-relaxed text-white/60">Start on Free with {PLAN_CATALOG.free.aiCredits} monthly AI credits and one eligible trial 3D generation. Service availability is shown in Billing. <Link href="/pricing" target="_blank" rel="noopener noreferrer" className="text-lime-300 underline underline-offset-4">Compare plans<span className="sr-only"> (opens in a new tab)</span></Link></p>
                 <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto" role="log" aria-live="polite">
                     <div className="flex flex-col gap-4 pb-4">
                         {history.map((line) => (
@@ -474,6 +450,13 @@ export function OnboardingWizard({
                                 <div>
                                     <p className="text-[15px] font-semibold text-white/90">{COPY.extras.cityLabel}</p>
                                     <p className="mt-0.5 text-[12px] text-white/40">{COPY.extras.cityHint}</p>
+                                    <input
+                                        aria-label={COPY.extras.cityEnter}
+                                        value={goldCity}
+                                        onChange={(e) => setGoldCity(e.target.value)}
+                                        placeholder={COPY.extras.cityEnter}
+                                        className="mt-2 h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-[15px] text-white placeholder:text-white/35 focus:outline-none focus:ring-1 focus:ring-cyan-400/70"
+                                    />
                                     <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         {GOLD_CITIES.map((city) => (
                                             <button
@@ -482,7 +465,7 @@ export function OnboardingWizard({
                                                 onClick={() => setGoldCity(city)}
                                                 className={cn(
                                                     "min-h-12 rounded-[1.1rem] border px-4 py-3.5 text-left text-[15px] font-medium",
-                                                    goldCity === city ? "border-cyan-400 bg-cyan-400/20 text-cyan-50 ring-1 ring-cyan-400/50" : "border-white/10 bg-white/[0.04] text-white/80",
+                                                    goldCity.trim().toLowerCase() === city.toLowerCase() ? "border-cyan-400 bg-cyan-400/20 text-cyan-50 ring-1 ring-cyan-400/50" : "border-white/10 bg-white/[0.04] text-white/80",
                                                 )}
                                             >
                                                 {city}
@@ -491,15 +474,48 @@ export function OnboardingWizard({
                                     </div>
                                 </div>
                             ) : null}
-                            <div className="flex flex-wrap gap-2">
-                                {(need === "pharmacy" || need === "distribute" || need === "goldWholesale") ? (
-                                    <Chip onClick={() => setGstin("")} aria-label="Skip GSTIN">{COPY.extras.gstinSkip}</Chip>
-                                ) : null}
-                                <Chip selected={waLater} onClick={() => { setWaLater(true); toast.message(COPY.extras.waWarn) }}>{COPY.extras.waLater}</Chip>
-                                <Chip selected={emailSkipped} onClick={() => { setEmailSkipped(true); toast.message("Email skipped — you can add it later") }} aria-label="Skip email">{COPY.extras.emailSkip}</Chip>
-                            </div>
-                            {whatsapp && waOk ? <p className="text-[12px] text-white/45">WhatsApp {normalizeWhatsapp(whatsapp)}</p> : null}
-                            <Chip selected={extrasReady} onClick={afterExtras}>{COPY.extras.continue}</Chip>
+                            <label className="block space-y-1.5">
+                                <span className="text-[13px] font-medium text-white/80">{COPY.extras.phoneLabel}</span>
+                                <input
+                                    aria-label={COPY.extras.phoneLabel}
+                                    inputMode="tel"
+                                    value={whatsapp}
+                                    onChange={(e) => setWhatsapp(e.target.value)}
+                                    placeholder="91xxxxxxxxxx"
+                                    className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-[15px] text-white placeholder:text-white/35 focus:outline-none focus:ring-1 focus:ring-cyan-400/70"
+                                />
+                            </label>
+                            <label className="block space-y-1.5">
+                                <span className="text-[13px] font-medium text-white/80">{COPY.extras.emailLabel}</span>
+                                <input
+                                    aria-label={COPY.extras.emailLabel}
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="you@shop.com"
+                                    className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-[15px] text-white placeholder:text-white/35 focus:outline-none focus:ring-1 focus:ring-cyan-400/70"
+                                />
+                            </label>
+                            {(need === "pharmacy" || need === "distribute" || need === "goldWholesale") ? (
+                                <label className="block space-y-1.5">
+                                    <span className="text-[13px] font-medium text-white/80">{COPY.extras.gstinPlaceholder}</span>
+                                    <input
+                                        aria-label={COPY.extras.gstinPlaceholder}
+                                        value={gstin}
+                                        onChange={(e) => setGstin(e.target.value.toUpperCase())}
+                                        placeholder={COPY.extras.gstinPlaceholder}
+                                        className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-[15px] text-white placeholder:text-white/35 focus:outline-none focus:ring-1 focus:ring-cyan-400/70"
+                                    />
+                                </label>
+                            ) : null}
+                            <button
+                                type="button"
+                                disabled={!extrasReady}
+                                onClick={afterExtras}
+                                className="h-12 w-full rounded-full bg-cyan-400 text-sm font-medium text-zinc-950 disabled:opacity-40"
+                            >
+                                {COPY.extras.continue}
+                            </button>
                         </div>
                     ) : null}
 
@@ -507,7 +523,7 @@ export function OnboardingWizard({
                         <BlobLookStudio
                             name={name}
                             value={orb}
-                            onChange={(next) => setOrb((cur) => ({ ...cur, ...next, shape: "cercle" }))}
+                            onChange={(next) => setOrb((cur) => ({ ...cur, ...next }))}
                             phase="edit"
                             onContinue={() => push(COPY.look.continue, "ready")}
                             onSave={() => void launch(false)}
@@ -520,7 +536,7 @@ export function OnboardingWizard({
                         <BlobLookStudio
                             name={name}
                             value={orb}
-                            onChange={(next) => setOrb((cur) => ({ ...cur, ...next, shape: "cercle" }))}
+                            onChange={(next) => setOrb((cur) => ({ ...cur, ...next }))}
                             phase="preview"
                             onContinue={() => {}}
                             onSave={() => void launch(false)}
@@ -535,7 +551,7 @@ export function OnboardingWizard({
 
                 {composerOn ? (
                     <form
-                        className="mt-3 flex items-center gap-2 pb-1"
+                        className="mt-3 flex shrink-0 items-center gap-2 pb-1"
                         onSubmit={(e) => {
                             e.preventDefault()
                             onSend()

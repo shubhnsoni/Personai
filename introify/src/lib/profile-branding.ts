@@ -1,7 +1,7 @@
-import { clampOrbForPlan, gradientForColor, type AuraId } from "@/lib/bloub/catalog"
-import { getProfileBilling } from "@/lib/billing/service"
+import { clampOrbForPlan, gradientForColor, resolveBloubTheme, type AuraId } from "@/lib/bloub/catalog"
+import { lookupProfileEntitlement } from "@/lib/billing/entitlements"
 
-export type PublicAnimationConfig = { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: AuraId | string }
+export type PublicAnimationConfig = { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: AuraId | string; theme?: string }
 export const INTROIFY_PUBLIC_STYLE: PublicAnimationConfig = {
     colors: gradientForColor("blanc"),
     look: "bloub",
@@ -19,6 +19,7 @@ function freeLiveLook(configured: PublicAnimationConfig): PublicAnimationConfig 
         expression: configured.expression,
         color: configured.color,
         aura: configured.aura,
+        theme: configured.theme,
     }, false)
     return {
         look: "bloub",
@@ -26,6 +27,7 @@ function freeLiveLook(configured: PublicAnimationConfig): PublicAnimationConfig 
         expression: orb.expression,
         color: orb.color,
         aura: orb.aura,
+        ...(configured.theme !== undefined ? { theme: orb.theme } : {}),
         colors: gradientForColor(orb.color),
         speed: 1,
         intensity: 1,
@@ -34,11 +36,38 @@ function freeLiveLook(configured: PublicAnimationConfig): PublicAnimationConfig 
 
 /** A billing outage or downgrade restores required Introify presentation. */
 export async function publicBrandingAccess(profileId: string) {
-    try { return (await getProfileBilling(profileId)).features.customBranding } catch { return false }
+    try { return (await lookupProfileEntitlement(profileId)).features.customBranding } catch { return false }
 }
 
 export async function publicAnimationConfig(profileId: string, configured: PublicAnimationConfig): Promise<PublicAnimationConfig> {
-    return await publicBrandingAccess(profileId) ? configured : freeLiveLook(configured)
+    const allowed = await publicBrandingAccess(profileId) ? configured : freeLiveLook(configured)
+    if (allowed.theme === undefined) return allowed
+    const theme = resolveBloubTheme(allowed.theme)
+    // An older animation preset can still say "glass" or omit look entirely. The
+    // included LCD selection always renders the round bot, even after a downgrade.
+    return theme === "retro-lcd"
+        ? { ...allowed, theme, look: "bloub", shape: "cercle" }
+        : { ...allowed, theme }
+}
+
+/** The saved bot choice takes precedence over a legacy animation preset on every public route. */
+export function configuredProfileAnimation(profile: {
+    animationStyle?: { config?: unknown } | null
+    personalityConfig?: string | null
+}): PublicAnimationConfig {
+    let configured: PublicAnimationConfig = {}
+    try {
+        const raw = profile.animationStyle?.config
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) configured = parsed
+    } catch { /* A malformed preset must not prevent the saved bot from loading. */ }
+    try {
+        const bag = JSON.parse(profile.personalityConfig || "{}")
+        if (bag?.orb && typeof bag.orb === "object" && !Array.isArray(bag.orb)) {
+            configured = { ...configured, ...bag.orb }
+        }
+    } catch { /* Keep the preset when the personalization bag is malformed. */ }
+    return configured
 }
 
 export function canHideIntroifyBrand(entitled: boolean, personalityConfig?: string | null) {

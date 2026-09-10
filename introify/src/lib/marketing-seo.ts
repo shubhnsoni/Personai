@@ -21,6 +21,18 @@ export const MARKETING_ROUTES = [
     { path: "/sms-policy", index: false },
 ] as const
 
+export const MARKETING_FOOTER_PATHS = [
+    "/about",
+    "/contact",
+    "/acceptable-use",
+    "/sms-policy",
+    "/privacy",
+    "/terms",
+    "/refund-policy",
+    "/delivery-policy",
+    "/cookie-policy",
+] as const
+
 export function marketingOrigin(value = process.env.NEXT_PUBLIC_APP_URL): string {
     try {
         const url = new URL(value || "https://introify.com")

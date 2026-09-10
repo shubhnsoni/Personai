@@ -77,11 +77,19 @@ export const BLOUB_AURAS: { id: AuraId; label: string }[] = [
 
 export const DEFAULT_AURA: AuraId = "pulse"
 
+export type BloubThemeId = "classic" | "retro-lcd"
+
+export const BLOUB_THEMES: { id: BloubThemeId; label: string; description: string }[] = [
+    { id: "classic", label: "Classic", description: "Your colour, mood and aura." },
+    { id: "retro-lcd", label: "Retro LCD", description: "Pixel circle. Two eyes. A nostalgic green screen." },
+]
+
 export type BloubPick = {
     shape: ShapeId
     expression: ExpressionId
     color: ColorId
     aura: AuraId
+    theme: BloubThemeId
 }
 
 export const DEFAULT_BLOUB_PICK: BloubPick = {
@@ -89,10 +97,15 @@ export const DEFAULT_BLOUB_PICK: BloubPick = {
     expression: DEFAULT_EXPRESSION,
     color: DEFAULT_COLOR,
     aura: DEFAULT_AURA,
+    theme: "classic",
 }
 
-export const PREMIUM_BLOUB_BOTS: { id: ShapeId; label: string; expression: ExpressionId; color: ColorId }[] = [
+export const INCLUDED_BLOUB_BOTS: { id: ShapeId; label: string; expression: ExpressionId; color: ColorId }[] = [
+    { id: "cercle", label: "Circle", expression: "centre", color: "blanc" },
     { id: "galet", label: "Pebble", expression: "heureux", color: "ambre" },
+]
+
+export const PREMIUM_BLOUB_BOTS: { id: ShapeId; label: string; expression: ExpressionId; color: ColorId }[] = [
     { id: "squircle", label: "Squircle", expression: "fier", color: "violet" },
     { id: "nuage", label: "Cloud", expression: "excite", color: "bleu" },
     { id: "goutte", label: "Droplet", expression: "curieux", color: "turquoise" },
@@ -124,18 +137,28 @@ export function resolveBloubAura(id?: string | null): AuraId {
     return BLOUB_AURAS.some((item) => item.id === id) ? (id as AuraId) : DEFAULT_AURA
 }
 
-export function isPremiumBloubShape(shape: ShapeId): boolean {
-    return shape !== DEFAULT_SHAPE
+export function resolveBloubTheme(id?: string | null): BloubThemeId {
+    return id === "retro-lcd" ? "retro-lcd" : "classic"
 }
 
-export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "color" | "aura", string | null>> | null | undefined, premium: boolean): BloubPick {
+export function isIncludedBloubShape(shape: ShapeId): boolean {
+    return INCLUDED_BLOUB_BOTS.some((bot) => bot.id === shape)
+}
+
+export function isPremiumBloubShape(shape: ShapeId): boolean {
+    return !isIncludedBloubShape(shape)
+}
+
+export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "color" | "aura" | "theme", string | null>> | null | undefined, premium: boolean): BloubPick {
     const next: BloubPick = {
         shape: resolveBloubShape(pick?.shape),
         expression: resolveBloubExpression(pick?.expression),
         color: resolveBloubColor(pick?.color),
         aura: resolveBloubAura(pick?.aura),
+        theme: resolveBloubTheme(pick?.theme),
     }
-    if (!premium) next.shape = DEFAULT_SHAPE
+    if (next.theme === "retro-lcd") next.shape = "cercle"
+    if (!premium && isPremiumBloubShape(next.shape)) next.shape = DEFAULT_SHAPE
     return next
 }
 
@@ -156,11 +179,12 @@ export function parseOrbBag(personalityConfig?: string | null): BloubPick {
 export function writeOrbBag(personalityConfig: string | undefined, next: Partial<BloubPick>, premium = true): string {
     let bag: Record<string, unknown> = {}
     try {
-        bag = JSON.parse(personalityConfig || "{}") as Record<string, unknown>
+        const parsed: unknown = JSON.parse(personalityConfig || "{}")
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) bag = parsed as Record<string, unknown>
     } catch {
         bag = {}
     }
-    const prev = (bag.orb && typeof bag.orb === "object" ? bag.orb : {}) as Partial<BloubPick>
+    const prev = (bag.orb && typeof bag.orb === "object" && !Array.isArray(bag.orb) ? bag.orb : {}) as Partial<BloubPick>
     bag.orb = clampOrbForPlan({ ...prev, ...next }, premium)
     return JSON.stringify(bag)
 }

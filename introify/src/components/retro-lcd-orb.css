@@ -1,0 +1,111 @@
+.retro-lcd-orb {
+  --lcd-paper: #c4d58a;
+  --lcd-ink: #253021;
+  display: block;
+  flex: none;
+  isolation: isolate;
+}
+
+.dark .retro-lcd-orb,
+[data-lcd-mode="dark"] .retro-lcd-orb {
+  --lcd-paper: #253021;
+  --lcd-ink: #c4d58a;
+}
+
+[data-lcd-mode="light"] .retro-lcd-orb {
+  --lcd-paper: #c4d58a;
+  --lcd-ink: #253021;
+}
+
+.retro-lcd-paper { fill: var(--lcd-paper); }
+.retro-lcd-ink { fill: var(--lcd-ink); }
+.retro-lcd-grid { color: #7f9058; opacity: 0.55; pointer-events: none; }
+
+/* Tiny avatars retain the pixel outline without a noisy subpixel mesh. */
+.is-compact .retro-lcd-grid { opacity: 0.16; }
+
+.retro-lcd-orb[data-still="false"] .retro-lcd-character {
+  animation: lcd-idle 3s steps(4, end) infinite;
+}
+
+.retro-lcd-orb[data-still="false"][data-mood="greeting"] .retro-lcd-character {
+  animation: lcd-greeting 1.1s steps(5, end) 1;
+}
+
+.retro-lcd-orb[data-still="false"][data-mood="listening"] .retro-lcd-character {
+  animation: lcd-listening 1.8s steps(4, end) infinite;
+}
+
+.retro-lcd-orb[data-still="false"][data-mood="thinking"] .retro-lcd-eyes {
+  animation: lcd-thinking 2.2s steps(4, end) infinite;
+}
+
+.retro-lcd-orb[data-still="false"][data-mood="speaking"] .retro-lcd-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lcd-speaking 0.7s steps(2, end) infinite;
+}
+
+.retro-lcd-orb[data-still="false"][data-mood="success"] .retro-lcd-character,
+.retro-lcd-orb[data-still="false"][data-mood="react"] .retro-lcd-character {
+  animation: lcd-celebrate 0.7s steps(5, end) 1;
+}
+
+.retro-lcd-orb[data-still="false"][data-mood="error"] .retro-lcd-character {
+  animation: lcd-error 0.65s steps(5, end) 1;
+}
+
+@keyframes lcd-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes lcd-greeting {
+  0%, 50%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-4px); }
+  75% { transform: translateY(-2px); }
+}
+
+@keyframes lcd-listening {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+
+@keyframes lcd-thinking {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-3px, -2px); }
+  75% { transform: translate(3px, -2px); }
+}
+
+@keyframes lcd-speaking {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.72); }
+}
+
+@keyframes lcd-celebrate {
+  0%, 50%, 100% { transform: translateY(0); }
+  25%, 75% { transform: translateY(-4px); }
+}
+
+@keyframes lcd-error {
+  0%, 50%, 100% { transform: translateX(0); }
+  20%, 70% { transform: translateX(-2px); }
+  35%, 85% { transform: translateX(2px); }
+}
+
+.retro-lcd-orb[data-still="false"][data-aura="breathe"] .retro-lcd-ink {
+  animation: lcd-breathe 4s steps(4, end) infinite;
+}
+
+.retro-lcd-orb[data-still="false"][data-aura="pulse"] .retro-lcd-ink {
+  animation: lcd-breathe 2.8s steps(3, end) infinite;
+}
+
+@keyframes lcd-breathe {
+  0%, 100% { fill-opacity: 1; }
+  50% { fill-opacity: 0.94; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retro-lcd-orb :is(.retro-lcd-ink, .retro-lcd-character, .retro-lcd-eyes) { animation: none !important; }
+}

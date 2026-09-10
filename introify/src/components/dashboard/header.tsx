@@ -7,6 +7,7 @@ import { ModeToggle } from "@/components/mode-toggle"
 import { Button } from "@/components/ui/button"
 import { visibleNavItems } from "@/components/dashboard/sidebar"
 import { StudioSignOut } from "@/components/dashboard/studio-sign-out"
+import { cn } from "@/lib/utils"
 
 interface HeaderProps {
     slug: string
@@ -14,6 +15,7 @@ interface HeaderProps {
     role?: string | null
     extras?: import("@/lib/surfaces").SurfaceExtras | null
     onMenuClick?: () => void
+    flushBottom?: boolean
 }
 
 function titleFor(pathname: string, role?: string | null, extras?: import("@/lib/surfaces").SurfaceExtras | null) {
@@ -26,14 +28,19 @@ function titleFor(pathname: string, role?: string | null, extras?: import("@/lib
     return match?.name ?? "Studio"
 }
 
-export function Header({ slug, liveHref, role, extras, onMenuClick }: HeaderProps) {
+export function Header({ slug, liveHref, role, extras, onMenuClick, flushBottom }: HeaderProps) {
     const pathname = usePathname()
     const title = titleFor(pathname, role, extras)
     const home = pathname === "/dashboard"
     const href = liveHref || `/${slug}`
 
     return (
-        <header className="flex h-12 items-center gap-2 border-b border-white/8 bg-background/70 px-3 backdrop-blur-md md:h-14 md:px-5 lg:px-8">
+        <header
+            className={cn(
+                "flex h-12 items-center gap-2 px-3 md:h-14 md:px-5 lg:px-8",
+                flushBottom ? "bg-background" : "border-b border-white/8 bg-background/70 backdrop-blur-md",
+            )}
+        >
             <Button
                 variant="ghost"
                 size="icon"

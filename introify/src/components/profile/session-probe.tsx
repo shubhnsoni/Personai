@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { analyticsAllowed, readAnalyticsConsent } from "@/lib/analytics-consent"
 
 function vid() {
     try {
@@ -19,6 +20,7 @@ function vid() {
 export function SessionProbe({ slug }: { slug: string }) {
     useEffect(() => {
         if (typeof window === "undefined") return
+        try { if (!analyticsAllowed(readAnalyticsConsent(window.localStorage))) return } catch { return }
         if (document.referrer.includes("/dashboard") || document.referrer.includes("/admin")) return
         const visitor = vid()
         if (visitor) document.cookie = `pl_vid=${visitor}; path=/; max-age=${60 * 60 * 24 * 180}; samesite=lax`

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { ImpersonateButton } from "@/components/admin/admin-actions"
+import { PrivacyOps } from "@/components/admin/privacy-ops"
 import { AdminEmpty, AdminPageHead, AdminPanel, AdminTable } from "@/components/admin/admin-ui"
 
 export const dynamic = "force-dynamic"
@@ -13,10 +14,22 @@ export default async function AdminSupportPage() {
     })
     const now = Date.now()
     const waiting = rows.filter((row) => row.mode === "LIVE_REQUESTED").length
+    const privacyRequests = await prisma.auditEvent.findMany({
+        where: { action: "privacy_request" },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+    })
 
     return (
         <div className="space-y-5">
             <AdminPageHead title="Support" hint={`${waiting} waiting · ${rows.length - waiting} live. Reply in the shop inbox as support.`} />
+            <PrivacyOps
+                requests={privacyRequests.map((row) => ({
+                    id: row.id,
+                    createdAt: row.createdAt.toISOString(),
+                    meta: row.meta,
+                }))}
+            />
             <AdminPanel>
                 <AdminTable columns={["Shop", "Visitor", "Wait", "SLA", ""]}>
                     {rows.map((row) => {

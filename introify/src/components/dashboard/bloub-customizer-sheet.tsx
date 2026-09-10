@@ -3,7 +3,7 @@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { toast } from "sonner"
-import { BLOUB_AURAS, BLOUB_COLORS, BLOUB_MOODS, PREMIUM_BLOUB_BOTS, isPremiumBloubShape, type BloubPick } from "@/lib/bloub/catalog"
+import { BLOUB_AURAS, BLOUB_COLORS, BLOUB_MOODS, BLOUB_THEMES, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, type BloubPick } from "@/lib/bloub/catalog"
 import { cn } from "@/lib/utils"
 
 export function BloubCustomizerSheet({
@@ -19,11 +19,12 @@ export function BloubCustomizerSheet({
     onChange: (next: Partial<BloubPick>) => void
     premium?: boolean
 }) {
+    const retro = value.theme === "retro-lcd"
     return (
         <Sheet open={open} onOpenChange={(next) => { if (!next) onClose() }}>
             <SheetContent
                 side="bottom"
-                className="max-h-[88dvh] gap-0 overflow-y-auto rounded-t-3xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-w-none"
+                className="gap-0 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))] md:max-w-2xl"
             >
                 <SheetHeader className="border-b px-4 pb-4 pr-12">
                     <div className="flex items-center gap-3">
@@ -34,17 +35,41 @@ export function BloubCustomizerSheet({
                             expression={value.expression}
                             color={value.color}
                             aura={value.aura}
+                            theme={value.theme}
                         />
                         <div className="min-w-0 text-left">
-                            <SheetTitle>Customise blob</SheetTitle>
-                            <SheetDescription>One colour, a mood, and an aura.</SheetDescription>
+                            <SheetTitle>Customise bot</SheetTitle>
+                            <SheetDescription>Choose a bot, its theme, mood and motion.</SheetDescription>
                         </div>
                     </div>
                 </SheetHeader>
 
                 <div className="space-y-5 px-4 py-4">
                     <section className="space-y-2">
+                        <p className="text-xs font-medium">Theme</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            {BLOUB_THEMES.map((item) => (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    aria-label={`${item.label} theme`}
+                                    aria-pressed={value.theme === item.id}
+                                    onClick={() => onChange({ theme: item.id, ...(item.id === "retro-lcd" ? { shape: "cercle" as const } : {}) })}
+                                    className={cn("rounded-xl border p-3 text-left", value.theme === item.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40")}
+                                >
+                                    <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: item.id === "retro-lcd" ? "#c4d58a" : "#e7ebf0" }}>
+                                        <span className="h-5 w-5 rounded-full" style={{ background: item.id === "retro-lcd" ? "#253021" : "#00a0c3" }} />
+                                        <span className="h-1.5 w-9 rounded-full" style={{ background: item.id === "retro-lcd" ? "#253021" : "#445365" }} />
+                                    </span>
+                                    <span className="block text-xs font-medium">{item.label}</span>
+                                    <span className="mt-1 block text-xs text-muted-foreground">{item.description}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+                    <section className="space-y-2">
                         <p className="text-xs font-medium">Colour</p>
+                        {retro ? <p className="rounded-xl border bg-muted/30 p-3 text-sm text-muted-foreground">Pale LCD green and deep olive, automatically inverted in dark mode. Your Classic colour is kept for when you switch back.</p> : (
                         <div className="flex flex-wrap gap-2">
                             {BLOUB_COLORS.map((item) => (
                                 <button
@@ -61,6 +86,7 @@ export function BloubCustomizerSheet({
                                 />
                             ))}
                         </div>
+                        )}
                     </section>
 
                     <section className="space-y-2">
@@ -84,6 +110,7 @@ export function BloubCustomizerSheet({
                                         expression={item.id}
                                         color={value.color}
                                         aura="still"
+                                        theme={value.theme}
                                     />
                                     <span className="text-[10px] font-medium">{item.label}</span>
                                 </button>
@@ -111,27 +138,60 @@ export function BloubCustomizerSheet({
                     </section>
 
                     <section className="space-y-2">
-                        <p className="text-xs font-medium">More bots</p>
-                        <div className="grid grid-cols-5 gap-2">
+                        <p className="text-xs font-medium">Bots</p>
+                        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                            <button
+                                type="button"
+                                aria-label="Retro LCD"
+                                aria-pressed={retro}
+                                onClick={() => onChange({ theme: "retro-lcd", shape: "cercle" })}
+                                className={cn("flex flex-col items-center gap-1 rounded-xl border p-2 text-center", retro ? "border-foreground bg-muted/60" : "hover:bg-muted/40")}
+                            >
+                                <WelcomeOrb still size={44} look="bloub" shape="cercle" expression={value.expression} color={value.color} theme="retro-lcd" aura="still" />
+                                <span className="text-[10px] font-medium">Retro LCD</span>
+                            </button>
+                            {INCLUDED_BLOUB_BOTS.map((bot) => (
+                                <button
+                                    key={bot.id}
+                                    type="button"
+                                    onClick={() => onChange({ shape: bot.id, theme: "classic" })}
+                                    className={cn(
+                                        "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                        !retro && value.shape === bot.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                                    )}
+                                    aria-label={bot.label}
+                                    aria-pressed={!retro && value.shape === bot.id}
+                                >
+                                    <WelcomeOrb
+                                        still
+                                        size={44}
+                                        look="bloub"
+                                        shape={bot.id}
+                                        expression={bot.expression}
+                                        color={value.color}
+                                        aura="still"
+                                    />
+                                    <span className="text-[10px] font-medium">{bot.label}</span>
+                                </button>
+                            ))}
                             {PREMIUM_BLOUB_BOTS.map((bot) => (
                                 <button
                                     key={bot.id}
                                     type="button"
                                     onClick={() => {
-                                        if (!premium || isPremiumBloubShape(bot.id)) {
-                                            if (!premium) {
-                                                toast.message("This is a premium bot")
-                                                return
-                                            }
+                                        if (!premium) {
+                                            toast.message("This is a premium bot")
+                                            return
                                         }
-                                        onChange({ shape: bot.id, expression: bot.expression, color: bot.color })
+                                        onChange({ shape: bot.id, expression: bot.expression, color: bot.color, theme: "classic" })
                                     }}
                                     className={cn(
                                         "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
-                                        value.shape === bot.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                                        !retro && value.shape === bot.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
                                         !premium && "opacity-60",
                                     )}
                                     aria-label={premium ? bot.label : `${bot.label}, premium`}
+                                    aria-pressed={!retro && value.shape === bot.id}
                                 >
                                     <WelcomeOrb
                                         still

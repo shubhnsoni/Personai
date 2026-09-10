@@ -1,7 +1,19 @@
 import { Resend } from 'resend'
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const FROM_EMAIL = process.env.EMAIL_FROM || 'Introify <noreply@introify.com>'
+
+export function emailCanSend(key = process.env.RESEND_API_KEY) {
+    return Boolean(key && key.trim().length > 12 && !/placeholder|your[_-]|dummy|replace[_-]/i.test(key))
+}
+
+export function unconfiguredEmailLog(options: { to: string; subject: string; html?: string; text?: string }) {
+    return {
+        sent: false as const,
+        log: { to: options.to, subject: options.subject, reason: "EMAIL_NOT_CONFIGURED" },
+    }
+}
+
+const resend = emailCanSend() ? new Resend(process.env.RESEND_API_KEY) : null
 
 interface EmailOptions {
     to: string
@@ -28,12 +40,9 @@ interface PurchaseEmailData {
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
     if (!resend) {
-        console.log('[Email] RESEND_API_KEY not set. Would send email:', {
-            to: options.to,
-            subject: options.subject,
-            preview: options.text?.substring(0, 100) || options.html.substring(0, 100)
-        })
-        return true
+        const skipped = unconfiguredEmailLog(options)
+        console.warn('[Email] Sender is not configured. The message was not delivered.', skipped.log)
+        return skipped.sent
     }
 
     try {

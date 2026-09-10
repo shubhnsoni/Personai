@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/admin/require-admin"
 import { demoteBlockReason, isAdminEmail } from "@/lib/admin/allowlist"
+import { adminPlanWrite } from "@/lib/admin/plan-grant"
+import { PLAN_VERSION, isPlanId } from "@/lib/billing/catalog"
+import { billingTransaction, ensureDefaultBillingAccount, ensureMonthlyGrants, lockBillingAccount } from "@/lib/billing/service"
 import { IMPERSONATE_COOKIE, IMPERSONATE_MAX_AGE } from "@/lib/admin/impersonate"
 import {
     parsePlatformAiSettings,
@@ -175,6 +178,58 @@ export async function suspendUser(userId: string) {
     revalidatePath("/admin/users")
     revalidatePath(`/admin/users/${userId}`)
     revalidatePath("/admin/shops")
+}
+
+export async function setUserPlan(userId: string, planId: string) {
+    const admin = await requireAdmin()
+    if (!isPlanId(planId)) throw new Error("Unknown Introify plan")
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } })
+    if (!target) throw new Error("User not found")
+    const account = await ensureDefaultBillingAccount(target.id)
+    const patch = adminPlanWrite(planId, new Date())
+    await billingTransaction(async tx => {
+        await lockBillingAccount(tx, account.id)
+        await tx.platformSubscription.upsert({
+            where: { accountId: account.id },
+            create: { accountId: account.id, planVersion: PLAN_VERSION, ...patch },
+            update: { planVersion: PLAN_VERSION, ...patch },
+        })
+        if (planId !== "free") await ensureMonthlyGrants(tx, account.id)
+    })
+    await audit(admin.id, "set_user_plan", null, { userId, email: target.email, planId })
+    revalidatePath("/admin/users")
+    revalidatePath(`/admin/users/${userId}`)
+    revalidatePath("/admin/billing")
+}
+
+export async function recordPrivacyRequest(input: { email: string; kind: "ACCESS" | "CORRECTION" | "DELETION"; note?: string }) {
+    const admin = await requireAdmin()
+    const { privacyRequestRecord } = await import("@/lib/privacy/retention")
+    const record = privacyRequestRecord({ ...input, at: new Date() })
+    await prisma.auditEvent.create({
+        data: {
+            actorUserId: admin.id,
+            action: record.action,
+            meta: JSON.stringify(record).slice(0, 2000),
+        },
+    })
+    revalidatePath("/admin/support")
+}
+
+export async function purgeExpiredAnalytics() {
+    const admin = await requireAdmin()
+    const { expiredRecordIds, OPERATIONAL_RETENTION_DAYS } = await import("@/lib/privacy/retention")
+    const now = new Date()
+    const rows = await prisma.profileEvent.findMany({
+        where: { createdAt: { lt: new Date(now.getTime() - OPERATIONAL_RETENTION_DAYS.analyticsEvents * 86400_000) } },
+        select: { id: true, createdAt: true },
+        take: 5000,
+    })
+    const ids = expiredRecordIds(rows, OPERATIONAL_RETENTION_DAYS.analyticsEvents, now)
+    if (ids.length) await prisma.profileEvent.deleteMany({ where: { id: { in: ids } } })
+    await audit(admin.id, "purge_analytics", null, { count: ids.length })
+    revalidatePath("/admin/support")
+    return ids.length
 }
 
 export async function unsuspendUser(userId: string) {

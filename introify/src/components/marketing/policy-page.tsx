@@ -4,6 +4,7 @@ import { MarketingShell } from "./marketing-shell"
 import type { PolicyDocument } from "@/lib/marketing-policies"
 import { fill, localeHomePath, type UiLocale } from "@/lib/ui-locale"
 import { messagesFor } from "@/lib/ui-messages"
+import { CookiePreferenceManager } from "@/components/privacy/cookie-preference"
 
 export function PolicyPage({ document, locale = "en" }: { document: PolicyDocument; locale?: UiLocale }) {
     const policy = messagesFor(locale).chrome.policy
@@ -61,6 +62,9 @@ export function PolicyPage({ document, locale = "en" }: { document: PolicyDocume
                                     {section.paragraphs?.map((paragraph, i) => (
                                         <p key={i}>{paragraph}</p>
                                     ))}
+                                    {document.slug === "cookie-policy" && section.id === "control" ? (
+                                        <CookiePreferenceManager className="mt-4" />
+                                    ) : null}
                                     {section.bullets && (
                                         <ul>
                                             {section.bullets.map(

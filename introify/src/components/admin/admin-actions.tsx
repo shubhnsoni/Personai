@@ -5,6 +5,7 @@ import { useTransition } from "react"
 import {
     publishShop,
     setShopAiOverride,
+    setUserPlan,
     setUserRole,
     startImpersonate,
     stopImpersonate,
@@ -16,6 +17,7 @@ import {
 } from "@/app/actions/admin"
 import { Button } from "@/components/ui/button"
 import { AdminConfirm } from "@/components/admin/admin-confirm"
+import { PLANS, type PlanId } from "@/lib/billing/catalog"
 
 export function ImpersonateButton({
     profileId,
@@ -124,6 +126,29 @@ export function ShopAiOverrideSelect({
             <option value="codex">Codex</option>
             <option value="xai">SpaceXAI</option>
             <option value="openai">OpenAI</option>
+        </select>
+    )
+}
+
+export function UserPlanSelect({
+    userId,
+    planId,
+}: {
+    userId: string
+    planId: PlanId
+}) {
+    const [pending, start] = useTransition()
+    return (
+        <select
+            className="h-9 rounded-md border bg-background px-2 text-sm"
+            disabled={pending}
+            defaultValue={planId}
+            aria-label="Assign plan"
+            onChange={(event) => start(() => setUserPlan(userId, event.target.value))}
+        >
+            {PLANS.map((plan) => (
+                <option key={plan.id} value={plan.id}>{plan.name}</option>
+            ))}
         </select>
     )
 }
