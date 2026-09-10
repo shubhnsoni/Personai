@@ -1,3 +1,5 @@
+import { resolveKitRole } from "@/lib/role-alias"
+
 export const TRY_KITS = [
     { category: "new", role: "JEWELRY_RETAIL", goal: "SELL_PRODUCTS", slug: "try-jewelry-retail", name: "Jewellery store", blurb: "City gold board, weight × purity, making charges.", next: "/dashboard/products" },
     { category: "new", role: "JEWELRY_WHOLESALE", goal: "COLLECT_LEADS", slug: "try-gold-wholesale", name: "Gold wholesale", blurb: "70 touch in, 74 out, cash or udhar.", next: "/dashboard/products" },
@@ -53,9 +55,48 @@ export const TRY_KITS = [
 
 export type TryKit = (typeof TRY_KITS)[number]
 
+export type KitFamily = "shop" | "food" | "book" | "teach" | "studio"
+
+export const KIT_FAMILIES: { id: KitFamily; label: string; hint: string }[] = [
+    { id: "shop", label: "Shop", hint: "Products, stock, and pickup" },
+    { id: "food", label: "Food", hint: "Menus, tables, and catering" },
+    { id: "book", label: "Bookings", hint: "Time, visits, and treatments" },
+    { id: "teach", label: "Teach", hint: "Courses and classes" },
+    { id: "studio", label: "Studio", hint: "Portfolio, briefs, and pages" },
+]
+
+const FAMILY_BY_ENGINE: Record<string, KitFamily> = {
+    SHOP: "shop",
+    JEWELRY_RETAIL: "shop",
+    JEWELRY_WHOLESALE: "shop",
+    DISTRIBUTOR: "shop",
+    PHARMACY: "shop",
+    AUTO_PARTS: "shop",
+    RESTAURANT: "food",
+    CONSULTANT: "book",
+    CA: "book",
+    SALON_SPA: "book",
+    FIELD_SERVICE: "book",
+    COACH: "teach",
+    CREATOR: "studio",
+    DESIGNER: "studio",
+    JOB_SEEKER: "studio",
+    EVENTS_STUDIO: "studio",
+    REAL_ESTATE_BROKERAGE: "studio",
+    RECRUITMENT_AGENCY: "studio",
+    CUSTOM: "studio",
+}
+
 export function tryKitByRole(role?: string | null) {
     if (!role) return undefined
     return TRY_KITS.find((k) => k.role === role)
+}
+
+/** Owner-facing grouping for the profile kit picker. Caterer stays with food even though the engine is events. */
+export function kitFamily(role?: string | null): KitFamily {
+    if (role === "CATERER") return "food"
+    const engine = resolveKitRole(role) || role || ""
+    return FAMILY_BY_ENGINE[engine] || "studio"
 }
 
 export const ACTIVE_PROFILE_COOKIE = "pl-active-profile"

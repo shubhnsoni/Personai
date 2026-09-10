@@ -16,8 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WelcomeOrb } from "@/components/welcome-orb"
-import { TRY_KITS } from "@/lib/try-kits"
 import { User, Briefcase, FolderKanban, Palette, Sparkles, Globe, BookOpen, ChevronDown, Check, MapPin } from "lucide-react"
+import { KitPicker } from "@/components/dashboard/kit-picker"
 import { previewListing, applyListing } from "@/app/actions/listing"
 import { OfferSheet, LiveRow } from "@/components/dashboard/offer-sheet"
 import {
@@ -37,7 +37,7 @@ import { toast } from "sonner"
 import { FileField } from "@/components/ui/file-field"
 import { cn } from "@/lib/utils"
 import { QrCard } from "@/components/profile/qr-card"
-import { ADDONS, extrasFromAddons, suggestedAddons, type AddonId } from "@/lib/onboarding-needs"
+import { extrasFromAddons, suggestedAddons, type AddonId } from "@/lib/onboarding-needs"
 import { extrasOf, fieldOn, hasSurface, writeExtras } from "@/lib/surfaces"
 import { defaultPrepMinutesFromConfig, payModeFromConfig, paymentQrUrlFromConfig, writeDefaultPrepMinutes, writePayMode, writePaymentQrUrl } from "@/lib/payment-qr"
 import { socialsFromConfig, writeSocials } from "@/lib/socials"
@@ -592,53 +592,21 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                             </Select>
                         </Field>
                     </Section>
-                    <Section title="This page is" description="Role, goal, and extra surfaces.">
-                        <Field label="Role">
-                            <ChoiceRow
-                                value={watch("roleTemplate")}
-                                onChange={(val) => setValue("roleTemplate", val)}
-                                options={ROLES}
-                            />
-                        </Field>
-                        <Field label="Goal">
-                            <ChoiceRow
-                                value={watch("primaryGoal")}
-                                onChange={(val) => setValue("primaryGoal", val)}
-                                options={GOALS}
-                            />
-                        </Field>
-                        <Field label="Also on this page">
-                            <div className="flex flex-wrap gap-1.5">
-                                {ADDONS.map((addon) => {
-                                    const role = watch("roleTemplate")
-                                    const extra = extrasOf(watch("personalityConfig"))
-                                    const suggested = suggestedAddons(role).includes(addon.id)
-                                    const on = suggested || (extra.addons || []).includes(addon.id)
-                                    return (
-                                        <button
-                                            key={addon.id}
-                                            type="button"
-                                            onClick={() => {
-                                                const current = new Set(extra.addons || [])
-                                                if (suggested) return
-                                                if (current.has(addon.id)) current.delete(addon.id)
-                                                else current.add(addon.id)
-                                                const next = extrasFromAddons(role, [...suggestedAddons(role), ...current] as AddonId[])
-                                                setValue("personalityConfig", writeExtras(watch("personalityConfig"), next))
-                                            }}
-                                            className={cn(
-                                                "h-8 rounded-full border px-3 text-xs font-medium",
-                                                on
-                                                    ? "border-foreground bg-foreground text-background"
-                                                    : "border-border bg-background text-muted-foreground",
-                                            )}
-                                        >
-                                            {addon.label}
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        </Field>
+                    <Section title="This page is" description="Choose a kit that matches the work. Extra tools can be added without leaving it.">
+                        <KitPicker
+                            role={watch("roleTemplate")}
+                            goal={watch("primaryGoal")}
+                            extras={extrasOf(watch("personalityConfig"))}
+                            onRole={(nextRole, nextGoal) => {
+                                setValue("roleTemplate", nextRole, { shouldDirty: true })
+                                setValue("primaryGoal", nextGoal, { shouldDirty: true })
+                                const extra = extrasOf(watch("personalityConfig"))
+                                const keep = (extra.addons || []).filter((id) => !suggestedAddons(nextRole).includes(id as AddonId)) as AddonId[]
+                                setValue("personalityConfig", writeExtras(watch("personalityConfig"), extrasFromAddons(nextRole, [...suggestedAddons(nextRole), ...keep])), { shouldDirty: true })
+                            }}
+                            onGoal={(nextGoal) => setValue("primaryGoal", nextGoal, { shouldDirty: true })}
+                            onAddons={(addons) => setValue("personalityConfig", writeExtras(watch("personalityConfig"), extrasFromAddons(watch("roleTemplate"), addons)), { shouldDirty: true })}
+                        />
                     </Section>
                     <Section title="Reach" description="How guests pay.">
                         {fieldOn(watch("roleTemplate"), "whatsappUpi", extrasOf(watch("personalityConfig"))) || hasSurface(watch("roleTemplate"), "shop", extrasOf(watch("personalityConfig"))) ? (
@@ -753,18 +721,6 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
 
 const ghostInput = "h-auto rounded-none border-0 border-b border-border/70 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
 
-const ROLES = TRY_KITS.map((kit) => ({ id: kit.role, label: kit.name }))
-
-const GOALS = [
-    { id: "SELL_PRODUCTS", label: "Sell products" },
-    { id: "BOOK_TABLE", label: "Book a table" },
-    { id: "TAKE_APPOINTMENTS", label: "Take appointments" },
-    { id: "BOOK_CALL", label: "Book a call" },
-    { id: "HIRE_ME", label: "Get hired" },
-    { id: "SHOW_PORTFOLIO", label: "Show portfolio" },
-    { id: "COLLECT_LEADS", label: "Collect leads" },
-]
-
 const VOICES = [
     { id: "professional", label: "Professional", blurb: "Clear, no fluff." },
     { id: "warm", label: "Warm", blurb: "Kind and still direct." },
@@ -835,39 +791,6 @@ function Field({
             {children}
             {error ? <p className="text-xs text-destructive">{error}</p> : null}
             {hint && !error ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-        </div>
-    )
-}
-
-function ChoiceRow({
-    value,
-    onChange,
-    options,
-}: {
-    value?: string
-    onChange: (value: string) => void
-    options: { id: string; label: string }[]
-}) {
-    return (
-        <div className="flex flex-wrap gap-1.5">
-            {options.map((opt) => {
-                const on = value === opt.id
-                return (
-                    <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => onChange(opt.id)}
-                        className={cn(
-                            "h-8 rounded-full border px-3 text-xs font-medium transition-colors",
-                            on
-                                ? "border-foreground bg-foreground text-background"
-                                : "border-border bg-background text-muted-foreground hover:border-foreground/40 hover:text-foreground"
-                        )}
-                    >
-                        {opt.label}
-                    </button>
-                )
-            })}
         </div>
     )
 }
