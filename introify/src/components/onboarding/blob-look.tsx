@@ -158,7 +158,7 @@ export function BlobLookStudio({
             {usesAnimojiFaces(value) ? (
                 <section className="space-y-3">
                     <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Face</p>
-                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                    <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6" data-animoji-grid>
                         {ANIMOJI_FACES.map((item) => {
                             const selected = resolveAnimojiId(value.skin) === item.id
                             return (
@@ -173,8 +173,8 @@ export function BlobLookStudio({
                                         selected ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
                                     )}
                                 >
-                                    <WelcomeOrb still size={56} look="animoji" skin={item.id} aura="still" theme="classic" />
-                                    <span className="text-[11px]">{item.label}</span>
+                                    <WelcomeOrb still size={40} look="animoji" skin={item.id} aura="still" theme="classic" />
+                                    <span className="text-[10px]">{item.label}</span>
                                 </button>
                             )
                         })}

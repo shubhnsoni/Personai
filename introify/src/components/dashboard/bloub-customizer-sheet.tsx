@@ -17,6 +17,41 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"]
 
+function AnimojiFaceGrid({
+    value,
+    onChange,
+}: {
+    value: BloubPick
+    onChange: (next: Partial<BloubPick>) => void
+}) {
+    return (
+        <section className="space-y-2">
+            <p className="text-xs font-medium">Face</p>
+            <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6" data-animoji-grid>
+                {ANIMOJI_FACES.map((item) => {
+                    const selected = resolveAnimojiId(value.skin) === item.id
+                    return (
+                        <button
+                            key={item.id}
+                            type="button"
+                            aria-label={item.label}
+                            aria-pressed={selected}
+                            onClick={() => onChange({ look: "animoji", skin: item.id, theme: "classic", shape: "cercle" })}
+                            className={cn(
+                                "flex flex-col items-center gap-1 rounded-xl border p-1.5 text-center",
+                                selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                            )}
+                        >
+                            <WelcomeOrb still size={40} look="animoji" skin={item.id} aura="still" theme="classic" />
+                            <span className="text-[10px] font-medium">{item.label}</span>
+                        </button>
+                    )
+                })}
+            </div>
+        </section>
+    )
+}
+
 export function BloubCustomizerSheet({
     open,
     onClose,
@@ -84,7 +119,7 @@ export function BloubCustomizerSheet({
                     </div>
                 </div>
 
-                <div className="space-y-5 px-4 py-4" role="tabpanel">
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4" role="tabpanel">
                     {tab === "look" ? (
                         <>
                             {showSlider ? (
@@ -158,30 +193,7 @@ export function BloubCustomizerSheet({
 
                     {tab === "mood" ? (
                         usesAnimojiFaces(value) ? (
-                            <section className="space-y-2">
-                                <p className="text-xs font-medium">Face</p>
-                                <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-                                    {ANIMOJI_FACES.map((item) => {
-                                        const selected = resolveAnimojiId(value.skin) === item.id
-                                        return (
-                                            <button
-                                                key={item.id}
-                                                type="button"
-                                                aria-label={item.label}
-                                                aria-pressed={selected}
-                                                onClick={() => onChange({ look: "animoji", skin: item.id, theme: "classic", shape: "cercle" })}
-                                                className={cn(
-                                                    "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
-                                                    selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
-                                                )}
-                                            >
-                                                <WelcomeOrb still size={56} look="animoji" skin={item.id} aura="still" theme="classic" />
-                                                <span className="text-[11px] font-medium">{item.label}</span>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </section>
+                            <AnimojiFaceGrid value={value} onChange={onChange} />
                         ) : (
                         <>
                             <section className="space-y-2">
@@ -326,6 +338,9 @@ export function BloubCustomizerSheet({
                                 })}
                             </div>
                         </section>
+                    ) : null}
+                    {tab === "bots" && usesAnimojiFaces(value) ? (
+                        <AnimojiFaceGrid value={value} onChange={onChange} />
                     ) : null}
                 </div>
             </SheetContent>

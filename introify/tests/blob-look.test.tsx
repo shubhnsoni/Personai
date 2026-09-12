@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { DEFAULT_BLOUB_PICK } from "@/lib/bloub/catalog"
+import { ANIMOJI_FACES } from "@/lib/animoji"
 
 vi.mock("sonner", () => ({ toast: { message: vi.fn(), success: vi.fn(), error: vi.fn() } }))
 vi.mock("@/components/welcome-orb", () => ({ WelcomeOrb: ({ theme, look, skin, expression, shape }: { theme?: string; look?: string; skin?: string; expression?: string; shape?: string }) => <div data-testid="orb" data-theme={theme} data-look={look} data-skin={skin} data-expression={expression} data-shape={shape} /> }))
@@ -92,6 +93,25 @@ describe("included bots on onboarding and profile", () => {
         const colour = screen.getByText("Colour")
         const theme = screen.getByText("Chat themes")
         expect(Boolean(colour.compareDocumentPosition(theme) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    })
+
+    it("lists all twenty-seven coded animoji faces, including Panda and Nerd", () => {
+        render(
+            <BloubCustomizerSheet
+                open
+                onClose={() => {}}
+                value={{ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "bounce" }}
+                onChange={() => {}}
+                premium={false}
+            />,
+        )
+        expect(ANIMOJI_FACES).toHaveLength(27)
+        fireEvent.click(screen.getByRole("tab", { name: "Mood" }))
+        expect(document.querySelector("[data-animoji-grid]")?.querySelectorAll("button")).toHaveLength(27)
+        expect(screen.getByRole("button", { name: "Panda" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Nerd" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Frog" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Moon" })).toBeTruthy()
     })
 
     it("picks LCD as its own bot during onboarding and only shows that theme", () => {
