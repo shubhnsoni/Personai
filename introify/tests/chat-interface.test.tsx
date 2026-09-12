@@ -402,6 +402,40 @@ describe("ChatInterface - pending copy and home", () => {
         expect(document.querySelector("[data-pending-status]")).toBeTruthy()
     })
 
+    it("replaces an empty completed stream with a reply instead of looping pending copy", async () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        const payload = new TextEncoder().encode(`0:""\n`)
+        let sent = false
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => ({
+                ok: true,
+                status: 200,
+                headers: { get: (name: string) => name === "X-Conversation-Id" ? "c1" : null },
+                body: {
+                    getReader: () => ({
+                        read: async () => {
+                            if (sent) return { done: true, value: undefined }
+                            sent = true
+                            return { done: false, value: payload }
+                        },
+                    }),
+                },
+            })) as unknown as typeof fetch,
+        )
+        renderChat()
+        const field = document.querySelector('input[aria-label="Message"]') as HTMLInputElement
+        await act(async () => {
+            fireEvent.change(field, { target: { value: "Hello there" } })
+            fireEvent.submit(field.closest("form")!)
+            await Promise.resolve()
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+        expect(document.querySelector("[data-pending-status]")).toBeNull()
+        expect(document.body.textContent).toMatch(/could not be completed/)
+    })
+
     it("returns to the intro when the header identity is clicked", async () => {
         installMatchMedia({ [REDUCE_MOTION]: true })
         const payload = new TextEncoder().encode(`0:${JSON.stringify("A table for two")}\n`)

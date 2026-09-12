@@ -6,17 +6,17 @@ export function typingInputGaze(length: number, focused: boolean): { x: number; 
     return { x, y: -0.92 }
 }
 
-export const ASSISTANT_PENDING_DWELL_MS = 3200
+export const ASSISTANT_PENDING_DWELL_MS = 5200
 
 export function assistantPendingPhrase(name: string, nowMs: number): string {
     const host = name.trim() || "them"
     const phrases = [
-        "thinking this through",
-        "reading your message",
-        "checking the details",
-        "asking around the desk",
-        `talking with ${host}`,
-        "putting a reply together",
+        "thinking this through carefully",
+        "reading your message in full",
+        "checking the details on the desk",
+        "asking around so this is accurate",
+        `talking this over with ${host}`,
+        "putting a clear reply together now",
     ]
     return phrases[Math.floor(Math.max(0, nowMs) / ASSISTANT_PENDING_DWELL_MS) % phrases.length]
 }

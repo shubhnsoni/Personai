@@ -8,7 +8,7 @@ vi.mock("@/lib/request-currency", () => ({ getRequestCurrency: vi.fn() }))
 vi.mock("@/lib/memory", () => ({ maybeSummarizeConversation: vi.fn(), visitorKeyFrom: (_email: unknown, id: string) => id ? `visitor:${id}` : null }))
 vi.mock("@/lib/billing/service", () => ({ getProfileBilling: vi.fn(), reserveUsage: vi.fn(), settleUsage: vi.fn() }))
 vi.mock("@/lib/security", () => ({ createOwnershipFoundation: () => ({ requireOwnedResource: async () => ({ ok: false, refusal: { status: 403, code: "FORBIDDEN", message: "Access denied" } }) }), ownershipRefusalResponse: (value: { status: number }) => Response.json({ error: "Access denied" }, { status: value.status }) }))
-import { createChatPostHandler, issueConversationCapability, conversationCapabilityCookieName } from "@/app/api/chat/handler"
+import { chatProviderTimeoutMs, createChatPostHandler, issueConversationCapability, conversationCapabilityCookieName } from "@/app/api/chat/handler"
 import { AiAccessError } from "@/lib/ai-usage"
 
 const recipe = { mode: "fast" as const, provider: "openai" as const, model: "gpt-4o-mini", inputBudget: 2000, outputBudget: 500, inputUsdPerMillion: 0.15, outputUsdPerMillion: 0.6 }
@@ -105,8 +105,25 @@ describe("metered public chat", () => {
         const text = await response.text()
         expect(response.status).toBe(200)
         expect(text).toContain("Studio")
+        expect(text).not.toBe("0:\"\"\n")
         expect(settle).toHaveBeenCalledWith("reservation", "RELEASE", expect.objectContaining({ reason: "provider_timeout" }))
         delete process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS
+    })
+
+    it("falls back when the provider stream never yields a chunk", async () => {
+        process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS = "40"
+        complete.mockResolvedValue({ async *[Symbol.asyncIterator]() { await new Promise(() => {}) } })
+        const response = await handler()(request())
+        const text = await response.text()
+        expect(response.status).toBe(200)
+        expect(text).toContain("Studio")
+        expect(settle).toHaveBeenCalledWith("reservation", "RELEASE", expect.objectContaining({ reason: "provider_timeout" }))
+        delete process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS
+    })
+
+    it("finishes the provider wait inside the hosting proxy window", () => {
+        delete process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS
+        expect(chatProviderTimeoutMs()).toBe(8_000)
     })
 
     it("requires a client id before any reservation", async () => {

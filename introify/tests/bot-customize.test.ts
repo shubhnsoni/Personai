@@ -36,11 +36,11 @@ describe("blob gaze while typing", () => {
     })
 
     it("keeps pending chat copy as full phrases that dwell for seconds", () => {
-        expect(assistantPendingPhrase("SkyDine", 0)).toBe("thinking this through")
-        expect(assistantPendingPhrase("SkyDine", 3199)).toBe("thinking this through")
-        expect(assistantPendingPhrase("SkyDine", 3200)).toBe("reading your message")
-        expect(assistantPendingPhrase("SkyDine", 12800)).toMatch(/SkyDine/)
-        expect(assistantPendingPhrase("SkyDine", 0).split(" ").length).toBeGreaterThan(1)
+        expect(assistantPendingPhrase("SkyDine", 0)).toBe("thinking this through carefully")
+        expect(assistantPendingPhrase("SkyDine", 5199)).toBe("thinking this through carefully")
+        expect(assistantPendingPhrase("SkyDine", 5200)).toBe("reading your message in full")
+        expect(assistantPendingPhrase("SkyDine", 20800)).toMatch(/SkyDine/)
+        expect(assistantPendingPhrase("SkyDine", 0).split(" ").length).toBeGreaterThan(3)
     })
 
     it("looks down and tracks left to right as the composer fills", () => {

@@ -294,6 +294,7 @@ export function ChatInterface({
                     }
                 }
             }
+            if (!fullContent.trim()) throw new Error("empty_reply")
             return openId
         } catch (error) {
             if ((error as Error).name === "AbortError" && !timedOut) return conversationId
@@ -634,8 +635,10 @@ export function ChatInterface({
                                             ) : (
                                                 <ChatMarkdown text={m.content} />
                                             )
-                                        ) : (
+                                        ) : isLoading ? (
                                             <PendingStatus name={profile.displayName} />
+                                        ) : (
+                                            <span className="whitespace-pre-wrap">This reply could not be completed. Check the conversation before retrying.</span>
                                         )}
                                     </div>
 
@@ -1127,7 +1130,7 @@ function PendingStatus({ name }: { name: string }) {
         return () => window.clearInterval(id)
     }, [])
     return (
-        <span data-pending-status className="px-1 text-sm font-medium text-profile-mute" aria-live="polite">
+        <span data-pending-status className="px-1 text-sm font-medium text-profile-mute transition-opacity duration-700" aria-live="polite">
             {assistantPendingPhrase(name, elapsed)}
             <span className="inline-block w-[1.1em] animate-pulse">…</span>
         </span>
