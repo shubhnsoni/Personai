@@ -265,7 +265,7 @@ export async function boundedXaiResponse(input: OpenAI.Chat.Completions.ChatComp
         store: false,
         stream: false,
         ...(json ? { text: { format: { type: "json_object" as const } } } : {}),
-    }, { signal, timeout: 8_000 })
+    }, { signal, timeout: 5_000 })
 }
 
 export function xaiResponseText(response: OpenAI.Responses.Response) {
@@ -281,5 +281,5 @@ export async function boundedXaiChatStream(input: OpenAI.Chat.Completions.ChatCo
         parallel_tool_calls: false,
         stream: true,
         stream_options: { include_usage: true },
-    }, { signal, timeout: 8_000 })
+    }, { signal, timeout: 5_000 })
 }

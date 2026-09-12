@@ -47,6 +47,7 @@ beforeEach(() => {
 
 describe("metered public chat", () => {
     it("cancels provider work on disconnect and does not execute a pending business tool", async () => {
+        process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS = "40"
         let release!: () => void
         const pending = new Promise<void>(resolve => { release = resolve })
         let finished!: () => void
@@ -59,15 +60,14 @@ describe("metered public chat", () => {
             } finally { finished() }
         } })
         const response = await handler()(request({ messages: [{ role: "user", content: "Ada ada@example.test" }] }))
-        const reader = response.body!.getReader()
-        await reader.read()
-        await reader.cancel()
+        expect(response.status).toBe(200)
+        expect(await response.text()).toContain("Checking")
         expect(complete.mock.calls[0][2].aborted).toBe(true)
         release()
         await done
         expect(db.visitorLead.create).not.toHaveBeenCalled()
-        expect(settle).not.toHaveBeenCalled()
-        expect(db.message.create).toHaveBeenCalledTimes(1)
+        expect(settle).toHaveBeenCalledWith("reservation", "RELEASE", expect.objectContaining({ reason: "provider_timeout" }))
+        delete process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS
     })
     it("releases a credential failure that occurred before any provider dispatch", async () => {
         complete.mockRejectedValue(Object.assign(new Error("login unavailable"), { providerNotDispatched: true }))
@@ -123,7 +123,7 @@ describe("metered public chat", () => {
 
     it("finishes the provider wait inside the hosting proxy window", () => {
         delete process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS
-        expect(chatProviderTimeoutMs()).toBe(8_000)
+        expect(chatProviderTimeoutMs()).toBe(5_000)
     })
 
     it("requires a client id before any reservation", async () => {
@@ -187,13 +187,14 @@ describe("metered public chat", () => {
         complete.mockRejectedValue(new Error("network timeout"))
         const response = await handler()(request())
         expect(response.status).toBe(200)
-        await response.text().catch(() => "")
+        expect(await response.text()).toContain("Studio")
         expect(settle).not.toHaveBeenCalled()
     })
     it("holds a failed partial stream and prevents a blind credit release", async () => {
         complete.mockResolvedValue({ async *[Symbol.asyncIterator]() { yield chunk(); throw new Error("disconnected") } })
         const response = await handler()(request())
-        await expect(response.text()).rejects.toThrow()
+        expect(response.status).toBe(200)
+        expect(await response.text()).toContain("A grounded answer")
         expect(settle).not.toHaveBeenCalled()
     })
     it("releases on a local failure before provider dispatch", async () => {

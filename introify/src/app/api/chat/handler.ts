@@ -35,8 +35,9 @@ const VISITOR_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
 
 export function chatProviderTimeoutMs() {
     const n = Number(process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS)
-    if (Number.isFinite(n) && n >= 20) return Math.min(n, 60_000)
-    return 8_000
+    if (Number.isFinite(n) && n >= 20 && n < 1_000) return n
+    if (Number.isFinite(n) && n >= 1_000) return Math.min(n, 5_000)
+    return 5_000
 }
 
 function raceWithTimeout<T>(work: Promise<T>, ms: number, signal: AbortSignal): Promise<T> {
@@ -301,6 +302,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             await settleAi(reservation.id, action, metadata)
             settled = true
         }
+        const requestStartedAt = now()
         try {
         const responseCookies: string[] = []
         if (!conversationId) {
@@ -846,83 +848,61 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         if (req.signal.aborted) { await settle("RELEASE", { reason: "cancelled_before_dispatch" }); return new Response(null, { status: 499 }) }
         providerStarted = true
         const responseAbort = new AbortController()
-        const timeoutMs = chatProviderTimeoutMs()
-        const responseSignal = AbortSignal.any([req.signal, responseAbort.signal])
+        const timeoutMs = Math.max(20, requestStartedAt + chatProviderTimeoutMs() - now())
+        const responseSignal = typeof AbortSignal.any === "function"
+            ? AbortSignal.any([req.signal, responseAbort.signal])
+            : responseAbort.signal
         const encoder = new TextEncoder()
         let fullResponse = ""
-        let cancelled = false
         let toolCall: { id: string; name: string; arguments: string } | null = null
         const aborted = () => Object.assign(new Error("aborted"), { name: "AbortError" })
-        const stream = new ReadableStream({
-            async start(controller) {
-                const emit = (text: string) => { if (!cancelled) controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`)) }
-                const ping = () => { if (!cancelled) controller.enqueue(encoder.encode(":\n")) }
-                ping()
-                const pingTimer = setInterval(ping, 2_000)
-                try {
-                    const collected = await raceWithTimeout((async () => {
-                        const response = await createCompletion(input, recipe, responseSignal)
-                        for await (const chunk of response) {
-                            if (responseSignal.aborted || cancelled) throw aborted()
-                            if (chunk.model) returnedModel = chunk.model
-                            if (chunk.usage) { inputTokens = chunk.usage.prompt_tokens; outputTokens = chunk.usage.completion_tokens; reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens ?? null }
-                            const delta = chunk.choices[0]?.delta
-                            if (delta?.content) {
-                                const text = clipUtf8(delta.content, Math.max(0, recipe.outputBudget * 8 - Buffer.byteLength(fullResponse)))
-                                fullResponse += text
-                            }
-                            for (const call of delta?.tool_calls || []) {
-                                if (call.index !== 0) continue
-                                if (!toolCall) toolCall = { id: call.id || "", name: call.function?.name || "", arguments: "" }
-                                if (call.function?.name) toolCall.name = call.function.name
-                                if (call.function?.arguments) toolCall.arguments = (toolCall.arguments + call.function.arguments).slice(0, 2048)
-                            }
-                        }
-                        if (responseSignal.aborted || cancelled) throw aborted()
-                        if (toolCall?.name && offeredTools.has(toolCall.name) && allowedTools.has(toolCall.name)) {
-                            let args: Record<string, unknown> | null = null
-                            try { const parsed = JSON.parse(toolCall.arguments || "{}"); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) args = parsed } catch { /* invalid tool arguments do not execute */ }
-                            if (args) {
-                                const result = clipUtf8(await executeTool(toolCall.name, args), 4000)
-                                fullResponse += `${fullResponse ? "\n\n" : ""}${result}`
-                            }
-                        }
-                        return fullResponse
-                    })(), timeoutMs, responseSignal)
-                    const hadText = Boolean(collected)
-                    if (!hadText) await settle("RELEASE", { ...usageMetadata(recipe, inputTokens, outputTokens), returnedModel, reasoningTokens, reason: "empty_completed_response" })
-                    fullResponse = clipUtf8(collected || await groundedFallback(), 4000)
-                    emit(fullResponse)
-                    const saved = await db.message.create({ data: { conversationId: authorizedConversationId, senderType: "AI", text: fullResponse, role: "assistant" } })
-                    if (hadText) await settle("CONSUME", { ...usageMetadata(recipe, inputTokens, outputTokens), returnedModel, reasoningTokens, conversationId: authorizedConversationId, responseMessageId: saved.id, toolCalls: toolCall ? 1 : 0 })
-                    if (!cancelled) {
-                        controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions: generateSuggestions(fullResponse, profile.displayName) })}\n`))
-                        controller.close()
+        const replyBody = (text: string) => encoder.encode(`0:${JSON.stringify(text)}\nd:${JSON.stringify({ suggestions: generateSuggestions(text, profile.displayName) })}\n`)
+        try {
+            const collected = await raceWithTimeout((async () => {
+                const response = await createCompletion(input, recipe, responseSignal)
+                for await (const chunk of response) {
+                    if (responseSignal.aborted) throw aborted()
+                    if (chunk.model) returnedModel = chunk.model
+                    if (chunk.usage) { inputTokens = chunk.usage.prompt_tokens; outputTokens = chunk.usage.completion_tokens; reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens ?? null }
+                    const delta = chunk.choices[0]?.delta
+                    if (delta?.content) {
+                        const text = clipUtf8(delta.content, Math.max(0, recipe.outputBudget * 8 - Buffer.byteLength(fullResponse)))
+                        fullResponse += text
                     }
-                    if (hadText && memoryAllowed) void summarizeConversation(authorizedConversationId).catch(() => {})
-                } catch (error) {
-                    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.message === "provider_timeout")
-                    if (timedOut && !cancelled && !req.signal.aborted) {
-                        responseAbort.abort()
-                        await settle("RELEASE", { reason: "provider_timeout" })
-                        fullResponse = clipUtf8(fullResponse || await groundedFallback(), 4000)
-                        emit(fullResponse)
-                        await db.message.create({ data: { conversationId: authorizedConversationId, senderType: "AI", text: fullResponse, role: "assistant" } })
-                        if (!cancelled) {
-                            controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions: generateSuggestions(fullResponse, profile.displayName) })}\n`))
-                            controller.close()
-                        }
-                        return
+                    for (const call of delta?.tool_calls || []) {
+                        if (call.index !== 0) continue
+                        if (!toolCall) toolCall = { id: call.id || "", name: call.function?.name || "", arguments: "" }
+                        if (call.function?.name) toolCall.name = call.function.name
+                        if (call.function?.arguments) toolCall.arguments = (toolCall.arguments + call.function.arguments).slice(0, 2048)
                     }
-                    if (providerRejectedWithoutSpend(error)) await settle("RELEASE", { reason: "provider_rejected" })
-                    if (!cancelled) controller.error(new Error("The reply could not be completed. Please check the conversation before retrying."))
-                } finally {
-                    clearInterval(pingTimer)
                 }
-            },
-            cancel() { cancelled = true; responseAbort.abort() },
-        })
-        return new Response(stream, { headers: responseHeaders() })
+                if (responseSignal.aborted) throw aborted()
+                if (toolCall?.name && offeredTools.has(toolCall.name) && allowedTools.has(toolCall.name)) {
+                    let args: Record<string, unknown> | null = null
+                    try { const parsed = JSON.parse(toolCall.arguments || "{}"); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) args = parsed } catch { /* invalid tool arguments do not execute */ }
+                    if (args) {
+                        const result = clipUtf8(await executeTool(toolCall.name, args), 4000)
+                        fullResponse += `${fullResponse ? "\n\n" : ""}${result}`
+                    }
+                }
+                return fullResponse
+            })(), timeoutMs, responseSignal)
+            const hadText = Boolean(collected)
+            if (!hadText) await settle("RELEASE", { ...usageMetadata(recipe, inputTokens, outputTokens), returnedModel, reasoningTokens, reason: "empty_completed_response" })
+            fullResponse = clipUtf8(collected || await groundedFallback(), 4000)
+            const saved = await db.message.create({ data: { conversationId: authorizedConversationId, senderType: "AI", text: fullResponse, role: "assistant" } })
+            if (hadText) await settle("CONSUME", { ...usageMetadata(recipe, inputTokens, outputTokens), returnedModel, reasoningTokens, conversationId: authorizedConversationId, responseMessageId: saved.id, toolCalls: toolCall ? 1 : 0 })
+            if (hadText && memoryAllowed) void summarizeConversation(authorizedConversationId).catch(() => {})
+            return new Response(replyBody(fullResponse), { headers: responseHeaders() })
+        } catch (error) {
+            responseAbort.abort()
+            const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.message === "provider_timeout")
+            if (timedOut) await settle("RELEASE", { reason: "provider_timeout" })
+            else if (providerRejectedWithoutSpend(error)) await settle("RELEASE", { reason: "provider_rejected" })
+            fullResponse = clipUtf8(fullResponse || await groundedFallback(), 4000)
+            await db.message.create({ data: { conversationId: authorizedConversationId, senderType: "AI", text: fullResponse, role: "assistant" } })
+            return new Response(replyBody(fullResponse), { headers: responseHeaders() })
+        }
     } catch (error) {
         if (providerRejectedWithoutSpend(error)) await settle("RELEASE", { reason: "provider_rejected" })
         return Response.json({ error: "ai_generation_failed", message: "The reply could not be completed. Please check the conversation before retrying." }, { status: 502 })

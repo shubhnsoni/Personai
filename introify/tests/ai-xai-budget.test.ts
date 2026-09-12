@@ -22,7 +22,7 @@ describe("xAI total generation budget", () => {
         expect(mocks.chat).toHaveBeenCalledOnce()
         expect(mocks.chat).toHaveBeenCalledWith(
             expect.objectContaining({ max_completion_tokens: 500, stream: true, parallel_tool_calls: false }),
-            expect.objectContaining({ timeout: 8_000 }),
+            expect.objectContaining({ timeout: 5_000 }),
         )
         expect(mocks.chat.mock.calls[0][0].tools).toBeUndefined()
     })
