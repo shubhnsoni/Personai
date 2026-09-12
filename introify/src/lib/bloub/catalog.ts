@@ -258,9 +258,13 @@ export const PREMIUM_BLOUB_BOTS: BloubBot[] = [
     { id: "cercle", label: "Vex", expression: "blase", color: "gris", aura: "breathe", theme: "liquid-chrome" },
 ]
 
-/** Selecting a bot applies its complete look: silhouette, mood, colour, aura and theme. */
+/** Selecting a named bot applies its complete look: silhouette, mood, colour, aura and theme. */
 export function bloubBotPick(bot: BloubBot): Partial<BloubPick> {
-    return { shape: bot.id, expression: bot.expression, color: bot.color, aura: bot.aura, theme: bot.theme }
+    return { look: "bloub", shape: bot.id, expression: bot.expression, color: bot.color, aura: bot.aura, theme: bot.theme }
+}
+
+export function isNamedBloubBotSelected(bot: BloubBot, value: BloubPick) {
+    return resolveOrbLook(value.look) === "bloub" && value.shape === bot.id && value.theme === bot.theme
 }
 
 export const BLOUB_MOODS: { id: ExpressionId; label: string }[] = [

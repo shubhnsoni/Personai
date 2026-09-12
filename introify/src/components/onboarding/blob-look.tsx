@@ -8,12 +8,16 @@ import {
     BLOUB_THEMES,
     BLOUB_THEME_META,
     CUSTOMIZER_BOTS,
+    INCLUDED_BLOUB_BOTS,
+    PREMIUM_BLOUB_BOTS,
     blobColorIndex,
     blobPickFromColorIndex,
+    bloubBotPick,
     bloubThemeThumb,
     customizerBotPick,
     gradientForColor,
     isCustomizerBotSelected,
+    isNamedBloubBotSelected,
     isPremiumBloubTheme,
     resolveBloubTheme,
     resolveThemedOrb,
@@ -166,7 +170,7 @@ export function BlobLookStudio({
             </section>
 
             <section className="space-y-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Bots</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Looks</p>
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                     {CUSTOMIZER_BOTS.map((bot) => {
                         const selected = isCustomizerBotSelected(bot, value)
@@ -205,6 +209,43 @@ export function BlobLookStudio({
                             </button>
                         )
                     })}
+                </div>
+            </section>
+
+            <section className="space-y-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Bots</p>
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                    {INCLUDED_BLOUB_BOTS.map((bot) => {
+                        const selected = isNamedBloubBotSelected(bot, value)
+                        return (
+                            <button
+                                key={bot.label}
+                                type="button"
+                                aria-label={bot.label}
+                                aria-pressed={selected}
+                                onClick={() => onChange(bloubBotPick(bot))}
+                                className={cn(
+                                    "flex flex-col items-center gap-1 rounded-2xl py-2",
+                                    selected ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
+                                )}
+                            >
+                                <WelcomeOrb still size={44} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
+                                <span className="text-[10px]">{bot.label}</span>
+                            </button>
+                        )
+                    })}
+                    {PREMIUM_BLOUB_BOTS.map((bot) => (
+                        <button
+                            key={bot.label}
+                            type="button"
+                            aria-label={`${bot.label}, premium`}
+                            onClick={() => toast.message("This is a premium bot")}
+                            className="relative flex flex-col items-center gap-1 rounded-2xl bg-white/[0.04] py-2 opacity-60"
+                        >
+                            <WelcomeOrb still size={44} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
+                            <span className="text-[10px] text-white/50">{bot.label}</span>
+                        </button>
+                    ))}
                 </div>
             </section>
 

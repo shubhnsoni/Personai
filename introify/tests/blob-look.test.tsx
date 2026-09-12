@@ -57,7 +57,7 @@ describe("included bots on onboarding and profile", () => {
         expect(screen.queryByText("Your colour, mood and aura.")).toBeNull()
     })
 
-    it("exposes Blob, 8-Bit, CRT and Spark in the profile customizer", () => {
+    it("exposes Blob, 8-Bit, CRT and Spark plus named bots in the profile customizer", () => {
         const onChange = vi.fn()
         render(
             <BloubCustomizerSheet
@@ -74,6 +74,10 @@ describe("included bots on onboarding and profile", () => {
         fireEvent.click(screen.getByRole("button", { name: "CRT, premium" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ skin: "crt" }))
         expect(screen.getByRole("button", { name: "Spark, premium" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Zen" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Sol" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Lux, premium" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Nyx, premium" })).toBeTruthy()
         expect(screen.queryByRole("button", { name: "Neo" })).toBeNull()
         expect(screen.queryByRole("button", { name: "Neo, premium" })).toBeNull()
     })

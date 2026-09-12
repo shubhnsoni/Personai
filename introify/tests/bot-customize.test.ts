@@ -1,11 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest"
-import { CUSTOMIZER_BOTS, BLOB_COLOR_STOPS, blobColorFromIndex, blobColorIndex, PREMIUM_BLOUB_BOTS, BLOUB_THEMES } from "@/lib/bloub/catalog"
+import { CUSTOMIZER_BOTS, BLOB_COLOR_STOPS, blobColorFromIndex, blobColorIndex, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, BLOUB_THEMES } from "@/lib/bloub/catalog"
 import { typingInputGaze } from "@/lib/chat-gaze"
 
 describe("customise bots", () => {
-    it("shows Blob, 8-Bit, CRT and Spark and never Neo", () => {
+    it("shows Blob, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
         expect(CUSTOMIZER_BOTS.map((bot) => bot.label)).toEqual(["Blob", "8-Bit", "CRT", "Spark"])
+        expect(INCLUDED_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Zen", "Sol"])
+        expect(PREMIUM_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Lux", "Sky", "Dew", "Nyx", "Ion", "Vex"])
         expect(PREMIUM_BLOUB_BOTS.some((bot) => bot.label === "Neo")).toBe(false)
     })
 
