@@ -7,7 +7,7 @@ import { ANIMOJI_FACES, animojiClipForMood, resolveAnimojiId } from "@/lib/animo
 describe("customise bots", () => {
     it("shows Blob, Animoji, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
         expect(CUSTOMIZER_BOTS.map((bot) => bot.label)).toEqual(["Blob", "Glow", "Animoji", "8-Bit", "CRT", "Spark"])
-        expect(INCLUDED_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["LCD", "Azure", "Rose", "Sage", "Nova"])
+        expect(INCLUDED_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["LCD", "Azure", "Nova", "Telly", "Aurum", "Doodle", "Pearl"])
         expect(PREMIUM_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Nyx", "Ion", "Vex"])
         expect(BLOB_SHAPES.map((item) => item.label)).toEqual(["Circle", "Sol", "Lux", "Sky", "Dew"])
         expect(PREMIUM_BLOUB_BOTS.some((bot) => bot.label === "Neo")).toBe(false)
@@ -20,7 +20,7 @@ describe("customise bots", () => {
     })
 
     it("names look palettes as chat themes without selling copy", () => {
-        expect(BLOUB_THEMES.map((theme) => theme.label)).toEqual(["Classic", "Retro LCD", "Azure", "Rose", "Sage", "Space", "Comic", "Astral Nebula", "Hologram", "Liquid Chrome"])
+        expect(BLOUB_THEMES.map((theme) => theme.label)).toEqual(["Classic", "Retro LCD", "Azure", "Rose", "Sage", "Space", "Comic", "Retro TV", "Solid Gold", "Pencil Sketch", "Glass Bubble", "Astral Nebula", "Hologram", "Liquid Chrome"])
         for (const theme of BLOUB_THEMES) {
             expect(theme.description).toBe("")
         }

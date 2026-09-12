@@ -201,6 +201,103 @@
   --comic-shadow: #08050c;
 }
 
+/* ---- Mascots: Telly, Aurum, Doodle, Pearl ------------------------------- */
+:is(
+  [data-public-business-theme="retro-tv"],
+  [data-public-catalog-theme="retro-tv"],
+  [data-public-profile-theme="retro-tv"],
+  [data-chat-theme="retro-tv"],
+  body:has([data-public-business-theme="retro-tv"], [data-public-profile-theme="retro-tv"], [data-public-catalog-theme="retro-tv"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #e9e4d8;
+  --pt-ink: #3a3a35;
+  --pt-accent: #5f8273;
+}
+
+.dark :is(
+  [data-public-business-theme="retro-tv"],
+  [data-public-catalog-theme="retro-tv"],
+  [data-public-profile-theme="retro-tv"],
+  [data-chat-theme="retro-tv"],
+  body:has([data-public-business-theme="retro-tv"], [data-public-profile-theme="retro-tv"], [data-public-catalog-theme="retro-tv"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #171816;
+  --pt-ink: #e6e1d4;
+  --pt-accent: #8fb0a2;
+}
+
+:is(
+  [data-public-business-theme="solid-gold"],
+  [data-public-catalog-theme="solid-gold"],
+  [data-public-profile-theme="solid-gold"],
+  [data-chat-theme="solid-gold"],
+  body:has([data-public-business-theme="solid-gold"], [data-public-profile-theme="solid-gold"], [data-public-catalog-theme="solid-gold"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #faf6ee;
+  --pt-ink: #2a2416;
+  --pt-accent: #b8871a;
+}
+
+.dark :is(
+  [data-public-business-theme="solid-gold"],
+  [data-public-catalog-theme="solid-gold"],
+  [data-public-profile-theme="solid-gold"],
+  [data-chat-theme="solid-gold"],
+  body:has([data-public-business-theme="solid-gold"], [data-public-profile-theme="solid-gold"], [data-public-catalog-theme="solid-gold"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #15110a;
+  --pt-ink: #f7efdc;
+  --pt-accent: #e0b24a;
+}
+
+:is(
+  [data-public-business-theme="pencil-sketch"],
+  [data-public-catalog-theme="pencil-sketch"],
+  [data-public-profile-theme="pencil-sketch"],
+  [data-chat-theme="pencil-sketch"],
+  body:has([data-public-business-theme="pencil-sketch"], [data-public-profile-theme="pencil-sketch"], [data-public-catalog-theme="pencil-sketch"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #fbfaf7;
+  --pt-ink: #2b2b2b;
+  --pt-accent: #333333;
+}
+
+.dark :is(
+  [data-public-business-theme="pencil-sketch"],
+  [data-public-catalog-theme="pencil-sketch"],
+  [data-public-profile-theme="pencil-sketch"],
+  [data-chat-theme="pencil-sketch"],
+  body:has([data-public-business-theme="pencil-sketch"], [data-public-profile-theme="pencil-sketch"], [data-public-catalog-theme="pencil-sketch"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #171717;
+  --pt-ink: #ececec;
+  --pt-accent: #d0d0d0;
+}
+
+:is(
+  [data-public-business-theme="glass-bubble"],
+  [data-public-catalog-theme="glass-bubble"],
+  [data-public-profile-theme="glass-bubble"],
+  [data-chat-theme="glass-bubble"],
+  body:has([data-public-business-theme="glass-bubble"], [data-public-profile-theme="glass-bubble"], [data-public-catalog-theme="glass-bubble"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #f3f4f8;
+  --pt-ink: #1e2433;
+  --pt-accent: #4f74d6;
+}
+
+.dark :is(
+  [data-public-business-theme="glass-bubble"],
+  [data-public-catalog-theme="glass-bubble"],
+  [data-public-profile-theme="glass-bubble"],
+  [data-chat-theme="glass-bubble"],
+  body:has([data-public-business-theme="glass-bubble"], [data-public-profile-theme="glass-bubble"], [data-public-catalog-theme="glass-bubble"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #0e1118;
+  --pt-ink: #eef1f8;
+  --pt-accent: #a8bcff;
+}
+
 /* Keep the first frame and the browser safe areas on the same canvas, even
    before PublicBrowserTheme mounts. Palette values match BLOUB_THEME_META. */
 html:has([data-public-browser-theme="planet-azure"]),
@@ -263,6 +360,46 @@ html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
   background-color: #181020;
 }
 
+html:has([data-public-browser-theme="retro-tv"]),
+body:has([data-public-browser-theme="retro-tv"]) {
+  background-color: #e9e4d8;
+}
+
+html.dark:has([data-public-browser-theme="retro-tv"]),
+html.dark body:has([data-public-browser-theme="retro-tv"]) {
+  background-color: #171816;
+}
+
+html:has([data-public-browser-theme="solid-gold"]),
+body:has([data-public-browser-theme="solid-gold"]) {
+  background-color: #faf6ee;
+}
+
+html.dark:has([data-public-browser-theme="solid-gold"]),
+html.dark body:has([data-public-browser-theme="solid-gold"]) {
+  background-color: #15110a;
+}
+
+html:has([data-public-browser-theme="pencil-sketch"]),
+body:has([data-public-browser-theme="pencil-sketch"]) {
+  background-color: #fbfaf7;
+}
+
+html.dark:has([data-public-browser-theme="pencil-sketch"]),
+html.dark body:has([data-public-browser-theme="pencil-sketch"]) {
+  background-color: #171717;
+}
+
+html:has([data-public-browser-theme="glass-bubble"]),
+body:has([data-public-browser-theme="glass-bubble"]) {
+  background-color: #f3f4f8;
+}
+
+html.dark:has([data-public-browser-theme="glass-bubble"]),
+html.dark body:has([data-public-browser-theme="glass-bubble"]) {
+  background-color: #0e1118;
+}
+
 /* ---- Shared token plumbing (same contract as retro-lcd) ------------------ */
 :is(
   [data-public-business-theme="astral-nebula"], [data-public-catalog-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"], [data-chat-theme="astral-nebula"],
@@ -273,6 +410,10 @@ html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
   [data-public-business-theme="planet-sage"], [data-public-catalog-theme="planet-sage"], [data-public-profile-theme="planet-sage"], [data-chat-theme="planet-sage"],
   [data-public-business-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-chat-theme="cosmic-space"],
   [data-public-business-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-chat-theme="cosmic-comic"],
+  [data-public-business-theme="retro-tv"], [data-public-catalog-theme="retro-tv"], [data-public-profile-theme="retro-tv"], [data-chat-theme="retro-tv"],
+  [data-public-business-theme="solid-gold"], [data-public-catalog-theme="solid-gold"], [data-public-profile-theme="solid-gold"], [data-chat-theme="solid-gold"],
+  [data-public-business-theme="pencil-sketch"], [data-public-catalog-theme="pencil-sketch"], [data-public-profile-theme="pencil-sketch"], [data-chat-theme="pencil-sketch"],
+  [data-public-business-theme="glass-bubble"], [data-public-catalog-theme="glass-bubble"], [data-public-profile-theme="glass-bubble"], [data-chat-theme="glass-bubble"],
   body:has(
     [data-public-business-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"],
     [data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"],
@@ -281,7 +422,11 @@ html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
     [data-public-business-theme="planet-rose"], [data-public-profile-theme="planet-rose"],
     [data-public-business-theme="planet-sage"], [data-public-profile-theme="planet-sage"],
     [data-public-business-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"],
-    [data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"]
+    [data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"],
+    [data-public-business-theme="retro-tv"], [data-public-profile-theme="retro-tv"], [data-public-catalog-theme="retro-tv"],
+    [data-public-business-theme="solid-gold"], [data-public-profile-theme="solid-gold"], [data-public-catalog-theme="solid-gold"],
+    [data-public-business-theme="pencil-sketch"], [data-public-profile-theme="pencil-sketch"], [data-public-catalog-theme="pencil-sketch"],
+    [data-public-business-theme="glass-bubble"], [data-public-profile-theme="glass-bubble"], [data-public-catalog-theme="glass-bubble"]
   ) > [data-slot="sheet-content"]
 ) {
   --profile-bg: var(--pt-paper);
@@ -323,7 +468,11 @@ html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
 [data-chat-theme="planet-rose"] h1,
 [data-chat-theme="planet-sage"] h1,
 [data-chat-theme="cosmic-space"] h1,
-[data-chat-theme="cosmic-comic"] h1 {
+[data-chat-theme="cosmic-comic"] h1,
+[data-chat-theme="retro-tv"] h1,
+[data-chat-theme="solid-gold"] h1,
+[data-chat-theme="pencil-sketch"] h1,
+[data-chat-theme="glass-bubble"] h1 {
   letter-spacing: -0.02em;
 }
 
@@ -335,7 +484,11 @@ html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
   [data-chat-theme="planet-rose"],
   [data-chat-theme="planet-sage"],
   [data-chat-theme="cosmic-space"],
-  [data-chat-theme="cosmic-comic"]
+  [data-chat-theme="cosmic-comic"],
+  [data-chat-theme="retro-tv"],
+  [data-chat-theme="solid-gold"],
+  [data-chat-theme="pencil-sketch"],
+  [data-chat-theme="glass-bubble"]
 ) input:not([type="checkbox"]) {
   border: 1px solid var(--border);
   background: var(--profile-elev);
@@ -350,7 +503,11 @@ html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
   [data-chat-theme="planet-rose"],
   [data-chat-theme="planet-sage"],
   [data-chat-theme="cosmic-space"],
-  [data-chat-theme="cosmic-comic"]
+  [data-chat-theme="cosmic-comic"],
+  [data-chat-theme="retro-tv"],
+  [data-chat-theme="solid-gold"],
+  [data-chat-theme="pencil-sketch"],
+  [data-chat-theme="glass-bubble"]
 ) [data-slot="chip"] {
   border-color: var(--border);
 }
@@ -363,7 +520,11 @@ html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
   [data-chat-theme="planet-rose"],
   [data-chat-theme="planet-sage"],
   [data-chat-theme="cosmic-space"],
-  [data-chat-theme="cosmic-comic"]
+  [data-chat-theme="cosmic-comic"],
+  [data-chat-theme="retro-tv"],
+  [data-chat-theme="solid-gold"],
+  [data-chat-theme="pencil-sketch"],
+  [data-chat-theme="glass-bubble"]
 ) [data-chat-bubble="assistant"] {
   border-color: var(--border);
   background: var(--profile-elev);
@@ -400,7 +561,11 @@ html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
   [data-public-catalog-theme="planet-rose"],
   [data-public-catalog-theme="planet-sage"],
   [data-public-catalog-theme="cosmic-space"],
-  [data-public-catalog-theme="cosmic-comic"]
+  [data-public-catalog-theme="cosmic-comic"],
+  [data-public-catalog-theme="retro-tv"],
+  [data-public-catalog-theme="solid-gold"],
+  [data-public-catalog-theme="pencil-sketch"],
+  [data-public-catalog-theme="glass-bubble"]
 ) {
   & :is(.text-zinc-100, .text-zinc-200, .text-zinc-300) {
     color: var(--profile-text);
@@ -432,7 +597,11 @@ html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
   [data-public-business-theme="planet-rose"],
   [data-public-business-theme="planet-sage"],
   [data-public-business-theme="cosmic-space"],
-  [data-public-business-theme="cosmic-comic"]
+  [data-public-business-theme="cosmic-comic"],
+  [data-public-business-theme="retro-tv"],
+  [data-public-business-theme="solid-gold"],
+  [data-public-business-theme="pencil-sketch"],
+  [data-public-business-theme="glass-bubble"]
 ) .pdp-v13.pdp-v13 {
   --pdp-bg: var(--profile-bg);
   --pdp-white: var(--profile-elev);
@@ -464,7 +633,11 @@ body:has(
   [data-public-business-theme="planet-rose"], [data-public-profile-theme="planet-rose"],
   [data-public-business-theme="planet-sage"], [data-public-profile-theme="planet-sage"],
   [data-public-business-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"],
-  [data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"]
+  [data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"],
+  [data-public-business-theme="retro-tv"], [data-public-profile-theme="retro-tv"], [data-public-catalog-theme="retro-tv"],
+  [data-public-business-theme="solid-gold"], [data-public-profile-theme="solid-gold"], [data-public-catalog-theme="solid-gold"],
+  [data-public-business-theme="pencil-sketch"], [data-public-profile-theme="pencil-sketch"], [data-public-catalog-theme="pencil-sketch"],
+  [data-public-business-theme="glass-bubble"], [data-public-profile-theme="glass-bubble"], [data-public-catalog-theme="glass-bubble"]
 ) > [data-slot="sheet-content"] {
   border-color: var(--border);
   & :is(.text-white, .text-zinc-100, .text-zinc-200, .text-zinc-300) {
@@ -627,5 +800,302 @@ body:has(
   & :is(input:not([type="checkbox"]), textarea):focus-visible {
     outline: 2px solid var(--pt-accent);
     outline-offset: 3px;
+  }
+}
+
+/* Telly: warm paper, faint horizontal scanlines, mono readouts on chips and
+   softly bevelled panels like a plastic television shell. */
+:is(
+  [data-public-business-theme="retro-tv"],
+  [data-public-catalog-theme="retro-tv"],
+  [data-public-profile-theme="retro-tv"],
+  [data-chat-theme="retro-tv"],
+  body:has([data-public-business-theme="retro-tv"], [data-public-profile-theme="retro-tv"], [data-public-catalog-theme="retro-tv"]) > [data-slot="sheet-content"]
+) {
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 94%, var(--pt-ink));
+  --profile-chip: color-mix(in srgb, var(--pt-paper) 88%, var(--pt-ink));
+  --border: color-mix(in srgb, var(--pt-ink) 22%, var(--pt-paper));
+  background-image:
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--pt-ink) 3.5%, transparent) 0 1px, transparent 1px 4px),
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--pt-accent) 10%, transparent), transparent 60%);
+
+  & :is(h1, h2, h3) {
+    letter-spacing: -0.015em;
+  }
+
+  & :is([data-slot="chip"], [data-chat-header] time, [data-chat-header] small) {
+    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+  }
+
+  & :is([data-slot="card"], [data-chat-bubble]) {
+    border-radius: 16px;
+    border-color: var(--border);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent),
+      0 1px 0 color-mix(in srgb, var(--pt-ink) 14%, transparent);
+  }
+
+  & [data-chat-bubble="assistant"] {
+    background: color-mix(in srgb, var(--pt-accent) 12%, var(--profile-elev));
+  }
+
+  & :is(input:not([type="checkbox"]), textarea) {
+    border-radius: 14px;
+    box-shadow: inset 0 2px 4px color-mix(in srgb, var(--pt-ink) 10%, transparent);
+  }
+
+  & [data-chat-header] {
+    border-bottom: 1px solid var(--border);
+    background-color: color-mix(in srgb, var(--pt-paper) 92%, transparent);
+    backdrop-filter: blur(10px);
+  }
+}
+
+.dark :is(
+  [data-public-business-theme="retro-tv"],
+  [data-public-profile-theme="retro-tv"],
+  [data-chat-theme="retro-tv"]
+) :is([data-slot="card"], [data-chat-bubble]) {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+}
+
+/* Aurum: ivory paper, a warm top light and thin gilded edges on controls. */
+:is(
+  [data-public-business-theme="solid-gold"],
+  [data-public-catalog-theme="solid-gold"],
+  [data-public-profile-theme="solid-gold"],
+  [data-chat-theme="solid-gold"],
+  body:has([data-public-business-theme="solid-gold"], [data-public-profile-theme="solid-gold"], [data-public-catalog-theme="solid-gold"]) > [data-slot="sheet-content"]
+) {
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 95%, var(--pt-accent));
+  --profile-chip: color-mix(in srgb, var(--pt-paper) 88%, var(--pt-accent));
+  --border: color-mix(in srgb, var(--pt-accent) 38%, var(--pt-paper));
+  background-image:
+    radial-gradient(ellipse at 50% -10%, color-mix(in srgb, var(--pt-accent) 18%, transparent), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, color-mix(in srgb, var(--pt-accent) 8%, transparent), transparent 45%);
+
+  & :is(h1, h2, h3) {
+    letter-spacing: -0.025em;
+  }
+
+  & :is([data-slot="card"], [data-chat-bubble]) {
+    border-radius: 22px;
+    border-color: var(--border);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 60%, transparent),
+      0 10px 30px color-mix(in srgb, var(--pt-accent) 12%, transparent);
+  }
+
+  & [data-chat-bubble="assistant"] {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--pt-accent) 10%, var(--profile-elev)), var(--profile-elev));
+  }
+
+  & [data-chat-bubble="visitor"] {
+    border-color: color-mix(in srgb, var(--pt-accent) 70%, var(--pt-ink));
+  }
+
+  & :is([data-slot="chip"], input:not([type="checkbox"]), textarea) {
+    border-radius: 999px;
+    border-color: var(--border);
+  }
+
+  & [data-chat-header] {
+    border-bottom: 1px solid var(--border);
+    background-color: color-mix(in srgb, var(--pt-paper) 90%, transparent);
+    backdrop-filter: blur(14px);
+  }
+}
+
+/* Doodle: a sketchbook page. Panels are drawn by hand: organic wobbly
+   corners, a second lighter pencil pass slightly off the first, hatched
+   shading on chips and the visitor's bubble, and a wavy underline under the
+   title. Pure CSS shapes, so nothing here costs a filter or a font. */
+:is(
+  [data-public-business-theme="pencil-sketch"],
+  [data-public-catalog-theme="pencil-sketch"],
+  [data-public-profile-theme="pencil-sketch"],
+  [data-chat-theme="pencil-sketch"],
+  body:has([data-public-business-theme="pencil-sketch"], [data-public-profile-theme="pencil-sketch"], [data-public-catalog-theme="pencil-sketch"]) > [data-slot="sheet-content"]
+) {
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 97%, var(--pt-ink));
+  --profile-chip: color-mix(in srgb, var(--pt-paper) 93%, var(--pt-ink));
+  --border: color-mix(in srgb, var(--pt-ink) 78%, var(--pt-paper));
+  --sk-faint: color-mix(in srgb, var(--pt-ink) 38%, var(--pt-paper));
+  --sk-hatch: repeating-linear-gradient(-45deg, transparent 0 4px, color-mix(in srgb, var(--pt-ink) 9%, transparent) 4px 5px);
+  --sk-wobble-a: 18px 26px 16px 30px / 28px 16px 30px 18px;
+  --sk-wobble-b: 26px 16px 30px 18px / 16px 30px 18px 28px;
+  --sk-wobble-chip: 14px 22px 12px 24px / 22px 12px 24px 14px;
+  background-image:
+    radial-gradient(circle at 11px 17px, color-mix(in srgb, var(--pt-ink) 6%, transparent) 0.6px, transparent 1px),
+    radial-gradient(circle at 53px 41px, color-mix(in srgb, var(--pt-ink) 5%, transparent) 0.6px, transparent 1px);
+  background-size: 67px 59px, 97px 83px;
+
+  & :is(h1, h2, h3) {
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  & h1 {
+    text-decoration: underline wavy var(--sk-faint);
+    text-decoration-thickness: 1.2px;
+    text-underline-offset: 7px;
+    text-decoration-skip-ink: none;
+  }
+
+  /* First pencil pass. */
+  & :is([data-slot="card"], [data-chat-bubble]) {
+    position: relative;
+    border: 1.6px solid var(--border);
+    border-radius: var(--sk-wobble-a);
+    box-shadow: none;
+  }
+
+  & [data-chat-bubble="visitor"] {
+    border-radius: var(--sk-wobble-b);
+  }
+
+  /* Second, lighter pass that does not quite line up with the first. */
+  & :is([data-slot="card"], [data-chat-bubble]:not(:empty))::before {
+    content: "";
+    position: absolute;
+    inset: -3px -2px -2px -3px;
+    border: 1.1px solid var(--sk-faint);
+    border-radius: var(--sk-wobble-b);
+    transform: rotate(-0.4deg);
+    pointer-events: none;
+  }
+
+  & [data-chat-bubble="visitor"]::before {
+    border-radius: var(--sk-wobble-a);
+    transform: rotate(0.5deg);
+  }
+
+  & :is([data-slot="card"], [data-chat-bubble="assistant"]) {
+    background: var(--profile-elev);
+    color: var(--pt-ink);
+  }
+
+  /* The visitor's message is pencilled in solid: ink fill, paper text and a
+     hint of hatching so it reads as shaded rather than printed. */
+  & [data-chat-bubble="visitor"] {
+    border-color: var(--pt-ink);
+    background: var(--pt-ink);
+    color: var(--pt-paper);
+    box-shadow: 2px 3px 0 -1px var(--sk-faint);
+  }
+
+  & [data-chat-bubble="visitor"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: repeating-linear-gradient(-45deg, transparent 0 3px, color-mix(in srgb, var(--pt-paper) 9%, transparent) 3px 4px);
+    pointer-events: none;
+  }
+
+  & :is([data-slot="chip"], input:not([type="checkbox"]), textarea) {
+    border: 1.5px solid var(--border);
+    border-radius: var(--sk-wobble-chip);
+    background-color: var(--pt-paper);
+    box-shadow: 1.5px 2px 0 -0.5px var(--sk-faint);
+  }
+
+  & [data-slot="chip"] {
+    background-image: var(--sk-hatch);
+    font-weight: 600;
+  }
+
+  & [data-chat-header] {
+    position: relative;
+    border-bottom: 1.6px solid var(--border);
+    background: var(--pt-paper);
+  }
+
+  & [data-chat-header]::after {
+    content: "";
+    position: absolute;
+    left: 6%;
+    right: 3%;
+    bottom: -4px;
+    height: 1.1px;
+    background: var(--sk-faint);
+    transform: rotate(0.25deg);
+    pointer-events: none;
+  }
+
+  & :is(input:not([type="checkbox"]), textarea):focus-visible {
+    outline: 1.6px solid var(--pt-ink);
+    outline-offset: 3px;
+    border-radius: var(--sk-wobble-chip);
+  }
+}
+
+/* Pearl: cool white, translucent frosted panels and pill-shaped controls. */
+:is(
+  [data-public-business-theme="glass-bubble"],
+  [data-public-catalog-theme="glass-bubble"],
+  [data-public-profile-theme="glass-bubble"],
+  [data-chat-theme="glass-bubble"],
+  body:has([data-public-business-theme="glass-bubble"], [data-public-profile-theme="glass-bubble"], [data-public-catalog-theme="glass-bubble"]) > [data-slot="sheet-content"]
+) {
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 92%, #fff);
+  --profile-chip: color-mix(in srgb, var(--pt-paper) 90%, var(--pt-accent));
+  --border: color-mix(in srgb, var(--pt-accent) 22%, var(--pt-paper));
+  background-image:
+    radial-gradient(ellipse at 20% 0%, color-mix(in srgb, #bcd4ff 30%, transparent), transparent 50%),
+    radial-gradient(ellipse at 90% 30%, color-mix(in srgb, #f4c6f0 22%, transparent), transparent 45%),
+    radial-gradient(ellipse at 40% 100%, color-mix(in srgb, #c9f7e8 22%, transparent), transparent 50%);
+
+  & :is(h1, h2, h3) {
+    letter-spacing: -0.03em;
+  }
+
+  & :is([data-slot="card"], [data-chat-bubble]) {
+    border-radius: 24px;
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 80%, transparent),
+      0 12px 32px color-mix(in srgb, var(--pt-accent) 10%, transparent);
+  }
+
+  & :is([data-slot="card"], [data-chat-bubble="assistant"]) {
+    border-color: color-mix(in srgb, #fff 70%, var(--border));
+    background-color: color-mix(in srgb, var(--profile-elev) 78%, transparent);
+    backdrop-filter: blur(18px);
+  }
+
+  & :is([data-slot="chip"], input:not([type="checkbox"]), textarea) {
+    border-radius: 999px;
+    border-color: color-mix(in srgb, #fff 60%, var(--border));
+    background-color: color-mix(in srgb, var(--profile-elev) 82%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  & [data-chat-header] {
+    border-bottom: 1px solid var(--border);
+    background-color: color-mix(in srgb, var(--pt-paper) 80%, transparent);
+    backdrop-filter: blur(20px);
+  }
+}
+
+.dark :is(
+  [data-public-business-theme="glass-bubble"],
+  [data-public-catalog-theme="glass-bubble"],
+  [data-public-profile-theme="glass-bubble"],
+  [data-chat-theme="glass-bubble"]
+) {
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 90%, #fff);
+  background-image:
+    radial-gradient(ellipse at 20% 0%, color-mix(in srgb, #7ea3ff 14%, transparent), transparent 50%),
+    radial-gradient(ellipse at 90% 30%, color-mix(in srgb, #e39be0 10%, transparent), transparent 45%);
+
+  & :is([data-slot="card"], [data-chat-bubble], [data-slot="chip"], input:not([type="checkbox"]), textarea) {
+    border-color: color-mix(in srgb, #fff 12%, var(--border));
+  }
+
+  & :is([data-slot="card"], [data-chat-bubble]) {
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
   }
 }

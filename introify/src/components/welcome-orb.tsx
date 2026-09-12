@@ -10,6 +10,7 @@ import { RetroLcdOrb } from "@/components/retro-lcd-orb"
 import { PremiumThemeOrb } from "@/components/premium-theme-orb"
 import { PlanetOrb, isPlanetOrbVariant } from "@/components/planet-orb"
 import { CosmicOrb, isCosmicOrbVariant } from "@/components/cosmic-orb"
+import { MascotOrb, isMascotOrbVariant } from "@/components/mascot-orb"
 import { ProfileOrbit } from "@/components/profile-orbit"
 import { BotAura } from "@/components/bot-aura"
 import { botExpressionStyle, resolveBotExpression } from "@/lib/bot-expression"
@@ -279,6 +280,17 @@ export function WelcomeOrb({
                         frozenAt={frozenAt}
                         speed={speed}
                         intensity={intensity}
+                        mood={delighted ? "react" : mood}
+                    />
+                ) : isMascotOrbVariant(themed) ? (
+                    <MascotOrb
+                        variant={themed}
+                        size={size}
+                        gaze={look}
+                        lid={lid}
+                        expression={liveExpression}
+                        still={paused || reducedMotion || frozenAt !== undefined}
+                        aura="still"
                         mood={delighted ? "react" : mood}
                     />
                 ) : isPlanetOrbVariant(themed) ? (

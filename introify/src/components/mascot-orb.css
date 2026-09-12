@@ -1,0 +1,265 @@
+.mo-orb {
+  display: block;
+  flex: none;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.mo-body,
+.mo-character,
+.mo-face,
+.mo-eye,
+.mo-mouth,
+.mo-shadow,
+.mo-sketch-lines,
+.mo-bubble-rim {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.mo-eye {
+  transition: transform 140ms ease;
+}
+
+/* Shared moods ------------------------------------------------------------ */
+
+.mo-orb[data-still="false"] .mo-character {
+  animation: mo-float 4s ease-in-out infinite;
+}
+
+.mo-orb[data-still="false"] .mo-shadow {
+  animation: mo-shadow 4s ease-in-out infinite;
+}
+
+.mo-orb[data-still="false"][data-mood="greeting"] .mo-character {
+  animation: mo-greeting 1.2s ease-out 1;
+}
+
+.mo-orb[data-still="false"][data-mood="listening"] .mo-character {
+  animation: mo-listening 2.2s ease-in-out infinite;
+}
+
+.mo-orb[data-still="false"][data-mood="thinking"] .mo-face {
+  animation: mo-thinking 2.4s ease-in-out infinite;
+}
+
+.mo-orb[data-still="false"][data-mood="speaking"] .mo-mouth {
+  animation: mo-speaking 0.42s ease-in-out infinite alternate;
+}
+
+.mo-orb[data-still="false"][data-mood="success"] .mo-character,
+.mo-orb[data-still="false"][data-mood="react"] .mo-character {
+  animation: mo-celebrate 0.8s ease-out 1;
+}
+
+.mo-orb[data-still="false"][data-mood="error"] .mo-character {
+  animation: mo-error 0.65s ease-in-out 1;
+}
+
+@keyframes mo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes mo-shadow {
+  0%, 100% { transform: scaleX(1); opacity: 1; }
+  50% { transform: scaleX(0.9); opacity: 0.72; }
+}
+
+@keyframes mo-greeting {
+  0%, 60%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-9px); }
+  75% { transform: translateY(-3px); }
+}
+
+@keyframes mo-listening {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(2px) rotate(-2deg); }
+}
+
+@keyframes mo-thinking {
+  0%, 100% { transform: translate(0, 0); }
+  30% { transform: translate(-5px, -3px); }
+  70% { transform: translate(5px, -3px); }
+}
+
+@keyframes mo-speaking {
+  from { transform: scale(1, 0.55); }
+  to { transform: scale(1.06, 1); }
+}
+
+@keyframes mo-celebrate {
+  0%, 60%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-8px) scale(1.04); }
+}
+
+@keyframes mo-error {
+  0%, 50%, 100% { transform: translateX(0); }
+  20%, 70% { transform: translateX(-4px); }
+  35%, 85% { transform: translateX(4px); }
+}
+
+/* Telly — sits on its shelf; the tube does the moving --------------------- */
+
+.mo-orb--retro-tv[data-still="false"] .mo-character {
+  animation: none;
+}
+
+.mo-orb--retro-tv[data-still="false"] .mo-tv-glow {
+  animation: mo-tv-glow 4.2s ease-in-out infinite;
+}
+
+.mo-orb--retro-tv[data-still="false"][data-mood="listening"] .mo-tv-glow {
+  animation: mo-tv-glow 1.4s ease-in-out infinite;
+}
+
+.mo-orb--retro-tv[data-still="false"][data-mood="thinking"] .mo-tv-scan {
+  animation: mo-tv-roll 1.1s linear infinite;
+}
+
+.mo-orb--retro-tv[data-still="false"][data-mood="greeting"] .mo-character,
+.mo-orb--retro-tv[data-still="false"][data-mood="success"] .mo-character,
+.mo-orb--retro-tv[data-still="false"][data-mood="react"] .mo-character {
+  animation: mo-tv-hop 0.7s ease-out 1;
+}
+
+.mo-orb--retro-tv[data-still="false"][data-mood="error"] .mo-character {
+  animation: mo-error 0.65s ease-in-out 1;
+}
+
+@keyframes mo-tv-glow {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.16; }
+}
+
+@keyframes mo-tv-roll {
+  to { transform: translateY(6px); }
+}
+
+@keyframes mo-tv-hop {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  35% { transform: translateY(-7px) scale(0.98, 1.03); }
+  70% { transform: translateY(0) scale(1.02, 0.97); }
+}
+
+/* Aurum — heavy float and a light sweep when it pays attention ------------ */
+
+.mo-orb--solid-gold[data-still="false"] .mo-character {
+  animation-duration: 5s;
+}
+
+.mo-orb--solid-gold[data-still="false"][data-mood="listening"] .mo-gold-sweep,
+.mo-orb--solid-gold[data-still="false"][data-mood="greeting"] .mo-gold-sweep,
+.mo-orb--solid-gold[data-still="false"][data-mood="success"] .mo-gold-sweep {
+  animation: mo-gold-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes mo-gold-sweep {
+  0% { transform: skewX(-18deg) translateX(-30px); opacity: 0; }
+  40%, 60% { opacity: 0.5; }
+  100% { transform: skewX(-18deg) translateX(230px); opacity: 0; }
+}
+
+/* Doodle — graphite on paper, chalk on slate; a hand-drawn "boil" --------- */
+
+.mo-sketch-ink {
+  stroke: #3d3d3d;
+  color: #3d3d3d;
+}
+
+.mo-sketch-eye {
+  fill: #2f2f2f;
+}
+
+.mo-sketch-fill {
+  fill: #fff;
+  opacity: 0.6;
+}
+
+.dark .mo-sketch-ink {
+  stroke: #dcdcdc;
+  color: #dcdcdc;
+}
+
+.dark .mo-sketch-eye {
+  fill: #ececec;
+}
+
+.dark .mo-sketch-fill {
+  fill: #262626;
+  opacity: 0.7;
+}
+
+.mo-orb--pencil-sketch[data-still="false"] .mo-character,
+.mo-orb--pencil-sketch[data-still="false"] .mo-shadow {
+  animation: none;
+}
+
+.mo-orb--pencil-sketch[data-still="false"] .mo-sketch-lines {
+  animation: mo-boil 1.6s steps(2, jump-none) infinite;
+}
+
+.mo-orb--pencil-sketch[data-still="false"][data-mood="thinking"] .mo-sketch-lines {
+  animation: mo-spin 18s linear infinite;
+}
+
+.mo-orb--pencil-sketch[data-still="false"][data-mood="listening"] .mo-sketch-lines {
+  animation: mo-boil 0.9s steps(2, jump-none) infinite;
+}
+
+.mo-orb--pencil-sketch[data-still="false"][data-mood="greeting"] .mo-character,
+.mo-orb--pencil-sketch[data-still="false"][data-mood="success"] .mo-character,
+.mo-orb--pencil-sketch[data-still="false"][data-mood="react"] .mo-character {
+  animation: mo-celebrate 0.8s ease-out 1;
+}
+
+.mo-orb--pencil-sketch[data-still="false"][data-mood="error"] .mo-character {
+  animation: mo-error 0.65s ease-in-out 1;
+}
+
+@keyframes mo-boil {
+  0% { transform: rotate(-1deg) translate(0.4px, -0.3px); }
+  100% { transform: rotate(1deg) translate(-0.4px, 0.3px); }
+}
+
+@keyframes mo-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Pearl — a bubble's wobble and a slowly turning iridescent rim ----------- */
+
+.mo-orb--glass-bubble[data-still="false"] .mo-body {
+  animation: mo-wobble 3.4s ease-in-out infinite;
+}
+
+.mo-orb--glass-bubble[data-still="false"] .mo-bubble-rim {
+  animation: mo-spin 22s linear infinite;
+}
+
+.mo-orb--glass-bubble[data-still="false"][data-mood="listening"] .mo-bubble-rim {
+  animation-duration: 6s;
+}
+
+@keyframes mo-wobble {
+  0%, 100% { transform: scale(1, 1); }
+  33% { transform: scale(1.012, 0.988); }
+  66% { transform: scale(0.99, 1.01); }
+}
+
+/* Small decorative orbs stay calm ----------------------------------------- */
+
+.is-compact .mo-orb .mo-decor {
+  display: none;
+}
+
+.mo-orb[data-still="true"] * {
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mo-orb * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -83,9 +83,15 @@ export const DEFAULT_AURA: AuraId = "pulse"
 
 export type PlanetThemeId = "planet-azure" | "planet-rose" | "planet-sage"
 export type CosmicThemeId = "cosmic-space" | "cosmic-comic"
-export type BloubThemeId = "classic" | "retro-lcd" | "astral-nebula" | "holographic-hud" | "liquid-chrome" | PlanetThemeId | CosmicThemeId
+export type MascotThemeId = "retro-tv" | "solid-gold" | "pencil-sketch" | "glass-bubble"
+export type BloubThemeId = "classic" | "retro-lcd" | "astral-nebula" | "holographic-hud" | "liquid-chrome" | PlanetThemeId | CosmicThemeId | MascotThemeId
 export const PLANET_THEMES: readonly PlanetThemeId[] = ["planet-azure", "planet-rose", "planet-sage"]
 export const COSMIC_THEMES: readonly CosmicThemeId[] = ["cosmic-space", "cosmic-comic"]
+export const MASCOT_THEMES: readonly MascotThemeId[] = ["retro-tv", "solid-gold", "pencil-sketch", "glass-bubble"]
+
+export function isMascotTheme(theme?: string | null): theme is MascotThemeId {
+    return MASCOT_THEMES.includes(theme as MascotThemeId)
+}
 
 export function isPlanetTheme(theme?: string | null): theme is PlanetThemeId {
     return PLANET_THEMES.includes(theme as PlanetThemeId)
@@ -103,6 +109,10 @@ export const BLOUB_THEMES: { id: BloubThemeId; label: string; description: strin
     { id: "planet-sage", label: "Sage", description: "" },
     { id: "cosmic-space", label: "Space", description: "" },
     { id: "cosmic-comic", label: "Comic", description: "" },
+    { id: "retro-tv", label: "Retro TV", description: "" },
+    { id: "solid-gold", label: "Solid Gold", description: "" },
+    { id: "pencil-sketch", label: "Pencil Sketch", description: "" },
+    { id: "glass-bubble", label: "Glass Bubble", description: "" },
     { id: "astral-nebula", label: "Astral Nebula", description: "" },
     { id: "holographic-hud", label: "Hologram", description: "" },
     { id: "liquid-chrome", label: "Liquid Chrome", description: "" },
@@ -157,6 +167,30 @@ export const BLOUB_THEME_META: Partial<Record<BloubThemeId, BloubThemeMeta>> = {
         thumb: { bg: "#081710", dot: "#9ed2ac", bar: "#9ed2ac" },
         thumbLight: { bg: "#edf6ef", dot: "#35734e", bar: "#203e2b" },
         note: "Sage green and soft mint, with a matching light and dark canvas.",
+    },
+    "retro-tv": {
+        canvas: { light: "#e9e4d8", dark: "#171816" },
+        thumb: { bg: "#171816", dot: "#8fb0a2", bar: "#b9b3a4" },
+        thumbLight: { bg: "#e9e4d8", dot: "#6f8f82", bar: "#4a4a45" },
+        note: "Warm paper, a sage-green tube screen and mono readouts, dimmed to a late-night lounge in dark mode.",
+    },
+    "solid-gold": {
+        canvas: { light: "#faf6ee", dark: "#15110a" },
+        thumb: { bg: "#15110a", dot: "#e6b94e", bar: "#8a6a2a" },
+        thumbLight: { bg: "#faf6ee", dot: "#c9971d", bar: "#5a4620" },
+        note: "Polished gold on warm ivory, with a candle-lit dark edition.",
+    },
+    "pencil-sketch": {
+        canvas: { light: "#fbfaf7", dark: "#171717" },
+        thumb: { bg: "#171717", dot: "#d4d4d4", bar: "#8a8a8a" },
+        thumbLight: { bg: "#fbfaf7", dot: "#333333", bar: "#8a8a8a" },
+        note: "Graphite scribbles on clean paper, switching to chalk on slate in dark mode.",
+    },
+    "glass-bubble": {
+        canvas: { light: "#f3f4f8", dark: "#0e1118" },
+        thumb: { bg: "#0e1118", dot: "#a8bcff", bar: "#6a7fb3" },
+        thumbLight: { bg: "#f3f4f8", dot: "#5a7fe0", bar: "#3a4463" },
+        note: "A soft iridescent bubble on cool white, glowing gently on a midnight canvas.",
     },
     "retro-lcd": {
         canvas: { light: "#c4d58a", dark: "#10170f" },
@@ -335,6 +369,10 @@ export const INCLUDED_BLOUB_BOTS: BloubBot[] = [
     { id: "cercle", label: "LCD", expression: "centre", color: "vert", aura: "still", theme: "retro-lcd" },
     { id: "cercle", label: "Azure", expression: "centre", color: "bleu", aura: "breathe", theme: "planet-azure", themes: PLANET_THEMES },
     { id: "cercle", label: "Nova", expression: "centre", color: "violet", aura: "breathe", theme: "cosmic-space", themes: COSMIC_THEMES },
+    { id: "cercle", label: "Telly", expression: "heureux", color: "vert", aura: "still", theme: "retro-tv" },
+    { id: "cercle", label: "Aurum", expression: "centre", color: "ambre", aura: "breathe", theme: "solid-gold" },
+    { id: "cercle", label: "Doodle", expression: "centre", color: "gris", aura: "still", theme: "pencil-sketch" },
+    { id: "cercle", label: "Pearl", expression: "heureux", color: "bleu", aura: "breathe", theme: "glass-bubble" },
 ]
 
 export const PREMIUM_BLOUB_BOTS: BloubBot[] = [
