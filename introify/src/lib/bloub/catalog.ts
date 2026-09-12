@@ -191,10 +191,11 @@ export function blobColorFromIndex(index: number) {
     return BLOB_COLOR_STOPS[i]
 }
 
-export function blobPickFromColorIndex(index: number): Partial<BloubPick> {
+export function blobPickFromColorIndex(index: number, look?: OrbLook | string | null): Partial<BloubPick> {
     const stop = blobColorFromIndex(index)
+    const resolved = resolveOrbLook(look)
     return {
-        look: "bloub",
+        look: resolved === "glass" ? "glass" : "bloub",
         theme: "classic",
         variant: stop.id,
         color: VARIANT_COLOR[stop.id],
@@ -202,7 +203,7 @@ export function blobPickFromColorIndex(index: number): Partial<BloubPick> {
 }
 
 export type CustomizerBot = {
-    id: "blob" | PixelSkin
+    id: "blob" | "glow" | PixelSkin
     label: string
     look: OrbLook
     skin?: PixelSkin
@@ -211,6 +212,7 @@ export type CustomizerBot = {
 
 export const CUSTOMIZER_BOTS: CustomizerBot[] = [
     { id: "blob", label: "Blob", look: "bloub" },
+    { id: "glow", label: "Glow", look: "glass" },
     { id: "bit", label: "8-Bit", look: "pixel", skin: "bit", premium: true },
     { id: "crt", label: "CRT", look: "pixel", skin: "crt", premium: true },
     { id: "spark", label: "Spark", look: "pixel", skin: "spark", premium: true },
@@ -230,6 +232,16 @@ export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Parti
     if (bot.look === "pixel") {
         return { look: "pixel", skin: bot.skin, theme: "classic", shape: "cercle" }
     }
+    if (bot.look === "glass") {
+        return {
+            look: "glass",
+            skin: undefined,
+            theme: "classic",
+            shape: "cercle",
+            variant: current.variant || "aqua",
+            color: current.variant ? VARIANT_COLOR[current.variant] : current.color,
+        }
+    }
     return {
         look: "bloub",
         skin: undefined,
@@ -242,6 +254,7 @@ export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Parti
 
 export function isCustomizerBotSelected(bot: CustomizerBot, value: BloubPick) {
     if (bot.look === "pixel") return value.look === "pixel" && value.skin === bot.skin
+    if (bot.look === "glass") return resolveOrbLook(value.look) === "glass" && value.theme === "classic"
     return resolveOrbLook(value.look) === "bloub" && value.theme === "classic"
 }
 
@@ -281,13 +294,16 @@ export function isNamedBloubBotSelected(bot: BloubBot, value: BloubPick) {
 
 /** Chat themes that belong to the selected bot — Look never lists every theme. */
 export function lookThemesFor(value: BloubPick) {
-    if (resolveOrbLook(value.look) === "pixel") return []
+    if (resolveOrbLook(value.look) === "pixel" || resolveOrbLook(value.look) === "glass") return []
     const theme = resolveBloubTheme(value.theme)
     return BLOUB_THEMES.filter((item) => item.id === theme)
 }
 
 export function usesBlobColorSlider(value: BloubPick) {
-    return resolveOrbLook(value.look) !== "pixel" && !resolveThemedOrb(value.theme)
+    const look = resolveOrbLook(value.look)
+    if (look === "pixel") return false
+    if (look === "glass") return true
+    return !resolveThemedOrb(value.theme)
 }
 
 export function usesBlobShapes(value: BloubPick) {

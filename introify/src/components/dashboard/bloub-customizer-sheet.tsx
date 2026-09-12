@@ -89,7 +89,7 @@ export function BloubCustomizerSheet({
                             {showSlider ? (
                                 <section className="space-y-2">
                                     <p className="text-xs font-medium">Colour</p>
-                                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i))} />
+                                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i, value.look))} />
                                 </section>
                             ) : null}
                             {showShapes ? (

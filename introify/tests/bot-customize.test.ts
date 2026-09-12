@@ -5,7 +5,7 @@ import { typingInputGaze } from "@/lib/chat-gaze"
 
 describe("customise bots", () => {
     it("shows Blob, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
-        expect(CUSTOMIZER_BOTS.map((bot) => bot.label)).toEqual(["Blob", "8-Bit", "CRT", "Spark"])
+        expect(CUSTOMIZER_BOTS.map((bot) => bot.label)).toEqual(["Blob", "Glow", "8-Bit", "CRT", "Spark"])
         expect(INCLUDED_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["LCD"])
         expect(PREMIUM_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Nyx", "Ion", "Vex"])
         expect(BLOB_SHAPES.map((item) => item.label)).toEqual(["Circle", "Sol", "Lux", "Sky", "Dew"])
@@ -25,6 +25,7 @@ describe("customise bots", () => {
         }
         expect(lookThemesFor(DEFAULT_BLOUB_PICK).map((theme) => theme.id)).toEqual(["classic"])
         expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "pixel", skin: "crt" })).toEqual([])
+        expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "glass" })).toEqual([])
         expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, theme: "astral-nebula" }).map((theme) => theme.id)).toEqual(["astral-nebula"])
     })
 })

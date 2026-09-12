@@ -70,6 +70,8 @@ describe("included bots on onboarding and profile", () => {
         )
         fireEvent.click(screen.getByRole("button", { name: "Blob" }))
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "bloub" }))
+        fireEvent.click(screen.getByRole("button", { name: "Glow" }))
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "glass" }))
         fireEvent.click(screen.getByRole("button", { name: "CRT, premium" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ skin: "crt" }))
         expect(screen.getByRole("button", { name: "Spark, premium" })).toBeTruthy()
@@ -146,6 +148,22 @@ describe("included bots on onboarding and profile", () => {
         expect(screen.queryByLabelText("Classic theme")).toBeNull()
         expect(screen.queryByRole("slider", { name: "Colour" })).toBeNull()
         expect(screen.queryByRole("button", { name: "Sol" })).toBeNull()
+    })
+
+    it("gives Glow the six former colour bots as Look colours", () => {
+        const onChange = vi.fn()
+        render(<BloubCustomizerSheet open onClose={() => {}} value={{ ...DEFAULT_BLOUB_PICK, look: "glass" }} onChange={onChange} premium />)
+        fireEvent.click(screen.getByRole("tab", { name: "Look" }))
+        expect(screen.getByRole("button", { name: "Aqua" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Forest" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Ember" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Violet" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Sunrise" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Ice" })).toBeTruthy()
+        expect(screen.queryByLabelText("Classic theme")).toBeNull()
+        expect(screen.queryByRole("button", { name: "Sol" })).toBeNull()
+        fireEvent.click(screen.getByRole("button", { name: "Violet" }))
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "glass", variant: "violet" }))
     })
 
     it("paints a different still face for each Blob mood", () => {

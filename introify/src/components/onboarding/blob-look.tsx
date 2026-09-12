@@ -98,7 +98,7 @@ export function BlobLookStudio({
             {showSlider ? (
                 <section className="space-y-3">
                     <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Colour</p>
-                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i))} />
+                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i, value.look))} />
                 </section>
             ) : null}
 
