@@ -10,6 +10,7 @@ import { generateSuggestions } from "@/lib/suggestions"
 import { maybeSummarizeConversation, visitorKeyFrom } from "@/lib/memory"
 import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
+import { resolveKitRole } from "@/lib/role-alias"
 import { createOwnershipFoundation, ownershipRefusalResponse } from "@/lib/security"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { boundedChatInput, clipUtf8, resolveApiRecipe, streamChatWithFailover, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
@@ -31,6 +32,33 @@ export {
 
 const VISITOR_COOKIE = "pl_vid"
 const VISITOR_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
+
+export function chatProviderTimeoutMs() {
+    const n = Number(process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS)
+    if (Number.isFinite(n) && n >= 20) return Math.min(n, 60_000)
+    return 20_000
+}
+
+function raceWithTimeout<T>(work: Promise<T>, ms: number, signal: AbortSignal): Promise<T> {
+    return new Promise((resolve, reject) => {
+        if (signal.aborted) {
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" }))
+            return
+        }
+        const timer = setTimeout(() => {
+            reject(Object.assign(new Error("provider_timeout"), { name: "TimeoutError" }))
+        }, ms)
+        const onAbort = () => {
+            clearTimeout(timer)
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" }))
+        }
+        signal.addEventListener("abort", onAbort, { once: true })
+        work.then(
+            (value) => { clearTimeout(timer); signal.removeEventListener("abort", onAbort); resolve(value) },
+            (error) => { clearTimeout(timer); signal.removeEventListener("abort", onAbort); reject(error) },
+        )
+    })
+}
 
 const CONVERSATION_FORBIDDEN = Object.freeze({
     code: "FORBIDDEN" as const,
@@ -242,7 +270,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             visitorId = existing.visitorId
         }
 
-        const restaurantDesk = profile.roleTemplate === "RESTAURANT"
+        const restaurantDesk = resolveKitRole(profile.roleTemplate) === "RESTAURANT"
         if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk && liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED")) {
             return new Response(
                 JSON.stringify({ error: "ai_not_configured", message: "The AI assistant is temporarily unavailable. You can still use this business's contact and booking options." }),
@@ -818,6 +846,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         if (req.signal.aborted) { await settle("RELEASE", { reason: "cancelled_before_dispatch" }); return new Response(null, { status: 499 }) }
         providerStarted = true
         const responseAbort = new AbortController()
+        const timeoutMs = chatProviderTimeoutMs()
         const responseSignal = AbortSignal.any([req.signal, responseAbort.signal])
         const encoder = new TextEncoder()
         let fullResponse = ""
@@ -828,7 +857,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 const emit = (text: string) => { if (!cancelled) controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`)) }
                 try {
                     emit("")
-                    const response = await createCompletion(input, recipe, responseSignal)
+                    const response = await raceWithTimeout(createCompletion(input, recipe, responseSignal), timeoutMs, responseSignal)
                     for await (const chunk of response) {
                         if (responseSignal.aborted || cancelled) return
                         if (chunk.model) returnedModel = chunk.model
@@ -877,6 +906,20 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                     }
                     if (memoryAllowed) void summarizeConversation(authorizedConversationId).catch(() => {})
                 } catch (error) {
+                    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.message === "provider_timeout")
+                    if (timedOut && !cancelled && !req.signal.aborted) {
+                        responseAbort.abort()
+                        await settle("RELEASE", { reason: "provider_timeout" })
+                        const fallback = clipUtf8(await groundedFallback(), 4000)
+                        fullResponse = fallback
+                        emit(fallback)
+                        await db.message.create({ data: { conversationId: authorizedConversationId, senderType: "AI", text: fullResponse, role: "assistant" } })
+                        if (!cancelled) {
+                            controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions: generateSuggestions(fullResponse, profile.displayName) })}\n`))
+                            controller.close()
+                        }
+                        return
+                    }
                     if (providerRejectedWithoutSpend(error)) await settle("RELEASE", { reason: "provider_rejected" })
                     if (!cancelled) controller.error(new Error("The reply could not be completed. Please check the conversation before retrying."))
                 }

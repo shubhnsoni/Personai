@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest"
 import { CUSTOMIZER_BOTS, BLOB_COLOR_STOPS, BLOB_SHAPES, blobColorFromIndex, blobColorIndex, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, BLOUB_THEMES, DEFAULT_BLOUB_PICK, lookThemesFor } from "@/lib/bloub/catalog"
-import { typingInputGaze } from "@/lib/chat-gaze"
+import { assistantPendingPhrase, typingInputGaze } from "@/lib/chat-gaze"
 
 describe("customise bots", () => {
     it("shows Blob, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
@@ -33,6 +33,14 @@ describe("customise bots", () => {
 describe("blob gaze while typing", () => {
     it("looks straight ahead when the composer is idle", () => {
         expect(typingInputGaze(0, false)).toBeNull()
+    })
+
+    it("keeps pending chat copy as full phrases that dwell for seconds", () => {
+        expect(assistantPendingPhrase("SkyDine", 0)).toBe("thinking this through")
+        expect(assistantPendingPhrase("SkyDine", 3199)).toBe("thinking this through")
+        expect(assistantPendingPhrase("SkyDine", 3200)).toBe("reading your message")
+        expect(assistantPendingPhrase("SkyDine", 12800)).toMatch(/SkyDine/)
+        expect(assistantPendingPhrase("SkyDine", 0).split(" ").length).toBeGreaterThan(1)
     })
 
     it("looks down and tracks left to right as the composer fills", () => {

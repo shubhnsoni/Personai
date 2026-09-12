@@ -20,7 +20,7 @@ import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { wantsLiveSupport } from "@/lib/live-support"
 import { toast } from "sonner"
 import { resolveBloubTheme, resolveThemedOrb } from "@/lib/bloub/catalog"
-import { assistantPendingPhrase, typingInputGaze } from "@/lib/chat-gaze"
+import { ASSISTANT_PENDING_DWELL_MS, assistantPendingPhrase, typingInputGaze } from "@/lib/chat-gaze"
 import type { PublicAnimationConfig } from "@/lib/profile-branding"
 import { subscribeVisualKeyboard, visualKeyboardOpen } from "@/lib/visual-keyboard"
 import "@/components/profile/retro-lcd-theme.css"
@@ -190,6 +190,11 @@ export function ChatInterface({
         abortControllerRef.current?.abort()
         const abort = new AbortController()
         abortControllerRef.current = abort
+        let timedOut = false
+        const timeout = window.setTimeout(() => {
+            timedOut = true
+            abort.abort()
+        }, 22_000)
 
         const userMessage: ChatMessage = {
             id: crypto.randomUUID(),
@@ -291,7 +296,7 @@ export function ChatInterface({
             }
             return openId
         } catch (error) {
-            if ((error as Error).name === "AbortError") return conversationId
+            if ((error as Error).name === "AbortError" && !timedOut) return conversationId
             console.error("Chat error:", error)
 
             const errorMsg = (error as Error).message
@@ -324,6 +329,7 @@ export function ChatInterface({
             })
             return conversationId
         } finally {
+            window.clearTimeout(timeout)
             setIsLoading(false)
         }
     }, [messages, profile.id, conversationId, visitorId, isLoading, chatMode, memoryConsent])
@@ -1117,7 +1123,7 @@ function PendingStatus({ name }: { name: string }) {
     const [elapsed, setElapsed] = useState(0)
     useEffect(() => {
         const started = Date.now()
-        const id = window.setInterval(() => setElapsed(Date.now() - started), 1600)
+        const id = window.setInterval(() => setElapsed(Date.now() - started), ASSISTANT_PENDING_DWELL_MS)
         return () => window.clearInterval(id)
     }, [])
     return (

@@ -152,7 +152,7 @@ async function dispatchChatStream(
     signal?: AbortSignal,
 ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
     if (recipe.provider === "codex") return boundedCodexChatStream(input, recipe, signal)
-    if (recipe.provider === "xai") return boundedXaiChatStream(input, recipe)
+    if (recipe.provider === "xai") return boundedXaiChatStream(input, recipe, signal)
     return apiClient(recipe).chat.completions.create(input, { signal })
 }
 
@@ -254,7 +254,7 @@ export function boundedChatInput(
 }
 
 /** xAI chat limits exclude reasoning/tool arguments. Responses caps their total. */
-export async function boundedXaiResponse(input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming, recipe: ApiRecipe, json = false) {
+export async function boundedXaiResponse(input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming, recipe: ApiRecipe, json = false, signal?: AbortSignal) {
     if (recipe.provider !== "xai") throw new Error("Wrong provider")
     return apiClient(recipe).responses.create({
         model: recipe.model,
@@ -265,15 +265,15 @@ export async function boundedXaiResponse(input: OpenAI.Chat.Completions.ChatComp
         store: false,
         stream: false,
         ...(json ? { text: { format: { type: "json_object" as const } } } : {}),
-    })
+    }, { signal, timeout: 20_000 })
 }
 
 export function xaiResponseText(response: OpenAI.Responses.Response) {
     return response.output.flatMap(output => output.type === "message" ? output.content.flatMap(content => content.type === "output_text" ? [content.text] : []) : []).join("")
 }
 
-export async function boundedXaiChatStream(input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming, recipe: ApiRecipe): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
-    const result = await boundedXaiResponse(input, recipe)
+export async function boundedXaiChatStream(input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming, recipe: ApiRecipe, signal?: AbortSignal): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
+    const result = await boundedXaiResponse(input, recipe, false, signal)
     const functions = result.output.filter(output => output.type === "function_call").slice(0, 1)
     const base = { id: result.id, object: "chat.completion.chunk" as const, created: result.created_at, model: result.model }
     return { async *[Symbol.asyncIterator]() {

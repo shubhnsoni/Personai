@@ -98,6 +98,17 @@ describe("metered public chat", () => {
         expect((await handler()(request())).status).toBe(status)
         for (const call of [retrieve, complete, db.conversation.create, db.message.create, db.visitorLead.create]) expect(call).not.toHaveBeenCalled()
     })
+    it("falls back to a desk reply when the provider never starts streaming", async () => {
+        process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS = "40"
+        complete.mockImplementation(() => new Promise(() => {}))
+        const response = await handler()(request())
+        const text = await response.text()
+        expect(response.status).toBe(200)
+        expect(text).toContain("Studio")
+        expect(settle).toHaveBeenCalledWith("reservation", "RELEASE", expect.objectContaining({ reason: "provider_timeout" }))
+        delete process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS
+    })
+
     it("requires a client id before any reservation", async () => {
         expect((await handler()(request({}, "", null))).status).toBe(400)
         expect(reserve).not.toHaveBeenCalled()
