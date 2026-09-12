@@ -22,13 +22,13 @@ const PALETTES: Record<PlanetOrbVariant, Palette> = {
     "planet-sage": { light: "#f0fff4", mist: "#d5efdf", cloud: "#e3ffed", base: "#a2cdb6", middle: "#629f8d", shade: "#245c57", rim: "#bdffdb", eye: "#123d36", iris: "#4f9d84" },
     "planet-mercury": { light: "#f4f1ec", mist: "#d9d3ca", cloud: "#e8e2d8", base: "#a9a19a", middle: "#756c66", shade: "#3a332f", rim: "#e6dfd5", eye: "#26211f", iris: "#6e6560", clouds: "none" },
     "planet-venus": { light: "#fff8e6", mist: "#f9e3b3", cloud: "#fff1cf", base: "#e5b872", middle: "#c48b3f", shade: "#7a4f1c", rim: "#ffe6ad", eye: "#4a2e10", iris: "#b27c3a", clouds: "thick" },
-    "planet-earth": { light: "#eaf7ff", mist: "#bfe3fb", cloud: "#ffffff", base: "#4f9ddc", middle: "#2b6cb0", shade: "#123a6b", rim: "#b8e6ff", eye: "#0d2a4d", iris: "#3b7fbf", clouds: "thin" },
+    "planet-earth": { light: "#dff1ff", mist: "#9ccdf2", cloud: "#ffffff", base: "#3f8fd6", middle: "#2461ab", shade: "#0f3366", rim: "#b8e6ff", eye: "#0d2a4d", iris: "#3b7fbf", clouds: "none" },
     "planet-mars": { light: "#ffe9dc", mist: "#f6c3a6", cloud: "#f8d9c8", base: "#d9743f", middle: "#a9472a", shade: "#5a2314", rim: "#ffc7a6", eye: "#3a1a0e", iris: "#b4553a", clouds: "none" },
     "planet-jupiter": { light: "#fff4e4", mist: "#f3d9b5", cloud: "#8a5a36", base: "#d6a670", middle: "#a8734a", shade: "#5c3a22", rim: "#ffe0b8", eye: "#3d2412", iris: "#a06b45", clouds: "thick" },
     "planet-saturn": { light: "#fff8e8", mist: "#f5e4bf", cloud: "#b8955a", base: "#e3c48b", middle: "#b8955a", shade: "#6b5230", rim: "#ffecc0", eye: "#42301a", iris: "#a58452", clouds: "thin", ring: [154, 34, -16, 14] },
-    "planet-uranus": { light: "#f0fdff", mist: "#c8f2f7", cloud: "#e4fbfd", base: "#8fd9e3", middle: "#4fa9b8", shade: "#1e5f6e", rim: "#c4f5fb", eye: "#0f3a44", iris: "#3f95a5", clouds: "thin", ring: [130, 116, 8, 3] },
+    "planet-uranus": { light: "#f0fdff", mist: "#c8f2f7", cloud: "#e4fbfd", base: "#8fd9e3", middle: "#4fa9b8", shade: "#1e5f6e", rim: "#c4f5fb", eye: "#0f3a44", iris: "#3f95a5", clouds: "thin" },
     "planet-neptune": { light: "#e8efff", mist: "#b9c9ff", cloud: "#d6e0ff", base: "#4c6fe0", middle: "#2f48b3", shade: "#141f66", rim: "#b3c4ff", eye: "#0c1548", iris: "#4258c4", clouds: "thin" },
-    "planet-pluto": { light: "#fbf3ea", mist: "#ead4c0", cloud: "#f3e4d4", base: "#c8a98f", middle: "#8f6d55", shade: "#4a3327", rim: "#f2dcc8", eye: "#2f1f17", iris: "#8a6a55", clouds: "none" },
+    "planet-pluto": { light: "#fbf1e6", mist: "#e8cdb4", cloud: "#f3e4d4", base: "#c99f80", middle: "#8c6047", shade: "#4a2d23", rim: "#f2dcc8", eye: "#2f1f17", iris: "#8a6a55", clouds: "none" },
 }
 
 export function isPlanetOrbVariant(value: string | null | undefined): value is PlanetOrbVariant {
@@ -47,15 +47,30 @@ function PlanetFeatures({ variant, palette, uid }: { variant: PlanetOrbVariant; 
                     </g>
                 ))}
             </g>
-        case "planet-earth":
-            return <g className="planet-features" fill="#5aa15b" opacity=".92">
-                <path d="M92 118 C104 100 128 96 140 106 C150 114 138 128 146 138 C154 150 136 160 124 158 C108 156 96 142 92 118 Z" />
-                <path d="M182 82 C200 76 224 86 232 104 C238 118 226 126 214 128 C200 130 190 118 186 106 C184 96 176 90 182 82 Z" />
-                <path d="M198 178 C214 172 232 184 236 200 C240 220 226 240 208 242 C192 244 184 228 186 214 C188 200 186 184 198 178 Z" />
-                <path d="M118 194 C126 190 138 196 138 206 C138 220 128 234 118 238 C110 240 106 226 108 216 C110 206 110 198 118 194 Z" fill="#c9b27a" />
-                <path d="M108 60 C126 56 150 62 156 70 C152 78 132 82 116 78 C104 74 100 66 108 60 Z" fill="#f4f8ff" opacity=".9" />
-                <path d="M120 256 C144 250 178 252 200 258 C182 266 142 268 120 256 Z" fill="#f4f8ff" opacity=".9" />
+        case "planet-earth": {
+            // Continents read as the Atlantic hemisphere: the Americas on the left, Europe and Africa on the right.
+            const land = "#5f9e57"
+            const coast = "#3c7a43"
+            return <g className="planet-features">
+                <g fill={land} stroke={coast} strokeWidth="1.3" strokeLinejoin="round" opacity=".96">
+                    <path d="M78 104 C84 86 102 74 122 74 C134 74 140 82 138 92 C136 100 128 104 130 112 C132 122 124 128 118 136 C112 144 104 142 100 132 C96 122 84 118 78 104 Z" />
+                    <path d="M116 156 C124 148 134 150 138 160 C144 174 140 194 130 212 C126 220 118 218 116 206 C114 194 110 180 108 168 C108 162 110 158 116 156 Z" />
+                    <path d="M180 94 C192 86 208 86 220 92 C226 98 222 106 214 108 C206 110 196 110 190 106 C184 102 178 100 180 94 Z" />
+                    <path d="M184 116 C198 106 220 110 230 124 C238 140 234 160 226 178 C220 192 210 204 202 202 C194 200 190 184 186 168 C182 150 176 130 184 116 Z" />
+                    <path d="M234 84 C246 80 258 90 262 104 C258 114 250 112 242 108 C236 104 232 94 234 84 Z" />
+                </g>
+                <path d="M196 124 C208 118 224 124 228 134 C222 140 208 140 198 136 C192 132 190 128 196 124 Z" fill="#cbb27c" opacity=".85" />
+                <path d="M126 58 C140 54 154 58 160 66 C150 72 136 74 128 70 C122 66 120 60 126 58 Z" fill="#f7fbff" opacity=".95" />
+                <path d="M96 250 C124 242 194 242 224 250 C196 260 124 260 96 250 Z" fill="#f7fbff" opacity=".95" />
+                <g fill="none" stroke="#ffffff" strokeLinecap="round" opacity=".62" filter={`url(#${uid}-haze)`}>
+                    <path d="M92 150 C110 142 128 150 142 146" strokeWidth="7" />
+                    <path d="M154 96 C170 88 184 96 200 90" strokeWidth="6" />
+                    <path d="M150 200 C172 194 190 204 214 196" strokeWidth="8" />
+                    <path d="M84 206 C96 200 106 206 118 202" strokeWidth="5" />
+                    <path d="M206 226 C220 220 232 226 244 220" strokeWidth="5" />
+                </g>
             </g>
+        }
         case "planet-mars":
             return <g className="planet-features">
                 <path d="M118 66 C138 56 182 56 202 66 C190 76 130 76 118 66 Z" fill="#fff4ee" opacity=".9" />
@@ -76,10 +91,22 @@ function PlanetFeatures({ variant, palette, uid }: { variant: PlanetOrbVariant; 
                 <ellipse cx="206" cy="112" rx="10" ry="4" fill={palette.light} opacity=".45" />
             </g>
         case "planet-pluto":
+            // Mottled tan ice, the dark equatorial "whale" on the left and the pale Tombaugh heart on the right.
             return <g className="planet-features">
-                <path d="M138 196 C146 180 168 182 172 196 C176 182 198 180 206 196 C214 214 188 236 172 246 C156 236 130 214 138 196 Z" fill="#efdccb" opacity=".9" />
-                <path d="M92 116 C112 100 140 104 150 116 C142 126 118 130 100 126 Z" fill={palette.shade} opacity=".22" />
-                <circle cx="222" cy="126" r="6" fill={palette.shade} opacity=".22" />
+                <path d="M58 168 C76 150 104 146 128 154 C142 160 146 174 138 184 C126 196 104 200 84 196 C68 192 56 182 58 168 Z" fill="#6b4535" opacity=".5" filter={`url(#${uid}-haze)`} />
+                <path d="M144 176 C150 164 164 160 176 168 C184 160 200 160 210 170 C222 184 216 206 200 222 C190 232 178 240 168 236 C154 228 138 208 138 192 C138 186 140 180 144 176 Z" fill="#f0e6da" opacity=".78" filter={`url(#${uid}-haze)`} />
+                <path d="M150 178 C158 170 170 172 176 180 C184 172 196 174 202 182 C210 194 204 208 194 216 C186 224 178 228 172 226 C160 218 148 202 148 190 Z" fill="#f7f0e7" opacity=".55" />
+                <g fill={palette.shade} opacity=".2">
+                    <ellipse cx="108" cy="104" rx="22" ry="9" transform="rotate(-14 108 104)" />
+                    <ellipse cx="206" cy="108" rx="14" ry="6" transform="rotate(12 206 108)" />
+                    <circle cx="228" cy="140" r="5" />
+                    <circle cx="176" cy="88" r="4" />
+                    <ellipse cx="120" cy="228" rx="16" ry="6" />
+                </g>
+                <g fill={palette.light} opacity=".28">
+                    <ellipse cx="150" cy="118" rx="18" ry="6" transform="rotate(-10 150 118)" />
+                    <ellipse cx="228" cy="196" rx="10" ry="4" />
+                </g>
             </g>
         case "planet-venus":
             return <g className="planet-features" fill={palette.light} opacity=".5" filter={`url(#${uid}-haze)`}>
