@@ -5,6 +5,7 @@ import { WelcomeOrb } from "@/components/welcome-orb"
 import {
     BLOUB_AURAS,
     BLOUB_MOODS,
+    BLOB_SHAPES,
     BLOUB_THEME_META,
     CUSTOMIZER_BOTS,
     INCLUDED_BLOUB_BOTS,
@@ -20,6 +21,7 @@ import {
     lookThemesFor,
     resolveBloubTheme,
     usesBlobColorSlider,
+    usesBlobShapes,
     type BloubPick,
 } from "@/lib/bloub/catalog"
 import { BlobColorSlider } from "@/components/dashboard/blob-color-slider"
@@ -47,6 +49,7 @@ export function BlobLookStudio({
     const colors = gradientForColor(value.color)
     const themes = lookThemesFor(value)
     const showSlider = usesBlobColorSlider(value)
+    const showShapes = usesBlobShapes(value)
 
     if (phase === "preview") {
         return (
@@ -92,6 +95,44 @@ export function BlobLookStudio({
                 />
             </div>
 
+            {showSlider ? (
+                <section className="space-y-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Colour</p>
+                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i))} />
+                </section>
+            ) : null}
+
+            {showShapes ? (
+                <section className="space-y-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Shape</p>
+                    <div className="grid grid-cols-5 gap-2">
+                        {BLOB_SHAPES.map((item) => (
+                            <button
+                                key={item.id}
+                                type="button"
+                                aria-label={item.premium ? `${item.label}, premium` : item.label}
+                                aria-pressed={value.shape === item.id}
+                                onClick={() => {
+                                    if (item.premium) {
+                                        toast.message("This is a premium shape")
+                                        return
+                                    }
+                                    onChange({ look: "bloub", theme: "classic", shape: item.id })
+                                }}
+                                className={cn(
+                                    "flex flex-col items-center gap-1 rounded-2xl py-2",
+                                    value.shape === item.id ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
+                                    item.premium && "opacity-60",
+                                )}
+                            >
+                                <WelcomeOrb still size={44} look="bloub" shape={item.id} expression={value.expression} color={value.color} variant={value.variant} aura="still" theme="classic" />
+                                <span className="text-[10px]">{item.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            ) : null}
+
             {themes.length ? (
                 <section className="space-y-3">
                     <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Chat themes</p>
@@ -109,13 +150,6 @@ export function BlobLookStudio({
                             )
                         })}
                     </div>
-                </section>
-            ) : null}
-
-            {showSlider ? (
-                <section className="space-y-3">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Colour</p>
-                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i))} />
                 </section>
             ) : null}
 

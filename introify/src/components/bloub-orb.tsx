@@ -90,6 +90,7 @@ export function BloubOrb({
         engine.setShape(SHAPE_BY_ID.get(shapeId)?.radii ?? null, now)
         engine.setExpression(EXPRESSION_BY_ID.get(liveExprId) ?? null, now)
         engine.setState(liveState, now)
+        if (frozenAt !== undefined) setFrame(engine.sample(Math.max(frozenAt, now + BotEngine.SHAPE_MORPH)))
     }, [engine, shapeId, liveExprId, liveState, frozenAt])
 
     useEffect(() => {
@@ -105,7 +106,7 @@ export function BloubOrb({
                 clockRef.current
             )
         } else {
-            engine.setLook({ yaw: 0, pitch: 0, mix: 1, spin: 0, wander: 0.12 }, clockRef.current)
+            engine.setLook(null, clockRef.current)
         }
     }, [engine, gaze])
 

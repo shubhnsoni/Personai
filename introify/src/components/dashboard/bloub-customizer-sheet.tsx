@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { toast } from "sonner"
-import { BLOUB_AURAS, BLOUB_MOODS, CUSTOMIZER_BOTS, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, blobColorIndex, blobPickFromColorIndex, bloubBotPick, bloubThemeThumb, customizerBotPick, isCustomizerBotSelected, isNamedBloubBotSelected, isPremiumBloubTheme, lookThemesFor, usesBlobColorSlider, type BloubPick } from "@/lib/bloub/catalog"
+import { BLOUB_AURAS, BLOUB_MOODS, BLOB_SHAPES, CUSTOMIZER_BOTS, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, blobColorIndex, blobPickFromColorIndex, bloubBotPick, bloubThemeThumb, customizerBotPick, isCustomizerBotSelected, isNamedBloubBotSelected, isPremiumBloubTheme, lookThemesFor, usesBlobColorSlider, usesBlobShapes, type BloubPick } from "@/lib/bloub/catalog"
 import { BlobColorSlider } from "@/components/dashboard/blob-color-slider"
 import { cn } from "@/lib/utils"
 
@@ -35,6 +35,7 @@ export function BloubCustomizerSheet({
     }, [open])
     const themes = lookThemesFor(value)
     const showSlider = usesBlobColorSlider(value)
+    const showShapes = usesBlobShapes(value)
     return (
         <Sheet open={open} onOpenChange={(next) => { if (!next) onClose() }}>
             <SheetContent
@@ -85,6 +86,46 @@ export function BloubCustomizerSheet({
                 <div className="space-y-5 px-4 py-4" role="tabpanel">
                     {tab === "look" ? (
                         <>
+                            {showSlider ? (
+                                <section className="space-y-2">
+                                    <p className="text-xs font-medium">Colour</p>
+                                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i))} />
+                                </section>
+                            ) : null}
+                            {showShapes ? (
+                                <section className="space-y-2">
+                                    <p className="text-xs font-medium">Shape</p>
+                                    <div className="grid grid-cols-5 gap-2">
+                                        {BLOB_SHAPES.map((item) => {
+                                            const locked = Boolean(item.premium && !premium)
+                                            const selected = value.shape === item.id
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    aria-label={locked ? `${item.label}, premium` : item.label}
+                                                    aria-pressed={selected}
+                                                    onClick={() => {
+                                                        if (locked) {
+                                                            toast.message("This is a premium shape")
+                                                            return
+                                                        }
+                                                        onChange({ look: "bloub", theme: "classic", shape: item.id })
+                                                    }}
+                                                    className={cn(
+                                                        "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                                        selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                                                        locked && "opacity-60",
+                                                    )}
+                                                >
+                                                    <WelcomeOrb still size={44} look="bloub" shape={item.id} expression={value.expression} color={value.color} variant={value.variant} aura="still" theme="classic" />
+                                                    <span className="text-[10px] font-medium">{item.label}</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </section>
+                            ) : null}
                             {themes.length ? (
                                 <section className="space-y-2">
                                     <p className="text-xs font-medium">Chat themes</p>
@@ -111,12 +152,6 @@ export function BloubCustomizerSheet({
                             ) : (
                                 <p className="text-xs text-muted-foreground">This bot has no extra chat theme.</p>
                             )}
-                            {showSlider ? (
-                                <section className="space-y-2">
-                                    <p className="text-xs font-medium">Colour</p>
-                                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i))} />
-                                </section>
-                            ) : null}
                         </>
                     ) : null}
 
@@ -136,8 +171,9 @@ export function BloubCustomizerSheet({
                                             )}
                                         >
                                             <WelcomeOrb
+                                                key={item.id}
                                                 still
-                                                size={44}
+                                                size={56}
                                                 look={value.look || "bloub"}
                                                 skin={value.skin}
                                                 shape={value.shape}

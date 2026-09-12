@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import { DEFAULT_BLOUB_PICK } from "@/lib/bloub/catalog"
 
 vi.mock("sonner", () => ({ toast: { message: vi.fn(), success: vi.fn(), error: vi.fn() } }))
-vi.mock("@/components/welcome-orb", () => ({ WelcomeOrb: ({ theme, look, skin }: { theme?: string; look?: string; skin?: string }) => <div data-testid="orb" data-theme={theme} data-look={look} data-skin={skin} /> }))
+vi.mock("@/components/welcome-orb", () => ({ WelcomeOrb: ({ theme, look, skin, expression, shape }: { theme?: string; look?: string; skin?: string; expression?: string; shape?: string }) => <div data-testid="orb" data-theme={theme} data-look={look} data-skin={skin} data-expression={expression} data-shape={shape} /> }))
 
 const { BlobLookStudio } = await import("@/components/onboarding/blob-look")
 const { BloubCustomizerSheet } = await import("@/components/dashboard/bloub-customizer-sheet")
@@ -57,7 +57,7 @@ describe("included bots on onboarding and profile", () => {
         expect(screen.queryByText("Your colour, mood and aura.")).toBeNull()
     })
 
-    it("exposes Blob, 8-Bit, CRT and Spark plus named bots in the profile customizer", () => {
+    it("exposes Blob, 8-Bit, CRT and Spark plus themed bots, with Sol Lux Sky Dew as Blob shapes", () => {
         const onChange = vi.fn()
         render(
             <BloubCustomizerSheet
@@ -73,16 +73,21 @@ describe("included bots on onboarding and profile", () => {
         fireEvent.click(screen.getByRole("button", { name: "CRT, premium" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ skin: "crt" }))
         expect(screen.getByRole("button", { name: "Spark, premium" })).toBeTruthy()
-        expect(screen.getByRole("button", { name: "Zen" })).toBeTruthy()
-        expect(screen.getByRole("button", { name: "Sol" })).toBeTruthy()
         expect(screen.getByRole("button", { name: "LCD" })).toBeTruthy()
-        expect(screen.getByRole("button", { name: "Lux, premium" })).toBeTruthy()
         expect(screen.getByRole("button", { name: "Nyx, premium" })).toBeTruthy()
+        expect(screen.queryByRole("button", { name: "Zen" })).toBeNull()
         expect(screen.queryByRole("button", { name: "Neo" })).toBeNull()
-        expect(screen.queryByRole("button", { name: "Neo, premium" })).toBeNull()
         expect(screen.queryByRole("button", { name: "Ice" })).toBeNull()
-        expect(screen.queryByRole("button", { name: "Violet" })).toBeNull()
-        expect(screen.queryByRole("button", { name: "Sunrise" })).toBeNull()
+        fireEvent.click(screen.getByRole("tab", { name: "Look" }))
+        fireEvent.click(screen.getByRole("button", { name: "Sol" }))
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "bloub", shape: "galet" }))
+        fireEvent.click(screen.getByRole("button", { name: "Lux, premium" }))
+        expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ shape: "squircle" }))
+        expect(screen.getByRole("button", { name: "Sky, premium" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "Dew, premium" })).toBeTruthy()
+        const colour = screen.getByText("Colour")
+        const theme = screen.getByText("Chat themes")
+        expect(Boolean(colour.compareDocumentPosition(theme) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
     })
 
     it("picks LCD as its own bot during onboarding and only shows that theme", () => {
@@ -137,6 +142,16 @@ describe("included bots on onboarding and profile", () => {
         expect(screen.getByLabelText("Astral Nebula theme")).toBeTruthy()
         expect(screen.queryByLabelText("Classic theme")).toBeNull()
         expect(screen.queryByRole("slider", { name: "Colour" })).toBeNull()
+        expect(screen.queryByRole("button", { name: "Sol" })).toBeNull()
+    })
+
+    it("paints a different still face for each Blob mood", () => {
+        render(<BloubCustomizerSheet open onClose={() => {}} value={DEFAULT_BLOUB_PICK} onChange={() => {}} premium />)
+        fireEvent.click(screen.getByRole("tab", { name: "Mood" }))
+        expect(screen.getByText("Calm").closest("button")?.querySelector("[data-expression='centre']")).toBeTruthy()
+        expect(screen.getByText("Happy").closest("button")?.querySelector("[data-expression='heureux']")).toBeTruthy()
+        expect(screen.getByText("Surprised").closest("button")?.querySelector("[data-expression='surpris']")).toBeTruthy()
+        expect(screen.getByText("Shy").closest("button")?.querySelector("[data-expression='timide']")).toBeTruthy()
     })
 
     it("applies CRT when entitled", () => {

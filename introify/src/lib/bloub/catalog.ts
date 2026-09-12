@@ -216,6 +216,16 @@ export const CUSTOMIZER_BOTS: CustomizerBot[] = [
     { id: "spark", label: "Spark", look: "pixel", skin: "spark", premium: true },
 ]
 
+export const BLOB_SHAPES: { id: ShapeId; label: string; premium?: boolean }[] = [
+    { id: "cercle", label: "Circle" },
+    { id: "galet", label: "Sol" },
+    { id: "squircle", label: "Lux", premium: true },
+    { id: "nuage", label: "Sky", premium: true },
+    { id: "goutte", label: "Dew", premium: true },
+]
+
+const FREE_BLOB_SHAPES: ShapeId[] = ["cercle", "galet"]
+
 export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Partial<BloubPick> {
     if (bot.look === "pixel") {
         return { look: "pixel", skin: bot.skin, theme: "classic", shape: "cercle" }
@@ -224,7 +234,7 @@ export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Parti
         look: "bloub",
         skin: undefined,
         theme: "classic",
-        shape: "cercle",
+        shape: BLOB_SHAPES.some((item) => item.id === current.shape) ? current.shape : "cercle",
         variant: current.variant || "aqua",
         color: current.variant ? VARIANT_COLOR[current.variant] : current.color,
     }
@@ -232,7 +242,7 @@ export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Parti
 
 export function isCustomizerBotSelected(bot: CustomizerBot, value: BloubPick) {
     if (bot.look === "pixel") return value.look === "pixel" && value.skin === bot.skin
-    return resolveOrbLook(value.look) === "bloub" && value.theme === "classic" && !namedBotMatch(value)
+    return resolveOrbLook(value.look) === "bloub" && value.theme === "classic"
 }
 
 export type BloubBot = {
@@ -245,15 +255,10 @@ export type BloubBot = {
 }
 
 export const INCLUDED_BLOUB_BOTS: BloubBot[] = [
-    { id: "cercle", label: "Zen", expression: "centre", color: "blanc", aura: "pulse", theme: "classic" },
-    { id: "galet", label: "Sol", expression: "heureux", color: "ambre", aura: "breathe", theme: "classic" },
     { id: "cercle", label: "LCD", expression: "centre", color: "vert", aura: "still", theme: "retro-lcd" },
 ]
 
 export const PREMIUM_BLOUB_BOTS: BloubBot[] = [
-    { id: "squircle", label: "Lux", expression: "fier", color: "violet", aura: "pulse", theme: "classic" },
-    { id: "nuage", label: "Sky", expression: "excite", color: "bleu", aura: "breathe", theme: "classic" },
-    { id: "goutte", label: "Dew", expression: "curieux", color: "turquoise", aura: "pulse", theme: "classic" },
     { id: "cercle", label: "Nyx", expression: "centre", color: "violet", aura: "breathe", theme: "astral-nebula" },
     { id: "cercle", label: "Ion", expression: "attentif", color: "turquoise", aura: "pulse", theme: "holographic-hud" },
     { id: "cercle", label: "Vex", expression: "blase", color: "gris", aura: "breathe", theme: "liquid-chrome" },
@@ -274,10 +279,6 @@ export function isNamedBloubBotSelected(bot: BloubBot, value: BloubPick) {
     return true
 }
 
-function namedBotMatch(value: BloubPick) {
-    return [...INCLUDED_BLOUB_BOTS, ...PREMIUM_BLOUB_BOTS].some((bot) => isNamedBloubBotSelected(bot, value))
-}
-
 /** Chat themes that belong to the selected bot — Look never lists every theme. */
 export function lookThemesFor(value: BloubPick) {
     if (resolveOrbLook(value.look) === "pixel") return []
@@ -287,6 +288,10 @@ export function lookThemesFor(value: BloubPick) {
 
 export function usesBlobColorSlider(value: BloubPick) {
     return resolveOrbLook(value.look) !== "pixel" && !resolveThemedOrb(value.theme)
+}
+
+export function usesBlobShapes(value: BloubPick) {
+    return resolveOrbLook(value.look) === "bloub" && !resolveThemedOrb(value.theme)
 }
 
 export const BLOUB_MOODS: { id: ExpressionId; label: string }[] = [
@@ -325,7 +330,7 @@ export function resolveThemedOrb(id?: string | null): "retro-lcd" | "astral-nebu
 }
 
 export function isIncludedBloubShape(shape: ShapeId): boolean {
-    return INCLUDED_BLOUB_BOTS.some((bot) => bot.id === shape)
+    return FREE_BLOB_SHAPES.includes(shape)
 }
 
 export function isPremiumBloubShape(shape: ShapeId): boolean {
