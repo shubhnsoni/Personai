@@ -178,7 +178,7 @@ export function RestaurantMenu({
 
     useEffect(() => {
         const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-sec]"))
-        if (!sections.length) return
+        if (!sections.length || typeof IntersectionObserver === "undefined") return
         const obs = new IntersectionObserver(
             (entries) => {
                 const visible = entries
@@ -354,7 +354,7 @@ export function RestaurantMenu({
                 })}
             </div>
 
-            <div className="pointer-events-none fixed inset-x-3 bottom-5 z-30 flex items-end gap-2">
+            <div className="pointer-events-none fixed inset-x-3 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-[70] flex items-end gap-2">
                 {cartCount > 0 && !searchOpen ? (
                     <button
                         type="button"

@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react"
 import { BotEngine, type BotFrame } from "@/lib/bloub/engine"
 import { NOTIF_BLUE } from "@/lib/bloub/decor"
 import { EXPRESSION_BY_ID, type ExpressionId } from "@/lib/bloub/expressions"
-import { COLOR_BY_ID, SHAPE_BY_ID, mixHex } from "@/lib/bloub/skins"
+import { COLOR_BY_ID, SHAPE_BY_ID, contrastInk, mixHex } from "@/lib/bloub/skins"
 import { DEMI_VIEWBOX, RAYON } from "@/lib/bloub/repere"
 import { blobColorFromIndex, blobColorIndex, resolveBloubColor, resolveBloubExpression, resolveBloubShape } from "@/lib/bloub/catalog"
 import type { StateId } from "@/lib/bloub/states"
@@ -65,13 +65,24 @@ export function BloubOrb({
     // Sample immediately so static/SSR markup paints the blob instead of a blank slot.
     const [frame, setFrame] = useState<BotFrame>(() => engine.sample(frozenAt ?? 0.8))
     const [wink, setWink] = useState(false)
+    const [darkSurface, setDarkSurface] = useState(() => typeof document !== "undefined" && document.documentElement.classList.contains("dark"))
+
+    useEffect(() => {
+        const root = document.documentElement
+        const sync = () => setDarkSurface(root.classList.contains("dark"))
+        sync()
+        const observer = new MutationObserver(sync)
+        observer.observe(root, { attributes: true, attributeFilter: ["class"] })
+        return () => observer.disconnect()
+    }, [])
 
     const shapeId = resolveBloubShape(shape)
     const restExpr = resolveBloubExpression(expression)
     const colorId = resolveBloubColor(color)
-    const ink = variant
+    const rawInk = variant
         ? blobColorFromIndex(blobColorIndex(variant)).hex
         : (COLOR_BY_ID.get(colorId)?.hex ?? "#0a0a0c")
+    const ink = contrastInk(rawInk, darkSurface ? "dark" : "light")
     const liveExprId = wink ? restExpr : (MOOD_EXPR[mood] ?? restExpr)
     const liveState: StateId = wink ? "wink" : MOOD_STATE[mood] ?? "idle"
 

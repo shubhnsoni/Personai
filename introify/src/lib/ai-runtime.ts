@@ -25,9 +25,9 @@ const APPROVED_MODELS = {
         reasoning: ["gpt-5.6-sol", "o3-mini", "o3"],
     },
     xai: {
-        fast: ["grok-3-mini"],
-        smart: ["grok-3"],
-        reasoning: ["grok-4"],
+        fast: ["grok-4.6", "grok-4.3"],
+        smart: ["grok-4.6", "grok-4.5"],
+        reasoning: ["grok-4.6", "grok-4.5"],
     },
 } as const
 
@@ -50,10 +50,20 @@ function providerKeyReady(provider: AiProvider): boolean {
     return Boolean(key?.trim() && key.trim().length >= 12 && !/placeholder|your[_-]|dummy|replace[_-]/i.test(key))
 }
 
+const XAI_MODEL_ALIAS: Record<string, string> = {
+    "grok-3-mini": "grok-4.3",
+    "grok-3": "grok-4.5",
+    "grok-4": "grok-4.6",
+    "grok-4.5": "grok-4.6",
+}
+
 function modelForProvider(provider: AiProvider, mode: AiMode, preferred: boolean): string | null {
     const mapped = process.env[`INTROIFY_AI_${mode.toUpperCase()}_MODEL`]?.trim()
     const approved = APPROVED_MODELS[provider][mode] as readonly string[]
-    if (preferred) return mapped && approved.includes(mapped) ? mapped : null
+    const resolved = provider === "xai" && mapped ? (XAI_MODEL_ALIAS[mapped] || mapped) : mapped
+    if (resolved && approved.includes(resolved)) return resolved
+    if (provider === "xai") return approved[0] || null
+    if (preferred) return null
     return approved[0] || null
 }
 

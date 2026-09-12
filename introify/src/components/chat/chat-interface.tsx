@@ -474,7 +474,6 @@ export function ChatInterface({
                         />
                     ) : undefined}
                     actions={headerActions}
-                    links={contactLinks}
                 />
             ) : headerActions ? (
                 <div className="absolute right-3 top-3 z-20">{headerActions}</div>
@@ -996,7 +995,20 @@ function WelcomeIntro({
                                 )}
                             </h1>
                             {visibleStage === "ready" && !compact ? (
-                                <AskAboutLine welcome={welcome} topics={topics} />
+                                <div data-ask-about>
+                                    <AskAboutLine welcome={welcome} topics={topics} />
+                                    {contact ? (
+                                        <motion.div
+                                            data-welcome-contact
+                                            initial={skip ? false : { opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                                            className="mt-3 flex justify-center"
+                                        >
+                                            {contact}
+                                        </motion.div>
+                                    ) : null}
+                                </div>
                             ) : null}
                         </motion.div>
                     )}
@@ -1005,36 +1017,24 @@ function WelcomeIntro({
 
             {!compact && <div data-welcome-chips className="relative z-[1] flex min-h-[2.75rem] flex-col items-center gap-2.5 max-w-xl">
                 {visibleStage === "ready" && (
-                    <>
-                        <div className="flex flex-wrap justify-center gap-2">
-                            {chips.map((chip, i) => (
-                                <motion.div
-                                    key={chip.id}
-                                    initial={skip ? false : { opacity: 0, y: 14, filter: "blur(8px)" }}
-                                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                                    transition={{ delay: 0.05 + i * 0.07, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-                                >
-                                    <Chip
-                                        variant="profile"
-                                        highlighted={chip.highlighted}
-                                        icon={chip.icon}
-                                        label={chip.label}
-                                        onClick={() => onChip(chip)}
-                                    />
-                                </motion.div>
-                            ))}
-                        </div>
-                        {contact ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                        {chips.map((chip, i) => (
                             <motion.div
-                                data-welcome-contact
-                                initial={skip ? false : { opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.12, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                                key={chip.id}
+                                initial={skip ? false : { opacity: 0, y: 14, filter: "blur(8px)" }}
+                                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                                transition={{ delay: 0.05 + i * 0.07, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
                             >
-                                {contact}
+                                <Chip
+                                    variant="profile"
+                                    highlighted={chip.highlighted}
+                                    icon={chip.icon}
+                                    label={chip.label}
+                                    onClick={() => onChip(chip)}
+                                />
                             </motion.div>
-                        ) : null}
-                    </>
+                        ))}
+                    </div>
                 )}
             </div>}
         </div>

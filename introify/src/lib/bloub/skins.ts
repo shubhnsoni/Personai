@@ -136,6 +136,24 @@ export const COLORS: BotColor[] = [
 export const COLOR_BY_ID = new Map<string, BotColor>(COLORS.map((c) => [c.id, c]))
 export const DEFAULT_COLOR = 'blanc'
 
+export function hexLuminance(hex: string): number {
+  const v = parseInt(hex.replace('#', '').slice(0, 6), 16)
+  if (!Number.isFinite(v)) return 0.5
+  const channel = (shift: number) => {
+    const c = ((v >> shift) & 255) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+}
+
+/** Keep the blob readable: light ink on a light page becomes dark, and the reverse. */
+export function contrastInk(ink: string, surface: 'light' | 'dark'): string {
+  const luminance = hexLuminance(ink)
+  if (surface === 'light' && luminance > 0.72) return '#0a0a0c'
+  if (surface === 'dark' && luminance < 0.22) return '#f7f7f8'
+  return ink
+}
+
 /** Melange deux couleurs hex. Sert a la brume de profondeur des particules. */
 export function mixHex(from: string, to: string, t: number): string {
   const parse = (h: string) => {

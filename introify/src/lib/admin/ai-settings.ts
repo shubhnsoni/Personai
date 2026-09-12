@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS: PlatformAiSettings = {
     fallback: ["xai", "openai"],
     models: {
         codex: DEFAULT_CODEX_MODEL,
-        xai: "grok-4.5",
+        xai: "grok-4.6",
         openai: "gpt-4o-mini",
     },
     kill: { codex: false, xai: false, openai: false },

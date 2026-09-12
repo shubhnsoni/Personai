@@ -1,5 +1,13 @@
 .pl-orb-scene.is-pixel {
   --pix: calc(var(--orb-s) / 16);
+  background: transparent;
+  box-shadow: none;
+}
+
+.pl-orb-scene.is-pixel::before,
+.pl-orb-scene.is-pixel::after {
+  content: none;
+  display: none;
 }
 
 .pl-pix {
@@ -11,8 +19,7 @@
   width: var(--orb-s);
   height: var(--orb-s);
   z-index: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 32%, color-mix(in srgb, var(--c-bright) 28%, #111) 0%, #0a0a0c 72%);
+  background: transparent;
   animation:
     pl-orb-float calc(4.2s / var(--orb-speed)) ease-in-out infinite,
     pl-orb-tilt calc(6.4s / var(--orb-speed)) ease-in-out infinite;
@@ -25,8 +32,8 @@
 
 .pl-pix.is-crt {
   gap: calc(var(--pix) * 4);
-  background: radial-gradient(circle at 38% 32%, color-mix(in srgb, var(--c-bright) 42%, #04120a) 0%, #04120a 78%);
-  box-shadow: inset 0 0 calc(var(--pix) * 2) color-mix(in srgb, var(--c-bright) 35%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .pl-pix-eye {

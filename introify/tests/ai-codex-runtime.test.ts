@@ -53,7 +53,7 @@ describe("explicit Codex production provider", () => {
         vi.stubEnv("CODEX_HOME", "")
         vi.stubEnv("XAI_API_KEY", "xai-live-key-abcdefgh")
         vi.stubEnv("OPENAI_API_KEY", "")
-        expect(resolveApiRecipe("fast")).toMatchObject({ provider: "xai", model: "grok-3-mini" })
+        expect(resolveApiRecipe("fast")).toMatchObject({ provider: "xai", model: "grok-4.6" })
     })
     it("rejects stale or caller-substituted models", async () => {
         const recipe = resolveApiRecipe("fast")!
