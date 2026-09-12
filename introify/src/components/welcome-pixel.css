@@ -36,8 +36,9 @@
 }
 
 .pl-pix.is-crt .pl-pix-eye {
-  width: calc(var(--pix) * 3);
-  height: calc(var(--pix) * 6);
+  width: calc(var(--pix) * 4);
+  height: calc(var(--pix) * 4);
+  border-radius: 50%;
   background: color-mix(in srgb, var(--c-bright) 82%, #04120a);
   box-shadow:
     0 0 calc(var(--pix) * 1.6) color-mix(in srgb, var(--c-bright) 70%, transparent),

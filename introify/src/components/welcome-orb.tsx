@@ -233,6 +233,7 @@ export function WelcomeOrb({
                     shape={shape}
                     expression={expression}
                     color={color}
+                    variant={variant}
                     mood={mood}
                     reactToken={reactToken}
                     gaze={gaze}

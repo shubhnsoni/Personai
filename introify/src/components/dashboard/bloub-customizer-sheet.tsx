@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { toast } from "sonner"
-import { BLOUB_AURAS, BLOUB_COLORS, BLOUB_MOODS, BLOUB_THEMES, BLOUB_THEME_META, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, bloubBotPick, bloubThemeThumb, isPremiumBloubTheme, resolveBloubTheme, type BloubPick } from "@/lib/bloub/catalog"
+import { BLOUB_AURAS, BLOUB_MOODS, BLOUB_THEMES, CUSTOMIZER_BOTS, blobColorIndex, blobPickFromColorIndex, bloubThemeThumb, customizerBotPick, isCustomizerBotSelected, isPremiumBloubTheme, resolveThemedOrb, type BloubPick } from "@/lib/bloub/catalog"
+import { BlobColorSlider } from "@/components/dashboard/blob-color-slider"
 import { cn } from "@/lib/utils"
 
 const TABS = [
@@ -32,8 +33,7 @@ export function BloubCustomizerSheet({
     useEffect(() => {
         if (open) setTab("look")
     }, [open])
-    const retro = value.theme === "retro-lcd"
-    const themeMeta = BLOUB_THEME_META[resolveBloubTheme(value.theme)]
+    const showSlider = !resolveThemedOrb(value.theme)
     return (
         <Sheet open={open} onOpenChange={(next) => { if (!next) onClose() }}>
             <SheetContent
@@ -83,7 +83,7 @@ export function BloubCustomizerSheet({
                     {tab === "look" ? (
                         <>
                             <section className="space-y-2">
-                                <p className="text-xs font-medium">Theme</p>
+                                <p className="text-xs font-medium">Chat themes</p>
                                 <div className="grid grid-cols-2 gap-2">
                                     {BLOUB_THEMES.map((item) => {
                                         const thumb = bloubThemeThumb(item.id, "light")
@@ -92,49 +92,33 @@ export function BloubCustomizerSheet({
                                             <button
                                                 key={item.id}
                                                 type="button"
-                                                aria-label={premiumTheme ? `${item.label} theme, premium` : `${item.label} theme`}
-                                                aria-pressed={value.theme === item.id}
+                                                aria-label={premiumTheme && !premium ? `${item.label} theme, premium` : `${item.label} theme`}
+                                                aria-pressed={value.theme === item.id && value.look !== "pixel"}
                                                 onClick={() => {
                                                     if (premiumTheme && !premium) {
                                                         toast.message("This is a premium theme")
                                                         return
                                                     }
-                                                    onChange({ theme: item.id, ...(item.id === "retro-lcd" ? { shape: "cercle" as const } : {}) })
+                                                    onChange({ look: "bloub", theme: item.id, ...(item.id === "retro-lcd" ? { shape: "cercle" as const } : {}) })
                                                 }}
-                                                className={cn("rounded-xl border p-3 text-left", value.theme === item.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40")}
+                                                className={cn("rounded-xl border p-3 text-left", value.theme === item.id && value.look !== "pixel" ? "border-foreground bg-muted/60" : "hover:bg-muted/40")}
                                             >
                                                 <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: thumb.bg }}>
                                                     <span className="h-5 w-5 rounded-full" style={{ background: thumb.dot }} />
                                                     <span className="h-1.5 w-9 rounded-full" style={{ background: thumb.bar }} />
                                                 </span>
                                                 <span className="block text-xs font-medium">{item.label}{premiumTheme ? " ✦" : ""}</span>
-                                                <span className="mt-1 block text-xs text-muted-foreground">{item.description}</span>
                                             </button>
                                         )
                                     })}
                                 </div>
                             </section>
-                            <section className="space-y-2">
-                                <p className="text-xs font-medium">Colour</p>
-                                {themeMeta ? <p className="rounded-xl border bg-muted/30 p-3 text-sm text-muted-foreground">{themeMeta.note}</p> : (
-                                <div className="flex flex-wrap gap-2">
-                                    {BLOUB_COLORS.map((item) => (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            title={item.label}
-                                            onClick={() => onChange({ color: item.id })}
-                                            className={cn(
-                                                "h-9 w-9 rounded-full border-2",
-                                                value.color === item.id ? "border-foreground" : "border-transparent"
-                                            )}
-                                            style={{ background: item.hex }}
-                                            aria-label={item.label}
-                                        />
-                                    ))}
-                                </div>
-                                )}
-                            </section>
+                            {showSlider ? (
+                                <section className="space-y-2">
+                                    <p className="text-xs font-medium">Colour</p>
+                                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i))} />
+                                </section>
+                            ) : null}
                         </>
                     ) : null}
 
@@ -193,73 +177,44 @@ export function BloubCustomizerSheet({
                         <section className="space-y-2">
                             <p className="text-xs font-medium">Bots</p>
                             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                                <button
-                                    type="button"
-                                    aria-label="Retro LCD"
-                                    aria-pressed={retro}
-                                    onClick={() => onChange({ theme: "retro-lcd", shape: "cercle" })}
-                                    className={cn("flex flex-col items-center gap-1 rounded-xl border p-2 text-center", retro ? "border-foreground bg-muted/60" : "hover:bg-muted/40")}
-                                >
-                                    <WelcomeOrb still size={44} look="bloub" shape="cercle" expression={value.expression} color={value.color} theme="retro-lcd" aura="still" />
-                                    <span className="text-[10px] font-medium">Retro LCD</span>
-                                </button>
-                                {INCLUDED_BLOUB_BOTS.map((bot) => (
-                                    <button
-                                        key={bot.label}
-                                        type="button"
-                                        onClick={() => onChange(bloubBotPick(bot))}
-                                        className={cn(
-                                            "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
-                                            value.shape === bot.id && value.theme === bot.theme ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
-                                        )}
-                                        aria-label={bot.label}
-                                        aria-pressed={value.shape === bot.id && value.theme === bot.theme}
-                                    >
-                                        <WelcomeOrb
-                                            still
-                                            size={44}
-                                            look="bloub"
-                                            shape={bot.id}
-                                            expression={bot.expression}
-                                            color={bot.color}
-                                            aura="still"
-                                            theme={bot.theme}
-                                        />
-                                        <span className="text-[10px] font-medium">{bot.label}</span>
-                                    </button>
-                                ))}
-                                {PREMIUM_BLOUB_BOTS.map((bot) => (
-                                    <button
-                                        key={bot.label}
-                                        type="button"
-                                        onClick={() => {
-                                            if (!premium) {
-                                                toast.message("This is a premium bot")
-                                                return
-                                            }
-                                            onChange(bloubBotPick(bot))
-                                        }}
-                                        className={cn(
-                                            "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
-                                            value.shape === bot.id && value.theme === bot.theme ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
-                                            !premium && "opacity-60",
-                                        )}
-                                        aria-label={premium ? bot.label : `${bot.label}, premium`}
-                                        aria-pressed={value.shape === bot.id && value.theme === bot.theme}
-                                    >
-                                        <WelcomeOrb
-                                            still
-                                            size={44}
-                                            look="bloub"
-                                            shape={bot.id}
-                                            expression={bot.expression}
-                                            color={bot.color}
-                                            aura="still"
-                                            theme={bot.theme}
-                                        />
-                                        <span className="text-[10px] font-medium">{bot.label}</span>
-                                    </button>
-                                ))}
+                                {CUSTOMIZER_BOTS.map((bot) => {
+                                    const locked = Boolean(bot.premium && !premium)
+                                    const selected = isCustomizerBotSelected(bot, value)
+                                    return (
+                                        <button
+                                            key={bot.id}
+                                            type="button"
+                                            aria-label={locked ? `${bot.label}, premium` : bot.label}
+                                            aria-pressed={selected}
+                                            onClick={() => {
+                                                if (locked) {
+                                                    toast.message("This is a premium bot")
+                                                    return
+                                                }
+                                                onChange(customizerBotPick(bot, value))
+                                            }}
+                                            className={cn(
+                                                "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                                selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                                                locked && "opacity-60",
+                                            )}
+                                        >
+                                            <WelcomeOrb
+                                                still
+                                                size={44}
+                                                look={bot.look}
+                                                skin={bot.skin}
+                                                shape="cercle"
+                                                expression={value.expression}
+                                                color={value.color}
+                                                variant={value.variant}
+                                                aura="still"
+                                                theme="classic"
+                                            />
+                                            <span className="text-[10px] font-medium">{bot.label}</span>
+                                        </button>
+                                    )
+                                })}
                             </div>
                         </section>
                     ) : null}

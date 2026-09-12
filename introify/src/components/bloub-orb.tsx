@@ -6,7 +6,7 @@ import { NOTIF_BLUE } from "@/lib/bloub/decor"
 import { EXPRESSION_BY_ID, type ExpressionId } from "@/lib/bloub/expressions"
 import { COLOR_BY_ID, SHAPE_BY_ID, mixHex } from "@/lib/bloub/skins"
 import { DEMI_VIEWBOX, RAYON } from "@/lib/bloub/repere"
-import { resolveBloubColor, resolveBloubExpression, resolveBloubShape } from "@/lib/bloub/catalog"
+import { blobColorFromIndex, blobColorIndex, resolveBloubColor, resolveBloubExpression, resolveBloubShape } from "@/lib/bloub/catalog"
 import type { StateId } from "@/lib/bloub/states"
 import { cn } from "@/lib/utils"
 
@@ -34,6 +34,7 @@ export function BloubOrb({
     shape,
     expression,
     color,
+    variant,
     mood = "idle",
     reactToken = 0,
     gaze = null,
@@ -45,6 +46,7 @@ export function BloubOrb({
     shape?: string
     expression?: string
     color?: string
+    variant?: string
     mood?: OrbMood
     reactToken?: number
     gaze?: { x: number; y: number } | null
@@ -67,7 +69,9 @@ export function BloubOrb({
     const shapeId = resolveBloubShape(shape)
     const restExpr = resolveBloubExpression(expression)
     const colorId = resolveBloubColor(color)
-    const ink = COLOR_BY_ID.get(colorId)?.hex ?? "#0a0a0c"
+    const ink = variant
+        ? blobColorFromIndex(blobColorIndex(variant)).hex
+        : (COLOR_BY_ID.get(colorId)?.hex ?? "#0a0a0c")
     const liveExprId = wink ? restExpr : (MOOD_EXPR[mood] ?? restExpr)
     const liveState: StateId = wink ? "wink" : MOOD_STATE[mood] ?? "idle"
 
@@ -101,7 +105,7 @@ export function BloubOrb({
                 clockRef.current
             )
         } else {
-            engine.setLook(null, clockRef.current)
+            engine.setLook({ yaw: 0, pitch: 0, mix: 1, spin: 0, wander: 0.12 }, clockRef.current)
         }
     }, [engine, gaze])
 

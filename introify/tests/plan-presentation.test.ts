@@ -56,7 +56,7 @@ describe("paid presentation features", () => {
     it("strips paid theme and footer-removal fields on direct Free settings writes", () => {
         const saved = validateAiSettings("free", { personalityConfig: '{"orb":{"color":"rouge","shape":"nuage","expression":"heureux","aura":"breathe"},"hideIntroifyBrand":true,"socials":{"website":"https://example.test"}}' })
         expect(JSON.parse(saved.personalityConfig!)).toEqual({
-            orb: { shape: "cercle", expression: "heureux", color: "rouge", aura: "breathe", theme: "classic" },
+            orb: { shape: "cercle", expression: "heureux", color: "rouge", aura: "breathe", theme: "classic", look: "bloub" },
             socials: { website: "https://example.test" },
         })
     })

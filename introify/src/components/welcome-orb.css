@@ -772,3 +772,39 @@
     animation: none;
   }
 }
+
+.blob-color-slider {
+  position: relative;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+.blob-color-slider input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  outline: none;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+.blob-color-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--slider-swatch, #00d7ff);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.28);
+}
+.blob-color-slider input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--slider-swatch, #00d7ff);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.28);
+}

@@ -1,3 +1,5 @@
+import { ORB_VARIANTS, type OrbVariantId } from "@/lib/orb-variants"
+import { resolveOrbLook, type OrbLook, type PixelSkin } from "@/lib/pixel-skins"
 import {
     COLORS,
     COLOR_BY_ID,
@@ -80,11 +82,11 @@ export const DEFAULT_AURA: AuraId = "pulse"
 export type BloubThemeId = "classic" | "retro-lcd" | "astral-nebula" | "holographic-hud" | "liquid-chrome"
 
 export const BLOUB_THEMES: { id: BloubThemeId; label: string; description: string }[] = [
-    { id: "classic", label: "Classic", description: "Your colour, mood and aura." },
-    { id: "retro-lcd", label: "Retro LCD", description: "Pixel circle. Two eyes. A nostalgic green screen." },
-    { id: "astral-nebula", label: "Astral Nebula", description: "Swirling violet plasma with star-core eyes and orbiting dust." },
-    { id: "holographic-hud", label: "Holographic HUD", description: "Cyan wireframe scanlines with targeting-bracket eyes." },
-    { id: "liquid-chrome", label: "Liquid Chrome", description: "Polished mercury sphere with slim aperture-slit eyes." },
+    { id: "classic", label: "Classic", description: "" },
+    { id: "retro-lcd", label: "Retro LCD", description: "" },
+    { id: "astral-nebula", label: "Astral Nebula", description: "" },
+    { id: "holographic-hud", label: "Holographic HUD", description: "" },
+    { id: "liquid-chrome", label: "Liquid Chrome", description: "" },
 ]
 
 export const PREMIUM_BLOUB_THEMES: readonly BloubThemeId[] = ["astral-nebula", "holographic-hud", "liquid-chrome"]
@@ -148,6 +150,9 @@ export type BloubPick = {
     color: ColorId
     aura: AuraId
     theme: BloubThemeId
+    look?: OrbLook
+    skin?: PixelSkin
+    variant?: OrbVariantId
 }
 
 export const DEFAULT_BLOUB_PICK: BloubPick = {
@@ -156,6 +161,78 @@ export const DEFAULT_BLOUB_PICK: BloubPick = {
     color: DEFAULT_COLOR,
     aura: DEFAULT_AURA,
     theme: "classic",
+    look: "bloub",
+    variant: "aqua",
+}
+
+const BLOB_COLOR_ORDER: OrbVariantId[] = ["aqua", "forest", "ember", "violet", "sunrise", "ice"]
+
+export const BLOB_COLOR_STOPS = BLOB_COLOR_ORDER.map((id) => {
+    const item = ORB_VARIANTS.find((variant) => variant.id === id)!
+    return { id: item.id, hex: item.colors[0], deep: item.colors[1], label: item.name }
+})
+
+const VARIANT_COLOR: Record<OrbVariantId, ColorId> = {
+    aqua: "turquoise",
+    forest: "vert",
+    ember: "ambre",
+    violet: "violet",
+    sunrise: "rose",
+    ice: "blanc",
+}
+
+export function blobColorIndex(variant?: string | null): number {
+    const i = BLOB_COLOR_STOPS.findIndex((stop) => stop.id === variant)
+    return i >= 0 ? i : 0
+}
+
+export function blobColorFromIndex(index: number) {
+    const i = Math.max(0, Math.min(BLOB_COLOR_STOPS.length - 1, Math.round(index)))
+    return BLOB_COLOR_STOPS[i]
+}
+
+export function blobPickFromColorIndex(index: number): Partial<BloubPick> {
+    const stop = blobColorFromIndex(index)
+    return {
+        look: "bloub",
+        theme: "classic",
+        variant: stop.id,
+        color: VARIANT_COLOR[stop.id],
+    }
+}
+
+export type CustomizerBot = {
+    id: "blob" | PixelSkin
+    label: string
+    look: OrbLook
+    skin?: PixelSkin
+    premium?: boolean
+}
+
+export const CUSTOMIZER_BOTS: CustomizerBot[] = [
+    { id: "blob", label: "Blob", look: "bloub" },
+    { id: "bit", label: "8-Bit", look: "pixel", skin: "bit", premium: true },
+    { id: "crt", label: "CRT", look: "pixel", skin: "crt", premium: true },
+    { id: "spark", label: "Spark", look: "pixel", skin: "spark", premium: true },
+]
+
+export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Partial<BloubPick> {
+    if (bot.look === "pixel") {
+        return { look: "pixel", skin: bot.skin, theme: "classic", shape: "cercle" }
+    }
+    return {
+        look: "bloub",
+        skin: undefined,
+        theme: "classic",
+        shape: "cercle",
+        variant: current.variant || "aqua",
+        color: current.variant ? VARIANT_COLOR[current.variant] : current.color,
+    }
+}
+
+export function isCustomizerBotSelected(bot: CustomizerBot, value: BloubPick) {
+    if (bot.look === "pixel") return value.look === "pixel" && value.skin === bot.skin
+    return resolveOrbLook(value.look) === "bloub" && value.theme === "classic"
 }
 
 export type BloubBot = {
@@ -176,7 +253,6 @@ export const PREMIUM_BLOUB_BOTS: BloubBot[] = [
     { id: "squircle", label: "Lux", expression: "fier", color: "violet", aura: "pulse", theme: "classic" },
     { id: "nuage", label: "Sky", expression: "excite", color: "bleu", aura: "breathe", theme: "classic" },
     { id: "goutte", label: "Dew", expression: "curieux", color: "turquoise", aura: "pulse", theme: "classic" },
-    { id: "hexagone", label: "Neo", expression: "attentif", color: "encre", aura: "still", theme: "classic" },
     { id: "cercle", label: "Nyx", expression: "centre", color: "violet", aura: "breathe", theme: "astral-nebula" },
     { id: "cercle", label: "Ion", expression: "attentif", color: "turquoise", aura: "pulse", theme: "holographic-hud" },
     { id: "cercle", label: "Vex", expression: "blase", color: "gris", aura: "breathe", theme: "liquid-chrome" },
@@ -230,17 +306,31 @@ export function isPremiumBloubShape(shape: ShapeId): boolean {
     return !isIncludedBloubShape(shape)
 }
 
-export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "color" | "aura" | "theme", string | null>> | null | undefined, premium: boolean): BloubPick {
+export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "color" | "aura" | "theme" | "look" | "skin" | "variant", string | null>> | null | undefined, premium: boolean): BloubPick {
+    if (!pick || Object.keys(pick).length === 0) return { ...DEFAULT_BLOUB_PICK }
+    const look = pick?.look === "pixel" || pick?.look === "glass" || pick?.look === "bloub" || pick?.look === "blob" ? pick.look : "bloub"
+    const skin = pick?.skin === "bit" || pick?.skin === "crt" || pick?.skin === "spark" ? pick.skin : undefined
+    const variant = ORB_VARIANTS.some((item) => item.id === pick?.variant) ? pick?.variant as OrbVariantId : undefined
     const next: BloubPick = {
         shape: resolveBloubShape(pick?.shape),
         expression: resolveBloubExpression(pick?.expression),
         color: resolveBloubColor(pick?.color),
         aura: resolveBloubAura(pick?.aura),
         theme: resolveBloubTheme(pick?.theme),
+        look: look === "blob" ? "bloub" : look,
+        ...(skin ? { skin } : {}),
+        ...(variant ? { variant } : {}),
     }
-    if (resolveThemedOrb(next.theme)) next.shape = "cercle"
+    if (resolveThemedOrb(next.theme)) {
+        next.shape = "cercle"
+        next.look = "bloub"
+    }
     if (!premium && isPremiumBloubShape(next.shape)) next.shape = DEFAULT_SHAPE
     if (!premium && isPremiumBloubTheme(next.theme)) next.theme = "classic"
+    if (!premium && next.look === "pixel") {
+        next.look = "bloub"
+        delete next.skin
+    }
     return next
 }
 

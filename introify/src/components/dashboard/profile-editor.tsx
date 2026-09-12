@@ -100,7 +100,6 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
     const [, setIsSaving] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [blobOpen, setBlobOpen] = useState(false)
-    const [auraOpen, setAuraOpen] = useState(false)
     const [googleOpen, setGoogleOpen] = useState(false)
     const [paymentQrUrl, setPaymentQrUrl] = useState(() => paymentQrUrlFromConfig(profile.personalityConfig))
     const [payMode, setPayMode] = useState(() => payModeFromConfig(profile.personalityConfig))
@@ -170,20 +169,22 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
     const orbPick = parseOrbBag(personalityRaw)
     const selectedPresetConfig = (() => {
         const preset = presets.find((p) => p.id === selectedAnimationId)
-        if (!preset) return {} as { look?: string }
+        if (!preset) return {} as { look?: string; skin?: string; variant?: string }
         try {
             return typeof preset.config === "string" ? JSON.parse(preset.config) : preset.config
         } catch {
             return {}
         }
-    })() as { look?: string; shape?: string; expression?: string; color?: string; colors?: string[] }
-    const blobSelected = selectedPresetConfig.look === "bloub" || selectedPresetConfig.look === "blob"
+    })() as { look?: string; shape?: string; expression?: string; color?: string; colors?: string[]; skin?: string; variant?: string }
     const liveOrb: BloubPick = {
         shape: resolveBloubShape(orbPick.shape || selectedPresetConfig.shape),
         expression: resolveBloubExpression(orbPick.expression || selectedPresetConfig.expression),
         color: resolveBloubColor(orbPick.color || selectedPresetConfig.color),
         aura: resolveBloubAura(orbPick.aura),
         theme: orbPick.theme,
+        look: orbPick.look || (selectedPresetConfig.look === "pixel" ? "pixel" : "bloub"),
+        skin: orbPick.skin || (selectedPresetConfig.skin as BloubPick["skin"]),
+        variant: orbPick.variant || (selectedPresetConfig.variant as BloubPick["variant"]),
     }
     const blobPresetId = presets.find((p) => {
         try {
@@ -195,8 +196,19 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
     })?.id
 
     const setOrb = (patch: Partial<BloubPick>) => {
-        setValue("personalityConfig", writeOrbBag(personalityRaw, { ...liveOrb, ...patch }, aiAccess.customBranding), { shouldDirty: true })
-        if (!blobSelected && blobPresetId) setValue("animationStyleId", blobPresetId, { shouldDirty: true })
+        const next = { ...liveOrb, ...patch }
+        setValue("personalityConfig", writeOrbBag(personalityRaw, next, aiAccess.customBranding), { shouldDirty: true })
+        const match = presets.find((preset) => {
+            try {
+                const cfg = typeof preset.config === "string" ? JSON.parse(preset.config) : preset.config
+                if (next.look === "pixel") return cfg?.look === "pixel" && cfg?.skin === next.skin
+                return cfg?.look === "bloub" || cfg?.look === "blob"
+            } catch {
+                return false
+            }
+        })
+        if (match) setValue("animationStyleId", match.id, { shouldDirty: true })
+        else if (blobPresetId) setValue("animationStyleId", blobPresetId, { shouldDirty: true })
     }
 
     const imageUrl = watch("imageUrl")
@@ -399,7 +411,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                     </Section>
                     <Section title="Welcome aura" description="The face on your public page.">
                         {!aiAccess.customBranding ? (
-                            <p className="text-sm text-muted-foreground">Zen, Sol and Retro LCD are included, with moods and light/dark themes. More bots and footer removal are on Pro. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Compare plans</Link></p>
+                            <p className="text-sm text-muted-foreground">Blob and chat themes are included. Extra bots and footer removal are on Pro. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Compare plans</Link></p>
                         ) : null}
                         <ToggleRow title="Hide Introify footer" description="Your business name, photo and logo are available on every plan.">
                             <Switch aria-label="Hide Introify footer" disabled={!aiAccess.customBranding} checked={aiAccess.customBranding && Boolean(personalityConfig.hideIntroifyBrand)} onCheckedChange={value => updatePersonalityField("hideIntroifyBrand", value)} />
@@ -409,7 +421,9 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 still
                                 size={72}
                                 colors={(selectedPresetConfig.colors as [string, string] | undefined) || ["#00D7FF", "#07104D"]}
-                                look="bloub"
+                                look={liveOrb.look || "bloub"}
+                                skin={liveOrb.skin}
+                                variant={liveOrb.variant}
                                 shape={liveOrb.shape}
                                 expression={liveOrb.expression}
                                 color={liveOrb.color}
@@ -417,77 +431,13 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 theme={liveOrb.theme}
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">{liveOrb.theme === "classic" ? "Your blob" : (BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label ?? "Your blob")}</p>
-                                <p className="text-xs text-muted-foreground">{liveOrb.theme === "classic" ? "Choose your bot, theme, mood and aura." : BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.description}</p>
+                                <p className="text-sm font-medium">{liveOrb.look === "pixel" ? (liveOrb.skin === "crt" ? "CRT" : liveOrb.skin === "spark" ? "Spark" : "8-Bit") : liveOrb.theme === "classic" ? "Blob" : (BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label ?? "Blob")}</p>
+                                <p className="text-xs text-muted-foreground">Choose a bot, chat theme, mood and colour.</p>
                             </div>
-                            <div className="flex shrink-0 flex-col gap-1.5">
-                                <button type="button" onClick={() => setBlobOpen(true)} className="h-8 rounded-full border border-border px-3 text-xs font-medium">
-                                    Customise
-                                </button>
-                                {aiAccess.customBranding ? (
-                                    <button type="button" onClick={() => setAuraOpen((open) => !open)} className="h-8 rounded-full px-3 text-xs font-medium text-muted-foreground hover:text-foreground">
-                                        {auraOpen ? "Done" : "More bots"}
-                                    </button>
-                                ) : null}
-                            </div>
+                            <button type="button" onClick={() => setBlobOpen(true)} className="h-8 shrink-0 rounded-full border border-border px-3 text-xs font-medium">
+                                Customise
+                            </button>
                         </div>
-                        {auraOpen && aiAccess.customBranding ? (
-                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                {[...presets].sort((a, b) => {
-                                    const look = (p: WelcomeAnimationPreset) => {
-                                        try {
-                                            const cfg = typeof p.config === "string" ? JSON.parse(p.config) : p.config
-                                            return cfg?.look === "bloub" || cfg?.look === "blob" ? 1 : 0
-                                        } catch {
-                                            return 0
-                                        }
-                                    }
-                                    return look(b) - look(a)
-                                }).map((preset) => {
-                                    let config: { colors?: string[]; variant?: string; look?: string; skin?: string; speed?: number; intensity?: number; shape?: string; expression?: string; color?: string } = {}
-                                    try {
-                                        config = typeof preset.config === "string" ? JSON.parse(preset.config) : preset.config
-                                    } catch { /* keep empty */ }
-                                    const colors = (config.colors || ["#00D7FF", "#07104D"]) as [string, string]
-                                    const selected = selectedAnimationId === preset.id
-                                    const isBlob = config.look === "bloub" || config.look === "blob"
-                                    return (
-                                        <button
-                                            key={preset.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setValue("animationStyleId", preset.id, { shouldDirty: true })
-                                                if (!isBlob) setValue("personalityConfig", writeOrbBag(personalityRaw, { theme: "classic" }), { shouldDirty: true })
-                                                if (isBlob) setBlobOpen(true)
-                                            }}
-                                            className={cn(
-                                                "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-colors",
-                                                selected ? "border-aurora/50 bg-aurora/10" : "hover:bg-muted/40"
-                                            )}
-                                        >
-                                            <div className="flex h-[72px] w-full items-center justify-center">
-                                                <WelcomeOrb
-                                                    still
-                                                    size={64}
-                                                    colors={colors}
-                                                    variant={config.variant}
-                                                    look={config.look}
-                                                    skin={config.skin}
-                                                    shape={isBlob ? liveOrb.shape : config.shape}
-                                                    expression={isBlob ? liveOrb.expression : config.expression}
-                                                    color={isBlob ? liveOrb.color : config.color}
-                                                    theme={isBlob ? liveOrb.theme : "classic"}
-                                                    speed={config.speed || 1}
-                                                    intensity={config.intensity || 1}
-                                                />
-                                            </div>
-                                            <span className="text-xs font-medium">{preset.name}</span>
-                                            {isBlob ? <span className="text-[10px] text-muted-foreground">{selected ? "Tap to customise" : "Custom"}</span> : null}
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        ) : null}
                     </Section>
                     <BloubCustomizerSheet
                         open={blobOpen}

@@ -114,7 +114,7 @@ describe("profile editor tabs", () => {
     it("does not dump every aura preset on Look", async () => {
         await act(async () => { render(<ProfileEditor profile={profile()} presets={presets} defaultTab="appearance" />) })
         expect(await screen.findByText("Welcome aura")).toBeTruthy()
-        expect(screen.getByText("Your blob")).toBeTruthy()
+        expect(screen.getByText("Blob")).toBeTruthy()
         expect(screen.getByRole("button", { name: "Customise" })).toBeTruthy()
         expect(screen.queryByText("Cyan")).toBeNull()
         expect(screen.queryByRole("button", { name: "Change look" })).toBeNull()

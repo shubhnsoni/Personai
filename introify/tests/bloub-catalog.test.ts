@@ -16,6 +16,8 @@ describe("blob look bag", () => {
             color: "blanc",
             aura: "pulse",
             theme: "classic",
+            look: "bloub",
+            variant: "aqua",
         })
         expect(parseOrbBag(null)).toEqual(DEFAULT_BLOUB_PICK)
     })
@@ -32,6 +34,7 @@ describe("blob look bag", () => {
             color: "rouge",
             aura: "breathe",
             theme: "classic",
+            look: "bloub",
         })
         expect(clampOrbForPlan({
             shape: "nuage",
@@ -64,7 +67,7 @@ describe("blob look bag", () => {
             theme: "retro-lcd", shape: "galet", expression: "curieux", color: "rose", aura: "breathe",
         }, false)
         expect(parseOrbBag(saved)).toEqual({
-            theme: "retro-lcd", shape: "cercle", expression: "curieux", color: "rose", aura: "breathe",
+            theme: "retro-lcd", shape: "cercle", expression: "curieux", color: "rose", aura: "breathe", look: "bloub",
         })
         expect(JSON.parse(saved)).toMatchObject({ customInstructions: "Be concise", socials: { instagram: "https://instagram.com/studio" } })
         expect(parseOrbBag(writeOrbBag(saved, { theme: "classic" }, false))).toMatchObject({

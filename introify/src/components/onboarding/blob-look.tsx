@@ -4,19 +4,22 @@ import { toast } from "sonner"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import {
     BLOUB_AURAS,
-    BLOUB_COLORS,
     BLOUB_MOODS,
     BLOUB_THEMES,
     BLOUB_THEME_META,
-    INCLUDED_BLOUB_BOTS,
-    PREMIUM_BLOUB_BOTS,
-    bloubBotPick,
+    CUSTOMIZER_BOTS,
+    blobColorIndex,
+    blobPickFromColorIndex,
     bloubThemeThumb,
+    customizerBotPick,
     gradientForColor,
+    isCustomizerBotSelected,
     isPremiumBloubTheme,
     resolveBloubTheme,
+    resolveThemedOrb,
     type BloubPick,
 } from "@/lib/bloub/catalog"
+import { BlobColorSlider } from "@/components/dashboard/blob-color-slider"
 import { cn } from "@/lib/utils"
 
 export function BlobLookStudio({
@@ -39,8 +42,7 @@ export function BlobLookStudio({
     busy: boolean
 }) {
     const colors = gradientForColor(value.color)
-    const retro = value.theme === "retro-lcd"
-    const themeMeta = BLOUB_THEME_META[resolveBloubTheme(value.theme)]
+    const showSlider = !resolveThemedOrb(value.theme)
 
     if (phase === "preview") {
         return (
@@ -73,19 +75,21 @@ export function BlobLookStudio({
             <div className="flex justify-center py-4">
                 <WelcomeOrb
                     size={168}
-                    look="bloub"
+                    look={value.look || "bloub"}
+                    skin={value.skin}
                     shape={value.shape}
                     expression={value.expression}
                     color={value.color}
                     aura={value.aura}
                     theme={value.theme}
+                    variant={value.variant}
                     colors={colors}
                     mood="idle"
                 />
             </div>
 
             <section className="space-y-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Theme</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Chat themes</p>
                 <div className="grid grid-cols-2 gap-2">
                     {BLOUB_THEMES.map((item) => {
                         const thumb = bloubThemeThumb(item.id, "dark")
@@ -95,50 +99,33 @@ export function BlobLookStudio({
                                 key={item.id}
                                 type="button"
                                 aria-label={`${item.label} theme`}
-                                aria-pressed={value.theme === item.id}
+                                aria-pressed={value.theme === item.id && value.look !== "pixel"}
                                 onClick={() => {
                                     if (premiumTheme) {
                                         toast.message("This is a premium theme")
                                         return
                                     }
-                                    onChange({ theme: item.id, ...(item.id === "retro-lcd" ? { shape: "cercle" as const } : {}) })
+                                    onChange({ look: "bloub", theme: item.id, ...(item.id === "retro-lcd" ? { shape: "cercle" as const } : {}) })
                                 }}
-                                className={cn("rounded-2xl border p-3 text-left", value.theme === item.id ? "border-white/70 bg-white/[0.08]" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]")}
+                                className={cn("rounded-2xl border p-3 text-left", value.theme === item.id && value.look !== "pixel" ? "border-white/70 bg-white/[0.08]" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]")}
                             >
                                 <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: thumb.bg }}>
                                     <span className="h-5 w-5 rounded-full" style={{ background: thumb.dot }} />
                                     <span className="h-1.5 w-9 rounded-full" style={{ background: thumb.bar }} />
                                 </span>
                                 <span className="block text-[13px] font-medium text-white">{item.label}{premiumTheme ? " ✦" : ""}</span>
-                                <span className="mt-1 block text-xs leading-relaxed text-white/60">{item.description}</span>
                             </button>
                         )
                     })}
                 </div>
             </section>
 
-            <section className="space-y-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Colour</p>
-                {themeMeta ? <p className={cn("rounded-2xl border p-3 text-sm leading-relaxed", retro ? "border-[#c4d58a]/20 bg-[#253021] text-[#c4d58a]" : "border-white/10 bg-white/[0.05] text-white/70")}>{themeMeta.note}</p> : (
-                <div className="flex flex-wrap gap-2">
-                    {BLOUB_COLORS.map((item) => (
-                        <button
-                            key={item.id}
-                            type="button"
-                            title={item.label}
-                            aria-label={item.label}
-                            aria-pressed={value.color === item.id}
-                            onClick={() => onChange({ color: item.id })}
-                            className={cn(
-                                "h-8 w-8 rounded-full",
-                                value.color === item.id ? "ring-2 ring-white ring-offset-2 ring-offset-zinc-950" : "opacity-80 hover:opacity-100",
-                            )}
-                            style={{ background: item.hex }}
-                        />
-                    ))}
-                </div>
-                )}
-            </section>
+            {showSlider ? (
+                <section className="space-y-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Colour</p>
+                    <BlobColorSlider index={blobColorIndex(value.variant)} onChange={(i) => onChange(blobPickFromColorIndex(i))} />
+                </section>
+            ) : null}
 
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Mood</p>
@@ -181,61 +168,43 @@ export function BlobLookStudio({
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Bots</p>
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                    <button
-                        type="button"
-                        aria-label="Retro LCD"
-                        aria-pressed={retro}
-                        onClick={() => onChange({ theme: "retro-lcd", shape: "cercle" })}
-                        className={cn("flex flex-col items-center gap-1 rounded-2xl py-2", retro ? "bg-[#c4d58a] text-[#253021]" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]")}
-                    >
-                        <WelcomeOrb still size={44} look="bloub" shape="cercle" expression={value.expression} color={value.color} theme="retro-lcd" aura="still" />
-                        <span className="text-[10px]">Retro LCD</span>
-                    </button>
-                    {INCLUDED_BLOUB_BOTS.map((bot) => (
-                        <button
-                            key={bot.label}
-                            type="button"
-                            onClick={() => onChange(bloubBotPick(bot))}
-                            className={cn(
-                                "flex flex-col items-center gap-1 rounded-2xl py-2",
-                                value.shape === bot.id && value.theme === bot.theme ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
-                            )}
-                            aria-label={bot.label}
-                            aria-pressed={value.shape === bot.id && value.theme === bot.theme}
-                        >
-                            <WelcomeOrb
-                                still
-                                size={44}
-                                look="bloub"
-                                shape={bot.id}
-                                expression={bot.expression}
-                                color={bot.color}
-                                aura="still"
-                            />
-                            <span className="text-[10px]">{bot.label}</span>
-                        </button>
-                    ))}
-                    {PREMIUM_BLOUB_BOTS.map((bot) => (
-                        <button
-                            key={bot.label}
-                            type="button"
-                            onClick={() => toast.message("This is a premium bot")}
-                            className="relative flex flex-col items-center gap-1 rounded-2xl bg-white/[0.04] py-2 opacity-60"
-                            aria-label={`${bot.label}, premium`}
-                        >
-                            <WelcomeOrb
-                                still
-                                size={44}
-                                look="bloub"
-                                shape={bot.id}
-                                expression={bot.expression}
-                                color={bot.color}
-                                aura="still"
-                                theme={bot.theme}
-                            />
-                            <span className="text-[10px] text-white/50">{bot.label}</span>
-                        </button>
-                    ))}
+                    {CUSTOMIZER_BOTS.map((bot) => {
+                        const selected = isCustomizerBotSelected(bot, value)
+                        return (
+                            <button
+                                key={bot.id}
+                                type="button"
+                                aria-label={bot.premium ? `${bot.label}, premium` : bot.label}
+                                aria-pressed={selected}
+                                onClick={() => {
+                                    if (bot.premium) {
+                                        toast.message("This is a premium bot")
+                                        return
+                                    }
+                                    onChange(customizerBotPick(bot, value))
+                                }}
+                                className={cn(
+                                    "flex flex-col items-center gap-1 rounded-2xl py-2",
+                                    selected ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
+                                    bot.premium && "opacity-60",
+                                )}
+                            >
+                                <WelcomeOrb
+                                    still
+                                    size={44}
+                                    look={bot.look}
+                                    skin={bot.skin}
+                                    shape="cercle"
+                                    expression={value.expression}
+                                    color={value.color}
+                                    variant={value.variant}
+                                    aura="still"
+                                    theme="classic"
+                                />
+                                <span className="text-[10px]">{bot.label}</span>
+                            </button>
+                        )
+                    })}
                 </div>
             </section>
 
@@ -270,7 +239,9 @@ function LivePagePreview({ name, look }: { name: string; look: BloubPick }) {
                 <div className="mt-8">
                     <WelcomeOrb
                         size={168}
-                        look="bloub"
+                        look={look.look || "bloub"}
+                        skin={look.skin}
+                        variant={look.variant}
                         shape={look.shape}
                         expression={look.expression}
                         color={look.color}
