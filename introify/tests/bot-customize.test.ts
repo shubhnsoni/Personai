@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest"
-import { CUSTOMIZER_BOTS, BLOB_COLOR_STOPS, blobColorFromIndex, blobColorIndex, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, BLOUB_THEMES } from "@/lib/bloub/catalog"
+import { CUSTOMIZER_BOTS, BLOB_COLOR_STOPS, blobColorFromIndex, blobColorIndex, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, BLOUB_THEMES, DEFAULT_BLOUB_PICK, lookThemesFor } from "@/lib/bloub/catalog"
 import { typingInputGaze } from "@/lib/chat-gaze"
 
 describe("customise bots", () => {
     it("shows Blob, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
         expect(CUSTOMIZER_BOTS.map((bot) => bot.label)).toEqual(["Blob", "8-Bit", "CRT", "Spark"])
-        expect(INCLUDED_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Zen", "Sol"])
+        expect(INCLUDED_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Zen", "Sol", "LCD"])
         expect(PREMIUM_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Lux", "Sky", "Dew", "Nyx", "Ion", "Vex"])
         expect(PREMIUM_BLOUB_BOTS.some((bot) => bot.label === "Neo")).toBe(false)
     })
@@ -22,6 +22,9 @@ describe("customise bots", () => {
         for (const theme of BLOUB_THEMES) {
             expect(theme.description).toBe("")
         }
+        expect(lookThemesFor(DEFAULT_BLOUB_PICK).map((theme) => theme.id)).toEqual(["classic"])
+        expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "pixel", skin: "crt" })).toEqual([])
+        expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, theme: "astral-nebula" }).map((theme) => theme.id)).toEqual(["astral-nebula"])
     })
 })
 

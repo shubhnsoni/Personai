@@ -52,8 +52,8 @@ describe("included bots on onboarding and profile", () => {
         expect(sheet?.className).toMatch(/\boverflow-y-auto\b/)
         expect(screen.getByRole("tablist", { name: "Bot customisation" })).toBeTruthy()
         expect(screen.getByText("Customise bot")).toBeTruthy()
-        expect(screen.getByText("Chat themes")).toBeTruthy()
-        expect(screen.getByRole("slider", { name: "Colour" })).toBeTruthy()
+        expect(screen.getByRole("tab", { name: "Bots" }).getAttribute("aria-selected")).toBe("true")
+        expect(screen.getByRole("button", { name: "CRT, premium" })).toBeTruthy()
         expect(screen.queryByText("Your colour, mood and aura.")).toBeNull()
     })
 
@@ -68,7 +68,6 @@ describe("included bots on onboarding and profile", () => {
                 premium={false}
             />,
         )
-        fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
         fireEvent.click(screen.getByRole("button", { name: "Blob" }))
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "bloub" }))
         fireEvent.click(screen.getByRole("button", { name: "CRT, premium" }))
@@ -76,66 +75,73 @@ describe("included bots on onboarding and profile", () => {
         expect(screen.getByRole("button", { name: "Spark, premium" })).toBeTruthy()
         expect(screen.getByRole("button", { name: "Zen" })).toBeTruthy()
         expect(screen.getByRole("button", { name: "Sol" })).toBeTruthy()
+        expect(screen.getByRole("button", { name: "LCD" })).toBeTruthy()
         expect(screen.getByRole("button", { name: "Lux, premium" })).toBeTruthy()
         expect(screen.getByRole("button", { name: "Nyx, premium" })).toBeTruthy()
         expect(screen.queryByRole("button", { name: "Neo" })).toBeNull()
         expect(screen.queryByRole("button", { name: "Neo, premium" })).toBeNull()
+        expect(screen.queryByRole("button", { name: "Ice" })).toBeNull()
+        expect(screen.queryByRole("button", { name: "Violet" })).toBeNull()
+        expect(screen.queryByRole("button", { name: "Sunrise" })).toBeNull()
     })
 
-    it("selects Retro LCD as a chat theme during onboarding", () => {
+    it("picks LCD as its own bot during onboarding and only shows that theme", () => {
         const onChange = vi.fn()
         const props = { name: "North Studio", value: DEFAULT_BLOUB_PICK, onChange, phase: "edit" as const, onContinue: vi.fn(), onSave: vi.fn(), onModify: vi.fn(), busy: false }
         const { rerender } = render(<BlobLookStudio {...props} />)
-        fireEvent.click(screen.getByRole("button", { name: "Retro LCD theme" }))
-        expect(onChange).toHaveBeenLastCalledWith({ look: "bloub", theme: "retro-lcd", shape: "cercle" })
+        fireEvent.click(screen.getByRole("button", { name: "LCD" }))
+        expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ look: "bloub", theme: "retro-lcd", shape: "cercle" }))
         rerender(<BlobLookStudio {...props} value={{ ...DEFAULT_BLOUB_PICK, theme: "retro-lcd" }} />)
-        expect(screen.getByRole("button", { name: "Retro LCD theme" }).getAttribute("aria-pressed")).toBe("true")
+        expect(screen.getByLabelText("Retro LCD theme")).toBeTruthy()
+        expect(screen.queryByLabelText("Classic theme")).toBeNull()
         expect(screen.queryByRole("slider", { name: "Colour" })).toBeNull()
-        fireEvent.click(screen.getByRole("button", { name: "Classic theme" }))
-        expect(onChange).toHaveBeenLastCalledWith({ look: "bloub", theme: "classic" })
     })
 
-    it("keeps Retro LCD as a free chat theme in the profile customizer", () => {
+    it("keeps LCD as a free bot in the profile customizer", () => {
         const onChange = vi.fn()
-        const { rerender } = render(<BloubCustomizerSheet open onClose={() => {}} value={DEFAULT_BLOUB_PICK} onChange={onChange} premium={false} />)
-        fireEvent.click(screen.getByRole("button", { name: "Retro LCD theme" }))
-        expect(onChange).toHaveBeenLastCalledWith({ look: "bloub", theme: "retro-lcd", shape: "cercle" })
-        rerender(<BloubCustomizerSheet open onClose={() => {}} value={{ ...DEFAULT_BLOUB_PICK, theme: "retro-lcd" }} onChange={onChange} premium={false} />)
-        fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
-        expect(screen.getByRole("button", { name: "Blob" }).getAttribute("aria-pressed")).toBe("false")
+        render(<BloubCustomizerSheet open onClose={() => {}} value={DEFAULT_BLOUB_PICK} onChange={onChange} premium={false} />)
+        fireEvent.click(screen.getByRole("button", { name: "LCD" }))
+        expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ look: "bloub", theme: "retro-lcd", shape: "cercle" }))
         fireEvent.click(screen.getByRole("button", { name: "Blob" }))
         expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ look: "bloub", theme: "classic" }))
     })
 
-    it("locks themed premium chat themes for Free and applies them when entitled", () => {
+    it("locks themed premium bots for Free and applies them when entitled", () => {
         const onChange = vi.fn()
         const props = { open: true, onClose: () => {}, onChange }
         const { rerender } = render(<BloubCustomizerSheet {...props} value={DEFAULT_BLOUB_PICK} premium={false} />)
-        fireEvent.click(screen.getByRole("button", { name: "Astral Nebula theme, premium" }))
-        fireEvent.click(screen.getByRole("button", { name: "Holographic HUD theme, premium" }))
+        fireEvent.click(screen.getByRole("button", { name: "Nyx, premium" }))
+        fireEvent.click(screen.getByRole("button", { name: "Ion, premium" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ theme: "astral-nebula" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ theme: "holographic-hud" }))
 
         rerender(<BloubCustomizerSheet {...props} value={DEFAULT_BLOUB_PICK} premium />)
-        fireEvent.click(screen.getByRole("button", { name: "Astral Nebula theme" }))
+        fireEvent.click(screen.getByRole("button", { name: "Nyx" }))
         expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "astral-nebula", look: "bloub" }))
-        fireEvent.click(screen.getByRole("button", { name: "Holographic HUD theme" }))
+        fireEvent.click(screen.getByRole("button", { name: "Ion" }))
         expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "holographic-hud" }))
-        fireEvent.click(screen.getByRole("button", { name: "Liquid Chrome theme" }))
+        fireEvent.click(screen.getByRole("button", { name: "Vex" }))
         expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme: "liquid-chrome" }))
     })
 
-    it("shows every premium chat theme in the look tab", () => {
-        render(<BloubCustomizerSheet open onClose={() => {}} value={DEFAULT_BLOUB_PICK} onChange={() => {}} premium />)
-        expect(screen.getByRole("button", { name: "Astral Nebula theme" })).toBeTruthy()
-        expect(screen.getByRole("button", { name: "Holographic HUD theme" })).toBeTruthy()
-        expect(screen.getByRole("button", { name: "Liquid Chrome theme" })).toBeTruthy()
+    it("shows only the selected bot's own chat theme in Look", () => {
+        const { rerender } = render(<BloubCustomizerSheet open onClose={() => {}} value={DEFAULT_BLOUB_PICK} onChange={() => {}} premium />)
+        fireEvent.click(screen.getByRole("tab", { name: "Look" }))
+        expect(screen.getByLabelText("Classic theme")).toBeTruthy()
+        expect(screen.getByRole("slider", { name: "Colour" })).toBeTruthy()
+        expect(screen.queryByLabelText("Astral Nebula theme")).toBeNull()
+        expect(screen.queryByLabelText("Holographic HUD theme")).toBeNull()
+        expect(screen.queryByLabelText("Liquid Chrome theme")).toBeNull()
+        rerender(<BloubCustomizerSheet open onClose={() => {}} value={{ ...DEFAULT_BLOUB_PICK, theme: "astral-nebula" }} onChange={() => {}} premium />)
+        fireEvent.click(screen.getByRole("tab", { name: "Look" }))
+        expect(screen.getByLabelText("Astral Nebula theme")).toBeTruthy()
+        expect(screen.queryByLabelText("Classic theme")).toBeNull()
+        expect(screen.queryByRole("slider", { name: "Colour" })).toBeNull()
     })
 
     it("applies CRT when entitled", () => {
         const onChange = vi.fn()
         render(<BloubCustomizerSheet open onClose={() => {}} value={DEFAULT_BLOUB_PICK} onChange={onChange} premium />)
-        fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
         fireEvent.click(screen.getByRole("button", { name: "CRT" }))
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "pixel", skin: "crt" }))
         fireEvent.click(screen.getByRole("button", { name: "Spark" }))

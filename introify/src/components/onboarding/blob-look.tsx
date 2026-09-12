@@ -5,7 +5,6 @@ import { WelcomeOrb } from "@/components/welcome-orb"
 import {
     BLOUB_AURAS,
     BLOUB_MOODS,
-    BLOUB_THEMES,
     BLOUB_THEME_META,
     CUSTOMIZER_BOTS,
     INCLUDED_BLOUB_BOTS,
@@ -18,9 +17,9 @@ import {
     gradientForColor,
     isCustomizerBotSelected,
     isNamedBloubBotSelected,
-    isPremiumBloubTheme,
+    lookThemesFor,
     resolveBloubTheme,
-    resolveThemedOrb,
+    usesBlobColorSlider,
     type BloubPick,
 } from "@/lib/bloub/catalog"
 import { BlobColorSlider } from "@/components/dashboard/blob-color-slider"
@@ -46,7 +45,8 @@ export function BlobLookStudio({
     busy: boolean
 }) {
     const colors = gradientForColor(value.color)
-    const showSlider = !resolveThemedOrb(value.theme)
+    const themes = lookThemesFor(value)
+    const showSlider = usesBlobColorSlider(value)
 
     if (phase === "preview") {
         return (
@@ -92,37 +92,25 @@ export function BlobLookStudio({
                 />
             </div>
 
-            <section className="space-y-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Chat themes</p>
-                <div className="grid grid-cols-2 gap-2">
-                    {BLOUB_THEMES.map((item) => {
-                        const thumb = bloubThemeThumb(item.id, "dark")
-                        const premiumTheme = isPremiumBloubTheme(item.id)
-                        return (
-                            <button
-                                key={item.id}
-                                type="button"
-                                aria-label={`${item.label} theme`}
-                                aria-pressed={value.theme === item.id && value.look !== "pixel"}
-                                onClick={() => {
-                                    if (premiumTheme) {
-                                        toast.message("This is a premium theme")
-                                        return
-                                    }
-                                    onChange({ look: "bloub", theme: item.id, ...(item.id === "retro-lcd" ? { shape: "cercle" as const } : {}) })
-                                }}
-                                className={cn("rounded-2xl border p-3 text-left", value.theme === item.id && value.look !== "pixel" ? "border-white/70 bg-white/[0.08]" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]")}
-                            >
-                                <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: thumb.bg }}>
-                                    <span className="h-5 w-5 rounded-full" style={{ background: thumb.dot }} />
-                                    <span className="h-1.5 w-9 rounded-full" style={{ background: thumb.bar }} />
-                                </span>
-                                <span className="block text-[13px] font-medium text-white">{item.label}{premiumTheme ? " ✦" : ""}</span>
-                            </button>
-                        )
-                    })}
-                </div>
-            </section>
+            {themes.length ? (
+                <section className="space-y-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Chat themes</p>
+                    <div className="grid grid-cols-2 gap-2">
+                        {themes.map((item) => {
+                            const thumb = bloubThemeThumb(item.id, "dark")
+                            return (
+                                <div key={item.id} aria-label={`${item.label} theme`} className="rounded-2xl border border-white/70 bg-white/[0.08] p-3 text-left">
+                                    <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: thumb.bg }}>
+                                        <span className="h-5 w-5 rounded-full" style={{ background: thumb.dot }} />
+                                        <span className="h-1.5 w-9 rounded-full" style={{ background: thumb.bar }} />
+                                    </span>
+                                    <span className="block text-[13px] font-medium text-white">{item.label}</span>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </section>
+            ) : null}
 
             {showSlider ? (
                 <section className="space-y-3">
@@ -170,7 +158,7 @@ export function BlobLookStudio({
             </section>
 
             <section className="space-y-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Looks</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Bots</p>
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                     {CUSTOMIZER_BOTS.map((bot) => {
                         const selected = isCustomizerBotSelected(bot, value)
@@ -195,7 +183,7 @@ export function BlobLookStudio({
                             >
                                 <WelcomeOrb
                                     still
-                                    size={44}
+                                    size={56}
                                     look={bot.look}
                                     skin={bot.skin}
                                     shape="cercle"
@@ -209,12 +197,6 @@ export function BlobLookStudio({
                             </button>
                         )
                     })}
-                </div>
-            </section>
-
-            <section className="space-y-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Bots</p>
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                     {INCLUDED_BLOUB_BOTS.map((bot) => {
                         const selected = isNamedBloubBotSelected(bot, value)
                         return (
@@ -229,7 +211,7 @@ export function BlobLookStudio({
                                     selected ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
                                 )}
                             >
-                                <WelcomeOrb still size={44} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
+                                <WelcomeOrb still size={56} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
                                 <span className="text-[10px]">{bot.label}</span>
                             </button>
                         )
@@ -242,7 +224,7 @@ export function BlobLookStudio({
                             onClick={() => toast.message("This is a premium bot")}
                             className="relative flex flex-col items-center gap-1 rounded-2xl bg-white/[0.04] py-2 opacity-60"
                         >
-                            <WelcomeOrb still size={44} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
+                            <WelcomeOrb still size={56} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
                             <span className="text-[10px] text-white/50">{bot.label}</span>
                         </button>
                     ))}

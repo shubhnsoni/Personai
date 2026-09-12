@@ -4,14 +4,14 @@ import { useEffect, useState } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { toast } from "sonner"
-import { BLOUB_AURAS, BLOUB_MOODS, BLOUB_THEMES, CUSTOMIZER_BOTS, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, blobColorIndex, blobPickFromColorIndex, bloubBotPick, bloubThemeThumb, customizerBotPick, isCustomizerBotSelected, isNamedBloubBotSelected, isPremiumBloubTheme, resolveThemedOrb, type BloubPick } from "@/lib/bloub/catalog"
+import { BLOUB_AURAS, BLOUB_MOODS, CUSTOMIZER_BOTS, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, blobColorIndex, blobPickFromColorIndex, bloubBotPick, bloubThemeThumb, customizerBotPick, isCustomizerBotSelected, isNamedBloubBotSelected, isPremiumBloubTheme, lookThemesFor, usesBlobColorSlider, type BloubPick } from "@/lib/bloub/catalog"
 import { BlobColorSlider } from "@/components/dashboard/blob-color-slider"
 import { cn } from "@/lib/utils"
 
 const TABS = [
+    { id: "bots", label: "Bots" },
     { id: "look", label: "Look" },
     { id: "mood", label: "Mood" },
-    { id: "bots", label: "Bots" },
 ] as const
 
 type TabId = (typeof TABS)[number]["id"]
@@ -29,11 +29,12 @@ export function BloubCustomizerSheet({
     onChange: (next: Partial<BloubPick>) => void
     premium?: boolean
 }) {
-    const [tab, setTab] = useState<TabId>("look")
+    const [tab, setTab] = useState<TabId>("bots")
     useEffect(() => {
-        if (open) setTab("look")
+        if (open) setTab("bots")
     }, [open])
-    const showSlider = !resolveThemedOrb(value.theme)
+    const themes = lookThemesFor(value)
+    const showSlider = usesBlobColorSlider(value)
     return (
         <Sheet open={open} onOpenChange={(next) => { if (!next) onClose() }}>
             <SheetContent
@@ -45,10 +46,12 @@ export function BloubCustomizerSheet({
                         <div className="flex items-center gap-3">
                             <WelcomeOrb
                                 size={56}
-                                look="bloub"
+                                look={value.look || "bloub"}
+                                skin={value.skin}
                                 shape={value.shape}
                                 expression={value.expression}
                                 color={value.color}
+                                variant={value.variant}
                                 aura={value.aura}
                                 theme={value.theme}
                             />
@@ -82,37 +85,32 @@ export function BloubCustomizerSheet({
                 <div className="space-y-5 px-4 py-4" role="tabpanel">
                     {tab === "look" ? (
                         <>
-                            <section className="space-y-2">
-                                <p className="text-xs font-medium">Chat themes</p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {BLOUB_THEMES.map((item) => {
-                                        const thumb = bloubThemeThumb(item.id, "light")
-                                        const premiumTheme = isPremiumBloubTheme(item.id)
-                                        return (
-                                            <button
-                                                key={item.id}
-                                                type="button"
-                                                aria-label={premiumTheme && !premium ? `${item.label} theme, premium` : `${item.label} theme`}
-                                                aria-pressed={value.theme === item.id && value.look !== "pixel"}
-                                                onClick={() => {
-                                                    if (premiumTheme && !premium) {
-                                                        toast.message("This is a premium theme")
-                                                        return
-                                                    }
-                                                    onChange({ look: "bloub", theme: item.id, ...(item.id === "retro-lcd" ? { shape: "cercle" as const } : {}) })
-                                                }}
-                                                className={cn("rounded-xl border p-3 text-left", value.theme === item.id && value.look !== "pixel" ? "border-foreground bg-muted/60" : "hover:bg-muted/40")}
-                                            >
-                                                <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: thumb.bg }}>
-                                                    <span className="h-5 w-5 rounded-full" style={{ background: thumb.dot }} />
-                                                    <span className="h-1.5 w-9 rounded-full" style={{ background: thumb.bar }} />
-                                                </span>
-                                                <span className="block text-xs font-medium">{item.label}{premiumTheme ? " ✦" : ""}</span>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </section>
+                            {themes.length ? (
+                                <section className="space-y-2">
+                                    <p className="text-xs font-medium">Chat themes</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {themes.map((item) => {
+                                            const thumb = bloubThemeThumb(item.id, "light")
+                                            const premiumTheme = isPremiumBloubTheme(item.id)
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    aria-label={premiumTheme && !premium ? `${item.label} theme, premium` : `${item.label} theme`}
+                                                    className="rounded-xl border border-foreground bg-muted/60 p-3 text-left"
+                                                >
+                                                    <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: thumb.bg }}>
+                                                        <span className="h-5 w-5 rounded-full" style={{ background: thumb.dot }} />
+                                                        <span className="h-1.5 w-9 rounded-full" style={{ background: thumb.bar }} />
+                                                    </span>
+                                                    <span className="block text-xs font-medium">{item.label}{premiumTheme ? " ✦" : ""}</span>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </section>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">This bot has no extra chat theme.</p>
+                            )}
                             {showSlider ? (
                                 <section className="space-y-2">
                                     <p className="text-xs font-medium">Colour</p>
@@ -140,10 +138,12 @@ export function BloubCustomizerSheet({
                                             <WelcomeOrb
                                                 still
                                                 size={44}
-                                                look="bloub"
+                                                look={value.look || "bloub"}
+                                                skin={value.skin}
                                                 shape={value.shape}
                                                 expression={item.id}
                                                 color={value.color}
+                                                variant={value.variant}
                                                 aura="still"
                                                 theme={value.theme}
                                             />
@@ -174,119 +174,94 @@ export function BloubCustomizerSheet({
                     ) : null}
 
                     {tab === "bots" ? (
-                        <div className="space-y-5">
-                            <section className="space-y-2">
-                                <p className="text-xs font-medium">Looks</p>
-                                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                                    {CUSTOMIZER_BOTS.map((bot) => {
-                                        const locked = Boolean(bot.premium && !premium)
-                                        const selected = isCustomizerBotSelected(bot, value)
-                                        return (
-                                            <button
-                                                key={bot.id}
-                                                type="button"
-                                                aria-label={locked ? `${bot.label}, premium` : bot.label}
-                                                aria-pressed={selected}
-                                                onClick={() => {
-                                                    if (locked) {
-                                                        toast.message("This is a premium bot")
-                                                        return
-                                                    }
-                                                    onChange(customizerBotPick(bot, value))
-                                                }}
-                                                className={cn(
-                                                    "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
-                                                    selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
-                                                    locked && "opacity-60",
-                                                )}
-                                            >
-                                                <WelcomeOrb
-                                                    still
-                                                    size={44}
-                                                    look={bot.look}
-                                                    skin={bot.skin}
-                                                    shape="cercle"
-                                                    expression={value.expression}
-                                                    color={value.color}
-                                                    variant={value.variant}
-                                                    aura="still"
-                                                    theme="classic"
-                                                />
-                                                <span className="text-[10px] font-medium">{bot.label}</span>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </section>
-                            <section className="space-y-2">
-                                <p className="text-xs font-medium">Bots</p>
-                                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                                    {INCLUDED_BLOUB_BOTS.map((bot) => {
-                                        const selected = isNamedBloubBotSelected(bot, value)
-                                        return (
-                                            <button
-                                                key={bot.label}
-                                                type="button"
-                                                aria-label={bot.label}
-                                                aria-pressed={selected}
-                                                onClick={() => onChange(bloubBotPick(bot))}
-                                                className={cn(
-                                                    "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
-                                                    selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
-                                                )}
-                                            >
-                                                <WelcomeOrb
-                                                    still
-                                                    size={44}
-                                                    look="bloub"
-                                                    shape={bot.id}
-                                                    expression={bot.expression}
-                                                    color={bot.color}
-                                                    aura="still"
-                                                    theme={bot.theme}
-                                                />
-                                                <span className="text-[10px] font-medium">{bot.label}</span>
-                                            </button>
-                                        )
-                                    })}
-                                    {PREMIUM_BLOUB_BOTS.map((bot) => {
-                                        const selected = isNamedBloubBotSelected(bot, value)
-                                        return (
-                                            <button
-                                                key={bot.label}
-                                                type="button"
-                                                aria-label={premium ? bot.label : `${bot.label}, premium`}
-                                                aria-pressed={selected}
-                                                onClick={() => {
-                                                    if (!premium) {
-                                                        toast.message("This is a premium bot")
-                                                        return
-                                                    }
-                                                    onChange(bloubBotPick(bot))
-                                                }}
-                                                className={cn(
-                                                    "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
-                                                    selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
-                                                    !premium && "opacity-60",
-                                                )}
-                                            >
-                                                <WelcomeOrb
-                                                    still
-                                                    size={44}
-                                                    look="bloub"
-                                                    shape={bot.id}
-                                                    expression={bot.expression}
-                                                    color={bot.color}
-                                                    aura="still"
-                                                    theme={bot.theme}
-                                                />
-                                                <span className="text-[10px] font-medium">{bot.label}</span>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </section>
-                        </div>
+                        <section className="space-y-2">
+                            <p className="text-xs font-medium">Bots</p>
+                            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                                {CUSTOMIZER_BOTS.map((bot) => {
+                                    const locked = Boolean(bot.premium && !premium)
+                                    const selected = isCustomizerBotSelected(bot, value)
+                                    return (
+                                        <button
+                                            key={bot.id}
+                                            type="button"
+                                            aria-label={locked ? `${bot.label}, premium` : bot.label}
+                                            aria-pressed={selected}
+                                            onClick={() => {
+                                                if (locked) {
+                                                    toast.message("This is a premium bot")
+                                                    return
+                                                }
+                                                onChange(customizerBotPick(bot, value))
+                                            }}
+                                            className={cn(
+                                                "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                                selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                                                locked && "opacity-60",
+                                            )}
+                                        >
+                                            <WelcomeOrb
+                                                still
+                                                size={56}
+                                                look={bot.look}
+                                                skin={bot.skin}
+                                                shape="cercle"
+                                                expression={value.expression}
+                                                color={value.color}
+                                                variant={value.variant}
+                                                aura="still"
+                                                theme="classic"
+                                            />
+                                            <span className="text-[10px] font-medium">{bot.label}</span>
+                                        </button>
+                                    )
+                                })}
+                                {INCLUDED_BLOUB_BOTS.map((bot) => {
+                                    const selected = isNamedBloubBotSelected(bot, value)
+                                    return (
+                                        <button
+                                            key={bot.label}
+                                            type="button"
+                                            aria-label={bot.label}
+                                            aria-pressed={selected}
+                                            onClick={() => onChange(bloubBotPick(bot))}
+                                            className={cn(
+                                                "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                                selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                                            )}
+                                        >
+                                            <WelcomeOrb still size={56} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
+                                            <span className="text-[10px] font-medium">{bot.label}</span>
+                                        </button>
+                                    )
+                                })}
+                                {PREMIUM_BLOUB_BOTS.map((bot) => {
+                                    const selected = isNamedBloubBotSelected(bot, value)
+                                    return (
+                                        <button
+                                            key={bot.label}
+                                            type="button"
+                                            aria-label={premium ? bot.label : `${bot.label}, premium`}
+                                            aria-pressed={selected}
+                                            onClick={() => {
+                                                if (!premium) {
+                                                    toast.message("This is a premium bot")
+                                                    return
+                                                }
+                                                onChange(bloubBotPick(bot))
+                                            }}
+                                            className={cn(
+                                                "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                                selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                                                !premium && "opacity-60",
+                                            )}
+                                        >
+                                            <WelcomeOrb still size={56} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
+                                            <span className="text-[10px] font-medium">{bot.label}</span>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </section>
                     ) : null}
                 </div>
             </SheetContent>

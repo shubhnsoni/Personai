@@ -232,7 +232,7 @@ export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Parti
 
 export function isCustomizerBotSelected(bot: CustomizerBot, value: BloubPick) {
     if (bot.look === "pixel") return value.look === "pixel" && value.skin === bot.skin
-    return resolveOrbLook(value.look) === "bloub" && value.theme === "classic"
+    return resolveOrbLook(value.look) === "bloub" && value.theme === "classic" && !namedBotMatch(value)
 }
 
 export type BloubBot = {
@@ -247,6 +247,7 @@ export type BloubBot = {
 export const INCLUDED_BLOUB_BOTS: BloubBot[] = [
     { id: "cercle", label: "Zen", expression: "centre", color: "blanc", aura: "pulse", theme: "classic" },
     { id: "galet", label: "Sol", expression: "heureux", color: "ambre", aura: "breathe", theme: "classic" },
+    { id: "cercle", label: "LCD", expression: "centre", color: "vert", aura: "still", theme: "retro-lcd" },
 ]
 
 export const PREMIUM_BLOUB_BOTS: BloubBot[] = [
@@ -264,7 +265,28 @@ export function bloubBotPick(bot: BloubBot): Partial<BloubPick> {
 }
 
 export function isNamedBloubBotSelected(bot: BloubBot, value: BloubPick) {
-    return resolveOrbLook(value.look) === "bloub" && value.shape === bot.id && value.theme === bot.theme
+    if (resolveOrbLook(value.look) !== "bloub") return false
+    if (value.shape !== bot.id || value.theme !== bot.theme) return false
+    if (!resolveThemedOrb(bot.theme) && bot.id === "cercle") {
+        if (value.expression !== bot.expression || value.color !== bot.color) return false
+        if (value.variant && VARIANT_COLOR[value.variant] !== bot.color) return false
+    }
+    return true
+}
+
+function namedBotMatch(value: BloubPick) {
+    return [...INCLUDED_BLOUB_BOTS, ...PREMIUM_BLOUB_BOTS].some((bot) => isNamedBloubBotSelected(bot, value))
+}
+
+/** Chat themes that belong to the selected bot — Look never lists every theme. */
+export function lookThemesFor(value: BloubPick) {
+    if (resolveOrbLook(value.look) === "pixel") return []
+    const theme = resolveBloubTheme(value.theme)
+    return BLOUB_THEMES.filter((item) => item.id === theme)
+}
+
+export function usesBlobColorSlider(value: BloubPick) {
+    return resolveOrbLook(value.look) !== "pixel" && !resolveThemedOrb(value.theme)
 }
 
 export const BLOUB_MOODS: { id: ExpressionId; label: string }[] = [

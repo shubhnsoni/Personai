@@ -11,6 +11,8 @@
   width: var(--orb-s);
   height: var(--orb-s);
   z-index: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, color-mix(in srgb, var(--c-bright) 28%, #111) 0%, #0a0a0c 72%);
   animation:
     pl-orb-float calc(4.2s / var(--orb-speed)) ease-in-out infinite,
     pl-orb-tilt calc(6.4s / var(--orb-speed)) ease-in-out infinite;
@@ -19,6 +21,12 @@
       calc(var(--pix) * var(--pix-gx, 0)),
       calc(var(--pix) * var(--pix-gy, 0))
     );
+}
+
+.pl-pix.is-crt {
+  gap: calc(var(--pix) * 4);
+  background: radial-gradient(circle at 38% 32%, color-mix(in srgb, var(--c-bright) 42%, #04120a) 0%, #04120a 78%);
+  box-shadow: inset 0 0 calc(var(--pix) * 2) color-mix(in srgb, var(--c-bright) 35%, transparent);
 }
 
 .pl-pix-eye {
@@ -31,10 +39,6 @@
 }
 
 /* CRT — phosphor slabs with a rolling scan */
-.pl-pix.is-crt {
-  gap: calc(var(--pix) * 4);
-}
-
 .pl-pix.is-crt .pl-pix-eye {
   width: calc(var(--pix) * 4);
   height: calc(var(--pix) * 4);
