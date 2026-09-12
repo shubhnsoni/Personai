@@ -179,7 +179,7 @@ export function ArStudio({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
-                className="flex max-h-[94dvh] flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-white/10 bg-zinc-950 p-0 text-zinc-100"
+                className="flex flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-white/10 bg-zinc-950 p-0 text-zinc-100"
             >
                 <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/20" />
                 <div className="px-5 pr-12 pt-3">

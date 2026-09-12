@@ -20,6 +20,7 @@ import {
     type DishGroup,
 } from "@/lib/dish-options"
 import { cn } from "@/lib/utils"
+import { bottomDrawerPanelClassName, bottomDrawerShellClassName } from "@/components/ui/sheet"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { categoryIcon } from "@/lib/category-icons"
 
@@ -417,7 +418,7 @@ export function RestaurantMenu({
             </div>
 
             {nav ? (
-                <div className="fixed inset-0 z-50 flex items-end justify-center p-3 md:items-center md:p-6">
+                <div className={cn("fixed inset-0 z-50 p-3", bottomDrawerShellClassName)}>
                     <button type="button" className="absolute inset-0 bg-black/55" onClick={() => setNav(false)} aria-label="Close menu" />
                     <div className="relative z-10 w-full max-h-[72dvh] overflow-auto rounded-[1.6rem] bg-[#171717] p-4 text-white shadow-2xl md:max-w-lg">
                         <div className="mb-2 flex items-center justify-between px-1">
@@ -622,9 +623,9 @@ function CustomizeSheet({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-6">
+        <div className={cn("fixed inset-0 z-50", bottomDrawerShellClassName)}>
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
-            <div className="relative z-10 w-full max-h-[86dvh] overflow-auto rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl">
+            <div className={cn("relative z-10 w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl", bottomDrawerPanelClassName)}>
                 <div className="sticky top-0 flex items-center justify-between border-b border-border/50 bg-background px-4 py-3">
                     <div className="min-w-0">
                         <p className="truncate text-[15px] font-semibold">{item.title}</p>
@@ -836,9 +837,9 @@ function CartSheet({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-6">
+        <div className={cn("fixed inset-0 z-50", bottomDrawerShellClassName)}>
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close cart" />
-            <div className="relative z-10 w-full max-h-[88dvh] overflow-auto rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl">
+            <div className={cn("relative z-10 w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl", bottomDrawerPanelClassName)}>
                 <div className="sticky top-0 flex items-center justify-between border-b border-border/50 bg-background px-4 py-3">
                     <p className="text-[15px] font-semibold">Your order</p>
                     <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground" aria-label="Close">

@@ -46,6 +46,9 @@ describe("included bots on onboarding and profile", () => {
         const sheet = document.querySelector('[data-slot="sheet-content"]')
         expect(sheet?.className).not.toMatch(/\bsm:max-w-none\b/)
         expect(sheet?.className).not.toMatch(/\binset-x-0\b/)
+        expect(sheet?.className).toMatch(/max-h-\[calc\(100dvh-3rem-env\(safe-area-inset-top,0px\)\)\]/)
+        expect(sheet?.className).toMatch(/\boverflow-y-auto\b/)
+        expect(screen.getByRole("tablist", { name: "Bot customisation" })).toBeTruthy()
         expect(screen.getByText("Customise bot")).toBeTruthy()
     })
 
@@ -60,6 +63,7 @@ describe("included bots on onboarding and profile", () => {
                 premium={false}
             />,
         )
+        fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
         fireEvent.click(screen.getByRole("button", { name: "Pebble" }))
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ shape: "galet" }))
         fireEvent.click(screen.getByRole("button", { name: "Cloud, premium" }))
@@ -88,6 +92,7 @@ describe("included bots on onboarding and profile", () => {
         fireEvent.click(screen.getByRole("button", { name: "Retro LCD theme" }))
         expect(onChange).toHaveBeenLastCalledWith({ theme: "retro-lcd", shape: "cercle" })
         rerender(<BloubCustomizerSheet open onClose={() => {}} value={{ ...DEFAULT_BLOUB_PICK, theme: "retro-lcd" }} onChange={onChange} premium={false} />)
+        fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
         expect(screen.getByRole("button", { name: "Retro LCD" }).getAttribute("aria-pressed")).toBe("true")
         expect(screen.getByRole("button", { name: "Circle" }).getAttribute("aria-pressed")).toBe("false")
         expect(screen.queryByRole("button", { name: "Turquoise" })).toBeNull()

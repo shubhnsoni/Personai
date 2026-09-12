@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { bottomDrawerPanelClassName, bottomDrawerShellClassName } from "@/components/ui/sheet"
 
 function Dialog({
   ...props
@@ -57,13 +58,14 @@ function DialogContent({
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
-      <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-6">
+      <div className={cn("pointer-events-none fixed inset-0 z-50", bottomDrawerShellClassName)}>
         <DialogPrimitive.Content
           data-slot="dialog-content"
           className={cn(
             "pointer-events-auto bg-zinc-950 text-white border-white/10 z-50 grid w-full gap-4 border shadow-2xl duration-200",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-            "max-h-[min(88dvh,100%)] overflow-y-auto rounded-t-3xl px-3 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]",
+            bottomDrawerPanelClassName,
+            "overflow-y-auto overscroll-contain rounded-t-3xl px-3 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]",
             "md:max-h-[min(85dvh,40rem)] md:max-w-lg md:rounded-2xl md:p-6",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
             className

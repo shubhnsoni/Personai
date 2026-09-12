@@ -33,7 +33,7 @@ export function CalendarSyncSheet({
 
     return (
         <Sheet open={open} onOpenChange={(next) => { if (!next) onClose() }}>
-            <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-3xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <SheetContent side="bottom" className="overflow-y-auto rounded-t-3xl pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <SheetHeader>
                     <SheetTitle>Sync calendar</SheetTitle>
                 </SheetHeader>

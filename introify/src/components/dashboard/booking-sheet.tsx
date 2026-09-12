@@ -33,7 +33,7 @@ export function BookingSheet({
 
     return (
         <Sheet open={!!booking} onOpenChange={(open) => { if (!open) onClose() }}>
-            <SheetContent side="bottom" className="max-h-[80dvh] rounded-t-3xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <SheetContent side="bottom" className="rounded-t-3xl pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <SheetHeader>
                     <SheetTitle>{hold ? "Blocked time" : table ? `Table for ${res.partySize}` : booking.visitorName}</SheetTitle>
                 </SheetHeader>

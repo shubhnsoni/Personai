@@ -47,6 +47,12 @@ function SheetOverlay({
   )
 }
 
+export const bottomDrawerShellClassName =
+  "flex items-end justify-center md:items-center md:p-6"
+
+export const bottomDrawerPanelClassName =
+  "max-h-[calc(100dvh-3rem-env(safe-area-inset-top,0px))] min-h-0"
+
 const sheetVariants = cva(
   "bg-background z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out",
   {
@@ -54,7 +60,7 @@ const sheetVariants = cva(
       side: {
         top: "fixed data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 border-b",
         bottom:
-          "pointer-events-auto relative w-full max-h-[min(88dvh,100%)] overflow-y-auto rounded-t-3xl border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom md:max-h-[min(80dvh,42rem)] md:max-w-lg md:rounded-2xl md:border",
+          `pointer-events-auto relative w-full ${bottomDrawerPanelClassName} overflow-y-auto overscroll-contain rounded-t-3xl border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom md:max-h-[min(80dvh,42rem)] md:max-w-lg md:rounded-2xl md:border`,
         left: "fixed data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
         right: "fixed data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
       },
@@ -101,9 +107,9 @@ function SheetContent({
       {side === "bottom" ? (
         <div
           data-sheet-shell=""
-          className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-6"
+          className={cn("pointer-events-none fixed inset-0 z-50", bottomDrawerShellClassName)}
         >
-          <div className="pointer-events-auto w-full md:flex md:justify-center">{content}</div>
+          {content}
         </div>
       ) : (
         content

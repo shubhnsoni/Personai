@@ -232,7 +232,7 @@ export function CourseCurriculum({ courseId, modules }: { courseId: string; modu
             <Sheet open={!!sheet} onOpenChange={(open) => !open && setSheet(null)}>
                 <SheetContent
                     side="bottom"
-                    className="max-h-[88dvh] gap-0 overflow-y-auto rounded-t-3xl border-border/70 p-0"
+                    className="gap-0 overflow-y-auto rounded-t-3xl border-border/70 p-0"
                 >
                     {sheet?.kind === "module" ? (
                         <ModuleSheet

@@ -239,7 +239,7 @@ export function CalendarStudio({
             <CalendarSyncSheet open={syncOpen} onClose={() => setSyncOpen(false)} icsUrl={icsUrl} />
 
             <Sheet open={hoursOpen} onOpenChange={setHoursOpen}>
-                <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-3xl">
+                <SheetContent side="bottom" className="overflow-y-auto rounded-t-3xl">
                     <SheetHeader>
                         <SheetTitle>Hours</SheetTitle>
                     </SheetHeader>

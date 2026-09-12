@@ -136,7 +136,7 @@ export function BookingModal({ isOpen, onClose, profile, selectedServiceId }: Bo
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
-            <DialogContent className="flex max-h-[min(88dvh,100%)] flex-col overflow-hidden border-white/10 bg-zinc-950 p-0 text-white sm:max-w-[440px]">
+            <DialogContent className="flex flex-col overflow-hidden border-white/10 bg-zinc-950 p-0 text-white sm:max-w-[440px]">
                 <AnimatePresence mode="wait">
                     {isSuccess ? (
                         <motion.div

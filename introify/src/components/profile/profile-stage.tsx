@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { parseContentDisplayMode } from "@/lib/content-display"
+import { bottomDrawerPanelClassName, bottomDrawerShellClassName } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 
 export function ProfileStage({
@@ -56,9 +57,9 @@ export function ProfileStage({
                         role={sidebar ? "complementary" : "dialog"}
                         aria-modal={sidebar ? undefined : true}
                         className={cn(
-                            "fixed inset-0 flex items-end justify-center",
+                            "fixed inset-0",
+                            bottomDrawerShellClassName,
                             zClass,
-                            !sidebar && "md:items-center md:p-6",
                             sidebar &&
                                 "md:static md:inset-auto md:h-full md:w-[min(56%,42rem)] md:min-w-[22rem] md:items-stretch md:justify-stretch md:p-0",
                         )}
@@ -69,7 +70,8 @@ export function ProfileStage({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 24 }}
                             className={cn(
-                                "relative flex max-h-[min(88dvh,100%)] w-full min-h-0 flex-col overflow-hidden rounded-t-3xl border-t border-white/10 bg-zinc-950 shadow-2xl",
+                                "relative flex w-full flex-col overflow-hidden rounded-t-3xl border-t border-white/10 bg-zinc-950 shadow-2xl",
+                                bottomDrawerPanelClassName,
                                 !sidebar && "md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl md:border",
                                 sidebar &&
                                     "md:h-full md:max-h-none md:max-w-none md:rounded-none md:border-0 md:border-l md:border-white/10 md:shadow-none",
