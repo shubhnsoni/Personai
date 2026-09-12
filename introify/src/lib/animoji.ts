@@ -10,6 +10,10 @@ export const ANIMOJI_FACES: { id: AnimojiId; label: string }[] = [
     { id: "et", label: "ET" },
 ]
 
+export const ANIMOJI_FRAME_COUNT = 46
+export const ANIMOJI_FRAME_SIZE = 180
+export const ANIMOJI_DURATION_MS = 3833
+
 const ANIMOJI_SET = new Set<string>(ANIMOJI_IDS)
 
 export function isAnimojiId(value?: string | null): value is AnimojiId {
@@ -21,7 +25,15 @@ export function resolveAnimojiId(value?: string | null): AnimojiId {
     return isAnimojiId(value) ? value : DEFAULT_ANIMOJI
 }
 
-/** Mood is expressed on the chosen face in code, not by swapping another clip. */
+/** Mood is expressed on the chosen face, not by swapping another clip. */
 export function animojiClipForMood(selected: AnimojiId, _mood?: string | null): AnimojiId {
     return resolveAnimojiId(selected)
+}
+
+export function animojiStripSrc(id: AnimojiId) {
+    return `/bots/animoji/coded/${id}.webp`
+}
+
+export function animojiStripValues(count = ANIMOJI_FRAME_COUNT, size = ANIMOJI_FRAME_SIZE) {
+    return Array.from({ length: count }, (_, index) => String(-index * size)).join(";")
 }

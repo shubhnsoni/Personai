@@ -1,93 +1,33 @@
 .animoji-face {
   display: block;
-  overflow: visible;
+  overflow: hidden;
+  border-radius: 50%;
 }
 
 .animoji-face svg {
   display: block;
   width: 100%;
   height: 100%;
-  overflow: visible;
+  overflow: hidden;
 }
 
-.animoji-motion {
+.animoji-face:not([data-still]) .animoji-strip {
   transform-box: fill-box;
-  transform-origin: center;
+  transform-origin: 0 0;
+  animation: animoji-strip-play var(--animoji-duration, 3.833s) steps(46) infinite;
 }
 
-.animoji-face[data-animoji="bounce"] .animoji-motion {
-  animation: animoji-bounce 1.35s cubic-bezier(0.45, 0.08, 0.22, 1) infinite;
+.animoji-face[data-mood="greeting"]:not([data-still]) .animoji-strip {
+  animation-duration: 2.1s;
 }
 
-.animoji-face[data-animoji="sun"] .animoji-sun-rays {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: animoji-sun-spin 18s linear infinite;
-}
-
-.animoji-face[data-animoji="et"] .animoji-motion {
-  animation: animoji-et-float 2.6s cubic-bezier(0.45, 0.08, 0.22, 1) infinite;
-}
-
-.animoji-face[data-mood="greeting"][data-animoji="bounce"] .animoji-motion {
-  animation-duration: 0.9s;
-}
-
-.animoji-face[data-mood="thinking"] .animoji-eyes {
-  transform: translate(0, 3px);
-}
-
-.animoji-face[data-mood="listening"] .animoji-eyes {
-  transform: scale(1.06);
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.animoji-mouth-open,
-.animoji-mouth-frown {
-  display: none;
-}
-
-.animoji-face[data-mood="speaking"] .animoji-mouth-rest,
-.animoji-face[data-mood="success"] .animoji-mouth-rest {
-  display: none;
-}
-
-.animoji-face[data-mood="speaking"] .animoji-mouth-open,
-.animoji-face[data-mood="success"] .animoji-mouth-open {
-  display: inline;
-}
-
-.animoji-face[data-mood="error"] .animoji-mouth-rest {
-  display: none;
-}
-
-.animoji-face[data-mood="error"] .animoji-mouth-frown {
-  display: inline;
-}
-
-.animoji-face[data-still] .animoji-motion,
-.animoji-face[data-still] .animoji-sun-rays {
-  animation: none;
-}
-
-@keyframes animoji-bounce {
-  0%, 100% { transform: translateY(2.4%) scale(1.03, 0.97); }
-  50% { transform: translateY(-8%) scale(0.97, 1.05); }
-}
-
-@keyframes animoji-sun-spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes animoji-et-float {
-  0%, 100% { transform: translateY(2%) rotate(-2.2deg); }
-  50% { transform: translateY(-6%) rotate(2.2deg); }
+@keyframes animoji-strip-play {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-97.826087%, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animoji-motion,
-  .animoji-sun-rays {
+  .animoji-face .animoji-strip {
     animation: none;
   }
 }

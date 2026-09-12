@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest"
 import { CUSTOMIZER_BOTS, BLOB_COLOR_STOPS, BLOB_SHAPES, blobColorFromIndex, blobColorIndex, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, BLOUB_THEMES, DEFAULT_BLOUB_PICK, lookThemesFor, clampOrbForPlan, customizerBotPick, usesAnimojiFaces } from "@/lib/bloub/catalog"
 import { assistantPendingPhrase, typingInputGaze } from "@/lib/chat-gaze"
-import { ANIMOJI_FACES, animojiClipForMood, resolveAnimojiId } from "@/lib/animoji"
+import { ANIMOJI_FACES, ANIMOJI_FRAME_COUNT, animojiClipForMood, resolveAnimojiId } from "@/lib/animoji"
 
 describe("customise bots", () => {
     it("shows Blob, Animoji, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
@@ -60,6 +60,7 @@ describe("animoji bot", () => {
         expect(customizerBotPick(animoji, DEFAULT_BLOUB_PICK)).toMatchObject({ look: "animoji", skin: "bounce" })
         expect(usesAnimojiFaces({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "sun" })).toBe(true)
         expect(ANIMOJI_FACES.map((item) => item.id)).toEqual(["bounce", "sun", "et"])
+        expect(ANIMOJI_FRAME_COUNT).toBe(46)
         expect(resolveAnimojiId("laugh")).toBe("bounce")
         expect(resolveAnimojiId("wow")).toBe("bounce")
         expect(clampOrbForPlan({ look: "animoji", skin: "wow" }, false)).toMatchObject({ look: "animoji", skin: "bounce" })
