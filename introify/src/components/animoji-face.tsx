@@ -64,6 +64,13 @@ function Face({ id, uid, gx, gy }: { id: AnimojiId; uid: string; gx: number; gy:
         case "coffee": return <CoffeeCharacter uid={uid} gx={gx} gy={gy} />
         case "star": return <StarCharacter uid={uid} gx={gx} gy={gy} />
         case "moon": return <MoonCharacter uid={uid} gx={gx} gy={gy} />
+        case "devil": return <DevilCharacter uid={uid} gx={gx} gy={gy} />
+        case "cat": return <CatCharacter uid={uid} gx={gx} gy={gy} />
+        case "robot": return <RobotCharacter uid={uid} gx={gx} gy={gy} />
+        case "flower": return <FlowerCharacter uid={uid} gx={gx} gy={gy} />
+        case "fire": return <FireCharacter uid={uid} gx={gx} gy={gy} />
+        case "frog": return <FrogCharacter uid={uid} gx={gx} gy={gy} />
+        case "panda": return <PandaCharacter uid={uid} gx={gx} gy={gy} />
         default: return <YellowCharacter look={id} uid={uid} gx={gx} gy={gy} />
     }
 }
@@ -103,6 +110,20 @@ function YellowCharacter({ look, uid, gx, gy }: { look: AnimojiId; uid: string; 
                 </g>
             ) : null}
             {look === "money" ? <circle className="animoji-spark" cx="58" cy="24" r="2.2" fill="#fff" opacity="0.9" /> : null}
+            {look === "shy" ? (
+                <g className="animoji-blush" fill="#F472B6" opacity="0.55">
+                    <ellipse cx="24" cy="46" rx="5" ry="2.4" />
+                    <ellipse cx="56" cy="46" rx="5" ry="2.4" />
+                </g>
+            ) : null}
+            {look === "nerd" ? (
+                <g className="animoji-shades" fill="none" stroke="#1c1408" strokeWidth="2">
+                    <circle cx="32" cy="38" r="7.2" />
+                    <circle cx="48" cy="38" r="7.2" />
+                    <path d="M39.2 38h1.6" />
+                </g>
+            ) : null}
+            {look === "angel" ? <ellipse className="animoji-halo" cx="40" cy="12" rx="12" ry="3.4" fill="none" stroke="#F5D76E" strokeWidth="2.4" /> : null}
         </g>
     )
 }
@@ -330,6 +351,149 @@ function MoonCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number })
             </g>
             <g className="animoji-mouth">
                 <path d="M36 48c2.2 2.6 7 2.6 9 0" fill="none" stroke="#1c1408" strokeWidth="2" strokeLinecap="round" />
+            </g>
+        </g>
+    )
+}
+
+function DevilCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
+    const px = gx * 2.2
+    const py = -gy * 1.8
+    return (
+        <g className="animoji-character">
+            <defs><Skin uid={uid} stops={["#FF7A6B", "#E23D2B", "#A51B12"]} /></defs>
+            <path d="M22 22l6 12M58 22l-6 12" fill="none" stroke="#A51B12" strokeWidth="5" strokeLinecap="round" />
+            <circle cx="40" cy="42" r="24" fill={`url(#${uid}-skin)`} />
+            <g className="animoji-eyes">
+                <ellipse cx={32 + px} cy={40 + py} rx="4.2" ry="5" fill="#1c1408" />
+                <ellipse cx={48 + px} cy={40 + py} rx="4.2" ry="5" fill="#1c1408" />
+            </g>
+            <g className="animoji-mouth">
+                <path d="M32 54c3.4-3.6 12.6-3.6 16 0" fill="none" stroke="#1c1408" strokeWidth="2.4" strokeLinecap="round" />
+            </g>
+        </g>
+    )
+}
+
+function CatCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
+    const px = gx * 2
+    const py = -gy * 1.6
+    return (
+        <g className="animoji-character">
+            <defs><Skin uid={uid} stops={["#F6C07A", "#E09A3A", "#B86A12"]} /></defs>
+            <path d="M18 28l10 16h-2zM62 28l-10 16h2z" fill="#E09A3A" />
+            <circle cx="40" cy="44" r="22" fill={`url(#${uid}-skin)`} />
+            <g className="animoji-eyes">
+                <ellipse cx={32 + px} cy={42 + py} rx="3.4" ry="5.4" fill="#1c1408" />
+                <ellipse cx={48 + px} cy={42 + py} rx="3.4" ry="5.4" fill="#1c1408" />
+            </g>
+            <g className="animoji-mouth">
+                <path d="M40 48v4M36 52c2 3 6 3 8 0" fill="none" stroke="#1c1408" strokeWidth="1.8" strokeLinecap="round" />
+            </g>
+        </g>
+    )
+}
+
+function RobotCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
+    const px = gx * 2
+    const py = -gy * 1.4
+    return (
+        <g className="animoji-character">
+            <defs><Skin uid={uid} stops={["#D7DCE4", "#9AA3B2", "#6B7380"]} /></defs>
+            <rect x="38" y="12" width="4" height="10" rx="1" fill="#6B7380" />
+            <circle className="animoji-spark" cx="40" cy="12" r="3" fill="#7CFF6B" />
+            <rect x="18" y="22" width="44" height="38" rx="8" fill={`url(#${uid}-skin)`} />
+            <g className="animoji-eyes">
+                <rect x={26 + px} y={34 + py} width="10" height="10" rx="2" fill="#1c1408" />
+                <rect x={44 + px} y={34 + py} width="10" height="10" rx="2" fill="#1c1408" />
+                <rect x={28 + px} y={36 + py} width="4" height="4" rx="1" fill="#7CFF6B" />
+                <rect x={46 + px} y={36 + py} width="4" height="4" rx="1" fill="#7CFF6B" />
+            </g>
+            <g className="animoji-mouth">
+                <rect x="30" y="50" width="20" height="4" rx="2" fill="#1c1408" />
+            </g>
+        </g>
+    )
+}
+
+function FlowerCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
+    const px = gx * 1.6
+    const py = -gy * 1.2
+    return (
+        <g className="animoji-character">
+            <defs><Skin uid={uid} stops={["#FFE56A", "#F5C400", "#E0A000"]} /></defs>
+            {Array.from({ length: 6 }, (_, i) => (
+                <ellipse key={i} cx="40" cy="18" rx="8" ry="14" fill="#F472B6" transform={`rotate(${i * 60} 40 40)`} />
+            ))}
+            <circle cx="40" cy="40" r="14" fill={`url(#${uid}-skin)`} />
+            <g className="animoji-eyes">
+                <circle cx={35 + px} cy={39 + py} r="2.2" fill="#1c1408" />
+                <circle cx={45 + px} cy={39 + py} r="2.2" fill="#1c1408" />
+            </g>
+            <g className="animoji-mouth">
+                <path d="M36 45c1.8 2.2 6.2 2.2 8 0" fill="none" stroke="#1c1408" strokeWidth="1.8" strokeLinecap="round" />
+            </g>
+        </g>
+    )
+}
+
+function FireCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
+    const px = gx * 1.8
+    const py = -gy * 1.4
+    return (
+        <g className="animoji-character">
+            <defs><Skin uid={uid} stops={["#FFE56A", "#FF8A3D", "#E23D2B"]} /></defs>
+            <path d="M40 10c8 14-8 18 0 28 14-4 24 8 24 20 0 14-11 24-24 24S16 72 16 58c0-18 12-28 24-48z" fill={`url(#${uid}-skin)`} />
+            <g className="animoji-eyes">
+                <circle cx={33 + px} cy={50 + py} r="2.8" fill="#1c1408" />
+                <circle cx={47 + px} cy={50 + py} r="2.8" fill="#1c1408" />
+            </g>
+            <g className="animoji-mouth">
+                <path d="M35 58c2.4 3 7.6 3 10 0" fill="none" stroke="#1c1408" strokeWidth="2" strokeLinecap="round" />
+            </g>
+        </g>
+    )
+}
+
+function FrogCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
+    const px = gx * 2
+    const py = -gy * 1.4
+    return (
+        <g className="animoji-character">
+            <defs><Skin uid={uid} stops={["#B6E35A", "#7BC02A", "#4F8A12"]} /></defs>
+            <circle cx="40" cy="46" r="22" fill={`url(#${uid}-skin)`} />
+            <circle cx="28" cy="28" r="10" fill={`url(#${uid}-skin)`} />
+            <circle cx="52" cy="28" r="10" fill={`url(#${uid}-skin)`} />
+            <g className="animoji-eyes">
+                <circle cx={28 + px} cy={28 + py} r="4.2" fill="#fff" />
+                <circle cx={52 + px} cy={28 + py} r="4.2" fill="#fff" />
+                <circle cx={28 + px} cy={28 + py} r="2.2" fill="#1c1408" />
+                <circle cx={52 + px} cy={28 + py} r="2.2" fill="#1c1408" />
+            </g>
+            <g className="animoji-mouth">
+                <path d="M30 52c4 8 16 8 20 0" fill="none" stroke="#1c1408" strokeWidth="2.2" strokeLinecap="round" />
+            </g>
+        </g>
+    )
+}
+
+function PandaCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
+    const px = gx * 2
+    const py = -gy * 1.6
+    return (
+        <g className="animoji-character">
+            <defs><Skin uid={uid} stops={["#FFFFFF", "#F0F0F0", "#D8D8D8"]} /></defs>
+            <circle cx="22" cy="22" r="10" fill="#1c1408" />
+            <circle cx="58" cy="22" r="10" fill="#1c1408" />
+            <circle cx="40" cy="42" r="24" fill={`url(#${uid}-skin)`} />
+            <g className="animoji-eyes">
+                <ellipse cx={30 + px} cy={40 + py} rx="7" ry="8" fill="#1c1408" />
+                <ellipse cx={50 + px} cy={40 + py} rx="7" ry="8" fill="#1c1408" />
+                <circle cx={30 + px} cy={40 + py} r="2.2" fill="#fff" />
+                <circle cx={50 + px} cy={40 + py} r="2.2" fill="#fff" />
+            </g>
+            <g className="animoji-mouth">
+                <ellipse cx="40" cy="54" rx="3.2" ry="2.4" fill="#1c1408" />
             </g>
         </g>
     )

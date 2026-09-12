@@ -60,7 +60,7 @@ describe("animoji bot", () => {
         expect(customizerBotPick(animoji, DEFAULT_BLOUB_PICK)).toMatchObject({ look: "animoji", skin: "bounce" })
         expect(usesAnimojiFaces({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "sun" })).toBe(true)
         expect(ANIMOJI_FACES.map((item) => item.id)).toEqual([
-            "bounce", "sun", "et", "love", "laugh", "wow", "sleepy", "ghost", "cloud", "coffee", "cry", "money", "angry", "wink", "cool", "star", "moon",
+            "bounce", "sun", "et", "love", "laugh", "wow", "sleepy", "ghost", "cloud", "coffee", "cry", "money", "angry", "wink", "cool", "star", "moon", "nerd", "shy", "devil", "angel", "cat", "robot", "flower", "fire", "frog", "panda",
         ])
         expect(resolveAnimojiId("laugh")).toBe("laugh")
         expect(resolveAnimojiId("wow")).toBe("wow")

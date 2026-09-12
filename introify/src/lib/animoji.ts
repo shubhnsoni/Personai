@@ -16,6 +16,16 @@ export const ANIMOJI_IDS = [
     "cool",
     "star",
     "moon",
+    "nerd",
+    "shy",
+    "devil",
+    "angel",
+    "cat",
+    "robot",
+    "flower",
+    "fire",
+    "frog",
+    "panda",
 ] as const
 
 export type AnimojiId = (typeof ANIMOJI_IDS)[number]
@@ -40,6 +50,16 @@ export const ANIMOJI_FACES: { id: AnimojiId; label: string }[] = [
     { id: "cool", label: "Cool" },
     { id: "star", label: "Star" },
     { id: "moon", label: "Moon" },
+    { id: "nerd", label: "Nerd" },
+    { id: "shy", label: "Shy" },
+    { id: "devil", label: "Devil" },
+    { id: "angel", label: "Angel" },
+    { id: "cat", label: "Cat" },
+    { id: "robot", label: "Robot" },
+    { id: "flower", label: "Flower" },
+    { id: "fire", label: "Fire" },
+    { id: "frog", label: "Frog" },
+    { id: "panda", label: "Panda" },
 ]
 
 const ANIMOJI_SET = new Set<string>(ANIMOJI_IDS)
