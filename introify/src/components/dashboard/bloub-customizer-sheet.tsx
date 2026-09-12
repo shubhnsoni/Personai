@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { AzureMoods } from "./azure-moods"
+import { AzureLooks } from "./azure-looks"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { toast } from "sonner"
 import { BLOUB_AURAS, BLOUB_MOODS, BLOB_SHAPES, CUSTOMIZER_BOTS, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, blobColorIndex, blobPickFromColorIndex, bloubBotPick, bloubThemeThumb, customizerBotPick, isCustomizerBotSelected, isNamedBloubBotSelected, isPremiumBloubTheme, lookThemesFor, usesAnimojiFaces, usesBlobColorSlider, usesBlobShapes, type BloubPick } from "@/lib/bloub/catalog"
@@ -166,6 +166,7 @@ export function BloubCustomizerSheet({
                     </section>
                     {tab === "look" ? (
                         <>
+                            <AzureLooks value={value} onChange={onChange} />
                             {showSlider ? (
                                 <section className="space-y-2">
                                     <p className="text-xs font-medium">Colour</p>
@@ -239,14 +240,13 @@ export function BloubCustomizerSheet({
                                     </div>
                                 </section>
                             ) : (
-                                <p className="text-xs text-muted-foreground">{value.theme.startsWith("planet-") ? "Choose Azure, Rose or Sage in the Mood tab." : "This bot has no extra chat theme."}</p>
+                                value.theme.startsWith("planet-") ? null : <p className="text-xs text-muted-foreground">This bot has no extra chat theme.</p>
                             )}
                         </>
                     ) : null}
 
                     {tab === "mood" ? (
                         <>
-                            <AzureMoods value={value} onChange={onChange} />
                             {usesAnimojiFaces(value) ? <AnimojiFaceGrid value={value} onChange={onChange} /> : null}
                             <section className="space-y-2">
                                 <p className="text-xs font-medium">Mood</p>

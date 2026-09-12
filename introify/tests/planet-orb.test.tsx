@@ -32,11 +32,33 @@ describe("PlanetOrb", () => {
     })
 
     it("identifies only supported planet IDs", () => {
-        expect(isPlanetOrbVariant("planet-azure")).toBe(true)
-        expect(isPlanetOrbVariant("planet-rose")).toBe(true)
-        expect(isPlanetOrbVariant("planet-sage")).toBe(true)
+        for (const id of ["planet-azure", "planet-rose", "planet-sage", "planet-mercury", "planet-venus", "planet-earth", "planet-mars", "planet-jupiter", "planet-saturn", "planet-uranus", "planet-neptune", "planet-pluto"]) {
+            expect(isPlanetOrbVariant(id), id).toBe(true)
+        }
         expect(isPlanetOrbVariant("planet-unknown")).toBe(false)
+        expect(isPlanetOrbVariant("constructor")).toBe(false)
         expect(isPlanetOrbVariant(undefined)).toBe(false)
+    })
+
+    it("gives each solar planet its own surface while keeping the shared face", () => {
+        const SOLAR = ["planet-mercury", "planet-venus", "planet-earth", "planet-mars", "planet-jupiter", "planet-saturn", "planet-uranus", "planet-neptune", "planet-pluto"] as const
+        const { container } = render(<>{SOLAR.map((variant) => <PlanetOrb key={variant} size={200} variant={variant} />)}</>)
+        const ids = Array.from(container.querySelectorAll("[id]"), (element) => element.id)
+        expect(new Set(ids).size).toBe(ids.length)
+        expect(container.querySelectorAll(".planet-eye")).toHaveLength(SOLAR.length * 2)
+        for (const element of container.querySelectorAll("[fill],[stroke],[clip-path],[filter]")) {
+            for (const attribute of ["fill", "stroke", "clip-path", "filter"]) {
+                const reference = element.getAttribute(attribute)?.match(/^url\(#(.+)\)$/)?.[1]
+                if (reference) expect(ids).toContain(reference)
+            }
+        }
+        const surfaces = new Set(Array.from(container.querySelectorAll("svg"), (svg) => svg.querySelector('[clip-path]')!.innerHTML.replace(/planet-[^"]*-/g, "")))
+        expect(surfaces.size).toBe(SOLAR.length)
+        expect(container.querySelector(".planet-orb--planet-saturn [data-ring=\"front\"]")).not.toBeNull()
+        expect(container.querySelector(".planet-orb--planet-saturn [data-ring=\"back\"]")).not.toBeNull()
+        expect(container.querySelector(".planet-orb--planet-mars .planet-ring")).toBeNull()
+        expect(container.querySelector(".planet-orb--planet-mercury .planet-clouds")).toBeNull()
+        expect(container.querySelector(".planet-orb--planet-jupiter .planet-clouds")).not.toBeNull()
     })
 
     it("renders all six saved expressions distinctly even without animation", () => {

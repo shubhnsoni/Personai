@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
-import { DEFAULT_BLOUB_PICK } from "@/lib/bloub/catalog"
+import { BLOUB_THEMES, DEFAULT_BLOUB_PICK, PLANET_THEMES } from "@/lib/bloub/catalog"
 
 vi.mock("@/components/welcome-orb", () => ({
     WelcomeOrb: ({ orbitProfile, profileImageUrl }: { orbitProfile?: boolean; profileImageUrl?: string }) => (
@@ -36,17 +36,23 @@ describe("owner profile orbit controls", () => {
         expect(onChange).toHaveBeenLastCalledWith({ orbitProfile: false })
     })
 
-    it("groups Rose and Sage under Azure in the Mood tab and retains saved selections", () => {
+    it("groups every planet under Azure as Looks in the Look tab and retains saved selections", () => {
         const onChange = vi.fn()
         render(<BloubCustomizerSheet open onClose={vi.fn()} value={{ ...DEFAULT_BLOUB_PICK, theme: "planet-rose" }} onChange={onChange} />)
         expect(screen.getByRole("button", { name: "Azure" }).getAttribute("aria-pressed")).toBe("true")
         expect(screen.queryByRole("button", { name: "Rose" })).toBeNull()
-        expect(screen.queryByRole("button", { name: "Sage" })).toBeNull()
+        expect(screen.queryByRole("button", { name: "Saturn" })).toBeNull()
         fireEvent.click(screen.getByRole("tab", { name: "Mood" }))
-        expect(screen.getByRole("button", { name: "Rose mood" }).getAttribute("aria-pressed")).toBe("true")
-        for (const [label, theme] of [["Azure", "planet-azure"], ["Rose", "planet-rose"], ["Sage", "planet-sage"]]) {
-            fireEvent.click(screen.getByRole("button", { name: `${label} mood` }))
+        expect(screen.queryByRole("button", { name: "Rose look" })).toBeNull()
+        expect(screen.queryByText("Azure moods")).toBeNull()
+        fireEvent.click(screen.getByRole("tab", { name: "Look" }))
+        expect(screen.getByText("Looks")).not.toBeNull()
+        expect(screen.getByRole("button", { name: "Rose look" }).getAttribute("aria-pressed")).toBe("true")
+        for (const theme of PLANET_THEMES) {
+            const label = BLOUB_THEMES.find((item) => item.id === theme)!.label
+            fireEvent.click(screen.getByRole("button", { name: `${label} look` }))
             expect(onChange).toHaveBeenLastCalledWith({ theme })
         }
+        expect(PLANET_THEMES).toHaveLength(12)
     })
 })

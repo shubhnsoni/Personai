@@ -81,11 +81,14 @@ export const BLOUB_AURAS: { id: AuraId; label: string }[] = [
 
 export const DEFAULT_AURA: AuraId = "pulse"
 
-export type PlanetThemeId = "planet-azure" | "planet-rose" | "planet-sage"
+export type SolarPlanetId = "planet-mercury" | "planet-venus" | "planet-earth" | "planet-mars" | "planet-jupiter" | "planet-saturn" | "planet-uranus" | "planet-neptune" | "planet-pluto"
+export type PlanetThemeId = "planet-azure" | "planet-rose" | "planet-sage" | SolarPlanetId
 export type CosmicThemeId = "cosmic-space" | "cosmic-comic"
 export type MascotThemeId = "retro-tv" | "solid-gold" | "pencil-sketch" | "glass-bubble"
 export type BloubThemeId = "classic" | "retro-lcd" | "astral-nebula" | "holographic-hud" | "liquid-chrome" | PlanetThemeId | CosmicThemeId | MascotThemeId
-export const PLANET_THEMES: readonly PlanetThemeId[] = ["planet-azure", "planet-rose", "planet-sage"]
+export const SOLAR_PLANETS: readonly SolarPlanetId[] = ["planet-mercury", "planet-venus", "planet-earth", "planet-mars", "planet-jupiter", "planet-saturn", "planet-uranus", "planet-neptune", "planet-pluto"]
+/** Every look the Azure bot owns: its three pastel worlds followed by the solar system. */
+export const PLANET_THEMES: readonly PlanetThemeId[] = ["planet-azure", "planet-rose", "planet-sage", ...SOLAR_PLANETS]
 export const COSMIC_THEMES: readonly CosmicThemeId[] = ["cosmic-space", "cosmic-comic"]
 export const MASCOT_THEMES: readonly MascotThemeId[] = ["retro-tv", "solid-gold", "pencil-sketch", "glass-bubble"]
 
@@ -107,6 +110,15 @@ export const BLOUB_THEMES: { id: BloubThemeId; label: string; description: strin
     { id: "planet-azure", label: "Azure", description: "" },
     { id: "planet-rose", label: "Rose", description: "" },
     { id: "planet-sage", label: "Sage", description: "" },
+    { id: "planet-mercury", label: "Mercury", description: "" },
+    { id: "planet-venus", label: "Venus", description: "" },
+    { id: "planet-earth", label: "Earth", description: "" },
+    { id: "planet-mars", label: "Mars", description: "" },
+    { id: "planet-jupiter", label: "Jupiter", description: "" },
+    { id: "planet-saturn", label: "Saturn", description: "" },
+    { id: "planet-uranus", label: "Uranus", description: "" },
+    { id: "planet-neptune", label: "Neptune", description: "" },
+    { id: "planet-pluto", label: "Pluto", description: "" },
     { id: "cosmic-space", label: "Space", description: "" },
     { id: "cosmic-comic", label: "Comic", description: "" },
     { id: "retro-tv", label: "Retro TV", description: "" },
@@ -167,6 +179,60 @@ export const BLOUB_THEME_META: Partial<Record<BloubThemeId, BloubThemeMeta>> = {
         thumb: { bg: "#081710", dot: "#9ed2ac", bar: "#9ed2ac" },
         thumbLight: { bg: "#edf6ef", dot: "#35734e", bar: "#203e2b" },
         note: "Sage green and soft mint, with a matching light and dark canvas.",
+    },
+    "planet-mercury": {
+        canvas: { light: "#f1efeb", dark: "#14120f" },
+        thumb: { bg: "#14120f", dot: "#b8aea4", bar: "#7d746c" },
+        thumbLight: { bg: "#f1efeb", dot: "#6e6560", bar: "#2b2724" },
+        note: "Cratered grey stone and warm dust, from bright noon to a long shadowed night.",
+    },
+    "planet-venus": {
+        canvas: { light: "#fdf5e4", dark: "#1a1208" },
+        thumb: { bg: "#1a1208", dot: "#f0c26a", bar: "#a37a3c" },
+        thumbLight: { bg: "#fdf5e4", dot: "#b8782f", bar: "#4a2e10" },
+        note: "Thick cream clouds and amber heat, glowing like embers after dark.",
+    },
+    "planet-earth": {
+        canvas: { light: "#eaf4fb", dark: "#07131f" },
+        thumb: { bg: "#07131f", dot: "#7fbdf2", bar: "#3d7fc0" },
+        thumbLight: { bg: "#eaf4fb", dot: "#2b6cb0", bar: "#0f2c4c" },
+        note: "Ocean blue, green continents and white weather, with a night-side dark canvas.",
+    },
+    "planet-mars": {
+        canvas: { light: "#fbeee7", dark: "#180a05" },
+        thumb: { bg: "#180a05", dot: "#f08b62", bar: "#a35236" },
+        thumbLight: { bg: "#fbeee7", dot: "#b4553a", bar: "#4a1f10" },
+        note: "Rust red plains and a frosted polar cap, dimming to a dusty red dusk.",
+    },
+    "planet-jupiter": {
+        canvas: { light: "#faf1e4", dark: "#160e07" },
+        thumb: { bg: "#160e07", dot: "#e2a86f", bar: "#9a6a44" },
+        thumbLight: { bg: "#faf1e4", dot: "#a06b45", bar: "#3d2412" },
+        note: "Banded caramel clouds and the great red storm, on parchment or deep umber.",
+    },
+    "planet-saturn": {
+        canvas: { light: "#fbf6ea", dark: "#15100a" },
+        thumb: { bg: "#15100a", dot: "#e8c47e", bar: "#a08654" },
+        thumbLight: { bg: "#fbf6ea", dot: "#a58452", bar: "#42301a" },
+        note: "Pale gold with tilted rings, on ivory by day and antique bronze by night.",
+    },
+    "planet-uranus": {
+        canvas: { light: "#ecf9fb", dark: "#06171b" },
+        thumb: { bg: "#06171b", dot: "#7fd6e3", bar: "#3f95a5" },
+        thumbLight: { bg: "#ecf9fb", dot: "#3f95a5", bar: "#0f3a44" },
+        note: "Glacial cyan and a faint ring, cool and calm in both modes.",
+    },
+    "planet-neptune": {
+        canvas: { light: "#eceff9", dark: "#070b1e" },
+        thumb: { bg: "#070b1e", dot: "#8fa4ff", bar: "#4c5fc9" },
+        thumbLight: { bg: "#eceff9", dot: "#3a52c9", bar: "#0c1548" },
+        note: "Deep royal blue and racing dark storms, with an abyssal dark canvas.",
+    },
+    "planet-pluto": {
+        canvas: { light: "#f7f1ea", dark: "#130d0a" },
+        thumb: { bg: "#130d0a", dot: "#c7a58c", bar: "#7a5f4c" },
+        thumbLight: { bg: "#f7f1ea", dot: "#8a6a55", bar: "#2f1f17" },
+        note: "Dusty tan ice with its pale heart, far from the sun in either mode.",
     },
     "retro-tv": {
         canvas: { light: "#e9e4d8", dark: "#171816" },

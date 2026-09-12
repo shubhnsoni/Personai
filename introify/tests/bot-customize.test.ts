@@ -20,7 +20,7 @@ describe("customise bots", () => {
     })
 
     it("names look palettes as chat themes without selling copy", () => {
-        expect(BLOUB_THEMES.map((theme) => theme.label)).toEqual(["Classic", "Retro LCD", "Azure", "Rose", "Sage", "Space", "Comic", "Retro TV", "Solid Gold", "Pencil Sketch", "Glass Bubble", "Astral Nebula", "Hologram", "Liquid Chrome"])
+        expect(BLOUB_THEMES.map((theme) => theme.label)).toEqual(["Classic", "Retro LCD", "Azure", "Rose", "Sage", "Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto", "Space", "Comic", "Retro TV", "Solid Gold", "Pencil Sketch", "Glass Bubble", "Astral Nebula", "Hologram", "Liquid Chrome"])
         for (const theme of BLOUB_THEMES) {
             expect(theme.description).toBe("")
         }

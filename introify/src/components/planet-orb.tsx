@@ -3,18 +3,98 @@
 import { useId, type CSSProperties } from "react"
 import "./planet-orb.css"
 
-export type PlanetOrbVariant = "planet-azure" | "planet-rose" | "planet-sage"
+export type PlanetOrbVariant =
+    | "planet-azure" | "planet-rose" | "planet-sage"
+    | "planet-mercury" | "planet-venus" | "planet-earth" | "planet-mars" | "planet-jupiter" | "planet-saturn" | "planet-uranus" | "planet-neptune" | "planet-pluto"
 type Lid = "none" | "blink" | "wink-left" | "wink-right"
 
-export function isPlanetOrbVariant(value: string | null | undefined): value is PlanetOrbVariant {
-    return value === "planet-azure" || value === "planet-rose" || value === "planet-sage"
+type Palette = {
+    light: string; mist: string; cloud: string; base: string; middle: string; shade: string; rim: string; eye: string; iris: string
+    /** Rocky worlds skip the drifting cloud layer; gas giants can thicken it. */
+    clouds?: "none" | "thin" | "thick"
+    /** A tilted ring system: [rx, ry, tilt in degrees, stroke width]. */
+    ring?: [number, number, number, number]
 }
 
-const PALETTES = {
+const PALETTES: Record<PlanetOrbVariant, Palette> = {
     "planet-azure": { light: "#edfaff", mist: "#c9ebfa", cloud: "#d7f7ff", base: "#91c5e9", middle: "#568ec5", shade: "#163d7c", rim: "#a8e5ff", eye: "#09254f", iris: "#477db3" },
     "planet-rose": { light: "#fff2f4", mist: "#f6d4e4", cloud: "#ffeaf2", base: "#dea3c5", middle: "#ad6f9d", shade: "#583363", rim: "#ffcbec", eye: "#442249", iris: "#a36f9c" },
     "planet-sage": { light: "#f0fff4", mist: "#d5efdf", cloud: "#e3ffed", base: "#a2cdb6", middle: "#629f8d", shade: "#245c57", rim: "#bdffdb", eye: "#123d36", iris: "#4f9d84" },
-} satisfies Record<PlanetOrbVariant, Record<string, string>>
+    "planet-mercury": { light: "#f4f1ec", mist: "#d9d3ca", cloud: "#e8e2d8", base: "#a9a19a", middle: "#756c66", shade: "#3a332f", rim: "#e6dfd5", eye: "#26211f", iris: "#6e6560", clouds: "none" },
+    "planet-venus": { light: "#fff8e6", mist: "#f9e3b3", cloud: "#fff1cf", base: "#e5b872", middle: "#c48b3f", shade: "#7a4f1c", rim: "#ffe6ad", eye: "#4a2e10", iris: "#b27c3a", clouds: "thick" },
+    "planet-earth": { light: "#eaf7ff", mist: "#bfe3fb", cloud: "#ffffff", base: "#4f9ddc", middle: "#2b6cb0", shade: "#123a6b", rim: "#b8e6ff", eye: "#0d2a4d", iris: "#3b7fbf", clouds: "thin" },
+    "planet-mars": { light: "#ffe9dc", mist: "#f6c3a6", cloud: "#f8d9c8", base: "#d9743f", middle: "#a9472a", shade: "#5a2314", rim: "#ffc7a6", eye: "#3a1a0e", iris: "#b4553a", clouds: "none" },
+    "planet-jupiter": { light: "#fff4e4", mist: "#f3d9b5", cloud: "#8a5a36", base: "#d6a670", middle: "#a8734a", shade: "#5c3a22", rim: "#ffe0b8", eye: "#3d2412", iris: "#a06b45", clouds: "thick" },
+    "planet-saturn": { light: "#fff8e8", mist: "#f5e4bf", cloud: "#b8955a", base: "#e3c48b", middle: "#b8955a", shade: "#6b5230", rim: "#ffecc0", eye: "#42301a", iris: "#a58452", clouds: "thin", ring: [154, 34, -16, 14] },
+    "planet-uranus": { light: "#f0fdff", mist: "#c8f2f7", cloud: "#e4fbfd", base: "#8fd9e3", middle: "#4fa9b8", shade: "#1e5f6e", rim: "#c4f5fb", eye: "#0f3a44", iris: "#3f95a5", clouds: "thin", ring: [130, 116, 8, 3] },
+    "planet-neptune": { light: "#e8efff", mist: "#b9c9ff", cloud: "#d6e0ff", base: "#4c6fe0", middle: "#2f48b3", shade: "#141f66", rim: "#b3c4ff", eye: "#0c1548", iris: "#4258c4", clouds: "thin" },
+    "planet-pluto": { light: "#fbf3ea", mist: "#ead4c0", cloud: "#f3e4d4", base: "#c8a98f", middle: "#8f6d55", shade: "#4a3327", rim: "#f2dcc8", eye: "#2f1f17", iris: "#8a6a55", clouds: "none" },
+}
+
+export function isPlanetOrbVariant(value: string | null | undefined): value is PlanetOrbVariant {
+    return typeof value === "string" && Object.hasOwn(PALETTES, value)
+}
+
+/** Surface details that make each world recognisable at a glance. All sit inside the globe clip. */
+function PlanetFeatures({ variant, palette, uid }: { variant: PlanetOrbVariant; palette: Palette; uid: string }) {
+    switch (variant) {
+        case "planet-mercury":
+            return <g className="planet-features" fill={palette.shade} opacity=".5">
+                {[[112, 128, 11], [214, 118, 8], [190, 208, 14], [96, 196, 7], [150, 236, 9], [232, 176, 6], [130, 92, 5]].map(([cx, cy, r]) => (
+                    <g key={`${cx}-${cy}`}>
+                        <circle cx={cx} cy={cy} r={r} />
+                        <circle cx={cx} cy={cy} r={r} fill="none" stroke={palette.light} strokeWidth="1.2" opacity=".55" />
+                    </g>
+                ))}
+            </g>
+        case "planet-earth":
+            return <g className="planet-features" fill="#5aa15b" opacity=".92">
+                <path d="M92 118 C104 100 128 96 140 106 C150 114 138 128 146 138 C154 150 136 160 124 158 C108 156 96 142 92 118 Z" />
+                <path d="M182 82 C200 76 224 86 232 104 C238 118 226 126 214 128 C200 130 190 118 186 106 C184 96 176 90 182 82 Z" />
+                <path d="M198 178 C214 172 232 184 236 200 C240 220 226 240 208 242 C192 244 184 228 186 214 C188 200 186 184 198 178 Z" />
+                <path d="M118 194 C126 190 138 196 138 206 C138 220 128 234 118 238 C110 240 106 226 108 216 C110 206 110 198 118 194 Z" fill="#c9b27a" />
+                <path d="M108 60 C126 56 150 62 156 70 C152 78 132 82 116 78 C104 74 100 66 108 60 Z" fill="#f4f8ff" opacity=".9" />
+                <path d="M120 256 C144 250 178 252 200 258 C182 266 142 268 120 256 Z" fill="#f4f8ff" opacity=".9" />
+            </g>
+        case "planet-mars":
+            return <g className="planet-features">
+                <path d="M118 66 C138 56 182 56 202 66 C190 76 130 76 118 66 Z" fill="#fff4ee" opacity=".9" />
+                <path d="M86 150 C104 136 126 138 138 150 C146 160 128 168 112 166 C98 164 84 160 86 150 Z" fill={palette.shade} opacity=".28" />
+                <path d="M186 196 C206 186 234 190 240 206 C232 220 206 224 190 216 C182 210 180 202 186 196 Z" fill={palette.shade} opacity=".24" />
+                <ellipse cx="164" cy="226" rx="34" ry="8" fill={palette.shade} opacity=".18" />
+            </g>
+        case "planet-jupiter":
+            return <g className="planet-features">
+                <ellipse cx="204" cy="206" rx="26" ry="14" fill="#c9553a" opacity=".85" />
+                <ellipse cx="204" cy="206" rx="17" ry="8" fill="#e2775a" opacity=".8" />
+                <ellipse cx="206" cy="205" rx="8" ry="3.5" fill="#f4a58c" opacity=".7" />
+            </g>
+        case "planet-neptune":
+            return <g className="planet-features">
+                <ellipse cx="118" cy="196" rx="22" ry="10" fill={palette.shade} opacity=".55" />
+                <ellipse cx="118" cy="196" rx="12" ry="5" fill="#0a1140" opacity=".6" />
+                <ellipse cx="206" cy="112" rx="10" ry="4" fill={palette.light} opacity=".45" />
+            </g>
+        case "planet-pluto":
+            return <g className="planet-features">
+                <path d="M138 196 C146 180 168 182 172 196 C176 182 198 180 206 196 C214 214 188 236 172 246 C156 236 130 214 138 196 Z" fill="#efdccb" opacity=".9" />
+                <path d="M92 116 C112 100 140 104 150 116 C142 126 118 130 100 126 Z" fill={palette.shade} opacity=".22" />
+                <circle cx="222" cy="126" r="6" fill={palette.shade} opacity=".22" />
+            </g>
+        case "planet-venus":
+            return <g className="planet-features" fill={palette.light} opacity=".5" filter={`url(#${uid}-haze)`}>
+                <path d="M84 132 C118 118 150 140 190 126 C220 116 236 128 244 140 C220 148 190 142 160 150 C126 158 100 150 84 132 Z" />
+                <path d="M96 204 C130 190 172 208 212 194 C230 188 240 196 236 206 C204 214 170 210 130 220 C112 224 100 216 96 204 Z" />
+            </g>
+        default:
+            return null
+    }
+}
+
+/** Half of a tilted ring, drawn behind and then in front of the globe so it wraps around it. */
+function ringArc(rx: number, ry: number, front: boolean) {
+    return `M${-rx} 0 A${rx} ${ry} 0 0 ${front ? 0 : 1} ${rx} 0`
+}
 
 // Long continuous contours keep the cloud layer seamless while it drifts across the globe.
 function cloudLine(y: number, phase: number, strength = 1) {
@@ -78,6 +158,7 @@ export function PlanetOrb({
 }: PlanetOrbProps) {
     const uid = `planet-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`
     const palette = PALETTES[variant] ?? PALETTES["planet-azure"]
+    const { clouds, ring } = palette
     const frozen = Number.isFinite(frozenAt)
     const motionSpeed = Number.isFinite(speed) ? Math.min(3, Math.max(0.2, speed)) : 1
     const style = {
@@ -125,6 +206,13 @@ export function PlanetOrb({
                     <stop offset=".47" stopColor={palette.cloud} stopOpacity=".13" />
                     <stop offset="1" stopColor={palette.cloud} stopOpacity="0" />
                 </radialGradient>
+                {ring && <linearGradient id={`${uid}-ring`} x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stopColor={palette.mist} stopOpacity=".55" />
+                    <stop offset=".3" stopColor={palette.middle} stopOpacity=".9" />
+                    <stop offset=".5" stopColor={palette.light} stopOpacity=".95" />
+                    <stop offset=".7" stopColor={palette.middle} stopOpacity=".9" />
+                    <stop offset="1" stopColor={palette.mist} stopOpacity=".55" />
+                </linearGradient>}
                 <clipPath id={`${uid}-clip`}><circle cx="160" cy="160" r="103" /></clipPath>
                 <filter id={`${uid}-haze`} x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3" /></filter>
                 {detailed && <filter id={`${uid}-wind`} x="-10%" y="-30%" width="120%" height="160%" colorInterpolationFilters="sRGB">
@@ -138,24 +226,31 @@ export function PlanetOrb({
                 </filter>}
             </defs>
             <g className="planet-character">
+                {ring && <g className="planet-ring" transform={`translate(160 160) rotate(${ring[2]})`} fill="none" stroke={`url(#${uid}-ring)`} strokeWidth={ring[3]} strokeLinecap="round">
+                    <path data-ring="back" d={ringArc(ring[0], ring[1], false)} opacity=".75" />
+                </g>}
                 <circle cx="160" cy="160" r="103" fill={`url(#${uid}-sphere)`} />
                 <g clipPath={`url(#${uid}-clip)`}>
-                    {detailed && <g className="planet-weather-texture" opacity=".44">
+                    {detailed && clouds !== "none" && <g className="planet-weather-texture" opacity=".44">
                         <rect x="55" y="55" width="210" height="210" fill={palette.cloud} filter={`url(#${uid}-cloud-texture)`} />
                     </g>}
-                    <g className="planet-clouds" fill="none" stroke={palette.cloud} filter={detailed ? `url(#${uid}-wind)` : undefined}>
+                    <PlanetFeatures variant={variant} palette={palette} uid={uid} />
+                    {clouds !== "none" && <g className="planet-clouds" fill="none" stroke={palette.cloud} opacity={clouds === "thin" ? .6 : 1} filter={detailed ? `url(#${uid}-wind)` : undefined}>
                         <path d={cloudLine(190, 1.9)} strokeWidth="18" opacity=".38" filter={`url(#${uid}-haze)`} />
                         <path d={cloudLine(215, 2.15)} strokeWidth="11" opacity=".21" filter={`url(#${uid}-haze)`} />
-                        {BANDS.filter((_, i) => detailed || i % 3 === 0).map((band, i) => <path key={i} d={band.path} strokeWidth={band.width} opacity={band.opacity} />)}
+                        {BANDS.filter((_, i) => (detailed && clouds !== "thin") || i % 3 === 0).map((band, i) => <path key={i} d={band.path} strokeWidth={band.width} opacity={band.opacity} />)}
                         <path d="M69 115 C88 133 76 158 109 160 C141 162 115 137 99 146 C85 155 105 174 132 166 C153 160 151 152 175 156" strokeWidth="1.3" opacity=".26" />
                         <path d="M79 111 C104 138 82 149 111 151 C128 154 136 164 158 161" strokeWidth="3" opacity=".2" filter={`url(#${uid}-haze)`} />
                         <path d={cloudLine(104, 0.8, 0.4)} strokeWidth="1.5" opacity=".18" />
                         <path d={cloudLine(112, 0.95, 0.4)} strokeWidth=".7" opacity=".2" />
-                    </g>
+                    </g>}
                     <circle cx="160" cy="160" r="103" fill={`url(#${uid}-shine)`} />
                     <circle cx="160" cy="160" r="103" fill={`url(#${uid}-limb)`} />
                 </g>
                 <circle cx="160" cy="160" r="102.7" stroke={`url(#${uid}-rim)`} strokeWidth="1.5" fill="none" />
+                {ring && <g className="planet-ring" transform={`translate(160 160) rotate(${ring[2]})`} fill="none" stroke={`url(#${uid}-ring)`} strokeWidth={ring[3]} strokeLinecap="round">
+                    <path data-ring="front" d={ringArc(ring[0], ring[1], true)} />
+                </g>}
                 <path d="M67 132 A99 99 0 0 1 171 61" fill="none" stroke={palette.light} strokeWidth="2.5" strokeLinecap="round" opacity=".53" filter={`url(#${uid}-haze)`} />
                 <g transform={`translate(${dx} ${dy})`}>
                     <g className="planet-face">

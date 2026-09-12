@@ -150,6 +150,223 @@
   --pt-accent: #9ed2ac;
 }
 
+/* ---- Solar system palettes (Azure's looks) ------------------------------ */
+:is(
+  [data-public-business-theme="planet-mercury"],
+  [data-public-catalog-theme="planet-mercury"],
+  [data-public-profile-theme="planet-mercury"],
+  [data-chat-theme="planet-mercury"],
+  body:has([data-public-business-theme="planet-mercury"], [data-public-profile-theme="planet-mercury"], [data-public-catalog-theme="planet-mercury"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #f1efeb;
+  --pt-ink: #2b2724;
+  --pt-accent: #6e6560;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-mercury"],
+  [data-public-catalog-theme="planet-mercury"],
+  [data-public-profile-theme="planet-mercury"],
+  [data-chat-theme="planet-mercury"],
+  body:has([data-public-business-theme="planet-mercury"], [data-public-profile-theme="planet-mercury"], [data-public-catalog-theme="planet-mercury"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #14120f;
+  --pt-ink: #efe9e2;
+  --pt-accent: #b8aea4;
+}
+
+:is(
+  [data-public-business-theme="planet-venus"],
+  [data-public-catalog-theme="planet-venus"],
+  [data-public-profile-theme="planet-venus"],
+  [data-chat-theme="planet-venus"],
+  body:has([data-public-business-theme="planet-venus"], [data-public-profile-theme="planet-venus"], [data-public-catalog-theme="planet-venus"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #fdf5e4;
+  --pt-ink: #4a2e10;
+  --pt-accent: #b8782f;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-venus"],
+  [data-public-catalog-theme="planet-venus"],
+  [data-public-profile-theme="planet-venus"],
+  [data-chat-theme="planet-venus"],
+  body:has([data-public-business-theme="planet-venus"], [data-public-profile-theme="planet-venus"], [data-public-catalog-theme="planet-venus"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #1a1208;
+  --pt-ink: #fff1d6;
+  --pt-accent: #f0c26a;
+}
+
+:is(
+  [data-public-business-theme="planet-earth"],
+  [data-public-catalog-theme="planet-earth"],
+  [data-public-profile-theme="planet-earth"],
+  [data-chat-theme="planet-earth"],
+  body:has([data-public-business-theme="planet-earth"], [data-public-profile-theme="planet-earth"], [data-public-catalog-theme="planet-earth"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #eaf4fb;
+  --pt-ink: #0f2c4c;
+  --pt-accent: #2b6cb0;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-earth"],
+  [data-public-catalog-theme="planet-earth"],
+  [data-public-profile-theme="planet-earth"],
+  [data-chat-theme="planet-earth"],
+  body:has([data-public-business-theme="planet-earth"], [data-public-profile-theme="planet-earth"], [data-public-catalog-theme="planet-earth"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #07131f;
+  --pt-ink: #e6f2ff;
+  --pt-accent: #7fbdf2;
+}
+
+:is(
+  [data-public-business-theme="planet-mars"],
+  [data-public-catalog-theme="planet-mars"],
+  [data-public-profile-theme="planet-mars"],
+  [data-chat-theme="planet-mars"],
+  body:has([data-public-business-theme="planet-mars"], [data-public-profile-theme="planet-mars"], [data-public-catalog-theme="planet-mars"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #fbeee7;
+  --pt-ink: #4a1f10;
+  --pt-accent: #b4553a;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-mars"],
+  [data-public-catalog-theme="planet-mars"],
+  [data-public-profile-theme="planet-mars"],
+  [data-chat-theme="planet-mars"],
+  body:has([data-public-business-theme="planet-mars"], [data-public-profile-theme="planet-mars"], [data-public-catalog-theme="planet-mars"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #180a05;
+  --pt-ink: #ffe4d6;
+  --pt-accent: #f08b62;
+}
+
+:is(
+  [data-public-business-theme="planet-jupiter"],
+  [data-public-catalog-theme="planet-jupiter"],
+  [data-public-profile-theme="planet-jupiter"],
+  [data-chat-theme="planet-jupiter"],
+  body:has([data-public-business-theme="planet-jupiter"], [data-public-profile-theme="planet-jupiter"], [data-public-catalog-theme="planet-jupiter"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #faf1e4;
+  --pt-ink: #3d2412;
+  --pt-accent: #a06b45;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-jupiter"],
+  [data-public-catalog-theme="planet-jupiter"],
+  [data-public-profile-theme="planet-jupiter"],
+  [data-chat-theme="planet-jupiter"],
+  body:has([data-public-business-theme="planet-jupiter"], [data-public-profile-theme="planet-jupiter"], [data-public-catalog-theme="planet-jupiter"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #160e07;
+  --pt-ink: #f8e8d2;
+  --pt-accent: #e2a86f;
+}
+
+:is(
+  [data-public-business-theme="planet-saturn"],
+  [data-public-catalog-theme="planet-saturn"],
+  [data-public-profile-theme="planet-saturn"],
+  [data-chat-theme="planet-saturn"],
+  body:has([data-public-business-theme="planet-saturn"], [data-public-profile-theme="planet-saturn"], [data-public-catalog-theme="planet-saturn"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #fbf6ea;
+  --pt-ink: #42301a;
+  --pt-accent: #a58452;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-saturn"],
+  [data-public-catalog-theme="planet-saturn"],
+  [data-public-profile-theme="planet-saturn"],
+  [data-chat-theme="planet-saturn"],
+  body:has([data-public-business-theme="planet-saturn"], [data-public-profile-theme="planet-saturn"], [data-public-catalog-theme="planet-saturn"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #15100a;
+  --pt-ink: #f9edd6;
+  --pt-accent: #e8c47e;
+}
+
+:is(
+  [data-public-business-theme="planet-uranus"],
+  [data-public-catalog-theme="planet-uranus"],
+  [data-public-profile-theme="planet-uranus"],
+  [data-chat-theme="planet-uranus"],
+  body:has([data-public-business-theme="planet-uranus"], [data-public-profile-theme="planet-uranus"], [data-public-catalog-theme="planet-uranus"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #ecf9fb;
+  --pt-ink: #0f3a44;
+  --pt-accent: #3f95a5;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-uranus"],
+  [data-public-catalog-theme="planet-uranus"],
+  [data-public-profile-theme="planet-uranus"],
+  [data-chat-theme="planet-uranus"],
+  body:has([data-public-business-theme="planet-uranus"], [data-public-profile-theme="planet-uranus"], [data-public-catalog-theme="planet-uranus"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #06171b;
+  --pt-ink: #dcf7fb;
+  --pt-accent: #7fd6e3;
+}
+
+:is(
+  [data-public-business-theme="planet-neptune"],
+  [data-public-catalog-theme="planet-neptune"],
+  [data-public-profile-theme="planet-neptune"],
+  [data-chat-theme="planet-neptune"],
+  body:has([data-public-business-theme="planet-neptune"], [data-public-profile-theme="planet-neptune"], [data-public-catalog-theme="planet-neptune"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #eceff9;
+  --pt-ink: #0c1548;
+  --pt-accent: #3a52c9;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-neptune"],
+  [data-public-catalog-theme="planet-neptune"],
+  [data-public-profile-theme="planet-neptune"],
+  [data-chat-theme="planet-neptune"],
+  body:has([data-public-business-theme="planet-neptune"], [data-public-profile-theme="planet-neptune"], [data-public-catalog-theme="planet-neptune"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #070b1e;
+  --pt-ink: #e3e8ff;
+  --pt-accent: #8fa4ff;
+}
+
+:is(
+  [data-public-business-theme="planet-pluto"],
+  [data-public-catalog-theme="planet-pluto"],
+  [data-public-profile-theme="planet-pluto"],
+  [data-chat-theme="planet-pluto"],
+  body:has([data-public-business-theme="planet-pluto"], [data-public-profile-theme="planet-pluto"], [data-public-catalog-theme="planet-pluto"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #f7f1ea;
+  --pt-ink: #2f1f17;
+  --pt-accent: #8a6a55;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-pluto"],
+  [data-public-catalog-theme="planet-pluto"],
+  [data-public-profile-theme="planet-pluto"],
+  [data-chat-theme="planet-pluto"],
+  body:has([data-public-business-theme="planet-pluto"], [data-public-profile-theme="planet-pluto"], [data-public-catalog-theme="planet-pluto"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #130d0a;
+  --pt-ink: #f3e6da;
+  --pt-accent: #c7a58c;
+}
+
 /* ---- Nova: Space and Comic ---------------------------------------------- */
 :is(
   [data-public-business-theme="cosmic-space"],
@@ -330,6 +547,96 @@ html.dark body:has([data-public-browser-theme="planet-sage"]) {
   background-color: #081710;
 }
 
+html:has([data-public-browser-theme="planet-mercury"]),
+body:has([data-public-browser-theme="planet-mercury"]) {
+  background-color: #f1efeb;
+}
+
+html.dark:has([data-public-browser-theme="planet-mercury"]),
+html.dark body:has([data-public-browser-theme="planet-mercury"]) {
+  background-color: #14120f;
+}
+
+html:has([data-public-browser-theme="planet-venus"]),
+body:has([data-public-browser-theme="planet-venus"]) {
+  background-color: #fdf5e4;
+}
+
+html.dark:has([data-public-browser-theme="planet-venus"]),
+html.dark body:has([data-public-browser-theme="planet-venus"]) {
+  background-color: #1a1208;
+}
+
+html:has([data-public-browser-theme="planet-earth"]),
+body:has([data-public-browser-theme="planet-earth"]) {
+  background-color: #eaf4fb;
+}
+
+html.dark:has([data-public-browser-theme="planet-earth"]),
+html.dark body:has([data-public-browser-theme="planet-earth"]) {
+  background-color: #07131f;
+}
+
+html:has([data-public-browser-theme="planet-mars"]),
+body:has([data-public-browser-theme="planet-mars"]) {
+  background-color: #fbeee7;
+}
+
+html.dark:has([data-public-browser-theme="planet-mars"]),
+html.dark body:has([data-public-browser-theme="planet-mars"]) {
+  background-color: #180a05;
+}
+
+html:has([data-public-browser-theme="planet-jupiter"]),
+body:has([data-public-browser-theme="planet-jupiter"]) {
+  background-color: #faf1e4;
+}
+
+html.dark:has([data-public-browser-theme="planet-jupiter"]),
+html.dark body:has([data-public-browser-theme="planet-jupiter"]) {
+  background-color: #160e07;
+}
+
+html:has([data-public-browser-theme="planet-saturn"]),
+body:has([data-public-browser-theme="planet-saturn"]) {
+  background-color: #fbf6ea;
+}
+
+html.dark:has([data-public-browser-theme="planet-saturn"]),
+html.dark body:has([data-public-browser-theme="planet-saturn"]) {
+  background-color: #15100a;
+}
+
+html:has([data-public-browser-theme="planet-uranus"]),
+body:has([data-public-browser-theme="planet-uranus"]) {
+  background-color: #ecf9fb;
+}
+
+html.dark:has([data-public-browser-theme="planet-uranus"]),
+html.dark body:has([data-public-browser-theme="planet-uranus"]) {
+  background-color: #06171b;
+}
+
+html:has([data-public-browser-theme="planet-neptune"]),
+body:has([data-public-browser-theme="planet-neptune"]) {
+  background-color: #eceff9;
+}
+
+html.dark:has([data-public-browser-theme="planet-neptune"]),
+html.dark body:has([data-public-browser-theme="planet-neptune"]) {
+  background-color: #070b1e;
+}
+
+html:has([data-public-browser-theme="planet-pluto"]),
+body:has([data-public-browser-theme="planet-pluto"]) {
+  background-color: #f7f1ea;
+}
+
+html.dark:has([data-public-browser-theme="planet-pluto"]),
+html.dark body:has([data-public-browser-theme="planet-pluto"]) {
+  background-color: #130d0a;
+}
+
 html:has([data-public-browser-theme="holographic-hud"]),
 body:has([data-public-browser-theme="holographic-hud"]) {
   background-color: #eef6fc;
@@ -405,9 +712,7 @@ html.dark body:has([data-public-browser-theme="glass-bubble"]) {
   [data-public-business-theme="astral-nebula"], [data-public-catalog-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"], [data-chat-theme="astral-nebula"],
   [data-public-business-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-chat-theme="holographic-hud"],
   [data-public-business-theme="liquid-chrome"], [data-public-catalog-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"], [data-chat-theme="liquid-chrome"],
-  [data-public-business-theme="planet-azure"], [data-public-catalog-theme="planet-azure"], [data-public-profile-theme="planet-azure"], [data-chat-theme="planet-azure"],
-  [data-public-business-theme="planet-rose"], [data-public-catalog-theme="planet-rose"], [data-public-profile-theme="planet-rose"], [data-chat-theme="planet-rose"],
-  [data-public-business-theme="planet-sage"], [data-public-catalog-theme="planet-sage"], [data-public-profile-theme="planet-sage"], [data-chat-theme="planet-sage"],
+  [data-public-business-theme^="planet-"], [data-public-catalog-theme^="planet-"], [data-public-profile-theme^="planet-"], [data-chat-theme^="planet-"],
   [data-public-business-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-chat-theme="cosmic-space"],
   [data-public-business-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-chat-theme="cosmic-comic"],
   [data-public-business-theme="retro-tv"], [data-public-catalog-theme="retro-tv"], [data-public-profile-theme="retro-tv"], [data-chat-theme="retro-tv"],
@@ -418,9 +723,7 @@ html.dark body:has([data-public-browser-theme="glass-bubble"]) {
     [data-public-business-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"],
     [data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"],
     [data-public-business-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"],
-    [data-public-business-theme="planet-azure"], [data-public-profile-theme="planet-azure"],
-    [data-public-business-theme="planet-rose"], [data-public-profile-theme="planet-rose"],
-    [data-public-business-theme="planet-sage"], [data-public-profile-theme="planet-sage"],
+    [data-public-business-theme^="planet-"], [data-public-profile-theme^="planet-"], [data-public-catalog-theme^="planet-"],
     [data-public-business-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"],
     [data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"],
     [data-public-business-theme="retro-tv"], [data-public-profile-theme="retro-tv"], [data-public-catalog-theme="retro-tv"],
@@ -464,9 +767,7 @@ html.dark body:has([data-public-browser-theme="glass-bubble"]) {
 [data-chat-theme="holographic-hud"] h1,
 [data-chat-theme="liquid-chrome"] h1,
 [data-chat-theme="astral-nebula"] h1,
-[data-chat-theme="planet-azure"] h1,
-[data-chat-theme="planet-rose"] h1,
-[data-chat-theme="planet-sage"] h1,
+[data-chat-theme^="planet-"] h1,
 [data-chat-theme="cosmic-space"] h1,
 [data-chat-theme="cosmic-comic"] h1,
 [data-chat-theme="retro-tv"] h1,
@@ -480,9 +781,7 @@ html.dark body:has([data-public-browser-theme="glass-bubble"]) {
   [data-chat-theme="astral-nebula"],
   [data-chat-theme="holographic-hud"],
   [data-chat-theme="liquid-chrome"],
-  [data-chat-theme="planet-azure"],
-  [data-chat-theme="planet-rose"],
-  [data-chat-theme="planet-sage"],
+  [data-chat-theme^="planet-"],
   [data-chat-theme="cosmic-space"],
   [data-chat-theme="cosmic-comic"],
   [data-chat-theme="retro-tv"],
@@ -499,9 +798,7 @@ html.dark body:has([data-public-browser-theme="glass-bubble"]) {
   [data-chat-theme="astral-nebula"],
   [data-chat-theme="holographic-hud"],
   [data-chat-theme="liquid-chrome"],
-  [data-chat-theme="planet-azure"],
-  [data-chat-theme="planet-rose"],
-  [data-chat-theme="planet-sage"],
+  [data-chat-theme^="planet-"],
   [data-chat-theme="cosmic-space"],
   [data-chat-theme="cosmic-comic"],
   [data-chat-theme="retro-tv"],
@@ -516,9 +813,7 @@ html.dark body:has([data-public-browser-theme="glass-bubble"]) {
   [data-chat-theme="astral-nebula"],
   [data-chat-theme="holographic-hud"],
   [data-chat-theme="liquid-chrome"],
-  [data-chat-theme="planet-azure"],
-  [data-chat-theme="planet-rose"],
-  [data-chat-theme="planet-sage"],
+  [data-chat-theme^="planet-"],
   [data-chat-theme="cosmic-space"],
   [data-chat-theme="cosmic-comic"],
   [data-chat-theme="retro-tv"],
@@ -537,9 +832,7 @@ html.dark body:has([data-public-browser-theme="glass-bubble"]) {
 }
 
 :is(
-  [data-chat-theme="planet-azure"],
-  [data-chat-theme="planet-rose"],
-  [data-chat-theme="planet-sage"],
+  [data-chat-theme^="planet-"],
   [data-chat-theme="cosmic-space"],
   [data-chat-theme="cosmic-comic"]
 ) :is(input:not([type="checkbox"]), [data-chat-bubble]) {
@@ -557,9 +850,7 @@ html.dark body:has([data-public-browser-theme="glass-bubble"]) {
   [data-public-catalog-theme="astral-nebula"],
   [data-public-catalog-theme="holographic-hud"],
   [data-public-catalog-theme="liquid-chrome"],
-  [data-public-catalog-theme="planet-azure"],
-  [data-public-catalog-theme="planet-rose"],
-  [data-public-catalog-theme="planet-sage"],
+  [data-public-catalog-theme^="planet-"],
   [data-public-catalog-theme="cosmic-space"],
   [data-public-catalog-theme="cosmic-comic"],
   [data-public-catalog-theme="retro-tv"],
@@ -593,9 +884,7 @@ html.dark body:has([data-public-browser-theme="glass-bubble"]) {
   [data-public-business-theme="astral-nebula"],
   [data-public-business-theme="holographic-hud"],
   [data-public-business-theme="liquid-chrome"],
-  [data-public-business-theme="planet-azure"],
-  [data-public-business-theme="planet-rose"],
-  [data-public-business-theme="planet-sage"],
+  [data-public-business-theme^="planet-"],
   [data-public-business-theme="cosmic-space"],
   [data-public-business-theme="cosmic-comic"],
   [data-public-business-theme="retro-tv"],
@@ -629,9 +918,7 @@ body:has(
   [data-public-business-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"],
   [data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"],
   [data-public-business-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"],
-  [data-public-business-theme="planet-azure"], [data-public-profile-theme="planet-azure"],
-  [data-public-business-theme="planet-rose"], [data-public-profile-theme="planet-rose"],
-  [data-public-business-theme="planet-sage"], [data-public-profile-theme="planet-sage"],
+  [data-public-business-theme^="planet-"], [data-public-profile-theme^="planet-"], [data-public-catalog-theme^="planet-"],
   [data-public-business-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"],
   [data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"],
   [data-public-business-theme="retro-tv"], [data-public-profile-theme="retro-tv"], [data-public-catalog-theme="retro-tv"],

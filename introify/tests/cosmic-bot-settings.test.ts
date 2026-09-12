@@ -28,7 +28,7 @@ describe("Nova and its Space and Comic themes", () => {
         }
         expect(bloubBotPick(nova, DEFAULT_BLOUB_PICK).theme).toBe("cosmic-space")
         expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, theme: "astral-nebula" }).map((item) => item.id)).toEqual(["astral-nebula"])
-        expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, theme: "planet-azure" }).map((item) => item.id)).toEqual(["planet-azure"])
+        expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, theme: "planet-azure" })).toEqual([])
         expect(isNamedBloubBotSelected(nova, { ...DEFAULT_BLOUB_PICK, theme: "cosmic-space", look: "glass" })).toBe(false)
     })
 
