@@ -14,7 +14,7 @@ export default async function PublicBusinessLayout({ children, params }: { child
     const profile = await prisma.profile.findUnique({ where: { slug }, select: { id: true, isPublic: true, personalityConfig: true, animationStyle: { select: { config: true } } } })
     const hideBrand = profile?.isPublic && canHideIntroifyBrand(await publicBrandingAccess(profile.id), profile.personalityConfig)
     const content = <>{children}{profile?.isPublic && !hideBrand && (
-        <footer className="shrink-0 border-t border-border bg-background px-4 py-3 text-center text-xs text-muted-foreground">
+        <footer className="shrink-0 border-t border-border bg-profile px-4 py-3 text-center text-xs text-muted-foreground">
             Made with <Link href="/" className="font-semibold text-foreground underline-offset-4 hover:underline">Introify</Link>
         </footer>
     )}</>

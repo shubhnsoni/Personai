@@ -45,6 +45,26 @@ afterEach(() => {
 })
 
 describe("Public business browser chrome", () => {
+    it("paints html and the profile viewport so no default strip shows around the canvas", () => {
+        const { container, rerender } = render(contents())
+        const frame = container.firstElementChild as HTMLElement
+        expect(frame.className).toMatch(/\bh-dvh\b/)
+        expect(frame.getAttribute("data-profile-viewport")).toBe("")
+
+        state.pathname = "/custom/shop"
+        rerender(contents("astral-nebula"))
+        expect(frame.getAttribute("data-public-browser-theme")).toBe("astral-nebula")
+        expect(chromeMeta()?.content).toBe("#ede6fb")
+
+        state.pathname = "/custom"
+        state.resolvedTheme = "dark"
+        root().classList.add("dark")
+        rerender(contents("classic"))
+        expect(frame.getAttribute("data-public-browser-theme")).toBe("classic")
+        expect(chromeMeta()?.content).toBeTruthy()
+        expect(document.body.style.backgroundColor).not.toBe("")
+    })
+
     it("uses the selected light mode rather than the operating system's dark appearance", () => {
         // The root theme metadata still has both OS queries; the active app choice wins.
         const { unmount } = render(contents())

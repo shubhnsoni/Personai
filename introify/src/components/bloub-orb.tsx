@@ -38,7 +38,7 @@ export function BloubOrb({
     reactToken = 0,
     gaze = null,
     frozenAt,
-    paper = "var(--background, #f9f9f9)",
+    paper = "var(--profile-bg, var(--background, #f9f9f9))",
     className,
 }: {
     size?: number
@@ -60,7 +60,8 @@ export function BloubOrb({
         return new BotEngine(RAYON, "idle", radii, expr)
     })
     const clockRef = useRef(0)
-    const [frame, setFrame] = useState<BotFrame | null>(null)
+    // Sample immediately so static/SSR markup paints the blob instead of a blank slot.
+    const [frame, setFrame] = useState<BotFrame>(() => engine.sample(frozenAt ?? 0.8))
     const [wink, setWink] = useState(false)
 
     const shapeId = resolveBloubShape(shape)

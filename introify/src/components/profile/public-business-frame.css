@@ -1,4 +1,9 @@
 /* Paint the first server-rendered frame too; :has removes the canvas tint when leaving. */
+html:has([data-public-browser-theme]),
+body:has([data-public-browser-theme]) {
+  background-color: var(--profile-bg);
+}
+
 html:has([data-public-browser-theme="retro-lcd"]),
 body:has([data-public-browser-theme="retro-lcd"]) {
   background-color: #c4d58a;
@@ -9,9 +14,41 @@ html.dark body:has([data-public-browser-theme="retro-lcd"]) {
   background-color: #10170f;
 }
 
+html:has([data-public-browser-theme="astral-nebula"]),
+body:has([data-public-browser-theme="astral-nebula"]) {
+  background-color: #ede6fb;
+}
+
+html.dark:has([data-public-browser-theme="astral-nebula"]),
+html.dark body:has([data-public-browser-theme="astral-nebula"]) {
+  background-color: #090714;
+}
+
+html:has([data-public-browser-theme="holographic-hud"]),
+body:has([data-public-browser-theme="holographic-hud"]) {
+  background-color: #e5f8fd;
+}
+
+html.dark:has([data-public-browser-theme="holographic-hud"]),
+html.dark body:has([data-public-browser-theme="holographic-hud"]) {
+  background-color: #060810;
+}
+
+html:has([data-public-browser-theme="liquid-chrome"]),
+body:has([data-public-browser-theme="liquid-chrome"]) {
+  background-color: #e9ecf1;
+}
+
+html.dark:has([data-public-browser-theme="liquid-chrome"]),
+html.dark body:has([data-public-browser-theme="liquid-chrome"]) {
+  background-color: #0b0d12;
+}
+
 /* The frame owns every safe-area edge, keeping the footer and composer above the indicator. */
 [data-profile-viewport] {
   box-sizing: border-box;
+  min-height: 100dvh;
+  background-color: var(--profile-bg, var(--background));
   padding-top: env(safe-area-inset-top, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
