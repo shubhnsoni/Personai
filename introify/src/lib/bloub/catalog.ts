@@ -187,8 +187,8 @@ export const BLOUB_THEME_META: Partial<Record<BloubThemeId, BloubThemeMeta>> = {
         note: "Graphite scribbles on clean paper, switching to chalk on slate in dark mode.",
     },
     "glass-bubble": {
-        canvas: { light: "#f3f4f8", dark: "#0e1118" },
-        thumb: { bg: "#0e1118", dot: "#a8bcff", bar: "#6a7fb3" },
+        canvas: { light: "#f3f4f8", dark: "#0f141f" },
+        thumb: { bg: "#0f141f", dot: "#9db4ff", bar: "#6a7fb3" },
         thumbLight: { bg: "#f3f4f8", dot: "#5a7fe0", bar: "#3a4463" },
         note: "A soft iridescent bubble on cool white, glowing gently on a midnight canvas.",
     },

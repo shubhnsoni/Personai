@@ -293,9 +293,9 @@
   [data-chat-theme="glass-bubble"],
   body:has([data-public-business-theme="glass-bubble"], [data-public-profile-theme="glass-bubble"], [data-public-catalog-theme="glass-bubble"]) > [data-slot="sheet-content"]
 ) {
-  --pt-paper: #0e1118;
+  --pt-paper: #0f141f;
   --pt-ink: #eef1f8;
-  --pt-accent: #a8bcff;
+  --pt-accent: #9db4ff;
 }
 
 /* Keep the first frame and the browser safe areas on the same canvas, even
@@ -397,7 +397,7 @@ body:has([data-public-browser-theme="glass-bubble"]) {
 
 html.dark:has([data-public-browser-theme="glass-bubble"]),
 html.dark body:has([data-public-browser-theme="glass-bubble"]) {
-  background-color: #0e1118;
+  background-color: #0f141f;
 }
 
 /* ---- Shared token plumbing (same contract as retro-lcd) ------------------ */
@@ -817,10 +817,16 @@ body:has(
   --border: color-mix(in srgb, var(--pt-ink) 22%, var(--pt-paper));
   background-image:
     repeating-linear-gradient(0deg, color-mix(in srgb, var(--pt-ink) 3.5%, transparent) 0 1px, transparent 1px 4px),
-    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--pt-accent) 10%, transparent), transparent 60%);
+    radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--pt-accent) 10%, transparent), transparent 60%);
 
   & :is(h1, h2, h3) {
     letter-spacing: -0.015em;
+  }
+
+  & [data-slot="chip"][data-highlighted] {
+    background-color: var(--pt-accent);
+    color: var(--pt-paper);
+    border-color: var(--pt-accent);
   }
 
   & :is([data-slot="chip"], [data-chat-header] time, [data-chat-header] small) {
@@ -848,8 +854,8 @@ body:has(
   }
 
   & [data-chat-header] {
-    border-bottom: 1px solid var(--border);
-    background-color: color-mix(in srgb, var(--pt-paper) 92%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--pt-ink) 12%, transparent);
+    background-color: transparent;
     backdrop-filter: blur(10px);
   }
 }
@@ -874,11 +880,17 @@ body:has(
   --profile-chip: color-mix(in srgb, var(--pt-paper) 88%, var(--pt-accent));
   --border: color-mix(in srgb, var(--pt-accent) 38%, var(--pt-paper));
   background-image:
-    radial-gradient(ellipse at 50% -10%, color-mix(in srgb, var(--pt-accent) 18%, transparent), transparent 55%),
-    radial-gradient(ellipse at 100% 100%, color-mix(in srgb, var(--pt-accent) 8%, transparent), transparent 45%);
+    radial-gradient(ellipse at 50% 110%, color-mix(in srgb, var(--pt-accent) 16%, transparent), transparent 55%),
+    radial-gradient(ellipse at 100% 60%, color-mix(in srgb, var(--pt-accent) 7%, transparent), transparent 45%);
 
   & :is(h1, h2, h3) {
     letter-spacing: -0.025em;
+  }
+
+  & [data-slot="chip"][data-highlighted] {
+    background-color: var(--pt-accent);
+    color: var(--pt-paper);
+    border-color: color-mix(in srgb, var(--pt-accent) 70%, var(--pt-ink));
   }
 
   & :is([data-slot="card"], [data-chat-bubble]) {
@@ -903,8 +915,8 @@ body:has(
   }
 
   & [data-chat-header] {
-    border-bottom: 1px solid var(--border);
-    background-color: color-mix(in srgb, var(--pt-paper) 90%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--pt-accent) 22%, transparent);
+    background-color: transparent;
     backdrop-filter: blur(14px);
   }
 }
@@ -999,31 +1011,31 @@ body:has(
   & :is([data-slot="chip"], input:not([type="checkbox"]), textarea) {
     border: 1.5px solid var(--border);
     border-radius: var(--sk-wobble-chip);
-    background-color: var(--pt-paper);
     box-shadow: 1.5px 2px 0 -0.5px var(--sk-faint);
   }
 
   & [data-slot="chip"] {
-    background-image: var(--sk-hatch);
     font-weight: 600;
   }
 
-  & [data-chat-header] {
-    position: relative;
-    border-bottom: 1.6px solid var(--border);
-    background: var(--pt-paper);
+  & :is([data-slot="chip"]:not([data-highlighted]), input:not([type="checkbox"]), textarea) {
+    background-color: var(--pt-paper);
   }
 
-  & [data-chat-header]::after {
-    content: "";
-    position: absolute;
-    left: 6%;
-    right: 3%;
-    bottom: -4px;
-    height: 1.1px;
-    background: var(--sk-faint);
-    transform: rotate(0.25deg);
-    pointer-events: none;
+  & [data-slot="chip"]:not([data-highlighted]) {
+    background-image: var(--sk-hatch);
+  }
+
+  /* The primary action is pencilled in solid, like the visitor's bubble. */
+  & [data-slot="chip"][data-highlighted] {
+    background-color: var(--pt-ink);
+    color: var(--pt-paper);
+    border-color: var(--pt-ink);
+  }
+
+  & [data-chat-header] {
+    border-bottom: 1.6px solid var(--border);
+    background: var(--pt-paper);
   }
 
   & :is(input:not([type="checkbox"]), textarea):focus-visible {
@@ -1033,7 +1045,9 @@ body:has(
   }
 }
 
-/* Pearl: cool white, translucent frosted panels and pill-shaped controls. */
+/* Pearl: cool white with a soft iridescent wash low on the page, frosted
+   panels and pill-shaped controls. Dark mode is a clean midnight blue with
+   solid surfaces (blur over dark reads muddy) and a faint periwinkle rim. */
 :is(
   [data-public-business-theme="glass-bubble"],
   [data-public-catalog-theme="glass-bubble"],
@@ -1041,13 +1055,14 @@ body:has(
   [data-chat-theme="glass-bubble"],
   body:has([data-public-business-theme="glass-bubble"], [data-public-profile-theme="glass-bubble"], [data-public-catalog-theme="glass-bubble"]) > [data-slot="sheet-content"]
 ) {
-  --profile-elev: color-mix(in srgb, var(--pt-paper) 92%, #fff);
-  --profile-chip: color-mix(in srgb, var(--pt-paper) 90%, var(--pt-accent));
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 88%, #fff);
+  --profile-chip: color-mix(in srgb, var(--pt-paper) 92%, var(--pt-accent));
   --border: color-mix(in srgb, var(--pt-accent) 22%, var(--pt-paper));
+  --pearl-rim: color-mix(in srgb, #fff 70%, var(--border));
   background-image:
-    radial-gradient(ellipse at 20% 0%, color-mix(in srgb, #bcd4ff 30%, transparent), transparent 50%),
-    radial-gradient(ellipse at 90% 30%, color-mix(in srgb, #f4c6f0 22%, transparent), transparent 45%),
-    radial-gradient(ellipse at 40% 100%, color-mix(in srgb, #c9f7e8 22%, transparent), transparent 50%);
+    radial-gradient(ellipse at 15% 100%, color-mix(in srgb, #bcd4ff 30%, transparent), transparent 50%),
+    radial-gradient(ellipse at 90% 70%, color-mix(in srgb, #f4c6f0 20%, transparent), transparent 45%),
+    radial-gradient(ellipse at 55% 110%, color-mix(in srgb, #c9f7e8 22%, transparent), transparent 50%);
 
   & :is(h1, h2, h3) {
     letter-spacing: -0.03em;
@@ -1061,21 +1076,31 @@ body:has(
   }
 
   & :is([data-slot="card"], [data-chat-bubble="assistant"]) {
-    border-color: color-mix(in srgb, #fff 70%, var(--border));
+    border-color: var(--pearl-rim);
     background-color: color-mix(in srgb, var(--profile-elev) 78%, transparent);
     backdrop-filter: blur(18px);
   }
 
   & :is([data-slot="chip"], input:not([type="checkbox"]), textarea) {
     border-radius: 999px;
-    border-color: color-mix(in srgb, #fff 60%, var(--border));
+    border-color: var(--pearl-rim);
+  }
+
+  & :is([data-slot="chip"]:not([data-highlighted]), input:not([type="checkbox"]), textarea) {
     background-color: color-mix(in srgb, var(--profile-elev) 82%, transparent);
     backdrop-filter: blur(12px);
   }
 
+  & [data-slot="chip"][data-highlighted] {
+    background-color: var(--pt-accent);
+    color: var(--pt-paper);
+    border-color: var(--pt-accent);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--pt-accent) 28%, transparent);
+  }
+
   & [data-chat-header] {
-    border-bottom: 1px solid var(--border);
-    background-color: color-mix(in srgb, var(--pt-paper) 80%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--pt-accent) 14%, transparent);
+    background-color: transparent;
     backdrop-filter: blur(20px);
   }
 }
@@ -1084,18 +1109,30 @@ body:has(
   [data-public-business-theme="glass-bubble"],
   [data-public-catalog-theme="glass-bubble"],
   [data-public-profile-theme="glass-bubble"],
-  [data-chat-theme="glass-bubble"]
+  [data-chat-theme="glass-bubble"],
+  body:has([data-public-business-theme="glass-bubble"], [data-public-profile-theme="glass-bubble"], [data-public-catalog-theme="glass-bubble"]) > [data-slot="sheet-content"]
 ) {
-  --profile-elev: color-mix(in srgb, var(--pt-paper) 90%, #fff);
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 90%, var(--pt-accent));
+  --profile-chip: color-mix(in srgb, var(--pt-paper) 88%, var(--pt-accent));
+  --border: color-mix(in srgb, var(--pt-accent) 26%, var(--pt-paper));
+  --pearl-rim: color-mix(in srgb, var(--pt-accent) 34%, var(--pt-paper));
   background-image:
-    radial-gradient(ellipse at 20% 0%, color-mix(in srgb, #7ea3ff 14%, transparent), transparent 50%),
-    radial-gradient(ellipse at 90% 30%, color-mix(in srgb, #e39be0 10%, transparent), transparent 45%);
-
-  & :is([data-slot="card"], [data-chat-bubble], [data-slot="chip"], input:not([type="checkbox"]), textarea) {
-    border-color: color-mix(in srgb, #fff 12%, var(--border));
-  }
+    radial-gradient(ellipse at 50% 115%, color-mix(in srgb, var(--pt-accent) 14%, transparent), transparent 55%);
 
   & :is([data-slot="card"], [data-chat-bubble]) {
-    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent);
+  }
+
+  & :is([data-slot="card"], [data-chat-bubble="assistant"], [data-slot="chip"]:not([data-highlighted]), input:not([type="checkbox"]), textarea) {
+    background-color: var(--profile-elev);
+    backdrop-filter: none;
+  }
+
+  & [data-slot="chip"][data-highlighted] {
+    box-shadow: 0 0 0 1px color-mix(in srgb, #fff 18%, transparent) inset;
+  }
+
+  & [data-chat-header] {
+    border-bottom-color: color-mix(in srgb, var(--pt-accent) 18%, transparent);
   }
 }
