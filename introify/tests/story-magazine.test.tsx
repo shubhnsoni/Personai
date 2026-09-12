@@ -33,5 +33,9 @@ describe("about magazine", () => {
         expect(screen.getAllByText(/704 Maru Tower/).length).toBeGreaterThan(0)
         expect(container.textContent).not.toMatch(/Step inside/)
         expect(container.querySelector("img[class*='object-cover'][class*='absolute']")).toBeNull()
+        const hero = container.querySelector(".aspect-square.rounded-full") as HTMLElement
+        expect(hero).toBeTruthy()
+        expect(hero.querySelector("img")?.className).toMatch(/object-cover/)
     })
 })
+

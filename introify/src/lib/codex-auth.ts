@@ -12,6 +12,7 @@ const REFRESH_TIMEOUT_MS = 30_000
 type AuthPayload = Record<string, unknown>
 const authOperations = new Map<string, Promise<unknown>>()
 const refreshes = new Map<string, { accessToken: string; promise: Promise<CodexCredentials> }>()
+const memoryAuth = new Map<string, AuthPayload>()
 
 export type CodexCredentials = {
     accessToken: string
@@ -112,6 +113,11 @@ function withAuthLock<T>(path: string, operation: () => Promise<T>): Promise<T> 
     return pending
 }
 
+function payloadFreshness(payload: AuthPayload | null): string {
+    const stamp = payload && typeof payload.last_refresh === "string" ? payload.last_refresh : ""
+    return stamp
+}
+
 async function loadAuthPayload(path: string): Promise<AuthPayload> {
     let saved: AuthPayload | null = null
     try {
@@ -119,6 +125,10 @@ async function loadAuthPayload(path: string): Promise<AuthPayload> {
         readCodexCredentialsFromObject(parsed)
         saved = parsed as AuthPayload
     } catch { /* An explicit environment seed can recover a missing/invalid file. */ }
+    const remembered = memoryAuth.get(resolve(path)) || null
+    if (remembered && payloadFreshness(remembered) >= payloadFreshness(saved)) {
+        saved = remembered
+    }
 
     const fromEnv = codexAuthJsonFromEnv()
     if (fromEnv) {
@@ -157,8 +167,21 @@ async function loadAuthPayload(path: string): Promise<AuthPayload> {
     return saved
 }
 
+function accessTokenNeedsRefresh(token: string, now = Date.now()) {
+    const exp = jwtClaims(token).exp
+    if (typeof exp !== "number" || !Number.isFinite(exp)) return false
+    return exp * 1000 - now < 10 * 60 * 1000
+}
+
 export function loadCodexCredentials(path = codexAuthPath()): Promise<CodexCredentials> {
-    return withAuthLock(path, async () => readCodexCredentialsFromObject(await loadAuthPayload(path)))
+    return withAuthLock(path, async () => {
+        const payload = await loadAuthPayload(path)
+        const credentials = readCodexCredentialsFromObject(payload)
+        if (accessTokenNeedsRefresh(credentials.accessToken) && credentials.refreshToken) {
+            return refreshAndPersist(credentials, path, payload)
+        }
+        return credentials
+    })
 }
 
 export function refreshCodexCredentials(
@@ -257,9 +280,12 @@ async function persistAuthPayload(path: string, payload: AuthPayload) {
         })
         // Readers see either complete old JSON or complete new JSON, never a partial write.
         await rename(temporary, path)
+        memoryAuth.set(resolve(path), structuredClone(payload))
     } catch {
+        memoryAuth.set(resolve(path), structuredClone(payload))
         if (process.env.NODE_ENV === "production") {
-            throw new CodexAuthError("Could not persist ChatGPT credentials; CODEX_HOME must be writable.")
+            console.error("Codex credentials kept in memory; CODEX_HOME was not writable.")
+            return
         }
         // Preserve the local CLI's prior best-effort persistence behavior.
     } finally {

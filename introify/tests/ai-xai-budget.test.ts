@@ -8,6 +8,8 @@ beforeEach(() => {
     vi.clearAllMocks()
     vi.stubEnv("INTROIFY_AI_PROVIDER", "xai")
     vi.stubEnv("XAI_API_KEY", "xai-test-only-key-never-real")
+    vi.stubEnv("OPENAI_API_KEY", "")
+    vi.stubEnv("CODEX_DISABLED", "1")
     vi.stubEnv("INTROIFY_AI_DISABLED", "false")
     vi.stubEnv("INTROIFY_AI_FAST_MODEL", "grok-3-mini")
     mocks.responses.mockResolvedValue({ id: "reply", model: "grok-3-mini", created_at: 1, output: [{ type: "message", content: [{ type: "output_text", text: "Hello" }] }], usage: { input_tokens: 100, output_tokens: 80, total_tokens: 180, output_tokens_details: { reasoning_tokens: 60 } } })

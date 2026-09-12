@@ -5,3 +5,9 @@ export function typingInputGaze(length: number, focused: boolean): { x: number; 
         : Math.min(0.92, -0.78 + (Math.min(length, 28) / 28) * 1.7)
     return { x, y: -0.92 }
 }
+
+export function assistantPendingPhrase(name: string, nowMs: number): string {
+    const host = name.trim() || "them"
+    const phrases = ["thinking", "reading", "asking", `talking to ${host}`]
+    return phrases[Math.floor(Math.max(0, nowMs) / 1600) % phrases.length]
+}

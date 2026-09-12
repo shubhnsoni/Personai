@@ -1,10 +1,11 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest"
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), stream: vi.fn(), billing: vi.fn(), reserve: vi.fn() }))
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), stream: vi.fn(), billing: vi.fn(), reserve: vi.fn(), responses: vi.fn(), chat: vi.fn() }))
 vi.mock("@/lib/codex-auth", () => ({ hasCodexAuthSource: mocks.auth }))
 vi.mock("@/lib/codex-chat", () => ({ streamCodexChat: mocks.stream }))
 vi.mock("@/lib/billing/service", () => ({ getProfileBilling: mocks.billing, reserveUsage: mocks.reserve, settleUsage: vi.fn() }))
-import { boundedChatInput, boundedCodexChatStream, getAiAvailability, resolveApiRecipe, usageMetadata } from "@/lib/ai-runtime"
+vi.mock("openai", () => ({ default: class OpenAI { responses = { create: mocks.responses }; chat = { completions: { create: mocks.chat } } } }))
+import { boundedChatInput, boundedCodexChatStream, getAiAvailability, listApiRecipes, resolveApiRecipe, streamChatWithFailover, usageMetadata } from "@/lib/ai-runtime"
 import { prepareAiUsage } from "@/lib/ai-usage"
 import { getPlan } from "@/lib/billing/catalog"
 
@@ -38,12 +39,21 @@ describe("explicit Codex production provider", () => {
         expect(mocks.stream).not.toHaveBeenCalled()
     })
     it.each(["disabled", "missing-auth", "missing-home", "unmapped", "wrong-tier"])("fails closed when %s", reason => {
+        vi.stubEnv("OPENAI_API_KEY", "")
+        vi.stubEnv("XAI_API_KEY", "")
         if (reason === "disabled") vi.stubEnv("INTROIFY_AI_DISABLED", "true")
         if (reason === "missing-auth") mocks.auth.mockReturnValue(false)
         if (reason === "missing-home") vi.stubEnv("CODEX_HOME", "")
         if (reason === "unmapped") vi.stubEnv("INTROIFY_AI_FAST_MODEL", "")
         if (reason === "wrong-tier") vi.stubEnv("INTROIFY_AI_FAST_MODEL", "gpt-5.6-sol")
         expect(resolveApiRecipe("fast")).toBeNull()
+    })
+    it("keeps chat available on xAI when Codex credentials are missing", () => {
+        mocks.auth.mockReturnValue(false)
+        vi.stubEnv("CODEX_HOME", "")
+        vi.stubEnv("XAI_API_KEY", "xai-live-key-abcdefgh")
+        vi.stubEnv("OPENAI_API_KEY", "")
+        expect(resolveApiRecipe("fast")).toMatchObject({ provider: "xai", model: "grok-3-mini" })
     })
     it("rejects stale or caller-substituted models", async () => {
         const recipe = resolveApiRecipe("fast")!
@@ -58,4 +68,38 @@ describe("explicit Codex production provider", () => {
         vi.stubEnv("INTROIFY_AI_FAST_OUTPUT_USD_PER_MTOK", "8")
         expect(usageMetadata(resolveApiRecipe("fast")!, 120, 30)).toMatchObject({ provider: "codex", usageKnown: true, costKnown: false, estimatedCostMicros: null })
     })
+    it("lists xAI as a live fallback while Codex remains preferred", () => {
+        vi.stubEnv("XAI_API_KEY", "xai-live-key-abcdefgh")
+        vi.stubEnv("OPENAI_API_KEY", "")
+        expect(resolveApiRecipe("fast")).toMatchObject({ provider: "codex", model: "gpt-5.6-luna" })
+        expect(listApiRecipes("fast").map(recipe => recipe.provider)).toEqual(["codex", "xai"])
+    })
+    it("answers on xAI when Codex is rejected before any tokens", async () => {
+        mocks.stream.mockRejectedValue(Object.assign(new Error("Codex chat failed (HTTP 401)."), { status: 401 }))
+        vi.stubEnv("XAI_API_KEY", "xai-live-key-abcdefgh")
+        vi.stubEnv("OPENAI_API_KEY", "")
+        mocks.responses.mockResolvedValue({
+            id: "reply",
+            model: "grok-3-mini",
+            created_at: 1,
+            output: [{ type: "message", content: [{ type: "output_text", text: "From grok" }] }],
+            usage: { input_tokens: 10, output_tokens: 4, total_tokens: 14, output_tokens_details: { reasoning_tokens: 0 } },
+        })
+        const recipe = resolveApiRecipe("fast")!
+        expect(recipe.provider).toBe("codex")
+        const stream = await streamChatWithFailover(boundedChatInput(recipe, "Facts", [{ role: "user", content: "Hello" }], []), recipe)
+        let text = ""
+        for await (const chunk of stream) text += chunk.choices[0]?.delta.content || ""
+        expect(text).toBe("From grok")
+        expect(mocks.stream).toHaveBeenCalledOnce()
+    })
+    it("does not switch providers when the visitor cancelled", async () => {
+        mocks.stream.mockRejectedValue(Object.assign(new Error("aborted"), { name: "AbortError" }))
+        vi.stubEnv("XAI_API_KEY", "xai-live-key-abcdefgh")
+        vi.stubEnv("OPENAI_API_KEY", "")
+        const recipe = resolveApiRecipe("fast")!
+        await expect(streamChatWithFailover(boundedChatInput(recipe, "Facts", [{ role: "user", content: "Hello" }], []), recipe)).rejects.toMatchObject({ name: "AbortError" })
+        expect(mocks.responses).not.toHaveBeenCalled()
+    })
 })
+

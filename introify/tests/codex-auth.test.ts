@@ -151,27 +151,39 @@ describe("Codex refresh concurrency and persistence", () => {
         expect(fetch).toHaveBeenCalledTimes(2)
     })
 
-    it("fails production refresh when atomic replacement fails, preserving the complete old file", async () => {
+    it("keeps a refreshed token in memory when CODEX_HOME cannot be written", async () => {
         const path = await authFile()
         await fs.writeFile(path, JSON.stringify(seed()))
         const initial = await loadCodexCredentials(path)
         const backup = join(dirname(path), "auth.before.json")
         vi.mocked(fetch).mockImplementationOnce(async () => {
-            // Make replacement fail after loading the old credentials, on every OS.
             await fs.rename(path, backup)
             await fs.mkdir(path)
             return Response.json({ access_token: "rotated-access", refresh_token: "rotated-refresh" })
         })
-        await expect(refreshCodexCredentials(initial, path)).rejects.toThrow("CODEX_HOME must be writable")
+        const refreshed = await refreshCodexCredentials(initial, path)
+        expect(refreshed.accessToken).toBe("rotated-access")
+        expect((await loadCodexCredentials(path)).accessToken).toBe("rotated-access")
         expect(JSON.parse(await fs.readFile(backup, "utf8"))).toEqual(seed())
-        expect((await fs.readdir(dirname(path))).sort()).toEqual(["auth.before.json", "auth.json"])
     })
 
-    it("fails production seeding when credentials cannot be persisted", async () => {
+    it("refreshes an access token that is about to expire without waiting for a 401", async () => {
+        const path = await authFile()
+        const expiring = `aaa.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 60 })).toString("base64url")}.sig`
+        await fs.writeFile(path, JSON.stringify({
+            auth_mode: "chatgpt",
+            tokens: { access_token: expiring, refresh_token: "seed-refresh", account_id: "test-account" },
+        }))
+        vi.mocked(fetch).mockResolvedValueOnce(Response.json({ access_token: "rotated-access", refresh_token: "rotated-refresh" }))
+        expect((await loadCodexCredentials(path)).accessToken).toBe("rotated-access")
+        expect(fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it("keeps env-seeded credentials in memory when CODEX_HOME cannot be written", async () => {
         const path = await authFile()
         vi.stubEnv("CODEX_AUTH_JSON", JSON.stringify(seed()))
         await fs.mkdir(path)
-        await expect(loadCodexCredentials(path)).rejects.toThrow("CODEX_HOME must be writable")
+        expect((await loadCodexCredentials(path)).accessToken).toBe("seed-access")
         expect(await fs.readdir(dirname(path))).toEqual(["auth.json"])
     })
 

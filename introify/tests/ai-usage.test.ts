@@ -11,6 +11,8 @@ beforeEach(() => {
     vi.clearAllMocks()
     vi.stubEnv("INTROIFY_AI_PROVIDER", "openai")
     vi.stubEnv("OPENAI_API_KEY", "sk-unit-test-not-real-12345")
+    vi.stubEnv("XAI_API_KEY", "")
+    vi.stubEnv("CODEX_DISABLED", "1")
     vi.stubEnv("INTROIFY_AI_DISABLED", "false")
     vi.stubEnv("INTROIFY_AI_FAST_MODEL", "gpt-4o-mini")
     vi.stubEnv("INTROIFY_AI_SMART_MODEL", "gpt-4o")
@@ -48,6 +50,8 @@ describe("server AI entitlements", () => {
     })
     it("does not use a Codex session or default model when API mapping is absent", async () => {
         vi.stubEnv("INTROIFY_AI_PROVIDER", "codex")
+        vi.stubEnv("OPENAI_API_KEY", "")
+        vi.stubEnv("XAI_API_KEY", "")
         expect(resolveApiRecipe("fast")).toBeNull()
         await expect(prepareAiUsage({ profileId: "shop", operationKey: "one" })).rejects.toMatchObject({ status: 503 })
         expect(billing.reserve).not.toHaveBeenCalled()

@@ -60,11 +60,16 @@ export function ShopWordmark({
 }) {
     if (logoUrl) {
         return (
-            <img
-                src={logoUrl}
-                alt={name}
-                className={cn("h-8 w-auto max-w-[9rem] object-contain object-left", className)}
-            />
+            <span className={cn("inline-flex min-w-0 items-center gap-2", className)}>
+                <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full">
+                    <img
+                        src={logoUrl}
+                        alt=""
+                        className="h-8 w-8 rounded-full object-cover"
+                    />
+                </span>
+                <span className="truncate font-semibold tracking-tight">{name}</span>
+            </span>
         )
     }
     return (

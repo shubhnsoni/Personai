@@ -36,18 +36,31 @@ function costSetting(name: string): number | null {
     return Number.isFinite(value) && value > 0 ? value : null
 }
 
-/** All visitor providers require an explicit mode mapping; never silently fall back. */
-export function resolveApiRecipe(mode: AiMode): ApiRecipe | null {
-    if (process.env.INTROIFY_AI_DISABLED === "true") return null
-    const provider = process.env.INTROIFY_AI_PROVIDER?.trim()
-    if (provider !== "openai" && provider !== "xai" && provider !== "codex") return null
-    const key = provider === "openai" ? process.env.OPENAI_API_KEY : process.env.XAI_API_KEY
-    const model = process.env[`INTROIFY_AI_${mode.toUpperCase()}_MODEL`]?.trim()
-    if (!model || !(APPROVED_MODELS[provider][mode] as readonly string[]).includes(model)) return null
+type AiProvider = "openai" | "xai" | "codex"
+
+function isAiProvider(value: string | undefined): value is AiProvider {
+    return value === "openai" || value === "xai" || value === "codex"
+}
+
+function providerKeyReady(provider: AiProvider): boolean {
     if (provider === "codex") {
-        // Production must use the application's dedicated persistent credential directory.
-        if (!hasCodexAuthSource() || (process.env.NODE_ENV === "production" && !process.env.CODEX_HOME?.trim())) return null
-    } else if (!key?.trim() || key.trim().length < 12 || /placeholder|your[_-]|dummy|replace[_-]/i.test(key)) return null
+        return hasCodexAuthSource() && (process.env.NODE_ENV !== "production" || Boolean(process.env.CODEX_HOME?.trim()))
+    }
+    const key = provider === "openai" ? process.env.OPENAI_API_KEY : process.env.XAI_API_KEY
+    return Boolean(key?.trim() && key.trim().length >= 12 && !/placeholder|your[_-]|dummy|replace[_-]/i.test(key))
+}
+
+function modelForProvider(provider: AiProvider, mode: AiMode, preferred: boolean): string | null {
+    const mapped = process.env[`INTROIFY_AI_${mode.toUpperCase()}_MODEL`]?.trim()
+    const approved = APPROVED_MODELS[provider][mode] as readonly string[]
+    if (preferred) return mapped && approved.includes(mapped) ? mapped : null
+    return approved[0] || null
+}
+
+function recipeForProvider(mode: AiMode, provider: AiProvider, preferred: boolean): ApiRecipe | null {
+    if (!providerKeyReady(provider)) return null
+    const model = modelForProvider(provider, mode, preferred)
+    if (!model) return null
     return {
         mode, provider, model,
         inputBudget: mode === "fast" ? 2000 : 4000,
@@ -57,15 +70,58 @@ export function resolveApiRecipe(mode: AiMode): ApiRecipe | null {
     }
 }
 
+function providerOrder(): AiProvider[] {
+    const preferred = process.env.INTROIFY_AI_PROVIDER?.trim()
+    const order: AiProvider[] = []
+    if (isAiProvider(preferred)) order.push(preferred)
+    for (const provider of ["xai", "openai", "codex"] as const) {
+        if (!order.includes(provider)) order.push(provider)
+    }
+    return order
+}
+
+/** Every provider that can answer this mode, preferred first. */
+export function listApiRecipes(mode: AiMode): ApiRecipe[] {
+    if (process.env.INTROIFY_AI_DISABLED === "true") return []
+    const preferred = process.env.INTROIFY_AI_PROVIDER?.trim()
+    const recipes: ApiRecipe[] = []
+    for (const provider of providerOrder()) {
+        const recipe = recipeForProvider(mode, provider, provider === preferred)
+        if (recipe) recipes.push(recipe)
+    }
+    return recipes
+}
+
+/** Prefer the mapped provider; if it is unconfigured, use any other live provider so chat stays up. */
+export function resolveApiRecipe(mode: AiMode): ApiRecipe | null {
+    return listApiRecipes(mode)[0] || null
+}
+
+export function recipeIsLive(recipe: ApiRecipe): boolean {
+    return listApiRecipes(recipe.mode).some(item => item.provider === recipe.provider && item.model === recipe.model)
+}
+
+/** Auth, outage and network failures can move to the next live provider. Allowance 402 never does. */
+export function providerFailoverError(error: unknown): boolean {
+    if (!error || typeof error !== "object") return false
+    if ("name" in error && error.name === "AbortError") return false
+    if (error instanceof Error && error.message === "ai_not_configured") return false
+    if ("providerNotDispatched" in error && error.providerNotDispatched === true) return true
+    const status = "status" in error ? Number(error.status) : NaN
+    if (Number.isFinite(status)) {
+        if (status === 402) return false
+        return status >= 500 || [401, 403, 404, 408, 409, 429].includes(status)
+    }
+    return true
+}
+
 export function getAiAvailability() {
     return { fast: Boolean(resolveApiRecipe("fast")), smart: Boolean(resolveApiRecipe("smart")), reasoning: Boolean(resolveApiRecipe("reasoning")) }
 }
 
 export function apiClient(recipe: ApiRecipe) {
     if (recipe.provider === "codex") throw new Error("Codex uses the server-side streaming adapter")
-    // Re-check rather than permitting a stale or caller-invented recipe/model.
-    const current = resolveApiRecipe(recipe.mode)
-    if (!current || current.provider !== recipe.provider || current.model !== recipe.model) throw new Error("ai_not_configured")
+    if (!recipeIsLive(recipe)) throw new Error("ai_not_configured")
     return new OpenAI({
         apiKey: recipe.provider === "openai" ? process.env.OPENAI_API_KEY : process.env.XAI_API_KEY,
         ...(recipe.provider === "xai" ? { baseURL: "https://api.x.ai/v1" } : {}),
@@ -76,9 +132,46 @@ export function apiClient(recipe: ApiRecipe) {
 
 /** Only supplied business tools can run; Codex gets no shell, filesystem or browser tools. */
 export async function boundedCodexChatStream(input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming, recipe: ApiRecipe, signal?: AbortSignal) {
-    const current = resolveApiRecipe(recipe.mode)
-    if (!current || current.provider !== "codex" || current.model !== recipe.model || input.model !== recipe.model) throw new Error("ai_not_configured")
+    if (!recipeIsLive(recipe) || recipe.provider !== "codex" || input.model !== recipe.model) throw new Error("ai_not_configured")
     return streamCodexChat({ ...input, max_completion_tokens: recipe.outputBudget, parallel_tool_calls: false }, { signal })
+}
+
+async function dispatchChatStream(
+    input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
+    recipe: ApiRecipe,
+    signal?: AbortSignal,
+): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
+    if (recipe.provider === "codex") return boundedCodexChatStream(input, recipe, signal)
+    if (recipe.provider === "xai") return boundedXaiChatStream(input, recipe)
+    return apiClient(recipe).chat.completions.create(input, { signal })
+}
+
+/** Try the reserved provider, then any other live provider, so chat stays up through token expiry. */
+export async function streamChatWithFailover(
+    input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
+    recipe: ApiRecipe,
+    signal?: AbortSignal,
+): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
+    const seen = new Set<string>()
+    const candidates: ApiRecipe[] = []
+    for (const candidate of [recipe, ...listApiRecipes(recipe.mode)]) {
+        const key = `${candidate.provider}:${candidate.model}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        candidates.push(candidate)
+    }
+    let lastError: unknown
+    for (const candidate of candidates) {
+        if (signal?.aborted) throw lastError instanceof Error ? lastError : Object.assign(new Error("aborted"), { name: "AbortError" })
+        const nextInput = { ...input, model: candidate.model, max_completion_tokens: candidate.outputBudget }
+        try {
+            return await dispatchChatStream(nextInput, candidate, signal)
+        } catch (error) {
+            lastError = error
+            if (signal?.aborted || !providerFailoverError(error)) throw error
+        }
+    }
+    throw lastError || new Error("ai_not_configured")
 }
 
 export async function boundedCodexResponse(input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming, recipe: ApiRecipe): Promise<OpenAI.Chat.Completions.ChatCompletion> {

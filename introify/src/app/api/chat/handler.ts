@@ -12,7 +12,7 @@ import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { createOwnershipFoundation, ownershipRefusalResponse } from "@/lib/security"
 import { getRequestCurrency } from "@/lib/request-currency"
-import { apiClient, boundedCodexChatStream, boundedXaiChatStream, boundedChatInput, clipUtf8, resolveApiRecipe, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
+import { boundedChatInput, clipUtf8, resolveApiRecipe, streamChatWithFailover, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
 import { AiAccessError, prepareAiUsage, finishAiUsage, providerRejectedWithoutSpend, type AiReservation } from "@/lib/ai-usage"
 import {
     CONVERSATION_CAPABILITY_TTL_SECONDS,
@@ -111,9 +111,7 @@ const productionDependencies: ChatRouteDependencies = {
     requestCurrency: getRequestCurrency,
     createCompletion: async (input, recipe, signal) => {
         if (!recipe) throw new Error("ai_not_configured")
-        if (recipe.provider === "codex") return boundedCodexChatStream(input, recipe, signal)
-        if (recipe.provider === "xai") return boundedXaiChatStream(input, recipe)
-        return apiClient(recipe).chat.completions.create(input, { signal })
+        return streamChatWithFailover(input, recipe, signal)
     },
     summarizeConversation: maybeSummarizeConversation,
     providerConfigured: () => ["fast", "smart", "reasoning"].some(mode => resolveApiRecipe(mode as "fast" | "smart" | "reasoning")),

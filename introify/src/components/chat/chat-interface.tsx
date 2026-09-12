@@ -20,7 +20,7 @@ import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { wantsLiveSupport } from "@/lib/live-support"
 import { toast } from "sonner"
 import { resolveBloubTheme, resolveThemedOrb } from "@/lib/bloub/catalog"
-import { typingInputGaze } from "@/lib/chat-gaze"
+import { assistantPendingPhrase, typingInputGaze } from "@/lib/chat-gaze"
 import type { PublicAnimationConfig } from "@/lib/profile-branding"
 import { subscribeVisualKeyboard, visualKeyboardOpen } from "@/lib/visual-keyboard"
 import "@/components/profile/retro-lcd-theme.css"
@@ -328,6 +328,16 @@ export function ChatInterface({
         }
     }, [messages, profile.id, conversationId, visitorId, isLoading, chatMode, memoryConsent])
 
+    const goToChatHome = () => {
+        abortControllerRef.current?.abort()
+        setMessages([])
+        setConversationId(null)
+        setInput("")
+        setIsLoading(false)
+        setStreamSuggestions([])
+        onIntroStage?.("hi")
+    }
+
     const handleSubmit = (e?: React.FormEvent, overrideInput?: string) => {
         e?.preventDefault()
         const messageToSend = overrideInput || input
@@ -426,8 +436,8 @@ export function ChatInterface({
         >
             {hasStarted ? (
                 <ChatHeader
-                    identity={<>
-                        <div className="shrink-0">
+                    identity={<button type="button" onClick={goToChatHome} aria-label="Back to chat" className="flex min-w-0 items-center gap-2 text-left">
+                        <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full">
                             <ChatAvatar
                                 size={36}
                                 name={profile.displayName}
@@ -448,11 +458,11 @@ export function ChatInterface({
                                 mood={orbMood}
                                 reactToken={orbReact}
                             />
-                        </div>
+                        </span>
                         <span className="font-semibold text-ui text-profile-text truncate min-w-0">
                             {chatMode === "LIVE" ? profile.displayName : `${profile.displayName}'s AI`}
                         </span>
-                    </>}
+                    </button>}
                     primaryAction={!keyboardOpen && primaryChip ? (
                         <Chip
                             variant="profile"
@@ -498,6 +508,8 @@ export function ChatInterface({
                             <ChatAvatar
                                 size={keyboardOpen ? 96 : 168}
                                 name={profile.displayName}
+                                imageUrl={profile.imageUrl}
+                                mode={profile.chatAvatarMode}
                                 colors={orbColors}
                                 variant={animationConfig.variant}
                                 look={animationConfig.look}
@@ -546,11 +558,13 @@ export function ChatInterface({
                                     <div className="mb-0.5 shrink-0">
                                         {isLiveHost ? (
                                             profile.imageUrl ? (
-                                                <img
-                                                    src={profile.imageUrl}
-                                                    alt={profile.displayName}
-                                                    className="h-8 w-8 rounded-full object-cover ring-2 ring-[var(--chat-accent)]"
-                                                />
+                                                <span className="relative block h-8 w-8 overflow-hidden rounded-full ring-2 ring-[var(--chat-accent)]">
+                                                    <img
+                                                        src={profile.imageUrl}
+                                                        alt={profile.displayName}
+                                                        className="h-full w-full object-cover"
+                                                    />
+                                                </span>
                                             ) : (
                                                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--chat-accent)] text-[11px] font-medium text-[var(--chat-on-accent)]">
                                                     {profile.displayName.slice(0, 1)}
@@ -560,6 +574,8 @@ export function ChatInterface({
                                             <ChatAvatar
                                                 size={32}
                                                 name={profile.displayName}
+                                                imageUrl={profile.imageUrl}
+                                                mode={profile.chatAvatarMode}
                                                 colors={orbColors}
                                                 variant={animationConfig.variant}
                                                 look={animationConfig.look}
@@ -614,11 +630,7 @@ export function ChatInterface({
                                                 <ChatMarkdown text={m.content} />
                                             )
                                         ) : (
-                                            <span className="flex items-center gap-1 px-1">
-                                                <span className="w-1.5 h-1.5 bg-profile-mute rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                                <span className="w-1.5 h-1.5 bg-profile-mute rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                                <span className="w-1.5 h-1.5 bg-profile-mute rounded-full animate-bounce"></span>
-                                            </span>
+                                            <PendingStatus name={profile.displayName} />
                                         )}
                                     </div>
 
@@ -1098,6 +1110,21 @@ function AskAboutLine({ welcome, topics = [] }: { welcome?: string | null; topic
                 />
             ) : null}
         </motion.p>
+    )
+}
+
+function PendingStatus({ name }: { name: string }) {
+    const [elapsed, setElapsed] = useState(0)
+    useEffect(() => {
+        const started = Date.now()
+        const id = window.setInterval(() => setElapsed(Date.now() - started), 1600)
+        return () => window.clearInterval(id)
+    }, [])
+    return (
+        <span data-pending-status className="px-1 text-sm font-medium text-profile-mute" aria-live="polite">
+            {assistantPendingPhrase(name, elapsed)}
+            <span className="inline-block w-[1.1em] animate-pulse">…</span>
+        </span>
     )
 }
 

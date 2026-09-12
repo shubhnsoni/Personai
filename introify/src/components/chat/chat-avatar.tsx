@@ -47,21 +47,38 @@ export function ChatAvatar({
 
     if (showImage) {
         return (
-            <img
-                src={imageUrl}
-                alt={name}
-                width={size}
-                height={size}
+            <span
+                data-chat-avatar="photo"
                 className={className}
                 style={{
                     width: size,
                     height: size,
+                    minWidth: size,
+                    minHeight: size,
+                    aspectRatio: "1 / 1",
                     borderRadius: "9999px",
-                    objectFit: "cover",
+                    overflow: "hidden",
                     display: "block",
                     flexShrink: 0,
+                    position: "relative",
+                    background: "color-mix(in oklab, var(--chat-accent, #94a3b8) 18%, transparent)",
                 }}
-            />
+            >
+                <img
+                    src={imageUrl}
+                    alt={name}
+                    className="h-full w-full object-cover"
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        objectPosition: "center",
+                        display: "block",
+                    }}
+                />
+            </span>
         )
     }
 

@@ -148,7 +148,7 @@ export function StoryMagazine({
             <header className="sticky top-0 z-30 border-b border-black/10 bg-[#eceae6]/90 backdrop-blur-md">
                 <div className="mx-auto flex max-w-5xl items-center gap-3 px-5 py-4">
                     <Link href={restaurant ? `/${slug}/menu` : `/${slug}`} className="flex min-w-0 flex-1 items-center gap-3">
-                        {logoUrl ? <img src={logoUrl} alt="" className="h-9 w-9 rounded-[10px] object-cover" /> : null}
+                        {logoUrl ? <img src={logoUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : null}
                         <span className="truncate text-[13px] font-semibold tracking-tight">{name}</span>
                     </Link>
                     {phone && tel ? (
@@ -166,11 +166,11 @@ export function StoryMagazine({
             </header>
 
             <section className="mx-auto grid max-w-5xl gap-10 px-5 py-16 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)] lg:items-center">
-                <div className="overflow-hidden rounded-[10px] bg-[#d8d4cc]">
+                <div className="mx-auto w-full max-w-[16rem] overflow-hidden rounded-full bg-[#d8d4cc] aspect-square">
                     {logoUrl ? (
-                        <img src={logoUrl} alt={`${name} logo`} className="aspect-[4/5] w-full object-cover" />
+                        <img src={logoUrl} alt={`${name} logo`} className="h-full w-full object-cover" />
                     ) : (
-                        <div className="flex aspect-[4/5] items-center justify-center text-5xl font-semibold text-black/20">
+                        <div className="flex h-full w-full items-center justify-center text-5xl font-semibold text-black/20">
                             {name.slice(0, 1)}
                         </div>
                     )}

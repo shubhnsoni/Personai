@@ -42,7 +42,9 @@ export function CatalogHeader({
                 <Link href={backHref || `/${slug}`} className="flex min-w-0 flex-1 items-center gap-2.5">
                     {compact && logoUrl ? (
                         <>
-                            <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-border" />
+                            <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full ring-1 ring-border">
+                                <img src={logoUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+                            </span>
                             <span className="min-w-0">
                                 <span className="block truncate font-semibold tracking-tight text-foreground">{name}</span>
                                 {hoursLabel ? (

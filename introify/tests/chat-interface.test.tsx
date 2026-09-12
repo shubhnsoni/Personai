@@ -387,3 +387,58 @@ describe("ChatInterface - live support option", () => {
         expect(document.body.textContent).toContain("Talk live with Ada Lovelace")
     })
 })
+
+describe("ChatInterface - pending copy and home", () => {
+    it("shows thinking instead of bounce dots while a reply is in flight", () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})) as unknown as typeof fetch)
+        renderChat()
+        const field = document.querySelector('input[aria-label="Message"]') as HTMLInputElement
+        act(() => {
+            fireEvent.change(field, { target: { value: "Hello there" } })
+            fireEvent.submit(field.closest("form")!)
+        })
+        expect(document.body.textContent).toMatch(/thinking/)
+        expect(document.querySelector("[data-pending-status]")).toBeTruthy()
+    })
+
+    it("returns to the intro when the header identity is clicked", async () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        const payload = new TextEncoder().encode(`0:${JSON.stringify("A table for two")}\n`)
+        let sent = false
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => ({
+                ok: true,
+                status: 200,
+                headers: { get: (name: string) => name === "X-Conversation-Id" ? "c1" : null },
+                body: {
+                    getReader: () => ({
+                        read: async () => {
+                            if (sent) return { done: true, value: undefined }
+                            sent = true
+                            return { done: false, value: payload }
+                        },
+                    }),
+                },
+            })) as unknown as typeof fetch,
+        )
+        renderChat()
+        const field = document.querySelector('input[aria-label="Message"]') as HTMLInputElement
+        await act(async () => {
+            fireEvent.change(field, { target: { value: "Can I book a table?" } })
+            fireEvent.submit(field.closest("form")!)
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+        expect(document.body.textContent).toContain("A table for two")
+        const home = document.querySelector('[aria-label="Back to chat"]') as HTMLButtonElement
+        expect(home).toBeTruthy()
+        act(() => {
+            fireEvent.click(home)
+        })
+        expect(document.body.textContent).toContain(INTRO_LINE)
+        expect(document.querySelector('[aria-label="Back to chat"]')).toBeNull()
+    })
+})
+
