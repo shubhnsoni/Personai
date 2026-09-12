@@ -19,10 +19,11 @@ import { ChatMarkdown } from "@/components/chat/chat-markdown"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { wantsLiveSupport } from "@/lib/live-support"
 import { toast } from "sonner"
-import { resolveBloubTheme } from "@/lib/bloub/catalog"
+import { resolveBloubTheme, resolveThemedOrb } from "@/lib/bloub/catalog"
 import type { PublicAnimationConfig } from "@/lib/profile-branding"
 import { subscribeVisualKeyboard, visualKeyboardOpen } from "@/lib/visual-keyboard"
 import "@/components/profile/retro-lcd-theme.css"
+import "@/components/profile/premium-themes.css"
 
 interface ChatMessage {
     id: string
@@ -107,7 +108,7 @@ export function ChatInterface({
     const orbColors = colors.length >= 2 ? (colors as [string, string]) : undefined
     const orbTheme = ORB_THEMES[resolveOrbVariant(colors, animationConfig.variant)]
     const botTheme = resolveBloubTheme(animationConfig.theme)
-    const retro = botTheme === "retro-lcd"
+    const themedOrb = Boolean(resolveThemedOrb(animationConfig.theme))
     const keyboardOpen = useSyncExternalStore(subscribeVisualKeyboard, visualKeyboardOpen, () => false)
 
     useEffect(() => {
@@ -419,7 +420,7 @@ export function ChatInterface({
         <div
             data-chat-theme={botTheme}
             className="relative flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden text-profile-text"
-            style={retro ? undefined : {
+            style={themedOrb ? undefined : {
                 ["--pl-orb-from" as string]: orbTheme.bright,
                 ["--pl-orb-to" as string]: orbTheme.deep,
                 ["--pl-aurora" as string]: orbTheme.accent,
@@ -514,10 +515,10 @@ export function ChatInterface({
                             />
                         }
                         accent={orbTheme.accent}
-                        bare={retro || animationConfig.look === "pixel" || animationConfig.look === "bloub" || animationConfig.look === "blob"}
+                        bare={themedOrb || animationConfig.look === "pixel" || animationConfig.look === "bloub" || animationConfig.look === "blob"}
                         onReady={() => setIntroReady(true)}
                         onStage={onIntroStage}
-                        skipIntro={retro || profile.roleTemplate === "RESTAURANT"}
+                        skipIntro={themedOrb || profile.roleTemplate === "RESTAURANT"}
                     />
                 )}
 

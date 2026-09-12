@@ -84,7 +84,7 @@ export const COPY = {
     },
     look: {
         h: "Give it a face",
-        s: "Circle, centred eyes, one colour. Mood and aura are yours.",
+        s: "Zen, centred eyes, one colour. Mood and aura are yours.",
         continue: "Looks right",
         premium: "This is a premium bot",
     },

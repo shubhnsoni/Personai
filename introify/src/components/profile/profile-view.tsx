@@ -22,9 +22,10 @@ import { toast } from "sonner"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { Tracker, track } from "@/components/profile/tracker"
 import { SessionProbe } from "@/components/profile/session-probe"
-import { resolveBloubTheme } from "@/lib/bloub/catalog"
+import { resolveBloubTheme, resolveThemedOrb } from "@/lib/bloub/catalog"
 import type { PublicAnimationConfig } from "@/lib/profile-branding"
 import "./retro-lcd-theme.css"
+import "./premium-themes.css"
 
 interface ProfileViewProps {
     profile: {
@@ -216,13 +217,13 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
     })
     const theme = ORB_THEMES[resolveOrbVariant(colors, animationConfig.variant)]
     const botTheme = resolveBloubTheme(animationConfig.theme)
-    const retro = botTheme === "retro-lcd"
+    const themed = resolveThemedOrb(animationConfig.theme)
 
     return (
         <div
             data-public-profile-theme={botTheme}
             className="relative flex h-full min-h-0 w-full flex-1 overflow-hidden bg-profile text-profile-text"
-            style={retro ? undefined : {
+            style={themed ? undefined : {
                 ["--pl-orb-from" as string]: theme.bright,
                 ["--pl-orb-to" as string]: theme.deep,
                 ["--pl-aurora" as string]: theme.accent,
@@ -249,7 +250,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                 </div>
             )}
 
-            {!retro && <div
+            {!themed && <div
                 className="absolute inset-0 pointer-events-none z-0 transition-opacity duration-[1600ms] ease-out"
                 style={{
                     opacity: introStage === "hi" || introStage === "type" ? 0 : 0.1,
@@ -259,7 +260,7 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
 
             <Tracker slug={profile.slug} />
             <SessionProbe slug={profile.slug} />
-            {restaurant || retro ? null : <IntroVeil stage={introStage} />}
+            {restaurant || themed ? null : <IntroVeil stage={introStage} />}
 
             <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
                 <div className="relative mx-auto flex min-h-0 w-full flex-1 overflow-hidden">

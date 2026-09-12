@@ -2,6 +2,7 @@
 
 import { useEffect, type RefObject } from "react"
 import { useTheme } from "next-themes"
+import { BLOUB_THEME_META, type BloubThemeId } from "@/lib/bloub/catalog"
 
 /** Keep browser chrome and the page canvas on the selected business palette. */
 export function PublicBrowserTheme({ active, theme, frameRef }: {
@@ -49,8 +50,9 @@ export function PublicBrowserTheme({ active, theme, frameRef }: {
         const refresh = () => {
             const selected = forcedTheme || resolvedTheme
             const mode = selected === "dark" || (!selected && root.classList.contains("dark")) ? "dark" : "light"
-            const color = theme === "retro-lcd"
-                ? mode === "dark" ? "#10170f" : "#c4d58a"
+            const canvas = BLOUB_THEME_META[theme as BloubThemeId]?.canvas
+            const color = canvas
+                ? canvas[mode]
                 : getComputedStyle(frame).getPropertyValue("--profile-bg").trim()
             if (!color) return
 

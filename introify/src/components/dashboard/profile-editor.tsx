@@ -21,6 +21,7 @@ import { KitPicker } from "@/components/dashboard/kit-picker"
 import { previewListing, applyListing } from "@/app/actions/listing"
 import { OfferSheet, LiveRow } from "@/components/dashboard/offer-sheet"
 import {
+    BLOUB_THEMES,
     parseOrbBag,
     resolveBloubAura,
     resolveBloubColor,
@@ -398,7 +399,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                     </Section>
                     <Section title="Welcome aura" description="The face on your public page.">
                         {!aiAccess.customBranding ? (
-                            <p className="text-sm text-muted-foreground">Circle, Pebble and Retro LCD are included, with moods and light/dark themes. More bots and footer removal are on Pro. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Compare plans</Link></p>
+                            <p className="text-sm text-muted-foreground">Zen, Sol and Retro LCD are included, with moods and light/dark themes. More bots and footer removal are on Pro. <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">Compare plans</Link></p>
                         ) : null}
                         <ToggleRow title="Hide Introify footer" description="Your business name, photo and logo are available on every plan.">
                             <Switch aria-label="Hide Introify footer" disabled={!aiAccess.customBranding} checked={aiAccess.customBranding && Boolean(personalityConfig.hideIntroifyBrand)} onCheckedChange={value => updatePersonalityField("hideIntroifyBrand", value)} />
@@ -416,8 +417,8 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 theme={liveOrb.theme}
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">{liveOrb.theme === "retro-lcd" ? "Retro LCD" : "Your blob"}</p>
-                                <p className="text-xs text-muted-foreground">{liveOrb.theme === "retro-lcd" ? "Pixel eyes. Classic green. Light and dark, in sync." : "Choose your bot, theme, mood and aura."}</p>
+                                <p className="text-sm font-medium">{liveOrb.theme === "classic" ? "Your blob" : (BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label ?? "Your blob")}</p>
+                                <p className="text-xs text-muted-foreground">{liveOrb.theme === "classic" ? "Choose your bot, theme, mood and aura." : BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.description}</p>
                             </div>
                             <div className="flex shrink-0 flex-col gap-1.5">
                                 <button type="button" onClick={() => setBlobOpen(true)} className="h-8 rounded-full border border-border px-3 text-xs font-medium">

@@ -1,4 +1,4 @@
-import { clampOrbForPlan, gradientForColor, resolveBloubTheme, type AuraId } from "@/lib/bloub/catalog"
+import { clampOrbForPlan, gradientForColor, resolveBloubTheme, resolveThemedOrb, type AuraId } from "@/lib/bloub/catalog"
 import { lookupProfileEntitlement } from "@/lib/billing/entitlements"
 
 export type PublicAnimationConfig = { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: AuraId | string; theme?: string }
@@ -43,9 +43,9 @@ export async function publicAnimationConfig(profileId: string, configured: Publi
     const allowed = await publicBrandingAccess(profileId) ? configured : freeLiveLook(configured)
     if (allowed.theme === undefined) return allowed
     const theme = resolveBloubTheme(allowed.theme)
-    // An older animation preset can still say "glass" or omit look entirely. The
-    // included LCD selection always renders the round bot, even after a downgrade.
-    return theme === "retro-lcd"
+    // An older animation preset can still say "glass" or omit look entirely. Bespoke
+    // themed orbs always render the round bot, even after a downgrade.
+    return resolveThemedOrb(theme)
         ? { ...allowed, theme, look: "bloub", shape: "cercle" }
         : { ...allowed, theme }
 }

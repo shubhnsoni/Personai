@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
-import { DEFAULT_BLOUB_PICK } from "@/lib/bloub/catalog"
+import { DEFAULT_BLOUB_PICK, bloubBotPick, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS } from "@/lib/bloub/catalog"
 
 vi.mock("sonner", () => ({ toast: { message: vi.fn(), success: vi.fn(), error: vi.fn() } }))
 vi.mock("@/components/welcome-orb", () => ({ WelcomeOrb: ({ theme }: { theme?: string }) => <div data-testid="orb" data-theme={theme} /> }))
@@ -9,7 +9,7 @@ const { BlobLookStudio } = await import("@/components/onboarding/blob-look")
 const { BloubCustomizerSheet } = await import("@/components/dashboard/bloub-customizer-sheet")
 
 describe("included bots on onboarding and profile", () => {
-    it("lets anyone pick Circle or Pebble during onboarding and names other bots as premium", () => {
+    it("lets anyone pick Zen or Sol during onboarding and names other bots as premium", () => {
         const onChange = vi.fn()
         render(
             <BlobLookStudio
@@ -23,9 +23,9 @@ describe("included bots on onboarding and profile", () => {
                 busy={false}
             />,
         )
-        fireEvent.click(screen.getByRole("button", { name: "Pebble" }))
+        fireEvent.click(screen.getByRole("button", { name: "Sol" }))
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ shape: "galet" }))
-        fireEvent.click(screen.getByRole("button", { name: "Cloud, premium" }))
+        fireEvent.click(screen.getByRole("button", { name: "Sky, premium" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ shape: "nuage" }))
     })
 
@@ -64,9 +64,9 @@ describe("included bots on onboarding and profile", () => {
             />,
         )
         fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
-        fireEvent.click(screen.getByRole("button", { name: "Pebble" }))
+        fireEvent.click(screen.getByRole("button", { name: "Sol" }))
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ shape: "galet" }))
-        fireEvent.click(screen.getByRole("button", { name: "Cloud, premium" }))
+        fireEvent.click(screen.getByRole("button", { name: "Sky, premium" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ shape: "nuage" }))
     })
 
@@ -78,12 +78,12 @@ describe("included bots on onboarding and profile", () => {
         expect(onChange).toHaveBeenLastCalledWith({ theme: "retro-lcd", shape: "cercle" })
         rerender(<BlobLookStudio {...props} value={{ ...DEFAULT_BLOUB_PICK, theme: "retro-lcd" }} />)
         expect(screen.getByRole("button", { name: "Retro LCD" }).getAttribute("aria-pressed")).toBe("true")
-        expect(screen.getByRole("button", { name: "Circle" }).getAttribute("aria-pressed")).toBe("false")
+        expect(screen.getByRole("button", { name: "Zen" }).getAttribute("aria-pressed")).toBe("false")
         expect(screen.queryByRole("button", { name: "Turquoise" })).toBeNull()
         fireEvent.click(screen.getByRole("button", { name: "Classic theme" }))
         expect(onChange).toHaveBeenLastCalledWith({ theme: "classic" })
-        fireEvent.click(screen.getByRole("button", { name: "Pebble" }))
-        expect(onChange).toHaveBeenLastCalledWith({ theme: "classic", shape: "galet" })
+        fireEvent.click(screen.getByRole("button", { name: "Sol" }))
+        expect(onChange).toHaveBeenLastCalledWith(bloubBotPick(INCLUDED_BLOUB_BOTS[1]))
     })
 
     it("keeps the Retro bot and theme available in the Free profile customizer", () => {
@@ -94,10 +94,43 @@ describe("included bots on onboarding and profile", () => {
         rerender(<BloubCustomizerSheet open onClose={() => {}} value={{ ...DEFAULT_BLOUB_PICK, theme: "retro-lcd" }} onChange={onChange} premium={false} />)
         fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
         expect(screen.getByRole("button", { name: "Retro LCD" }).getAttribute("aria-pressed")).toBe("true")
-        expect(screen.getByRole("button", { name: "Circle" }).getAttribute("aria-pressed")).toBe("false")
+        expect(screen.getByRole("button", { name: "Zen" }).getAttribute("aria-pressed")).toBe("false")
         expect(screen.queryByRole("button", { name: "Turquoise" })).toBeNull()
         expect(screen.getAllByTestId("orb").filter(node => node.getAttribute("data-theme") === "retro-lcd").length).toBeGreaterThan(1)
-        fireEvent.click(screen.getByRole("button", { name: "Circle" }))
-        expect(onChange).toHaveBeenLastCalledWith({ theme: "classic", shape: "cercle" })
+        fireEvent.click(screen.getByRole("button", { name: "Zen" }))
+        expect(onChange).toHaveBeenLastCalledWith(bloubBotPick(INCLUDED_BLOUB_BOTS[0]))
+    })
+
+    it("locks themed premium bots for Free and applies full configurations when entitled", () => {
+        const onChange = vi.fn()
+        const props = { open: true, onClose: () => {}, onChange }
+        const { rerender } = render(<BloubCustomizerSheet {...props} value={DEFAULT_BLOUB_PICK} premium={false} />)
+        fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
+        fireEvent.click(screen.getByRole("button", { name: "Nyx, premium" }))
+        fireEvent.click(screen.getByRole("button", { name: "Ion, premium" }))
+        expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ theme: "astral-nebula" }))
+        expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ theme: "holographic-hud" }))
+
+        rerender(<BloubCustomizerSheet {...props} value={DEFAULT_BLOUB_PICK} premium />)
+        fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
+        fireEvent.click(screen.getByRole("button", { name: "Nyx" }))
+        const nyx = PREMIUM_BLOUB_BOTS.find(bot => bot.label === "Nyx")!
+        expect(onChange).toHaveBeenLastCalledWith(bloubBotPick(nyx))
+        fireEvent.click(screen.getByRole("button", { name: "Ion" }))
+        const ion = PREMIUM_BLOUB_BOTS.find(bot => bot.label === "Ion")!
+        expect(onChange).toHaveBeenLastCalledWith(bloubBotPick(ion))
+        fireEvent.click(screen.getByRole("button", { name: "Vex" }))
+        const vex = PREMIUM_BLOUB_BOTS.find(bot => bot.label === "Vex")!
+        expect(onChange).toHaveBeenLastCalledWith({ theme: "liquid-chrome", shape: "cercle", expression: "blase", color: "gris", aura: "breathe" })
+        expect(bloubBotPick(vex)).toEqual({ theme: "liquid-chrome", shape: "cercle", expression: "blase", color: "gris", aura: "breathe" })
+    })
+
+    it("shows every premium orb's own theme in the bot grid previews", () => {
+        render(<BloubCustomizerSheet open onClose={() => {}} value={DEFAULT_BLOUB_PICK} onChange={() => {}} premium />)
+        fireEvent.click(screen.getByRole("tab", { name: "Bots" }))
+        const orbs = screen.getAllByTestId("orb")
+        for (const theme of ["astral-nebula", "holographic-hud", "liquid-chrome"]) {
+            expect(orbs.some(node => node.getAttribute("data-theme") === theme)).toBe(true)
+        }
     })
 })

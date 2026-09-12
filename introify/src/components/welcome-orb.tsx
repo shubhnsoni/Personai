@@ -6,8 +6,9 @@ import { ORB_VARIANTS, resolveOrbVariant, type OrbVariantId } from "@/lib/orb-va
 import { resolveOrbLook, resolvePixelSkin, type OrbLook, type PixelSkin } from "@/lib/pixel-skins"
 import { BloubOrb } from "@/components/bloub-orb"
 import { RetroLcdOrb } from "@/components/retro-lcd-orb"
+import { PremiumThemeOrb } from "@/components/premium-theme-orb"
 import { COLOR_BY_ID } from "@/lib/bloub/skins"
-import { resolveBloubAura, resolveBloubColor, resolveBloubTheme, type AuraId } from "@/lib/bloub/catalog"
+import { resolveBloubAura, resolveBloubColor, resolveThemedOrb, type AuraId } from "@/lib/bloub/catalog"
 import "./welcome-orb.css"
 import "./welcome-pixel.css"
 
@@ -74,7 +75,8 @@ export function WelcomeOrb({
     const resolved = resolveOrbVariant(colors, variant)
     const resolvedLook = resolveOrbLook(lookStyle)
     const resolvedSkin = resolvePixelSkin(skin)
-    const retro = resolveBloubTheme(theme) === "retro-lcd"
+    const themed = resolveThemedOrb(theme)
+    const retro = themed === "retro-lcd"
     const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionSnapshot, () => true)
 
     useEffect(() => {
@@ -82,7 +84,7 @@ export function WelcomeOrb({
     }, [gaze])
 
     useEffect(() => {
-        if (!reactToken || (retro && (still || reducedMotion || frozenAt !== undefined))) return
+        if (!reactToken || (themed && (still || reducedMotion || frozenAt !== undefined))) return
         delightedRef.current = true
         let raf2 = 0
         const raf1 = window.requestAnimationFrame(() => {
@@ -98,12 +100,12 @@ export function WelcomeOrb({
             window.cancelAnimationFrame(raf2)
             window.clearTimeout(clear)
         }
-    }, [reactToken, retro, still, frozenAt, reducedMotion])
+    }, [reactToken, themed, still, frozenAt, reducedMotion])
 
     useEffect(() => {
-        if (still || frozenAt !== undefined || (!retro && resolvedLook === "bloub")) return
+        if (still || frozenAt !== undefined || (!themed && resolvedLook === "bloub")) return
         const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        if (reducedMotion && retro) return
+        if (reducedMotion && themed) return
 
         let raf = 0
         let last = performance.now()
@@ -160,7 +162,7 @@ export function WelcomeOrb({
 
         raf = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(raf)
-    }, [still, frozenAt, retro, resolvedLook, reducedMotion])
+    }, [still, frozenAt, themed, resolvedLook, reducedMotion])
 
     const pupil = {
         transform: `translate(calc(-50% + ${look.x * 42}%), calc(-50% + ${-look.y * 38}%))`,
@@ -175,13 +177,14 @@ export function WelcomeOrb({
             className={cn(
                 "pl-orb-scene",
                 size < 56 && "is-compact",
-                !retro && resolvedLook === "pixel" && "is-pixel",
-                !retro && resolvedLook === "bloub" && "is-bloub",
+                !themed && resolvedLook === "pixel" && "is-pixel",
+                !themed && resolvedLook === "bloub" && "is-bloub",
                 retro && "is-retro-lcd",
+                themed && !retro && "is-premium",
                 className
             )}
             data-variant={resolved}
-            data-bot-theme={retro ? "retro-lcd" : undefined}
+            data-bot-theme={themed ?? undefined}
             data-skin={resolvedLook === "pixel" ? resolvedSkin : undefined}
             style={{
                 ["--orb-s" as string]: `${size}px`,
@@ -196,21 +199,34 @@ export function WelcomeOrb({
             }}
             aria-hidden
         >
-            {!retro && resolvedLook === "bloub" && resolveBloubAura(aura) !== "still" ? (
+            {!themed && resolvedLook === "bloub" && resolveBloubAura(aura) !== "still" ? (
                 <span className="pl-orb-aura" data-rhythm={resolveBloubAura(aura)} aria-hidden>
                     <i /><i /><i />
                 </span>
             ) : null}
-            {retro ? (
-                <RetroLcdOrb
-                    size={size}
-                    gaze={look}
-                    lid={lid}
-                    expression={delighted || mood === "success" ? "heureux" : mood === "error" ? "triste" : mood === "listening" ? "attentif" : expression || "centre"}
-                    still={still || reducedMotion || frozenAt !== undefined}
-                    aura={resolveBloubAura(aura)}
-                    mood={delighted ? "react" : mood}
-                />
+            {themed ? (
+                retro ? (
+                    <RetroLcdOrb
+                        size={size}
+                        gaze={look}
+                        lid={lid}
+                        expression={delighted || mood === "success" ? "heureux" : mood === "error" ? "triste" : mood === "listening" ? "attentif" : expression || "centre"}
+                        still={still || reducedMotion || frozenAt !== undefined}
+                        aura={resolveBloubAura(aura)}
+                        mood={delighted ? "react" : mood}
+                    />
+                ) : (
+                    <PremiumThemeOrb
+                        variant={themed}
+                        size={size}
+                        gaze={look}
+                        lid={lid}
+                        expression={delighted || mood === "success" ? "heureux" : mood === "error" ? "triste" : mood === "listening" ? "attentif" : expression || "centre"}
+                        still={still || reducedMotion || frozenAt !== undefined}
+                        aura={resolveBloubAura(aura)}
+                        mood={delighted ? "react" : mood}
+                    />
+                )
             ) : resolvedLook === "bloub" ? (
                 <BloubOrb
                     size={size}

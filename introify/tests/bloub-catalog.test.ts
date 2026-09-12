@@ -20,7 +20,7 @@ describe("blob look bag", () => {
         expect(parseOrbBag(null)).toEqual(DEFAULT_BLOUB_PICK)
     })
 
-    it("includes Circle and Pebble on Free and locks other bots", () => {
+    it("includes Zen and Sol on Free and locks other bots", () => {
         expect(clampOrbForPlan({
             shape: "galet",
             expression: "heureux",

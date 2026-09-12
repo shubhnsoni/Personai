@@ -6,6 +6,7 @@ import { isReservedUiLocale } from "@/lib/ui-locale"
 import { resolveBloubTheme } from "@/lib/bloub/catalog"
 import { PublicBusinessFrame } from "@/components/profile/public-business-frame"
 import "@/components/profile/retro-lcd-theme.css"
+import "@/components/profile/premium-themes.css"
 
 export default async function PublicBusinessLayout({ children, params }: { children: ReactNode; params: Promise<{ slug: string }> }) {
     const { slug } = await params

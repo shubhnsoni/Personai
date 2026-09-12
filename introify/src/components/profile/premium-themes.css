@@ -1,0 +1,250 @@
+/* Premium orb themes paint the same token surface as Retro LCD: the public
+   profile, its chat, linked catalogues, and portalled booking sheets. Each
+   theme owns --pt-paper/--pt-ink; shared component rules consume the tokens. */
+
+/* ---- Astral Nebula ------------------------------------------------------ */
+:is(
+  [data-public-business-theme="astral-nebula"],
+  [data-public-catalog-theme="astral-nebula"],
+  [data-public-profile-theme="astral-nebula"],
+  [data-chat-theme="astral-nebula"],
+  body:has([data-public-business-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #ede6fb;
+  --pt-ink: #221543;
+  --pt-accent: #7c3aed;
+}
+
+.dark :is(
+  [data-public-business-theme="astral-nebula"],
+  [data-public-catalog-theme="astral-nebula"],
+  [data-public-profile-theme="astral-nebula"],
+  [data-chat-theme="astral-nebula"],
+  body:has([data-public-business-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #090714;
+  --pt-ink: #f5efff;
+  --pt-accent: #a78bfa;
+}
+
+/* ---- Holographic HUD ---------------------------------------------------- */
+:is(
+  [data-public-business-theme="holographic-hud"],
+  [data-public-catalog-theme="holographic-hud"],
+  [data-public-profile-theme="holographic-hud"],
+  [data-chat-theme="holographic-hud"],
+  body:has([data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #e5f8fd;
+  --pt-ink: #06232e;
+  --pt-accent: #00a7c8;
+}
+
+.dark :is(
+  [data-public-business-theme="holographic-hud"],
+  [data-public-catalog-theme="holographic-hud"],
+  [data-public-profile-theme="holographic-hud"],
+  [data-chat-theme="holographic-hud"],
+  body:has([data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #060810;
+  --pt-ink: #c9f4ff;
+  --pt-accent: #00e5ff;
+}
+
+/* ---- Liquid Chrome ------------------------------------------------------ */
+:is(
+  [data-public-business-theme="liquid-chrome"],
+  [data-public-catalog-theme="liquid-chrome"],
+  [data-public-profile-theme="liquid-chrome"],
+  [data-chat-theme="liquid-chrome"],
+  body:has([data-public-business-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #e9ecf1;
+  --pt-ink: #101522;
+  --pt-accent: #475569;
+}
+
+.dark :is(
+  [data-public-business-theme="liquid-chrome"],
+  [data-public-catalog-theme="liquid-chrome"],
+  [data-public-profile-theme="liquid-chrome"],
+  [data-chat-theme="liquid-chrome"],
+  body:has([data-public-business-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #0b0d12;
+  --pt-ink: #eef2f8;
+  --pt-accent: #9fb0c4;
+}
+
+/* ---- Shared token plumbing (same contract as retro-lcd) ------------------ */
+:is(
+  [data-public-business-theme="astral-nebula"], [data-public-catalog-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"], [data-chat-theme="astral-nebula"],
+  [data-public-business-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-chat-theme="holographic-hud"],
+  [data-public-business-theme="liquid-chrome"], [data-public-catalog-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"], [data-chat-theme="liquid-chrome"]
+) {
+  --profile-bg: var(--pt-paper);
+  --profile-text: var(--pt-ink);
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 93%, var(--pt-ink));
+  --profile-chip: color-mix(in srgb, var(--pt-paper) 88%, var(--pt-ink));
+  --profile-mute: color-mix(in srgb, var(--pt-ink) 72%, var(--pt-paper));
+  --profile-ring: var(--pt-accent);
+  --pl-aurora: var(--pt-accent);
+  --pl-brand-foreground: var(--pt-paper);
+  --chat-accent: var(--pt-accent);
+  --chat-on-accent: var(--pt-paper);
+  --background: var(--profile-bg);
+  --foreground: var(--profile-text);
+  --card: var(--profile-elev);
+  --card-foreground: var(--profile-text);
+  --popover: var(--profile-elev);
+  --popover-foreground: var(--profile-text);
+  --primary: var(--pt-accent);
+  --primary-foreground: var(--pt-paper);
+  --secondary: var(--profile-chip);
+  --secondary-foreground: var(--profile-text);
+  --muted: var(--profile-chip);
+  --muted-foreground: var(--profile-mute);
+  --accent: var(--profile-chip);
+  --accent-foreground: var(--profile-text);
+  --border: color-mix(in srgb, var(--pt-accent) 32%, var(--pt-paper));
+  --input: var(--border);
+  --ring: var(--pt-accent);
+  background-color: var(--profile-bg);
+  color: var(--profile-text);
+}
+
+/* HUD leans terminal; both premium pages tighten display type. */
+[data-chat-theme="holographic-hud"] :is(h1, [data-slot="chip"]) {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+[data-chat-theme="liquid-chrome"] h1,
+[data-chat-theme="astral-nebula"] h1 {
+  letter-spacing: -0.02em;
+}
+
+:is(
+  [data-chat-theme="astral-nebula"],
+  [data-chat-theme="holographic-hud"],
+  [data-chat-theme="liquid-chrome"]
+) input:not([type="checkbox"]) {
+  border: 1px solid var(--border);
+  background: var(--profile-elev);
+  backdrop-filter: none;
+}
+
+:is(
+  [data-chat-theme="astral-nebula"],
+  [data-chat-theme="holographic-hud"],
+  [data-chat-theme="liquid-chrome"]
+) [data-slot="chip"] {
+  border-color: var(--border);
+}
+
+:is(
+  [data-chat-theme="astral-nebula"],
+  [data-chat-theme="holographic-hud"],
+  [data-chat-theme="liquid-chrome"]
+) [data-chat-bubble="assistant"] {
+  border-color: var(--border);
+  background: var(--profile-elev);
+  color: var(--profile-text);
+}
+
+/* Theme-specific silhouettes for chat chrome. */
+[data-chat-theme="holographic-hud"] [data-slot="chip"],
+[data-chat-theme="holographic-hud"] [data-chat-bubble] {
+  border-radius: 8px;
+}
+
+[data-chat-theme="astral-nebula"] [data-chat-bubble] {
+  border-radius: 18px;
+}
+
+[data-chat-theme="liquid-chrome"] input:not([type="checkbox"]),
+[data-chat-theme="liquid-chrome"] [data-chat-bubble] {
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--pt-ink) 10%, transparent);
+}
+
+/* Linked catalogues inherit the palette without touching cover photos. */
+:is(
+  [data-public-catalog-theme="astral-nebula"],
+  [data-public-catalog-theme="holographic-hud"],
+  [data-public-catalog-theme="liquid-chrome"]
+) {
+  & :is(.text-zinc-100, .text-zinc-200, .text-zinc-300) {
+    color: var(--profile-text);
+  }
+  & :is(.text-zinc-400, .text-zinc-500) {
+    color: var(--profile-mute);
+  }
+  & :is([class~="bg-zinc-900/50"], [class~="bg-zinc-950/95"]) {
+    background-color: var(--profile-elev);
+  }
+  & [class~="border-white/10"] {
+    border-color: var(--border);
+  }
+  & :is(.bg-cyan-500, .bg-cyan-400) {
+    background-color: var(--pt-accent);
+    color: var(--pt-paper);
+  }
+  & header .text-cyan-400 {
+    color: var(--profile-text);
+  }
+}
+
+/* Product detail tokens. */
+:is(
+  [data-public-business-theme="astral-nebula"],
+  [data-public-business-theme="holographic-hud"],
+  [data-public-business-theme="liquid-chrome"]
+) .pdp-v13.pdp-v13 {
+  --pdp-bg: var(--profile-bg);
+  --pdp-white: var(--profile-elev);
+  --pdp-ink: var(--profile-text);
+  --pdp-ink-soft: var(--profile-text);
+  --pdp-fog: var(--profile-mute);
+  --pdp-fog-dim: var(--profile-mute);
+  --pdp-line: var(--border);
+  --pdp-line-strong: var(--border);
+  --pdp-cyan: var(--pt-accent);
+  --pdp-cyan-ink: var(--pt-paper);
+  --pdp-blue-a: var(--pt-accent);
+  --pdp-blue-b: var(--pt-accent);
+  --pdp-sticky: var(--profile-bg);
+  --pdp-hero-0: var(--profile-elev);
+  --pdp-hero-1: var(--profile-elev);
+  --pdp-hero-2: var(--profile-elev);
+  --pdp-hero-3: var(--profile-elev);
+  --pdp-hero-wash: var(--profile-chip);
+  --pdp-blister: var(--profile-elev);
+}
+
+/* Booking/event sheets portal to body; scope their legacy palette too. */
+body:has(
+  [data-public-business-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"],
+  [data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"],
+  [data-public-business-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"]
+) > [data-slot="sheet-content"] {
+  border-color: var(--border);
+  & :is(.text-white, .text-zinc-100, .text-zinc-200, .text-zinc-300) {
+    color: var(--profile-text);
+  }
+  & :is(.text-zinc-400, .text-zinc-500) {
+    color: var(--profile-mute);
+  }
+  & :is([class~="bg-white/5"], [class~="bg-white/10"], .bg-zinc-900) {
+    background-color: var(--profile-chip);
+  }
+  & :is(input, select, textarea) {
+    color: var(--profile-text);
+    border-color: var(--border);
+    background-color: var(--profile-elev);
+  }
+  & :is(.bg-white, [class~="bg-white/90"]) {
+    background-color: var(--pt-accent);
+    color: var(--pt-paper);
+  }
+}

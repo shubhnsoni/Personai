@@ -77,12 +77,70 @@ export const BLOUB_AURAS: { id: AuraId; label: string }[] = [
 
 export const DEFAULT_AURA: AuraId = "pulse"
 
-export type BloubThemeId = "classic" | "retro-lcd"
+export type BloubThemeId = "classic" | "retro-lcd" | "astral-nebula" | "holographic-hud" | "liquid-chrome"
 
 export const BLOUB_THEMES: { id: BloubThemeId; label: string; description: string }[] = [
     { id: "classic", label: "Classic", description: "Your colour, mood and aura." },
     { id: "retro-lcd", label: "Retro LCD", description: "Pixel circle. Two eyes. A nostalgic green screen." },
+    { id: "astral-nebula", label: "Astral Nebula", description: "Swirling violet plasma with star-core eyes and orbiting dust." },
+    { id: "holographic-hud", label: "Holographic HUD", description: "Cyan wireframe scanlines with targeting-bracket eyes." },
+    { id: "liquid-chrome", label: "Liquid Chrome", description: "Polished mercury sphere with slim aperture-slit eyes." },
 ]
+
+export const PREMIUM_BLOUB_THEMES: readonly BloubThemeId[] = ["astral-nebula", "holographic-hud", "liquid-chrome"]
+
+export function isPremiumBloubTheme(theme?: BloubThemeId | string | null): boolean {
+    return PREMIUM_BLOUB_THEMES.includes(theme as BloubThemeId)
+}
+
+/** Themes that render a bespoke orb superseding the Classic blob, and theme the whole public page. */
+export type ThemedOrbId = Exclude<BloubThemeId, "classic">
+
+export type BloubThemeMeta = {
+    /** Browser chrome + page canvas per appearance mode. */
+    canvas: { light: string; dark: string }
+    /** Picker thumbnail chips: dark-context and light-context treatments. */
+    thumb: { bg: string; dot: string; bar: string }
+    thumbLight: { bg: string; dot: string; bar: string }
+    /** Shown instead of the colour swatches while this theme owns the palette. */
+    note: string
+}
+
+export const BLOUB_THEME_META: Partial<Record<BloubThemeId, BloubThemeMeta>> = {
+    "retro-lcd": {
+        canvas: { light: "#c4d58a", dark: "#10170f" },
+        thumb: { bg: "#253021", dot: "#c4d58a", bar: "#c4d58a" },
+        thumbLight: { bg: "#c4d58a", dot: "#253021", bar: "#253021" },
+        note: "Pale LCD green and deep olive, automatically inverted in dark mode. Your Classic colour is kept for when you switch back.",
+    },
+    "astral-nebula": {
+        canvas: { light: "#ede6fb", dark: "#090714" },
+        thumb: { bg: "#150d2e", dot: "#c084fc", bar: "#8b5cf6" },
+        thumbLight: { bg: "#ede6fb", dot: "#7c3aed", bar: "#a855f7" },
+        note: "Cosmic violet and supernova magenta, tuned for light and dark. Your Classic colour is kept for when you switch back.",
+    },
+    "holographic-hud": {
+        canvas: { light: "#e5f8fd", dark: "#060810" },
+        thumb: { bg: "#04131c", dot: "#00f0ff", bar: "#0aa8c2" },
+        thumbLight: { bg: "#e5f8fd", dot: "#00b7d4", bar: "#164e63" },
+        note: "Laser cyan on void black with mono type. Your Classic colour is kept for when you switch back.",
+    },
+    "liquid-chrome": {
+        canvas: { light: "#e9ecf1", dark: "#0b0d12" },
+        thumb: { bg: "#15181f", dot: "#e2e8f0", bar: "#94a3b8" },
+        thumbLight: { bg: "#e9ecf1", dot: "#cbd5e1", bar: "#64748b" },
+        note: "Polished silver with prismatic reflections, inverted in dark mode. Your Classic colour is kept for when you switch back.",
+    },
+}
+
+/** Thumbnail swatches for the theme picker, honouring the surrounding surface brightness. */
+export function bloubThemeThumb(id: BloubThemeId, surface: "dark" | "light"): { bg: string; dot: string; bar: string } {
+    const meta = BLOUB_THEME_META[id]
+    if (meta) return surface === "dark" ? meta.thumb : meta.thumbLight
+    return surface === "dark"
+        ? { bg: "#15202b", dot: "#b2edff", bar: "#dbe4ee" }
+        : { bg: "#e7ebf0", dot: "#00a0c3", bar: "#445365" }
+}
 
 export type BloubPick = {
     shape: ShapeId
@@ -100,17 +158,34 @@ export const DEFAULT_BLOUB_PICK: BloubPick = {
     theme: "classic",
 }
 
-export const INCLUDED_BLOUB_BOTS: { id: ShapeId; label: string; expression: ExpressionId; color: ColorId }[] = [
-    { id: "cercle", label: "Circle", expression: "centre", color: "blanc" },
-    { id: "galet", label: "Pebble", expression: "heureux", color: "ambre" },
+export type BloubBot = {
+    id: ShapeId
+    label: string
+    expression: ExpressionId
+    color: ColorId
+    aura: AuraId
+    theme: BloubThemeId
+}
+
+export const INCLUDED_BLOUB_BOTS: BloubBot[] = [
+    { id: "cercle", label: "Zen", expression: "centre", color: "blanc", aura: "pulse", theme: "classic" },
+    { id: "galet", label: "Sol", expression: "heureux", color: "ambre", aura: "breathe", theme: "classic" },
 ]
 
-export const PREMIUM_BLOUB_BOTS: { id: ShapeId; label: string; expression: ExpressionId; color: ColorId }[] = [
-    { id: "squircle", label: "Squircle", expression: "fier", color: "violet" },
-    { id: "nuage", label: "Cloud", expression: "excite", color: "bleu" },
-    { id: "goutte", label: "Droplet", expression: "curieux", color: "turquoise" },
-    { id: "hexagone", label: "Hexagon", expression: "attentif", color: "encre" },
+export const PREMIUM_BLOUB_BOTS: BloubBot[] = [
+    { id: "squircle", label: "Lux", expression: "fier", color: "violet", aura: "pulse", theme: "classic" },
+    { id: "nuage", label: "Sky", expression: "excite", color: "bleu", aura: "breathe", theme: "classic" },
+    { id: "goutte", label: "Dew", expression: "curieux", color: "turquoise", aura: "pulse", theme: "classic" },
+    { id: "hexagone", label: "Neo", expression: "attentif", color: "encre", aura: "still", theme: "classic" },
+    { id: "cercle", label: "Nyx", expression: "centre", color: "violet", aura: "breathe", theme: "astral-nebula" },
+    { id: "cercle", label: "Ion", expression: "attentif", color: "turquoise", aura: "pulse", theme: "holographic-hud" },
+    { id: "cercle", label: "Vex", expression: "blase", color: "gris", aura: "breathe", theme: "liquid-chrome" },
 ]
+
+/** Selecting a bot applies its complete look: silhouette, mood, colour, aura and theme. */
+export function bloubBotPick(bot: BloubBot): Partial<BloubPick> {
+    return { shape: bot.id, expression: bot.expression, color: bot.color, aura: bot.aura, theme: bot.theme }
+}
 
 export const BLOUB_MOODS: { id: ExpressionId; label: string }[] = [
     { id: "centre", label: "Calm" },
@@ -138,7 +213,13 @@ export function resolveBloubAura(id?: string | null): AuraId {
 }
 
 export function resolveBloubTheme(id?: string | null): BloubThemeId {
-    return id === "retro-lcd" ? "retro-lcd" : "classic"
+    return BLOUB_THEMES.some((item) => item.id === id) ? (id as BloubThemeId) : "classic"
+}
+
+/** The orb renderer each bespoke theme uses; null keeps the Classic blob renderer. */
+export function resolveThemedOrb(id?: string | null): "retro-lcd" | "astral-nebula" | "holographic-hud" | "liquid-chrome" | null {
+    const theme = resolveBloubTheme(id)
+    return theme === "classic" ? null : theme
 }
 
 export function isIncludedBloubShape(shape: ShapeId): boolean {
@@ -157,8 +238,9 @@ export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "c
         aura: resolveBloubAura(pick?.aura),
         theme: resolveBloubTheme(pick?.theme),
     }
-    if (next.theme === "retro-lcd") next.shape = "cercle"
+    if (resolveThemedOrb(next.theme)) next.shape = "cercle"
     if (!premium && isPremiumBloubShape(next.shape)) next.shape = DEFAULT_SHAPE
+    if (!premium && isPremiumBloubTheme(next.theme)) next.theme = "classic"
     return next
 }
 

@@ -7,9 +7,14 @@ import {
     BLOUB_COLORS,
     BLOUB_MOODS,
     BLOUB_THEMES,
+    BLOUB_THEME_META,
     INCLUDED_BLOUB_BOTS,
     PREMIUM_BLOUB_BOTS,
+    bloubBotPick,
+    bloubThemeThumb,
     gradientForColor,
+    isPremiumBloubTheme,
+    resolveBloubTheme,
     type BloubPick,
 } from "@/lib/bloub/catalog"
 import { cn } from "@/lib/utils"
@@ -35,6 +40,7 @@ export function BlobLookStudio({
 }) {
     const colors = gradientForColor(value.color)
     const retro = value.theme === "retro-lcd"
+    const themeMeta = BLOUB_THEME_META[resolveBloubTheme(value.theme)]
 
     if (phase === "preview") {
         return (
@@ -81,29 +87,39 @@ export function BlobLookStudio({
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Theme</p>
                 <div className="grid grid-cols-2 gap-2">
-                    {BLOUB_THEMES.map((item) => (
-                        <button
-                            key={item.id}
-                            type="button"
-                            aria-label={`${item.label} theme`}
-                            aria-pressed={value.theme === item.id}
-                            onClick={() => onChange({ theme: item.id, ...(item.id === "retro-lcd" ? { shape: "cercle" as const } : {}) })}
-                            className={cn("rounded-2xl border p-3 text-left", value.theme === item.id ? "border-white/70 bg-white/[0.08]" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]")}
-                        >
-                            <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: item.id === "retro-lcd" ? "#253021" : "#15202b" }}>
-                                <span className="h-5 w-5 rounded-full" style={{ background: item.id === "retro-lcd" ? "#c4d58a" : "#b2edff" }} />
-                                <span className="h-1.5 w-9 rounded-full" style={{ background: item.id === "retro-lcd" ? "#c4d58a" : "#dbe4ee" }} />
-                            </span>
-                            <span className="block text-[13px] font-medium text-white">{item.label}</span>
-                            <span className="mt-1 block text-xs leading-relaxed text-white/60">{item.description}</span>
-                        </button>
-                    ))}
+                    {BLOUB_THEMES.map((item) => {
+                        const thumb = bloubThemeThumb(item.id, "dark")
+                        const premiumTheme = isPremiumBloubTheme(item.id)
+                        return (
+                            <button
+                                key={item.id}
+                                type="button"
+                                aria-label={`${item.label} theme`}
+                                aria-pressed={value.theme === item.id}
+                                onClick={() => {
+                                    if (premiumTheme) {
+                                        toast.message("This is a premium theme")
+                                        return
+                                    }
+                                    onChange({ theme: item.id, ...(item.id === "retro-lcd" ? { shape: "cercle" as const } : {}) })
+                                }}
+                                className={cn("rounded-2xl border p-3 text-left", value.theme === item.id ? "border-white/70 bg-white/[0.08]" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]")}
+                            >
+                                <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: thumb.bg }}>
+                                    <span className="h-5 w-5 rounded-full" style={{ background: thumb.dot }} />
+                                    <span className="h-1.5 w-9 rounded-full" style={{ background: thumb.bar }} />
+                                </span>
+                                <span className="block text-[13px] font-medium text-white">{item.label}{premiumTheme ? " ✦" : ""}</span>
+                                <span className="mt-1 block text-xs leading-relaxed text-white/60">{item.description}</span>
+                            </button>
+                        )
+                    })}
                 </div>
             </section>
 
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Colour</p>
-                {retro ? <p className="rounded-2xl border border-[#c4d58a]/20 bg-[#253021] p-3 text-sm leading-relaxed text-[#c4d58a]">Pale LCD green and deep olive, automatically inverted in dark mode. Your Classic colour is kept for when you switch back.</p> : (
+                {themeMeta ? <p className={cn("rounded-2xl border p-3 text-sm leading-relaxed", retro ? "border-[#c4d58a]/20 bg-[#253021] text-[#c4d58a]" : "border-white/10 bg-white/[0.05] text-white/70")}>{themeMeta.note}</p> : (
                 <div className="flex flex-wrap gap-2">
                     {BLOUB_COLORS.map((item) => (
                         <button
@@ -177,15 +193,15 @@ export function BlobLookStudio({
                     </button>
                     {INCLUDED_BLOUB_BOTS.map((bot) => (
                         <button
-                            key={bot.id}
+                            key={bot.label}
                             type="button"
-                            onClick={() => onChange({ shape: bot.id, theme: "classic" })}
+                            onClick={() => onChange(bloubBotPick(bot))}
                             className={cn(
                                 "flex flex-col items-center gap-1 rounded-2xl py-2",
-                                !retro && value.shape === bot.id ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
+                                value.shape === bot.id && value.theme === bot.theme ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
                             )}
                             aria-label={bot.label}
-                            aria-pressed={!retro && value.shape === bot.id}
+                            aria-pressed={value.shape === bot.id && value.theme === bot.theme}
                         >
                             <WelcomeOrb
                                 still
@@ -193,7 +209,7 @@ export function BlobLookStudio({
                                 look="bloub"
                                 shape={bot.id}
                                 expression={bot.expression}
-                                color={value.color}
+                                color={bot.color}
                                 aura="still"
                             />
                             <span className="text-[10px]">{bot.label}</span>
@@ -201,7 +217,7 @@ export function BlobLookStudio({
                     ))}
                     {PREMIUM_BLOUB_BOTS.map((bot) => (
                         <button
-                            key={bot.id}
+                            key={bot.label}
                             type="button"
                             onClick={() => toast.message("This is a premium bot")}
                             className="relative flex flex-col items-center gap-1 rounded-2xl bg-white/[0.04] py-2 opacity-60"
@@ -215,6 +231,7 @@ export function BlobLookStudio({
                                 expression={bot.expression}
                                 color={bot.color}
                                 aura="still"
+                                theme={bot.theme}
                             />
                             <span className="text-[10px] text-white/50">{bot.label}</span>
                         </button>
@@ -236,17 +253,20 @@ export function BlobLookStudio({
 function LivePagePreview({ name, look }: { name: string; look: BloubPick }) {
     const colors = gradientForColor(look.color)
     const retro = look.theme === "retro-lcd"
+    const meta = BLOUB_THEME_META[resolveBloubTheme(look.theme)]
+    const canvas = meta?.canvas.dark
+    const ink = retro ? "#c4d58a" : meta ? "#f6f4ee" : undefined
     return (
         <div
             className="overflow-hidden rounded-[1.8rem] border border-white/10"
             data-bot-theme={look.theme}
             data-lcd-mode="dark"
-            style={{ background: retro ? "#253021" : `radial-gradient(circle at 50% 28%, ${colors[0]}22, #09090b 62%)` }}
+            style={{ background: canvas ?? `radial-gradient(circle at 50% 28%, ${colors[0]}22, #09090b 62%)` }}
         >
-            <p className={cn("px-5 pt-4 text-[11px] uppercase tracking-[0.18em]", retro ? "text-[#c4d58a]/70" : "text-white/35")}>Live page</p>
+            <p className={cn("px-5 pt-4 text-[11px] uppercase tracking-[0.18em]", ink ? "opacity-70" : "text-white/35")} style={ink ? { color: ink } : undefined}>Live page</p>
             <div className="flex min-h-[22rem] flex-col items-center justify-center px-6 pb-8 pt-6 text-center">
-                <p className={cn("text-sm", retro ? "text-[#c4d58a]/75" : "text-white/55")}>Hi!</p>
-                <h3 className={cn("mt-2 text-2xl font-medium tracking-tight", retro ? "text-[#c4d58a]" : "text-white")}>{name}&apos;s AI</h3>
+                <p className={cn("text-sm", ink ? "opacity-75" : "text-white/55")} style={ink ? { color: ink } : undefined}>Hi!</p>
+                <h3 className={cn("mt-2 text-2xl font-medium tracking-tight", !ink && "text-white")} style={ink ? { color: ink } : undefined}>{name}&apos;s AI</h3>
                 <div className="mt-8">
                     <WelcomeOrb
                         size={168}
@@ -260,7 +280,7 @@ function LivePagePreview({ name, look }: { name: string; look: BloubPick }) {
                         mood="greeting"
                     />
                 </div>
-                <p className={cn("mt-8 rounded-full px-4 py-2 text-[13px]", retro ? "border border-[#c4d58a]/30 bg-[#c4d58a]/10 text-[#c4d58a]" : "bg-white/10 text-white/70")}>What should I know about {name}?</p>
+                <p className={cn("mt-8 rounded-full px-4 py-2 text-[13px]", ink ? "border bg-white/5" : "bg-white/10 text-white/70")} style={ink ? { color: ink, borderColor: `${ink}55` } : undefined}>What should I know about {name}?</p>
             </div>
         </div>
     )

@@ -1,0 +1,197 @@
+.pt-orb {
+  display: block;
+  flex: none;
+  isolation: isolate;
+}
+
+.pl-orb-scene.is-premium {
+  overflow: visible;
+}
+
+.pt-orb-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 140ms ease;
+}
+
+/* Shared moods ------------------------------------------------------------ */
+
+.pt-orb[data-still="false"] .pt-orb-character {
+  animation: pt-idle 3.6s ease-in-out infinite;
+}
+
+.pt-orb[data-still="false"][data-mood="greeting"] .pt-orb-character {
+  animation: pt-greeting 1.2s ease-out 1;
+}
+
+.pt-orb[data-still="false"][data-mood="listening"] .pt-orb-character {
+  animation: pt-listening 2s ease-in-out infinite;
+}
+
+.pt-orb[data-still="false"][data-mood="thinking"] .pt-orb-eyes {
+  animation: pt-thinking 2.4s ease-in-out infinite;
+}
+
+.pt-orb[data-still="false"][data-mood="speaking"] .pt-orb-eyes {
+  animation: pt-speaking 0.9s ease-in-out infinite;
+}
+
+.pt-orb[data-still="false"][data-mood="success"] .pt-orb-character,
+.pt-orb[data-still="false"][data-mood="react"] .pt-orb-character {
+  animation: pt-celebrate 0.8s ease-out 1;
+}
+
+.pt-orb[data-still="false"][data-mood="error"] .pt-orb-character {
+  animation: pt-error 0.65s ease-in-out 1;
+}
+
+@keyframes pt-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes pt-greeting {
+  0%, 60%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-8px); }
+  75% { transform: translateY(-3px); }
+}
+
+@keyframes pt-listening {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+}
+
+@keyframes pt-thinking {
+  0%, 100% { transform: translate(0, 0); }
+  30% { transform: translate(-5px, -3px); }
+  70% { transform: translate(5px, -3px); }
+}
+
+@keyframes pt-speaking {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.86); }
+}
+
+/* pt-speaking animates the gaze group; keep the blink override intact by
+   scoping the keyframe to the eyes container, which only carries gaze. */
+
+@keyframes pt-celebrate {
+  0%, 60%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-7px) scale(1.04); }
+}
+
+@keyframes pt-error {
+  0%, 50%, 100% { transform: translateX(0); }
+  20%, 70% { transform: translateX(-4px); }
+  35%, 85% { transform: translateX(4px); }
+}
+
+/* Aura -------------------------------------------------------------------- */
+
+.pt-orb[data-still="false"][data-aura="breathe"] .pt-orb-body {
+  animation: pt-breathe 4.6s ease-in-out infinite;
+}
+
+.pt-orb[data-still="false"][data-aura="pulse"] .pt-orb-body {
+  animation: pt-breathe 2.9s ease-in-out infinite;
+}
+
+@keyframes pt-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.94; transform: scale(1.015); }
+}
+
+.pt-orb-body,
+.pt-orb-character,
+.pt-orb-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Astral Nebula ----------------------------------------------------------- */
+
+.pt-orb--astral-nebula[data-still="false"] .pt-nebula-orbit {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: pt-orbit 14s linear infinite;
+}
+
+.pt-orb--astral-nebula[data-still="false"][data-mood="listening"] .pt-nebula-orbit {
+  animation-duration: 8s;
+}
+
+@keyframes pt-orbit {
+  to { transform: rotate(360deg); }
+}
+
+.pt-orb--astral-nebula[data-still="false"] .pt-orb-eye {
+  animation: pt-twinkle 3.4s ease-in-out infinite;
+}
+
+.pt-orb--astral-nebula[data-still="false"] .pt-orb-eye:nth-child(2) {
+  animation-delay: 1.7s;
+}
+
+@keyframes pt-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+/* Holographic HUD --------------------------------------------------------- */
+
+.pt-orb--holographic-hud[data-still="false"] .pt-hud-rings {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: pt-hud-spin 26s linear infinite;
+}
+
+@keyframes pt-hud-spin {
+  to { transform: rotate(360deg); }
+}
+
+.pt-orb--holographic-hud[data-still="false"] .pt-hud-scan {
+  animation: pt-hud-scan 3.8s ease-in-out infinite;
+}
+
+@keyframes pt-hud-scan {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(126px); }
+}
+
+.pt-orb--holographic-hud .pt-hud-readout {
+  animation: pt-hud-readout-blink 6s step-end infinite;
+}
+
+@keyframes pt-hud-readout-blink {
+  0%, 92%, 100% { opacity: 0.7; }
+  94% { opacity: 0.15; }
+}
+
+/* Liquid Chrome ----------------------------------------------------------- */
+
+.pt-orb--liquid-chrome[data-still="false"] .pt-chrome-iris {
+  animation: pt-chrome-sheen 6s ease-in-out infinite;
+}
+
+@keyframes pt-chrome-sheen {
+  0%, 100% { opacity: 0.42; }
+  50% { opacity: 0.68; }
+}
+
+.pt-orb--liquid-chrome[data-still="false"] .pt-chrome-ring--inner {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: pt-hud-spin 34s linear infinite reverse;
+}
+
+/* Small decorative orbs stay calm ----------------------------------------- */
+
+.is-compact .pt-orb :is(.pt-nebula-orbit, .pt-hud-rings, .pt-hud-scan, .pt-chrome-ring, .pt-hud-readout) {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pt-orb :is(.pt-orb-character, .pt-orb-eyes, .pt-orb-body, .pt-nebula-orbit, .pt-hud-rings, .pt-hud-scan, .pt-chrome-iris, .pt-chrome-ring--inner, .pt-orb-eye, .pt-hud-readout) {
+    animation: none !important;
+  }
+}
