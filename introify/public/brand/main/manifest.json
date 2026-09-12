@@ -1,17 +1,17 @@
 {
-  "option": 11,
+  "option": 13,
   "status": "locked",
-  "sourceHash": "30a12450ffd1435799dd51cb1966d4c7b54f6b46db8d78ca2827c7bcecce6151",
-  "duration": 2.7,
-  "restFrame": 45,
+  "sourceHash": "35036c6963bc3da9a699f9b5e3bf177e32d520fda3ce4e4b60db903c469d63eb",
+  "duration": 1.6975929931120852,
+  "restFrame": 120,
   "files": {
-    "introify-logo-light-once.svg": "492e66080fb28ea2bba22483c640739957628392b305a030291781f403a1cfa4",
-    "introify-logo-light-still.svg": "5d69241e206b149ed392203f3403fb17020216f92d2b395cd8d6a30555a37ba0",
-    "introify-logo-dark-once.svg": "7e8d87b6dce4f4a5fac629d447f9640c2cd80e08fb2fa7643625cfc28542bb32",
-    "introify-logo-dark-still.svg": "30fe1d720734b73403845b01143ca3b443612e78cf2123695af7569e6d563b6d",
-    "introify-symbol-light-once.svg": "0489a23108356cabd0b3d20fc7a61c4e7ccfa61a9e2a9b427acbcd53b8a679c5",
-    "introify-symbol-light-still.svg": "cbba861fd1c71c1a4cd6091efaff571382e372cc5584ed1614c4a1c8bd8b90d9",
-    "introify-symbol-dark-once.svg": "23e589115b36c102e9ddca19e4d0a2e973b409fe4dcfbb8a8f01a184095c6b8a",
-    "introify-symbol-dark-still.svg": "2df903749deed999b11566f82e50aab0c7d51bdad1bfbfdfa58bcac2a88f4ba9"
+    "introify-logo-light-once.svg": "e64ebb448e760d5a8538dee7f76fc54c1d2f0edccd0def00d64a80192d87e4e8",
+    "introify-logo-light-still.svg": "3482305d33ceab705023b656c888f4b5969d29cc401e576ba6adb48e0d1b1a35",
+    "introify-logo-dark-once.svg": "f92d42bf148d9489e4e018a495e4c99e0cdf3ba120f82998ee3eb50b9f60acac",
+    "introify-logo-dark-still.svg": "36b6cc2d4d3de80558e90fd726f15e7813293f2c8e9452d4c8ec155ffada2266",
+    "introify-symbol-light-once.svg": "87485b8410526d755eec029e0a63a237348486515685d119d4b400993b6caa12",
+    "introify-symbol-light-still.svg": "c73422ed9df33a4c665fbe25fa71c0ef539cbf85b3d8dd26050f7d1551337fc9",
+    "introify-symbol-dark-once.svg": "e78de0ca9dfc4829abacdadbc640380642dbc6284550d5900d6b46a1873de8f6",
+    "introify-symbol-dark-still.svg": "d63b3ae5e2ed91946cb59424cccdadb6c5f07fc3c9c978a6e7df4cf1c954d885"
   }
 }

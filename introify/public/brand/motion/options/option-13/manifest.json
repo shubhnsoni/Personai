@@ -1,0 +1,20 @@
+{
+  "option": 13,
+  "status": "locked",
+  "name": "Saved motion",
+  "sourceKey": "finalize:a550f90f-0a9b-4469-ab73-7566695073a7",
+  "sourceHash": "35036c6963bc3da9a699f9b5e3bf177e32d520fda3ce4e4b60db903c469d63eb",
+  "sourceTakeId": null,
+  "lockedAt": "2026-09-12T17:39:51.956Z",
+  "duration": 1.6975929931120852,
+  "keyframes": 0,
+  "files": {
+    "settings.json": "ff008e28e2ea815cd6a71a606c888c681f61e5ce2a8efdf9b6f98d4cff6405e6",
+    "motion-data.json": "e3a432f13373fbc80be19f949453ca279461e8b6b2c0f00cb418fb2493a27030",
+    "introify-logo-light.svg": "3c7a550cd6911374bd35e1aa89dbc0e791be5feb2e6b95ee0e41e6de6d929b48",
+    "introify-logo-dark.svg": "8935ad7354251c97dd963cca1271414626cf3b42662ab409de7f6e4af60bb3c5",
+    "introify-symbol-light.svg": "5c6d321bbe6ec163aa2d623d7b94646fade3167a67f36626670fd2d90698b79a",
+    "introify-symbol-dark.svg": "7f721807afbae3fd5f035fb7f54f3c62a6bb8a2d9ad47a70320c71f7a80f7fb7",
+    "index.html": "99a2f4d87ac8aad459348235b3b7d0cbf9e632ace169d6a469ef28fe854cd096"
+  }
+}

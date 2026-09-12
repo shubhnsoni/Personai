@@ -1,6 +1,7 @@
 import { act, fireEvent, render } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { SelectedBrand } from "@/components/brand/selected-brand"
+import selection from "@/components/brand/selected-option.json"
 
 let intersect: (entries: Partial<IntersectionObserverEntry>[]) => void
 let reduced = false
@@ -34,16 +35,16 @@ describe("approved site logo playback", () => {
     it("waits for the footer to enter, plays one loop, rests, and replays only after reentry", async () => {
         const { container } = render(<SelectedBrand />)
         const logo = container.querySelector("svg")!
-        expect(logo.getAttribute("data-brand-option")).toBe("11")
+        expect(logo.getAttribute("data-brand-option")).toBe("13")
         expect(logo.getAttribute("data-brand-playing")).toBe("false")
         expect(fetch).not.toHaveBeenCalled()
         enter(true)
         await settle()
         expect(logo.getAttribute("data-brand-playing")).toBe("true")
         fireEvent.load(container.querySelector('image[href^="blob:"]')!)
-        act(() => vi.advanceTimersByTime(2699))
+        act(() => vi.advanceTimersByTime(Math.floor(selection.duration * 1000) - 1))
         expect(logo.getAttribute("data-brand-playing")).toBe("true")
-        act(() => vi.advanceTimersByTime(1))
+        act(() => vi.advanceTimersByTime(2))
         expect(logo.getAttribute("data-brand-playing")).toBe("false")
         enter(true)
         await settle()

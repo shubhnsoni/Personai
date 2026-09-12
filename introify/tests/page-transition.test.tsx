@@ -35,6 +35,10 @@ vi.mock("next/link", () => {
 import { PageTransitionProvider } from "@/components/navigation/page-transition"
 import TransitionLink from "@/components/navigation/transition-link"
 import { BrandLoading } from "@/components/navigation/brand-loading"
+import RootLoading from "@/app/loading"
+import DashboardLoading from "@/app/dashboard/loading"
+import AdminLoading from "@/app/admin/loading"
+import { AuthLoading } from "@/components/auth/auth-loading"
 
 type LinkProps = ComponentProps<typeof TransitionLink>
 const animate = vi.fn()
@@ -306,5 +310,11 @@ describe("inter-page transition lifecycle", () => {
         expect(status.querySelector(".brand-loading-track, .page-transit-progress")).toBeNull()
         expect(status.querySelector(".brand-loading-circle-progress")).not.toBeNull()
         expect(status.querySelector('image[href="/brand/main/loading-light.svg"]')).not.toBeNull()
+    })
+    it.each([RootLoading, DashboardLoading, AdminLoading, AuthLoading])("uses the same viewport loader size across page boundaries: %s", Loading => {
+        const { container } = render(<Loading />)
+        expect(container.querySelector('.brand-loading--page')).not.toBeNull()
+        expect(container.querySelector('.brand-loading-visual--compact')).toBeNull()
+        expect(container.querySelector('[data-loading-option="10"]')).not.toBeNull()
     })
 })

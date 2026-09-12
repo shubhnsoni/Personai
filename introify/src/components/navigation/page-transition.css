@@ -20,12 +20,13 @@
   gap: 16px;
   padding: 32px 20px;
 }
-.brand-loading--page { min-height: 100dvh; background: var(--transit-surface); }
+.brand-loading--page { position: fixed; inset: 0; z-index: 90; min-height: 0; display: grid; place-items: center; padding: 0; gap: 0; pointer-events: none; background: var(--transit-surface); }
+.brand-loading--page .brand-loading-label { position: absolute; top: calc(50% + 88px); left: 20px; right: 20px; }
 .brand-loading--compact { min-height: 140px; padding: 24px 12px; }
 .brand-loading-label { font-size: 12px; line-height: 1.5; opacity: .7; text-align: center; }
 .brand-loading-visual { position: relative; display: grid; place-items: center; width: 144px; height: 144px; }
 .brand-loading-visual--compact { width: 88px; height: 88px; }
-.brand-loading-circle { position: absolute; inset: 15%; width: 70%; height: 70%; stroke-width: 1; }
+.brand-loading-circle { position: absolute; inset: 8%; width: 84%; height: 84%; stroke-width: 1; }
 .brand-loading-circle-track { stroke: var(--transit-line); opacity: .65; }
 .brand-loading-circle-progress { stroke: var(--transit-accent); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; transform: rotate(-90deg); transform-origin: center; animation: introify-loading-fill 7s ease-out forwards; transition: stroke-dashoffset 120ms ease-out; }
 .brand-loading-visual[data-complete="true"] .brand-loading-circle-progress { stroke-dashoffset: 0; animation: none; }
@@ -34,6 +35,7 @@
 .page-transit { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; pointer-events: none; background: color-mix(in srgb, var(--transit-surface) 94%, transparent); }
 .page-transit[data-phase="leaving"] { animation: introify-loading-exit 120ms ease-out both; }
 body:has(.page-transit) .brand-loading > .brand-loading-visual { visibility: hidden; }
+body:has(.page-transit) .brand-loading--page { visibility: hidden; }
 @keyframes introify-loading-fill { 0% { stroke-dashoffset: 100; } 25% { stroke-dashoffset: 50; } 65% { stroke-dashoffset: 20; } 100% { stroke-dashoffset: 10; } }
 @keyframes introify-loading-exit { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {

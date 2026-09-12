@@ -11,7 +11,7 @@ import { BrandLoading } from "@/components/navigation/brand-loading"
 export default function BusinessOsLoading() {
     return (
         <div className="flex-1 space-y-6" aria-busy="true" aria-label="Loading Business OS">
-            <BrandLoading label="Loading Business OS" compact />
+            <BrandLoading label="Loading Business OS" fullPage />
             <PageHeader
                 title="Business OS"
                 description="Versioned blueprints composed from the shared operating engines."

@@ -15,7 +15,7 @@ function animationSource(path: string) {
     return animationCache.get(path)!
 }
 
-/** Option 11: one complete performance per viewport entry, then a visible rest pose. */
+/** Approved option: one complete performance per viewport entry, then its final pose. */
 export function SelectedBrand({ className, decorative = false, animated = true, symbol = false }: {
     className?: string; decorative?: boolean; animated?: boolean; symbol?: boolean
 }) {

@@ -1,4 +1,4 @@
-"""Promote the verified, immutable Option 11 into site playback assets."""
+"""Promote the verified, immutable Option 13 into site playback assets."""
 from pathlib import Path
 import hashlib
 import json
@@ -6,10 +6,10 @@ import re
 import xml.etree.ElementTree as ET
 
 app = Path(__file__).resolve().parents[2]
-source = app / 'public/brand/motion/options/option-11'
+source = app / 'public/brand/motion/options/option-13'
 target = app / 'public/brand/main'
 manifest = json.loads((source / 'manifest.json').read_text())
-assert manifest['option'] == 11 and manifest['status'] == 'locked'
+assert manifest['option'] == 13 and manifest['status'] == 'locked'
 for name, digest in manifest['files'].items():
     assert hashlib.sha256((source / name).read_bytes()).hexdigest() == digest, name
 target.mkdir(exist_ok=True)
@@ -32,7 +32,8 @@ for kind in ['logo', 'symbol']:
                             child.set('repeatCount', '1')
                             child.set('fill', 'freeze')
                         else:
-                            value = child.get('values').split(';')[45]
+                            # The selected clip ends on the completed logo.
+                            value = child.get('values').split(';')[-1]
                             if child.tag == tag('animateTransform'):
                                 value = f"{child.get('type')}({value})"
                             parent.set(child.get('attributeName'), value)
@@ -41,15 +42,15 @@ for kind in ['logo', 'symbol']:
             content = ET.tostring(root, encoding='unicode')
             (target / name).write_text(content, encoding='utf-8')
             files[name] = hashlib.sha256(content.encode()).hexdigest()
-selection = {'option': 11, 'status': 'locked', 'sourceHash': manifest['sourceHash'],
-             'duration': manifest['duration'], 'restFrame': 45, 'files': files}
+selection = {'option': 13, 'status': 'locked', 'sourceHash': manifest['sourceHash'],
+             'duration': manifest['duration'], 'restFrame': 120, 'files': files}
 (target / 'manifest.json').write_text(json.dumps(selection, indent=2)+'\n')
 (app / 'src/components/brand/selected-option.json').write_text(json.dumps({
-    'option': 11, 'duration': manifest['duration'], 'sourceHash': manifest['sourceHash']
+    'option': 13, 'duration': manifest['duration'], 'sourceHash': manifest['sourceHash']
 }, indent=2)+'\n')
-print('Verified and promoted Option 11; original saved files unchanged.')
+print('Verified and promoted Option 13; original saved files unchanged.')
 
-# The transition uses the separately approved gentle Option 10, never Option 11.
+# The transition retains the separately approved gentle Option 10.
 loading_source = app / 'public/brand/motion/options/option-10'
 loading = json.loads((loading_source / 'manifest.json').read_text())
 assert loading['option'] == 10 and loading['status'] == 'locked'
