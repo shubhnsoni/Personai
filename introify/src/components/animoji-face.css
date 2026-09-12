@@ -16,49 +16,50 @@
 }
 
 .animoji-eyes,
-.animoji-mouth {
+.animoji-mouth,
+.animoji-heart,
+.animoji-tear,
+.animoji-steam,
+.animoji-spark,
+.animoji-zzz,
+.animoji-brows {
   transform-box: fill-box;
   transform-origin: center;
 }
 
-.animoji-face[data-still="false"][data-animoji="bounce"] .animoji-character {
-  animation: animoji-bounce 1.55s cubic-bezier(0.45, 0.08, 0.22, 1) infinite;
+.animoji-face[data-still="false"][data-animoji="bounce"] .animoji-character { animation: animoji-bounce 1.55s cubic-bezier(0.45, 0.08, 0.22, 1) infinite; }
+.animoji-face[data-still="false"][data-animoji="sun"] .animoji-character { transform-origin: 50% 50%; animation: animoji-sun 2.4s cubic-bezier(0.45, 0.08, 0.22, 1) infinite; }
+.animoji-face[data-still="false"][data-animoji="et"] .animoji-character { transform-origin: 50% 70%; animation: animoji-et 2.6s cubic-bezier(0.45, 0.08, 0.22, 1) infinite; }
+.animoji-face[data-still="false"][data-animoji="love"] .animoji-character { animation: animoji-love 1.8s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="laugh"] .animoji-character { animation: animoji-laugh 0.9s cubic-bezier(0.45, 0.08, 0.22, 1) infinite; }
+.animoji-face[data-still="false"][data-animoji="wow"] .animoji-character { transform-origin: 50% 50%; animation: animoji-wow 1.4s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="sleepy"] .animoji-character { animation: animoji-sleepy 3.2s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="ghost"] .animoji-character { transform-origin: 50% 60%; animation: animoji-ghost 2.8s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="cloud"] .animoji-character { transform-origin: 50% 50%; animation: animoji-cloud 3.4s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="coffee"] .animoji-character { animation: animoji-coffee 2s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="cry"] .animoji-character { animation: animoji-cry 2.2s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="money"] .animoji-character { animation: animoji-money 1.6s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="angry"] .animoji-character { animation: animoji-angry 0.85s ease-in-out infinite; }
+
+.animoji-face[data-still="false"][data-animoji="love"] .animoji-heart { animation: animoji-pulse 1.1s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="coffee"] .animoji-steam { animation: animoji-steam 1.4s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="coffee"] .animoji-steam + .animoji-steam { animation-delay: 0.2s; }
+.animoji-face[data-still="false"][data-animoji="coffee"] .animoji-steam + .animoji-steam + .animoji-steam { animation-delay: 0.4s; }
+.animoji-face[data-still="false"][data-animoji="cry"] .animoji-tear { animation: animoji-drip 1.3s ease-in infinite; }
+.animoji-face[data-still="false"][data-animoji="sleepy"] .animoji-zzz { animation: animoji-float-z 2.4s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="money"] .animoji-spark { animation: animoji-twinkle 1s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-animoji="bounce"] .animoji-eyes,
+.animoji-face[data-still="false"][data-animoji="wow"] .animoji-eyes {
+  animation: animoji-blink 4.6s ease-in-out infinite;
 }
 
-.animoji-face[data-still="false"][data-animoji="sun"] .animoji-character {
-  transform-origin: 50% 50%;
-  animation: animoji-sun 2.4s cubic-bezier(0.45, 0.08, 0.22, 1) infinite;
-}
-
-.animoji-face[data-still="false"][data-animoji="et"] .animoji-character {
-  transform-origin: 50% 70%;
-  animation: animoji-et 2.6s cubic-bezier(0.45, 0.08, 0.22, 1) infinite;
-}
-
-.animoji-face[data-still="false"][data-mood="greeting"] .animoji-character {
-  animation-duration: 0.95s;
-}
-
-.animoji-face[data-still="false"][data-mood="listening"] .animoji-eyes {
-  animation: animoji-listen 1.8s ease-in-out infinite;
-}
-
-.animoji-face[data-still="false"][data-mood="thinking"] .animoji-eyes {
-  animation: animoji-think 2.2s ease-in-out infinite;
-}
-
-.animoji-face[data-still="false"][data-mood="speaking"] .animoji-mouth {
-  animation: animoji-speak 0.7s ease-in-out infinite;
-}
-
+.animoji-face[data-still="false"][data-mood="greeting"] .animoji-character { animation-duration: 0.85s; }
+.animoji-face[data-still="false"][data-mood="listening"] .animoji-eyes { animation: animoji-listen 1.8s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-mood="thinking"] .animoji-eyes { animation: animoji-think 2.2s ease-in-out infinite; }
+.animoji-face[data-still="false"][data-mood="speaking"] .animoji-mouth { animation: animoji-speak 0.7s ease-in-out infinite; }
 .animoji-face[data-still="false"][data-mood="success"] .animoji-character,
-.animoji-face[data-still="false"][data-mood="react"] .animoji-character {
-  animation-duration: 0.7s;
-}
-
-.animoji-face[data-still="false"][data-mood="error"] .animoji-character {
-  animation: animoji-error 0.65s ease-in-out 1;
-}
+.animoji-face[data-still="false"][data-mood="react"] .animoji-character { animation-duration: 0.7s; }
+.animoji-face[data-still="false"][data-mood="error"] .animoji-character { animation: animoji-error 0.65s ease-in-out 1; }
 
 @keyframes animoji-bounce {
   0%, 100% { transform: translateY(0) scale(1, 1); }
@@ -67,33 +68,96 @@
   62% { transform: translateY(5%) scale(1.08, 0.9); }
   78% { transform: translateY(-4%) scale(0.97, 1.05); }
 }
-
 @keyframes animoji-sun {
   0%, 100% { transform: rotate(0deg) scale(1); }
   50% { transform: rotate(8deg) scale(1.05); }
 }
-
 @keyframes animoji-et {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(-6%) rotate(2.5deg); }
 }
-
+@keyframes animoji-love {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5%) scale(1.06); }
+}
+@keyframes animoji-laugh {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-8%) rotate(-4deg); }
+  55% { transform: translateY(3%) rotate(3deg); }
+}
+@keyframes animoji-wow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+@keyframes animoji-sleepy {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(4%) rotate(-4deg); }
+}
+@keyframes animoji-ghost {
+  0%, 100% { transform: translate(0, 0) rotate(-2deg); }
+  50% { transform: translate(3%, -7%) rotate(3deg); }
+}
+@keyframes animoji-cloud {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(4%); }
+}
+@keyframes animoji-coffee {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-3%) rotate(3deg); }
+}
+@keyframes animoji-cry {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(3%); }
+  70% { transform: translateY(-2%); }
+}
+@keyframes animoji-money {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-6%) scale(1.04); }
+  60% { transform: translateY(2%) scale(0.98); }
+}
+@keyframes animoji-angry {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(-2%) rotate(-3deg); }
+  60% { transform: translateX(2%) rotate(3deg); }
+}
+@keyframes animoji-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+@keyframes animoji-steam {
+  0%, 100% { transform: translateY(0); opacity: 0.35; }
+  50% { transform: translateY(-4px); opacity: 0.9; }
+}
+@keyframes animoji-drip {
+  0% { transform: translateY(0); opacity: 0.2; }
+  70% { transform: translateY(6px); opacity: 1; }
+  100% { transform: translateY(10px); opacity: 0; }
+}
+@keyframes animoji-float-z {
+  0%, 100% { transform: translate(0, 0); opacity: 0.25; }
+  50% { transform: translate(3px, -6px); opacity: 0.7; }
+}
+@keyframes animoji-twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+@keyframes animoji-blink {
+  0%, 88%, 100% { transform: scaleY(1); }
+  92%, 96% { transform: scaleY(0.08); }
+}
 @keyframes animoji-listen {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(1.5px); }
 }
-
 @keyframes animoji-think {
   0%, 100% { transform: translate(0, 0); }
   25% { transform: translate(-2px, -1.5px); }
   75% { transform: translate(2px, -1.5px); }
 }
-
 @keyframes animoji-speak {
   0%, 100% { transform: scaleY(1); }
   50% { transform: scaleY(0.72); }
 }
-
 @keyframes animoji-error {
   0%, 50%, 100% { transform: translateX(0); }
   20%, 70% { transform: translateX(-2px); }
@@ -101,7 +165,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animoji-face :is(.animoji-character, .animoji-eyes, .animoji-mouth) {
+  .animoji-face :is(.animoji-character, .animoji-eyes, .animoji-mouth, .animoji-heart, .animoji-tear, .animoji-steam, .animoji-spark, .animoji-zzz) {
     animation: none !important;
   }
 }

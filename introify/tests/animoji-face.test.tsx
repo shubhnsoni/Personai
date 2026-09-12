@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest"
 import { render } from "@testing-library/react"
 import { installMatchMedia } from "./helpers/match-media"
 import { AnimojiFace } from "@/components/animoji-face"
+import { ANIMOJI_IDS } from "@/lib/animoji"
 
 describe("coded animoji faces", () => {
     it("draws one svg character per face, like LCD, never a smear strip", () => {
         installMatchMedia()
-        for (const id of ["bounce", "sun", "et"] as const) {
+        expect(ANIMOJI_IDS).toHaveLength(13)
+        for (const id of ANIMOJI_IDS) {
             const { container, unmount } = render(<AnimojiFace id={id} size={64} />)
             expect(container.querySelector("svg")).toBeTruthy()
             expect(container.querySelector("img")).toBeNull()

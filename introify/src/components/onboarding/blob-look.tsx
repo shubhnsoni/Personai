@@ -158,7 +158,7 @@ export function BlobLookStudio({
             {usesAnimojiFaces(value) ? (
                 <section className="space-y-3">
                     <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Face</p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                         {ANIMOJI_FACES.map((item) => {
                             const selected = resolveAnimojiId(value.skin) === item.id
                             return (

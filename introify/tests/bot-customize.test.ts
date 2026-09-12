@@ -55,14 +55,17 @@ describe("blob gaze while typing", () => {
 })
 
 describe("animoji bot", () => {
-    it("ships three coded faces and keeps the chosen face through chat mood", () => {
+    it("ships thirteen coded faces and keeps the chosen face through chat mood", () => {
         const animoji = CUSTOMIZER_BOTS.find((bot) => bot.id === "animoji")!
         expect(customizerBotPick(animoji, DEFAULT_BLOUB_PICK)).toMatchObject({ look: "animoji", skin: "bounce" })
         expect(usesAnimojiFaces({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "sun" })).toBe(true)
-        expect(ANIMOJI_FACES.map((item) => item.id)).toEqual(["bounce", "sun", "et"])
-        expect(resolveAnimojiId("laugh")).toBe("bounce")
-        expect(resolveAnimojiId("wow")).toBe("bounce")
-        expect(clampOrbForPlan({ look: "animoji", skin: "wow" }, false)).toMatchObject({ look: "animoji", skin: "bounce" })
+        expect(ANIMOJI_FACES.map((item) => item.id)).toEqual([
+            "bounce", "sun", "et", "love", "laugh", "wow", "sleepy", "ghost", "cloud", "coffee", "cry", "money", "angry",
+        ])
+        expect(resolveAnimojiId("laugh")).toBe("laugh")
+        expect(resolveAnimojiId("wow")).toBe("wow")
+        expect(resolveAnimojiId("pacman")).toBe("bounce")
+        expect(clampOrbForPlan({ look: "animoji", skin: "wow" }, false)).toMatchObject({ look: "animoji", skin: "wow" })
         expect(clampOrbForPlan({ look: "animoji", skin: "et" }, false)).toMatchObject({ look: "animoji", skin: "et" })
         expect(animojiClipForMood("sun", "idle")).toBe("sun")
         expect(animojiClipForMood("sun", "thinking")).toBe("sun")
