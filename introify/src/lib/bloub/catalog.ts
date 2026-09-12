@@ -130,7 +130,8 @@ export const BLOUB_THEMES: { id: BloubThemeId; label: string; description: strin
     { id: "liquid-chrome", label: "Liquid Chrome", description: "" },
 ]
 
-export const PREMIUM_BLOUB_THEMES: readonly BloubThemeId[] = ["astral-nebula", "holographic-hud", "liquid-chrome"]
+/** Free plans keep Classic and Retro LCD; every bespoke world is part of Premium. */
+export const PREMIUM_BLOUB_THEMES: readonly BloubThemeId[] = BLOUB_THEMES.map((item) => item.id).filter((id) => id !== "classic" && id !== "retro-lcd")
 
 export function isPremiumBloubTheme(theme?: BloubThemeId | string | null): boolean {
     return PREMIUM_BLOUB_THEMES.includes(theme as BloubThemeId)
@@ -164,19 +165,19 @@ export const BLOUB_THEME_META: Partial<Record<BloubThemeId, BloubThemeMeta>> = {
     },
     "planet-azure": {
         canvas: { light: "#edf5fb", dark: "#07111f" },
-        thumb: { bg: "#07111f", dot: "#88c8f3", bar: "#88c8f3" },
+        thumb: { bg: "#07111f", dot: "#88c8f3", bar: "#4f8fc9" },
         thumbLight: { bg: "#edf5fb", dot: "#2563a6", bar: "#172f4c" },
         note: "Cloud blue and soft silver, with a matching light and dark canvas.",
     },
     "planet-rose": {
         canvas: { light: "#fbf0f3", dark: "#1a0d17" },
-        thumb: { bg: "#1a0d17", dot: "#f0a4c8", bar: "#f0a4c8" },
+        thumb: { bg: "#1a0d17", dot: "#f0a4c8", bar: "#b86f97" },
         thumbLight: { bg: "#fbf0f3", dot: "#a8406b", bar: "#4a2639" },
         note: "Rose pink and soft pearl, with a matching light and dark canvas.",
     },
     "planet-sage": {
         canvas: { light: "#edf6ef", dark: "#081710" },
-        thumb: { bg: "#081710", dot: "#9ed2ac", bar: "#9ed2ac" },
+        thumb: { bg: "#081710", dot: "#9ed2ac", bar: "#5f9a74" },
         thumbLight: { bg: "#edf6ef", dot: "#35734e", bar: "#203e2b" },
         note: "Sage green and soft mint, with a matching light and dark canvas.",
     },
@@ -433,15 +434,15 @@ export type BloubBot = {
 
 export const INCLUDED_BLOUB_BOTS: BloubBot[] = [
     { id: "cercle", label: "LCD", expression: "centre", color: "vert", aura: "still", theme: "retro-lcd" },
+]
+
+export const PREMIUM_BLOUB_BOTS: BloubBot[] = [
     { id: "cercle", label: "Azure", expression: "centre", color: "bleu", aura: "breathe", theme: "planet-azure", themes: PLANET_THEMES },
     { id: "cercle", label: "Nova", expression: "centre", color: "violet", aura: "breathe", theme: "cosmic-space", themes: COSMIC_THEMES },
     { id: "cercle", label: "Telly", expression: "heureux", color: "vert", aura: "still", theme: "retro-tv" },
     { id: "cercle", label: "Aurum", expression: "centre", color: "ambre", aura: "breathe", theme: "solid-gold" },
     { id: "cercle", label: "Doodle", expression: "centre", color: "gris", aura: "still", theme: "pencil-sketch" },
     { id: "cercle", label: "Pearl", expression: "heureux", color: "bleu", aura: "breathe", theme: "glass-bubble" },
-]
-
-export const PREMIUM_BLOUB_BOTS: BloubBot[] = [
     { id: "cercle", label: "Nyx", expression: "centre", color: "violet", aura: "breathe", theme: "astral-nebula" },
     { id: "cercle", label: "Ion", expression: "heureux", color: "turquoise", aura: "pulse", theme: "holographic-hud" },
     { id: "cercle", label: "Vex", expression: "blase", color: "gris", aura: "breathe", theme: "liquid-chrome" },

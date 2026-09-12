@@ -13,7 +13,7 @@ import { validateAiSettings } from "@/lib/ai-settings"
 import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
 
 describe("Nova and its Space and Comic themes", () => {
-    const nova = INCLUDED_BLOUB_BOTS.find((bot) => bot.label === "Nova")!
+    const nova = PREMIUM_BLOUB_BOTS.find((bot) => bot.label === "Nova")!
 
     it("has one selectable bot with two owned themes and keeps other bots separate", () => {
         expect(nova).toBeDefined()
@@ -23,7 +23,7 @@ describe("Nova and its Space and Comic themes", () => {
             expect(bots.filter((bot) => isNamedBloubBotSelected(bot, pick))).toEqual([nova])
             expect(lookThemesFor(pick).map((item) => item.label)).toEqual(["Space", "Comic"])
             expect(resolveThemedOrb(theme)).toBe(theme)
-            expect(isPremiumBloubTheme(theme)).toBe(false)
+            expect(isPremiumBloubTheme(theme)).toBe(true)
             expect(bloubBotPick(nova, pick).theme).toBe(theme)
         }
         expect(bloubBotPick(nova, DEFAULT_BLOUB_PICK).theme).toBe("cosmic-space")
@@ -37,9 +37,9 @@ describe("Nova and its Space and Comic themes", () => {
             for (const aura of ["pulse", "breathe", "still"] as const) {
                 let saved = writeOrbBag('{"socials":{"website":"https://example.test"}}', {
                     ...bloubBotPick(nova), expression, aura, orbitProfile: true,
-                }, false)
+                }, true)
                 for (const theme of ["cosmic-comic", "cosmic-space"] as const) {
-                    saved = writeOrbBag(saved, { theme }, false)
+                    saved = writeOrbBag(saved, { theme }, true)
                     expect(parseOrbBag(saved)).toMatchObject({ theme, expression, aura, orbitProfile: true, shape: "cercle", look: "bloub" })
                     expect(JSON.parse(saved).socials).toEqual({ website: "https://example.test" })
                 }
@@ -47,33 +47,35 @@ describe("Nova and its Space and Comic themes", () => {
         }
     })
 
-    it("accepts both themes on every plan while preserving existing paid-theme gates", () => {
+    it("keeps both Nova themes for paid plans and returns Free to Classic", () => {
         for (const theme of COSMIC_THEMES) {
-            for (const plan of ["free", "starter", "pro", "business", "scale"] as const) {
+            for (const plan of ["starter", "pro", "business", "scale"] as const) {
                 const saved = validateAiSettings(plan, {
                     personalityConfig: JSON.stringify({ orb: { theme, expression: "curieux", aura: "pulse", orbitProfile: true } }),
                 })
                 expect(parseOrbBag(saved.personalityConfig)).toMatchObject({ theme, expression: "curieux", aura: "pulse", orbitProfile: true })
             }
-            expect(clampOrbForPlan({ theme, look: "pixel", skin: "crt", shape: "nuage" }, false)).toMatchObject({ theme, look: "bloub", shape: "cercle" })
-            expect(clampOrbForPlan({ theme, look: "pixel", skin: "crt" }, false).skin).toBeUndefined()
+            const free = validateAiSettings("free", { personalityConfig: JSON.stringify({ orb: { theme, expression: "curieux", aura: "pulse", orbitProfile: true } }) })
+            expect(parseOrbBag(free.personalityConfig)).toMatchObject({ theme: "classic", expression: "curieux", aura: "pulse", orbitProfile: true })
+            expect(clampOrbForPlan({ theme, look: "pixel", skin: "crt", shape: "nuage" }, true)).toMatchObject({ theme, look: "bloub", shape: "cercle" })
+            expect(clampOrbForPlan({ theme, look: "pixel", skin: "crt" }, true).skin).toBeUndefined()
         }
         expect(clampOrbForPlan({ theme: "astral-nebula" }, false).theme).toBe("classic")
         expect(clampOrbForPlan({ theme: "cosmic-unknown" }, false).theme).toBe("classic")
     })
 
-    it("uses the saved Nova theme on public pages despite legacy presets or a billing outage", async () => {
+    it("uses the saved Nova theme on public pages while entitled, despite legacy presets", async () => {
         for (const theme of COSMIC_THEMES) {
             const configured = configuredProfileAnimation({
                 animationStyle: { config: '{"theme":"classic","look":"glass"}' },
                 personalityConfig: JSON.stringify({ orb: { theme, expression: "timide", aura: "breathe", orbitProfile: true } }),
             })
-            for (const paid of [false, true]) {
-                entitlement.mockResolvedValue({ features: { customBranding: paid } })
-                expect(await publicAnimationConfig("profile", configured)).toMatchObject({ theme, look: "bloub", shape: "cercle", expression: "timide", aura: "breathe", orbitProfile: true })
-            }
+            entitlement.mockResolvedValue({ features: { customBranding: true } })
+            expect(await publicAnimationConfig("profile", configured)).toMatchObject({ theme, look: "bloub", shape: "cercle", expression: "timide", aura: "breathe", orbitProfile: true })
+            entitlement.mockResolvedValue({ features: { customBranding: false } })
+            expect(await publicAnimationConfig("profile", configured)).toMatchObject({ theme: "classic", expression: "timide", aura: "breathe" })
             entitlement.mockRejectedValue(new Error("temporarily unavailable"))
-            expect(await publicAnimationConfig("profile", configured)).toMatchObject({ theme, expression: "timide", aura: "breathe", orbitProfile: true })
+            expect(await publicAnimationConfig("profile", configured)).toMatchObject({ theme: "classic", expression: "timide" })
         }
     })
 })

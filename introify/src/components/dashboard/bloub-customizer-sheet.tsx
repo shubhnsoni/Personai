@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { AzureLooks } from "./azure-looks"
+import { PremiumBotPreview, type PremiumBot } from "./premium-bot-preview"
+import { PremiumStar } from "./premium-star"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { toast } from "sonner"
 import { BLOUB_AURAS, BLOUB_MOODS, BLOB_SHAPES, CUSTOMIZER_BOTS, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, blobColorIndex, blobPickFromColorIndex, bloubBotPick, bloubThemeThumb, customizerBotPick, isCustomizerBotSelected, isNamedBloubBotSelected, isPremiumBloubTheme, lookThemesFor, usesAnimojiFaces, usesBlobColorSlider, usesBlobShapes, type BloubPick } from "@/lib/bloub/catalog"
@@ -72,6 +74,7 @@ export function BloubCustomizerSheet({
     onSetupProfilePhoto?: () => void
 }) {
     const [tab, setTab] = useState<TabId>("bots")
+    const [previewBot, setPreviewBot] = useState<PremiumBot | null>(null)
     const [photoRequested, setPhotoRequested] = useState(false)
     const [wasOpen, setWasOpen] = useState(open)
     const hasProfilePhoto = Boolean(profileImageUrl?.trim())
@@ -316,17 +319,17 @@ export function BloubCustomizerSheet({
                                             aria-pressed={selected}
                                             onClick={() => {
                                                 if (locked) {
-                                                    toast.message("This is a premium bot")
+                                                    setPreviewBot(bot)
                                                     return
                                                 }
                                                 onChange(customizerBotPick(bot, value))
                                             }}
                                             className={cn(
-                                                "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                                "relative flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
                                                 selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
-                                                locked && "opacity-60",
                                             )}
                                         >
+                                            {locked ? <PremiumStar /> : null}
                                             <WelcomeOrb
                                                 still
                                                 size={56}
@@ -372,17 +375,17 @@ export function BloubCustomizerSheet({
                                             aria-pressed={selected}
                                             onClick={() => {
                                                 if (!premium) {
-                                                    toast.message("This is a premium bot")
+                                                    setPreviewBot(bot)
                                                     return
                                                 }
                                                 onChange(bloubBotPick(bot, value))
                                             }}
                                             className={cn(
-                                                "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                                "relative flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
                                                 selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
-                                                !premium && "opacity-60",
                                             )}
                                         >
+                                            {!premium ? <PremiumStar /> : null}
                                             <WelcomeOrb still size={56} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
                                             <span className="text-[10px] font-medium">{bot.label}</span>
                                         </button>
@@ -396,6 +399,7 @@ export function BloubCustomizerSheet({
                     ) : null}
                 </div>
             </SheetContent>
+            <PremiumBotPreview bot={previewBot} onClose={() => setPreviewBot(null)} />
         </Sheet>
     )
 }

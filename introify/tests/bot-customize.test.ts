@@ -7,8 +7,8 @@ import { ANIMOJI_FACES, animojiClipForMood, resolveAnimojiId } from "@/lib/animo
 describe("customise bots", () => {
     it("shows Blob, Animoji, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
         expect(CUSTOMIZER_BOTS.map((bot) => bot.label)).toEqual(["Blob", "Glow", "Animoji", "8-Bit", "CRT", "Spark"])
-        expect(INCLUDED_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["LCD", "Azure", "Nova", "Telly", "Aurum", "Doodle", "Pearl"])
-        expect(PREMIUM_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Nyx", "Ion", "Vex"])
+        expect(INCLUDED_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["LCD"])
+        expect(PREMIUM_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Azure", "Nova", "Telly", "Aurum", "Doodle", "Pearl", "Nyx", "Ion", "Vex"])
         expect(BLOB_SHAPES.map((item) => item.label)).toEqual(["Circle", "Sol", "Lux", "Sky", "Dew"])
         expect(PREMIUM_BLOUB_BOTS.some((bot) => bot.label === "Neo")).toBe(false)
     })

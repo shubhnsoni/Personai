@@ -36,7 +36,8 @@ describe("profile settings server boundary", () => {
         await updateProfile("shop", { imageUrl: "/uploads/profile.webp", personalityConfig: '{"orb":{"theme":"planet-azure","orbitProfile":true}}' })
         const saved = mocks.update.mock.calls[0][0].data
         expect(saved.imageUrl).toBe("/uploads/profile.webp")
-        expect(JSON.parse(saved.personalityConfig).orb).toMatchObject({ theme: "planet-azure", orbitProfile: true })
+        // Planets are Premium: a Free write keeps the orbit but rests on the Classic bot.
+        expect(JSON.parse(saved.personalityConfig).orb).toMatchObject({ theme: "classic", orbitProfile: true })
     })
     it("uses an existing photo for partial writes instead of clearing it", async () => {
         mocks.execute.mockImplementation(async input => ({ ok: true, value: await input.writeOwned({ resourceId: "shop", profile: { id: "shop", userId: "owner", imageUrl: "/uploads/profile.webp" } }) }))

@@ -38,7 +38,7 @@ describe("owner profile orbit controls", () => {
 
     it("groups every planet under Azure as Looks in the Look tab and retains saved selections", () => {
         const onChange = vi.fn()
-        render(<BloubCustomizerSheet open onClose={vi.fn()} value={{ ...DEFAULT_BLOUB_PICK, theme: "planet-rose" }} onChange={onChange} />)
+        render(<BloubCustomizerSheet open onClose={vi.fn()} value={{ ...DEFAULT_BLOUB_PICK, theme: "planet-rose" }} onChange={onChange} premium />)
         expect(screen.getByRole("button", { name: "Azure" }).getAttribute("aria-pressed")).toBe("true")
         expect(screen.queryByRole("button", { name: "Rose" })).toBeNull()
         expect(screen.queryByRole("button", { name: "Saturn" })).toBeNull()

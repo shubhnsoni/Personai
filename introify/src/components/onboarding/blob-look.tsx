@@ -1,7 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { toast } from "sonner"
 import { AzureLooks } from "@/components/dashboard/azure-looks"
+import { PremiumBotPreview, type PremiumBot } from "@/components/dashboard/premium-bot-preview"
+import { PremiumStar } from "@/components/dashboard/premium-star"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import {
     BLOUB_AURAS,
@@ -54,6 +57,7 @@ export function BlobLookStudio({
     const themes = lookThemesFor(value)
     const showSlider = usesBlobColorSlider(value)
     const showShapes = usesBlobShapes(value)
+    const [previewBot, setPreviewBot] = useState<PremiumBot | null>(null)
 
     if (phase === "preview") {
         return (
@@ -249,17 +253,17 @@ export function BlobLookStudio({
                                 aria-pressed={selected}
                                 onClick={() => {
                                     if (bot.premium) {
-                                        toast.message("This is a premium bot")
+                                        setPreviewBot(bot)
                                         return
                                     }
                                     onChange(customizerBotPick(bot, value))
                                 }}
                                 className={cn(
-                                    "flex flex-col items-center gap-1 rounded-2xl py-2",
+                                    "relative flex flex-col items-center gap-1 rounded-2xl py-2",
                                     selected ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
-                                    bot.premium && "opacity-60",
                                 )}
                             >
+                                {bot.premium ? <PremiumStar /> : null}
                                 <WelcomeOrb
                                     still
                                     size={56}
@@ -300,15 +304,17 @@ export function BlobLookStudio({
                             key={bot.label}
                             type="button"
                             aria-label={`${bot.label}, premium`}
-                            onClick={() => toast.message("This is a premium bot")}
-                            className="relative flex flex-col items-center gap-1 rounded-2xl bg-white/[0.04] py-2 opacity-60"
+                            onClick={() => setPreviewBot(bot)}
+                            className="relative flex flex-col items-center gap-1 rounded-2xl bg-white/[0.04] py-2 text-white/75 hover:bg-white/[0.1]"
                         >
+                            <PremiumStar />
                             <WelcomeOrb still size={56} look="bloub" shape={bot.id} expression={bot.expression} color={bot.color} aura="still" theme={bot.theme} />
-                            <span className="text-[10px] text-white/50">{bot.label}</span>
+                            <span className="text-[10px]">{bot.label}</span>
                         </button>
                     ))}
                 </div>
             </section>
+            <PremiumBotPreview bot={previewBot} onClose={() => setPreviewBot(null)} upgradeHref="/pricing" />
 
             <button
                 type="button"

@@ -36,14 +36,14 @@ afterEach(() => {
 })
 
 describe("mascot catalog", () => {
-    it("ships Telly, Aurum, Doodle and Pearl as included bots, one theme each", () => {
+    it("ships Telly, Aurum, Doodle and Pearl as Premium bots, one theme each", () => {
         expect(MASCOT_THEMES).toEqual(VARIANTS)
         for (const theme of VARIANTS) {
-            const bot = INCLUDED_BLOUB_BOTS.find((item) => item.theme === theme)!
+            const bot = PREMIUM_BLOUB_BOTS.find((item) => item.theme === theme)!
             expect(bot?.label).toBe(BOTS[theme])
             expect(bot.themes).toBeUndefined()
             expect(isMascotTheme(theme)).toBe(true)
-            expect(isPremiumBloubTheme(theme)).toBe(false)
+            expect(isPremiumBloubTheme(theme)).toBe(true)
             expect(resolveThemedOrb(theme)).toBe(theme)
             expect(BLOUB_THEME_META[theme]?.canvas.light).toBeTruthy()
             expect(BLOUB_THEME_META[theme]?.canvas.dark).toBeTruthy()
@@ -62,13 +62,14 @@ describe("mascot catalog", () => {
         expect(isMascotOrbVariant(undefined)).toBe(false)
     })
 
-    it("survives free-plan clamping and round-trips through the saved orb bag", () => {
+    it("gates the mascots behind Premium and round-trips through the saved orb bag when entitled", () => {
         for (const theme of VARIANTS) {
-            const free = clampOrbForPlan({ theme, shape: "nuage", look: "glass" }, false)
-            expect(free.theme).toBe(theme)
-            expect(free.shape).toBe("cercle")
-            expect(free.look).toBe("bloub")
-            const saved = writeOrbBag(undefined, { theme, expression: "timide", aura: "still" }, false)
+            const paid = clampOrbForPlan({ theme, shape: "nuage", look: "glass" }, true)
+            expect(paid.theme).toBe(theme)
+            expect(paid.shape).toBe("cercle")
+            expect(paid.look).toBe("bloub")
+            expect(clampOrbForPlan({ theme, expression: "timide" }, false)).toMatchObject({ theme: "classic", expression: "timide" })
+            const saved = writeOrbBag(undefined, { theme, expression: "timide", aura: "still" }, true)
             expect(parseOrbBag(saved)).toMatchObject({ theme, expression: "timide", aura: "still" })
         }
     })

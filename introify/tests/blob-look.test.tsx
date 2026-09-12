@@ -77,6 +77,8 @@ describe("included bots on onboarding and profile", () => {
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "animoji", skin: "bounce" }))
         fireEvent.click(screen.getByRole("button", { name: "CRT, premium" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ skin: "crt" }))
+        // A Premium bot opens its preview popup; close it to continue browsing the grid.
+        fireEvent.click(screen.getByRole("button", { name: "Maybe later" }))
         expect(screen.getByRole("button", { name: "Spark, premium" })).toBeTruthy()
         expect(screen.getByRole("button", { name: "LCD" })).toBeTruthy()
         expect(screen.getByRole("button", { name: "Nyx, premium" })).toBeTruthy()
@@ -140,7 +142,9 @@ describe("included bots on onboarding and profile", () => {
         const props = { open: true, onClose: () => {}, onChange }
         const { rerender } = render(<BloubCustomizerSheet {...props} value={DEFAULT_BLOUB_PICK} premium={false} />)
         fireEvent.click(screen.getByRole("button", { name: "Nyx, premium" }))
+        fireEvent.click(screen.getByRole("button", { name: "Maybe later" }))
         fireEvent.click(screen.getByRole("button", { name: "Ion, premium" }))
+        fireEvent.click(screen.getByRole("button", { name: "Maybe later" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ theme: "astral-nebula" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ theme: "holographic-hud" }))
 
