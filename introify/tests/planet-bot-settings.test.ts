@@ -6,7 +6,7 @@ vi.mock("@/lib/billing/entitlements", () => ({ lookupProfileEntitlement: entitle
 
 import {
     CUSTOMIZER_BOTS, DEFAULT_BLOUB_PICK, INCLUDED_BLOUB_BOTS, PLANET_THEMES,
-    bloubBotPick, clampOrbForPlan, customizerBotPick, parseOrbBag, writeOrbBag,
+    bloubBotPick, clampOrbForPlan, customizerBotPick, parseOrbBag, writeOrbBag, isNamedBloubBotSelected, lookThemesFor,
 } from "@/lib/bloub/catalog"
 import { validateAiSettings } from "@/lib/ai-settings"
 import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
@@ -14,10 +14,13 @@ import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile
 describe("planet bots and orbiting profile settings", () => {
     it("includes every planet on Free and preserves its exact saved choice", () => {
         for (const theme of PLANET_THEMES) {
-            const bot = INCLUDED_BLOUB_BOTS.find(item => item.theme === theme)!
+            const bot = INCLUDED_BLOUB_BOTS.find(item => item.label === "Azure")!
+            const current = { ...DEFAULT_BLOUB_PICK, theme }
+            expect(isNamedBloubBotSelected(bot, current)).toBe(true)
+            expect(lookThemesFor(current)).toEqual([])
             expect(bot).toBeDefined()
             const saved = writeOrbBag('{"socials":{"website":"https://example.test"}}', {
-                ...bloubBotPick(bot), orbitProfile: true,
+                ...bloubBotPick(bot, current), orbitProfile: true,
             }, false)
             expect(parseOrbBag(saved)).toMatchObject({ theme, shape: "cercle", look: "bloub", orbitProfile: true })
             expect(JSON.parse(saved).socials).toEqual({ website: "https://example.test" })

@@ -333,9 +333,7 @@ export type BloubBot = {
 
 export const INCLUDED_BLOUB_BOTS: BloubBot[] = [
     { id: "cercle", label: "LCD", expression: "centre", color: "vert", aura: "still", theme: "retro-lcd" },
-    { id: "cercle", label: "Azure", expression: "centre", color: "bleu", aura: "breathe", theme: "planet-azure" },
-    { id: "cercle", label: "Rose", expression: "centre", color: "rose", aura: "breathe", theme: "planet-rose" },
-    { id: "cercle", label: "Sage", expression: "centre", color: "vert", aura: "breathe", theme: "planet-sage" },
+    { id: "cercle", label: "Azure", expression: "centre", color: "bleu", aura: "breathe", theme: "planet-azure", themes: PLANET_THEMES },
     { id: "cercle", label: "Nova", expression: "centre", color: "violet", aura: "breathe", theme: "cosmic-space", themes: COSMIC_THEMES },
 ]
 
@@ -366,6 +364,7 @@ export function lookThemesFor(value: BloubPick) {
     const look = resolveOrbLook(value.look)
     if (look === "pixel" || look === "glass" || look === "animoji") return []
     const theme = resolveBloubTheme(value.theme)
+    if (PLANET_THEMES.includes(theme as PlanetThemeId)) return []
     const family = [...INCLUDED_BLOUB_BOTS, ...PREMIUM_BLOUB_BOTS].find((bot) => bot.themes?.includes(theme))
     return BLOUB_THEMES.filter((item) => family?.themes ? family.themes.includes(item.id) : item.id === theme)
 }

@@ -78,6 +78,10 @@ export function WelcomeOrb({
     frozenAt,
     still = false,
 }: WelcomeOrbProps) {
+    const sceneRef = useRef<HTMLDivElement>(null)
+    const [novaActive, setNovaActive] = useState(true)
+    const nova = isCosmicOrbVariant(theme)
+    const paused = still || (nova && !novaActive)
     const [look, setLook] = useState({ x: 0, y: 0 })
     const [lid, setLid] = useState<"none" | "blink" | "wink-left" | "wink-right">("none")
     const [delighted, setDelighted] = useState(false)
@@ -91,11 +95,25 @@ export function WelcomeOrb({
     const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionSnapshot, () => true)
 
     useEffect(() => {
+        if (!nova) return
+        let inView = true
+        const update = () => setNovaActive(inView && !document.hidden)
+        const observer = typeof IntersectionObserver === "function" ? new IntersectionObserver(entries => {
+            inView = entries[0].isIntersecting
+            update()
+        }, { rootMargin: "60px" }) : null
+        if (sceneRef.current) observer?.observe(sceneRef.current)
+        document.addEventListener("visibilitychange", update)
+        update()
+        return () => { observer?.disconnect(); document.removeEventListener("visibilitychange", update) }
+    }, [nova])
+
+    useEffect(() => {
         gazeRef.current = gaze
     }, [gaze])
 
     useEffect(() => {
-        if (!reactToken || still || reducedMotion || frozenAt !== undefined) return
+        if (!reactToken || paused || reducedMotion || frozenAt !== undefined) return
         delightedRef.current = true
         let raf2 = 0
         const raf1 = window.requestAnimationFrame(() => {
@@ -111,15 +129,18 @@ export function WelcomeOrb({
             window.cancelAnimationFrame(raf2)
             window.clearTimeout(clear)
         }
-    }, [reactToken, themed, still, frozenAt, reducedMotion])
+    }, [reactToken, themed, paused, frozenAt, reducedMotion])
 
     useEffect(() => {
-        if (still || reducedMotion || frozenAt !== undefined || (!themed && resolvedLook === "bloub")) return
+        if (paused || reducedMotion || frozenAt !== undefined || (!themed && resolvedLook === "bloub")) return
         const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
         if (reducedMotion && themed) return
 
         let raf = 0
         let last = performance.now()
+        let paintedAt = 0
+        let paintedX = 0
+        let paintedY = 0
         let lx = 0
         let ly = 0
         let tx = 0
@@ -154,7 +175,11 @@ export function WelcomeOrb({
             const k = 1 - Math.exp(-dt * (g ? 16 : 8))
             lx += (tx - lx) * k
             ly += (ty - ly) * k
-            setLook({ x: lx, y: ly })
+            // Nova needs smooth eye movement, not a full React render every display frame.
+            if (!nova || (now - paintedAt >= 1000 / 30 && (Math.abs(lx - paintedX) > .003 || Math.abs(ly - paintedY) > .003))) {
+                setLook({ x: lx, y: ly })
+                paintedAt = now; paintedX = lx; paintedY = ly
+            }
 
             if (!reduced && !delightedRef.current && now >= nextLid) {
                 const roll = Math.random()
@@ -173,7 +198,7 @@ export function WelcomeOrb({
 
         raf = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(raf)
-    }, [still, frozenAt, themed, resolvedLook, reducedMotion])
+    }, [paused, frozenAt, themed, resolvedLook, reducedMotion, nova])
 
     const pupil = {
         transform: `translate(calc(-50% + ${look.x * 42}%), calc(-50% + ${-look.y * 38}%))`,
@@ -188,6 +213,7 @@ export function WelcomeOrb({
 
     const orb = (
         <div
+            ref={sceneRef}
             className={cn(
                 "pl-orb-scene",
                 size < 56 && "is-compact",
@@ -202,7 +228,7 @@ export function WelcomeOrb({
             data-variant={resolved}
             data-bot-theme={themed ?? undefined}
             data-aura={resolveBloubAura(aura)}
-            data-motion-paused={still || reducedMotion || frozenAt !== undefined}
+            data-motion-paused={paused || reducedMotion || frozenAt !== undefined}
             data-expression={liveExpression}
             data-mood={mood}
             data-skin={resolvedLook === "pixel" ? resolvedSkin : undefined}
@@ -221,13 +247,13 @@ export function WelcomeOrb({
             }}
             aria-hidden
         >
-            <BotAura aura={resolveBloubAura(aura)} color={auraColor} speed={speed} intensity={intensity} still={still || reducedMotion} frozenAt={frozenAt} />
+            <BotAura aura={resolveBloubAura(aura)} color={auraColor} speed={speed} intensity={intensity} still={paused || reducedMotion} frozenAt={frozenAt} />
             {resolvedLook === "animoji" ? (
                 <AnimojiFace
                     id={skin}
                     mood={mood}
                     expression={liveExpression}
-                    still={still || reducedMotion || frozenAt !== undefined}
+                    still={paused || reducedMotion || frozenAt !== undefined}
                     size={size}
                     gaze={look}
                 />
@@ -238,7 +264,7 @@ export function WelcomeOrb({
                         gaze={look}
                         lid={lid}
                         expression={liveExpression}
-                        still={still || reducedMotion || frozenAt !== undefined}
+                        still={paused || reducedMotion || frozenAt !== undefined}
                         aura="still"
                         mood={delighted ? "react" : mood}
                     />
@@ -249,7 +275,7 @@ export function WelcomeOrb({
                         gaze={look}
                         lid={lid}
                         expression={liveExpression}
-                        still={still || reducedMotion}
+                        still={paused || reducedMotion}
                         frozenAt={frozenAt}
                         speed={speed}
                         intensity={intensity}
@@ -262,7 +288,7 @@ export function WelcomeOrb({
                         gaze={look}
                         lid={lid}
                         expression={liveExpression}
-                        still={still || reducedMotion}
+                        still={paused || reducedMotion}
                         frozenAt={frozenAt}
                         speed={speed}
                         mood={mood}
@@ -274,7 +300,7 @@ export function WelcomeOrb({
                         gaze={look}
                         lid={lid}
                         expression={liveExpression}
-                        still={still || reducedMotion || frozenAt !== undefined}
+                        still={paused || reducedMotion || frozenAt !== undefined}
                         aura="still"
                         mood={delighted ? "react" : mood}
                     />
@@ -289,7 +315,7 @@ export function WelcomeOrb({
                     mood={mood}
                     reactToken={reactToken}
                     gaze={gaze}
-                    frozenAt={still || reducedMotion ? frozenAt ?? 0.8 : frozenAt}
+                    frozenAt={paused || reducedMotion ? frozenAt ?? 0.8 : frozenAt}
                     className={size < 56 ? "is-compact" : undefined}
                 />
             ) : resolvedLook === "pixel" ? (
@@ -344,7 +370,7 @@ export function WelcomeOrb({
         </div>
     )
     return orbitProfile && profileImageUrl?.trim() ? (
-        <ProfileOrbit imageUrl={profileImageUrl.trim()} size={size} still={still || reducedMotion} frozenAt={frozenAt} speed={speed}>
+        <ProfileOrbit imageUrl={profileImageUrl.trim()} size={size} still={paused || reducedMotion} frozenAt={frozenAt} speed={speed}>
             {orb}
         </ProfileOrbit>
     ) : orb

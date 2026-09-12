@@ -22,12 +22,39 @@ for(const [title,controls] of groups){const field=document.createElement('fields
  if(title==='Whole icon')field.insertAdjacentHTML('beforeend','<p class="hint">Rotate and move the dot and ribbon together, including the finished logo pose.</p><button id="reset-icon">Reset whole icon</button>');
  $('settings').append(field);
 }
+const rangePanel=document.createElement('fieldset');
+rangePanel.className='playback-range';
+rangePanel.innerHTML=`<legend>Start & end</legend><p class="hint">Choose the segment to play and save. Times follow playback speed. A trimmed loop may jump if its end and start poses differ.</p><div class="range-pair"><label for="range-start">Start (seconds)<input id="range-start" type="number" min="0" step=".01"></label><label for="range-end">End (seconds)<input id="range-end" type="number" min="0" step=".01"></label></div><div class="row"><button id="range-set-start">Set start here</button><button id="range-set-end">Set end here</button></div><p class="hint" id="range-summary"></p><button id="range-reset">Use full animation</button>`;
+$('settings').prepend(rangePanel);
+function sourceDuration(){return recorder&&(recorder.state.recording||recorder.state.preview)?recorder.state.duration:motionSeconds/(config.rangeEnd-config.rangeStart);}
+function sourceProgress(){return recorder?.state.recording?progress:config.rangeStart+progress*(config.rangeEnd-config.rangeStart);}
+function syncRangeControls(){
+ const total=sourceDuration();
+ for(const [id,value] of [['range-start',config.rangeStart],['range-end',config.rangeEnd]]){$(id).value=(value*total).toFixed(2);$(id).max=total;$(id).disabled=Boolean(recorder?.state.recording);}
+ for(const id of ['range-set-start','range-set-end','range-reset'])$(id).disabled=Boolean(recorder?.state.recording);
+ $('range-summary').textContent=`${((config.rangeEnd-config.rangeStart)*total).toFixed(2)} seconds selected of ${total.toFixed(2)} seconds`;
+}
+function setRange(start,end){
+ try{
+  const next=validate({...config,rangeStart:start,rangeEnd:end}),position=sourceProgress();
+  config=next;progress=Math.max(0,Math.min(1,(position-start)/(end-start)));recorder?.invalidate();change(false);
+  status('Playback range updated. Downloads and new options use this segment.');
+ }catch(error){syncRangeControls();status(error.message,true);}
+}
+let rangeInputTimer;
+for(const id of ['range-start','range-end']){
+ const apply=()=>{clearTimeout(rangeInputTimer);if($(id).value==='')return;const value=Number($(id).value)/sourceDuration();if(id==='range-start')setRange(value,config.rangeEnd);else setRange(config.rangeStart,value);};
+ $(id).oninput=()=>{clearTimeout(rangeInputTimer);rangeInputTimer=setTimeout(apply,250);};$(id).onchange=apply;
+}
+$('range-set-start').onclick=()=>setRange(sourceProgress(),config.rangeEnd);
+$('range-set-end').onclick=()=>setRange(config.rangeStart,sourceProgress());
+$('range-reset').onclick=()=>setRange(0,1);
 function status(message,error=false){$('status').textContent=message;$('status').style.color=error?'#ffb2ad':'';}
 function syncControls(){for(const [key,value] of Object.entries(config)){const el=$(key);if(!el)continue;if(el.type==='checkbox')el.checked=value;else el.value=value;const out=$(key+'-value');if(out)out.value=Number(value).toFixed(key==='dotDelay'?2:el.step<1?2:0)+(el.dataset.unit||'');}$('dotDelay').disabled=config.sync;for(const key of ['orbitSpeed','orbitDepth','ribbonHold','logoHold','exitTime','rotationX','rotationY','rotationZ','perspective','orbitSize'])$(key).disabled=config.movement!=='ribbon-logo';}
 function group(node,transform){const wrapper=node.ownerDocument.createElementNS(ns,'g');wrapper.setAttribute('transform',transform);node.parentNode.insertBefore(wrapper,node);wrapper.append(node);}
 function compile(id,motion){const doc=new DOMParser().parseFromString(templates[id],'image/svg+xml'),svg=doc.documentElement;
  const layer=svg.querySelector('.motion'),paths=layer.querySelectorAll(':scope > path'),head=layer.querySelector('ellipse');
- const update=(node,map)=>{for(const a of node.querySelectorAll('animate')){const key=map[a.getAttribute('attributeName')];if(key){a.setAttribute('values',motion[key]);a.setAttribute('dur',motion.duration+'s');node.setAttribute(a.getAttribute('attributeName'),motion[key].split(';')[0]);}}};
+ const update=(node,map)=>{for(const a of node.querySelectorAll('animate')){const key=map[a.getAttribute('attributeName')];if(key){a.setAttribute('values',motion[key]);a.setAttribute('dur',motion.duration+'s');a.setAttribute('keyTimes',motion.keyTimes);node.setAttribute(a.getAttribute('attributeName'),motion[key].split(';')[0]);}}};
  update(paths[0],{d:'trail',opacity:'trailOpacity'});update(paths[1],{d:'ring',opacity:'ringOpacity'});update(paths[2],{d:'body',opacity:'opacity'});update(head,{cx:'x',cy:'y',rx:'rx',ry:'ry'});
  const staticDot=`translate(${config.dotX} ${config.dotY}) translate(133 49) scale(${config.dotScale}) translate(-133 -49)`;
  const staticRibbon=`translate(${config.ribbonX} ${config.ribbonY}) translate(88 100) scale(${config.ribbonScale}) translate(-88 -100)`;
@@ -60,20 +87,20 @@ function compile(id,motion){const doc=new DOMParser().parseFromString(templates[
  for(const node of svg.querySelectorAll('[id]')){const old=node.id,newId=id+'-'+old;node.id=newId;for(const other of svg.querySelectorAll('*'))for(const attr of [...other.attributes])if(attr.value.includes('url(#'+old+')'))other.setAttribute(attr.name,attr.value.replaceAll('url(#'+old+')','url(#'+newId+')'));}
  return svg;
 }
-function currentMotion(){return recorder?.motion(base)??buildMotion(base,config);}
-function rebuild(){if(!ready)return;const motion=currentMotion();motionSeconds=motion.duration;roots=[];for(const id of Object.keys(templates)){const svg=compile(id,motion);$(id).replaceChildren(document.importNode(svg,true));const live=$(id).firstElementChild;live.pauseAnimations();roots.push(live);}draw();}
+function currentMotion(){return recorder?.motion(base)??buildMotion(base,recorder?.state.recording?{...config,rangeStart:0,rangeEnd:1}:config);}
+function rebuild(){if(!ready)return;const motion=currentMotion();motionSeconds=motion.duration;syncRangeControls();roots=[];for(const id of Object.keys(templates)){const svg=compile(id,motion);$(id).replaceChildren(document.importNode(svg,true));const live=$(id).firstElementChild;live.pauseAnimations();roots.push(live);}draw();}
 function change(edit=true){config=validate(config);if(edit)recorder?.onEdit();syncControls();dirty=!finalized?.finalizedAt||JSON.stringify(config)!==JSON.stringify(finalized.settings);$('state').textContent=sharedPreview?'Shared preview':dirty?'Draft · autosaved':'Finalized';$('save-title').textContent=sharedPreview?'Shared preview. Export or save your changes to keep them.':dirty?'Your draft saves automatically in this browser.':'These settings are finalized for implementation.';try{if(!sharedPreview)localStorage.setItem(storageKey,JSON.stringify(config));}catch{status('Browser storage is unavailable. Export your settings to keep a copy.',true);}cancelAnimationFrame(refreshFrame);refreshFrame=requestAnimationFrame(rebuild);}
-for(const key of Object.keys(defaults))$(key).addEventListener('input',e=>{config[key]=e.target.type==='checkbox'?e.target.checked:key==='movement'?e.target.value:Number(e.target.value);change();});
+for(const key of Object.keys(defaults).filter(key=>!key.startsWith('range')))$(key).addEventListener('input',e=>{config[key]=e.target.type==='checkbox'?e.target.checked:key==='movement'?e.target.value:Number(e.target.value);change();});
 $('center-dot').onclick=()=>{Object.assign(config,{strength:0,dotX:0,dotY:0,dotDelay:0,sync:true});change();};
 $('reset-dot').onclick=()=>{for(const key of ['dotX','dotY','dotScale','dotDelay','strength','sync'])config[key]=defaults[key];change();};
 $('reset-icon').onclick=()=>{Object.assign(config,{iconRotation:0,iconX:0,iconY:0});change();};
 const presets={reference:defaults,snappy:{...defaults,speed:1.6,ribbonHold:.8,logoHold:1.3,exitTime:.7},calm:{...defaults,speed:.65,ribbonHold:1.4,logoHold:1.5,strength:.6}};
 document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{config={...presets[b.dataset.preset]};progress=0;change();status('Preset applied. You can keep adjusting every setting.');});
-function duration(){return recorder&&(recorder.state.preview||recorder.state.recording)?recorder.state.duration:motionSeconds;}
-function draw(){const seconds=duration();const animationSeconds=recorder?.state.recording?motionSeconds:seconds;for(const root of roots){root.setCurrentTime(progress*animationSeconds);root.classList.toggle('force-motion',explicit);}$('scrub').value=progress;$('time').value=(progress*seconds).toFixed(2)+' / '+seconds.toFixed(2)+' s';$('play').textContent=playing?'Pause':'Play';}
+function duration(){return recorder?.state.recording?recorder.state.duration:motionSeconds;}
+function draw(){const seconds=duration();const animationSeconds=recorder?.state.recording?motionSeconds:seconds;for(const root of roots){root.setCurrentTime(Math.min(progress,1-1e-7)*animationSeconds);root.classList.toggle('force-motion',explicit);}$('scrub').value=progress;$('time').value=(sourceProgress()*sourceDuration()).toFixed(2)+' s | '+seconds.toFixed(2)+' s selected';$('play').textContent=playing?'Pause':'Play';}
 function tick(now){if(last&&playing&&ready){const next=progress+Math.min(now-last,100)/1000/duration();if(next>=1&&recorder?.boundary())progress=1;else progress=next%1;draw();}last=now;requestAnimationFrame(tick);}
 $('play').onclick=()=>{playing=!playing;explicit=true;draw();};$('restart').onclick=()=>{progress=0;playing=true;explicit=true;draw();};$('scrub').oninput=e=>{progress=Number(e.target.value);playing=false;explicit=true;draw();};
-document.querySelectorAll('[data-phase]').forEach(b=>b.onclick=()=>{progress=phasePosition(Number(b.dataset.phase),config);playing=false;explicit=true;draw();});
+document.querySelectorAll('[data-phase]').forEach(b=>b.onclick=()=>{progress=Math.max(0,Math.min(1,(phasePosition(Number(b.dataset.phase),config)-config.rangeStart)/(config.rangeEnd-config.rangeStart)));playing=false;explicit=true;draw();});
 function download(name,contents,type){const url=URL.createObjectURL(new Blob([contents],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 document.querySelectorAll('[data-download]').forEach(b=>b.onclick=()=>{if(!ready)return;const id=b.dataset.download;download('introify-'+id+'-custom.svg',new XMLSerializer().serializeToString(compile(id,currentMotion())),'image/svg+xml');status('Downloaded SVG with your current settings and active keyframes.');});
 $('export').onclick=()=>download('introify-motion-settings.json',JSON.stringify({schemaVersion:1,baseVersion:7,settings:config},null,2),'application/json');
@@ -82,7 +109,7 @@ $('reset').onclick=()=>{config={...defaults};progress=0;change();status('Origina
 $('restore').onclick=()=>{if(!finalized?.finalizedAt)return status('No finalized settings yet. Save an option first.');if(finalized.take)recorder.load(finalized.take);else{config=validate(finalized.settings);change();}status('Loaded your last saved settings and keyframes.');};
 let pendingOption=null;
 $('finalize').onclick=async()=>{if($('finalize').disabled)return;$('finalize').disabled=true;try{const snapshot={settings:validate(config),take:recorder.getTake()},fingerprint=JSON.stringify(snapshot);if(pendingOption?.fingerprint!==fingerprint)pendingOption={fingerprint,id:crypto.randomUUID()};const response=await fetch('/api/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...snapshot,requestId:pendingOption.id})});const data=await response.json();if(!response.ok)throw Error(data.error);pendingOption=null;finalized={...snapshot,finalizedAt:data.finalizedAt,option:data.option};change(false);status(`Saved Option ${data.option}${data.keyframes?', including all '+data.keyframes+' keyframes':''}. Earlier options are unchanged.`);showSavedOption(data.option,data.url);}catch(error){status('Could not save option: '+error.message,true);}finally{$('finalize').disabled=false;}};
-recorder=createRecorder({temporary:sharedPreview,getConfig:()=>config,getProgress:()=>progress,setProgress:value=>{progress=value;explicit=true;draw();},setConfig:value=>{config=validate(value);change(false);},pause:()=>{playing=false;draw();},play:()=>{playing=true;explicit=true;draw();},refresh:rebuild,status,download});
+recorder=createRecorder({temporary:sharedPreview,getConfig:()=>config,getProgress:()=>sourceProgress(),setProgress:value=>{progress=!recorder?.state.recording?Math.max(0,Math.min(1,(value-config.rangeStart)/(config.rangeEnd-config.rangeStart))):value;explicit=true;draw();},setConfig:value=>{config=validate(value);change(false);},pause:()=>{playing=false;draw();},play:()=>{playing=true;explicit=true;draw();},refresh:rebuild,status,download});
 try {
  const ids=['logo-light','logo-dark','symbol-light','symbol-dark'];
  const responses=await Promise.all(['/api/base','/api/finalized',...ids.map(id=>'/brand/motion/introify-'+id+'.svg')].map(url=>fetch(url).then(r=>{if(!r.ok)throw Error('Unable to load '+url);return r.text();})));

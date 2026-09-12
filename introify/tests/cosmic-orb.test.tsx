@@ -10,9 +10,10 @@ describe("CosmicOrb", () => {
         expect(container.querySelectorAll(".cosmic-eye")).toHaveLength(4)
         expect(container.querySelectorAll(".cosmic-eye-rays")).toHaveLength(4)
         expect(container.querySelector(".cosmic-mouth")).toBeNull()
-        const shapes = Array.from(container.querySelectorAll(".cosmic-silhouette"), path => path.getAttribute("d"))
-        expect(shapes[0]).toBe(shapes[1])
-        expect(container.querySelectorAll(".cosmic-ink-accents")).toHaveLength(1)
+        const artwork = Array.from(container.querySelectorAll(".cosmic-artwork"), image => image.getAttribute("href"))
+        expect(artwork).toEqual(["/bots/nova/space-body.webp", "/bots/nova/comic-body.webp"])
+        expect(container.querySelectorAll("feTurbulence, feDisplacementMap, filter")).toHaveLength(0)
+        expect(container.querySelectorAll("svg *").length).toBeLessThan(70)
         for (const element of container.querySelectorAll("[fill],[stroke],[clip-path],[filter]")) {
             for (const attribute of ["fill", "stroke", "clip-path", "filter"]) {
                 const reference = element.getAttribute(attribute)?.match(/^url\(#(.+)\)$/)?.[1]

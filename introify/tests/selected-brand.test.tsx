@@ -34,14 +34,14 @@ describe("approved site logo playback", () => {
     it("waits for the footer to enter, plays one loop, rests, and replays only after reentry", async () => {
         const { container } = render(<SelectedBrand />)
         const logo = container.querySelector("svg")!
-        expect(logo.getAttribute("data-brand-option")).toBe("9")
+        expect(logo.getAttribute("data-brand-option")).toBe("11")
         expect(logo.getAttribute("data-brand-playing")).toBe("false")
         expect(fetch).not.toHaveBeenCalled()
         enter(true)
         await settle()
         expect(logo.getAttribute("data-brand-playing")).toBe("true")
         fireEvent.load(container.querySelector('image[href^="blob:"]')!)
-        act(() => vi.advanceTimersByTime(3193))
+        act(() => vi.advanceTimersByTime(2699))
         expect(logo.getAttribute("data-brand-playing")).toBe("true")
         act(() => vi.advanceTimersByTime(1))
         expect(logo.getAttribute("data-brand-playing")).toBe("false")

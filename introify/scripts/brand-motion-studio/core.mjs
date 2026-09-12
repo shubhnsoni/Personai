@@ -1,7 +1,8 @@
+import {clipMotion,validateRange} from './clip.mjs';
 import {orbitFrame} from './orbit.mjs';
 import {ribbonLoopFrame} from './ribbon.mjs';
 import {buildRibbonLogo,ribbonLogoTiming} from './ribbon-logo.mjs';
-export const defaults = Object.freeze({ speed:1, movement:'full', iconRotation:0, iconX:0, iconY:0, orbitSpeed:1, orbitDepth:1, rotationX:0, rotationY:0, rotationZ:0, perspective:260, orbitSize:.8, orbitTurns:1, orbitDirection:1, attachDot:true, ribbonHold:1, logoHold:1, exitTime:1, sync:true, dotDelay:0, strength:1, dotX:0, dotY:0, dotScale:1, ribbonX:0, ribbonY:0, ribbonScale:1, gap:0 });
+export const defaults = Object.freeze({ rangeStart:0, rangeEnd:1, speed:1, movement:'full', iconRotation:0, iconX:0, iconY:0, orbitSpeed:1, orbitDepth:1, rotationX:0, rotationY:0, rotationZ:0, perspective:260, orbitSize:.8, orbitTurns:1, orbitDirection:1, attachDot:true, ribbonHold:1, logoHold:1, exitTime:1, sync:true, dotDelay:0, strength:1, dotX:0, dotY:0, dotScale:1, ribbonX:0, ribbonY:0, ribbonScale:1, gap:0 });
 export const limits = {speed:[.25,2.5],ribbonHold:[.4,2.5],logoHold:[.4,2.5],exitTime:[.4,2.5],dotDelay:[-.3,.3],strength:[0,1.5],dotX:[-30,30],dotY:[-25,25],dotScale:[.5,1.5],ribbonX:[-20,20],ribbonY:[-20,20],ribbonScale:[.7,1.2],gap:[0,50]};
 Object.assign(limits,{orbitSpeed:[1,2],orbitDepth:[.5,1.4]});
 Object.assign(limits,{iconRotation:[-180,180],iconX:[-40,40],iconY:[-40,40]});
@@ -17,6 +18,7 @@ export function validate(input) {
   if(input.movement!==undefined&&!['full','ribbon','ribbon-logo','gentle'].includes(input.movement)) throw Error('Unknown movement.');
   for(const key of ['sync','attachDot'])if(input[key]!==undefined&&typeof input[key]!=='boolean') throw Error(`Invalid ${key} setting.`);
   if(!Number.isInteger(result.orbitTurns)||![-1,1].includes(result.orbitDirection))throw Error('Invalid orbit direction or turns.');
+  Object.assign(result,validateRange(input.rangeStart,input.rangeEnd));
   return {...result,movement:input.movement??result.movement,sync:input.sync??result.sync,attachDot:input.attachDot??result.attachDot};
 }
 const rounded=v=>Math.round(v*1000)/1000;
@@ -31,8 +33,11 @@ function sourceTime(t,c) {
   return 1;
 }
 export function buildMotion(base,input) {
+  const c=validate(input);return clipMotion(buildSourceMotion(base,c),c.rangeStart,c.rangeEnd);
+}
+export function buildSourceMotion(base,input) {
   const c=validate(input),tracks={};
-  if(c.movement==='ribbon-logo')return wholeIcon(buildRibbonLogo(base,c,buildMotion(base,{...c,movement:'ribbon'}),buildMotion(base,{...c,movement:'gentle'})),c);
+  if(c.movement==='ribbon-logo')return wholeIcon(buildRibbonLogo(base,c,buildSourceMotion(base,{...c,movement:'ribbon'}),buildSourceMotion(base,{...c,movement:'gentle'})),c);
   for(const [key,value] of Object.entries(base)) if(typeof value==='string'&&key!=='keyTimes') {
     tracks[key]=value.split(';').map(s=>({source:s,values:(s.match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi)||[]).map(Number)}));
   }

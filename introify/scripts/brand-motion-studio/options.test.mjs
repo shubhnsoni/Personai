@@ -13,7 +13,7 @@ test('numbered keyframe options are complete, sequential, immutable and retry-sa
  for(const id of ['logo-light','logo-dark','symbol-light','symbol-dark'])await copyFile(path.join(app,'public/brand/motion/introify-'+id+'.svg'),path.join(brand,'introify-'+id+'.svg'));
  await mkdir(path.join(brand,'options/option-1'),{recursive:true});const original='{"option":1,"status":"locked"}';await writeFile(path.join(brand,'options/option-1/manifest.json'),original);
  const base=JSON.parse(await readFile(path.join(app,'src/components/brand/motion-data.json'),'utf8'));
- const take={name:'Keyed test',duration:4,loop:true,keyframes:[{time:0,settings:defaults},{time:.4,settings:{...defaults,rotationX:60,gap:25}}]};
+ const take={name:'Keyed test',duration:4,loop:true,rangeStart:.25,rangeEnd:.75,keyframes:[{time:0,settings:defaults},{time:.4,settings:{...defaults,rotationX:60,gap:25}}]};
  const motion=buildTakeMotion(base,take),store=createOptionStore(brand),input={sourceKey:'test-one',name:take.name,take,settings:defaults,motion};
  const [two,three]=await Promise.all([store.create(input),store.create({...input,sourceKey:'test-two'})]);
  assert.equal(two.option,2);assert.equal(three.option,3);
@@ -24,6 +24,6 @@ test('numbered keyframe options are complete, sequential, immutable and retry-sa
  assert.deepEqual(JSON.parse(await readFile(path.join(directory,'take.json'),'utf8')),take);
  assert.deepEqual(JSON.parse(await readFile(path.join(directory,'motion-data.json'),'utf8')),motion);
  for(const [file,hash] of Object.entries(two.files))assert.equal(createHash('sha256').update(await readFile(path.join(directory,file))).digest('hex'),hash);
- const svg=await readFile(path.join(directory,'introify-logo-light.svg'),'utf8');assert.match(svg,/dur="4s"/);assert.match(svg,/animateTransform/);assert.match(svg,/data-depth="front"/);assert.ok(!svg.includes('NaN'));
+ const svg=await readFile(path.join(directory,'introify-logo-light.svg'),'utf8');assert.match(svg,/dur="2s"/);assert.match(svg,/animateTransform/);assert.match(svg,/data-depth="front"/);assert.ok(!svg.includes('NaN'));
  console.log('Option export test artifacts: '+brand);
 });

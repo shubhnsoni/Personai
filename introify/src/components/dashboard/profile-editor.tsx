@@ -436,7 +436,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 profileImageUrl={imageUrl}
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">{liveOrb.look === "animoji" ? "Animoji" : liveOrb.look === "pixel" ? (liveOrb.skin === "crt" ? "CRT" : liveOrb.skin === "spark" ? "Spark" : "8-Bit") : liveOrb.look === "glass" ? "Glow" : liveOrb.theme === "classic" ? "Blob" : isCosmicTheme(liveOrb.theme) ? `Nova · ${BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label}` : (BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label ?? "Blob")}</p>
+                                <p className="text-sm font-medium">{liveOrb.look === "animoji" ? "Animoji" : liveOrb.look === "pixel" ? (liveOrb.skin === "crt" ? "CRT" : liveOrb.skin === "spark" ? "Spark" : "8-Bit") : liveOrb.look === "glass" ? "Glow" : liveOrb.theme === "classic" ? "Blob" : liveOrb.theme.startsWith("planet-") ? "Azure" : isCosmicTheme(liveOrb.theme) ? `Nova · ${BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label}` : (BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label ?? "Blob")}</p>
                                 <p className="text-xs text-muted-foreground">Choose a bot, chat theme, mood and colour.</p>
                             </div>
                             <button type="button" onClick={() => setBlobOpen(true)} className="h-8 shrink-0 rounded-full border border-border px-3 text-xs font-medium">

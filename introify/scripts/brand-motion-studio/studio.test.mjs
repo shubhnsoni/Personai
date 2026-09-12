@@ -194,3 +194,35 @@ test('ribbon starts at zero and its dot tracks the leading cap for the entire ke
  assert.equal(paths[0],paths[120]);assert.equal(xs[0],xs[120]);assert.equal(ys[0],ys[120]);
  assert.ok(Math.hypot(xs[20]-xs[0],ys[20]-ys[0])>10);
 });
+
+
+test('playback range trims every track without changing speed or endpoint poses',()=>{
+ const c={...defaults,movement:'ribbon-logo'};
+ const full=buildMotion(base,c),clip=buildMotion(base,{...c,rangeStart:.25,rangeEnd:.75});
+ assert.equal(clip.duration,full.duration*.5);
+ for(const key of ['x','y','rx','ring','body','iconRotate','iconTranslate']){
+  assert.equal(clip[key].split(';')[0],full[key].split(';')[30],key+' start');
+  assert.equal(clip[key].split(';').at(-1),full[key].split(';')[90],key+' end');
+ }
+ assert.equal(clip.keyTimes.split(';').length,121);
+ assert.ok(!JSON.stringify(clip).includes('NaN'));
+ assert.deepEqual(buildMotion(base,{...c,rangeStart:0,rangeEnd:1}),full);
+ assert.throws(()=>validate({...c,rangeStart:.8,rangeEnd:.5}));
+ assert.throws(()=>validate({...c,rangeStart:.5,rangeEnd:.5}));
+});
+
+test('keyframe take range is preserved and applied after the full take is baked',()=>{
+ const settings={...defaults,movement:'ribbon-logo'};
+ const take={name:'Trimmed take',duration:4,loop:false,keyframes:[{time:0,settings},{time:1,settings:{...settings,iconRotation:30}}]};
+ const full=buildTakeMotion(base,take),selected={...take,rangeStart:.25,rangeEnd:.75},clip=buildTakeMotion(base,selected);
+ assert.equal(validateTake(selected).rangeStart,.25);
+ assert.equal(validateTake(selected).rangeEnd,.75);
+ assert.equal(clip.duration,2);
+ for(const key of ['x','ring','iconRotate','letteringTranslate']){
+  assert.equal(clip[key].split(';')[0],full[key].split(';')[30]);
+  assert.equal(clip[key].split(';').at(-1),full[key].split(';')[90]);
+ }
+ const template=readFileSync(new URL('../../public/brand/motion/introify-logo-light.svg',import.meta.url),'utf8');
+ const svg=exportMotionSvg(template,'logo-light',clip,settings);
+ assert.match(svg,/dur="2s"/);assert.ok(!svg.includes('NaN'));
+});

@@ -36,12 +36,17 @@ describe("owner profile orbit controls", () => {
         expect(onChange).toHaveBeenLastCalledWith({ orbitProfile: false })
     })
 
-    it("offers every planet without a premium lock", () => {
+    it("groups Rose and Sage under Azure in the Mood tab and retains saved selections", () => {
         const onChange = vi.fn()
-        render(<BloubCustomizerSheet open onClose={vi.fn()} value={DEFAULT_BLOUB_PICK} onChange={onChange} />)
+        render(<BloubCustomizerSheet open onClose={vi.fn()} value={{ ...DEFAULT_BLOUB_PICK, theme: "planet-rose" }} onChange={onChange} />)
+        expect(screen.getByRole("button", { name: "Azure" }).getAttribute("aria-pressed")).toBe("true")
+        expect(screen.queryByRole("button", { name: "Rose" })).toBeNull()
+        expect(screen.queryByRole("button", { name: "Sage" })).toBeNull()
+        fireEvent.click(screen.getByRole("tab", { name: "Mood" }))
+        expect(screen.getByRole("button", { name: "Rose mood" }).getAttribute("aria-pressed")).toBe("true")
         for (const [label, theme] of [["Azure", "planet-azure"], ["Rose", "planet-rose"], ["Sage", "planet-sage"]]) {
-            fireEvent.click(screen.getByRole("button", { name: label }))
-            expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ theme }))
+            fireEvent.click(screen.getByRole("button", { name: `${label} mood` }))
+            expect(onChange).toHaveBeenLastCalledWith({ theme })
         }
     })
 })

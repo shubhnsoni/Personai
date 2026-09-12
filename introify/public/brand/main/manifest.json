@@ -1,17 +1,17 @@
 {
-  "option": 9,
+  "option": 11,
   "status": "locked",
-  "sourceHash": "d62af062781286916afb9a6cb32a69b6fc9b4260bb5d90d818b950ed606e3315",
-  "duration": 3.194,
+  "sourceHash": "30a12450ffd1435799dd51cb1966d4c7b54f6b46db8d78ca2827c7bcecce6151",
+  "duration": 2.7,
   "restFrame": 45,
   "files": {
-    "introify-logo-light-once.svg": "be76133a859a9939c457440346d0f5aa6fd9fec6a4ae282dbcd0852baab74dbf",
-    "introify-logo-light-still.svg": "6495cf03881f2eb44cecf8b0385640752323849dca7f4fd34b2851c501fcc4b5",
-    "introify-logo-dark-once.svg": "b46536e25607f37ad8bedfb32031cf98bfb7232cabdfe993c1cb69a4223a14aa",
-    "introify-logo-dark-still.svg": "011b954602735eb1c186a89a61a3a4fc84560bde1228a6f8a7210cf15d7cb9fb",
-    "introify-symbol-light-once.svg": "cf0e8c1e2322e9305e7c07089d6617a0429479ce9f6f8649c27ae58cf323e147",
-    "introify-symbol-light-still.svg": "f973178ecdd01f7722b350aae204f53ea9fccc22e541315b1f900c8cac2dc8b2",
-    "introify-symbol-dark-once.svg": "f87232a1b463f11624e7644b615f85cb6ddbd0eaa70cc9de1a186ac5c2f641fe",
-    "introify-symbol-dark-still.svg": "6c165a2d2f21ee8e113ce3f3e7a6ae3f5b6f66615197a142f918735d08e5444e"
+    "introify-logo-light-once.svg": "492e66080fb28ea2bba22483c640739957628392b305a030291781f403a1cfa4",
+    "introify-logo-light-still.svg": "5d69241e206b149ed392203f3403fb17020216f92d2b395cd8d6a30555a37ba0",
+    "introify-logo-dark-once.svg": "7e8d87b6dce4f4a5fac629d447f9640c2cd80e08fb2fa7643625cfc28542bb32",
+    "introify-logo-dark-still.svg": "30fe1d720734b73403845b01143ca3b443612e78cf2123695af7569e6d563b6d",
+    "introify-symbol-light-once.svg": "0489a23108356cabd0b3d20fc7a61c4e7ccfa61a9e2a9b427acbcd53b8a679c5",
+    "introify-symbol-light-still.svg": "cbba861fd1c71c1a4cd6091efaff571382e372cc5584ed1614c4a1c8bd8b90d9",
+    "introify-symbol-dark-once.svg": "23e589115b36c102e9ddca19e4d0a2e973b409fe4dcfbb8a8f01a184095c6b8a",
+    "introify-symbol-dark-still.svg": "2df903749deed999b11566f82e50aab0c7d51bdad1bfbfdfa58bcac2a88f4ba9"
   }
 }

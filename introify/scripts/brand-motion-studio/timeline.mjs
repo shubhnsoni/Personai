@@ -1,4 +1,5 @@
-import {validate,buildMotion} from './core.mjs';
+import {clipMotion,validateRange} from './clip.mjs';
+import {validate,buildSourceMotion} from './core.mjs';
 const n=v=>Math.round(v*1000)/1000;
 const easing=t=>t*t*(3-2*t);
 export function validateTake(input){
@@ -13,7 +14,7 @@ export function validateTake(input){
     return {time:n(frame.time),settings:validate(frame.settings)};
   }).sort((a,b)=>a.time-b.time);
   if(keyframes.some((frame,i)=>i&&frame.time===keyframes[i-1].time))throw Error('Two keyframes cannot share the same time.');
-  return {schemaVersion:1,baseVersion:8,name,duration:input.duration,loop:input.loop,keyframes};
+  return {schemaVersion:1,baseVersion:8,name,duration:input.duration,loop:input.loop,keyframes,...validateRange(input.rangeStart,input.rangeEnd)};
 }
 const lerp=(a,b,t)=>a+(b-a)*t;
 function stringMix(a,b,t){
@@ -45,7 +46,7 @@ export function buildTakeMotion(base,input){
   const keys=[...take.keyframes];
   if(keys[0].time>0)keys.unshift({...keys[0],time:0});
   if(take.loop){if(keys.at(-1).time===1)keys[keys.length-1]={time:1,settings:keys[0].settings};else keys.push({time:1,settings:keys[0].settings});}
-  const frames=keys.map(frame=>({...frame,motion:bake(buildMotion(base,frame.settings),frame.settings),placement:placement(frame.settings)}));
+  const frames=keys.map(frame=>({...frame,motion:bake(buildSourceMotion(base,frame.settings),frame.settings),placement:placement(frame.settings)}));
   const strings=Object.keys(frames[0].motion).filter(k=>typeof frames[0].motion[k]==='string'&&k!=='keyTimes');
   const split=frames.map(frame=>Object.fromEntries(strings.map(k=>[k,frame.motion[k].split(';')])));
   const meshReference=frames.find(frame=>frame.motion.orbitPanels)?.motion.orbitPanels;
@@ -61,5 +62,5 @@ export function buildTakeMotion(base,input){
   for(const key of strings)out[key]=finish(samples.map(({a,b,mix},i)=>stringMix(split[a][key][i],split[b][key][i],mix)));
   for(const key of Object.keys(frames[0].placement))out[key]=finish(samples.map(({a,b,mix})=>stringMix(frames[a].placement[key],frames[b].placement[key],mix)));
   if(meshReference)out.orbitPanels=meshReference.map((_,panel)=>Object.fromEntries(['d','color','front','back'].map(key=>[key,finish(samples.map(({a,b,mix},i)=>stringMix(panelTracks[a][panel][key][i],panelTracks[b][panel][key][i],mix)))])));
-  return out;
+  return clipMotion(out,take.rangeStart,take.rangeEnd);
 }

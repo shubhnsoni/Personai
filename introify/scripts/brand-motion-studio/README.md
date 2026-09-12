@@ -23,3 +23,7 @@ Every option contains its settings, exact compiled motion, keyframes when presen
 Saved takes can be reloaded and exported as JSON. SVG downloads include the active take, with placements baked into the animation and a frozen final frame for non-looping takes. The top save also updates `.local/brand-motion/finalized-settings.json` and `.local/brand-motion/finalized-motion-data.json` for implementation.
 
 Validation: `node --test introify/scripts/brand-motion-studio/*.test.mjs` from the repository root checks attachment, interpolation, validation, sequential option numbering, retry safety, file hashes and complete SVG/keyframe exports.
+
+### Playback range
+
+Start & end at the top of Motion controls selects a source interval in seconds. Use the timeline with Set start here / Set end here, or enter times. Use full animation restores the complete sequence. The range scales with playback speed and is included in settings JSON, saved options, keyframe takes and SVG exports. Keyframes retain their full source timeline; trimming is applied after baking the take. Recording captures the full take, with range controls disabled until recording stops. Trimmed endpoints are preserved and may form a visible jump when looping.

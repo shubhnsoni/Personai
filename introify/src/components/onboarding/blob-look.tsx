@@ -1,6 +1,7 @@
 "use client"
 
 import { toast } from "sonner"
+import { AzureMoods } from "@/components/dashboard/azure-moods"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import {
     BLOUB_AURAS,
@@ -169,6 +170,7 @@ export function BlobLookStudio({
                 </section>
             ) : null}
 
+            <AzureMoods value={value} onChange={onChange} dark />
             {usesAnimojiFaces(value) ? (
                 <section className="space-y-3">
                     <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Face</p>
