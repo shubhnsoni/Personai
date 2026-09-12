@@ -4,6 +4,16 @@ body:has([data-public-browser-theme]) {
   background-color: var(--profile-bg);
 }
 
+html:has([data-public-browser-theme="classic"]),
+body:has([data-public-browser-theme="classic"]) {
+  background-color: oklch(0.97 0.008 240);
+}
+
+html.dark:has([data-public-browser-theme="classic"]),
+html.dark body:has([data-public-browser-theme="classic"]) {
+  background-color: oklch(0.08 0.02 250);
+}
+
 html:has([data-public-browser-theme="retro-lcd"]),
 body:has([data-public-browser-theme="retro-lcd"]) {
   background-color: #c4d58a;
@@ -48,7 +58,6 @@ html.dark body:has([data-public-browser-theme="liquid-chrome"]) {
 [data-profile-viewport] {
   box-sizing: border-box;
   min-height: 100dvh;
-  background-color: var(--profile-bg, var(--background));
   padding-top: env(safe-area-inset-top, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);

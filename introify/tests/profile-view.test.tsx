@@ -206,6 +206,46 @@ describe("ProfileView - intro chips follow contentDisplayMode", () => {
         expect(screen.getByText("Services & Pricing")).toBeTruthy()
     })
 
+    it("puts WhatsApp, maps and Zomato on a smaller row under the chips, not among them", () => {
+        render(
+            <ProfileView
+                profile={{
+                    ...PROFILE,
+                    whatsapp: "919262268837",
+                    personalityConfig: JSON.stringify({
+                        socials: {
+                            instagram: "https://www.instagram.com/skydine.ranchi/",
+                            maps: "https://www.google.com/maps/place/SkyDine",
+                            zomato: "https://www.zomato.com/ranchi/skydine-cafe-doranda",
+                        },
+                    }),
+                    serviceOfferings: [
+                        {
+                            id: "s1",
+                            name: "Consult",
+                            description: null,
+                            priceCents: 0,
+                            isFree: true,
+                            durationMinutes: 30,
+                            isActive: true,
+                        },
+                    ],
+                }}
+                animationConfig={{}}
+                colors={["#52E8FF"]}
+            />,
+        )
+        const chips = document.querySelector("[data-welcome-chips]")
+        const contact = document.querySelector("[data-profile-contact]")
+        expect(chips?.contains(contact)).toBe(true)
+        expect(chips?.querySelector("[data-slot='chip']")?.getAttribute("aria-label")).not.toBe("WhatsApp")
+        expect(screen.getByRole("link", { name: "WhatsApp" })).toBeTruthy()
+        expect(screen.getByRole("link", { name: "Maps" })).toBeTruthy()
+        expect(screen.getByRole("link", { name: "Zomato" })).toBeTruthy()
+        expect(screen.getByRole("link", { name: "Instagram" })).toBeTruthy()
+        expect(screen.queryByRole("button", { name: "WhatsApp" })).toBeNull()
+    })
+
     it("sends About to the dedicated about page instead of a photo wall", () => {
         render(
             <ProfileView

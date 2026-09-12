@@ -36,6 +36,7 @@ describe("Public business viewport boundary", () => {
         const { container, rerender } = render(contents())
         const frame = container.firstElementChild as HTMLElement
         expect(frame.hasAttribute("data-profile-viewport")).toBe(true)
+        expect(frame.className).toMatch(/\bbg-profile\b/)
         expect(frame.style.height).toBe("780px")
         expect(frame.querySelector("main")).not.toBeNull()
         expect(frame.querySelector("footer")).not.toBeNull()
@@ -44,7 +45,8 @@ describe("Public business viewport boundary", () => {
         rerender(contents())
         expect(frame.hasAttribute("data-profile-viewport")).toBe(false)
         expect(frame.style.height).toBe("")
-        expect(frame.className).toBe("")
+        expect(frame.className).toMatch(/\bbg-profile\b/)
+        expect(frame.className).not.toMatch(/\bh-dvh\b/)
         expect(remove).toHaveBeenCalledWith("resize", add.mock.calls[0][1])
         expect(frame.getAttribute("data-public-business-theme")).toBe("retro-lcd")
     })

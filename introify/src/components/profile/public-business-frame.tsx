@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 import { PublicBrowserTheme } from "@/components/profile/public-browser-theme"
 import { visualKeyboardOpen } from "@/lib/visual-keyboard"
+import { cn } from "@/lib/utils"
 import "@/components/profile/public-business-frame.css"
 
 /** The chat and its footer share one viewport; linked catalogues retain normal page scrolling. */
@@ -46,7 +47,7 @@ export function PublicBusinessFrame({ children, profilePath, theme }: {
             data-public-business-theme={theme}
             data-public-browser-theme={isBusiness ? theme : undefined}
             data-profile-viewport={isProfile ? "" : undefined}
-            className={isProfile ? "flex h-dvh min-h-0 w-full flex-col overflow-hidden" : undefined}
+            className={cn(isBusiness && "bg-profile", isProfile && "flex h-dvh min-h-0 w-full flex-col overflow-hidden")}
         >
             <PublicBrowserTheme active={isBusiness} theme={theme} frameRef={frameRef} />
             {children}

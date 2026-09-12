@@ -20,6 +20,7 @@ import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { wantsLiveSupport } from "@/lib/live-support"
 import { toast } from "sonner"
 import { resolveBloubTheme, resolveThemedOrb } from "@/lib/bloub/catalog"
+import { typingInputGaze } from "@/lib/chat-gaze"
 import type { PublicAnimationConfig } from "@/lib/profile-branding"
 import { subscribeVisualKeyboard, visualKeyboardOpen } from "@/lib/visual-keyboard"
 import "@/components/profile/retro-lcd-theme.css"
@@ -64,7 +65,7 @@ interface ChatInterfaceProps {
     isPanelOpen?: boolean
     onIntroStage?: (stage: "hi" | "type" | "orb" | "ready") => void
     headerActions?: ReactNode
-    headerLinks?: ReactNode
+    contactLinks?: ReactNode
 }
 
 type RichContentType = "experience" | "projects" | "about" | "services" | "products" | "courses" | "events" | "communities"
@@ -79,7 +80,7 @@ export function ChatInterface({
     animationConfig = {},
     onIntroStage,
     headerActions,
-    headerLinks,
+    contactLinks,
 }: ChatInterfaceProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState("")
@@ -388,14 +389,7 @@ export function ChatInterface({
     }
 
     const hasStarted = messages.length > 0
-    const typingGaze = inputFocused || input.length > 0
-        ? {
-            x: input.length === 0
-                ? -0.72
-                : Math.min(0.92, -0.78 + (Math.min(input.length, 28) / 28) * 1.7),
-            y: -0.92,
-        }
-        : null
+    const typingGaze = typingInputGaze(input.length, inputFocused)
     const lastMsg = messages[messages.length - 1]
     const orbMood =
         isLoading && lastMsg?.role === "assistant" && lastMsg.content
@@ -430,47 +424,51 @@ export function ChatInterface({
                 ["--chat-on-accent" as string]: orbTheme.onAccent,
             }}
         >
-            <ChatHeader
-                identity={hasStarted ? <>
-                    <div className="shrink-0">
-                        <ChatAvatar
-                            size={36}
-                            name={profile.displayName}
-                            imageUrl={profile.imageUrl}
-                            mode={profile.chatAvatarMode}
-                            colors={orbColors}
-                            variant={animationConfig.variant}
-                            look={animationConfig.look}
-                            skin={animationConfig.skin}
-                            shape={animationConfig.shape}
-                            expression={animationConfig.expression}
-                            color={animationConfig.color}
-                            aura={animationConfig.aura}
-                            theme={botTheme}
-                            speed={animationConfig.speed}
-                            intensity={animationConfig.intensity}
-                            gaze={typingGaze}
-                            mood={orbMood}
-                            reactToken={orbReact}
+            {hasStarted ? (
+                <ChatHeader
+                    identity={<>
+                        <div className="shrink-0">
+                            <ChatAvatar
+                                size={36}
+                                name={profile.displayName}
+                                imageUrl={profile.imageUrl}
+                                mode={profile.chatAvatarMode}
+                                colors={orbColors}
+                                variant={animationConfig.variant}
+                                look={animationConfig.look}
+                                skin={animationConfig.skin}
+                                shape={animationConfig.shape}
+                                expression={animationConfig.expression}
+                                color={animationConfig.color}
+                                aura={animationConfig.aura}
+                                theme={botTheme}
+                                speed={animationConfig.speed}
+                                intensity={animationConfig.intensity}
+                                gaze={typingGaze}
+                                mood={orbMood}
+                                reactToken={orbReact}
+                            />
+                        </div>
+                        <span className="font-semibold text-ui text-profile-text truncate min-w-0">
+                            {chatMode === "LIVE" ? profile.displayName : `${profile.displayName}'s AI`}
+                        </span>
+                    </>}
+                    primaryAction={!keyboardOpen && primaryChip ? (
+                        <Chip
+                            variant="profile"
+                            size="sm"
+                            highlighted={primaryChip.highlighted}
+                            icon={primaryChip.icon}
+                            label={primaryChip.label}
+                            onClick={() => handleChip(primaryChip)}
                         />
-                    </div>
-                    <span className="font-semibold text-ui text-profile-text truncate min-w-0">
-                        {chatMode === "LIVE" ? profile.displayName : `${profile.displayName}'s AI`}
-                    </span>
-                </> : undefined}
-                primaryAction={hasStarted && !keyboardOpen && primaryChip ? (
-                    <Chip
-                        variant="profile"
-                        size="sm"
-                        highlighted={primaryChip.highlighted}
-                        icon={primaryChip.icon}
-                        label={primaryChip.label}
-                        onClick={() => handleChip(primaryChip)}
-                    />
-                ) : undefined}
-                actions={headerActions}
-                links={headerLinks}
-            />
+                    ) : undefined}
+                    actions={headerActions}
+                    links={contactLinks}
+                />
+            ) : headerActions ? (
+                <div className="absolute right-3 top-3 z-20">{headerActions}</div>
+            ) : null}
 
             <div
                 ref={scrollRef}
@@ -493,6 +491,7 @@ export function ChatInterface({
                         welcome={profile.welcomeMessageOverride}
                         topics={topics}
                         chips={emptyChips}
+                        contact={contactLinks}
                         compact={keyboardOpen}
                         onChip={handleChip}
                         orb={
@@ -661,8 +660,7 @@ export function ChatInterface({
             </div>
 
             <div data-chat-composer className={cn(
-                "relative shrink-0 w-full bg-profile pt-2 transition-opacity duration-500",
-                keyboardOpen ? "pb-2" : "pb-[max(0.5rem,env(safe-area-inset-bottom))]",
+                "relative shrink-0 w-full bg-profile pt-2 pb-2 transition-opacity duration-500",
                 !hasStarted && !introReady && "pointer-events-none opacity-0"
             )}>
                 <div
@@ -808,6 +806,7 @@ function WelcomeIntro({
     welcome,
     topics,
     chips,
+    contact,
     compact = false,
     onChip,
     orb,
@@ -821,6 +820,7 @@ function WelcomeIntro({
     welcome?: string | null
     topics?: string[]
     chips: ChatChip[]
+    contact?: ReactNode
     compact?: boolean
     onChip: (chip: ChatChip) => void
     orb: ReactNode
@@ -991,23 +991,39 @@ function WelcomeIntro({
                 </AnimatePresence>
             </div>
 
-            {!compact && <div data-welcome-chips className="relative z-[1] flex min-h-[2.75rem] flex-wrap justify-center gap-2 max-w-xl">
-                {visibleStage === "ready" && chips.map((chip, i) => (
-                    <motion.div
-                        key={chip.id}
-                        initial={skip ? false : { opacity: 0, y: 14, filter: "blur(8px)" }}
-                        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                        transition={{ delay: 0.05 + i * 0.07, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-                    >
-                        <Chip
-                            variant="profile"
-                            highlighted={chip.highlighted}
-                            icon={chip.icon}
-                            label={chip.label}
-                            onClick={() => onChip(chip)}
-                        />
-                    </motion.div>
-                ))}
+            {!compact && <div data-welcome-chips className="relative z-[1] flex min-h-[2.75rem] flex-col items-center gap-2.5 max-w-xl">
+                {visibleStage === "ready" && (
+                    <>
+                        <div className="flex flex-wrap justify-center gap-2">
+                            {chips.map((chip, i) => (
+                                <motion.div
+                                    key={chip.id}
+                                    initial={skip ? false : { opacity: 0, y: 14, filter: "blur(8px)" }}
+                                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                                    transition={{ delay: 0.05 + i * 0.07, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                                >
+                                    <Chip
+                                        variant="profile"
+                                        highlighted={chip.highlighted}
+                                        icon={chip.icon}
+                                        label={chip.label}
+                                        onClick={() => onChip(chip)}
+                                    />
+                                </motion.div>
+                            ))}
+                        </div>
+                        {contact ? (
+                            <motion.div
+                                data-welcome-contact
+                                initial={skip ? false : { opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.12, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                            >
+                                {contact}
+                            </motion.div>
+                        ) : null}
+                    </>
+                )}
             </div>}
         </div>
     )

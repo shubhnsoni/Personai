@@ -12,9 +12,10 @@ import { extrasOf, isDigitalCatalogItem, publicChipAllowed, shopNavLabel } from 
 import { resolveKitRole } from "@/lib/role-alias"
 import { CheckoutSheet, type CheckoutItem } from "@/components/checkout/checkout-sheet"
 import { TipSheet } from "@/components/profile/tip-sheet"
-import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, Instagram, Facebook, Youtube, MapPin } from "lucide-react"
+import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images } from "lucide-react"
 import { storyLabel, storyPath } from "@/lib/story"
 import { hasSocials, socialsFromConfig } from "@/lib/socials"
+import { ProfileContactRow } from "@/components/profile/profile-contact-row"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { useLiveOrders } from "@/components/shop/use-live-order"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -274,33 +275,14 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                         topics={welcomeTopics(profile)}
                         onIntroStage={setIntroStage}
                         headerActions={<ModeToggle />}
-                        headerLinks={hasSocials(socials) ? <>
-                            {socials.instagram ? (
-                                <a href={socials.instagram} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Instagram">
-                                    <Instagram className="h-3.5 w-3.5" />
-                                </a>
-                            ) : null}
-                            {socials.facebook ? (
-                                <a href={socials.facebook} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Facebook">
-                                    <Facebook className="h-3.5 w-3.5" />
-                                </a>
-                            ) : null}
-                            {socials.youtube ? (
-                                <a href={socials.youtube} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="YouTube">
-                                    <Youtube className="h-3.5 w-3.5" />
-                                </a>
-                            ) : null}
-                            {socials.maps ? (
-                                <a href={socials.maps} target="_blank" rel="noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-profile-chip text-profile-text dark:border-white/10" aria-label="Maps">
-                                    <MapPin className="h-3.5 w-3.5" />
-                                </a>
-                            ) : null}
-                            {socials.zomato ? (
-                                <a href={socials.zomato} target="_blank" rel="noreferrer" className="flex h-8 items-center rounded-full border border-black/10 bg-profile-chip px-2 text-[11px] font-medium text-profile-text dark:border-white/10">
-                                    Zomato
-                                </a>
-                            ) : null}
-                        </> : undefined}
+                        contactLinks={(profile.whatsapp || hasSocials(socials)) ? (
+                            <ProfileContactRow
+                                name={profile.displayName}
+                                whatsapp={profile.whatsapp}
+                                socials={socials}
+                                onWhatsApp={() => track(profile.slug, "wa_tap")}
+                            />
+                        ) : undefined}
                     />
                 </div>
             </div>
@@ -599,11 +581,8 @@ function buildGoalChips(
         wa: {
             id: "wa",
             label: "",
-            available: Boolean(profile.whatsapp),
+            available: false,
             icon: <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />,
-            href: profile.whatsapp
-                ? `https://wa.me/${profile.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${profile.displayName}`)}`
-                : undefined,
         },
         tip: {
             id: "tip",

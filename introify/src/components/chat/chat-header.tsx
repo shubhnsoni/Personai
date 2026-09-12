@@ -56,7 +56,7 @@ export function ChatHeader({ identity, primaryAction, actions, links, className 
                 <nav
                     aria-label="Business links"
                     data-chat-header-links
-                    className="col-span-2 row-start-2 flex min-w-0 flex-wrap items-center justify-end gap-2 md:col-span-1 md:col-start-2 md:row-start-1 md:max-w-80 [&>a]:min-h-10 [&>a]:min-w-10 [&>a]:shrink-0 [&>a]:focus-visible:outline-none [&>a]:focus-visible:ring-2 [&>a]:focus-visible:ring-profile-ring [&>a]:focus-visible:ring-offset-2"
+                    className="col-span-2 row-start-2 flex min-w-0 flex-wrap items-center justify-end md:col-span-1 md:col-start-2 md:row-start-1 md:max-w-80"
                 >
                     {links}
                 </nav>
