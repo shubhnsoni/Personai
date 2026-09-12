@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest"
 import { CUSTOMIZER_BOTS, BLOB_COLOR_STOPS, BLOB_SHAPES, blobColorFromIndex, blobColorIndex, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, BLOUB_THEMES, DEFAULT_BLOUB_PICK, lookThemesFor, clampOrbForPlan, customizerBotPick, usesAnimojiFaces } from "@/lib/bloub/catalog"
 import { assistantPendingPhrase, typingInputGaze } from "@/lib/chat-gaze"
-import { ANIMOJI_FACES, animojiClipForMood } from "@/lib/animoji"
+import { ANIMOJI_FACES, animojiClipForMood, resolveAnimojiId } from "@/lib/animoji"
 
 describe("customise bots", () => {
     it("shows Blob, Animoji, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
@@ -26,7 +26,7 @@ describe("customise bots", () => {
         }
         expect(lookThemesFor(DEFAULT_BLOUB_PICK).map((theme) => theme.id)).toEqual(["classic"])
         expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "pixel", skin: "crt" })).toEqual([])
-        expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "laugh" })).toEqual([])
+        expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "sun" })).toEqual([])
         expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "glass" })).toEqual([])
         expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, theme: "astral-nebula" }).map((theme) => theme.id)).toEqual(["astral-nebula"])
     })
@@ -55,16 +55,19 @@ describe("blob gaze while typing", () => {
 })
 
 describe("animoji bot", () => {
-    it("keeps the Creative Emoji pack as one free bot with chat mood clips", () => {
+    it("ships three coded faces and keeps the chosen face through chat mood", () => {
         const animoji = CUSTOMIZER_BOTS.find((bot) => bot.id === "animoji")!
         expect(customizerBotPick(animoji, DEFAULT_BLOUB_PICK)).toMatchObject({ look: "animoji", skin: "bounce" })
-        expect(usesAnimojiFaces({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "laugh" })).toBe(true)
-        expect(clampOrbForPlan({ look: "animoji", skin: "wow" }, false)).toMatchObject({ look: "animoji", skin: "wow" })
-        expect(ANIMOJI_FACES).toHaveLength(30)
+        expect(usesAnimojiFaces({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "sun" })).toBe(true)
+        expect(ANIMOJI_FACES.map((item) => item.id)).toEqual(["bounce", "sun", "et"])
+        expect(resolveAnimojiId("laugh")).toBe("bounce")
+        expect(resolveAnimojiId("wow")).toBe("bounce")
+        expect(clampOrbForPlan({ look: "animoji", skin: "wow" }, false)).toMatchObject({ look: "animoji", skin: "bounce" })
+        expect(clampOrbForPlan({ look: "animoji", skin: "et" }, false)).toMatchObject({ look: "animoji", skin: "et" })
         expect(animojiClipForMood("sun", "idle")).toBe("sun")
-        expect(animojiClipForMood("sun", "thinking")).toBe("coffee")
-        expect(animojiClipForMood("sun", "speaking")).toBe("laugh")
-        expect(animojiClipForMood("sun", "listening")).toBe("curious")
-        expect(animojiClipForMood("sun", "greeting")).toBe("bounce")
+        expect(animojiClipForMood("sun", "thinking")).toBe("sun")
+        expect(animojiClipForMood("sun", "speaking")).toBe("sun")
+        expect(animojiClipForMood("et", "listening")).toBe("et")
+        expect(animojiClipForMood("bounce", "greeting")).toBe("bounce")
     })
 })

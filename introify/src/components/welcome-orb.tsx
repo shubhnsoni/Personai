@@ -212,6 +212,7 @@ export function WelcomeOrb({
                     mood={mood}
                     still={still || reducedMotion || frozenAt !== undefined}
                     size={size}
+                    gaze={look}
                 />
             ) : themed ? (
                 retro ? (

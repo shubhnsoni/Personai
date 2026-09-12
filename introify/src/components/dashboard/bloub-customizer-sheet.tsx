@@ -159,8 +159,8 @@ export function BloubCustomizerSheet({
                     {tab === "mood" ? (
                         usesAnimojiFaces(value) ? (
                             <section className="space-y-2">
-                                <p className="text-xs font-medium">Emoji</p>
-                                <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
+                                <p className="text-xs font-medium">Face</p>
+                                <div className="grid grid-cols-3 gap-2">
                                     {ANIMOJI_FACES.map((item) => {
                                         const selected = resolveAnimojiId(value.skin) === item.id
                                         return (
@@ -175,8 +175,8 @@ export function BloubCustomizerSheet({
                                                     selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
                                                 )}
                                             >
-                                                <WelcomeOrb still size={48} look="animoji" skin={item.id} aura="still" theme="classic" />
-                                                <span className="text-[10px] font-medium">{item.label}</span>
+                                                <WelcomeOrb still size={56} look="animoji" skin={item.id} aura="still" theme="classic" />
+                                                <span className="text-[11px] font-medium">{item.label}</span>
                                             </button>
                                         )
                                     })}
