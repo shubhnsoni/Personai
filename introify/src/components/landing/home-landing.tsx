@@ -1,105 +1,41 @@
 import Image from "next/image"
 import Link from "@/components/navigation/transition-link"
-import { ArrowDown, ArrowRight, ArrowUpRight, Check, CalendarDays, Link2, Plus, ScanLine, Sparkles } from "lucide-react"
+import { ArrowUpRight, ArrowUp, Link2, Check, Plus } from "lucide-react"
 import { MarketingShell } from "@/components/marketing/marketing-shell"
-import { IntroifyWordmark } from "@/components/brand/wordmark"
-import { PricingTeaser } from "@/components/billing/pricing-teaser"
 import { LandingMotion, MotionToggle } from "./brand-motion"
-import { ProfilePreview } from "./profile-preview"
-import { FeaturePlay } from "./feature-play"
-import { IntroifyGuide } from "./introify-guide"
-import { type UiLocale } from "@/lib/ui-locale"
+import { StoryBot, type StoryBotName } from "./story-bot"
+import { CharacterChooser, ConversationPreview } from "./story-experiences"
+import { LegacyHomeLanding } from "./legacy-home-landing"
+import { PUBLIC_PLANS } from "@/lib/billing/catalog"
 import { messagesFor } from "@/lib/ui-messages"
-import "./forest-home.css"
+import type { UiLocale } from "@/lib/ui-locale"
+import "./product-story.css"
 
-function Flower({ className = "" }: { className?: string }) {
-    return <svg className={className} viewBox="0 0 100 100" aria-hidden="true" fill="none"><path d="M50 4v92M4 50h92M17.5 17.5l65 65m0-65-65 65" stroke="currentColor" strokeWidth="12" strokeLinecap="round" /></svg>
-}
+const stories: { key: string; headline: string; name: string; bot: StoryBotName; welcome: string; question: string; answer: string; action: string; caption: string; alt: string }[] = [
+    { key: "cafe", headline: "A better hello. Before the first sip.", name: "Little Hours Café", bot: "Pearl", welcome: "Good coffee. A warmer welcome.", question: "Do you have anything dairy-free?", answer: "Yes — our menu includes oat-milk drinks and dairy-free options. Have a look before you order.", action: "Explore the menu", caption: "From table card to menu. A guest opens your link, asks a question, and finds what to order — while you keep serving.", alt: "A café guest checking her phone beside a cappuccino while a barista works at the counter" },
+    { key: "shop", headline: "A little curiosity. A new favorite.", name: "Form & Field", bot: "Nyx", welcome: "Objects with a little more story.", question: "Tell me about your handmade pieces.", answer: "Our collection brings together ceramics and everyday objects from independent makers. Explore the pieces and their details.", action: "View the collection", caption: "From discovery to detail. Give a curious shopper one place to explore your collection and reach your store.", alt: "A shopper holding her phone and a ceramic vase in an independent homewares shop" },
+    { key: "studio", headline: "Less wondering. More showing up.", name: "Slow Days Studio", bot: "Ion", welcome: "A little space for yourself.", question: "I’m new to yoga. Where do I start?", answer: "Welcome! Our beginner class is a gentle place to begin. See what to expect, explore the schedule, and contact the studio with questions.", action: "Explore the classes", caption: "From ‘Is this for me?’ to a first visit. Help a newcomer understand your classes before they get in touch.", alt: "A visitor with a yoga mat checking his phone as an instructor welcomes him to a studio" },
+]
 
 export function HomeLanding({ locale = "en" }: { locale?: UiLocale }) {
-    const home = messagesFor(locale).home
-    const { hero, product, share, people, how, faq, final: closing, possibilities, promise } = home
-    return (
-        <MarketingShell className="brand-home" locale={locale}>
-            <LandingMotion>
-                <main id="main-content">
-                    <section className="fh-hero" aria-labelledby="fh-hero-title">
-                        <div className="fh-container fh-hero-grid">
-                            <div className="fh-hero-copy">
-                                <p className="fh-eyebrow"><span className="fh-status-dot" /> {hero.eyebrow}</p>
-                                <h1 id="fh-hero-title">{hero.title}<br />{hero.titleMid}<br /><em>{hero.titleEm}</em><Flower className="fh-heading-flower" /></h1>
-                                <p className="fh-hero-description">{hero.description}<br className="fh-desktop-break" /> {hero.descriptionMore}</p>
-                                <div className="fh-hero-actions"><Link className="fh-button" href="/sign-up">{hero.cta} <ArrowUpRight size={19} /></Link><Link className="fh-text-link" href="#in-action">{hero.secondary} <ArrowDown size={17} /></Link></div>
-                                <div className="fh-hero-notes"><span><Check size={13} /> {hero.free}</span><span><Check size={13} /> {hero.noCard}</span><span><Check size={13} /> {hero.yours}</span></div>
-                            </div>
-                            <div className="fh-hero-art"><ProfilePreview /><div className="fh-art-caption"><span>{hero.caption}</span><MotionToggle pause={home.pauseAnimations} resume={home.resumeAnimations} /></div></div>
-                        </div>
-                    </section>
-                    <div className="fh-possibilities"><div className="fh-container"><p>{possibilities.lead}<br /><strong>{possibilities.em}</strong></p><div><span>{possibilities.story}</span><Flower /><span>{possibilities.services}</span><Flower /><span>{possibilities.products}</span><Flower /><span>{possibilities.chapter}</span></div></div></div>
-                    <section className="fh-promise fh-section" id="promise" aria-labelledby="fh-promise-title">
-                        <div className="fh-container">
-                            <div className="fh-section-heading" data-reveal>
-                                <div>
-                                    <p className="fh-eyebrow">{promise.eyebrow}</p>
-                                    <h2 id="fh-promise-title">{promise.title}<br /><em>{promise.titleEm}</em></h2>
-                                </div>
-                                <p>{promise.lead}</p>
-                            </div>
-                            <div className="fh-promise-grid">
-                                {([
-                                    [promise.whoLabel, promise.whoTitle, promise.whoBody],
-                                    [promise.whatLabel, promise.whatTitle, promise.whatBody],
-                                    [promise.howLabel, promise.howTitle, promise.howBody],
-                                ] as const).map(([label, title, body], index) => (
-                                    <article className="fh-promise-card" key={label} data-reveal>
-                                        <span>0{index + 1} / {label}</span>
-                                        <h3>{title}</h3>
-                                        <p>{body}</p>
-                                    </article>
-                                ))}
-                            </div>
-                        </div>
-                    </section>
-                    <FeaturePlay locale={locale} />
-                    <section className="fh-product fh-section" id="product" aria-labelledby="fh-product-title">
-                        <div className="fh-container">
-                            <div className="fh-section-heading" data-reveal><div><p className="fh-eyebrow">{product.eyebrow}</p><h2 id="fh-product-title">{product.title}<br /><em>{product.titleEm}</em></h2></div><p>{product.lead}</p></div>
-                            <div className="fh-feature-grid">
-                                <article className="fh-feature fh-feature-story" data-reveal>
-                                    <div className="fh-feature-top"><span className="fh-index">{product.storyIndex}</span><Link2 size={21} /></div>
-                                    <h3>{product.storyTitle}<br />{product.storyTitle2}</h3><p>{product.storyBody}</p>
-                                    <div className="fh-link-stack" aria-hidden="true"><div><span className="fh-stack-icon">a.</span><span><strong>{product.about}</strong><small>{product.aboutSub}</small></span><ArrowUpRight size={18} /></div><div><span className="fh-stack-icon"><Sparkles size={19} /></span><span><strong>{product.made}</strong><small>{product.madeSub}</small></span><ArrowUpRight size={18} /></div><div><span className="fh-stack-icon"><Link2 size={19} /></span><span><strong>{product.find}</strong><small>{product.findSub}</small></span><ArrowUpRight size={18} /></div></div>
-                                    <span className="fh-feature-end">{product.storyEnd}</span>
-                                </article>
-                                <article className="fh-feature fh-feature-bookings" data-reveal>
-                                    <div className="fh-feature-top"><span className="fh-index">{product.timeIndex}</span><CalendarDays size={21} /></div><h3>{product.timeTitle}<br />{product.timeTitle2}</h3><p>{product.timeBody}</p>
-                                    <div className="fh-calendar" aria-hidden="true"><div><strong>{product.calendar}</strong><span>{product.duration}</span></div><div className="fh-calendar-days">{product.days.map((day, i) => <div className={i === 2 ? "is-chosen" : ""} key={`${day}-${i}`}><span>{day}</span><b>{12 + i}</b></div>)}</div><div className="fh-slots">{product.slots.map(slot => <span key={slot}>{slot}</span>)}</div></div>
-                                </article>
-                                <article className="fh-feature fh-feature-offers" data-reveal>
-                                    <div className="fh-feature-top"><span className="fh-index">{product.offerIndex}</span><ArrowUpRight size={21} /></div><h3>{product.offerTitle}<br />{product.offerTitle2}</h3><p>{product.offerBody}</p>
-                                    <div className="fh-offer-visual"><div className="fh-offer-photo"><Image src="/marketing/ceramic-vase.jpg" alt={product.vaseAlt} fill sizes="(max-width: 700px) 60vw, 260px" /></div><div className="fh-offer-label"><span>{product.offerKicker}</span><strong>{product.offerName}</strong><ArrowUpRight size={18} /></div></div>
-                                </article>
-                            </div>
-                        </div>
-                    </section>
-                    <section className="fh-share-section" aria-labelledby="fh-share-title">
-                        <div className="fh-container fh-share-grid">
-                            <div className="fh-share-copy" data-reveal><p className="fh-eyebrow">{share.eyebrow}</p><h2 id="fh-share-title">{share.title}<br />{share.titleMid}<br /><em>{share.titleEm}</em></h2><p>{share.body}</p><Link className="fh-button fh-button-lime" href="/sign-up">{share.cta} <ArrowUpRight size={19} /></Link></div>
-                            <div className="fh-share-art" data-reveal aria-hidden="true"><div className="fh-share-orbit" /><div className="fh-share-orbit fh-share-orbit-two" /><span className="fh-share-chip fh-share-chip-top"><Link2 size={16} /> {share.social}</span><div className="fh-name-card"><IntroifyWordmark decorative /><span>{share.hello}</span><strong>{share.happen}<br />{share.happen2}</strong><div className="fh-name-card-bottom"><span>{share.cardWork}<br />{share.cardLink}</span><ScanLine size={43} strokeWidth={1.4} /></div></div><span className="fh-share-chip fh-share-chip-bottom"><ArrowUpRight size={16} /> {share.next}</span><Flower className="fh-share-flower" /></div>
-                        </div>
-                    </section>
-                    <section className="fh-people fh-section" id="stories" aria-labelledby="fh-people-title">
-                        <div className="fh-container"><div className="fh-section-heading" data-reveal><div><p className="fh-eyebrow">{people.eyebrow}</p><h2 id="fh-people-title">{people.title}<br /><em>{people.titleEm}</em></h2></div><p>{people.lead}</p></div>
-                            <div className="fh-people-grid">{home.audiences.map((audience, i) => <article className="fh-person" key={audience.group} data-reveal><div className={`fh-person-photo fh-person-photo-${i}`}><Image src={audience.image} alt={audience.alt} fill sizes="(max-width: 700px) 92vw, (max-width: 1000px) 45vw, 390px" /><span>0{i + 1}</span><div className="fh-person-tags">{audience.tags.map(tag => <span key={tag}>{tag}</span>)}</div></div><p className="fh-eyebrow">{audience.group}</p><h3>{audience.title}</h3><p className="fh-person-description">{audience.text}</p><Link href="/sign-up" className="fh-text-link">{audience.cta} <ArrowUpRight size={17} /></Link></article>)}</div>
-                        </div>
-                    </section>
-                    <IntroifyGuide copy={messagesFor(locale).guide} />
-                    <PricingTeaser locale={locale} />
-                    <section className="fh-how fh-section" id="how-it-works" aria-labelledby="fh-how-title"><div className="fh-container"><div className="fh-section-heading" data-reveal><div><p className="fh-eyebrow">{how.eyebrow}</p><h2 id="fh-how-title">{how.title}<br /><em>{how.titleEm}</em></h2></div><Link href="/sign-up" className="fh-text-link">{how.cta} <ArrowUpRight size={19} /></Link></div><div className="fh-steps">{how.steps.map(([number, title, text]) => <article key={number} data-reveal><span>{number}<ArrowRight size={25} /></span><h3>{title}</h3><p>{text}</p></article>)}</div></div></section>
-                    <section className="fh-faq fh-section" id="faq" aria-labelledby="fh-faq-title"><div className="fh-container fh-faq-grid"><div data-reveal><p className="fh-eyebrow">{faq.eyebrow}</p><h2 id="fh-faq-title">{faq.title}<br /><em>{faq.titleEm}</em></h2><p>{faq.lead}</p><Flower className="fh-faq-flower" /></div><div className="fh-faq-list">{faq.items.map(([question, answer], i) => <details key={question} data-reveal><summary><span>0{i + 1}</span><h3>{question}</h3><Plus size={20} /></summary><p>{answer}</p></details>)}</div></div></section>
-                    <section className="fh-final" aria-labelledby="fh-final-title"><div className="fh-container" data-reveal><p className="fh-eyebrow">{closing.eyebrow}</p><h2 id="fh-final-title">{closing.title}<br /><em>{closing.titleEm}</em></h2><Link className="fh-button fh-button-lime" href="/sign-up">{closing.cta} <ArrowUpRight size={20} /></Link><p className="fh-final-note">{closing.note}</p><Flower className="fh-final-flower" /></div></section>
-                </main>
-            </LandingMotion>
-        </MarketingShell>
-    )
+    if (locale === "hi") return <LegacyHomeLanding locale={locale} />
+    return <MarketingShell className="product-story" locale={locale}><LandingMotion><main id="main-content">
+        <section className="ps-hero ps-wrap" aria-labelledby="ps-title">
+            <h1 id="ps-title">Your page.<br /><span>With a voice.</span></h1>
+            <p className="ps-lead">One page for your work, your business, your world.<br className="ps-desktop-break" /> An AI guide to help people explore it.</p>
+            <Link className="ps-button" href="/sign-up">Create your free page <ArrowUpRight size={18} /></Link><p className="ps-fine">Start free. No card needed.</p>
+            <div className="ps-hero-stage"><StoryBot name="Nyx" className="ps-hero-nyx" /><StoryBot name="Ion" className="ps-hero-ion" /><StoryBot name="Pearl" className="ps-hero-pearl" /><div className="ps-bubble ps-bubble-question">“Can you tell me more?”</div><div className="ps-bubble ps-bubble-answer">Of course. Where shall we start?</div></div>
+            <p className="ps-hero-caption">More than a link. A place to start a conversation.</p><MotionToggle />
+        </section>
+        <section className="ps-section ps-cloud" id="product"><div className="ps-wrap" data-reveal><header className="ps-heading ps-centered"><h2>Everything you do.<br />Beautifully introduced.</h2><p>Your story, work, services, and ways to get in touch.<br />All together. All unmistakably you.</p></header><div className="ps-browser"><div className="ps-browser-bar"><span aria-hidden="true">● ● ●</span> introify.com / maya</div><div className="ps-profile"><div><StoryBot name="Doodle" /><h3>Maya Lane.<br />Brand designer.</h3><p>I help thoughtful businesses look and feel like themselves.</p><Link className="ps-button" href="/sign-up">Build your own page <ArrowUpRight size={17} /></Link><ul><li>Selected work <ArrowUpRight size={16} /></li><li>Brand design & websites <ArrowUpRight size={16} /></li><li>Let’s talk <ArrowUpRight size={16} /></li></ul></div><div className="ps-work"><div>make<br />something<br />matter.</div><p>A place for your best work.<br /><span>And the next conversation it starts.</span></p></div></div></div></div></section>
+        <section className="ps-section ps-night" id="in-action"><div className="ps-wrap" data-reveal><header className="ps-heading"><h2>You’re busy.<br />Your page is listening.</h2><p>Help visitors explore what you do, with answers grounded in the information you add. Then point them toward the next step.</p></header><ConversationPreview /><p className="ps-fine">You choose the details. Your guide helps people find them.</p></div></section>
+        <section className="ps-section" id="stories"><div className="ps-wrap"><header className="ps-heading" data-reveal><h2>Small moments.<br />Real possibilities.</h2><p>At the counter. On the way. Before a first visit.<br />Be there for the questions that help someone take the next step.</p></header>{stories.map(story => <article className="ps-story" key={story.key} data-reveal><h3>{story.headline}</h3><div className={`ps-story-grid ps-story-${story.key}`}><div className="ps-lifestyle"><Image src={`/marketing/everyday/${story.key}.webp`} alt={story.alt} fill sizes="(max-width: 700px) 92vw, (max-width: 1000px) 58vw, 784px" /></div><div className="ps-phone" aria-label={`${story.name} mobile page example`}><div className="ps-phone-status"><span>9:41</span><span aria-hidden="true" className="ps-phone-island" /><span aria-hidden="true">▰</span></div><small>introify.com / {story.key === "cafe" ? "littlehours" : story.key === "shop" ? "formandfield" : "slowdays"}</small><StoryBot name={story.bot} /><h4>{story.name}</h4><p className="ps-phone-welcome">{story.welcome}</p><p className="ps-phone-question">{story.question}</p><p className="ps-phone-answer">{story.answer}</p><span className="ps-phone-action">{story.action} <ArrowUpRight size={15} /></span><div className="ps-phone-composer">Ask {story.name}… <ArrowUp size={18} /></div></div></div><p className="ps-story-caption">{story.caption}</p></article>)}</div></section>
+        <section className="ps-section ps-cloud" id="characters"><div className="ps-wrap" data-reveal><header className="ps-heading ps-centered"><h2>Find your kind<br />of character.</h2><p>Cosmic. Curious. Playful. Calm.<br />Choose a guide that feels at home on your page.</p></header><CharacterChooser /></div></section>
+        <section className="ps-section" id="share"><div className="ps-wrap" data-reveal><header className="ps-heading"><h2>One link.<br />So many ways in.</h2><p>Put it in your bio. Share it in a message. Add a QR code at your counter.<br />Your next customer can find you wherever the day takes them.</p></header><div className="ps-share-card"><StoryBot name="Pearl" /><div><Link2 size={28} /><h3>introify.com/you</h3><p>Your social bio. Your business card. Your next hello.</p><Link className="ps-button" href="/sign-up">Make your link <ArrowUpRight size={18} /></Link></div></div></div></section>
+        <section className="ps-section ps-cloud" id="how-it-works"><div className="ps-wrap" data-reveal><header className="ps-heading"><h2>Your details change.<br />Your page can, too.</h2><p>Start with the essentials. Add your work and offerings.<br />Keep the information your visitors need close at hand.</p></header><div className="ps-editor-scene"><div className="ps-editor"><h3>Your business essentials</h3><dl><div><dt>01 · Introduce yourself</dt><dd>Your name, story, and a character that feels like you.</dd></div><div><dt>02 · Add what you do</dt><dd>Work, products, services, hours, and useful answers.</dd></div><div><dt>03 · Share your page</dt><dd>One link. Ready for your next conversation.</dd></div></dl><Link className="ps-button" href="/sign-up">Start your page <Check size={17} /></Link></div><StoryBot name="Doodle" /></div></div></section>
+        <section className="ps-section"><div className="ps-wrap" data-reveal><header className="ps-heading"><h2>Different businesses.<br />One home.</h2><p>A studio. A side project. A second shop.<br />Give each its own page, and keep your work together.</p></header><div className="ps-businesses">{([["Aurum", "Maya Studio", "Brand design & websites"], ["Nyx", "Sunday Coffee", "Your neighborhood café"], ["Pearl", "Slow Days", "Space to slow down"]] as const).map(([bot, name, role]) => <div key={name}><StoryBot name={bot} /><h3>{name}</h3><p>{role}</p></div>)}</div><p className="ps-fine">Business includes up to {PUBLIC_PLANS.find(p => p.id === "business")?.limits.businesses} businesses. Allowances are shared across the account.</p></div></section>
+        <section className="ps-section ps-cloud" id="plans"><div className="ps-wrap" data-reveal><header className="ps-heading"><h2>Start small.<br />Grow from there.</h2><p>A free place to begin. More room when you need it.</p></header><div className="ps-plans">{PUBLIC_PLANS.map(plan => <article key={plan.id} data-featured={plan.recommended}><h3>{plan.name}</h3><p className="ps-price"><strong>${plan.monthlyCents / 100}</strong><span>/ month</span></p><p className="ps-muted">{plan.id === "free" ? "For your first page." : plan.id === "pro" ? "For your work and business." : "For a team with more to share."}</p><ul><li>{plan.limits.businesses} {plan.limits.businesses === 1 ? "business" : "businesses"} · {plan.limits.seats} {plan.limits.seats === 1 ? "seat" : "seats"}</li><li>{plan.aiCredits.toLocaleString("en-US")} AI credits / month</li><li>{plan.id === "free" ? "Fast AI replies" : "Fast, Smart & Reasoning AI"}</li><li>{plan.id === "free" ? "Your work, links & offerings" : "Custom branding & instructions"}</li></ul><Link className="ps-text-link" href={plan.id === "free" ? "/sign-up" : "/pricing"}>{plan.id === "free" ? "Start free" : `Explore ${plan.name}`} <ArrowUpRight size={17} /></Link></article>)}</div><p className="ps-fine">Monthly prices in USD. AI credits are shared across the account; usage varies by model.<br />Annual options, plan availability, and full details are on the <Link href="/pricing">pricing page</Link>.</p></div></section>
+        <section className="ps-section ps-faq" id="faq"><div className="ps-wrap"><header className="ps-heading"><h2>A few good questions.</h2></header>{messagesFor(locale).home.faq.items.map(([q,a]) => <details key={q}><summary>{q}<Plus size={20} /></summary><p>{a}</p></details>)}</div></section>
+        <section className="ps-section ps-night ps-closing"><div className="ps-wrap" data-reveal><p className="ps-eyebrow">A small link. A world of possibility.</p><h2>Your next hello<br />starts here.</h2><p className="ps-lead">Put your work, your world, and a little personality online.<br />Give people a place to find you — and a reason to stay.</p><Link className="ps-button" href="/sign-up">Create your free page <ArrowUpRight size={18} /></Link><p className="ps-fine">Start free. Make it yours. No card required.</p><div className="ps-footer-bots"><StoryBot name="Nyx" /><StoryBot name="Ion" /><StoryBot name="Pearl" /></div></div></section>
+    </main></LandingMotion></MarketingShell>
 }

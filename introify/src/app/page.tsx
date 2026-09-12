@@ -6,7 +6,7 @@ import {
 } from "@/lib/marketing-seo"
 
 export const metadata = marketingMetadata({
-    title: "Introify — Your personal page, work & bookings in one link",
+    title: "Introify — Your page. With a voice. | AI business pages",
     description: BRAND_DESCRIPTION,
     path: "/",
     languages: true,

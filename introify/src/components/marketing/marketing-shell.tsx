@@ -10,6 +10,7 @@ import { homeHash, localeHomePath, type UiLocale } from "@/lib/ui-locale"
 import { messagesFor } from "@/lib/ui-messages"
 import "./marketing.css"
 import "./marketing-theme.css"
+import "./public-blue.css"
 
 export function BrandMark({ locale = "en" }: { locale?: UiLocale }) {
     const chrome = messagesFor(locale).chrome

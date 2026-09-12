@@ -117,8 +117,8 @@ describe("AuthScreen", () => {
         expect(onAlternative).toHaveBeenCalledOnce()
         expect(screen.getByRole("link", { name: "Forgot password?" }).getAttribute("href")).toBe("/sign-in/reset-password")
         expect(screen.getByRole("link", { name: "Create an account" }).getAttribute("href")).toBe("/sign-up")
-        expect(screen.getByText("Illustrative profile and generated portrait.")).toBeTruthy()
-        expect(screen.getByRole("img", { name: "Illustrative portrait of a ceramic artist in her studio" })).toBeTruthy()
+        expect(screen.getByText("Ready when you are.")).toBeTruthy()
+        expect(screen.getByRole("img", { name: "Ion, an Introify AI guide" })).toBeTruthy()
     })
 
     it("uses the shared persisted theme control in the account header", () => {

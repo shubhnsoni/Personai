@@ -1,0 +1,21 @@
+{
+  "option": 12,
+  "status": "locked",
+  "name": "Saved motion",
+  "sourceKey": "finalize:c487f400-6c58-450d-bc01-69b0fa88a715",
+  "sourceHash": "b969fd3c148ee941a67edfafa38af8d59e46066580a9b88b6bd1f16492e64673",
+  "sourceTakeId": null,
+  "lockedAt": "2026-09-12T17:39:05.698Z",
+  "duration": 0.9986982592360677,
+  "keyframes": 0,
+  "files": {
+    "settings.json": "bb97718dede06235d9d6d2b23a0ddde7ae31cc95923950ea2cf3ec544b0edf0f",
+    "motion-data.json": "c8c561cfce535d4dc45a420249fc22f0a9e846ecb2a123ee737806b6d0914faf",
+    "introify-logo-light.svg": "3703fc073170e94d41ae9ce5abe0c41a6603d6ca0893b7061322566a3e36a628",
+    "introify-logo-dark.svg": "d306cc079c1e3e13c04c178c7a6c7d1be426c87eaea975e9757cd1ddcc6e9053",
+    "introify-symbol-light.svg": "fd942a8f89d8bc2c9fc5e5663e4f8c374f44c7c4835d62b000421131c4ab45ea",
+    "introify-symbol-dark.svg": "1af50e3548f0a1aef97f7033c7a62e33a362d7eed2cd4afab4d3b34a5c1af24b",
+    "index.html": "180ac949407bdf4220060c2812a3775b05e02c33ce27dcaa6da950b55b0389e5"
+  },
+  "integrityNote": "File checksums refreshed for the saved option assets included in the public-page release."
+}

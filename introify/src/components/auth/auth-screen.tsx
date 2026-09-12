@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
+import { StoryBot } from "@/components/landing/story-bot";
 import Link from "@/components/navigation/transition-link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, Check, Link2, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Sparkles } from "lucide-react";
 import { BrandMark } from "@/components/marketing/marketing-shell";
 import { ThemeToggle } from "@/components/marketing/theme-toggle";
 import "./auth.css";
@@ -60,37 +60,11 @@ export function AuthScreen({ children }: { children: React.ReactNode }) {
             <em>{current.emphasis}</em>
           </p>
           <p className="au-description">{current.description}</p>
-          <div className="au-story" aria-label="Illustrative creator page">
-            <div className="au-story-photo">
-              <Image
-                src="/marketing/ceramic-artist.png"
-                alt="Illustrative portrait of a ceramic artist in her studio"
-                fill
-                sizes="(max-width: 900px) 1px, (max-width: 1200px) 36vw, 440px"
-              />
-              <span className="au-story-label">A SPACE FOR WHAT YOU DO</span>
-            </div>
-            <div className="au-story-caption">
-              <div>
-                <strong>
-                  Mira Studio <span aria-hidden="true">✳</span>
-                </strong>
-                <span>CERAMICS & CREATIVE WORKSHOPS</span>
-              </div>
-              <ArrowUpRight size={22} aria-hidden="true" />
-            </div>
-            <div className="au-story-note">
-              <Link2 size={17} aria-hidden="true" />
-              <span>
-                Your work. Your story.
-                <br />
-                <strong>One place to begin.</strong>
-              </span>
-            </div>
+          <div className="au-bot-scene">
+            <p>Your page. With a voice.</p>
+            <StoryBot name={mode === "sign-up" ? "Pearl" : "Ion"} />
+            <p>{mode === "sign-up" ? "A little personality. A place of your own." : "Ready when you are."}</p>
           </div>
-          <p className="au-example-note">
-            Illustrative profile and generated portrait.
-          </p>
         </aside>
 
         <section className="au-form-column" aria-label={current.sectionLabel}>
