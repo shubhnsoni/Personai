@@ -81,7 +81,8 @@ export function SelectedBrand({ className, decorative = false, animated = true, 
             // Keep this entry consumed until the logo leaves the viewport.
         }, selection.duration * 1000)
     }
-    const width = symbol ? 260 : 870, height = symbol ? 260 : 219
+    // Match the padded source viewport: slightly smaller artwork with motion headroom.
+    const width = symbol ? 260 : 940.41, height = symbol ? 260 : 302.41
     return <svg ref={ref} xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${width} ${height}`}
         width={width} height={height} className={className} data-brand-option={selection.option}
         data-brand-playing={Boolean(sources)} role={decorative ? undefined : "img"}

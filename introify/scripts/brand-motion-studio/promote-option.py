@@ -21,10 +21,8 @@ for kind in ['logo', 'symbol']:
         original = (source / f'introify-{kind}-{mode}.svg').read_text()
         for playback in ['once', 'still']:
             root = ET.fromstring(original)
-            if kind == 'logo':
-                root.set('viewBox', '0 0 870 219')
-                root.set('width', '870')
-                root.set('height', '219')
+            # Preserve the saved viewport padding so the rotated dot stays visible.
+            # Tight cropping to the lettering bounds clips the icon during playback.
             for parent in root.iter():
                 for child in list(parent):
                     if child.tag == tag('style') or child.get('class') == 'still':
