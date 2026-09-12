@@ -1,10 +1,28 @@
 import { describe, expect, it } from "vitest"
 import { render } from "@testing-library/react"
-import { installMatchMedia } from "./helpers/match-media"
+import { installMatchMedia, REDUCE_MOTION } from "./helpers/match-media"
 import { AnimojiFace } from "@/components/animoji-face"
 import { ANIMOJI_IDS } from "@/lib/animoji"
 
 describe("coded animoji faces", () => {
+    it.each(ANIMOJI_IDS)("keeps %s selected while changing its saved and runtime expressions", (id) => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        const { container, rerender } = render(<AnimojiFace id={id} size={64} expression="heureux" />)
+        const face = container.querySelector<HTMLElement>("[data-animoji]")!
+        const happyPose = face.style.cssText
+        expect(face.dataset.animoji).toBe(id)
+        expect(face.dataset.expression).toBe("heureux")
+        expect(face.dataset.still).toBe("true")
+        rerender(<AnimojiFace id={id} size={64} expression="triste" />)
+        expect(face.dataset.animoji).toBe(id)
+        expect(face.dataset.expression).toBe("triste")
+        expect(face.style.cssText).not.toBe(happyPose)
+        rerender(<AnimojiFace id={id} size={64} expression="triste" mood="listening" />)
+        expect(face.dataset.expression).toBe("attentif")
+        rerender(<AnimojiFace id={id} size={64} expression="triste" mood="idle" />)
+        expect(face.dataset.expression).toBe("triste")
+    })
+
     it("draws one svg character per face, like LCD, never a smear strip", () => {
         installMatchMedia()
         expect(ANIMOJI_IDS).toHaveLength(27)

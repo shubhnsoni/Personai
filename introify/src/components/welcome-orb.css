@@ -3,40 +3,6 @@
   overflow: visible;
 }
 
-.pl-orb-aura {
-  position: absolute;
-  inset: 50%;
-  width: 118%;
-  height: 118%;
-  translate: -50% -50%;
-  pointer-events: none;
-}
-
-.pl-orb-aura i {
-  position: absolute;
-  inset: 0;
-  border: 1px solid color-mix(in srgb, var(--orb-aura, #f7f7f8) 55%, transparent);
-  border-radius: 999px;
-  opacity: 0;
-  animation: pl-orb-aura-ring calc(2.6s / var(--orb-speed, 1)) ease-out infinite;
-}
-
-.pl-orb-aura[data-rhythm="breathe"] i {
-  animation-duration: calc(4.2s / var(--orb-speed, 1));
-}
-
-.pl-orb-aura i:nth-child(2) { animation-delay: calc(0.85s / var(--orb-speed, 1)); }
-.pl-orb-aura i:nth-child(3) { animation-delay: calc(1.7s / var(--orb-speed, 1)); }
-
-@keyframes pl-orb-aura-ring {
-  0% { transform: scale(0.72); opacity: 0.42; }
-  100% { transform: scale(1.42); opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pl-orb-aura i { animation: none; opacity: 0.2; transform: scale(1.08); }
-}
-
 .pl-orb-scene {
   --orb-s: 200px;
   --orb-speed: 1;
@@ -159,8 +125,7 @@
     );
   border: none;
   box-shadow:
-    inset 0 calc(var(--orb-s) * -0.05) calc(var(--orb-s) * 0.1) color-mix(in srgb, var(--c-bright) 18%, transparent),
-    0 calc(var(--orb-s) * 0.025) calc(var(--orb-s) * 0.08) color-mix(in srgb, var(--c-deep) 18%, transparent);
+    inset 0 calc(var(--orb-s) * -0.05) calc(var(--orb-s) * 0.1) color-mix(in srgb, var(--c-bright) 18%, transparent);
   overflow: hidden;
   animation:
     pl-orb-float calc(4.2s / var(--orb-speed)) ease-in-out infinite,
@@ -225,6 +190,8 @@
   z-index: 4;
   pointer-events: none;
   transition: transform 0.16s ease-out;
+  rotate: var(--bot-face-angle, 0deg);
+  translate: 0 var(--bot-face-y, 0%);
 }
 
 .pl-orb-eye {
@@ -240,14 +207,19 @@
   overflow: hidden;
   background: rgba(255, 255, 255, 0.08);
   transform-origin: center;
+  scale: var(--bot-eye-x, 1) var(--bot-eye-y, 1);
 }
 
 .pl-orb-eye:first-child {
   left: 0;
+  rotate: var(--bot-eye-left-angle, 0deg);
+  translate: calc((1 - var(--bot-eye-gap, 1)) * 25%) 0;
 }
 
 .pl-orb-eye:nth-child(2) {
   right: 0;
+  rotate: var(--bot-eye-right-angle, 0deg);
+  translate: calc((var(--bot-eye-gap, 1) - 1) * 25%) 0;
 }
 
 .pl-orb-pupil {
@@ -292,6 +264,8 @@
   height: 100%;
   overflow: visible;
   transform-origin: 50% 38%;
+  scale: var(--bot-mouth-scale, 1);
+  rotate: var(--bot-mouth-angle, 0deg);
 }
 
 .pl-orb-mouth {
@@ -335,20 +309,6 @@
     inset calc(var(--orb-s) * -0.037) calc(var(--orb-s) * -0.03) calc(var(--orb-s) * 0.07) color-mix(in srgb, var(--c-bright) 12%, transparent);
   pointer-events: none;
   z-index: 6;
-}
-
-.pl-orb-shadow {
-  position: absolute;
-  width: 59%;
-  height: 7.8%;
-  left: 50%;
-  bottom: -1%;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  background: var(--c-shadow);
-  filter: blur(calc(var(--orb-s) * 0.047));
-  animation: pl-orb-shadow calc(4.2s / var(--orb-speed)) ease-in-out infinite;
-  z-index: 0;
 }
 
 /* Variant personalities */
@@ -438,7 +398,7 @@
 }
 
 .pl-orb.is-error .pl-orb-mouth-svg {
-  transform: scaleY(-1) translateY(-20%);
+  transform: translateY(-10%);
 }
 
 .pl-orb.is-blinking:not(.is-delighted) .pl-orb-eye,
@@ -483,18 +443,6 @@
   }
   50% {
     rotate: 1.8deg;
-  }
-}
-
-@keyframes pl-orb-shadow {
-  0%,
-  100% {
-    transform: translateX(-50%) scaleX(1);
-    opacity: 0.26;
-  }
-  50% {
-    transform: translateX(-50%) scaleX(0.86);
-    opacity: 0.16;
   }
 }
 
@@ -755,7 +703,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pl-orb,
-  .pl-orb-shadow,
   .pl-orb-core,
   .pl-orb-core::before,
   .pl-orb-core::after,
@@ -808,4 +755,14 @@
   background: var(--slider-swatch, #00d7ff);
   border: 2px solid #fff;
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.28);
+}
+
+/* Pause every decorative layer, including legacy glass/pixel animations. */
+.pl-orb-scene[data-motion-paused="true"] .pl-pix.is-greeting .pl-pix-eye { opacity: 1; }
+.pl-orb-scene[data-motion-paused="true"] *,
+.pl-orb-scene[data-motion-paused="true"] *::before,
+.pl-orb-scene[data-motion-paused="true"] *::after {
+  animation-play-state: paused !important;
+  animation-delay: var(--orb-static-time, -.8s) !important;
+  transition: none !important;
 }

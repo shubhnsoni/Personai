@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { BotEngine, type BotFrame } from "@/lib/bloub/engine"
 import { NOTIF_BLUE } from "@/lib/bloub/decor"
-import { EXPRESSION_BY_ID, type ExpressionId } from "@/lib/bloub/expressions"
+import { EXPRESSION_BY_ID } from "@/lib/bloub/expressions"
+import { resolveBotExpression } from "@/lib/bot-expression"
 import { COLOR_BY_ID, SHAPE_BY_ID, contrastInk, mixHex } from "@/lib/bloub/skins"
 import { DEMI_VIEWBOX, RAYON } from "@/lib/bloub/repere"
 import { blobColorFromIndex, blobColorIndex, resolveBloubColor, resolveBloubExpression, resolveBloubShape } from "@/lib/bloub/catalog"
@@ -14,14 +15,13 @@ type OrbMood = "idle" | "listening" | "thinking" | "speaking" | "success" | "err
 
 const VB = DEMI_VIEWBOX
 
-const MOOD_EXPR: Record<OrbMood, ExpressionId | null> = {
-    idle: null,
-    listening: "attentif",
-    thinking: null,
-    speaking: "curieux",
-    success: "heureux",
-    error: "triste",
-    greeting: "excite",
+function subscribeReducedMotion(onChange: () => void) {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)")
+    query.addEventListener?.("change", onChange)
+    return () => query.removeEventListener?.("change", onChange)
+}
+function reducedMotionSnapshot() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches
 }
 
 const MOOD_STATE: Partial<Record<OrbMood, StateId>> = {
@@ -56,14 +56,16 @@ export function BloubOrb({
 }) {
     const uid = useId().replace(/:/g, "")
     const maskId = `bloub-mask-${uid}`
+    const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionSnapshot, () => true)
+    const freeze = frozenAt !== undefined || reducedMotion
     const [engine] = useState(() => {
         const radii = SHAPE_BY_ID.get(resolveBloubShape(shape))?.radii ?? null
-        const expr = EXPRESSION_BY_ID.get(resolveBloubExpression(expression)) ?? null
-        return new BotEngine(RAYON, "idle", radii, expr)
+        const expr = EXPRESSION_BY_ID.get(resolveBotExpression(expression, mood)) ?? null
+        return new BotEngine(RAYON, MOOD_STATE[mood] ?? "idle", radii, expr)
     })
     const clockRef = useRef(0)
     // Sample immediately so static/SSR markup paints the blob instead of a blank slot.
-    const [frame, setFrame] = useState<BotFrame>(() => engine.sample(frozenAt ?? 0.8))
+    const [animatedFrame, setFrame] = useState<BotFrame>(() => engine.sample(frozenAt ?? 0.8))
     const [wink, setWink] = useState(false)
     const [darkSurface, setDarkSurface] = useState(() => typeof document !== "undefined" && document.documentElement.classList.contains("dark"))
 
@@ -83,29 +85,38 @@ export function BloubOrb({
         ? blobColorFromIndex(blobColorIndex(variant)).hex
         : (COLOR_BY_ID.get(colorId)?.hex ?? "#0a0a0c")
     const ink = contrastInk(rawInk, darkSurface ? "dark" : "light")
-    const liveExprId = wink ? restExpr : (MOOD_EXPR[mood] ?? restExpr)
-    const liveState: StateId = wink ? "wink" : MOOD_STATE[mood] ?? "idle"
+    const liveExprId = wink && !freeze ? restExpr : resolveBotExpression(expression, mood)
+    const liveState: StateId = wink && !freeze ? "wink" : MOOD_STATE[mood] ?? "idle"
+    const staticFrame = useMemo(() => {
+        if (!freeze) return null
+        const staticEngine = new BotEngine(
+            RAYON, liveState,
+            SHAPE_BY_ID.get(shapeId)?.radii ?? null,
+            EXPRESSION_BY_ID.get(liveExprId) ?? null,
+        )
+        return staticEngine.sample(frozenAt ?? 0.8)
+    }, [freeze, frozenAt, liveState, shapeId, liveExprId])
+    const frame = staticFrame ?? animatedFrame
 
     useEffect(() => {
-        if (!reactToken) return
+        if (!reactToken || freeze) return
         const raf = window.requestAnimationFrame(() => setWink(true))
         const clear = window.setTimeout(() => setWink(false), 1600)
         return () => {
             window.cancelAnimationFrame(raf)
             window.clearTimeout(clear)
         }
-    }, [reactToken])
+    }, [reactToken, freeze])
 
     useEffect(() => {
         const now = clockRef.current
         engine.setShape(SHAPE_BY_ID.get(shapeId)?.radii ?? null, now)
         engine.setExpression(EXPRESSION_BY_ID.get(liveExprId) ?? null, now)
         engine.setState(liveState, now)
-        if (frozenAt !== undefined) setFrame(engine.sample(Math.max(frozenAt, now + BotEngine.SHAPE_MORPH)))
-    }, [engine, shapeId, liveExprId, liveState, frozenAt])
+    }, [engine, shapeId, liveExprId, liveState])
 
     useEffect(() => {
-        if (gaze) {
+        if (gaze && !freeze) {
             engine.setLook(
                 {
                     yaw: gaze.x * 16,
@@ -119,18 +130,10 @@ export function BloubOrb({
         } else {
             engine.setLook(null, clockRef.current)
         }
-    }, [engine, gaze])
+    }, [engine, gaze, freeze])
 
     useEffect(() => {
-        if (frozenAt !== undefined) {
-            const raf = requestAnimationFrame(() => setFrame(engine.sample(frozenAt)))
-            return () => cancelAnimationFrame(raf)
-        }
-        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        if (reduced) {
-            const raf = requestAnimationFrame(() => setFrame(engine.sample(0.8)))
-            return () => cancelAnimationFrame(raf)
-        }
+        if (freeze) return
         let raf = 0
         let last = 0
         const tick = (ms: number) => {
@@ -142,7 +145,7 @@ export function BloubOrb({
         }
         raf = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(raf)
-    }, [engine, frozenAt])
+    }, [engine, freeze])
 
     if (!frame) {
         return <div className={className} style={{ width: size, height: size }} aria-hidden />
@@ -154,6 +157,9 @@ export function BloubOrb({
             height={size}
             viewBox={`${-VB} ${-VB} ${VB * 2} ${VB * 2}`}
             className={cn("block", className)}
+            data-expression={liveExprId}
+            data-mood={mood}
+            data-still={freeze}
             role="img"
             aria-hidden
         >

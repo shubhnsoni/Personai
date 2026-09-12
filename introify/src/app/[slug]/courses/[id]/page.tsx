@@ -1,4 +1,5 @@
 import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
+import { resolveThemedOrb } from "@/lib/bloub/catalog"
 import { notFound } from "next/navigation"
 import Link from "@/components/navigation/transition-link"
 import { prisma } from "@/lib/prisma"
@@ -28,7 +29,7 @@ export default async function CourseSalesPage({ params }: { params: Promise<{ sl
     if (!course) notFound()
 
     const config = await publicAnimationConfig(course.profile.id, configuredProfileAnimation(course.profile))
-    const retro = config.theme === "retro-lcd"
+    const catalogTheme = resolveThemedOrb(config.theme)
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
     const outcomes: string[] = (() => {
         try {
@@ -45,14 +46,14 @@ export default async function CourseSalesPage({ params }: { params: Promise<{ sl
 
     return (
         <div
-            data-public-catalog-theme={retro ? "retro-lcd" : undefined}
-            className={retro ? "min-h-dvh bg-background text-foreground" : "dark min-h-dvh bg-zinc-950 text-zinc-100"}
-            style={retro ? undefined : {
+            data-public-catalog-theme={catalogTheme ?? undefined}
+            className={catalogTheme ? "min-h-dvh bg-background text-foreground" : "dark min-h-dvh bg-zinc-950 text-zinc-100"}
+            style={catalogTheme ? undefined : {
                 ["--pl-aurora" as string]: theme.accent,
                 ["--pl-brand-foreground" as string]: theme.onAccent,
             }}
         >
-            <CatalogHeader themeToggle={retro}
+            <CatalogHeader themeToggle={Boolean(catalogTheme)}
                 slug={slug}
                 name={course.profile.displayName}
                 logoUrl={logo}

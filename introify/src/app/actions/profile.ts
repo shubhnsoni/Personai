@@ -73,6 +73,21 @@ export async function updateProfile(profileId: string, data: ProfileUpdateData) 
         writeOwned: async ({ resourceId, profile }) => {
             const billing = await getProfileBilling(resourceId)
             const aiSettings = validateAiSettings(billing.planId, data)
+            const resultingImageUrl = data.imageUrl === undefined ? profile.imageUrl : data.imageUrl.trim()
+            const resultingPersonality = aiSettings.personalityConfig === undefined ? profile.personalityConfig : aiSettings.personalityConfig
+            if (resultingPersonality && !resultingImageUrl?.trim()) {
+                let personality: { orb?: { orbitProfile?: boolean } } | null = null
+                try { personality = JSON.parse(resultingPersonality) } catch { /* Already validated when submitted. */ }
+                if (personality?.orb?.orbitProfile === true) {
+                    if (data.imageUrl !== undefined && profile.imageUrl?.trim()) {
+                        // Removing a photo also removes its orbit; the selected bot remains intact.
+                        personality.orb.orbitProfile = false
+                        aiSettings.personalityConfig = JSON.stringify(personality)
+                    } else {
+                        throw new Error("Set up your profile photo before turning on Profile in orbit.")
+                    }
+                }
+            }
             let slug = data.slug
             if (slug) {
                 slug = normalizeUsername(slug)
@@ -108,7 +123,7 @@ export async function updateProfile(profileId: string, data: ProfileUpdateData) 
                     contentDisplayMode: data.contentDisplayMode,
                     personalityConfig: aiSettings.personalityConfig,
                     aiModel: aiSettings.aiModel,
-                    imageUrl: data.imageUrl || null,
+                    imageUrl: data.imageUrl === undefined ? undefined : resultingImageUrl || null,
                     shopLogoUrl: data.shopLogoUrl || null,
                     chatAvatarMode: data.chatAvatarMode === "IMAGE" ? "IMAGE" : "ORB",
                     autoMemoryEnabled: aiSettings.autoMemoryEnabled,

@@ -1,0 +1,105 @@
+.planet-orb {
+    display: block;
+    flex: none;
+    overflow: visible;
+    isolation: isolate;
+}
+
+.planet-character {
+    transform-origin: 160px 160px;
+    animation: planet-float calc(var(--planet-unit) * 5.4) ease-in-out infinite;
+}
+
+.planet-clouds {
+    animation: planet-weather calc(var(--planet-unit) * 19) ease-in-out infinite;
+}
+
+.planet-weather-texture {
+    animation: planet-weather calc(var(--planet-unit) * 27) ease-in-out infinite reverse;
+}
+
+.planet-eye {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 120ms ease;
+}
+
+.planet-face {
+    transform-origin: 161px 156px;
+}
+
+.planet-orb[data-mood="listening"] .planet-character {
+    animation-name: planet-listen;
+    animation-duration: calc(var(--planet-unit) * 3.8);
+}
+
+.planet-orb[data-mood="thinking"] .planet-face {
+    animation: planet-think calc(var(--planet-unit) * 3.6) ease-in-out infinite;
+}
+
+.planet-orb[data-mood="speaking"] .planet-mouth {
+    transform-origin: 161px 165px;
+    animation: planet-speak calc(var(--planet-unit) * .7) ease-in-out infinite;
+}
+
+.planet-orb[data-mood="greeting"] .planet-character,
+.planet-orb[data-mood="success"] .planet-character,
+.planet-orb[data-mood="react"] .planet-character {
+    animation: planet-greet calc(var(--planet-unit) * 1.2) ease-out 1;
+}
+
+.planet-orb[data-mood="error"] .planet-face {
+    animation: planet-no calc(var(--planet-unit) * .65) ease-in-out 1;
+}
+
+.planet-orb[data-frozen="true"] *,
+.planet-orb[data-still="true"] * {
+    animation-play-state: paused !important;
+    animation-delay: var(--planet-delay) !important;
+    transition: none !important;
+}
+
+@keyframes planet-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+@keyframes planet-weather {
+    0%, 100% { transform: translateX(-5px); }
+    50% { transform: translateX(7px); }
+}
+
+@keyframes planet-listen {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-2px) scale(1.014); }
+}
+
+@keyframes planet-think {
+    0%, 100% { transform: translate(0, 0); }
+    35%, 60% { transform: translate(3px, -3px); }
+}
+
+@keyframes planet-speak {
+    0%, 100% { transform: scaleY(.7); }
+    35% { transform: scaleY(1.5); }
+    65% { transform: scaleY(.95); }
+}
+
+@keyframes planet-greet {
+    0%, 100% { transform: translateY(0) scale(1); }
+    38% { transform: translateY(-7px) scale(1.025); }
+    70% { transform: translateY(1px) scale(.997); }
+}
+
+@keyframes planet-no {
+    0%, 100% { transform: translateX(0); }
+    25%, 65% { transform: translateX(-3px); }
+    45%, 80% { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .planet-orb * {
+        animation: none !important;
+        transition: none !important;
+    }
+}

@@ -1,0 +1,16 @@
+{
+  "option": 1,
+  "status": "locked",
+  "sourceFinalizedAt": "2026-09-12T13:19:09.593Z",
+  "lockedAt": "2026-09-12T13:22:56.396Z",
+  "files": {
+    "settings.json": "e564edff48943d4b63bf22fe812221874ea956bbeb2fe8d22346b22608d7700e",
+    "motion-data.json": "7bbd7a41cf024db50490b93f78454a63d734418cf139d93ecfb7a97fe77ff945",
+    "introify-logo-light.svg": "8250c38c77d77625ad1fa84de589818386e57ab2f82552910918bd465c0af4a9",
+    "introify-logo-dark.svg": "c69844b968ac707f2b9a53356ffe9ddc02c836029ef9e1ad1134f4f7ebca44fa",
+    "introify-symbol-light.svg": "5de8445c1d7064fe2e342810dd01728f3e0a424da64a8e21e232b78cbd2df083",
+    "introify-symbol-dark.svg": "a14dbc1dbc686b3896f11aeb8c4db7d629e4aad54af871a92da62b76a8ac4601",
+    "README.md": "0addc6e1c174a072383e67b9b3b7c3c959de905bd4f623d3484c895a5ad87ec9",
+    "index.html": "b2e709e1024b058933db277cf16d0970d6041fa9004d37d06b552c2b4abb5257"
+  }
+}

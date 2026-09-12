@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "baseVersion": 6,
+  "finalizedAt": "2026-09-12T13:19:09.593Z",
+  "settings": {
+    "speed": 0.75,
+    "movement": "gentle",
+    "ribbonHold": 1,
+    "logoHold": 1,
+    "exitTime": 1,
+    "sync": true,
+    "dotDelay": 0,
+    "strength": 1.45,
+    "dotX": 6,
+    "dotY": 10,
+    "dotScale": 1,
+    "ribbonX": -5,
+    "ribbonY": 7,
+    "ribbonScale": 0.875,
+    "gap": 18
+  }
+}

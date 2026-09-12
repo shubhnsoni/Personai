@@ -16,6 +16,7 @@ export function ChatAvatar({
     color,
     aura,
     theme,
+    orbitProfile,
     speed,
     intensity,
     gaze,
@@ -36,6 +37,7 @@ export function ChatAvatar({
     color?: string
     aura?: string
     theme?: string
+    orbitProfile?: boolean
     speed?: number
     intensity?: number
     gaze?: { x: number; y: number } | null
@@ -43,7 +45,7 @@ export function ChatAvatar({
     reactToken?: number
     className?: string
 }) {
-    const showImage = mode === "IMAGE" && !!imageUrl
+    const showImage = mode === "IMAGE" && !!imageUrl && !orbitProfile
 
     if (showImage) {
         return (
@@ -94,6 +96,8 @@ export function ChatAvatar({
             color={color}
             aura={aura}
             theme={theme}
+            orbitProfile={orbitProfile}
+            profileImageUrl={imageUrl}
             speed={speed || 1}
             intensity={intensity || 1}
             gaze={gaze}

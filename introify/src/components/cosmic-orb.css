@@ -1,0 +1,165 @@
+.cosmic-orb {
+    display: block;
+    flex: none;
+    overflow: visible;
+    isolation: isolate;
+}
+
+.cosmic-character {
+    transform-origin: 160px 160px;
+    animation: cosmic-hover calc(var(--cosmic-unit) * 6.4) ease-in-out infinite;
+}
+
+.cosmic-gas {
+    transform-origin: 160px 160px;
+    animation: cosmic-tide calc(var(--cosmic-unit) * 10.6) ease-in-out infinite;
+}
+
+.cosmic-gas--soft {
+    animation-direction: reverse;
+    animation-duration: calc(var(--cosmic-unit) * 14.8);
+}
+
+.cosmic-filaments {
+    animation-direction: reverse;
+    animation-duration: calc(var(--cosmic-unit) * 12.3);
+}
+
+.cosmic-veil {
+    transform-origin: 160px 162px;
+    animation: cosmic-breathe calc(var(--cosmic-unit) * 8.6) ease-in-out infinite;
+}
+
+.cosmic-spark {
+    animation: cosmic-twinkle calc(var(--cosmic-unit) * 4.7) ease-in-out infinite;
+    animation-delay: var(--spark-delay);
+}
+
+.cosmic-eye {
+    transform-origin: 0 0;
+    transition: transform 180ms ease;
+}
+
+.cosmic-eye-light,
+.cosmic-eye-halo {
+    transform-origin: 0 0;
+    animation: cosmic-starlight calc(var(--cosmic-unit) * 4.2) ease-in-out infinite;
+}
+
+.cosmic-eye-position:nth-child(2) .cosmic-eye-light {
+    animation-delay: calc(var(--cosmic-unit) * -.6);
+}
+
+.cosmic-orb[data-expression="timide"] .cosmic-eye-light {
+    opacity: .78;
+}
+
+.cosmic-orb[data-mood="listening"] .cosmic-eye-halo {
+    animation: cosmic-listening calc(var(--cosmic-unit) * 2.4) ease-in-out infinite;
+}
+
+.cosmic-orb[data-mood="thinking"] .cosmic-face {
+    animation: cosmic-thinking calc(var(--cosmic-unit) * 3.8) ease-in-out infinite;
+}
+
+.cosmic-orb[data-mood="speaking"] .cosmic-eye-light {
+    animation: cosmic-speaking calc(var(--cosmic-unit) * .76) ease-in-out infinite;
+}
+
+.cosmic-orb[data-mood="speaking"] .cosmic-eye-position:nth-child(2) .cosmic-eye-light {
+    animation-delay: calc(var(--cosmic-unit) * -.22);
+}
+
+.cosmic-orb[data-mood="greeting"] .cosmic-character,
+.cosmic-orb[data-mood="success"] .cosmic-character,
+.cosmic-orb[data-mood="react"] .cosmic-character {
+    animation: cosmic-greeting calc(var(--cosmic-unit) * 1.1) ease-out 1;
+}
+
+.cosmic-orb[data-mood="success"] .cosmic-eye-halo,
+.cosmic-orb[data-mood="react"] .cosmic-eye-halo {
+    animation: cosmic-listening calc(var(--cosmic-unit) * 1.6) ease-in-out infinite;
+}
+
+.cosmic-orb[data-mood="error"] .cosmic-face {
+    animation: cosmic-concern calc(var(--cosmic-unit) * .72) ease-in-out 1;
+}
+
+.cosmic-orb--cosmic-comic .cosmic-filaments {
+    opacity: .7;
+}
+
+.cosmic-orb[data-detail="false"] .cosmic-ribbons {
+    opacity: .78;
+}
+
+.cosmic-orb[data-detail="false"] .cosmic-eye-rays {
+    opacity: 1;
+}
+
+.cosmic-orb[data-still="true"] *,
+.cosmic-orb[data-frozen="true"] * {
+    animation-play-state: paused !important;
+    animation-delay: var(--cosmic-delay) !important;
+    transition: none !important;
+}
+
+@keyframes cosmic-hover {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(var(--cosmic-lift)); }
+}
+
+@keyframes cosmic-tide {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(var(--cosmic-drift), calc(var(--cosmic-drift) * -.42)) scale(var(--cosmic-breathe)); }
+}
+
+@keyframes cosmic-breathe {
+    0%, 100% { transform: scale(1); opacity: .62; }
+    50% { transform: scale(var(--cosmic-breathe)); opacity: 1; }
+}
+
+@keyframes cosmic-twinkle {
+    0%, 100% { opacity: .2; }
+    50% { opacity: .9; }
+}
+
+@keyframes cosmic-starlight {
+    0%, 100% { transform: scale(.96); opacity: .86; }
+    50% { transform: scale(1.04); opacity: 1; }
+}
+
+@keyframes cosmic-listening {
+    0%, 100% { transform: scale(.9); opacity: .6; }
+    50% { transform: scale(1.16); opacity: 1; }
+}
+
+@keyframes cosmic-thinking {
+    0%, 100% { transform: translate(0, 0); }
+    30%, 60% { transform: translate(3px, -3px); }
+}
+
+@keyframes cosmic-speaking {
+    0%, 100% { transform: scale(.87, .93); opacity: .75; }
+    32% { transform: scale(1.15, 1.05); opacity: 1; }
+    64% { transform: scale(.98, 1.06); opacity: .9; }
+}
+
+@keyframes cosmic-greeting {
+    0%, 100% { transform: translateY(0) scale(1); }
+    40% { transform: translateY(calc(var(--cosmic-lift) * 2.2)) scale(var(--cosmic-breathe)); }
+    74% { transform: translateY(1px) scale(.996); }
+}
+
+@keyframes cosmic-concern {
+    0%, 100% { transform: translateX(0); }
+    24%, 62% { transform: translateX(-2px); }
+    43%, 81% { transform: translateX(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cosmic-orb * {
+        animation: none !important;
+        transition: none !important;
+    }
+}

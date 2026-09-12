@@ -5,7 +5,7 @@
 .brand-home .mk-header-inner { height:86px; }
 .brand-home .mk-button { border-radius:8px; }
 .brand-home .mk-footer { border-top:0; background:var(--fh-paper); }
-.brand-home .mk-brand { width:140px; }
+.brand-home .mk-brand { width:183px; }
 .brand-home main { overflow:clip; }
 .fh-container { width:min(1240px,calc(100% - 96px)); margin-inline:auto; }
 .fh-section { padding-block:112px; }
@@ -185,7 +185,7 @@
 .fh-share-orbit { position:absolute; width:105%; height:75%; border:1px solid #315c3d; border-radius:50%; transform:rotate(-32deg); }
 .fh-share-orbit-two { width:85%; height:110%; transform:rotate(35deg); border-color:#244f37; }
 .fh-name-card { position:relative; z-index:2; display:flex; flex-direction:column; width:310px; max-width:100%; min-height:337px; background:#f2f2df; border:1px solid #eff2d4; border-radius:13px; padding:25px 28px 23px; color:#1b482d; transform:rotate(-8deg); box-shadow:0 20px 50px #00271944; }
-.fh-name-card > svg { --brand-accent:#548130; width:108px; height:auto; margin-bottom:32px; }
+.fh-name-card > svg { --brand-accent:#0073D5; width:141px; height:auto; margin-bottom:32px; }
 .fh-name-card > span { font-size:8px; letter-spacing:.14em; margin-bottom:13px; color:#73845b; }
 .fh-name-card > strong { font-size:30px; font-weight:550; line-height:1.1; letter-spacing:-.055em; }
 .fh-name-card-bottom { display:flex; justify-content:space-between; align-items:flex-end; margin-top:auto; padding-top:35px; }
@@ -361,7 +361,7 @@
 }
 @media(max-width:700px) {
     .fh-container { width:calc(100% - 40px); }
-    .brand-home .mk-brand { width:108px; }
+    .brand-home .mk-brand { width:141px; }
     .brand-home .mk-header-inner { height:73px; }
     .fh-section { padding-block:65px; }
     .fh-hero { padding-top:44px; padding-bottom:36px; }

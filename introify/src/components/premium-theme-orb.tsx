@@ -50,12 +50,6 @@ function NebulaArt({ uid, eyes }: { uid: string; eyes: React.ReactNode }) {
                     <stop offset="55%" stopColor="#170f33" />
                     <stop offset="100%" stopColor="#06040f" />
                 </radialGradient>
-                <radialGradient id={`${uid}-n-halo`} cx="50%" cy="50%" r="50%">
-                    <stop offset="52%" stopColor="#7c5cf0" stopOpacity="0" />
-                    <stop offset="74%" stopColor="#a06bff" stopOpacity="0.3" />
-                    <stop offset="86%" stopColor="#d96fe8" stopOpacity="0.16" />
-                    <stop offset="100%" stopColor="#d96fe8" stopOpacity="0" />
-                </radialGradient>
                 <radialGradient id={`${uid}-n-core`} cx="50%" cy="62%" r="42%">
                     <stop offset="0%" stopColor="#ffb3f1" stopOpacity="0.95" />
                     <stop offset="28%" stopColor="#e879f9" stopOpacity="0.75" />
@@ -81,9 +75,8 @@ function NebulaArt({ uid, eyes }: { uid: string; eyes: React.ReactNode }) {
                 <clipPath id={`${uid}-n-clip`}><circle cx="160" cy="160" r="108" /></clipPath>
             </defs>
 
-            {/* outer atmosphere + orbiting dust */}
+            {/* orbiting dust */}
             <g className="pt-orb-decor">
-                <circle cx="160" cy="160" r="150" fill={`url(#${uid}-n-halo)`} />
                 <g className="pt-nebula-orbit">
                     <circle cx="160" cy="26" r="2.2" fill="#e9d5ff" opacity="0.9" />
                     <circle cx="285" cy="128" r="1.6" fill="#f5d0fe" opacity="0.75" />
@@ -133,87 +126,89 @@ function NebulaArt({ uid, eyes }: { uid: string; eyes: React.ReactNode }) {
     )
 }
 
-/* ------------------------------------------------------------------ *
- * Holographic HUD — Grok reference:
- * glass sphere shell over a dark void, cyan volumetric interior,
- * thin wireframe latitude/longitude, concentric radar rings outside,
- * a horizontal scanline sweep, corner framing brackets and
- * [ • ] bracket eyes.
- * ------------------------------------------------------------------ */
-function HudArt({ uid, eyes }: { uid: string; eyes: React.ReactNode }) {
+/* Keep the saved theme ID compatible with the floating glass globe. */
+function HologramArt({ uid, eyes }: { uid: string; eyes: React.ReactNode }) {
+    const dust = Array.from({ length: 76 }, (_, i) => {
+        const angle = i * 2.399963229728653
+        const distance = Math.sqrt((i + 0.5) / 76) * 100
+        return { x: 160 + Math.cos(angle) * distance, y: 151 + Math.sin(angle) * distance, r: i % 7 === 0 ? 0.9 : 0.45 }
+    })
     return (
         <>
             <defs>
-                <radialGradient id={`${uid}-h-void`} cx="50%" cy="46%" r="58%">
-                    <stop offset="0%" stopColor="#0d2b45" />
-                    <stop offset="58%" stopColor="#071a2c" />
-                    <stop offset="100%" stopColor="#030a14" />
+                <radialGradient id={`${uid}-h-glass`} cx="48%" cy="43%" r="58%">
+                    <stop offset="0%" stopColor="#102a47" stopOpacity="0.9" />
+                    <stop offset="62%" stopColor="#153955" stopOpacity="0.8" />
+                    <stop offset="85%" stopColor="#3e7ba3" stopOpacity="0.78" />
+                    <stop offset="96%" stopColor="#a0d7f9" stopOpacity="0.82" />
+                    <stop offset="100%" stopColor="#e2f7ff" stopOpacity="0.94" />
                 </radialGradient>
-                <radialGradient id={`${uid}-h-halo`} cx="50%" cy="50%" r="50%">
-                    <stop offset="55%" stopColor="#00e5ff" stopOpacity="0" />
-                    <stop offset="78%" stopColor="#00e5ff" stopOpacity="0.22" />
-                    <stop offset="100%" stopColor="#00e5ff" stopOpacity="0" />
+                <radialGradient id={`${uid}-h-bottom`} cx="50%" cy="100%" r="76%">
+                    <stop offset="0%" stopColor="#bcf3ff" stopOpacity="0.95" />
+                    <stop offset="24%" stopColor="#56bcef" stopOpacity="0.42" />
+                    <stop offset="72%" stopColor="#65bffc" stopOpacity="0" />
                 </radialGradient>
-                <linearGradient id={`${uid}-h-scan`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#00e5ff" stopOpacity="0" />
-                    <stop offset="50%" stopColor="#5ffaff" stopOpacity="0.5" />
-                    <stop offset="100%" stopColor="#00e5ff" stopOpacity="0" />
-                </linearGradient>
-                <linearGradient id={`${uid}-h-glass`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#bfefff" stopOpacity="0.34" />
-                    <stop offset="38%" stopColor="#67e8f9" stopOpacity="0.08" />
-                    <stop offset="100%" stopColor="#0891b2" stopOpacity="0.16" />
-                </linearGradient>
-                <filter id={`${uid}-h-glow`} x="-40%" y="-40%" width="180%" height="180%">
-                    <feGaussianBlur stdDeviation="3.4" result="b" />
+                <radialGradient id={`${uid}-h-sheen`} cx="29%" cy="16%" r="62%">
+                    <stop offset="0%" stopColor="#edfaff" stopOpacity="0.62" />
+                    <stop offset="30%" stopColor="#9bd3f8" stopOpacity="0.14" />
+                    <stop offset="68%" stopColor="#a0ddff" stopOpacity="0" />
+                </radialGradient>
+                <filter id={`${uid}-h-soft`} x="-30%" y="-30%" width="160%" height="160%">
+                    <feGaussianBlur stdDeviation="5" />
+                </filter>
+                <filter id={`${uid}-h-glow`} x="-80%" y="-100%" width="260%" height="300%">
+                    <feGaussianBlur stdDeviation="2.8" result="b" />
                     <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
                 </filter>
-                <clipPath id={`${uid}-h-clip`}><circle cx="160" cy="160" r="104" /></clipPath>
+                <clipPath id={`${uid}-h-clip`}><circle cx="160" cy="151" r="106" /></clipPath>
             </defs>
-
-            <g className="pt-orb-decor">
-                <circle cx="160" cy="160" r="150" fill={`url(#${uid}-h-halo)`} />
-                <g className="pt-hud-rings" stroke="#00e5ff" fill="none">
-                    <circle cx="160" cy="160" r="136" strokeWidth="1" strokeDasharray="3 10" opacity="0.5" />
-                    <circle cx="160" cy="160" r="124" strokeWidth="0.8" strokeDasharray="46 6 10 6" opacity="0.45" />
-                    <path d="M 160 14 v 14 M 160 292 v 14 M 14 160 h 14 M 292 160 h 14" strokeWidth="1.6" opacity="0.7" />
-                </g>
-            </g>
-
-            <g className="pt-orb-body">
-                <circle cx="160" cy="160" r="104" fill={`url(#${uid}-h-void)`} />
-
-                <g clipPath={`url(#${uid}-h-clip)`} stroke="#57e8ff" fill="none">
-                    {/* volumetric lat/long lattice */}
-                    <g opacity="0.32" strokeWidth="0.8">
-                        <ellipse cx="160" cy="160" rx="104" ry="30" />
-                        <ellipse cx="160" cy="160" rx="104" ry="64" />
-                        <ellipse cx="160" cy="160" rx="34" ry="104" />
-                        <ellipse cx="160" cy="160" rx="70" ry="104" />
+            <g className="pt-orb-body pt-holo-globe">
+                <circle cx="160" cy="151" r="106" fill={`url(#${uid}-h-glass)`} />
+                <g clipPath={`url(#${uid}-h-clip)`}>
+                    <circle cx="160" cy="151" r="106" fill={`url(#${uid}-h-bottom)`} />
+                    <g className="pt-holo-grid" stroke="#c5e9ff" strokeWidth="0.55" fill="none">
+                        {[-95, -80, -59, -32, 0, 32, 59, 80, 95].map(offset => (
+                            <ellipse key={offset} cx="160" cy={151 + offset} rx={Math.sqrt(106 ** 2 - offset ** 2)} ry={4 + (1 - Math.abs(offset) / 106) * 9} opacity="0.25" />
+                        ))}
+                        {[24, 49, 74, 95].map(rx => <ellipse key={rx} cx="160" cy="151" rx={rx} ry="106" opacity="0.22" />)}
+                        <path d="M160 45V257" opacity="0.26" />
                     </g>
-                    {/* inner rings */}
-                    <circle cx="160" cy="160" r="58" strokeWidth="0.7" strokeDasharray="5 7" opacity="0.5" />
-                    <circle cx="160" cy="160" r="78" strokeWidth="0.5" strokeDasharray="2 5" opacity="0.4" />
-                    {/* glass shell light */}
-                    <circle cx="160" cy="160" r="104" fill={`url(#${uid}-h-glass)`} stroke="#7deeff" strokeWidth="1.6" opacity="0.95" />
-                    {/* sweep */}
-                    <rect className="pt-hud-scan" x="60" y="66" width="200" height="10" fill={`url(#${uid}-h-scan)`} stroke="none" />
-                    {/* top sheen */}
-                    <ellipse cx="160" cy="104" rx="72" ry="22" fill="#cff9ff" opacity="0.2" filter={`url(#${uid}-h-glow)`} />
+                    <g className="pt-holo-dust" fill="#dcf5ff">
+                        {dust.map(({ x, y, r }, i) => <circle key={i} cx={x} cy={y} r={r} opacity={i % 3 === 0 ? 0.7 : 0.34} />)}
+                    </g>
+                    <circle cx="160" cy="151" r="106" fill={`url(#${uid}-h-sheen)`} />
+                    <path d="M65 127C71 87 101 58 142 51" stroke="#eefaff" strokeWidth="8" opacity="0.22" fill="none" filter={`url(#${uid}-h-soft)`} />
                 </g>
-
-                {/* framing brackets ride just outside the sphere */}
-                <g stroke="#8df3ff" strokeWidth="2" fill="none" opacity="0.9" filter={`url(#${uid}-h-glow)`}>
-                    <path d="M 84 118 v -22 h 22" />
-                    <path d="M 236 118 v -22 h -22" />
-                    <path d="M 84 202 v 22 h 22" />
-                    <path d="M 236 202 v 22 h -22" />
-                </g>
+                <circle className="pt-holo-rim" cx="160" cy="151" r="106" fill="none" stroke="#a7ddff" strokeWidth="1.1" opacity="0.9" filter={`url(#${uid}-h-glow)`} />
+                <path d="M81 80A106 106 0 0 1 237 78M100 238A106 106 0 0 0 220 238" fill="none" stroke="#e4f8ff" strokeWidth="1.5" strokeLinecap="round" opacity="0.85" />
             </g>
-            <text className="pt-hud-readout" x="160" y="218" fill="#9df3ff" fontSize="8.5" fontFamily="var(--font-geist-mono), ui-monospace, monospace" textAnchor="middle" letterSpacing="3" opacity="0.75">AI.CORE</text>
             {eyes}
         </>
     )
+}
+
+function hologramEye(expression: string, cx: number, index: number, closed: boolean) {
+    if (closed) return `M${cx - 10} 148Q${cx} 151 ${cx + 10} 148`
+    if (HAPPY.has(expression)) return `M${cx - 11} 149Q${cx} 134 ${cx + 11} 149`
+    if (WIDE.has(expression)) return `M${cx} 139a6 9 0 1 0 0 18a6 9 0 1 0 0-18`
+    if (SLEEPY.has(expression)) return `M${cx - 9} 149Q${cx} 153 ${cx + 9} 149`
+    if (expression === "attentif") return `M${cx} 140V152`
+    if (expression === "curieux") return index === 0 ? `M${cx - 9} 148Q${cx} 138 ${cx + 9} 148` : `M${cx} 138V152`
+    if (expression === "timide") return `M${cx - 6} 152Q${cx} 146 ${cx + 6} 152`
+    if (expression === "triste") return `M${cx - 9} ${index === 0 ? 149 : 144}Q${cx} 143 ${cx + 9} ${index === 0 ? 144 : 149}`
+    if (expression === "mefiant") return `M${cx - 10} ${index === 0 ? 143 : 149}L${cx + 10} ${index === 0 ? 149 : 143}`
+    return `M${cx - 8} 148Q${cx} 143 ${cx + 8} 148`
+}
+
+function hologramMouth(expression: string, mood: string) {
+    if (mood === "speaking") return "M153 174C153 167 168 167 168 174C168 183 153 183 153 174Z"
+    if (WIDE.has(expression)) return "M155 174a5 7 0 1 0 10 0a5 7 0 1 0-10 0"
+    if (expression === "triste") return "M149 181Q160 170 171 181"
+    if (HAPPY.has(expression)) return "M147 172Q160 186 173 172"
+    if (expression === "timide") return "M154 178Q160 182 166 178"
+    if (expression === "curieux") return "M155 177Q162 181 169 175"
+    if (SLEEPY.has(expression) || expression === "mefiant") return "M154 178H166"
+    return "M151 175Q160 184 169 175"
 }
 
 /* ------------------------------------------------------------------ *
@@ -241,17 +236,11 @@ function ChromeArt({ uid, eyes }: { uid: string; eyes: React.ReactNode }) {
                     <stop offset="82%" stopColor="#fb923c" />
                     <stop offset="100%" stopColor="#fde047" />
                 </linearGradient>
-                <radialGradient id={`${uid}-c-halo`} cx="50%" cy="50%" r="50%">
-                    <stop offset="58%" stopColor="#cbd5e1" stopOpacity="0" />
-                    <stop offset="80%" stopColor="#cbd5e1" stopOpacity="0.16" />
-                    <stop offset="100%" stopColor="#cbd5e1" stopOpacity="0" />
-                </radialGradient>
                 <filter id={`${uid}-c-soft`}><feGaussianBlur stdDeviation="4.5" /></filter>
                 <clipPath id={`${uid}-c-clip`}><circle cx="160" cy="160" r="108" /></clipPath>
             </defs>
 
             <g className="pt-orb-decor">
-                <circle cx="160" cy="160" r="148" fill={`url(#${uid}-c-halo)`} />
                 <circle className="pt-chrome-ring" cx="160" cy="160" r="132" fill="none" stroke={`url(#${uid}-c-iris)`} strokeWidth="1.2" opacity="0.4" />
             </g>
 
@@ -300,7 +289,7 @@ export function PremiumThemeOrb({
     const dx = still ? 0 : Math.max(-1, Math.min(1, gaze.x)) * 7
     const dy = still ? 0 : Math.max(-1, Math.min(1, -gaze.y)) * 5
     const eyes = [0, 1].map((index) => {
-        const closed = lid === "blink" || lid === (index === 0 ? "wink-left" : "wink-right")
+        const closed = !still && (lid === "blink" || lid === (index === 0 ? "wink-left" : "wink-right"))
         return { transform: eyeTransform(expression, index, closed) }
     })
 
@@ -312,12 +301,15 @@ export function PremiumThemeOrb({
                     <circle cx={cx} cy={cy} r="2.4" fill="#f9a8f4" />
                 </g>
             ))}
-            {variant === "holographic-hud" && [[120, 154], [194, 154]].map(([cx, cy], i) => (
-                <g key={i} className="pt-orb-eye" style={{ transform: eyes[i].transform }} stroke="#aef6ff" strokeLinecap="round" filter={`url(#${uid}-h-glow)`}>
-                    <path d={`M ${cx - 14} ${cy - 10} h -6 v 20 h 6 M ${cx + 14} ${cy - 10} h 6 v 20 h -6`} fill="none" strokeWidth="2.4" />
-                    <circle cx={cx} cy={cy} r="4.4" fill="#7df3ff" stroke="none" />
-                </g>
-            ))}
+            {variant === "holographic-hud" && <g className="pt-holo-face" fill="none" stroke="#c8f1ff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" filter={`url(#${uid}-h-glow)`}>
+                {[128, 192].map((cx, index) => <path
+                    key={index}
+                    className="pt-orb-eye pt-holo-eye"
+                    data-hologram-eye={index}
+                    d={hologramEye(expression, cx, index, !still && (lid === "blink" || lid === (index === 0 ? "wink-left" : "wink-right")))}
+                />)}
+                <path className="pt-holo-mouth" d={hologramMouth(expression, mood)} strokeWidth="2.9" />
+            </g>}
             {variant === "liquid-chrome" && [[122, 156], [198, 156]].map(([cx, cy], i) => (
                 <g key={i} className="pt-orb-eye" style={{ transform: eyes[i].transform }}>
                     <rect x={cx - 16} y={cy - 3.5} width="32" height="7" rx="3.5" fill="#0a0f1a" />
@@ -342,7 +334,11 @@ export function PremiumThemeOrb({
         >
             <g className="pt-orb-character">
                 {variant === "astral-nebula" && <NebulaArt uid={uid} eyes={eyesNode} />}
-                {variant === "holographic-hud" && <HudArt uid={uid} eyes={eyesNode} />}
+                {variant === "holographic-hud" && (
+                    // The former projector layout placed the globe at y=151.
+                    // Centre the complete globe, including its face, on the aura at y=160.
+                    <g transform="translate(0 9)"><HologramArt uid={uid} eyes={eyesNode} /></g>
+                )}
                 {variant === "liquid-chrome" && <ChromeArt uid={uid} eyes={eyesNode} />}
             </g>
         </svg>

@@ -75,18 +75,36 @@ export type AuraId = "pulse" | "breathe" | "still"
 export const BLOUB_AURAS: { id: AuraId; label: string }[] = [
     { id: "pulse", label: "Pulse" },
     { id: "breathe", label: "Breathe" },
-    { id: "still", label: "Still" },
+    // Keep the stored value compatible with existing profiles.
+    { id: "still", label: "Aura off" },
 ]
 
 export const DEFAULT_AURA: AuraId = "pulse"
 
-export type BloubThemeId = "classic" | "retro-lcd" | "astral-nebula" | "holographic-hud" | "liquid-chrome"
+export type PlanetThemeId = "planet-azure" | "planet-rose" | "planet-sage"
+export type CosmicThemeId = "cosmic-space" | "cosmic-comic"
+export type BloubThemeId = "classic" | "retro-lcd" | "astral-nebula" | "holographic-hud" | "liquid-chrome" | PlanetThemeId | CosmicThemeId
+export const PLANET_THEMES: readonly PlanetThemeId[] = ["planet-azure", "planet-rose", "planet-sage"]
+export const COSMIC_THEMES: readonly CosmicThemeId[] = ["cosmic-space", "cosmic-comic"]
+
+export function isPlanetTheme(theme?: string | null): theme is PlanetThemeId {
+    return PLANET_THEMES.includes(theme as PlanetThemeId)
+}
+
+export function isCosmicTheme(theme?: string | null): theme is CosmicThemeId {
+    return COSMIC_THEMES.includes(theme as CosmicThemeId)
+}
 
 export const BLOUB_THEMES: { id: BloubThemeId; label: string; description: string }[] = [
     { id: "classic", label: "Classic", description: "" },
     { id: "retro-lcd", label: "Retro LCD", description: "" },
+    { id: "planet-azure", label: "Azure", description: "" },
+    { id: "planet-rose", label: "Rose", description: "" },
+    { id: "planet-sage", label: "Sage", description: "" },
+    { id: "cosmic-space", label: "Space", description: "" },
+    { id: "cosmic-comic", label: "Comic", description: "" },
     { id: "astral-nebula", label: "Astral Nebula", description: "" },
-    { id: "holographic-hud", label: "Holographic HUD", description: "" },
+    { id: "holographic-hud", label: "Hologram", description: "" },
     { id: "liquid-chrome", label: "Liquid Chrome", description: "" },
 ]
 
@@ -110,6 +128,36 @@ export type BloubThemeMeta = {
 }
 
 export const BLOUB_THEME_META: Partial<Record<BloubThemeId, BloubThemeMeta>> = {
+    "cosmic-space": {
+        canvas: { light: "#f3edfc", dark: "#0b0818" },
+        thumb: { bg: "#0b0818", dot: "#d8a0ff", bar: "#b874ef" },
+        thumbLight: { bg: "#f3edfc", dot: "#7838aa", bar: "#452760" },
+        note: "Violet starlight and a deep-space canvas, with a soft lavender light mode.",
+    },
+    "cosmic-comic": {
+        canvas: { light: "#f5e7c9", dark: "#181020" },
+        thumb: { bg: "#181020", dot: "#f270c9", bar: "#e7cfa1" },
+        thumbLight: { bg: "#f5e7c9", dot: "#a52c80", bar: "#28182f" },
+        note: "Magenta ink, bold outlines and halftone paper, with a matching dark edition.",
+    },
+    "planet-azure": {
+        canvas: { light: "#edf5fb", dark: "#07111f" },
+        thumb: { bg: "#07111f", dot: "#88c8f3", bar: "#88c8f3" },
+        thumbLight: { bg: "#edf5fb", dot: "#2563a6", bar: "#172f4c" },
+        note: "Cloud blue and soft silver, with a matching light and dark canvas.",
+    },
+    "planet-rose": {
+        canvas: { light: "#fbf0f3", dark: "#1a0d17" },
+        thumb: { bg: "#1a0d17", dot: "#f0a4c8", bar: "#f0a4c8" },
+        thumbLight: { bg: "#fbf0f3", dot: "#a8406b", bar: "#4a2639" },
+        note: "Rose pink and soft pearl, with a matching light and dark canvas.",
+    },
+    "planet-sage": {
+        canvas: { light: "#edf6ef", dark: "#081710" },
+        thumb: { bg: "#081710", dot: "#9ed2ac", bar: "#9ed2ac" },
+        thumbLight: { bg: "#edf6ef", dot: "#35734e", bar: "#203e2b" },
+        note: "Sage green and soft mint, with a matching light and dark canvas.",
+    },
     "retro-lcd": {
         canvas: { light: "#c4d58a", dark: "#10170f" },
         thumb: { bg: "#253021", dot: "#c4d58a", bar: "#c4d58a" },
@@ -123,10 +171,10 @@ export const BLOUB_THEME_META: Partial<Record<BloubThemeId, BloubThemeMeta>> = {
         note: "Cosmic violet and supernova magenta, tuned for light and dark. Your Classic colour is kept for when you switch back.",
     },
     "holographic-hud": {
-        canvas: { light: "#e5f8fd", dark: "#060810" },
-        thumb: { bg: "#04131c", dot: "#00f0ff", bar: "#0aa8c2" },
-        thumbLight: { bg: "#e5f8fd", dot: "#00b7d4", bar: "#164e63" },
-        note: "Laser cyan on void black with mono type. Your Classic colour is kept for when you switch back.",
+        canvas: { light: "#eef6fc", dark: "#091525" },
+        thumb: { bg: "#091525", dot: "#a7ddff", bar: "#66b3e8" },
+        thumbLight: { bg: "#eef6fc", dot: "#367fad", bar: "#214969" },
+        note: "Ice-blue light and a translucent globe, tuned for light and dark. Your Classic colour is kept for when you switch back.",
     },
     "liquid-chrome": {
         canvas: { light: "#e9ecf1", dark: "#0b0d12" },
@@ -151,6 +199,7 @@ export type BloubPick = {
     color: ColorId
     aura: AuraId
     theme: BloubThemeId
+    orbitProfile: boolean
     look?: OrbLook
     skin?: PixelSkin | AnimojiId
     variant?: OrbVariantId
@@ -162,6 +211,7 @@ export const DEFAULT_BLOUB_PICK: BloubPick = {
     color: DEFAULT_COLOR,
     aura: DEFAULT_AURA,
     theme: "classic",
+    orbitProfile: false,
     look: "bloub",
     variant: "aqua",
 }
@@ -237,7 +287,7 @@ export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Parti
             skin: isAnimojiId(current.skin) ? current.skin : DEFAULT_ANIMOJI,
             theme: "classic",
             shape: "cercle",
-            aura: "still",
+            aura: current.aura,
         }
     }
     if (bot.look === "pixel") {
@@ -277,26 +327,33 @@ export type BloubBot = {
     color: ColorId
     aura: AuraId
     theme: BloubThemeId
+    /** Alternate page and character treatments owned by this single bot. */
+    themes?: readonly BloubThemeId[]
 }
 
 export const INCLUDED_BLOUB_BOTS: BloubBot[] = [
     { id: "cercle", label: "LCD", expression: "centre", color: "vert", aura: "still", theme: "retro-lcd" },
+    { id: "cercle", label: "Azure", expression: "centre", color: "bleu", aura: "breathe", theme: "planet-azure" },
+    { id: "cercle", label: "Rose", expression: "centre", color: "rose", aura: "breathe", theme: "planet-rose" },
+    { id: "cercle", label: "Sage", expression: "centre", color: "vert", aura: "breathe", theme: "planet-sage" },
+    { id: "cercle", label: "Nova", expression: "centre", color: "violet", aura: "breathe", theme: "cosmic-space", themes: COSMIC_THEMES },
 ]
 
 export const PREMIUM_BLOUB_BOTS: BloubBot[] = [
     { id: "cercle", label: "Nyx", expression: "centre", color: "violet", aura: "breathe", theme: "astral-nebula" },
-    { id: "cercle", label: "Ion", expression: "attentif", color: "turquoise", aura: "pulse", theme: "holographic-hud" },
+    { id: "cercle", label: "Ion", expression: "heureux", color: "turquoise", aura: "pulse", theme: "holographic-hud" },
     { id: "cercle", label: "Vex", expression: "blase", color: "gris", aura: "breathe", theme: "liquid-chrome" },
 ]
 
-/** Selecting a named bot applies its complete look: silhouette, mood, colour, aura and theme. */
-export function bloubBotPick(bot: BloubBot): Partial<BloubPick> {
-    return { look: "bloub", shape: bot.id, expression: bot.expression, color: bot.color, aura: bot.aura, theme: bot.theme }
+/** Selecting a named bot applies its defaults, retaining its selected alternate treatment. */
+export function bloubBotPick(bot: BloubBot, current?: BloubPick): Partial<BloubPick> {
+    const theme = current && isNamedBloubBotSelected(bot, current) ? current.theme : bot.theme
+    return { look: "bloub", shape: bot.id, expression: bot.expression, color: bot.color, aura: current?.aura ?? bot.aura, theme }
 }
 
 export function isNamedBloubBotSelected(bot: BloubBot, value: BloubPick) {
     if (resolveOrbLook(value.look) !== "bloub") return false
-    if (value.shape !== bot.id || value.theme !== bot.theme) return false
+    if (value.shape !== bot.id || !(bot.themes ?? [bot.theme]).includes(value.theme)) return false
     if (!resolveThemedOrb(bot.theme) && bot.id === "cercle") {
         if (value.expression !== bot.expression || value.color !== bot.color) return false
         if (value.variant && VARIANT_COLOR[value.variant] !== bot.color) return false
@@ -309,7 +366,8 @@ export function lookThemesFor(value: BloubPick) {
     const look = resolveOrbLook(value.look)
     if (look === "pixel" || look === "glass" || look === "animoji") return []
     const theme = resolveBloubTheme(value.theme)
-    return BLOUB_THEMES.filter((item) => item.id === theme)
+    const family = [...INCLUDED_BLOUB_BOTS, ...PREMIUM_BLOUB_BOTS].find((bot) => bot.themes?.includes(theme))
+    return BLOUB_THEMES.filter((item) => family?.themes ? family.themes.includes(item.id) : item.id === theme)
 }
 
 export function usesBlobColorSlider(value: BloubPick) {
@@ -357,7 +415,7 @@ export function resolveBloubTheme(id?: string | null): BloubThemeId {
 }
 
 /** The orb renderer each bespoke theme uses; null keeps the Classic blob renderer. */
-export function resolveThemedOrb(id?: string | null): "retro-lcd" | "astral-nebula" | "holographic-hud" | "liquid-chrome" | null {
+export function resolveThemedOrb(id?: string | null): ThemedOrbId | null {
     const theme = resolveBloubTheme(id)
     return theme === "classic" ? null : theme
 }
@@ -370,7 +428,9 @@ export function isPremiumBloubShape(shape: ShapeId): boolean {
     return !isIncludedBloubShape(shape)
 }
 
-export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "color" | "aura" | "theme" | "look" | "skin" | "variant", string | null>> | null | undefined, premium: boolean): BloubPick {
+export type OrbPickInput = Partial<Record<"shape" | "expression" | "color" | "aura" | "theme" | "look" | "skin" | "variant", string | null>> & { orbitProfile?: unknown }
+
+export function clampOrbForPlan(pick: OrbPickInput | null | undefined, premium: boolean): BloubPick {
     if (!pick || Object.keys(pick).length === 0) return { ...DEFAULT_BLOUB_PICK }
     const look = pick?.look === "pixel" || pick?.look === "glass" || pick?.look === "bloub" || pick?.look === "blob" || pick?.look === "animoji" ? pick.look : "bloub"
     const pixelSkin = pick?.skin === "bit" || pick?.skin === "crt" || pick?.skin === "spark" ? pick.skin : undefined
@@ -381,6 +441,7 @@ export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "c
         color: resolveBloubColor(pick?.color),
         aura: resolveBloubAura(pick?.aura),
         theme: resolveBloubTheme(pick?.theme),
+        orbitProfile: pick?.orbitProfile === true,
         look: look === "blob" ? "bloub" : look,
         ...(variant ? { variant } : {}),
     }
@@ -388,7 +449,6 @@ export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "c
         next.skin = resolveAnimojiId(pick?.skin)
         next.shape = "cercle"
         next.theme = "classic"
-        next.aura = "still"
     } else if (pixelSkin) {
         next.skin = pixelSkin
     }

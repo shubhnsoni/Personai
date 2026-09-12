@@ -5,6 +5,21 @@ import { contrastInk } from "@/lib/bloub/skins"
 import { installMatchMedia, REDUCE_MOTION } from "./helpers/match-media"
 
 describe("BloubOrb faces", () => {
+    it("updates reduced-motion expressions without requiring an explicit frozen time", () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        const { rerender, container } = render(<BloubOrb size={80} expression="centre" />)
+        const eyePaths = () => Array.from(container.querySelectorAll("mask path")).map(path => path.outerHTML).join("")
+        const calm = eyePaths()
+        rerender(<BloubOrb size={80} expression="heureux" />)
+        const happy = eyePaths()
+        expect(happy).not.toBe(calm)
+        rerender(<BloubOrb size={80} expression="heureux" mood="error" />)
+        expect(container.querySelector("svg")?.dataset.expression).toBe("triste")
+        expect(eyePaths()).not.toBe(happy)
+        rerender(<BloubOrb size={80} expression="heureux" mood="idle" />)
+        expect(eyePaths()).toBe(happy)
+    })
+
     it("paints a different still face for happy than for calm", () => {
         installMatchMedia({ [REDUCE_MOTION]: true })
         const { rerender, container } = render(<BloubOrb size={80} expression="centre" frozenAt={0.8} />)

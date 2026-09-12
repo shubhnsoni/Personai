@@ -1,4 +1,5 @@
 import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
+import { resolveThemedOrb } from "@/lib/bloub/catalog"
 import { notFound } from "next/navigation"
 import Link from "@/components/navigation/transition-link"
 import { prisma } from "@/lib/prisma"
@@ -24,7 +25,7 @@ export default async function EventSalesPage({ params }: { params: Promise<{ slu
     if (!event) notFound()
 
     const config = await publicAnimationConfig(event.profile.id, configuredProfileAnimation(event.profile))
-    const retro = config.theme === "retro-lcd"
+    const catalogTheme = resolveThemedOrb(config.theme)
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
     const logo = (event.profile as { shopLogoUrl?: string | null }).shopLogoUrl
     const online = !event.location && event.meetingUrl
@@ -40,11 +41,11 @@ export default async function EventSalesPage({ params }: { params: Promise<{ slu
 
     return (
         <div
-            data-public-catalog-theme={retro ? "retro-lcd" : undefined}
-            className={retro ? "min-h-dvh bg-background text-foreground" : "dark min-h-dvh bg-zinc-950 text-zinc-100"}
-            style={retro ? undefined : { ["--pl-aurora" as string]: theme.accent, ["--pl-brand-foreground" as string]: theme.onAccent }}
+            data-public-catalog-theme={catalogTheme ?? undefined}
+            className={catalogTheme ? "min-h-dvh bg-background text-foreground" : "dark min-h-dvh bg-zinc-950 text-zinc-100"}
+            style={catalogTheme ? undefined : { ["--pl-aurora" as string]: theme.accent, ["--pl-brand-foreground" as string]: theme.onAccent }}
         >
-            <CatalogHeader themeToggle={retro}
+            <CatalogHeader themeToggle={Boolean(catalogTheme)}
                 slug={slug}
                 name={event.profile.displayName}
                 logoUrl={logo}

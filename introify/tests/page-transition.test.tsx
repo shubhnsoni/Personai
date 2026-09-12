@@ -78,11 +78,11 @@ describe("inter-page transition lifecycle", () => {
         expect(document.activeElement).toBe(focus)
         expect(screen.getByRole("status").getAttribute("aria-live")).toBe("polite")
         expect(screen.getByText("Loading page")).toBeTruthy()
-        expect(screen.getByRole("status").querySelector(".page-transit-progress")?.getAttribute("aria-hidden")).toBe("true")
-        expect(document.querySelector(".brand-loading-orb, .brand-loading-wordmark, .page-transit-wash, .page-transit-center")).toBeNull()
+        expect(screen.getByRole("status").querySelector(".brand-loading-visual")?.getAttribute("aria-hidden")).toBe("true")
+        expect(document.querySelector("[data-loading-option=\"10\"] .brand-loading-circle-progress")).not.toBeNull()
         expect(screen.queryByRole("dialog")).toBeNull()
     })
-    it("finishes a visible line immediately on commit and removes it after the short exit", () => {
+    it("finishes the circular loader immediately on commit and removes it after the short exit", () => {
         const { rerender } = render(<Fixture />)
         fireEvent.click(screen.getByRole("link", { name: "Next page" }))
         advance(180)
@@ -297,13 +297,14 @@ describe("inter-page transition lifecycle", () => {
         expect(cancelAnimation).toHaveBeenCalledOnce()
         expect(vi.getTimerCount()).toBe(0)
     })
-    it("keeps standalone loading states to a labeled quiet line without an orb or wordmark", () => {
+    it("uses the locked Option 10 symbol and a circular indicator for streamed loading", () => {
         render(<BrandLoading label="Loading your workspace" compact />)
         const status = screen.getByRole("status")
         expect(status.getAttribute("aria-live")).toBe("polite")
         expect(screen.getByText("Loading your workspace")).toBeTruthy()
         expect(status.querySelector(".brand-loading-visual")?.getAttribute("aria-hidden")).toBe("true")
-        expect(status.querySelector(".brand-loading-track")).not.toBeNull()
-        expect(status.querySelector(".brand-loading-orb, .brand-loading-wordmark, svg")).toBeNull()
+        expect(status.querySelector(".brand-loading-track, .page-transit-progress")).toBeNull()
+        expect(status.querySelector(".brand-loading-circle-progress")).not.toBeNull()
+        expect(status.querySelector('image[href="/brand/main/loading-light.svg"]')).not.toBeNull()
     })
 })

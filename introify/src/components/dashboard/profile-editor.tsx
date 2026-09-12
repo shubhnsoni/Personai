@@ -22,6 +22,7 @@ import { previewListing, applyListing } from "@/app/actions/listing"
 import { OfferSheet, LiveRow } from "@/components/dashboard/offer-sheet"
 import {
     BLOUB_THEMES,
+    isCosmicTheme,
     parseOrbBag,
     resolveBloubAura,
     resolveBloubColor,
@@ -100,6 +101,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
     const [, setIsSaving] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [blobOpen, setBlobOpen] = useState(false)
+    const profilePhotoRef = useRef<HTMLDivElement>(null)
     const [googleOpen, setGoogleOpen] = useState(false)
     const [paymentQrUrl, setPaymentQrUrl] = useState(() => paymentQrUrlFromConfig(profile.personalityConfig))
     const [payMode, setPayMode] = useState(() => payModeFromConfig(profile.personalityConfig))
@@ -182,6 +184,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
         color: resolveBloubColor(orbPick.color || selectedPresetConfig.color),
         aura: resolveBloubAura(orbPick.aura),
         theme: orbPick.theme,
+        orbitProfile: orbPick.orbitProfile,
         look: orbPick.look || (selectedPresetConfig.look === "pixel" ? "pixel" : selectedPresetConfig.look === "animoji" ? "animoji" : "bloub"),
         skin: orbPick.skin || (selectedPresetConfig.skin as BloubPick["skin"]),
         variant: orbPick.variant || (selectedPresetConfig.variant as BloubPick["variant"]),
@@ -357,7 +360,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                 <TabsContent value="appearance" className={cn(tabPane, "space-y-3")}>
                     <Section title="Face" description="Photo on About. Logo on the live shop. Chat can use the photo in the top bar.">
                         <div className="grid gap-5 sm:grid-cols-2">
-                            <div className="space-y-3">
+                            <div ref={profilePhotoRef} className="space-y-3">
                                 <p className="text-xs font-medium text-muted-foreground">Photo</p>
                                 <div className="flex items-center gap-3">
                                     <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border bg-muted">
@@ -429,9 +432,11 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 color={liveOrb.color}
                                 aura={liveOrb.aura}
                                 theme={liveOrb.theme}
+                                orbitProfile={liveOrb.orbitProfile}
+                                profileImageUrl={imageUrl}
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">{liveOrb.look === "animoji" ? "Animoji" : liveOrb.look === "pixel" ? (liveOrb.skin === "crt" ? "CRT" : liveOrb.skin === "spark" ? "Spark" : "8-Bit") : liveOrb.look === "glass" ? "Glow" : liveOrb.theme === "classic" ? "Blob" : (BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label ?? "Blob")}</p>
+                                <p className="text-sm font-medium">{liveOrb.look === "animoji" ? "Animoji" : liveOrb.look === "pixel" ? (liveOrb.skin === "crt" ? "CRT" : liveOrb.skin === "spark" ? "Spark" : "8-Bit") : liveOrb.look === "glass" ? "Glow" : liveOrb.theme === "classic" ? "Blob" : isCosmicTheme(liveOrb.theme) ? `Nova · ${BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label}` : (BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label ?? "Blob")}</p>
                                 <p className="text-xs text-muted-foreground">Choose a bot, chat theme, mood and colour.</p>
                             </div>
                             <button type="button" onClick={() => setBlobOpen(true)} className="h-8 shrink-0 rounded-full border border-border px-3 text-xs font-medium">
@@ -445,6 +450,13 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                         value={liveOrb}
                         onChange={setOrb}
                         premium={aiAccess.customBranding}
+                        profileImageUrl={imageUrl}
+                        onSetupProfilePhoto={() => {
+                            setBlobOpen(false)
+                            const photo = profilePhotoRef.current
+                            photo?.scrollIntoView({ behavior: "smooth", block: "center" })
+                            photo?.querySelector<HTMLInputElement>('input[type="file"]')?.click()
+                        }}
                     />
                 </TabsContent>
 

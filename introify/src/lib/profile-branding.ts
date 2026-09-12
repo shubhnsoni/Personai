@@ -1,7 +1,7 @@
 import { clampOrbForPlan, gradientForColor, resolveBloubTheme, resolveThemedOrb, type AuraId } from "@/lib/bloub/catalog"
 import { lookupProfileEntitlement } from "@/lib/billing/entitlements"
 
-export type PublicAnimationConfig = { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: AuraId | string; theme?: string }
+export type PublicAnimationConfig = { speed?: number; intensity?: number; colors?: string[]; variant?: string; look?: string; skin?: string; shape?: string; expression?: string; color?: string; aura?: AuraId | string; theme?: string; orbitProfile?: boolean }
 export const INTROIFY_PUBLIC_STYLE: PublicAnimationConfig = {
     colors: gradientForColor("blanc"),
     look: "bloub",
@@ -23,6 +23,7 @@ function freeLiveLook(configured: PublicAnimationConfig): PublicAnimationConfig 
         look: configured.look,
         skin: configured.skin,
         variant: configured.variant,
+        orbitProfile: configured.orbitProfile,
     }, false)
     if (orb.look === "animoji") {
         return {
@@ -31,11 +32,12 @@ function freeLiveLook(configured: PublicAnimationConfig): PublicAnimationConfig 
             shape: "cercle",
             expression: orb.expression,
             color: orb.color,
-            aura: "still",
+            aura: orb.aura,
             theme: "classic",
             colors: gradientForColor("blanc"),
             speed: 1,
             intensity: 1,
+            ...(configured.orbitProfile !== undefined ? { orbitProfile: orb.orbitProfile } : {}),
         }
     }
     return {
@@ -48,6 +50,7 @@ function freeLiveLook(configured: PublicAnimationConfig): PublicAnimationConfig 
         colors: gradientForColor(orb.color),
         speed: 1,
         intensity: 1,
+        ...(configured.orbitProfile !== undefined ? { orbitProfile: orb.orbitProfile } : {}),
     }
 }
 
@@ -57,7 +60,10 @@ export async function publicBrandingAccess(profileId: string) {
 }
 
 export async function publicAnimationConfig(profileId: string, configured: PublicAnimationConfig): Promise<PublicAnimationConfig> {
-    const allowed = await publicBrandingAccess(profileId) ? configured : freeLiveLook(configured)
+    const allowed = await publicBrandingAccess(profileId) ? {
+        ...configured,
+        ...(configured.orbitProfile !== undefined ? { orbitProfile: configured.orbitProfile === true } : {}),
+    } : freeLiveLook(configured)
     if (allowed.theme === undefined) return allowed
     const theme = resolveBloubTheme(allowed.theme)
     // An older animation preset can still say "glass" or omit look entirely. Bespoke

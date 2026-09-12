@@ -43,6 +43,15 @@
   background: #fff;
   flex: none;
   image-rendering: pixelated;
+  scale: var(--bot-eye-x, 1) var(--bot-eye-y, 1);
+  rotate: var(--bot-eye-left-angle, 0deg);
+}
+
+.pl-pix-eye:nth-child(2) { rotate: var(--bot-eye-right-angle, 0deg); }
+.pl-pix {
+  rotate: var(--bot-face-angle, 0deg);
+  translate: 0 var(--bot-face-y, 0%);
+  column-gap: calc(var(--pix) * 3 * var(--bot-eye-gap, 1));
 }
 
 /* CRT — phosphor slabs with a rolling scan */
@@ -140,6 +149,8 @@
 }
 
 /* Shared moods */
+.pl-pix:is(.is-crt, .is-spark) { column-gap: calc(var(--pix) * 4 * var(--bot-eye-gap, 1)); }
+
 .pl-pix.is-listening .pl-pix-eye {
   filter: brightness(1.18);
 }
@@ -269,4 +280,5 @@
   .pl-pix.is-spark .pl-pix-eye {
     animation: none;
   }
+  .pl-pix.is-greeting .pl-pix-eye { opacity: 1; }
 }

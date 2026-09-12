@@ -8,8 +8,13 @@ import { AnimojiFace } from "@/components/animoji-face"
 import { BloubOrb } from "@/components/bloub-orb"
 import { RetroLcdOrb } from "@/components/retro-lcd-orb"
 import { PremiumThemeOrb } from "@/components/premium-theme-orb"
+import { PlanetOrb, isPlanetOrbVariant } from "@/components/planet-orb"
+import { CosmicOrb, isCosmicOrbVariant } from "@/components/cosmic-orb"
+import { ProfileOrbit } from "@/components/profile-orbit"
+import { BotAura } from "@/components/bot-aura"
+import { botExpressionStyle, resolveBotExpression } from "@/lib/bot-expression"
 import { COLOR_BY_ID } from "@/lib/bloub/skins"
-import { resolveBloubAura, resolveBloubColor, resolveThemedOrb, type AuraId } from "@/lib/bloub/catalog"
+import { BLOUB_THEME_META, resolveBloubAura, resolveBloubColor, resolveThemedOrb, type AuraId } from "@/lib/bloub/catalog"
 import "./welcome-orb.css"
 import "./welcome-pixel.css"
 
@@ -26,6 +31,8 @@ interface WelcomeOrbProps {
     color?: string
     aura?: AuraId | string
     theme?: string
+    orbitProfile?: boolean
+    profileImageUrl?: string | null
     speed?: number
     intensity?: number
     className?: string
@@ -60,7 +67,10 @@ export function WelcomeOrb({
     color,
     aura,
     theme,
+    orbitProfile = false,
+    profileImageUrl,
     speed = 1,
+    intensity = 1,
     className,
     gaze = null,
     mood = "idle",
@@ -85,7 +95,7 @@ export function WelcomeOrb({
     }, [gaze])
 
     useEffect(() => {
-        if (!reactToken || (themed && (still || reducedMotion || frozenAt !== undefined))) return
+        if (!reactToken || still || reducedMotion || frozenAt !== undefined) return
         delightedRef.current = true
         let raf2 = 0
         const raf1 = window.requestAnimationFrame(() => {
@@ -104,7 +114,7 @@ export function WelcomeOrb({
     }, [reactToken, themed, still, frozenAt, reducedMotion])
 
     useEffect(() => {
-        if (still || frozenAt !== undefined || (!themed && resolvedLook === "bloub")) return
+        if (still || reducedMotion || frozenAt !== undefined || (!themed && resolvedLook === "bloub")) return
         const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
         if (reducedMotion && themed) return
 
@@ -172,8 +182,11 @@ export function WelcomeOrb({
     const pixGy = Math.round(-look.y)
     const pixPx = Math.max(-1, Math.min(1, Math.round(look.x)))
     const pixPy = Math.max(-1, Math.min(1, Math.round(-look.y)))
+    const rawAura = themed ? BLOUB_THEME_META[themed]?.thumb.dot : COLOR_BY_ID.get(resolveBloubColor(color))?.hex
+    const auraColor = !rawAura || ["#f7f7f8", "#ffffff", "#0a0a0c"].includes(rawAura.toLowerCase()) ? "#70abd8" : rawAura
+    const liveExpression = resolveBotExpression(expression, delighted ? "react" : mood)
 
-    return (
+    const orb = (
         <div
             className={cn(
                 "pl-orb-scene",
@@ -182,16 +195,23 @@ export function WelcomeOrb({
                 !themed && resolvedLook === "animoji" && "is-animoji",
                 !themed && resolvedLook === "bloub" && "is-bloub",
                 retro && "is-retro-lcd",
+                isPlanetOrbVariant(themed) && "is-planet",
                 themed && !retro && "is-premium",
                 className
             )}
             data-variant={resolved}
             data-bot-theme={themed ?? undefined}
+            data-aura={resolveBloubAura(aura)}
+            data-motion-paused={still || reducedMotion || frozenAt !== undefined}
+            data-expression={liveExpression}
+            data-mood={mood}
             data-skin={resolvedLook === "pixel" ? resolvedSkin : undefined}
             style={{
+                ...botExpressionStyle(liveExpression),
                 ["--orb-s" as string]: `${size}px`,
                 ["--orb-speed" as string]: String(Math.max(speed, 0.35)),
                 ["--orb-aura" as string]: COLOR_BY_ID.get(resolveBloubColor(color))?.hex || "#f7f7f8",
+                ["--orb-static-time" as string]: `${-(frozenAt ?? 0.8)}s`,
                 ["--gaze-x" as string]: `${look.x * size * 0.06}px`,
                 ["--gaze-y" as string]: `${-look.y * size * 0.07}px`,
                 ["--pix-gx" as string]: pixGx,
@@ -201,15 +221,12 @@ export function WelcomeOrb({
             }}
             aria-hidden
         >
-            {!themed && resolvedLook === "bloub" && resolveBloubAura(aura) !== "still" ? (
-                <span className="pl-orb-aura" data-rhythm={resolveBloubAura(aura)} aria-hidden>
-                    <i /><i /><i />
-                </span>
-            ) : null}
+            <BotAura aura={resolveBloubAura(aura)} color={auraColor} speed={speed} intensity={intensity} still={still || reducedMotion} frozenAt={frozenAt} />
             {resolvedLook === "animoji" ? (
                 <AnimojiFace
                     id={skin}
                     mood={mood}
+                    expression={liveExpression}
                     still={still || reducedMotion || frozenAt !== undefined}
                     size={size}
                     gaze={look}
@@ -220,10 +237,35 @@ export function WelcomeOrb({
                         size={size}
                         gaze={look}
                         lid={lid}
-                        expression={delighted || mood === "success" ? "heureux" : mood === "error" ? "triste" : mood === "listening" ? "attentif" : expression || "centre"}
+                        expression={liveExpression}
                         still={still || reducedMotion || frozenAt !== undefined}
-                        aura={resolveBloubAura(aura)}
+                        aura="still"
                         mood={delighted ? "react" : mood}
+                    />
+                ) : isCosmicOrbVariant(themed) ? (
+                    <CosmicOrb
+                        variant={themed}
+                        size={size}
+                        gaze={look}
+                        lid={lid}
+                        expression={liveExpression}
+                        still={still || reducedMotion}
+                        frozenAt={frozenAt}
+                        speed={speed}
+                        intensity={intensity}
+                        mood={delighted ? "react" : mood}
+                    />
+                ) : isPlanetOrbVariant(themed) ? (
+                    <PlanetOrb
+                        variant={themed}
+                        size={size}
+                        gaze={look}
+                        lid={lid}
+                        expression={liveExpression}
+                        still={still || reducedMotion}
+                        frozenAt={frozenAt}
+                        speed={speed}
+                        mood={mood}
                     />
                 ) : (
                     <PremiumThemeOrb
@@ -231,9 +273,9 @@ export function WelcomeOrb({
                         size={size}
                         gaze={look}
                         lid={lid}
-                        expression={delighted || mood === "success" ? "heureux" : mood === "error" ? "triste" : mood === "listening" ? "attentif" : expression || "centre"}
+                        expression={liveExpression}
                         still={still || reducedMotion || frozenAt !== undefined}
-                        aura={resolveBloubAura(aura)}
+                        aura="still"
                         mood={delighted ? "react" : mood}
                     />
                 )
@@ -241,13 +283,13 @@ export function WelcomeOrb({
                 <BloubOrb
                     size={size}
                     shape={shape}
-                    expression={expression}
+                    expression={liveExpression}
                     color={color}
                     variant={variant}
                     mood={mood}
                     reactToken={reactToken}
                     gaze={gaze}
-                    frozenAt={still ? frozenAt ?? 0.8 : frozenAt}
+                    frozenAt={still || reducedMotion ? frozenAt ?? 0.8 : frozenAt}
                     className={size < 56 ? "is-compact" : undefined}
                 />
             ) : resolvedLook === "pixel" ? (
@@ -291,17 +333,21 @@ export function WelcomeOrb({
                             </div>
                             <div className="pl-orb-smile">
                                 <svg className="pl-orb-mouth-svg" viewBox="0 0 48 24" aria-hidden>
-                                    <path className="pl-orb-mouth" d="M7 8 C16 17.5 32 17.5 41 8" />
+                                    <path className="pl-orb-mouth" d={liveExpression === "surpris" || liveExpression === "effraye" ? "M18 12 a6 8 0 1 0 12 0 a6 8 0 1 0 -12 0" : liveExpression === "neutre" ? "M12 12 H36" : "M7 8 C16 17.5 32 17.5 41 8"} />
                                 </svg>
                             </div>
                         </div>
                         <div className="pl-orb-highlight" />
                     </div>
-                    <div className="pl-orb-shadow" />
                 </>
             )}
         </div>
     )
+    return orbitProfile && profileImageUrl?.trim() ? (
+        <ProfileOrbit imageUrl={profileImageUrl.trim()} size={size} still={still || reducedMotion} frozenAt={frozenAt} speed={speed}>
+            {orb}
+        </ProfileOrbit>
+    ) : orb
 }
 
 function PixelEye({ skin }: { skin: PixelSkin }) {

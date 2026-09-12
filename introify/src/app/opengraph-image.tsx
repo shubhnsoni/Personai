@@ -13,7 +13,7 @@ export default async function OpenGraphImage() {
             <div style={{ display: "flex", flexDirection: "column", width: 780 }}>
                 {/* A bundled outlined SVG keeps the shared image identical to the brand. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`data:image/svg+xml;base64,${logo.toString("base64")}`} alt="Introify" width={165} height={51} />
+                <img src={`data:image/svg+xml;base64,${logo.toString("base64")}`} alt="Introify" width={200} height={51} />
                 <div style={{ display: "flex", flexDirection: "column", marginTop: 62, fontSize: 85, fontWeight: 700, letterSpacing: -5, lineHeight: 1.03 }}>
                     <div style={{ display: "flex" }}>Your business,</div>
                     <div style={{ display: "flex", color: "#b8e274" }}>one page, ready to grow.</div>

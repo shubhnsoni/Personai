@@ -2,6 +2,7 @@
 
 import { type ReactNode, useId, useSyncExternalStore } from "react"
 import { animojiClipForMood, resolveAnimojiId, type AnimojiId } from "@/lib/animoji"
+import { botExpressionStyle, resolveBotExpression } from "@/lib/bot-expression"
 import { cn } from "@/lib/utils"
 import "./animoji-face.css"
 
@@ -18,6 +19,7 @@ function reducedMotionSnapshot() {
 export function AnimojiFace({
     id,
     mood = "idle",
+    expression,
     still = false,
     size,
     gaze,
@@ -25,6 +27,7 @@ export function AnimojiFace({
 }: {
     id?: string | null
     mood?: string
+    expression?: string
     still?: boolean
     size: number
     gaze?: { x: number; y: number } | null
@@ -32,6 +35,7 @@ export function AnimojiFace({
 }) {
     const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionSnapshot, () => true)
     const face: AnimojiId = animojiClipForMood(resolveAnimojiId(id), mood)
+    const liveExpression = resolveBotExpression(expression, mood)
     const freeze = still || reducedMotion
     const uid = useId().replace(/:/g, "")
     const gx = freeze ? 0 : Math.max(-1, Math.min(1, gaze?.x ?? 0))
@@ -43,9 +47,10 @@ export function AnimojiFace({
             data-animoji-coded="svg"
             data-animoji-mood={mood}
             data-mood={mood}
+            data-expression={liveExpression}
             data-still={freeze}
             className={cn("animoji-face relative block shrink-0", className)}
-            style={{ width: size, height: size, minWidth: size, minHeight: size }}
+            style={{ width: size, height: size, minWidth: size, minHeight: size, ...botExpressionStyle(liveExpression) }}
             aria-hidden
         >
             <svg viewBox="0 0 80 80" width={size} height={size} overflow="visible" focusable="false">

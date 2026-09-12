@@ -28,4 +28,28 @@ describe("profile settings server boundary", () => {
         await updateProfile("shop", { displayName: "A real business", shopLogoUrl: "/uploads/logo.png", animationStyleId: "premium", personalityConfig: '{"hideIntroifyBrand":true}' })
         expect(mocks.update).toHaveBeenCalledWith({ where: { id: "shop", userId: "owner" }, data: expect.objectContaining({ displayName: "A real business", shopLogoUrl: "/uploads/logo.png", animationStyleId: undefined, personalityConfig: "{}" }) })
     })
+    it("requires a photo when orbit is enabled through a direct settings write", async () => {
+        await expect(updateProfile("shop", { imageUrl: "  ", personalityConfig: '{"orb":{"theme":"planet-azure","orbitProfile":true}}' })).rejects.toThrow("Set up your profile photo")
+        expect(mocks.update).not.toHaveBeenCalled()
+    })
+    it("allows uploading a photo and enabling orbit together", async () => {
+        await updateProfile("shop", { imageUrl: "/uploads/profile.webp", personalityConfig: '{"orb":{"theme":"planet-azure","orbitProfile":true}}' })
+        const saved = mocks.update.mock.calls[0][0].data
+        expect(saved.imageUrl).toBe("/uploads/profile.webp")
+        expect(JSON.parse(saved.personalityConfig).orb).toMatchObject({ theme: "planet-azure", orbitProfile: true })
+    })
+    it("uses an existing photo for partial writes instead of clearing it", async () => {
+        mocks.execute.mockImplementation(async input => ({ ok: true, value: await input.writeOwned({ resourceId: "shop", profile: { id: "shop", userId: "owner", imageUrl: "/uploads/profile.webp" } }) }))
+        await updateProfile("shop", { personalityConfig: '{"orb":{"orbitProfile":true}}' })
+        const saved = mocks.update.mock.calls[0][0].data
+        expect(saved.imageUrl).toBeUndefined()
+        expect(JSON.parse(saved.personalityConfig).orb.orbitProfile).toBe(true)
+    })
+    it("turns orbit off when a photo is removed without losing the selected bot", async () => {
+        mocks.execute.mockImplementation(async input => ({ ok: true, value: await input.writeOwned({ resourceId: "shop", profile: { id: "shop", userId: "owner", imageUrl: "/uploads/profile.webp", personalityConfig: '{"orb":{"theme":"planet-sage","orbitProfile":true},"socials":{"website":"https://example.test"}}' } }) }))
+        await updateProfile("shop", { imageUrl: "" })
+        const saved = mocks.update.mock.calls[0][0].data
+        expect(saved.imageUrl).toBeNull()
+        expect(JSON.parse(saved.personalityConfig)).toEqual({ orb: { theme: "planet-sage", orbitProfile: false }, socials: { website: "https://example.test" } })
+    })
 })

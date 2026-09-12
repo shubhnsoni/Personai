@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
+import { BrandLoadingVisual } from "./brand-loading"
 
 type Transition = { id: number; phase: "opening" | "leaving" }
 const TransitionContext = createContext<(href: string) => void>(() => {})
@@ -114,7 +115,7 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
             {children}
             {transition && (
                 <div key={transition.id} className="page-transit" data-phase={transition.phase} role="status" aria-live="polite">
-                    <span className="page-transit-progress" aria-hidden="true" />
+                    <BrandLoadingVisual complete={transition.phase === "leaving"} />
                     <span className="sr-only">Loading page</span>
                 </div>
             )}

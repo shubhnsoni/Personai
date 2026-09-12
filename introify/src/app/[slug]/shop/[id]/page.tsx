@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation"
+import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
+import { resolveThemedOrb } from "@/lib/bloub/catalog"
 import { prisma } from "@/lib/prisma"
 import { parseGallery, parseVariants, whatsappHref } from "@/lib/commerce"
 import { extraDetailPhotos, parsePdpDisplay } from "@/lib/shop/pdp-display"
@@ -43,6 +45,9 @@ export default async function ProductSalesPage({
     })
     if (!product) notFound()
     if (isPharmacy(product.profile.roleTemplate) && isExpiredMedicine(product.variantsJson)) notFound()
+
+    const config = await publicAnimationConfig(product.profile.id, configuredProfileAnimation(product.profile))
+    const catalogTheme = resolveThemedOrb(config.theme)
 
     const highlights: string[] = (() => {
         try {
@@ -146,7 +151,7 @@ export default async function ProductSalesPage({
             : null
 
     return (
-        <>
+        <div data-public-catalog-theme={catalogTheme ?? undefined}>
         <Tracker slug={slug} name="pdp_view" />
         <SessionProbe slug={slug} />
         <PdpLight
@@ -184,7 +189,7 @@ export default async function ProductSalesPage({
                 jewelry || wholesale ? <GoldRateStrip board={board} wholesale={wholesale} tone="light" surface="pdp" /> : null
             }
         />
-        </>
+        </div>
     )
 }
 

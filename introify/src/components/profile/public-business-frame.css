@@ -36,12 +36,12 @@ html.dark body:has([data-public-browser-theme="astral-nebula"]) {
 
 html:has([data-public-browser-theme="holographic-hud"]),
 body:has([data-public-browser-theme="holographic-hud"]) {
-  background-color: #e5f8fd;
+  background-color: #eef6fc;
 }
 
 html.dark:has([data-public-browser-theme="holographic-hud"]),
 html.dark body:has([data-public-browser-theme="holographic-hud"]) {
-  background-color: #060810;
+  background-color: #091525;
 }
 
 html:has([data-public-browser-theme="liquid-chrome"]),

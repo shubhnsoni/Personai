@@ -39,9 +39,9 @@ export function MobileSidebar({ open, onOpenChange, counts, role, extras, busine
             >
                 <SheetHeader className="relative shrink-0 space-y-0 p-0 pr-10">
                     <div className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/30 md:hidden" />
-                    <div className="flex items-center gap-3 pb-[5px] pl-5 pr-10 pt-[14px]">
+                    <div className="flex items-center gap-3 pb-[5px] pl-5 pt-[14px]">
                         <SheetTitle className="sr-only">Menu</SheetTitle>
-                        <Logo href="/dashboard" size="sm" className="w-[88px] shrink-0" />
+                        <Logo href="/dashboard" size="sm" className="w-[115px] shrink-0" />
                         {businesses && activeProfileId ? (
                             <BusinessSwitcher businesses={businesses} activeId={activeProfileId} variant="drawer" onNavigate={() => onOpenChange(false)} />
                         ) : null}

@@ -1,0 +1,46 @@
+.bot-aura {
+  --bot-aura-paint: color-mix(in srgb, var(--bot-aura-color) 68%, #14334f);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  isolation: isolate;
+  opacity: var(--bot-aura-strength, .65);
+}
+.bot-aura-ring {
+  position: absolute;
+  inset: 3%;
+  border: 1px solid var(--bot-aura-paint);
+  border-radius: 50%;
+  opacity: 0;
+  animation: bot-aura-pulse var(--bot-aura-duration) ease-out infinite;
+}
+.bot-aura-ring:nth-child(2) { animation-delay: calc(var(--bot-aura-duration) / -3); }
+.dark .bot-aura { --bot-aura-paint: var(--bot-aura-color); }
+.bot-aura-ring:nth-child(3) { animation-delay: calc(var(--bot-aura-duration) * -2 / 3); }
+.bot-aura[data-aura="breathe"] .bot-aura-ring { display: none; }
+/* Breathe uses one concentric line; Pulse uses three staggered lines. */
+.bot-aura[data-aura="breathe"] .bot-aura-ring:first-child {
+  display: block;
+  animation: bot-aura-breathe var(--bot-aura-duration) ease-in-out infinite;
+}
+@keyframes bot-aura-pulse {
+  0% { transform: scale(.64); opacity: .7; }
+  80%, 100% { transform: scale(1); opacity: 0; }
+}
+@keyframes bot-aura-breathe {
+  0%,100% { transform: scale(.84); opacity: .4; }
+  50% { transform: scale(1); opacity: 1; }
+}
+.bot-aura[data-paused="true"] > span {
+  animation-play-state: paused !important;
+  animation-delay: var(--bot-aura-time) !important;
+}
+@media(prefers-reduced-motion:reduce) {
+  .bot-aura > span { animation: none !important; }
+  .bot-aura .bot-aura-ring { display: none; }
+  .bot-aura[data-aura="breathe"] .bot-aura-ring:first-child {
+    transform: scale(.9);
+    opacity: .35;
+  }
+}

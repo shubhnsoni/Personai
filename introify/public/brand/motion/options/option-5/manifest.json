@@ -1,0 +1,21 @@
+{
+  "option": 5,
+  "status": "locked",
+  "name": "Take 1",
+  "sourceKey": "finalize:014987e6-e285-4678-b564-8f78c0e6657c",
+  "sourceHash": "fe86c9747fc6c74dfea758330c42573cf360e828ebbcf9fb445aa4d943c6d279",
+  "sourceTakeId": null,
+  "lockedAt": "2026-09-12T15:50:02.391Z",
+  "duration": 2.8,
+  "keyframes": 3,
+  "files": {
+    "settings.json": "0e064beb8dc32fc15f30cd38869d78ecac517062a7fca01f67e2f8e8343f7aea",
+    "motion-data.json": "c019b0c1129c8edc520039b30dfec98a58c86ffaff148312909ebee3e97536f8",
+    "take.json": "c1d4985dbedf0a993bfd1adc1d826b901fccfbe8efa93860abbd3f1579fc52b9",
+    "introify-logo-light.svg": "5e89177e3d0031aec78e8926264dfba16f317a0ab0d9dc6dad0d097395758414",
+    "introify-logo-dark.svg": "f08c96ad8520e9328b066b6d7183f3d698a0585108d68bb29f2733f34c9b8471",
+    "introify-symbol-light.svg": "3cea3fd970566f1a6dfc31bc892e9530941bbc487aafa29c6eca2fdc6223c95b",
+    "introify-symbol-dark.svg": "9768666254d64c39a77a943f150c4bcd63f3e983585cda1b82f0c0da3acb2089",
+    "index.html": "b0bdf43e9fd4e0369170468d06f5a90c42bb01280edd627e6c9dc3412b683be9"
+  }
+}

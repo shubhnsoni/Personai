@@ -13,7 +13,31 @@
 .animoji-character {
   transform-box: fill-box;
   transform-origin: 50% 78%;
+  rotate: var(--bot-face-angle, 0deg);
+  translate: 0 var(--bot-face-y, 0%);
 }
+
+.animoji-eyes {
+  scale: var(--bot-eye-x, 1) var(--bot-eye-y, 1);
+}
+.animoji-eyes > :is(path, ellipse, circle, rect):first-child,
+.animoji-eyes > :is(path, ellipse, circle, rect):nth-child(2) {
+  transform-box: fill-box;
+  transform-origin: center;
+  rotate: var(--bot-eye-left-angle, 0deg);
+}
+.animoji-eyes > :is(path, ellipse, circle, rect):nth-child(2) {
+  rotate: var(--bot-eye-right-angle, 0deg);
+}
+.animoji-mouth {
+  scale: var(--bot-mouth-scale, 1);
+  rotate: var(--bot-mouth-angle, 0deg);
+}
+.animoji-face[data-expression="confus"] .animoji-eyes { rotate: -9deg; }
+.animoji-face[data-expression="curieux"] .animoji-eyes { rotate: 6deg; }
+.animoji-face[data-expression="colere"] .animoji-brows { scale: 1 1.4; }
+.animoji-face[data-expression="surpris"] .animoji-mouth,
+.animoji-face[data-expression="effraye"] .animoji-mouth { scale: .72 1.5; }
 
 .animoji-eyes,
 .animoji-mouth,
@@ -245,7 +269,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animoji-face :is(.animoji-character, .animoji-eyes, .animoji-mouth, .animoji-heart, .animoji-tear, .animoji-steam, .animoji-spark, .animoji-zzz) {
+  .animoji-face * {
     animation: none !important;
   }
 }

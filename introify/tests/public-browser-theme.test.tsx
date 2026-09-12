@@ -45,6 +45,102 @@ afterEach(() => {
 })
 
 describe("Public business browser chrome", () => {
+    it.each([
+        {
+            theme: "cosmic-space",
+            light: "#f3edfc",
+            lightRgb: "rgb(243, 237, 252)",
+            dark: "#0b0818",
+            darkRgb: "rgb(11, 8, 24)",
+        },
+        {
+            theme: "cosmic-comic",
+            light: "#f5e7c9",
+            lightRgb: "rgb(245, 231, 201)",
+            dark: "#181020",
+            darkRgb: "rgb(24, 16, 32)",
+        },
+        {
+            theme: "holographic-hud",
+            light: "#eef6fc",
+            lightRgb: "rgb(238, 246, 252)",
+            dark: "#091525",
+            darkRgb: "rgb(9, 21, 37)",
+        },
+    ])("keeps $theme canvas and browser metadata in sync through mode and route changes", ({ theme, light, lightRgb, dark, darkRgb }) => {
+        const { container, rerender } = render(contents(theme))
+        const frame = container.firstElementChild as HTMLElement
+        expect(frame.getAttribute("data-public-business-theme")).toBe(theme)
+        expect(frame.getAttribute("data-public-browser-theme")).toBe(theme)
+        expect(frame.hasAttribute("data-profile-viewport")).toBe(true)
+        expect(chromeMeta()?.content).toBe(light)
+        expect(chromeMeta()?.hasAttribute("media")).toBe(false)
+        expect(root().style.backgroundColor).toBe(lightRgb)
+        expect(document.body.style.backgroundColor).toBe(lightRgb)
+
+        state.resolvedTheme = "dark"
+        root().classList.add("dark")
+        root().style.colorScheme = "dark"
+        rerender(contents(theme))
+        expect(chromeMeta()?.content).toBe(dark)
+        expect(root().style.backgroundColor).toBe(darkRgb)
+        expect(document.body.style.backgroundColor).toBe(darkRgb)
+        expect(document.body.style.colorScheme).toBe("dark")
+        expect(document.head.querySelector<HTMLMetaElement>('meta[name="color-scheme"]')?.content).toBe("dark")
+        expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(2)
+
+        state.pathname = "/custom/shop/product-one"
+        rerender(contents(theme))
+        expect(frame.hasAttribute("data-profile-viewport")).toBe(false)
+        expect(frame.getAttribute("data-public-browser-theme")).toBe(theme)
+        expect(chromeMeta()?.content).toBe(dark)
+        expect(document.body.style.overflowY).toBe("auto")
+
+        state.resolvedTheme = "light"
+        root().classList.remove("dark")
+        root().style.colorScheme = "light"
+        rerender(contents(theme))
+        expect(chromeMeta()?.content).toBe(light)
+        expect(document.body.style.backgroundColor).toBe(lightRgb)
+        expect(document.body.style.colorScheme).toBe("light")
+        expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(2)
+
+        state.pathname = "/dashboard"
+        rerender(contents(theme))
+        expect(frame.hasAttribute("data-public-browser-theme")).toBe(false)
+        expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(0)
+        expect(chromeMeta()).toBe(defaultMeta[0])
+        expect(root().style.backgroundColor).toBe("rgb(8, 18, 35)")
+        expect(document.body.style.backgroundColor).toBe("rgb(9, 19, 36)")
+        expect(document.body.style.getPropertyPriority("background-color")).toBe("important")
+        expect(document.body.style.colorScheme).toBe("light dark")
+        expect(root().style.colorScheme).toBe("light")
+        expect(defaultMeta.map(meta => meta.content)).toEqual(["#ffffff", "#050505"])
+    })
+
+    it("replaces Nova and Hologram browser metadata when the saved bot theme changes", () => {
+        state.resolvedTheme = "dark"
+        root().classList.add("dark")
+        const { container, rerender, unmount } = render(contents("cosmic-space"))
+        const frame = container.firstElementChild as HTMLElement
+        for (const [theme, canvas] of [
+            ["cosmic-space", "#0b0818"],
+            ["cosmic-comic", "#181020"],
+            ["holographic-hud", "#091525"],
+            ["cosmic-space", "#0b0818"],
+        ]) {
+            rerender(contents(theme))
+            expect(frame.getAttribute("data-public-browser-theme")).toBe(theme)
+            expect(chromeMeta()?.content).toBe(canvas)
+            expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(2)
+        }
+        unmount()
+        expect(chromeMeta()).toBe(defaultMeta[0])
+        expect(document.head.querySelectorAll("meta[data-public-browser-theme]")).toHaveLength(0)
+        expect(root().style.backgroundColor).toBe("rgb(8, 18, 35)")
+        expect(document.body.style.backgroundColor).toBe("rgb(9, 19, 36)")
+    })
+
     it("paints html and the profile viewport so no default strip shows around the canvas", () => {
         const { container, rerender } = render(contents())
         const frame = container.firstElementChild as HTMLElement

@@ -104,13 +104,15 @@ describe("PremiumThemeOrb", () => {
         }
     })
 
-    it("closes a single eye on wink and respects still mode for gaze", () => {
-        const { container } = render(
-            <PremiumThemeOrb variant="liquid-chrome" size={120} gaze={{ x: 1, y: 1 }} lid="wink-left" expression="centre" still />,
+    it("winks when live and preserves the resting face in still previews", () => {
+        const { container, rerender } = render(
+            <PremiumThemeOrb variant="liquid-chrome" size={120} gaze={{ x: 1, y: 1 }} lid="wink-left" expression="centre" />,
         )
+        expect(container.querySelectorAll(".pt-orb-eye")[0].getAttribute("style")).toContain("scale(1, 0.12)")
+        rerender(<PremiumThemeOrb variant="liquid-chrome" size={120} gaze={{ x: 1, y: 1 }} lid="wink-left" expression="centre" still />)
         expect(container.querySelector(".pt-orb")!.getAttribute("data-still")).toBe("true")
         expect(container.querySelector(".pt-orb-eyes")!.getAttribute("style")).toContain("translate(0px, 0px)")
-        expect(container.querySelectorAll(".pt-orb-eye")[0].getAttribute("style")).toContain("scale(1, 0.12)")
+        expect(container.querySelectorAll(".pt-orb-eye")[0].getAttribute("style")).toContain("none")
         expect(container.querySelectorAll(".pt-orb-eye")[1].getAttribute("style")).not.toContain("scale(1, 0.12)")
     })
 })

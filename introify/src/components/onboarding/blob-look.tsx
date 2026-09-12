@@ -18,6 +18,7 @@ import {
     gradientForColor,
     isCustomizerBotSelected,
     isNamedBloubBotSelected,
+    isPremiumBloubTheme,
     lookThemesFor,
     resolveBloubTheme,
     usesAnimojiFaces,
@@ -142,13 +143,26 @@ export function BlobLookStudio({
                         {themes.map((item) => {
                             const thumb = bloubThemeThumb(item.id, "dark")
                             return (
-                                <div key={item.id} aria-label={`${item.label} theme`} className="rounded-2xl border border-white/70 bg-white/[0.08] p-3 text-left">
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    aria-label={`${item.label} theme`}
+                                    aria-pressed={value.theme === item.id}
+                                    onClick={() => {
+                                        if (isPremiumBloubTheme(item.id)) {
+                                            toast.message("This is a premium theme")
+                                            return
+                                        }
+                                        onChange({ theme: item.id })
+                                    }}
+                                    className={cn("rounded-2xl border p-3 text-left", value.theme === item.id ? "border-white/70 bg-white/[0.08]" : "border-white/15 hover:bg-white/[0.06]")}
+                                >
                                     <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: thumb.bg }}>
                                         <span className="h-5 w-5 rounded-full" style={{ background: thumb.dot }} />
                                         <span className="h-1.5 w-9 rounded-full" style={{ background: thumb.bar }} />
                                     </span>
                                     <span className="block text-[13px] font-medium text-white">{item.label}</span>
-                                </div>
+                                </button>
                             )
                         })}
                     </div>
@@ -180,7 +194,7 @@ export function BlobLookStudio({
                         })}
                     </div>
                 </section>
-            ) : (
+            ) : null}
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Mood</p>
                 <div className="flex flex-wrap gap-2">
@@ -199,9 +213,7 @@ export function BlobLookStudio({
                     ))}
                 </div>
             </section>
-            )}
 
-            {usesAnimojiFaces(value) ? null : (
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Aura</p>
                 <div className="flex flex-wrap gap-2">
@@ -210,6 +222,7 @@ export function BlobLookStudio({
                             key={item.id}
                             type="button"
                             onClick={() => onChange({ aura: item.id })}
+                            aria-pressed={value.aura === item.id}
                             className={cn(
                                 "rounded-full px-3.5 py-2 text-[13px]",
                                 value.aura === item.id ? "bg-white text-zinc-950" : "bg-white/[0.06] text-white/75 hover:bg-white/[0.1]",
@@ -220,7 +233,6 @@ export function BlobLookStudio({
                     ))}
                 </div>
             </section>
-            )}
 
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Bots</p>
@@ -270,7 +282,7 @@ export function BlobLookStudio({
                                 type="button"
                                 aria-label={bot.label}
                                 aria-pressed={selected}
-                                onClick={() => onChange(bloubBotPick(bot))}
+                                onClick={() => onChange(bloubBotPick(bot, value))}
                                 className={cn(
                                     "flex flex-col items-center gap-1 rounded-2xl py-2",
                                     selected ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",

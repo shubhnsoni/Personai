@@ -1,4 +1,5 @@
 import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
+import { resolveThemedOrb } from "@/lib/bloub/catalog"
 import { notFound } from "next/navigation"
 import Link from "@/components/navigation/transition-link"
 import { prisma } from "@/lib/prisma"
@@ -27,17 +28,17 @@ export default async function CoursesCatalogPage({ params }: { params: Promise<{
     if (!profile || !profile.isPublic) notFound()
 
     const config = await publicAnimationConfig(profile.id, configuredProfileAnimation(profile))
-    const retro = config.theme === "retro-lcd"
+    const catalogTheme = resolveThemedOrb(config.theme)
     const theme = ORB_THEMES[resolveOrbVariant(config.colors, config.variant)]
     const logo = (profile as { shopLogoUrl?: string | null }).shopLogoUrl
 
     return (
         <div
-            data-public-catalog-theme={retro ? "retro-lcd" : undefined}
-            className={retro ? "min-h-dvh bg-background text-foreground" : "dark min-h-dvh bg-zinc-950 text-zinc-100"}
-            style={retro ? undefined : { ["--pl-aurora" as string]: theme.accent, ["--pl-brand-foreground" as string]: theme.onAccent }}
+            data-public-catalog-theme={catalogTheme ?? undefined}
+            className={catalogTheme ? "min-h-dvh bg-background text-foreground" : "dark min-h-dvh bg-zinc-950 text-zinc-100"}
+            style={catalogTheme ? undefined : { ["--pl-aurora" as string]: theme.accent, ["--pl-brand-foreground" as string]: theme.onAccent }}
         >
-            <CatalogHeader themeToggle={retro} slug={slug} name={profile.displayName} logoUrl={logo} label="Courses" />
+            <CatalogHeader themeToggle={Boolean(catalogTheme)} slug={slug} name={profile.displayName} logoUrl={logo} label="Courses" />
             <main className="mx-auto max-w-2xl px-4 py-5 pb-10">
                 {profile.courses.length === 0 ? (
                     <p className="py-16 text-center text-sm text-zinc-500">No courses yet.</p>
@@ -57,7 +58,7 @@ export default async function CoursesCatalogPage({ params }: { params: Promise<{
                                         <p className="text-xs text-zinc-500">
                                             {c.modules.length} modules · {lessons} lessons
                                         </p>
-                                        <p className="text-sm tabular-nums" style={{ color: retro ? "var(--pl-aurora)" : theme.mid || theme.accent }}>
+                                        <p className="text-sm tabular-nums" style={{ color: catalogTheme ? "var(--pl-aurora)" : theme.mid || theme.accent }}>
                                             {formatMoney(c.priceCents, currency)}
                                         </p>
                                     </div>

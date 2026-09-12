@@ -290,7 +290,7 @@ export function OnboardingWizard({
     return (
         <div className="relative isolate flex h-dvh overflow-hidden auth-scene text-zinc-100">
             <aside className="relative z-10 sticky top-0 hidden h-full w-16 shrink-0 flex-col items-center overflow-hidden border-r border-white/10 py-5 lg:flex">
-                <Logo href="/" size="sm" className="w-10 text-base" />
+                <Logo href="/" size="sm" variant="icon" className="w-10 text-base" />
                 <nav className="mt-8 flex flex-1 flex-col items-center gap-3" aria-label="Onboarding steps">
                     {railBeats.map((s, i) => {
                         const Icon = s.icon

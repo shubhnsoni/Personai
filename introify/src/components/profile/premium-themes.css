@@ -27,17 +27,17 @@
   --pt-accent: #a78bfa;
 }
 
-/* ---- Holographic HUD ---------------------------------------------------- */
+/* ---- Hologram ----------------------------------------------------------- */
 :is(
   [data-public-business-theme="holographic-hud"],
   [data-public-catalog-theme="holographic-hud"],
   [data-public-profile-theme="holographic-hud"],
   [data-chat-theme="holographic-hud"],
-  body:has([data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"]) > [data-slot="sheet-content"]
+  body:has([data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"]) > [data-slot="sheet-content"]
 ) {
-  --pt-paper: #e5f8fd;
-  --pt-ink: #06232e;
-  --pt-accent: #00a7c8;
+  --pt-paper: #eef6fc;
+  --pt-ink: #122d44;
+  --pt-accent: #246b9b;
 }
 
 .dark :is(
@@ -45,11 +45,11 @@
   [data-public-catalog-theme="holographic-hud"],
   [data-public-profile-theme="holographic-hud"],
   [data-chat-theme="holographic-hud"],
-  body:has([data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"]) > [data-slot="sheet-content"]
+  body:has([data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"]) > [data-slot="sheet-content"]
 ) {
-  --pt-paper: #060810;
-  --pt-ink: #c9f4ff;
-  --pt-accent: #00e5ff;
+  --pt-paper: #091525;
+  --pt-ink: #e0f3ff;
+  --pt-accent: #a7ddff;
 }
 
 /* ---- Liquid Chrome ------------------------------------------------------ */
@@ -77,11 +77,212 @@
   --pt-accent: #9fb0c4;
 }
 
+/* ---- Planet palettes --------------------------------------------------- */
+:is(
+  [data-public-business-theme="planet-azure"],
+  [data-public-catalog-theme="planet-azure"],
+  [data-public-profile-theme="planet-azure"],
+  [data-chat-theme="planet-azure"],
+  body:has([data-public-business-theme="planet-azure"], [data-public-profile-theme="planet-azure"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #edf5fb;
+  --pt-ink: #172f4c;
+  --pt-accent: #2563a6;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-azure"],
+  [data-public-catalog-theme="planet-azure"],
+  [data-public-profile-theme="planet-azure"],
+  [data-chat-theme="planet-azure"],
+  body:has([data-public-business-theme="planet-azure"], [data-public-profile-theme="planet-azure"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #07111f;
+  --pt-ink: #e9f4ff;
+  --pt-accent: #88c8f3;
+}
+
+:is(
+  [data-public-business-theme="planet-rose"],
+  [data-public-catalog-theme="planet-rose"],
+  [data-public-profile-theme="planet-rose"],
+  [data-chat-theme="planet-rose"],
+  body:has([data-public-business-theme="planet-rose"], [data-public-profile-theme="planet-rose"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #fbf0f3;
+  --pt-ink: #4a2639;
+  --pt-accent: #a8406b;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-rose"],
+  [data-public-catalog-theme="planet-rose"],
+  [data-public-profile-theme="planet-rose"],
+  [data-chat-theme="planet-rose"],
+  body:has([data-public-business-theme="planet-rose"], [data-public-profile-theme="planet-rose"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #1a0d17;
+  --pt-ink: #fff0f7;
+  --pt-accent: #f0a4c8;
+}
+
+:is(
+  [data-public-business-theme="planet-sage"],
+  [data-public-catalog-theme="planet-sage"],
+  [data-public-profile-theme="planet-sage"],
+  [data-chat-theme="planet-sage"],
+  body:has([data-public-business-theme="planet-sage"], [data-public-profile-theme="planet-sage"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #edf6ef;
+  --pt-ink: #203e2b;
+  --pt-accent: #35734e;
+}
+
+.dark :is(
+  [data-public-business-theme="planet-sage"],
+  [data-public-catalog-theme="planet-sage"],
+  [data-public-profile-theme="planet-sage"],
+  [data-chat-theme="planet-sage"],
+  body:has([data-public-business-theme="planet-sage"], [data-public-profile-theme="planet-sage"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #081710;
+  --pt-ink: #edf8ef;
+  --pt-accent: #9ed2ac;
+}
+
+/* ---- Nova: Space and Comic ---------------------------------------------- */
+:is(
+  [data-public-business-theme="cosmic-space"],
+  [data-public-catalog-theme="cosmic-space"],
+  [data-public-profile-theme="cosmic-space"],
+  [data-chat-theme="cosmic-space"],
+  body:has([data-public-business-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #f3edfc;
+  --pt-ink: #291738;
+  --pt-accent: #8534af;
+}
+
+.dark :is(
+  [data-public-business-theme="cosmic-space"],
+  [data-public-catalog-theme="cosmic-space"],
+  [data-public-profile-theme="cosmic-space"],
+  [data-chat-theme="cosmic-space"],
+  body:has([data-public-business-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #0b0818;
+  --pt-ink: #f8ecff;
+  --pt-accent: #dda8ff;
+}
+
+:is(
+  [data-public-business-theme="cosmic-comic"],
+  [data-public-catalog-theme="cosmic-comic"],
+  [data-public-profile-theme="cosmic-comic"],
+  [data-chat-theme="cosmic-comic"],
+  body:has([data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #f5e7c9;
+  --pt-ink: #28132e;
+  --pt-accent: #922d86;
+  --comic-shadow: #28132e;
+}
+
+.dark :is(
+  [data-public-business-theme="cosmic-comic"],
+  [data-public-catalog-theme="cosmic-comic"],
+  [data-public-profile-theme="cosmic-comic"],
+  [data-chat-theme="cosmic-comic"],
+  body:has([data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"]) > [data-slot="sheet-content"]
+) {
+  --pt-paper: #181020;
+  --pt-ink: #f8e8c8;
+  --pt-accent: #f1a4e5;
+  --comic-shadow: #08050c;
+}
+
+/* Keep the first frame and the browser safe areas on the same canvas, even
+   before PublicBrowserTheme mounts. Palette values match BLOUB_THEME_META. */
+html:has([data-public-browser-theme="planet-azure"]),
+body:has([data-public-browser-theme="planet-azure"]) {
+  background-color: #edf5fb;
+}
+
+html.dark:has([data-public-browser-theme="planet-azure"]),
+html.dark body:has([data-public-browser-theme="planet-azure"]) {
+  background-color: #07111f;
+}
+
+html:has([data-public-browser-theme="planet-rose"]),
+body:has([data-public-browser-theme="planet-rose"]) {
+  background-color: #fbf0f3;
+}
+
+html.dark:has([data-public-browser-theme="planet-rose"]),
+html.dark body:has([data-public-browser-theme="planet-rose"]) {
+  background-color: #1a0d17;
+}
+
+html:has([data-public-browser-theme="planet-sage"]),
+body:has([data-public-browser-theme="planet-sage"]) {
+  background-color: #edf6ef;
+}
+
+html.dark:has([data-public-browser-theme="planet-sage"]),
+html.dark body:has([data-public-browser-theme="planet-sage"]) {
+  background-color: #081710;
+}
+
+html:has([data-public-browser-theme="holographic-hud"]),
+body:has([data-public-browser-theme="holographic-hud"]) {
+  background-color: #eef6fc;
+}
+
+html.dark:has([data-public-browser-theme="holographic-hud"]),
+html.dark body:has([data-public-browser-theme="holographic-hud"]) {
+  background-color: #091525;
+}
+
+html:has([data-public-browser-theme="cosmic-space"]),
+body:has([data-public-browser-theme="cosmic-space"]) {
+  background-color: #f3edfc;
+}
+
+html.dark:has([data-public-browser-theme="cosmic-space"]),
+html.dark body:has([data-public-browser-theme="cosmic-space"]) {
+  background-color: #0b0818;
+}
+
+html:has([data-public-browser-theme="cosmic-comic"]),
+body:has([data-public-browser-theme="cosmic-comic"]) {
+  background-color: #f5e7c9;
+}
+
+html.dark:has([data-public-browser-theme="cosmic-comic"]),
+html.dark body:has([data-public-browser-theme="cosmic-comic"]) {
+  background-color: #181020;
+}
+
 /* ---- Shared token plumbing (same contract as retro-lcd) ------------------ */
 :is(
   [data-public-business-theme="astral-nebula"], [data-public-catalog-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"], [data-chat-theme="astral-nebula"],
   [data-public-business-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-chat-theme="holographic-hud"],
-  [data-public-business-theme="liquid-chrome"], [data-public-catalog-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"], [data-chat-theme="liquid-chrome"]
+  [data-public-business-theme="liquid-chrome"], [data-public-catalog-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"], [data-chat-theme="liquid-chrome"],
+  [data-public-business-theme="planet-azure"], [data-public-catalog-theme="planet-azure"], [data-public-profile-theme="planet-azure"], [data-chat-theme="planet-azure"],
+  [data-public-business-theme="planet-rose"], [data-public-catalog-theme="planet-rose"], [data-public-profile-theme="planet-rose"], [data-chat-theme="planet-rose"],
+  [data-public-business-theme="planet-sage"], [data-public-catalog-theme="planet-sage"], [data-public-profile-theme="planet-sage"], [data-chat-theme="planet-sage"],
+  [data-public-business-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-chat-theme="cosmic-space"],
+  [data-public-business-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-chat-theme="cosmic-comic"],
+  body:has(
+    [data-public-business-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"],
+    [data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"],
+    [data-public-business-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"],
+    [data-public-business-theme="planet-azure"], [data-public-profile-theme="planet-azure"],
+    [data-public-business-theme="planet-rose"], [data-public-profile-theme="planet-rose"],
+    [data-public-business-theme="planet-sage"], [data-public-profile-theme="planet-sage"],
+    [data-public-business-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"],
+    [data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"]
+  ) > [data-slot="sheet-content"]
 ) {
   --profile-bg: var(--pt-paper);
   --profile-text: var(--pt-ink);
@@ -114,20 +315,27 @@
   color: var(--profile-text);
 }
 
-/* HUD leans terminal; both premium pages tighten display type. */
-[data-chat-theme="holographic-hud"] :is(h1, [data-slot="chip"]) {
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-}
-
+/* Theme headings share the product typography. */
+[data-chat-theme="holographic-hud"] h1,
 [data-chat-theme="liquid-chrome"] h1,
-[data-chat-theme="astral-nebula"] h1 {
+[data-chat-theme="astral-nebula"] h1,
+[data-chat-theme="planet-azure"] h1,
+[data-chat-theme="planet-rose"] h1,
+[data-chat-theme="planet-sage"] h1,
+[data-chat-theme="cosmic-space"] h1,
+[data-chat-theme="cosmic-comic"] h1 {
   letter-spacing: -0.02em;
 }
 
 :is(
   [data-chat-theme="astral-nebula"],
   [data-chat-theme="holographic-hud"],
-  [data-chat-theme="liquid-chrome"]
+  [data-chat-theme="liquid-chrome"],
+  [data-chat-theme="planet-azure"],
+  [data-chat-theme="planet-rose"],
+  [data-chat-theme="planet-sage"],
+  [data-chat-theme="cosmic-space"],
+  [data-chat-theme="cosmic-comic"]
 ) input:not([type="checkbox"]) {
   border: 1px solid var(--border);
   background: var(--profile-elev);
@@ -137,7 +345,12 @@
 :is(
   [data-chat-theme="astral-nebula"],
   [data-chat-theme="holographic-hud"],
-  [data-chat-theme="liquid-chrome"]
+  [data-chat-theme="liquid-chrome"],
+  [data-chat-theme="planet-azure"],
+  [data-chat-theme="planet-rose"],
+  [data-chat-theme="planet-sage"],
+  [data-chat-theme="cosmic-space"],
+  [data-chat-theme="cosmic-comic"]
 ) [data-slot="chip"] {
   border-color: var(--border);
 }
@@ -145,7 +358,12 @@
 :is(
   [data-chat-theme="astral-nebula"],
   [data-chat-theme="holographic-hud"],
-  [data-chat-theme="liquid-chrome"]
+  [data-chat-theme="liquid-chrome"],
+  [data-chat-theme="planet-azure"],
+  [data-chat-theme="planet-rose"],
+  [data-chat-theme="planet-sage"],
+  [data-chat-theme="cosmic-space"],
+  [data-chat-theme="cosmic-comic"]
 ) [data-chat-bubble="assistant"] {
   border-color: var(--border);
   background: var(--profile-elev);
@@ -153,13 +371,18 @@
 }
 
 /* Theme-specific silhouettes for chat chrome. */
-[data-chat-theme="holographic-hud"] [data-slot="chip"],
-[data-chat-theme="holographic-hud"] [data-chat-bubble] {
-  border-radius: 8px;
-}
-
 [data-chat-theme="astral-nebula"] [data-chat-bubble] {
   border-radius: 18px;
+}
+
+:is(
+  [data-chat-theme="planet-azure"],
+  [data-chat-theme="planet-rose"],
+  [data-chat-theme="planet-sage"],
+  [data-chat-theme="cosmic-space"],
+  [data-chat-theme="cosmic-comic"]
+) :is(input:not([type="checkbox"]), [data-chat-bubble]) {
+  border-radius: 20px;
 }
 
 [data-chat-theme="liquid-chrome"] input:not([type="checkbox"]),
@@ -172,7 +395,12 @@
 :is(
   [data-public-catalog-theme="astral-nebula"],
   [data-public-catalog-theme="holographic-hud"],
-  [data-public-catalog-theme="liquid-chrome"]
+  [data-public-catalog-theme="liquid-chrome"],
+  [data-public-catalog-theme="planet-azure"],
+  [data-public-catalog-theme="planet-rose"],
+  [data-public-catalog-theme="planet-sage"],
+  [data-public-catalog-theme="cosmic-space"],
+  [data-public-catalog-theme="cosmic-comic"]
 ) {
   & :is(.text-zinc-100, .text-zinc-200, .text-zinc-300) {
     color: var(--profile-text);
@@ -199,7 +427,12 @@
 :is(
   [data-public-business-theme="astral-nebula"],
   [data-public-business-theme="holographic-hud"],
-  [data-public-business-theme="liquid-chrome"]
+  [data-public-business-theme="liquid-chrome"],
+  [data-public-business-theme="planet-azure"],
+  [data-public-business-theme="planet-rose"],
+  [data-public-business-theme="planet-sage"],
+  [data-public-business-theme="cosmic-space"],
+  [data-public-business-theme="cosmic-comic"]
 ) .pdp-v13.pdp-v13 {
   --pdp-bg: var(--profile-bg);
   --pdp-white: var(--profile-elev);
@@ -225,8 +458,13 @@
 /* Booking/event sheets portal to body; scope their legacy palette too. */
 body:has(
   [data-public-business-theme="astral-nebula"], [data-public-profile-theme="astral-nebula"],
-  [data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"],
-  [data-public-business-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"]
+  [data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"],
+  [data-public-business-theme="liquid-chrome"], [data-public-profile-theme="liquid-chrome"],
+  [data-public-business-theme="planet-azure"], [data-public-profile-theme="planet-azure"],
+  [data-public-business-theme="planet-rose"], [data-public-profile-theme="planet-rose"],
+  [data-public-business-theme="planet-sage"], [data-public-profile-theme="planet-sage"],
+  [data-public-business-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"],
+  [data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"]
 ) > [data-slot="sheet-content"] {
   border-color: var(--border);
   & :is(.text-white, .text-zinc-100, .text-zinc-200, .text-zinc-300) {
@@ -246,5 +484,148 @@ body:has(
   & :is(.bg-white, [class~="bg-white/90"]) {
     background-color: var(--pt-accent);
     color: var(--pt-paper);
+  }
+}
+
+/* Hologram: a floating glass globe over a quiet line grid. */
+:is(
+  [data-public-business-theme="holographic-hud"],
+  [data-public-catalog-theme="holographic-hud"],
+  [data-public-profile-theme="holographic-hud"],
+  [data-chat-theme="holographic-hud"],
+  body:has([data-public-business-theme="holographic-hud"], [data-public-profile-theme="holographic-hud"], [data-public-catalog-theme="holographic-hud"]) > [data-slot="sheet-content"]
+) {
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 94%, var(--pt-accent));
+  --profile-chip: color-mix(in srgb, var(--pt-paper) 89%, var(--pt-accent));
+  --border: color-mix(in srgb, var(--pt-accent) 27%, var(--pt-paper));
+  background-image:
+    linear-gradient(90deg, color-mix(in srgb, var(--pt-accent) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--pt-accent) 3%, transparent) 1px, transparent 1px);
+  background-size: 64px 64px;
+
+  & :is(h1, h2, h3, [data-slot="chip"]) {
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.025em;
+  }
+
+  & :is([data-slot="card"], .bg-profile-elev, [data-chat-bubble="assistant"]) {
+    border-color: var(--border);
+    background-color: var(--profile-elev);
+    background-image: none;
+    box-shadow: none;
+  }
+
+  & :is([data-slot="card"], [data-chat-bubble]) {
+    border-radius: 22px;
+  }
+
+  & :is([data-slot="chip"], input:not([type="checkbox"]), textarea) {
+    border-radius: 24px;
+    border-color: var(--border);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--pt-ink) 8%, transparent);
+  }
+
+  & [data-chat-header] {
+    border-color: var(--border);
+    background-color: color-mix(in srgb, var(--pt-paper) 92%, transparent);
+    backdrop-filter: blur(16px);
+  }
+}
+
+/* Space uses sparse stars and a diffused violet cloud. Keeping the decoration
+   in the background leaves pointer targets, scrolling, and photos untouched. */
+:is(
+  [data-public-business-theme="cosmic-space"],
+  [data-public-catalog-theme="cosmic-space"],
+  [data-public-profile-theme="cosmic-space"],
+  [data-chat-theme="cosmic-space"],
+  body:has([data-public-business-theme="cosmic-space"], [data-public-profile-theme="cosmic-space"], [data-public-catalog-theme="cosmic-space"]) > [data-slot="sheet-content"]
+) {
+  background-image:
+    radial-gradient(ellipse at 62% 12%, color-mix(in srgb, var(--pt-accent) 12%, transparent), transparent 54%),
+    radial-gradient(ellipse at 8% 72%, color-mix(in srgb, #ab56c9 7%, transparent), transparent 52%),
+    radial-gradient(circle at 19px 31px, color-mix(in srgb, var(--pt-ink) 17%, transparent) 0.7px, transparent 1.1px),
+    radial-gradient(circle at 87px 63px, color-mix(in srgb, var(--pt-accent) 26%, transparent) 0.8px, transparent 1.3px);
+  background-size: auto, auto, 157px 139px, 241px 223px;
+
+  & :is([data-slot="card"], [data-chat-bubble="assistant"]) {
+    background-color: var(--profile-elev);
+    border-color: var(--border);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--pt-accent) 12%, transparent), 0 8px 26px #180a2c08;
+  }
+
+  & :is([data-slot="chip"], [data-chat-bubble]) {
+    border-radius: 22px;
+  }
+
+  & [data-chat-header] {
+    background-color: color-mix(in srgb, var(--pt-paper) 94%, transparent);
+    border-color: var(--border);
+    backdrop-filter: blur(14px);
+  }
+}
+
+/* Comic keeps the same Nova character in a printed-paper world. Halftone
+   stays faint behind copy; panels and controls carry the stronger ink. */
+:is(
+  [data-public-business-theme="cosmic-comic"],
+  [data-public-catalog-theme="cosmic-comic"],
+  [data-public-profile-theme="cosmic-comic"],
+  [data-chat-theme="cosmic-comic"],
+  body:has([data-public-business-theme="cosmic-comic"], [data-public-profile-theme="cosmic-comic"], [data-public-catalog-theme="cosmic-comic"]) > [data-slot="sheet-content"]
+) {
+  --profile-elev: color-mix(in srgb, var(--pt-paper) 96%, var(--pt-ink));
+  --profile-chip: color-mix(in srgb, var(--pt-paper) 90%, var(--pt-accent));
+  --border: color-mix(in srgb, var(--pt-ink) 65%, var(--pt-paper));
+  background-image:
+    radial-gradient(ellipse at 90% 4%, color-mix(in srgb, var(--pt-accent) 9%, transparent), transparent 48%),
+    radial-gradient(circle, color-mix(in srgb, var(--pt-ink) 6%, transparent) 0.7px, transparent 0.9px);
+  background-size: auto, 6px 6px;
+
+  & :is(h1, h2, h3) {
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 850;
+    letter-spacing: -0.04em;
+    text-wrap: balance;
+  }
+
+  & h1 {
+    font-style: italic;
+    text-shadow: 1px 2px 0 color-mix(in srgb, var(--pt-accent) 22%, transparent);
+  }
+
+  & :is([data-slot="card"], [data-chat-bubble]) {
+    border: 2px solid var(--border);
+    border-radius: 18px 18px 18px 6px;
+    box-shadow: 3px 3px 0 var(--comic-shadow);
+  }
+
+  & [data-chat-bubble="visitor"] {
+    border-radius: 18px 18px 6px 18px;
+  }
+
+  & [data-chat-bubble="assistant"] {
+    background: var(--profile-elev);
+  }
+
+  & :is([data-slot="chip"], input:not([type="checkbox"]), textarea) {
+    border: 2px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 2px 3px 0 var(--comic-shadow);
+  }
+
+  & [data-slot="chip"] {
+    font-weight: 750;
+    letter-spacing: -0.015em;
+  }
+
+  & [data-chat-header] {
+    border-bottom: 2px solid var(--border);
+    background: var(--pt-paper);
+  }
+
+  & :is(input:not([type="checkbox"]), textarea):focus-visible {
+    outline: 2px solid var(--pt-accent);
+    outline-offset: 3px;
   }
 }

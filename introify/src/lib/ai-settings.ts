@@ -1,4 +1,4 @@
-import { clampOrbForPlan } from "@/lib/bloub/catalog"
+import { clampOrbForPlan, type OrbPickInput } from "@/lib/bloub/catalog"
 import { allowedAiModes, getPlan, resolveAiMode, type PlanId } from "@/lib/billing/catalog"
 
 export function permittedPersonality(config: string | null | undefined, customInstructions: boolean) {
@@ -21,7 +21,7 @@ export function validateAiSettings(planId: PlanId, data: { aiModel?: string; aut
         try {
             const bag = JSON.parse(personalityConfig) as Record<string, unknown>
             if (bag.orb && typeof bag.orb === "object") {
-                bag.orb = clampOrbForPlan(bag.orb as Record<string, string | null>, plan.features.customBranding)
+                bag.orb = clampOrbForPlan(bag.orb as OrbPickInput, plan.features.customBranding)
             }
             if (!plan.features.customBranding) delete bag.hideIntroifyBrand
             personalityConfig = JSON.stringify(bag)

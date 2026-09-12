@@ -86,11 +86,11 @@ html[lang="hi-IN"] .mk-page em,
     gap: 40px;
 }
 .mk-brand {
-    --brand-accent: #4e7425;
+    --brand-accent: #0073D5;
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
-    width: 132px;
+    width: 173px;
     max-width: 100%;
     line-height: 1;
     color: #073d30;
@@ -1839,7 +1839,7 @@ html[lang="hi-IN"] .mk-page em,
         gap: 20px;
     }
     .mk-brand {
-        width: 108px;
+        width: 141px;
     }
     .mk-header-actions {
         gap: 0;

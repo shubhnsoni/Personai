@@ -1,0 +1,17 @@
+{
+  "option": 9,
+  "status": "locked",
+  "sourceHash": "d62af062781286916afb9a6cb32a69b6fc9b4260bb5d90d818b950ed606e3315",
+  "duration": 3.194,
+  "restFrame": 45,
+  "files": {
+    "introify-logo-light-once.svg": "9a526ec3bca6c20e0ee40b793bf5afb1c2666c67ecef32564bf7b3325c95ff09",
+    "introify-logo-light-still.svg": "51da124845947c095033c5b1c8a0dab16526ea760586a1efa4ba376a2bb727f3",
+    "introify-logo-dark-once.svg": "49800576b24114d6220b9fbad6dd033519fbc00eac6351a1b98a5551b8695842",
+    "introify-logo-dark-still.svg": "335f3cd68d08d952eade95c0f4d05859e18f443d5e07a3d56e946a20eef3631a",
+    "introify-symbol-light-once.svg": "cf0e8c1e2322e9305e7c07089d6617a0429479ce9f6f8649c27ae58cf323e147",
+    "introify-symbol-light-still.svg": "f973178ecdd01f7722b350aae204f53ea9fccc22e541315b1f900c8cac2dc8b2",
+    "introify-symbol-dark-once.svg": "f87232a1b463f11624e7644b615f85cb6ddbd0eaa70cc9de1a186ac5c2f641fe",
+    "introify-symbol-dark-still.svg": "6c165a2d2f21ee8e113ce3f3e7a6ae3f5b6f66615197a142f918735d08e5444e"
+  }
+}

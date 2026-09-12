@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { toast } from "sonner"
@@ -8,6 +8,7 @@ import { BLOUB_AURAS, BLOUB_MOODS, BLOB_SHAPES, CUSTOMIZER_BOTS, INCLUDED_BLOUB_
 import { ANIMOJI_FACES, resolveAnimojiId } from "@/lib/animoji"
 import { BlobColorSlider } from "@/components/dashboard/blob-color-slider"
 import { cn } from "@/lib/utils"
+import { Switch } from "@/components/ui/switch"
 
 const TABS = [
     { id: "bots", label: "Bots" },
@@ -58,17 +59,28 @@ export function BloubCustomizerSheet({
     value,
     onChange,
     premium = false,
+    profileImageUrl,
+    onSetupProfilePhoto,
 }: {
     open: boolean
     onClose: () => void
     value: BloubPick
     onChange: (next: Partial<BloubPick>) => void
     premium?: boolean
+    profileImageUrl?: string | null
+    onSetupProfilePhoto?: () => void
 }) {
     const [tab, setTab] = useState<TabId>("bots")
-    useEffect(() => {
-        if (open) setTab("bots")
-    }, [open])
+    const [photoRequested, setPhotoRequested] = useState(false)
+    const [wasOpen, setWasOpen] = useState(open)
+    const hasProfilePhoto = Boolean(profileImageUrl?.trim())
+    if (open !== wasOpen) {
+        setWasOpen(open)
+        if (open) {
+            setTab("bots")
+            setPhotoRequested(false)
+        }
+    }
     const themes = lookThemesFor(value)
     const showSlider = usesBlobColorSlider(value)
     const showShapes = usesBlobShapes(value)
@@ -91,6 +103,8 @@ export function BloubCustomizerSheet({
                                 variant={value.variant}
                                 aura={value.aura}
                                 theme={value.theme}
+                                orbitProfile={value.orbitProfile}
+                                profileImageUrl={profileImageUrl}
                             />
                             <div className="min-w-0 text-left">
                                 <SheetTitle>Customise bot</SheetTitle>
@@ -120,6 +134,35 @@ export function BloubCustomizerSheet({
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4" role="tabpanel">
+                    <section className="rounded-2xl border bg-muted/25 p-3.5" aria-label="Profile orbit">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium">Profile in orbit</p>
+                                <p id="profile-orbit-help" className="mt-1 text-xs leading-relaxed text-muted-foreground">Your profile photo revolves around your bot. Works with every bot.</p>
+                            </div>
+                            <Switch
+                                aria-label="Profile in orbit"
+                                aria-describedby="profile-orbit-help"
+                                checked={value.orbitProfile}
+                                onCheckedChange={(checked) => {
+                                    if (checked && !hasProfilePhoto) {
+                                        setPhotoRequested(true)
+                                        return
+                                    }
+                                    setPhotoRequested(false)
+                                    onChange({ orbitProfile: checked })
+                                }}
+                            />
+                        </div>
+                        {!hasProfilePhoto && (photoRequested || value.orbitProfile) ? (
+                            <div className="mt-3 rounded-xl bg-background p-3" role="status">
+                                <p className="text-xs leading-relaxed">Set up your profile photo to use this. Your bot will stay visible until a photo is added.</p>
+                                {onSetupProfilePhoto ? (
+                                    <button type="button" onClick={onSetupProfilePhoto} className="mt-2 text-xs font-medium underline underline-offset-4">Set up profile photo</button>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </section>
                     {tab === "look" ? (
                         <>
                             {showSlider ? (
@@ -170,17 +213,26 @@ export function BloubCustomizerSheet({
                                             const thumb = bloubThemeThumb(item.id, "light")
                                             const premiumTheme = isPremiumBloubTheme(item.id)
                                             return (
-                                                <div
+                                                <button
                                                     key={item.id}
+                                                    type="button"
                                                     aria-label={premiumTheme && !premium ? `${item.label} theme, premium` : `${item.label} theme`}
-                                                    className="rounded-xl border border-foreground bg-muted/60 p-3 text-left"
+                                                    aria-pressed={value.theme === item.id}
+                                                    onClick={() => {
+                                                        if (premiumTheme && !premium) {
+                                                            toast.message("This is a premium theme")
+                                                            return
+                                                        }
+                                                        onChange({ theme: item.id })
+                                                    }}
+                                                    className={cn("rounded-xl border p-3 text-left", value.theme === item.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40", premiumTheme && !premium && "opacity-60")}
                                                 >
                                                     <span aria-hidden className="mb-3 flex h-12 items-center justify-center gap-2 rounded-md" style={{ background: thumb.bg }}>
                                                         <span className="h-5 w-5 rounded-full" style={{ background: thumb.dot }} />
                                                         <span className="h-1.5 w-9 rounded-full" style={{ background: thumb.bar }} />
                                                     </span>
                                                     <span className="block text-xs font-medium">{item.label}{premiumTheme ? " ✦" : ""}</span>
-                                                </div>
+                                                </button>
                                             )
                                         })}
                                     </div>
@@ -192,10 +244,8 @@ export function BloubCustomizerSheet({
                     ) : null}
 
                     {tab === "mood" ? (
-                        usesAnimojiFaces(value) ? (
-                            <AnimojiFaceGrid value={value} onChange={onChange} />
-                        ) : (
                         <>
+                            {usesAnimojiFaces(value) ? <AnimojiFaceGrid value={value} onChange={onChange} /> : null}
                             <section className="space-y-2">
                                 <p className="text-xs font-medium">Mood</p>
                                 <div className="grid grid-cols-3 gap-2">
@@ -235,6 +285,7 @@ export function BloubCustomizerSheet({
                                             key={item.id}
                                             type="button"
                                             onClick={() => onChange({ aura: item.id })}
+                                            aria-pressed={value.aura === item.id}
                                             className={cn(
                                                 "rounded-full border px-3.5 py-2 text-xs",
                                                 value.aura === item.id ? "border-foreground bg-muted/60" : "hover:bg-muted/40"
@@ -246,7 +297,6 @@ export function BloubCustomizerSheet({
                                 </div>
                             </section>
                         </>
-                        )
                     ) : null}
 
                     {tab === "bots" ? (
@@ -299,7 +349,7 @@ export function BloubCustomizerSheet({
                                             type="button"
                                             aria-label={bot.label}
                                             aria-pressed={selected}
-                                            onClick={() => onChange(bloubBotPick(bot))}
+                                            onClick={() => onChange(bloubBotPick(bot, value))}
                                             className={cn(
                                                 "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
                                                 selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
@@ -323,7 +373,7 @@ export function BloubCustomizerSheet({
                                                     toast.message("This is a premium bot")
                                                     return
                                                 }
-                                                onChange(bloubBotPick(bot))
+                                                onChange(bloubBotPick(bot, value))
                                             }}
                                             className={cn(
                                                 "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",

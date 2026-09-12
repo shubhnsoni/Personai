@@ -459,6 +459,7 @@ export function ChatInterface({
                                 color={animationConfig.color}
                                 aura={animationConfig.aura}
                                 theme={botTheme}
+                                orbitProfile={animationConfig.orbitProfile}
                                 speed={animationConfig.speed}
                                 intensity={animationConfig.intensity}
                                 gaze={typingGaze}
@@ -525,6 +526,7 @@ export function ChatInterface({
                                 color={animationConfig.color}
                                 aura={animationConfig.aura}
                                 theme={botTheme}
+                                orbitProfile={animationConfig.orbitProfile}
                                 speed={animationConfig.speed}
                                 intensity={animationConfig.intensity}
                                 mood="greeting"
@@ -591,6 +593,7 @@ export function ChatInterface({
                                                 color={animationConfig.color}
                                                 aura={animationConfig.aura}
                                                 theme={botTheme}
+                                                orbitProfile={animationConfig.orbitProfile}
                                                 speed={animationConfig.speed}
                                                 intensity={animationConfig.intensity}
                                                 mood={orbMood}
@@ -940,16 +943,6 @@ function WelcomeIntro({
                                     animate={{ opacity: 0, scale: 2.55 }}
                                     transition={{ duration: 1.4, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
                                     style={{ boxShadow: `0 0 0 1px ${accent}` }}
-                                />
-                                <motion.div
-                                    className="pointer-events-none absolute inset-[-55%] rounded-full"
-                                    initial={{ opacity: 0, scale: 0.12 }}
-                                    animate={{ opacity: [0, 1, 0.58], scale: [0.12, 1.18, 1] }}
-                                    transition={{ duration: 1.45, times: [0, 0.38, 1], ease: [0.16, 1, 0.3, 1] }}
-                                    style={{
-                                        background: `radial-gradient(circle, ${accent}cc 0%, ${accent}55 28%, transparent 68%)`,
-                                        filter: "blur(22px)",
-                                    }}
                                 />
                             </>
                         )}

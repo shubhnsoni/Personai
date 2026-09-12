@@ -137,37 +137,57 @@
   50% { opacity: 0.72; }
 }
 
-/* Holographic HUD --------------------------------------------------------- */
+/* Floating hologram ------------------------------------------------------ */
 
-.pt-orb--holographic-hud[data-still="false"] .pt-hud-rings {
+.pt-orb.pt-orb--holographic-hud[data-still="false"] .pt-orb-character {
   transform-box: view-box;
+  transform-origin: 160px 160px;
+  animation: pt-holo-presence 3.6s ease-in-out infinite;
+}
+
+/* A centred breath keeps the globe concentric with its separate aura lines. */
+@keyframes pt-holo-presence {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.012); }
+}
+
+.pt-orb--holographic-hud[data-still="false"] .pt-holo-dust {
+  animation: pt-holo-shimmer 5s ease-in-out infinite;
+}
+
+.pt-holo-mouth {
+  transform-box: fill-box;
   transform-origin: center;
-  animation: pt-hud-spin 26s linear infinite;
 }
 
-@keyframes pt-hud-spin {
-  to { transform: rotate(360deg); }
+.pt-orb--holographic-hud[data-still="false"][data-mood="speaking"] .pt-holo-mouth {
+  animation: pt-holo-talk 0.48s ease-in-out infinite alternate;
 }
 
-.pt-orb--holographic-hud[data-still="false"] .pt-hud-scan {
-  animation: pt-hud-scan 3.8s ease-in-out infinite;
+.pt-orb--holographic-hud[data-still="false"][data-mood="listening"] .pt-holo-rim {
+  animation: pt-holo-attend 1.6s ease-in-out infinite;
 }
 
-@keyframes pt-hud-scan {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(126px); }
+@keyframes pt-holo-shimmer {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.42; }
 }
 
-.pt-orb--holographic-hud .pt-hud-readout {
-  animation: pt-hud-readout-blink 6s step-end infinite;
+@keyframes pt-holo-talk {
+  from { transform: scale(1, 0.35); }
+  to { transform: scale(1.08, 1); }
 }
 
-@keyframes pt-hud-readout-blink {
-  0%, 92%, 100% { opacity: 0.7; }
-  94% { opacity: 0.15; }
+@keyframes pt-holo-attend {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
 }
 
 /* Liquid Chrome ----------------------------------------------------------- */
+
+.pl-orb-scene[data-aura="still"] .pt-chrome-ring {
+  display: none;
+}
 
 .pt-orb--liquid-chrome[data-still="false"] .pt-chrome-iris {
   animation: pt-chrome-sheen 6s ease-in-out infinite;
@@ -181,17 +201,23 @@
 .pt-orb--liquid-chrome[data-still="false"] .pt-chrome-ring--inner {
   transform-box: view-box;
   transform-origin: center;
-  animation: pt-hud-spin 34s linear infinite reverse;
+  animation: pt-orbit 34s linear infinite reverse;
 }
 
 /* Small decorative orbs stay calm ----------------------------------------- */
 
-.is-compact .pt-orb :is(.pt-nebula-orbit, .pt-hud-rings, .pt-hud-scan, .pt-chrome-ring, .pt-hud-readout) {
+.is-compact .pt-orb :is(.pt-nebula-orbit, .pt-chrome-ring, .pt-holo-dust) {
   display: none;
 }
 
+.pt-orb[data-still="true"] * {
+  animation: none !important;
+  transition: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .pt-orb :is(.pt-orb-character, .pt-orb-eyes, .pt-orb-body, .pt-nebula-orbit, .pt-hud-rings, .pt-hud-scan, .pt-chrome-iris, .pt-chrome-ring--inner, .pt-orb-eye, .pt-hud-readout) {
+  .pt-orb * {
     animation: none !important;
+    transition: none !important;
   }
 }

@@ -1,0 +1,24 @@
+{
+  "option": 3,
+  "status": "locked",
+  "name": "Take 1",
+  "sourceKey": "finalize:4fe3e324-0c18-4edb-a540-21ae46537946",
+  "sourceHash": "6f4caa73753f5150fe17a4320800e57c9742edfc4611492e34b1ab2edf7dee59",
+  "sourceTakeId": null,
+  "lockedAt": "2026-09-12T14:14:05.757Z",
+  "duration": 2.8,
+  "keyframes": 3,
+  "files": {
+    "settings.json": "37516f3cafcfe44d92ea706a139acde548cef8771833b1ac0eebc25953710e64",
+    "motion-data.json": "1c44b12a9f8a1b6549b159e7eec10eb98c22360b7fb87c79189cbf751c3ae3c6",
+    "take.json": "c979be40988d09c4164aefaf9496447401483143ec3410580ece55c36831e606",
+    "introify-logo-light.svg": "b6a678e725635cbd513030906ebc9b5d74e8246c19a1026c895129fd1ef54952",
+    "introify-logo-dark.svg": "a855366f4e29e236eabe243a15d6e6d491fd8e4d261d1819f5cf4408fd55d0cf",
+    "introify-symbol-light.svg": "a5743b400ac609eb38e169ba451a0457bf96c351e7baff2d286ddf458e22af49",
+    "introify-symbol-dark.svg": "2d3862d0fbe5f979e5d09ca719796cbe7f75067154f5e76ec07dc74eaa4d5a4a",
+    "index.html": "48626646f7e472cd3f72202eb27762bb9698e721caa3918dc11ba6fe4bbd79d2"
+  },
+  "revision": 2,
+  "updatedAt": "2026-09-12T14:48:36.766Z",
+  "revisionNote": "User-requested complete logo rotation for Option 3."
+}

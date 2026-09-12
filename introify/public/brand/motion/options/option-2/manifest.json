@@ -1,0 +1,24 @@
+{
+  "option": 2,
+  "status": "locked",
+  "name": "Take 1",
+  "sourceKey": "finalize:f9e88754-9ec0-4ff3-bd57-933b79515319",
+  "sourceHash": "c20c5ab2ee9b5dfbb9b413259ceed636d79d9d7857b0de142bb83dcdeadb6252",
+  "sourceTakeId": null,
+  "lockedAt": "2026-09-12T13:57:21.826Z",
+  "duration": 2.8,
+  "keyframes": 3,
+  "files": {
+    "settings.json": "0e064beb8dc32fc15f30cd38869d78ecac517062a7fca01f67e2f8e8343f7aea",
+    "motion-data.json": "adb7cc45cb955b3b0f46820a318ae4359d3f439dd625ea398b9eb545b0554bd2",
+    "take.json": "c1d4985dbedf0a993bfd1adc1d826b901fccfbe8efa93860abbd3f1579fc52b9",
+    "introify-logo-light.svg": "953d5be52ab0002ecf3f0741c9195ce036d3b865159e0518291eef53fb70874c",
+    "introify-logo-dark.svg": "88e0aba5890fffafc1e0c7f0175bc8441c2aabc279176e80172cd30eb10fe6d4",
+    "introify-symbol-light.svg": "401fd88fe9ec7d7bbec919e1cd56c1a5d3c8c9fe2a053676bf88fe0aeea3fbf2",
+    "introify-symbol-dark.svg": "9310fe21d04c9d57c94569a193bb152e75ab83e8a297d38699699f032ebb4688",
+    "index.html": "9e68097e9e462cf56f852b02bc4ce1f446c3d2e02bec658a2b509426c9de782b"
+  },
+  "revision": 2,
+  "updatedAt": "2026-09-12T14:02:18.438Z",
+  "revisionNote": "User-requested zero-origin ribbon reveal with dot tracking the leading cap."
+}
