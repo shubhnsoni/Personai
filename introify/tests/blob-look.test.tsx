@@ -72,6 +72,8 @@ describe("included bots on onboarding and profile", () => {
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "bloub" }))
         fireEvent.click(screen.getByRole("button", { name: "Glow" }))
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "glass" }))
+        fireEvent.click(screen.getByRole("button", { name: "Animoji" }))
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ look: "animoji", skin: "bounce" }))
         fireEvent.click(screen.getByRole("button", { name: "CRT, premium" }))
         expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ skin: "crt" }))
         expect(screen.getByRole("button", { name: "Spark, premium" })).toBeTruthy()

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { cn } from "@/lib/utils"
 import { ORB_VARIANTS, resolveOrbVariant, type OrbVariantId } from "@/lib/orb-variants"
 import { resolveOrbLook, resolvePixelSkin, type OrbLook, type PixelSkin } from "@/lib/pixel-skins"
+import { AnimojiFace } from "@/components/animoji-face"
 import { BloubOrb } from "@/components/bloub-orb"
 import { RetroLcdOrb } from "@/components/retro-lcd-orb"
 import { PremiumThemeOrb } from "@/components/premium-theme-orb"
@@ -178,6 +179,7 @@ export function WelcomeOrb({
                 "pl-orb-scene",
                 size < 56 && "is-compact",
                 !themed && resolvedLook === "pixel" && "is-pixel",
+                !themed && resolvedLook === "animoji" && "is-animoji",
                 !themed && resolvedLook === "bloub" && "is-bloub",
                 retro && "is-retro-lcd",
                 themed && !retro && "is-premium",
@@ -204,7 +206,14 @@ export function WelcomeOrb({
                     <i /><i /><i />
                 </span>
             ) : null}
-            {themed ? (
+            {resolvedLook === "animoji" ? (
+                <AnimojiFace
+                    id={skin}
+                    mood={mood}
+                    still={still || reducedMotion || frozenAt !== undefined}
+                    size={size}
+                />
+            ) : themed ? (
                 retro ? (
                     <RetroLcdOrb
                         size={size}

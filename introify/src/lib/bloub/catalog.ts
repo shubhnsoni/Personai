@@ -1,3 +1,4 @@
+import { DEFAULT_ANIMOJI, isAnimojiId, resolveAnimojiId, type AnimojiId } from "@/lib/animoji"
 import { ORB_VARIANTS, type OrbVariantId } from "@/lib/orb-variants"
 import { resolveOrbLook, type OrbLook, type PixelSkin } from "@/lib/pixel-skins"
 import {
@@ -151,7 +152,7 @@ export type BloubPick = {
     aura: AuraId
     theme: BloubThemeId
     look?: OrbLook
-    skin?: PixelSkin
+    skin?: PixelSkin | AnimojiId
     variant?: OrbVariantId
 }
 
@@ -203,16 +204,17 @@ export function blobPickFromColorIndex(index: number, look?: OrbLook | string | 
 }
 
 export type CustomizerBot = {
-    id: "blob" | "glow" | PixelSkin
+    id: "blob" | "glow" | "animoji" | PixelSkin
     label: string
     look: OrbLook
-    skin?: PixelSkin
+    skin?: PixelSkin | AnimojiId
     premium?: boolean
 }
 
 export const CUSTOMIZER_BOTS: CustomizerBot[] = [
     { id: "blob", label: "Blob", look: "bloub" },
     { id: "glow", label: "Glow", look: "glass" },
+    { id: "animoji", label: "Animoji", look: "animoji", skin: DEFAULT_ANIMOJI },
     { id: "bit", label: "8-Bit", look: "pixel", skin: "bit", premium: true },
     { id: "crt", label: "CRT", look: "pixel", skin: "crt", premium: true },
     { id: "spark", label: "Spark", look: "pixel", skin: "spark", premium: true },
@@ -229,6 +231,15 @@ export const BLOB_SHAPES: { id: ShapeId; label: string; premium?: boolean }[] = 
 const FREE_BLOB_SHAPES: ShapeId[] = ["cercle", "galet"]
 
 export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Partial<BloubPick> {
+    if (bot.look === "animoji") {
+        return {
+            look: "animoji",
+            skin: isAnimojiId(current.skin) ? current.skin : DEFAULT_ANIMOJI,
+            theme: "classic",
+            shape: "cercle",
+            aura: "still",
+        }
+    }
     if (bot.look === "pixel") {
         return { look: "pixel", skin: bot.skin, theme: "classic", shape: "cercle" }
     }
@@ -253,6 +264,7 @@ export function customizerBotPick(bot: CustomizerBot, current: BloubPick): Parti
 }
 
 export function isCustomizerBotSelected(bot: CustomizerBot, value: BloubPick) {
+    if (bot.look === "animoji") return resolveOrbLook(value.look) === "animoji"
     if (bot.look === "pixel") return value.look === "pixel" && value.skin === bot.skin
     if (bot.look === "glass") return resolveOrbLook(value.look) === "glass" && value.theme === "classic"
     return resolveOrbLook(value.look) === "bloub" && value.theme === "classic"
@@ -294,20 +306,25 @@ export function isNamedBloubBotSelected(bot: BloubBot, value: BloubPick) {
 
 /** Chat themes that belong to the selected bot — Look never lists every theme. */
 export function lookThemesFor(value: BloubPick) {
-    if (resolveOrbLook(value.look) === "pixel" || resolveOrbLook(value.look) === "glass") return []
+    const look = resolveOrbLook(value.look)
+    if (look === "pixel" || look === "glass" || look === "animoji") return []
     const theme = resolveBloubTheme(value.theme)
     return BLOUB_THEMES.filter((item) => item.id === theme)
 }
 
 export function usesBlobColorSlider(value: BloubPick) {
     const look = resolveOrbLook(value.look)
-    if (look === "pixel") return false
+    if (look === "pixel" || look === "animoji") return false
     if (look === "glass") return true
     return !resolveThemedOrb(value.theme)
 }
 
 export function usesBlobShapes(value: BloubPick) {
     return resolveOrbLook(value.look) === "bloub" && !resolveThemedOrb(value.theme)
+}
+
+export function usesAnimojiFaces(value: BloubPick) {
+    return resolveOrbLook(value.look) === "animoji"
 }
 
 export const BLOUB_MOODS: { id: ExpressionId; label: string }[] = [
@@ -355,8 +372,8 @@ export function isPremiumBloubShape(shape: ShapeId): boolean {
 
 export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "color" | "aura" | "theme" | "look" | "skin" | "variant", string | null>> | null | undefined, premium: boolean): BloubPick {
     if (!pick || Object.keys(pick).length === 0) return { ...DEFAULT_BLOUB_PICK }
-    const look = pick?.look === "pixel" || pick?.look === "glass" || pick?.look === "bloub" || pick?.look === "blob" ? pick.look : "bloub"
-    const skin = pick?.skin === "bit" || pick?.skin === "crt" || pick?.skin === "spark" ? pick.skin : undefined
+    const look = pick?.look === "pixel" || pick?.look === "glass" || pick?.look === "bloub" || pick?.look === "blob" || pick?.look === "animoji" ? pick.look : "bloub"
+    const pixelSkin = pick?.skin === "bit" || pick?.skin === "crt" || pick?.skin === "spark" ? pick.skin : undefined
     const variant = ORB_VARIANTS.some((item) => item.id === pick?.variant) ? pick?.variant as OrbVariantId : undefined
     const next: BloubPick = {
         shape: resolveBloubShape(pick?.shape),
@@ -365,12 +382,20 @@ export function clampOrbForPlan(pick: Partial<Record<"shape" | "expression" | "c
         aura: resolveBloubAura(pick?.aura),
         theme: resolveBloubTheme(pick?.theme),
         look: look === "blob" ? "bloub" : look,
-        ...(skin ? { skin } : {}),
         ...(variant ? { variant } : {}),
+    }
+    if (next.look === "animoji") {
+        next.skin = resolveAnimojiId(pick?.skin)
+        next.shape = "cercle"
+        next.theme = "classic"
+        next.aura = "still"
+    } else if (pixelSkin) {
+        next.skin = pixelSkin
     }
     if (resolveThemedOrb(next.theme)) {
         next.shape = "cercle"
         next.look = "bloub"
+        delete next.skin
     }
     if (!premium && isPremiumBloubShape(next.shape)) next.shape = DEFAULT_SHAPE
     if (!premium && isPremiumBloubTheme(next.theme)) next.theme = "classic"

@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest"
-import { CUSTOMIZER_BOTS, BLOB_COLOR_STOPS, BLOB_SHAPES, blobColorFromIndex, blobColorIndex, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, BLOUB_THEMES, DEFAULT_BLOUB_PICK, lookThemesFor } from "@/lib/bloub/catalog"
+import { CUSTOMIZER_BOTS, BLOB_COLOR_STOPS, BLOB_SHAPES, blobColorFromIndex, blobColorIndex, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, BLOUB_THEMES, DEFAULT_BLOUB_PICK, lookThemesFor, clampOrbForPlan, customizerBotPick, usesAnimojiFaces } from "@/lib/bloub/catalog"
 import { assistantPendingPhrase, typingInputGaze } from "@/lib/chat-gaze"
+import { ANIMOJI_FACES, animojiClipForMood } from "@/lib/animoji"
 
 describe("customise bots", () => {
-    it("shows Blob, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
-        expect(CUSTOMIZER_BOTS.map((bot) => bot.label)).toEqual(["Blob", "Glow", "8-Bit", "CRT", "Spark"])
+    it("shows Blob, Animoji, 8-Bit, CRT and Spark plus named bots and never Neo", () => {
+        expect(CUSTOMIZER_BOTS.map((bot) => bot.label)).toEqual(["Blob", "Glow", "Animoji", "8-Bit", "CRT", "Spark"])
         expect(INCLUDED_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["LCD"])
         expect(PREMIUM_BLOUB_BOTS.map((bot) => bot.label)).toEqual(["Nyx", "Ion", "Vex"])
         expect(BLOB_SHAPES.map((item) => item.label)).toEqual(["Circle", "Sol", "Lux", "Sky", "Dew"])
@@ -25,6 +26,7 @@ describe("customise bots", () => {
         }
         expect(lookThemesFor(DEFAULT_BLOUB_PICK).map((theme) => theme.id)).toEqual(["classic"])
         expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "pixel", skin: "crt" })).toEqual([])
+        expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "laugh" })).toEqual([])
         expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, look: "glass" })).toEqual([])
         expect(lookThemesFor({ ...DEFAULT_BLOUB_PICK, theme: "astral-nebula" }).map((theme) => theme.id)).toEqual(["astral-nebula"])
     })
@@ -49,5 +51,20 @@ describe("blob gaze while typing", () => {
         expect(empty?.y).toBeLessThan(0)
         expect(full?.y).toBeLessThan(0)
         expect(empty!.x).toBeLessThan(full!.x)
+    })
+})
+
+describe("animoji bot", () => {
+    it("keeps the Creative Emoji pack as one free bot with chat mood clips", () => {
+        const animoji = CUSTOMIZER_BOTS.find((bot) => bot.id === "animoji")!
+        expect(customizerBotPick(animoji, DEFAULT_BLOUB_PICK)).toMatchObject({ look: "animoji", skin: "bounce" })
+        expect(usesAnimojiFaces({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "laugh" })).toBe(true)
+        expect(clampOrbForPlan({ look: "animoji", skin: "wow" }, false)).toMatchObject({ look: "animoji", skin: "wow" })
+        expect(ANIMOJI_FACES).toHaveLength(30)
+        expect(animojiClipForMood("sun", "idle")).toBe("sun")
+        expect(animojiClipForMood("sun", "thinking")).toBe("coffee")
+        expect(animojiClipForMood("sun", "speaking")).toBe("laugh")
+        expect(animojiClipForMood("sun", "listening")).toBe("curious")
+        expect(animojiClipForMood("sun", "greeting")).toBe("bounce")
     })
 })

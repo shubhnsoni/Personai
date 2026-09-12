@@ -182,7 +182,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
         color: resolveBloubColor(orbPick.color || selectedPresetConfig.color),
         aura: resolveBloubAura(orbPick.aura),
         theme: orbPick.theme,
-        look: orbPick.look || (selectedPresetConfig.look === "pixel" ? "pixel" : "bloub"),
+        look: orbPick.look || (selectedPresetConfig.look === "pixel" ? "pixel" : selectedPresetConfig.look === "animoji" ? "animoji" : "bloub"),
         skin: orbPick.skin || (selectedPresetConfig.skin as BloubPick["skin"]),
         variant: orbPick.variant || (selectedPresetConfig.variant as BloubPick["variant"]),
     }
@@ -431,7 +431,7 @@ export function ProfileEditor({ profile, presets, onSavingChange, defaultTab = "
                                 theme={liveOrb.theme}
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">{liveOrb.look === "pixel" ? (liveOrb.skin === "crt" ? "CRT" : liveOrb.skin === "spark" ? "Spark" : "8-Bit") : liveOrb.theme === "classic" ? "Blob" : (BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label ?? "Blob")}</p>
+                                <p className="text-sm font-medium">{liveOrb.look === "animoji" ? "Animoji" : liveOrb.look === "pixel" ? (liveOrb.skin === "crt" ? "CRT" : liveOrb.skin === "spark" ? "Spark" : "8-Bit") : liveOrb.look === "glass" ? "Glow" : liveOrb.theme === "classic" ? "Blob" : (BLOUB_THEMES.find((item) => item.id === liveOrb.theme)?.label ?? "Blob")}</p>
                                 <p className="text-xs text-muted-foreground">Choose a bot, chat theme, mood and colour.</p>
                             </div>
                             <button type="button" onClick={() => setBlobOpen(true)} className="h-8 shrink-0 rounded-full border border-border px-3 text-xs font-medium">

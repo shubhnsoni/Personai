@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { WelcomeOrb } from "@/components/welcome-orb"
 import { toast } from "sonner"
-import { BLOUB_AURAS, BLOUB_MOODS, BLOB_SHAPES, CUSTOMIZER_BOTS, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, blobColorIndex, blobPickFromColorIndex, bloubBotPick, bloubThemeThumb, customizerBotPick, isCustomizerBotSelected, isNamedBloubBotSelected, isPremiumBloubTheme, lookThemesFor, usesBlobColorSlider, usesBlobShapes, type BloubPick } from "@/lib/bloub/catalog"
+import { BLOUB_AURAS, BLOUB_MOODS, BLOB_SHAPES, CUSTOMIZER_BOTS, INCLUDED_BLOUB_BOTS, PREMIUM_BLOUB_BOTS, blobColorIndex, blobPickFromColorIndex, bloubBotPick, bloubThemeThumb, customizerBotPick, isCustomizerBotSelected, isNamedBloubBotSelected, isPremiumBloubTheme, lookThemesFor, usesAnimojiFaces, usesBlobColorSlider, usesBlobShapes, type BloubPick } from "@/lib/bloub/catalog"
+import { ANIMOJI_FACES, resolveAnimojiId } from "@/lib/animoji"
 import { BlobColorSlider } from "@/components/dashboard/blob-color-slider"
 import { cn } from "@/lib/utils"
 
@@ -156,6 +157,32 @@ export function BloubCustomizerSheet({
                     ) : null}
 
                     {tab === "mood" ? (
+                        usesAnimojiFaces(value) ? (
+                            <section className="space-y-2">
+                                <p className="text-xs font-medium">Emoji</p>
+                                <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
+                                    {ANIMOJI_FACES.map((item) => {
+                                        const selected = resolveAnimojiId(value.skin) === item.id
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                aria-label={item.label}
+                                                aria-pressed={selected}
+                                                onClick={() => onChange({ look: "animoji", skin: item.id, theme: "classic", shape: "cercle" })}
+                                                className={cn(
+                                                    "flex flex-col items-center gap-1 rounded-xl border p-2 text-center",
+                                                    selected ? "border-foreground bg-muted/60" : "hover:bg-muted/40",
+                                                )}
+                                            >
+                                                <WelcomeOrb still size={48} look="animoji" skin={item.id} aura="still" theme="classic" />
+                                                <span className="text-[10px] font-medium">{item.label}</span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </section>
+                        ) : (
                         <>
                             <section className="space-y-2">
                                 <p className="text-xs font-medium">Mood</p>
@@ -207,6 +234,7 @@ export function BloubCustomizerSheet({
                                 </div>
                             </section>
                         </>
+                        )
                     ) : null}
 
                     {tab === "bots" ? (

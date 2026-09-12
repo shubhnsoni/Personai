@@ -532,7 +532,7 @@ export function ChatInterface({
                             />
                         }
                         accent={orbTheme.accent}
-                        bare={themedOrb || animationConfig.look === "pixel" || animationConfig.look === "bloub" || animationConfig.look === "blob"}
+                        bare={themedOrb || animationConfig.look === "pixel" || animationConfig.look === "animoji" || animationConfig.look === "bloub" || animationConfig.look === "blob"}
                         onReady={() => setIntroReady(true)}
                         onStage={onIntroStage}
                         skipIntro={themedOrb || profile.roleTemplate === "RESTAURANT"}

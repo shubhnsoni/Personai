@@ -1,10 +1,11 @@
-export type OrbLook = "glass" | "pixel" | "bloub"
+export type OrbLook = "glass" | "pixel" | "bloub" | "animoji"
 export type PixelSkin = "bit" | "crt" | "spark"
 
 const SKINS: PixelSkin[] = ["bit", "crt", "spark"]
 
 export function resolveOrbLook(look?: string | null): OrbLook {
     if (look === "pixel") return "pixel"
+    if (look === "animoji") return "animoji"
     if (look === "bloub" || look === "blob") return "bloub"
     return "glass"
 }

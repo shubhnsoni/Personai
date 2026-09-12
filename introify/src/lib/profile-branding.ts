@@ -20,7 +20,24 @@ function freeLiveLook(configured: PublicAnimationConfig): PublicAnimationConfig 
         color: configured.color,
         aura: configured.aura,
         theme: configured.theme,
+        look: configured.look,
+        skin: configured.skin,
+        variant: configured.variant,
     }, false)
+    if (orb.look === "animoji") {
+        return {
+            look: "animoji",
+            skin: orb.skin,
+            shape: "cercle",
+            expression: orb.expression,
+            color: orb.color,
+            aura: "still",
+            theme: "classic",
+            colors: gradientForColor("blanc"),
+            speed: 1,
+            intensity: 1,
+        }
+    }
     return {
         look: "bloub",
         shape: orb.shape,

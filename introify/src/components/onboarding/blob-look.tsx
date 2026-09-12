@@ -20,10 +20,12 @@ import {
     isNamedBloubBotSelected,
     lookThemesFor,
     resolveBloubTheme,
+    usesAnimojiFaces,
     usesBlobColorSlider,
     usesBlobShapes,
     type BloubPick,
 } from "@/lib/bloub/catalog"
+import { ANIMOJI_FACES, resolveAnimojiId } from "@/lib/animoji"
 import { BlobColorSlider } from "@/components/dashboard/blob-color-slider"
 import { cn } from "@/lib/utils"
 
@@ -153,6 +155,32 @@ export function BlobLookStudio({
                 </section>
             ) : null}
 
+            {usesAnimojiFaces(value) ? (
+                <section className="space-y-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Emoji</p>
+                    <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
+                        {ANIMOJI_FACES.map((item) => {
+                            const selected = resolveAnimojiId(value.skin) === item.id
+                            return (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    aria-label={item.label}
+                                    aria-pressed={selected}
+                                    onClick={() => onChange({ look: "animoji", skin: item.id, theme: "classic", shape: "cercle" })}
+                                    className={cn(
+                                        "flex flex-col items-center gap-1 rounded-2xl py-2",
+                                        selected ? "bg-white text-zinc-950" : "bg-white/[0.04] text-white/75 hover:bg-white/[0.1]",
+                                    )}
+                                >
+                                    <WelcomeOrb still size={44} look="animoji" skin={item.id} aura="still" theme="classic" />
+                                    <span className="text-[10px]">{item.label}</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </section>
+            ) : (
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Mood</p>
                 <div className="flex flex-wrap gap-2">
@@ -171,7 +199,9 @@ export function BlobLookStudio({
                     ))}
                 </div>
             </section>
+            )}
 
+            {usesAnimojiFaces(value) ? null : (
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Aura</p>
                 <div className="flex flex-wrap gap-2">
@@ -190,6 +220,7 @@ export function BlobLookStudio({
                     ))}
                 </div>
             </section>
+            )}
 
             <section className="space-y-3">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/35">Bots</p>
