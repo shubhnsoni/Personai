@@ -7,7 +7,7 @@ import { ANIMOJI_IDS } from "@/lib/animoji"
 describe("coded animoji faces", () => {
     it("draws one svg character per face, like LCD, never a smear strip", () => {
         installMatchMedia()
-        expect(ANIMOJI_IDS).toHaveLength(13)
+        expect(ANIMOJI_IDS).toHaveLength(17)
         for (const id of ANIMOJI_IDS) {
             const { container, unmount } = render(<AnimojiFace id={id} size={64} />)
             expect(container.querySelector("svg")).toBeTruthy()

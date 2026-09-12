@@ -55,12 +55,12 @@ describe("blob gaze while typing", () => {
 })
 
 describe("animoji bot", () => {
-    it("ships thirteen coded faces and keeps the chosen face through chat mood", () => {
+    it("ships coded faces and keeps the chosen face through chat mood", () => {
         const animoji = CUSTOMIZER_BOTS.find((bot) => bot.id === "animoji")!
         expect(customizerBotPick(animoji, DEFAULT_BLOUB_PICK)).toMatchObject({ look: "animoji", skin: "bounce" })
         expect(usesAnimojiFaces({ ...DEFAULT_BLOUB_PICK, look: "animoji", skin: "sun" })).toBe(true)
         expect(ANIMOJI_FACES.map((item) => item.id)).toEqual([
-            "bounce", "sun", "et", "love", "laugh", "wow", "sleepy", "ghost", "cloud", "coffee", "cry", "money", "angry",
+            "bounce", "sun", "et", "love", "laugh", "wow", "sleepy", "ghost", "cloud", "coffee", "cry", "money", "angry", "wink", "cool", "star", "moon",
         ])
         expect(resolveAnimojiId("laugh")).toBe("laugh")
         expect(resolveAnimojiId("wow")).toBe("wow")

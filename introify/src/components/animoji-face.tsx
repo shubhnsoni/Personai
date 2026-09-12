@@ -62,6 +62,8 @@ function Face({ id, uid, gx, gy }: { id: AnimojiId; uid: string; gx: number; gy:
         case "ghost": return <GhostCharacter uid={uid} gx={gx} gy={gy} />
         case "cloud": return <CloudCharacter uid={uid} gx={gx} gy={gy} />
         case "coffee": return <CoffeeCharacter uid={uid} gx={gx} gy={gy} />
+        case "star": return <StarCharacter uid={uid} gx={gx} gy={gy} />
+        case "moon": return <MoonCharacter uid={uid} gx={gx} gy={gy} />
         default: return <YellowCharacter look={id} uid={uid} gx={gx} gy={gy} />
     }
 }
@@ -150,6 +152,25 @@ function yellowEyes(look: AnimojiId, px: number, py: number): ReactNode {
             </>
         )
     }
+    if (look === "wink") {
+        return (
+            <>
+                <path d={`M${27 + px} ${38 + py}c3 3 8 3 11 0`} fill="none" stroke="#1c1408" strokeWidth="2.4" strokeLinecap="round" />
+                <ellipse cx={48 + px} cy={38 + py} rx="4.4" ry="5.4" fill="#1c1408" />
+                <ellipse cx={46.8 + px} cy={36.2 + py} rx="1.3" ry="1.6" fill="#fff" />
+            </>
+        )
+    }
+    if (look === "cool") {
+        return (
+            <g className="animoji-shades">
+                <rect x={22 + px} y={33 + py} width="14" height="10" rx="3" fill="#1c1408" />
+                <rect x={44 + px} y={33 + py} width="14" height="10" rx="3" fill="#1c1408" />
+                <path d={`M${36 + px} ${38 + py}h8`} stroke="#1c1408" strokeWidth="2.2" />
+                <rect x={24 + px} y={35 + py} width="6" height="3" rx="1" fill="#9AE6FF" opacity="0.45" />
+            </g>
+        )
+    }
     return (
         <>
             <ellipse cx={32 + px} cy={38 + py} rx="4.4" ry="5.4" fill="#1c1408" />
@@ -194,21 +215,22 @@ function SunCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) 
 }
 
 function EtCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
-    const px = gx * 2.8
-    const py = -gy * 1.8
+    const px = gx * 2.4
+    const py = -gy * 1.6
     return (
         <g className="animoji-character">
-            <defs><Skin uid={uid} stops={["#D8DCE2", "#9AA3AE", "#6E7782"]} /></defs>
-            <path d="M26 26C26 12 54 12 54 26c3 14-2 36-14 39C28 62 23 40 26 26Z" fill={`url(#${uid}-skin)`} />
-            <ellipse cx="33" cy="24" rx="7" ry="3.4" fill="#fff" opacity="0.22" />
+            <defs><Skin uid={uid} stops={["#E4E8EE", "#B4BCC6", "#8A929C"]} /></defs>
+            <ellipse cx="40" cy="68" rx="14" ry="2.8" fill="#1c1408" opacity="0.1" />
+            <path d="M16 30C16 14 64 14 64 30c4 16-6 34-24 38C22 64 12 46 16 30Z" fill={`url(#${uid}-skin)`} />
+            <ellipse cx="32" cy="24" rx="10" ry="4.2" fill="#fff" opacity="0.22" />
             <g className="animoji-eyes">
-                <ellipse cx={32 + px} cy={38 + py} rx="8" ry="11" fill="#14161a" />
-                <ellipse cx={48 + px} cy={38 + py} rx="8" ry="11" fill="#14161a" />
-                <ellipse cx={29.6 + px} cy={34.2 + py} rx="2.2" ry="3" fill="#fff" opacity="0.85" />
-                <ellipse cx={45.6 + px} cy={34.2 + py} rx="2.2" ry="3" fill="#fff" opacity="0.85" />
+                <ellipse cx={30 + px} cy={38 + py} rx="8.5" ry="10.5" fill="#14161a" />
+                <ellipse cx={50 + px} cy={38 + py} rx="8.5" ry="10.5" fill="#14161a" />
+                <ellipse cx={27.4 + px} cy={34.4 + py} rx="2.4" ry="3.1" fill="#fff" opacity="0.9" />
+                <ellipse cx={47.4 + px} cy={34.4 + py} rx="2.4" ry="3.1" fill="#fff" opacity="0.9" />
             </g>
             <g className="animoji-mouth">
-                <path d="M36 54c2.2 3 5.8 3 8 0" fill="none" stroke="#2a3036" strokeWidth="2" strokeLinecap="round" />
+                <path d="M34 55c2.8 3.4 9.2 3.4 12 0" fill="none" stroke="#2a3036" strokeWidth="2.2" strokeLinecap="round" />
             </g>
         </g>
     )
@@ -272,6 +294,42 @@ function CoffeeCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number 
             </g>
             <g className="animoji-mouth">
                 <path d="M35 50c2.4 2.8 7.6 2.8 10 0" fill="none" stroke="#1c1408" strokeWidth="2" strokeLinecap="round" />
+            </g>
+        </g>
+    )
+}
+
+function StarCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
+    const px = gx * 1.8
+    const py = -gy * 1.4
+    return (
+        <g className="animoji-character">
+            <defs><Skin uid={uid} stops={["#FFE56A", "#F5C400", "#E0A000"]} /></defs>
+            <path d="M40 8l7.4 18.4 20 1.6-15.2 12.8 4.8 19.2L40 49.2 22.8 60l4.8-19.2L12.4 28l20-1.6z" fill={`url(#${uid}-skin)`} />
+            <g className="animoji-eyes">
+                <circle cx={34 + px} cy={36 + py} r="2.8" fill="#1c1408" />
+                <circle cx={46 + px} cy={36 + py} r="2.8" fill="#1c1408" />
+            </g>
+            <g className="animoji-mouth">
+                <path d="M34 44c2.6 3.4 9.4 3.4 12 0" fill="none" stroke="#1c1408" strokeWidth="2.2" strokeLinecap="round" />
+            </g>
+        </g>
+    )
+}
+
+function MoonCharacter({ uid, gx, gy }: { uid: string; gx: number; gy: number }) {
+    const px = gx * 1.6
+    const py = -gy * 1.2
+    return (
+        <g className="animoji-character">
+            <defs><Skin uid={uid} stops={["#F6E7B2", "#E8C86A", "#C9A227"]} /></defs>
+            <path d="M48 12c-16 2-28 16-28 32 0 18 14 32 32 32 6 0 12-1.6 17-4.4C56 68 44 56 44 40 44 26 52 16 64 12 59 12 53 12 48 12z" fill={`url(#${uid}-skin)`} />
+            <g className="animoji-eyes">
+                <circle cx={36 + px} cy={38 + py} r="2.6" fill="#1c1408" />
+                <path d={`M${44 + px} ${38 + py}c2 2.4 5 2.4 7 0`} fill="none" stroke="#1c1408" strokeWidth="2" strokeLinecap="round" />
+            </g>
+            <g className="animoji-mouth">
+                <path d="M36 48c2.2 2.6 7 2.6 9 0" fill="none" stroke="#1c1408" strokeWidth="2" strokeLinecap="round" />
             </g>
         </g>
     )

@@ -12,6 +12,10 @@ export const ANIMOJI_IDS = [
     "cry",
     "money",
     "angry",
+    "wink",
+    "cool",
+    "star",
+    "moon",
 ] as const
 
 export type AnimojiId = (typeof ANIMOJI_IDS)[number]
@@ -32,6 +36,10 @@ export const ANIMOJI_FACES: { id: AnimojiId; label: string }[] = [
     { id: "cry", label: "Cry" },
     { id: "money", label: "Money" },
     { id: "angry", label: "Angry" },
+    { id: "wink", label: "Wink" },
+    { id: "cool", label: "Cool" },
+    { id: "star", label: "Star" },
+    { id: "moon", label: "Moon" },
 ]
 
 const ANIMOJI_SET = new Set<string>(ANIMOJI_IDS)
