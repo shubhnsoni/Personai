@@ -7,6 +7,7 @@ export type PolicyDocument = {
     description: string
     updatedOn: string
     draft: boolean
+    relatedLinks?: { label: string; href: string }[]
     sections: {
         id: string
         title: string
@@ -88,72 +89,236 @@ export const policyDocuments: Record<
     },
     terms: {
         ...status,
-        slug: "terms",
-        title: "Terms of service",
-        kicker: "Using Introify",
-        description: "The responsibilities of Introify users, page owners and customers interacting with their businesses.",
-        sections: [
+        updatedOn: "13 September 2026",
+        "slug": "terms",
+        "title": "Terms and conditions",
+        "kicker": "Using Introify",
+        "description": "Understand your account, subscriptions, content rights, AI features and responsibilities when using Introify.",
+        "relatedLinks": [
             {
-                id: "operator", title: "The service and its operator",
-                paragraphs: ["Introify provides software for a public profile, business information and enabled tools such as enquiries, listings, bookings and content access. Plan prices and allowances are described on the pricing page. The legal operator details below and the final commercial terms are awaiting approval; paid checkout must remain unavailable until these details and applicable purchase terms are complete."],
-                fields: operatorFields,
+                "label": "Refund and cancellation policy",
+                "href": "/refund-policy"
             },
             {
-                id: "accounts", title: "Accounts and authorised use",
-                bullets: ["Use accurate information and only create or manage a page for yourself or a business you are authorised to represent.", "Keep sign-in credentials and access links secure. Do not share another person's private information without authority.", "Business account holders must be able to enter a binding agreement for their use of the service. Features for children require a separate review before being offered.", "Follow the acceptable use policy and the laws applicable to your content, business and customers."],
+                "label": "Privacy policy",
+                "href": "/privacy"
             },
             {
-                id: "content", title: "Your content and business page",
-                paragraphs: ["You retain your rights in content you supply. You must have the necessary rights to publish it and allow Introify and its service providers to store, process and display it as needed to operate the features you use. Publishing a page makes the selected content available to other people.", "Page owners are responsible for their identity, claims, licences where required, listing accuracy, availability, prices and customer disclosures. A profile's appearance on Introify is not certification of that business or its services."],
-            },
-            {
-                id: "transactions", title: "Listings, bookings and payments",
-                paragraphs: ["Check the identity of the seller or service provider and the listing's price, currency, taxes, delivery details and cancellation terms before making a commitment. The business offering the item or service is responsible for fulfilling its stated offer and addressing the transaction, subject to applicable law.", "Available payment options depend on the business and integration. A UPI QR code or payment link may send funds directly to a merchant. An order request, a payment screenshot or a WhatsApp message alone is not proof of confirmed payment, acceptance or delivery.", "If Introify offers a paid service of its own, the applicable price, billing period, renewal terms and refund conditions must be displayed before payment. No price or refund deadline is established by this draft. Introify remains responsible for its own services and any obligations imposed by law."],
-            },
-            {
-                id: "ai", title: "AI and third-party services",
-                paragraphs: ["AI features depend on configured providers and the information supplied to them. Outputs may be inaccurate or incomplete. Review them before relying on or publishing them, and obtain qualified advice for decisions that require it.", "External websites, payment services, sign-in providers and messaging applications have their own terms and privacy practices. Introify cannot promise the availability or performance of an external service."],
-            },
-            {
-                id: "availability", title: "Availability and misuse",
-                paragraphs: ["Features may change or be unavailable during maintenance or service interruptions. This draft does not provide an uptime, revenue or response-time guarantee.", "Access or content may need to be restricted to address unlawful activity, security threats, abuse or a valid legal requirement. The approved operating process must provide a contact route for affected users and review requests where appropriate."],
-            },
-            {
-                id: "rights", title: "Questions and applicable rights",
-                paragraphs: ["Nothing in these draft terms excludes consumer protections or other rights that cannot lawfully be excluded. Commercial liability provisions and dispute arrangements require review once the operator and service model are confirmed."],
-                fields: [...grievanceFields, { label: "Governing law and jurisdiction", value: marketingBusiness.jurisdiction }],
-            },
+                "label": "Plans and pricing",
+                "href": "/pricing"
+            }
         ],
+        "sections": [
+            {
+                "id": "operator",
+                "title": "The service and its operator",
+                "paragraphs": [
+                    "Introify is an online software service for creating public pages, presenting work and business information, and using enabled tools for enquiries, listings, bookings, digital content and AI conversations. Features depend on your plan and the services configured for your account.",
+                    "These terms cover Introify's platform. Purchases from businesses using Introify pages also have the relevant seller's purchase terms. Introify is the product name. The operator details and final commercial terms below are awaiting completion; paid checkout must remain unavailable until these details and applicable purchase terms are complete."
+                ],
+                "fields": [...operatorFields, { label: "Razorpay merchant ID", value: marketingBusiness.razorpayMerchantId }]
+            },
+            {
+                "id": "accounts",
+                "title": "Accounts and team access",
+                "bullets": [
+                    "Use accurate information and manage only pages you are authorised to represent. You must have legal capacity to enter an agreement and authority to act for any business you represent.",
+                    "Keep sign-in credentials and access links secure. Give team members only the access they need and remove access when it is no longer required.",
+                    "A billing account may cover multiple businesses according to its plan. Allowances are shared across that account; adding a business does not create a fresh allowance.",
+                    "Follow the acceptable use policy and applicable law. Do not impersonate others, publish unlawful content or bypass permissions, usage limits or payment controls."
+                ]
+            },
+            {
+                "id": "subscriptions",
+                "title": "Plans, billing and renewals",
+                "paragraphs": [
+                    "The pricing page describes current plans. Before paying, review the amount, currency, taxes, billing interval and recurring payment terms shown in checkout. An annual plan is charged for the year; a displayed monthly equivalent is not a monthly instalment.",
+                    "Where recurring billing is enabled, subscriptions renew according to the interval you authorise until renewal is turned off. The billing account owner or an authorised billing administrator can manage the subscription in Dashboard → Billing. Not using the service, closing a browser or removing an app shortcut does not cancel a subscription.",
+                    "Review the effective date and any charge or credit shown before confirming a plan change. A cancelled or failed checkout does not activate a paid plan. Access and allowances follow confirmed payment and subscription status, rather than a payment attempt or screenshot."
+                ]
+            },
+            {
+                "id": "usage",
+                "title": "AI credits, generations and add-ons",
+                "paragraphs": [
+                    "AI credits and photoreal 3D generations are separate allowances. AI usage varies by model. Included monthly allowances reset without rollover; annual billing does not release the whole year’s allowance at once. A free trial generation, where available and eligible, is a one-time trial rather than a recurring monthly grant.",
+                    "Add-on packs, where offered, are separate one-time purchases and do not create an automatic top-up. Review the validity and paid-plan requirements shown for the pack. Units are service allowances, not a cash balance or a payment account. Refund questions are governed separately by the refund policy and applicable rights.",
+                    "Features marked as planned, unavailable or awaiting activation are not immediately available benefits. Check the current feature availability before purchasing; do not rely solely on a future feature."
+                ]
+            },
+            {
+                "id": "content",
+                "title": "Your content and intellectual property",
+                "paragraphs": [
+                    "You retain your rights in the content you supply. You must have the necessary rights and permissions to upload it. You authorise Introify and its service providers to host, process, reproduce and display that content as needed to provide the features you use. This does not transfer ownership to Introify.",
+                    "Published pages and selected media are public and may be indexed or copied by others. Do not put private credentials, confidential records or information you are not authorised to share in public content. Keep your own copies of important material. Data handling and deletion are described in the privacy policy.",
+                    "Page owners are responsible for their identity, claims, licences, prices, availability and customer disclosures. A listing on Introify is not a certification or endorsement. Introify’s software, name and branding remain subject to their owners’ rights."
+                ]
+            },
+            {
+                "id": "transactions",
+                "title": "Purchases from businesses on Introify",
+                "paragraphs": [
+                    "Before purchasing a product, appointment, course, event or other offer, check the seller’s identity, total price, currency, taxes, fulfilment details and cancellation terms. The seller is responsible for the offer and its fulfilment, subject to applicable law.",
+                    "Payment options depend on the business and the enabled integration. A UPI QR code or external payment link may send funds directly to the seller. An order request, payment screenshot or WhatsApp message alone is not proof of confirmed payment, acceptance or delivery.",
+                    "The seller’s terms do not replace Introify’s responsibilities for its own platform services. Purchases from Introify and purchases from a page owner are separate transactions."
+                ]
+            },
+            {
+                "id": "ai",
+                "title": "AI and third-party services",
+                "paragraphs": [
+                    "AI answers and generated assets may be inaccurate, incomplete or unsuitable for a particular use. Review them before relying on or publishing them. AI output is not a guarantee of results or a substitute for qualified professional advice.",
+                    "Only supply information you are authorised to process. External AI, payment, authentication and messaging providers have their own terms and privacy practices. Availability depends on the enabled service; Introify cannot guarantee an external provider’s performance."
+                ]
+            },
+            {
+                "id": "cancellation",
+                "title": "Cancellation, account closure and suspension",
+                "paragraphs": [
+                    "Turning off subscription renewal and requesting a refund are different actions. See the refund and cancellation policy for the available cancellation steps, paid-period access and refund requests. Closing an account is also separate from stopping a payment mandate.",
+                    "When a paid subscription ends, plan limits and access can change. Check the billing screen before cancelling, especially when several businesses share one account. Save important material before requesting account closure; do not assume cancellation automatically deletes stored information.",
+                    "Access or content may be restricted to address unlawful activity, security threats, non-payment, abuse or a valid legal requirement. Where appropriate, the operator must provide notice and a route to seek review. Statutory rights and refund remedies are not removed by an account restriction."
+                ]
+            },
+            {
+                "id": "availability",
+                "title": "Service availability and responsibility",
+                "paragraphs": [
+                    "The service may be interrupted for maintenance, updates or circumstances outside reasonable control. No uptime, business revenue, conversion or AI accuracy guarantee is made by these terms.",
+                    "Use reasonable care when publishing content and making decisions based on it. Nothing here excludes liability or remedies that cannot legally be excluded, including responsibility for Introify’s own services. Any additional commercial liability provisions require review before these terms are approved."
+                ]
+            },
+            {
+                "id": "changes",
+                "title": "Changes and applicable purchase terms",
+                "paragraphs": [
+                    "The updated date identifies the latest revision. Material changes should be communicated before they apply where required. Changes must not retrospectively remove rights attached to an earlier purchase. Review the terms shown for your purchase and keep a copy of the receipt.",
+                    "Read these terms together with the privacy, acceptable use, refund and delivery policies. A final policy must state any applicable governing law and dispute arrangements without restricting non-waivable consumer rights."
+                ]
+            },
+            {
+                "id": "rights",
+                "title": "Contact and dispute resolution",
+                "paragraphs": [
+                    "For a platform issue, provide the account or business page URL, a transaction reference if relevant, and a short description through the published Introify support channel. For an order from a page owner, contact that seller first using its disclosed details.",
+                    "Public contact and jurisdiction details below remain pending. This does not remove any right to contact a payment provider, raise a dispute or use remedies available under applicable law. Never send passwords, OTPs, card security codes or UPI PINs in a support request."
+                ],
+                "fields": [...grievanceFields, { label: "Governing law and jurisdiction", value: marketingBusiness.jurisdiction }]
+            }
+        ]
     },
     refundPolicy: {
         ...status,
-        slug: "refund-policy",
-        title: "Cancellation & refunds",
-        kicker: "Clear purchase decisions",
-        description: "How cancellation and refund responsibilities relate to Introify services and purchases from page owners.",
-        sections: [
+        updatedOn: "13 September 2026",
+        "slug": "refund-policy",
+        "title": "Refund and cancellation policy",
+        "kicker": "Clear purchase decisions",
+        "description": "How to stop a renewal, report a billing problem and request a refund for Introify or a purchase from a business page.",
+        "relatedLinks": [
             {
-                id: "status", title: "Refund terms are being finalised",
-                paragraphs: ["The operator has not yet approved a refund request window or processing period for Introify's own paid services. These fields intentionally remain blank. This draft must not be used as a completed refund offer for a new paid service."],
-                fields: [{ label: "Refund request window", value: marketingBusiness.refundWindow }, { label: "Refund processing time", value: marketingBusiness.refundProcessingTime }, { label: "Refund support email", value: marketingBusiness.supportEmail }],
+                "label": "Terms and conditions",
+                "href": "/terms"
             },
             {
-                id: "introify", title: "Services purchased from Introify",
-                paragraphs: ["Before a paid Introify service is offered, its checkout and approved policy must explain eligibility, how to cancel or request a refund, any exceptions, the treatment of renewals or partial use, and when an approved refund is expected. Those decisions are pending.", "Cancelling a renewal and refunding a payment are different actions. A final policy must explain both where recurring billing is offered. No automatic renewal or cancellation feature is promised by this draft."],
+                "label": "Contact details",
+                "href": "/contact"
             },
             {
-                id: "merchants", title: "Purchases from a page owner",
-                paragraphs: ["A product, booking, course, event or other offer on a business page is subject to that business's disclosed cancellation and refund terms and applicable law. Review those terms and the seller's contact details before paying. A merchant-specific policy does not replace Introify's obligations for its own services.", "For a payment made directly to a merchant through UPI or an external link, the merchant and the payment service handle the relevant payment process. Introify cannot promise an automatic reversal of funds it did not receive."],
-            },
-            {
-                id: "requests", title: "Information for a refund enquiry",
-                bullets: ["Keep the order or booking reference, payment reference, transaction date and the name of the seller.", "Explain whether the concern is a duplicate charge, cancellation, non-delivery, incorrect item or another issue.", "Use the verified support channel for the seller or service concerned. Never send an OTP, UPI PIN, card security code or account password to request a refund."],
-            },
-            {
-                id: "protections", title: "Consumer protections",
-                paragraphs: ["Blank fields do not mean that all sales are final or that a customer has waived statutory rights. Any approved policy must preserve remedies required by applicable law and distinguish a refund being approved from the payment provider completing it."],
-            },
+                "label": "Delivery policy",
+                "href": "/delivery-policy"
+            }
         ],
+        "sections": [
+            {
+                "id": "scope",
+                "title": "Which purchase does this policy cover?",
+                "paragraphs": [
+                    "Introify subscriptions and add-on credits are purchases of online software services. A product, booking, course, event or other offer sold by an independent business on an Introify page is a separate purchase from that seller. Check your receipt to identify whom you paid.",
+                    "This policy explains those separate responsibilities. It does not replace a seller’s disclosed terms or rights available under applicable law."
+                ]
+            },
+            {
+                "id": "status",
+                "title": "Refund eligibility and timelines",
+                "paragraphs": [
+                    "The operator has not yet approved a refund request window, processing period or change-of-mind policy for Introify’s paid services. These values remain intentionally blank. They must be completed and disclosed before a new paid service is offered. This page is not a completed payment-gateway submission while those details are missing.",
+                    "Blank fields do not mean all sales are final. Remedies required by law, and any terms already disclosed for a completed purchase, continue to apply. No unapproved deadline on this page limits those rights."
+                ],
+                "fields": [{ label: "Refund request window", value: marketingBusiness.refundWindow }, { label: "Refund processing time", value: marketingBusiness.refundProcessingTime }, { label: "Refund support email", value: marketingBusiness.supportEmail }]
+            },
+            {
+                "id": "cancel",
+                "title": "How to turn off subscription renewal",
+                "paragraphs": [
+                    "Where a recurring Introify subscription is active, sign in, open Dashboard → Billing, and select the correct billing account. The owner or an authorised billing administrator can choose “Turn off renewal”. Check that the billing screen confirms the change and shows the end of the paid period.",
+                    "A confirmed cancellation stops the next renewal. Confirmed paid benefits continue until the end of the paid period shown in Billing, subject to any separate lawful account restriction. The change affects all businesses sharing that billing account.",
+                    "Cancellation does not automatically refund an earlier payment or delete your account. Not using Introify or deleting a shortcut does not cancel renewal. If the control is unavailable or does not confirm success, use the published support channel with the account and subscription reference. Do not assume the renewal has stopped."
+                ]
+            },
+            {
+                "id": "requests",
+                "title": "What to include in a refund request",
+                "bullets": [
+                    "Identify whether the payment was for Introify or for an independent seller. Use the published contact details for that recipient.",
+                    "Include your account email or business page URL, invoice or order number, payment reference, payment date, amount and currency.",
+                    "Explain the issue: for example, a duplicate charge, incorrect amount, access not delivered, a cancellation problem or an unauthorised payment.",
+                    "For a service issue, describe what you expected, what happened and any troubleshooting already attempted. Share only relevant evidence and remove unnecessary personal information.",
+                    "Never send an OTP, UPI PIN, password, complete card number or card security code. A refund request does not require these secrets."
+                ]
+            },
+            {
+                "id": "billing-issues",
+                "title": "Duplicate, failed or disputed payments",
+                "paragraphs": [
+                    "Report a suspected duplicate charge or incorrect amount with both payment references where available. An apparently unsuccessful payment may still be pending or later confirmed, so check the payment status before retrying.",
+                    "A failed-payment reversal by a bank or payment provider is different from an approved merchant refund. Contact the relevant payment provider about a pending debit and retain its reference. For a suspected unauthorised payment, contact your bank or payment provider promptly as well as the recipient; this policy does not restrict your dispute rights."
+                ]
+            },
+            {
+                "id": "subscriptions",
+                "title": "Renewals, annual plans and partial use",
+                "paragraphs": [
+                    "Turning off an annual subscription’s renewal stops the following annual charge; it does not convert the existing annual payment into monthly instalments. Cancellation alone does not decide whether an earlier charge is refundable.",
+                    "Refund eligibility for first purchases, renewals, plan changes and partial use must be stated in the approved purchase terms. Introify has not yet approved a blanket no-refund rule or a prorated refund formula. A request must be considered against the disclosed terms, the facts and applicable rights."
+                ]
+            },
+            {
+                "id": "credits",
+                "title": "AI credits, 3D generations and digital access",
+                "paragraphs": [
+                    "Add-on packs are separate from subscription charges. Explain whether a request relates to unused purchased units, a usage deduction, a failed generation or digital access that was not delivered. Include the relevant job, invoice or purchase reference if available.",
+                    "Restoring a deducted service credit and returning money to a payment method are different remedies. A free trial or included allowance is not itself a separate paid purchase. Availability, prior use and service delivery may be relevant to a request, but they do not automatically remove statutory remedies.",
+                    "Introify’s own software service does not involve shipping a physical item. There is no physical return address for an Introify subscription. Physical goods purchased from a page owner follow that seller’s return and fulfilment process."
+                ]
+            },
+            {
+                "id": "processing",
+                "title": "After a refund is approved",
+                "paragraphs": [
+                    "An approval and the arrival of funds are separate stages. The operator must communicate the approved amount, relevant payment reference, refund destination and expected processing period. Refunds should be routed through the original payment method where supported; never provide a PIN or OTP to receive one.",
+                    "Bank and payment-provider processing can affect when a refund appears. If it does not arrive within the communicated period, follow up with the refund reference so the recipient or payment provider can trace it. The published processing commitment above remains pending approval."
+                ]
+            },
+            {
+                "id": "merchants",
+                "title": "Purchases from independent businesses",
+                "paragraphs": [
+                    "For a merchant product, booking, course or event, review the seller’s cancellation, rescheduling, return, non-delivery and refund terms before paying. Contact the seller shown on the listing or receipt with the order and transaction references.",
+                    "A UPI QR code or external link may pay the seller directly. Introify cannot promise an automatic reversal of funds it did not receive. A seller’s policy cannot replace Introify’s responsibilities for its own services or waive consumer protections.",
+                    "If you cannot identify or reach the seller, use the published platform contact details to report the affected page. That report is separate from a payment dispute with your payment provider."
+                ]
+            },
+            {
+                "id": "protections",
+                "title": "Your rights and policy updates",
+                "paragraphs": [
+                    "Nothing in this policy excludes non-waivable consumer protections or prevents a lawful payment dispute. Any approved refund rules must be clear before payment and must not retrospectively remove rights from an earlier purchase.",
+                    "The date above identifies this revision. The operator, support contact, refund eligibility and processing deadlines must be completed before this draft is approved for paid-service activation."
+                ],
+                "fields": [...operatorFields, { label: "Razorpay merchant ID", value: marketingBusiness.razorpayMerchantId }]
+            }
+        ]
     },
     deliveryPolicy: {
         ...status,

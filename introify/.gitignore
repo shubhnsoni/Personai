@@ -56,3 +56,6 @@ next-env.d.ts
 # Local operator handoff and authenticated browser helper (contain private account details)
 /docs/CODEX_PRODUCTION_HANDOFF.md
 /scripts/_edge_cdp.py
+
+# Deliberate public brand download (other generated archives remain ignored).
+!/public/downloads/introify-logo-and-favicon.zip

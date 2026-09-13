@@ -3,6 +3,7 @@
 export const marketingBusiness = {
     brandName: "Introify",
     siteUrl: "https://introify.com",
+    razorpayMerchantId: "IlvCZ0jqGV3pyu",
     operatorName: "",
     supportEmail: "",
     businessAddress: "",

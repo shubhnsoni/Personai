@@ -35,6 +35,15 @@ export function PolicyPage({ document, locale = "en" }: { document: PolicyDocume
                             <p>{policy.draftBody}</p>
                         </div>
                     )}
+                    {document.relatedLinks && (
+                        <nav aria-label="Related policies and information" className="mb-10 flex flex-wrap gap-3">
+                            {document.relatedLinks.map(link => (
+                                <Link key={link.href} href={link.href} className="mk-button mk-button-outline">
+                                    {link.label} <ArrowUpRight size={15} aria-hidden="true" />
+                                </Link>
+                            ))}
+                        </nav>
+                    )}
                     <div className="mk-policy-layout">
                         <aside>
                             <nav aria-label={policy.onThisPage}>
