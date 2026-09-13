@@ -1,4 +1,5 @@
 const PRIORITY_SLUGS = [
+    "neal",
     "aura-fitness-ranchi",
     "fit24-ranchi",
     "fitness-addiction-doranda",
@@ -8,6 +9,7 @@ const PRIORITY_SLUGS = [
 ]
 
 export const FORCE_REFRESH_SLUGS = new Set([
+    "neal",
     "aura-fitness-ranchi",
     "fit24-ranchi",
     "skydine-cafe",

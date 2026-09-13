@@ -6,6 +6,7 @@ import { BOOK_SHOPS } from "./book"
 import { FIELD_SHOPS } from "./field"
 import { TEACH_SHOPS } from "./teach"
 import { STUDIO_SHOPS } from "./studio"
+import { NILESH_KUMAR } from "./neal"
 
 export const DEMO_SHOPS: DemoShop[] = [
     ...FOOD_SHOPS,
@@ -14,6 +15,7 @@ export const DEMO_SHOPS: DemoShop[] = [
     ...FIELD_SHOPS,
     ...TEACH_SHOPS,
     ...STUDIO_SHOPS,
+    NILESH_KUMAR,
 ]
 
 export function demoShopByFlavor(flavor?: string | null): DemoShop | undefined {

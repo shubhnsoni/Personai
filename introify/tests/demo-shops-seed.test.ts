@@ -12,7 +12,7 @@ import {
 describe("demo shop seed order", () => {
     it("fills Aura Fitness and Fit24 before the rest of the kits", () => {
         const slugs = orderedDemoShops(DEMO_SHOPS).map((shop) => shop.slug)
-        expect(slugs.slice(0, 2)).toEqual(["aura-fitness-ranchi", "fit24-ranchi"])
+        expect(slugs.slice(0, 3)).toEqual(["neal", "aura-fitness-ranchi", "fit24-ranchi"])
         expect(slugs.at(-1)).toBe("skydine-cafe")
         expect(new Set(slugs).size).toBe(DEMO_SHOPS.length)
     })

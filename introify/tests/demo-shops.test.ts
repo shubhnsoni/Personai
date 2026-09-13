@@ -62,6 +62,19 @@ describe("field demo catalogs", () => {
         expect(fit?.services?.some((s) => /night/i.test(s.name))).toBe(true)
     })
 
+    it("publishes Nilesh Kumar from the LinkedIn vanity /in/neal at /neal", () => {
+        const shop = demoShopBySlug("neal")
+        expect(shop?.name).toBe("Nilesh Kumar")
+        expect(shop?.headline).toMatch(/Ex-Razorpay/)
+        expect(shop?.venue.address?.locality).toBe("Bengaluru")
+        expect(shop?.whatsapp).toBeUndefined()
+        expect(shop?.documents.some((doc) => doc.rawText.includes("linkedin.com/in/neal"))).toBe(true)
+        expect(shop?.customInstructions).toMatch(/Never invent a phone number/)
+        expect(shop?.experiences?.some((row) => row.company === "Deel" && /Operation Lead/.test(row.role))).toBe(true)
+        expect(shop?.experiences?.some((row) => row.company === "Razorpay")).toBe(true)
+        expect(shop?.experiences?.some((row) => row.company === "upGrad Jeet")).toBe(true)
+    })
+
     it("includes Churuwala's Upper Bazar with the 1949 counter details", () => {
         const shop = demoShopBySlug("churuwala-upper-bazar")
         expect(shop?.name).toBe("Churuwala's")
