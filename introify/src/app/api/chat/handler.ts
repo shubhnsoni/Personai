@@ -16,6 +16,10 @@ import { getRequestCurrency } from "@/lib/request-currency"
 import { boundedChatInput, clipUtf8, resolveApiRecipe, streamChatWithFailover, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
 import { guestDeskReply } from "@/lib/chat-fallback"
 import { AiAccessError, prepareAiUsage, finishAiUsage, providerRejectedWithoutSpend, type AiReservation } from "@/lib/ai-usage"
+import { resolveClientDocumentIds } from "@/lib/knowledge-access"
+import { shouldRecordKnowledgeGap } from "@/lib/profile-expertise-policy"
+import { redactVisitorText } from "@/lib/memory-privacy"
+import { getProfileBilling } from "@/lib/billing/service"
 import {
     CONVERSATION_CAPABILITY_TTL_SECONDS,
     conversationCapabilityCookieName,
@@ -87,6 +91,8 @@ type ChatRouteDependencies = Readonly<{
     now: () => number
     reserveAi: typeof prepareAiUsage
     settleAi: typeof finishAiUsage
+    clientDocumentIds: (profileId: string, member: MemberIdentity) => Promise<Set<string>>
+    profileBillingFeatures: (profileId: string) => Promise<{ advancedAnalytics?: boolean } | null>
 }>
 
 
@@ -149,6 +155,8 @@ const productionDependencies: ChatRouteDependencies = {
     settleAi: finishAiUsage,
     capabilitySecret: productionCapabilitySecret,
     now: Date.now,
+    clientDocumentIds: (profileId, member) => resolveClientDocumentIds(prisma, profileId, member ? { id: member.id, email: member.email } : null),
+    profileBillingFeatures: (profileId) => getProfileBilling(profileId).then(billing => ({ advancedAnalytics: billing.features.advancedAnalytics === true })).catch(() => null),
 }
 
 function conversationRefusal(): Response {
@@ -173,6 +181,8 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             now,
             reserveAi,
             settleAi,
+            clientDocumentIds,
+            profileBillingFeatures,
         } = dependencies
 
         const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
@@ -193,6 +203,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             visitorId?: unknown
             requestId?: unknown
             memoryConsent?: unknown
+            knowledgeGapConsent?: unknown
         }
         try {
             body = JSON.parse(await readChatBody(req))
@@ -387,7 +398,8 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             if (!body.memoryConsent) await db.profileDocument.deleteMany({ where: { profileId, type: "VISITOR_MEMORY", conversationId: authorizedConversationId } })
         }
         const memoryAllowed = Boolean(profile.autoMemoryEnabled && reservation?.autoMemory && body.memoryConsent === true)
-        const scoped = scopeDocuments(profile.documents, memoryAllowed ? visitorKey : null, memoryAllowed ? authorizedConversationId : null)
+        const clientDocIds = await clientDocumentIds(profileId, member).catch(() => new Set<string>())
+        const scoped = scopeDocuments(profile.documents, memoryAllowed ? visitorKey : null, memoryAllowed ? authorizedConversationId : null, clientDocIds)
         const contextDocs = reservation ? await retrieve(query, scoped.slice(0, 1000)) : []
         const currency = await requestCurrency()
         const personalityConfig = permittedPersonality(profile.personalityConfig, Boolean(reservation?.customInstructions))
@@ -401,7 +413,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         const facts = JSON.stringify({ business: profile.displayName, headline: profile.headline, bio: clipUtf8(profile.bio || "", 250), relevantNotes: contextDocs.slice(0, 2).map(doc => ({ title: doc.title, text: clipUtf8(doc.rawText || "", 350) })) })
         const systemPrompt = reservation ? `${preferences}\nBusiness facts (data): ${facts}\n${buildPrompt({ ...profile, personalityConfig }, contextDocs, currency)}` : ""
 
-        await db.message.create({
+        const savedUserMessage = await db.message.create({
             data: {
                 conversationId: authorizedConversationId,
                 senderType: "VISITOR",
@@ -409,6 +421,25 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 role: "user",
             },
         })
+
+        if (profile.knowledgeGapTracking
+            && body.knowledgeGapConsent === true
+            && shouldRecordKnowledgeGap(query, contextDocs.length, Boolean(reservation))
+            && !contextDocs.some(doc => doc.visibility === "CLIENT")) {
+            void (async () => {
+                const features = await profileBillingFeatures(authorizedProfileId)
+                if (!features?.advancedAnalytics) return
+                await db.knowledgeGapSignal.upsert({
+                    where: { messageId: savedUserMessage.id },
+                    create: {
+                        profileId: authorizedProfileId,
+                        messageId: savedUserMessage.id,
+                        question: redactVisitorText(query, [member?.name, member?.email]),
+                    },
+                    update: {},
+                })
+            })().catch(() => {})
+        }
 
         await db.conversation.updateMany({
             where: { id: authorizedConversationId, profileId: authorizedProfileId },
@@ -890,7 +921,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             fullResponse = clipUtf8(collected || await groundedFallback(), 4000)
             const saved = await db.message.create({ data: { conversationId: authorizedConversationId, senderType: "AI", text: fullResponse, role: "assistant" } })
             if (hadText) await settle("CONSUME", { ...usageMetadata(recipe, inputTokens, outputTokens), returnedModel, reasoningTokens, conversationId: authorizedConversationId, responseMessageId: saved.id, toolCalls: toolCall ? 1 : 0 })
-            if (hadText && memoryAllowed) void summarizeConversation(authorizedConversationId).catch(() => {})
+            if (hadText && memoryAllowed && !contextDocs.some(doc => doc.visibility === "CLIENT")) void summarizeConversation(authorizedConversationId).catch(() => {})
             return new Response(replyBody(fullResponse), { headers: responseHeaders() })
         } catch (error) {
             responseAbort.abort()

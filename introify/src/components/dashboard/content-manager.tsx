@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { EmptyState } from "@/components/ui/empty-state"
 import { Brain, FileText, Link as LinkIcon, MessageCircle, Pencil, Trash2, Upload } from "lucide-react"
 import { addContent, deleteContent, syncKnowledgeFromChats, updateContent } from "@/app/actions/content"
+import { setKnowledgeVisibility } from "@/app/actions/knowledge-access"
 import { ImportStudio } from "@/components/dashboard/import-studio"
 import type { SurfaceExtras } from "@/lib/surfaces"
 import { toast } from "sonner"
@@ -27,7 +28,7 @@ export function ContentManager({
 }: {
     profileId: string
     documents: ProfileDocument[]
-    onBindAdd?: (open: () => void) => void
+    onBindAdd?: (open: (title?: string) => void) => void
     role?: string | null
     extras?: SurfaceExtras | null
 }) {
@@ -40,10 +41,10 @@ export function ContentManager({
     const [busy, setBusy] = useState(false)
     const [syncing, setSyncing] = useState(false)
 
-    const openCreate = () => {
+    const openCreate = (initialTitle = "") => {
         setEditing(null)
         setKind("text")
-        setTitle("")
+        setTitle(initialTitle)
         setContent("")
         setIsOpen(true)
     }
@@ -162,6 +163,12 @@ export function ContentManager({
                                     <button type="button" className="min-w-0 flex-1 text-left" onClick={() => openEdit(doc)}>
                                         <p className="truncate text-sm font-medium">{doc.title}</p>
                                         {isPrivateChatDocument(doc) && <p className="text-[10px] font-medium text-muted-foreground">Private · excluded from public answers</p>}
+                                        {!isPrivateChatDocument(doc) && (doc.visibility !== "PUBLIC" || doc.publicationState !== "PUBLISHED") && (
+                                            <p className="text-[10px] font-medium text-muted-foreground">
+                                                {doc.visibility === "PRIVATE" ? "Private" : doc.visibility === "CLIENT" ? "Clients only" : "Public"}
+                                                {doc.publicationState !== "PUBLISHED" ? " · Draft" : ""}
+                                            </p>
+                                        )}
                                         <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                                             {doc.sourceType === "URL" ? doc.url : doc.rawText}
                                         </p>
@@ -209,6 +216,39 @@ export function ContentManager({
                             <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={7} placeholder="Paste anything the AI should know." className="rounded-2xl" />
                         )}
                     </div>
+                    {editing && !isPrivateChatDocument(editing) ? (
+                        <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-3 text-xs">
+                            <Label className="text-xs">Sharing</Label>
+                            <select
+                                aria-label="Sharing"
+                                className="h-8 rounded-full border border-border/70 bg-transparent px-2"
+                                value={editing.visibility}
+                                onChange={event => {
+                                    const visibility = event.target.value as "PUBLIC" | "CLIENT" | "PRIVATE"
+                                    void setKnowledgeVisibility(profileId, editing.id, { visibility, publicationState: editing.publicationState as "DRAFT" | "PUBLISHED" })
+                                        .then(() => { setEditing({ ...editing, visibility }); toast.success("Sharing updated") })
+                                        .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not update sharing"))
+                                }}
+                            >
+                                <option value="PUBLIC">Public</option>
+                                <option value="CLIENT">Clients only</option>
+                                <option value="PRIVATE">Private</option>
+                            </select>
+                            <button
+                                type="button"
+                                aria-pressed={editing.publicationState === "PUBLISHED"}
+                                className="rounded-full border border-border/70 px-3 py-1"
+                                onClick={() => {
+                                    const publicationState = editing.publicationState === "PUBLISHED" ? "DRAFT" as const : "PUBLISHED" as const
+                                    void setKnowledgeVisibility(profileId, editing.id, { visibility: editing.visibility as "PUBLIC" | "CLIENT" | "PRIVATE", publicationState })
+                                        .then(() => { setEditing({ ...editing, publicationState }); toast.success(publicationState === "PUBLISHED" ? "Published" : "Moved to draft") })
+                                        .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not update sharing"))
+                                }}
+                            >
+                                {editing.publicationState === "PUBLISHED" ? "Unpublish" : "Publish"}
+                            </button>
+                        </div>
+                    ) : null}
                     <DialogFooter>
                         <Button variant="outline" className="rounded-full" onClick={() => setIsOpen(false)}>Cancel</Button>
                         <Button className="rounded-full" onClick={() => void handleSave()} disabled={busy || !title || !content}>

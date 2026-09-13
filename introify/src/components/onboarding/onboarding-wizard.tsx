@@ -43,6 +43,8 @@ import Link from "@/components/navigation/transition-link"
 import { PLAN_CATALOG } from "@/lib/billing/catalog"
 import { DEFAULT_BLOUB_PICK, writeOrbBag, type BloubPick } from "@/lib/bloub/catalog"
 import { BlobLookStudio } from "@/components/onboarding/blob-look"
+import { ProfileImportBuilder } from "@/components/profile/profile-import-builder"
+import type { ProfileBlueprint, ProfileImportPreview } from "@/lib/profile-import-contract"
 
 type Line = { id: string; role: "bot" | "user"; text: string; sub?: string }
 
@@ -110,6 +112,8 @@ export function OnboardingWizard({
     const [inviteDesks, setInviteDesks] = useState(true)
     const [busy, setBusy] = useState(false)
     const [orb, setOrb] = useState<BloubPick>({ ...DEFAULT_BLOUB_PICK })
+    const [importing, setImporting] = useState(false)
+    const [importDraft, setImportDraft] = useState<{ id: string; draft: ProfileBlueprint } | null>(null)
 
     const picked = needById(need)
     const suggested = need ? defaultAddons(need) : []
@@ -142,6 +146,7 @@ export function OnboardingWizard({
         const prev = (() => {
             if (beat === "ready") return "look"
             if (beat === "look") return hasExtrasBeat(need) ? "extras" : "features"
+            if (importDraft && beat === "features") return "username"
             const i = order.indexOf(beat)
             return order[Math.max(0, i - 1)]
         })()
@@ -178,18 +183,34 @@ export function OnboardingWizard({
         push(bits.join(" · ") || COPY.extras.continue, "look")
     }
 
+    function useImport(preview: ProfileImportPreview, blueprint: ProfileBlueprint) {
+        const displayName = blueprint.profile.displayName.trim()
+        setImportDraft({ id: preview.id, draft: blueprint })
+        setName(displayName)
+        setSpeakerName(displayName)
+        setNeed(blueprint.needId)
+        setAddons(blueprint.addons as AddonId[])
+        const next = suggestedUsername(displayName)
+        setUsername(next)
+        setImporting(false)
+        setHistory((h) => [...h, { id: uid(), role: "user", text: "Imported my profile" }, botFor("username", blueprint.needId)])
+        setBeat("username")
+        setDraft(next)
+    }
+
     async function launch(seedSample: boolean) {
         if (!need || name.trim().length < 2) return
         setBusy(true)
         try {
             const result = await createProfile({
+                importDraft: importDraft ? { id: importDraft.id, draft: { ...importDraft.draft, needId: need!, addons, profile: { ...importDraft.draft.profile, displayName: name.trim() || importDraft.draft.profile.displayName } } } : undefined,
                 billingAccountId,
                 roleTemplate: picked.role,
                 primaryGoal: picked.goal,
                 displayName: name.trim(),
                 username,
-                headline: picked.headline,
-                bio: speakerName ? `${speakerName}${speakerRole ? ` · ${speakerRole}` : ""}` : "",
+                headline: importDraft ? importDraft.draft.profile.headline : picked.headline,
+                bio: importDraft ? importDraft.draft.profile.bio : speakerName ? `${speakerName}${speakerRole ? ` · ${speakerRole}` : ""}` : "",
                 language: "en",
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                 needId: need,
@@ -241,7 +262,7 @@ export function OnboardingWizard({
                     return
                 }
                 setUsername(result.slug)
-                push(result.slug, "who")
+                push(result.slug, importDraft ? "features" : "who")
             }).catch(() => {
                 setBusy(false)
                 toast.error("Could not check that username")
@@ -346,6 +367,20 @@ export function OnboardingWizard({
                             </div>
                         ))}
                     </div>
+
+                    {beat === "name" ? (
+                        <div className="mt-2">
+                            {importing ? (
+                                <ProfileImportBuilder
+                                    context={billingAccountId ? { billingAccountId } : {}}
+                                    onUse={useImport}
+                                    onCancel={() => setImporting(false)}
+                                />
+                            ) : (
+                                <Chip onClick={() => setImporting(true)}>Import my profile</Chip>
+                            )}
+                        </div>
+                    ) : null}
 
                     {beat === "username" ? (
                         <p className="mt-2 text-[13px] text-white/45">

@@ -16,7 +16,7 @@ const secret = "test-capability-secret-never-production"
 const now = 1_780_000_000_000
 const profile = { id: "shop", userId: "owner", displayName: "Studio", isPublic: true, aiModel: "fast", roleTemplate: "CONSULTANT", personalityConfig: "{}", autoMemoryEnabled: false, documents: [], workExperiences: [], projects: [], serviceOfferings: [], digitalProducts: [], courses: [], events: [], communities: [], leadMagnets: [] }
 const db = {
-    profile: { findUnique: vi.fn() }, conversation: { create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), update: vi.fn() }, message: { create: vi.fn() }, profileEvent: { create: vi.fn() }, profileDocument: { deleteMany: vi.fn() }, visitorLead: { create: vi.fn() },
+    profile: { findUnique: vi.fn() }, conversation: { create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), update: vi.fn() }, message: { create: vi.fn() }, profileEvent: { create: vi.fn() }, profileDocument: { deleteMany: vi.fn() }, visitorLead: { create: vi.fn() }, knowledgeGapSignal: { upsert: vi.fn(async () => ({})) },
 }
 const reserve = vi.fn(), settle = vi.fn(), retrieve = vi.fn(), complete = vi.fn(), summarize = vi.fn()
 const chunk = (delta: unknown = { content: "A grounded answer" }, usage = false) => ({ id: "completion", object: "chat.completion.chunk", model: recipe.model, created: 1, choices: usage ? [] : [{ index: 0, delta, finish_reason: "stop", logprobs: null }], ...(usage ? { usage: { prompt_tokens: 300, completion_tokens: 20, total_tokens: 320 } } : {}) }) as OpenAI.Chat.Completions.ChatCompletionChunk
@@ -210,5 +210,34 @@ describe("metered public chat", () => {
         expect(reserve).not.toHaveBeenCalled()
         expect(retrieve).not.toHaveBeenCalled()
         expect(complete).not.toHaveBeenCalled()
+    })
+    it("records no gap signal without the visitor's explicit consent", async () => {
+        db.profile.findUnique.mockResolvedValue({ ...profile, knowledgeGapTracking: true })
+        const post = createChatPostHandler({ db: db as unknown as Prisma.TransactionClient, resolveMember: async () => null, rateLimit: () => ({ allowed: true, remaining: 10 }), reserveAi: reserve, settleAi: settle, retrieve, buildPrompt: () => "Business facts", requestCurrency: async () => "USD", createCompletion: complete, summarizeConversation: summarize, providerConfigured: () => true, capabilitySecret: () => secret, now: () => now, clientDocumentIds: async () => new Set(), profileBillingFeatures: async () => ({ advancedAnalytics: true }) })
+        const response = await post(request({ knowledgeGapConsent: false }))
+        expect(response.status).toBe(200)
+        await new Promise(resolve => setTimeout(resolve, 0))
+        expect(db.knowledgeGapSignal.upsert).not.toHaveBeenCalled()
+    })
+    it("records a consented unanswered question and keeps the reply working when logging fails", async () => {
+        db.profile.findUnique.mockResolvedValue({ ...profile, knowledgeGapTracking: true })
+        const post = createChatPostHandler({ db: db as unknown as Prisma.TransactionClient, resolveMember: async () => null, rateLimit: () => ({ allowed: true, remaining: 10 }), reserveAi: reserve, settleAi: settle, retrieve, buildPrompt: () => "Business facts", requestCurrency: async () => "USD", createCompletion: complete, summarizeConversation: summarize, providerConfigured: () => true, capabilitySecret: () => secret, now: () => now, clientDocumentIds: async () => new Set(), profileBillingFeatures: async () => ({ advancedAnalytics: true }) })
+        const response = await post(request({ knowledgeGapConsent: true, messages: [{ role: "user", content: "What are your weekend rates?" }] }))
+        expect(response.status).toBe(200)
+        await vi.waitFor(() => expect(db.knowledgeGapSignal.upsert).toHaveBeenCalled())
+        expect(db.knowledgeGapSignal.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ profileId: "shop", messageId: "saved-message" }) }))
+
+        vi.mocked(db.knowledgeGapSignal.upsert).mockRejectedValue(new Error("logger down"))
+        const again = await post(request({ knowledgeGapConsent: true, messages: [{ role: "user", content: "What are your weekend rates?" }] }, "", "two"))
+        expect(again.status).toBe(200)
+        expect(await again.text()).toContain("A grounded answer")
+    })
+    it("records no gap when the profile has no advanced analytics", async () => {
+        db.profile.findUnique.mockResolvedValue({ ...profile, knowledgeGapTracking: true })
+        const post = createChatPostHandler({ db: db as unknown as Prisma.TransactionClient, resolveMember: async () => null, rateLimit: () => ({ allowed: true, remaining: 10 }), reserveAi: reserve, settleAi: settle, retrieve, buildPrompt: () => "Business facts", requestCurrency: async () => "USD", createCompletion: complete, summarizeConversation: summarize, providerConfigured: () => true, capabilitySecret: () => secret, now: () => now, clientDocumentIds: async () => new Set(), profileBillingFeatures: async () => ({ advancedAnalytics: false }) })
+        const response = await post(request({ knowledgeGapConsent: true, messages: [{ role: "user", content: "What are your weekend rates?" }] }))
+        expect(response.status).toBe(200)
+        await new Promise(resolve => setTimeout(resolve, 10))
+        expect(db.knowledgeGapSignal.upsert).not.toHaveBeenCalled()
     })
 })

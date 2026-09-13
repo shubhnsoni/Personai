@@ -8,6 +8,7 @@ import { goldBoardFromConfig } from "@/lib/metal/board"
 import { formatRatePerGram } from "@/lib/metal/math"
 import { cloneClosingReminder, cloneOperatingPrompt } from "@/lib/clone-identity"
 import { isPrivateChatDocument } from "@/lib/memory-privacy"
+import { canReadKnowledge } from "@/lib/profile-expertise-policy"
 
 export interface PersonalityConfig {
     tone?: "professional" | "casual" | "friendly" | "witty"
@@ -147,11 +148,13 @@ function calculateBM25Score(
  * Legacy private notes never enter shared retrieval. Visitor notes require both
  * the verified visitor identity and the exact authorized conversation.
  */
-export function scopeDocuments(documents: ProfileDocument[], visitorKey?: string | null, conversationId?: string | null) {
+export function scopeDocuments(documents: ProfileDocument[], visitorKey?: string | null, conversationId?: string | null, clientDocumentIds: ReadonlySet<string> = new Set()) {
     return documents.filter((d) => {
-        if (d.type === "VISITOR_MEMORY") return Boolean(visitorKey && conversationId) && d.visitorKey === visitorKey && d.conversationId === conversationId
+        if ((d.publicationState ?? "PUBLISHED") !== "PUBLISHED") return false
+        if ((d.visibility ?? "PUBLIC") === "PRIVATE") return false
+        if (d.type === "VISITOR_MEMORY") return (d.visibility ?? "PUBLIC") === "PUBLIC" && Boolean(visitorKey && conversationId) && d.visitorKey === visitorKey && d.conversationId === conversationId
         if (isPrivateChatDocument(d)) return false
-        return true
+        return canReadKnowledge(d, clientDocumentIds)
     })
 }
 

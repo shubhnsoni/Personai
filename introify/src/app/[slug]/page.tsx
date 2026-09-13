@@ -7,6 +7,8 @@ import { isIndexableProfileSlug, marketingMetadata, marketingOrigin, marketingSt
 import { HomeLanding } from "@/components/landing/home-landing"
 import { isLocaleHomeSlug, isReservedUiLocale } from "@/lib/ui-locale"
 import { messagesFor } from "@/lib/ui-messages"
+import { IntentIntroduction } from "@/components/profile/intent-introduction"
+import Link from "next/link"
 
 export const dynamic = 'force-dynamic'
 
@@ -75,8 +77,42 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
     const colors = animationConfig.colors || ["#00D7FF", "#07104D"]
     const story = await import("@/app/actions/story").then((m) => m.publishedStoryForSlug(slug))
 
+    const [introductions, frameworkCount, publicKnowledgeCount] = await Promise.all([
+        prisma.profileIntroduction.findMany({
+            where: { profileId: profile.id, status: "PUBLISHED" },
+            select: { id: true, intent: true, text: true },
+            orderBy: { createdAt: "asc" },
+        }),
+        prisma.profileFramework.count({
+            where: { profileId: profile.id, status: "PUBLISHED", scoringApproved: true },
+        }),
+        prisma.profileDocument.count({
+            where: { profileId: profile.id, visibility: "PUBLIC", publicationState: "PUBLISHED" },
+        }),
+    ])
+    const expertiseLinks = (introductions.length || frameworkCount || publicKnowledgeCount) ? (
+        <div className="space-y-2">
+            {introductions.length ? (
+                <IntentIntroduction entries={introductions} defaultText={profile.welcomeMessageOverride} />
+            ) : null}
+            <div className="flex flex-wrap gap-1.5">
+                {frameworkCount ? (
+                    <Link href={`/${profile.slug}/frameworks`} className="rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium">
+                        Self-assessments ({frameworkCount})
+                    </Link>
+                ) : null}
+                {publicKnowledgeCount ? (
+                    <Link href={`/${profile.slug}/knowledge`} className="rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium">
+                        Knowledge
+                    </Link>
+                ) : null}
+            </div>
+        </div>
+    ) : undefined
+
     return (
         <ProfileView
+            expertiseLinks={expertiseLinks}
             profile={{
                 ...profile,
                 hasStory: Boolean(story?.frames.length),

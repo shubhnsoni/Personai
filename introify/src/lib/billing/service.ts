@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { AI_MODES, getPlan, isPlanId, type AiMode, type LimitKind, type Plan, type PlanId, type UsageUnit } from "./catalog"
 import { allowanceWindow, effectivePaidPlan } from "./periods"
+import { PROFILE_IMPORT_POLICY } from "@/lib/profile-import-contract"
 import { backfillAccountStorage } from "./storage-backfill"
 
 export type BillingTx = Prisma.TransactionClient
@@ -143,7 +144,7 @@ async function claimTrial(tx: BillingTx, accountId: string) {
     await tx.billingTrialClaim.create({ data: { userId: owner.id, accountId, grantId: grant.id } })
 }
 
-export async function reserveUsageInTransaction(tx: BillingTx, input: { accountId: string; profileId: string; unit: UsageUnit; amount: number; operationKey: string; actorId?: string; metadata?: Record<string, unknown> }) {
+export async function reserveUsageInTransaction(tx: BillingTx, input: { accountId: string; profileId: string | null; unit: UsageUnit; amount: number; operationKey: string; actorId?: string; metadata?: Record<string, unknown> }) {
     if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.operationKey.length < 8 || input.operationKey.length > 180) throw new Error("Invalid usage request.")
     await lockBillingAccount(tx, input.accountId)
     const existing = await tx.billingReservation.findUnique({ where: { accountId_unit_operationKey: { accountId: input.accountId, unit: input.unit, operationKey: input.operationKey } } })
@@ -152,7 +153,9 @@ export async function reserveUsageInTransaction(tx: BillingTx, input: { accountI
         return { id: existing.id, state: existing.state as "RESERVED" | "CONSUMED" | "RELEASED", created: false }
     }
     const context = await ensureMonthlyGrants(tx, input.accountId)
-    if (input.unit === "AI" && input.metadata?.mode !== undefined) {
+    if (input.metadata?.operation === "PROFILE_IMPORT") {
+        if (input.unit !== "AI" || input.amount !== PROFILE_IMPORT_POLICY.credits || input.metadata?.mode !== undefined) throw new Error("Invalid profile import usage request.")
+    } else if (input.unit === "AI" && input.metadata?.mode !== undefined) {
         const mode = input.metadata.mode as AiMode
         if (!Object.hasOwn(AI_MODES, mode) || !context.plan.aiModes.includes(mode) || input.amount !== AI_MODES[mode].credits) throw new Error("This AI mode is not included in the current plan.")
     }

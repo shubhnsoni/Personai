@@ -168,6 +168,7 @@ model User {
 
   profiles      Profile[]
   notifications Notification[]
+  profileImportJobs ProfileImportJob[]
 }
 
 model Profile {
@@ -202,6 +203,7 @@ model Profile {
   personalityConfig      String? // JSON: {tone, customInstructions, responseLength, language}
   aiModel                String                  @default("gpt-4o-mini") // "gpt-4o-mini" | "gpt-4o"
   autoMemoryEnabled      Boolean                 @default(false)
+  knowledgeGapTracking   Boolean                 @default(false)
   liveChatEnabled        Boolean                 @default(false)
   liveChatSlaMinutes     Int                     @default(10)
   aiProviderOverride     String?
@@ -259,6 +261,11 @@ model Profile {
   metalPayments               MetalPayment[]
   visitorSessions             VisitorSession[]
   moneyEvents                 MoneyEvent[]
+  profileImportJobs           ProfileImportJob[]
+  profileFrameworks           ProfileFramework[]
+  profileIntroductions        ProfileIntroduction[]
+  knowledgeGapSignals         KnowledgeGapSignal[]
+  knowledgePaymentProofs      KnowledgePaymentProof[]
 }
 
 model ProfileEvent {
@@ -433,12 +440,16 @@ model ProfileDocument {
   visitorKey          String?
   memberId            String?
   conversationId      String?
+  visibility             String                  @default("PUBLIC")
+  publicationState       String                  @default("PUBLISHED")
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   CaseDeliverable     CaseDeliverable[]
   CaseDocumentRequest CaseDocumentRequest[]
   CohortSubmission    CohortSubmission[]
   CohortCertificate   CohortCertificate[]
+  knowledgeAccessGrants  KnowledgeAccessGrant[]
+  knowledgePurchaseRules KnowledgePurchaseRule[]
 
   @@index([profileId, visitorKey])
 }
@@ -467,6 +478,7 @@ model ServiceOffering {
   waitlistEntries   AppointmentWaitlistEntry[]
   FieldJobRequest   FieldJobRequest[]
   FieldJob          FieldJob[]
+  knowledgePurchaseRules KnowledgePurchaseRule[]
 
   fieldJobInspectionTemplates FieldJobInspectionTemplate[]
 }
@@ -703,6 +715,7 @@ model Message {
   text           String
   role           String
   createdAt      DateTime     @default(now())
+  knowledgeGapSignal KnowledgeGapSignal?
 }
 
 model VisitorLead {
@@ -800,6 +813,7 @@ model DigitalProduct {
   ProductOption  ProductOption[]
   ProductVariant ProductVariant[]
   metalLots      MetalLot[]
+  knowledgePurchaseRules KnowledgePurchaseRule[]
 }
 
 model Course {
@@ -953,6 +967,7 @@ model Member {
   communities   CommunityMember[]
   bookings      Booking[]
   conversations Conversation[]
+  knowledgeAccessGrants KnowledgeAccessGrant[]
 }
 
 model MemberSession {
@@ -1279,6 +1294,8 @@ model BillingAccount {
   reservations     BillingReservation[]
   storage          BillingStorageObject[]
   checkouts        BillingCheckout[]
+  profileImportJobs ProfileImportJob[]
+
   @@index([ownerUserId])
 }
 
@@ -1291,6 +1308,7 @@ model BillingAccountMember {
   status    String @default("ACTIVE")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   @@unique([accountId, userId])
   @@index([userId, status])
 }
@@ -1311,6 +1329,7 @@ model BillingInvitation {
   acceptedBy    String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
   @@index([accountId, emailKey, status])
 }
 
@@ -1353,6 +1372,7 @@ model BillingCreditGrant {
   expiresAt   DateTime?
   revokedAt   DateTime?
   createdAt   DateTime @default(now())
+
   @@index([accountId, unit, expiresAt])
 }
 
@@ -1370,8 +1390,133 @@ model BillingReservation {
   metadata     Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
   @@unique([accountId, unit, operationKey])
   @@index([accountId, state])
+}
+
+model ProfileImportJob {
+  id               String         @id @default(cuid())
+  ownerUserId      String
+  owner            User           @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  billingAccountId String
+  billingAccount   BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Restrict)
+  targetProfileId  String?
+  targetProfile    Profile?       @relation(fields: [targetProfileId], references: [id], onDelete: SetNull)
+  requestId        String
+  inputHash        String
+  status           String         @default("PENDING")
+  draft            Json?
+  sources          Json?
+  warnings         Json?
+  error            String?
+  appliedProfileId String?
+  appliedSlug      String?
+  reservationId    String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  expiresAt        DateTime
+
+  @@unique([ownerUserId, requestId])
+  @@index([ownerUserId, createdAt])
+}
+
+model ProfileFramework {
+  id              String   @id @default(cuid())
+  profileId       String
+  profile         Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title           String
+  description     String
+  definition      Json
+  status          String   @default("DRAFT")
+  scoringApproved Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([profileId, status])
+}
+
+model ProfileIntroduction {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  intent    String
+  text      String
+  status    String   @default("DRAFT")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId, status])
+}
+
+model KnowledgeAccessGrant {
+  id         String          @id @default(cuid())
+  documentId String
+  document   ProfileDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  memberId   String
+  member     Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  state      String          @default("ALLOWED")
+  expiresAt  DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([documentId, memberId])
+}
+
+model KnowledgePurchaseRule {
+  id                String           @id @default(cuid())
+  documentId        String
+  document          ProfileDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  productId         String?
+  product           DigitalProduct?  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  serviceOfferingId String?
+  serviceOffering   ServiceOffering? @relation(fields: [serviceOfferingId], references: [id], onDelete: Cascade)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([documentId, productId])
+  @@unique([documentId, serviceOfferingId])
+}
+
+model KnowledgePaymentProof {
+  id                String   @id @default(cuid())
+  stripeAccountId   String   @default("platform")
+  checkoutSessionId String
+  paymentIntentId   String
+  profileId         String
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  itemType          String
+  itemId            String
+  buyerEmail        String
+  createdAt         DateTime @default(now())
+
+  @@unique([stripeAccountId, checkoutSessionId])
+  @@index([stripeAccountId, paymentIntentId])
+  @@index([profileId, buyerEmail])
+}
+
+model KnowledgePaymentBlock {
+  id              String   @id @default(cuid())
+  stripeAccountId String
+  paymentIntentId String
+  reason          String
+  createdAt       DateTime @default(now())
+
+  @@unique([stripeAccountId, paymentIntentId])
+}
+
+model KnowledgeGapSignal {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  messageId String   @unique
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  question  String
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId, status, createdAt])
 }
 
 model BillingLedgerEntry {
@@ -1385,6 +1530,7 @@ model BillingLedgerEntry {
   grantId       String?
   metadata      Json?
   createdAt     DateTime @default(now())
+
   @@index([accountId, createdAt])
 }
 
@@ -1405,6 +1551,7 @@ model BillingStorageObject {
   path      String @unique
   bytes     BigInt
   createdAt DateTime @default(now())
+
   @@index([accountId])
 }
 
@@ -1426,6 +1573,7 @@ model BillingCheckout {
   expiresAt       DateTime
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
   @@index([accountId, status])
 }
 
@@ -1441,6 +1589,7 @@ model BillingProviderEvent {
   leaseUntil     DateTime?
   createdAt      DateTime @default(now())
   processedAt    DateTime?
+
   @@index([status, createdAt])
 }
 
@@ -1457,6 +1606,7 @@ model PlatformInvoice {
   periodStart           DateTime?
   periodEnd             DateTime?
   createdAt             DateTime @default(now())
+
   @@index([accountId, createdAt])
 }
 
@@ -1467,6 +1617,7 @@ model BillingAuditEvent {
   kind      String
   metadata  Json?
   createdAt DateTime @default(now())
+
   @@index([accountId, createdAt])
 }
 

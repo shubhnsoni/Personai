@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import { animate, motion, useMotionTemplate, useMotionValue } from "framer-motion"
 import Link from "@/components/navigation/transition-link"
 import { useSearchParams } from "next/navigation"
@@ -72,6 +72,7 @@ interface ProfileViewProps {
             kind?: string | null
             covers?: number | null
         }>
+        knowledgeGapTracking?: boolean
         whatsapp?: string | null
         upiId?: string | null
         gstin?: string | null
@@ -125,13 +126,14 @@ interface ProfileViewProps {
     }
     animationConfig: PublicAnimationConfig
     colors: string[]
+    expertiseLinks?: ReactNode
 }
 
 type ContentType = "about" | "experience" | "projects" | "services" | "products" | "courses" | "events" | "communities" | null
 
 type ChipDef = ChatChip & { available: boolean }
 
-export function ProfileView({ profile, animationConfig, colors }: ProfileViewProps) {
+export function ProfileView({ profile, animationConfig, colors, expertiseLinks }: ProfileViewProps) {
     const [activeContent, setActiveContent] = useState<ContentType>(null)
     const [isBookingOpen, setIsBookingOpen] = useState(false)
     const [selectedService, setSelectedService] = useState<string | null>(null)
@@ -275,13 +277,18 @@ export function ProfileView({ profile, animationConfig, colors }: ProfileViewPro
                         topics={welcomeTopics(profile)}
                         onIntroStage={setIntroStage}
                         headerActions={<ModeToggle />}
-                        contactLinks={(profile.whatsapp || hasSocials(socials)) ? (
-                            <ProfileContactRow
-                                name={profile.displayName}
-                                whatsapp={profile.whatsapp}
-                                socials={socials}
-                                onWhatsApp={() => track(profile.slug, "wa_tap")}
-                            />
+                        contactLinks={(profile.whatsapp || hasSocials(socials) || expertiseLinks) ? (
+                            <>
+                                {(profile.whatsapp || hasSocials(socials)) ? (
+                                    <ProfileContactRow
+                                        name={profile.displayName}
+                                        whatsapp={profile.whatsapp}
+                                        socials={socials}
+                                        onWhatsApp={() => track(profile.slug, "wa_tap")}
+                                    />
+                                ) : null}
+                                {expertiseLinks}
+                            </>
                         ) : undefined}
                     />
                 </div>

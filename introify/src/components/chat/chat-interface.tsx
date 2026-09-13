@@ -53,6 +53,7 @@ interface ChatInterfaceProps {
         imageUrl?: string | null
         chatAvatarMode?: string | null
         autoMemoryEnabled?: boolean
+        knowledgeGapTracking?: boolean
         roleTemplate?: string | null
     }
     welcome?: ReactNode
@@ -85,6 +86,7 @@ export function ChatInterface({
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState("")
     const [memoryConsent, setMemoryConsent] = useState(false)
+    const [knowledgeGapConsent, setKnowledgeGapConsent] = useState(false)
     const [inputFocused, setInputFocused] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [conversationId, setConversationId] = useState<string | null>(null)
@@ -225,6 +227,7 @@ export function ChatInterface({
                     messages: newMessages.slice(-10).map(m => ({ role: m.role, content: m.content.slice(0, 2000) })),
                     requestId: userMessage.id,
                     memoryConsent,
+                    knowledgeGapConsent,
                     profileId: profile.id,
                     conversationId: openId,
                     visitorId
@@ -333,7 +336,7 @@ export function ChatInterface({
             window.clearTimeout(timeout)
             setIsLoading(false)
         }
-    }, [messages, profile.id, conversationId, visitorId, isLoading, chatMode, memoryConsent])
+    }, [messages, profile.id, conversationId, visitorId, isLoading, chatMode, memoryConsent, knowledgeGapConsent])
 
     const goToChatHome = () => {
         abortControllerRef.current?.abort()
@@ -770,6 +773,12 @@ export function ChatInterface({
                         <label className="mb-2 flex items-start gap-2 text-xs text-profile-mute">
                             <input type="checkbox" checked={memoryConsent} onChange={event => setMemoryConsent(event.target.checked)} className="mt-0.5" />
                             <span>Allow private notes for this conversation. Your choice applies to the next reply; unchecking deletes its saved notes then.</span>
+                        </label>
+                    )}
+                    {profile.knowledgeGapTracking && (
+                        <label className="mb-2 flex items-start gap-2 text-xs text-profile-mute">
+                            <input type="checkbox" checked={knowledgeGapConsent} onChange={event => setKnowledgeGapConsent(event.target.checked)} className="mt-0.5" />
+                            <span>Share unanswered questions with this profile owner to improve their knowledge.</span>
                         </label>
                     )}
                     <form

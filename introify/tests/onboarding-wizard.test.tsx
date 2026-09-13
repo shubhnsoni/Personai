@@ -20,8 +20,14 @@ vi.mock("@clerk/nextjs", () => ({
 }))
 
 vi.mock("@/app/actions/onboarding", () => ({
-    createProfile: vi.fn(),
+    createProfile: vi.fn(async () => ({ slug: "ada", next: "/dashboard" })),
     checkUsername: vi.fn(async (value: string) => ({ ok: true, slug: value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") })),
+}))
+
+const importMocks = vi.hoisted(() => ({ generate: vi.fn(), apply: vi.fn() }))
+vi.mock("@/app/actions/profile-import", () => ({
+    generateProfileImport: importMocks.generate,
+    applyProfileImport: importMocks.apply,
 }))
 
 vi.mock("@/components/welcome-orb", () => ({ WelcomeOrb: () => <div data-testid="orb" /> }))
@@ -152,7 +158,9 @@ describe("v4 onboarding chat", () => {
         expect(screen.getByLabelText("Glow")).toBeTruthy()
         fireEvent.click(screen.getByLabelText("Blob"))
         fireEvent.click(screen.getByLabelText("8-Bit, premium"))
-        expect(toast.message).toHaveBeenCalledWith("This is a premium bot")
+        expect(screen.getByRole("dialog")).toBeTruthy()
+        expect(toast.message).not.toHaveBeenCalledWith("This is a premium bot")
+        fireEvent.keyDown(document.activeElement || document.body, { key: "Escape" })
         fireEvent.click(screen.getByText("Happy"))
         fireEvent.click(screen.getByText(COPY.look.continue))
         expect(screen.getByText(COPY.ready.h)).toBeTruthy()
@@ -161,5 +169,57 @@ describe("v4 onboarding chat", () => {
         expect(screen.getByText("Keep modifying")).toBeTruthy()
         fireEvent.click(screen.getByText("Keep modifying"))
         expect(screen.getByText(COPY.look.h)).toBeTruthy()
+    })
+
+    it("offers profile import on the name beat and keeps the manual route", async () => {
+        start()
+        fireEvent.click(screen.getByText("Import my profile"))
+        expect(screen.getByLabelText("Profile links")).toBeTruthy()
+        expect(screen.getByLabelText("Pasted page text")).toBeTruthy()
+        expect(screen.getByText(/10 credits/)).toBeTruthy()
+        fireEvent.click(screen.getByText("Cancel"))
+        expect(screen.getByPlaceholderText(COPY.name.placeholder)).toBeTruthy()
+    })
+
+    it("runs an imported draft through username checks and creates atomically at Ready", async () => {
+        const { createProfile } = await import("@/app/actions/onboarding")
+        const draft = {
+            version: 1 as const,
+            profile: { displayName: "Ada Lovelace", headline: "Engineer", bio: "Imported bio.", welcome: "Hi", sourceIds: ["s1"] },
+            needId: "time" as const, addons: ["services" as const], socials: [],
+            experiences: [], projects: [],
+            services: [{ title: "Call", description: "d", durationMinutes: 30, price: null, currency: "USD" as const, basis: "suggested" as const, sourceIds: ["s1"] }],
+            products: [], knowledge: [], introductions: [], frameworks: [], missingInformation: [],
+        }
+        importMocks.generate.mockResolvedValue({
+            id: "job-9", status: "READY", draft,
+            sources: [{ id: "s1", label: "ada.dev", url: "https://ada.dev/", status: "read", discoveredFrom: null, warning: null }],
+            warnings: [], appliedProfileId: null, slug: null,
+        })
+        start()
+        fireEvent.click(screen.getByText("Import my profile"))
+        fireEvent.change(screen.getByLabelText("Pasted page text"), { target: { value: "ada evidence" } })
+        fireEvent.click(screen.getByText("These are my profiles or I have permission to import them."))
+        fireEvent.click(screen.getByRole("button", { name: /Generate full profile/ }))
+        await waitFor(() => expect(screen.getByRole("button", { name: "Use this draft" })).toBeTruthy())
+        expect(createProfile).not.toHaveBeenCalled()
+        expect(importMocks.apply).not.toHaveBeenCalled()
+        fireEvent.click(screen.getByRole("button", { name: "Use this draft" }))
+        expect(screen.getByText(COPY.username.h)).toBeTruthy()
+        expect(screen.getByDisplayValue("ada-lovelace")).toBeTruthy()
+        fireEvent.click(screen.getByLabelText("Send"))
+        await waitFor(() => expect(screen.getByText(COPY.features.h)).toBeTruthy())
+        fireEvent.click(screen.getByText(COPY.features.confirm))
+        await waitFor(() => expect(screen.getByText(COPY.look.h)).toBeTruthy())
+        fireEvent.click(screen.getByText(COPY.look.continue))
+        fireEvent.click(screen.getByText("Save and go to dashboard"))
+        await waitFor(() => expect(createProfile).toHaveBeenCalledWith(expect.objectContaining({
+            displayName: "Ada Lovelace",
+            headline: "Engineer",
+            bio: "Imported bio.",
+            needId: "time",
+            importDraft: { id: "job-9", draft: expect.objectContaining({ version: 1 }) },
+        })))
+        expect(importMocks.apply).not.toHaveBeenCalled()
     })
 })

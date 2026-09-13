@@ -1,6 +1,7 @@
 import Stripe from 'stripe'
 import { getUncachableStripeClient, requireStripeWebhookSecret } from './stripe'
 import { prisma } from './prisma'
+import { recordKnowledgePaymentEvent } from './knowledge-payments'
 
 export class WebhookHandlers {
     static async processWebhook(payload: Buffer, signature: string, _uuid?: string): Promise<void> {
@@ -8,6 +9,10 @@ export class WebhookHandlers {
 
         const stripe = await getUncachableStripeClient()
         const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret)
+
+        await recordKnowledgePaymentEvent(event).catch((error) => {
+            console.error("[Stripe] knowledge payment proof failed", error)
+        })
 
         switch (event.type) {
             case 'checkout.session.completed': {

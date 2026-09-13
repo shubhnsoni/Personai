@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import type { Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 import { extrasFromAddons, needById, type AddonId, type NeedId } from "@/lib/onboarding-needs"
@@ -12,9 +13,12 @@ import { ensureDefaultBillingAccount, withAccountLimit, assertAccountLimit } fro
 import { ACTIVE_PROFILE_COOKIE } from "@/lib/try-kits"
 import { requireAuthenticatedUser, unwrapOwnershipResult } from "@/lib/security"
 import { normalizeUsername, usernameError } from "@/lib/username"
+import { profileBlueprintSchema, type ProfileBlueprint } from "@/lib/profile-import-contract"
+import { applyProfileBlueprintTx } from "@/lib/profile-import-apply"
 
 export interface CreateProfileData {
     billingAccountId?: string
+    importDraft?: { id: string; draft: ProfileBlueprint }
     displayName: string
     headline?: string
     bio?: string
@@ -92,7 +96,28 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
         ? await prisma.billingAccount.findUnique({ where: { id: data.billingAccountId } })
         : await ensureDefaultBillingAccount(actor.userId)
     if (!account || account.ownerUserId !== actor.userId) throw new Error("Only the billing account owner can add a business.")
-    const displayName = data.displayName.trim()
+
+    let importJob: { id: string; status: string; appliedSlug: string | null; appliedProfileId: string | null } | null = null
+    let importBlueprint: ProfileBlueprint | null = null
+    if (data.importDraft) {
+        importBlueprint = profileBlueprintSchema.parse(data.importDraft.draft)
+        const job = await prisma.profileImportJob.findUnique({ where: { id: data.importDraft.id } })
+        if (!job || job.ownerUserId !== actor.userId || job.billingAccountId !== account.id || job.targetProfileId !== null) throw new Error("Import not found.")
+        if (job.expiresAt < new Date()) throw new Error("That import expired. Generate a new one.")
+        if (job.status === "APPLIED" && job.appliedSlug && job.appliedProfileId) {
+            const applied = await prisma.profile.findFirst({ where: { id: job.appliedProfileId, userId: actor.userId }, select: { id: true, slug: true } })
+            if (!applied) throw new Error("The previously imported profile is no longer available.")
+            if (data.activate) {
+                const jar = await cookies()
+                jar.set(ACTIVE_PROFILE_COOKIE, applied.id, { path: "/", sameSite: "lax", httpOnly: true })
+            }
+            const need = needById(importBlueprint.needId)
+            return { slug: applied.slug, next: need.next }
+        }
+        if (job.status !== "READY") throw new Error("That import is not ready to apply.")
+        importJob = job
+    }
+    const displayName = (importBlueprint?.profile.displayName || data.displayName).trim()
     if (!displayName) throw new TypeError("Profile display name is required")
 
     const wanted = data.username ? normalizeUsername(data.username) : ""
@@ -104,8 +129,13 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             return wanted
         })()
         : await availableBusinessSlug(displayName)
-    const extras = extrasFromAddons(data.roleTemplate, data.addons || [])
-    const defaultService = DEFAULT_SERVICE_BY_ROLE[data.roleTemplate]
+
+    const effectiveNeed = importBlueprint ? needById(importBlueprint.needId) : needById(data.needId)
+    const roleTemplate = importBlueprint ? effectiveNeed.role : data.roleTemplate
+    const primaryGoal = importBlueprint ? effectiveNeed.goal : data.primaryGoal
+    const addons = importBlueprint ? importBlueprint.addons : (data.addons || [])
+    const extras = extrasFromAddons(roleTemplate, addons as AddonId[])
+    const defaultService = importJob ? undefined : DEFAULT_SERVICE_BY_ROLE[roleTemplate]
     let personality = writeExtras(data.personalityConfig || null, extras)
     try {
         const bag = JSON.parse(personality) as Record<string, unknown>
@@ -119,7 +149,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
         if (data.email?.trim()) bag.contactEmail = data.email.trim()
         personality = JSON.stringify(bag)
     } catch { /* keep extras-only bag */ }
-    if (data.goldCity?.trim() && data.roleTemplate === "JEWELRY_WHOLESALE") {
+    if (data.goldCity?.trim() && roleTemplate === "JEWELRY_WHOLESALE") {
         const city = displayCity(data.goldCity)
         personality = writeGoldBoard(personality, {
             city,
@@ -130,19 +160,40 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             lastCheckedAt: new Date().toISOString(),
         })
     }
-    const profile = await withAccountLimit(account.id, "businesses", 1, async (tx) => {
-        const hasDefaultOffering = Boolean(defaultService || data.roleTemplate === "RESTAURANT" || data.addons?.includes("services"))
+    const profile = await withAccountLimit(account.id, "businesses", async tx => {
+        if (!importJob) return 1
+        const current = await tx.profileImportJob.findUnique({ where: { id: importJob.id }, select: { status: true } })
+        return current?.status === "APPLIED" ? 0 : 1
+    }, async (tx) => {
+        if (importJob) {
+            const claim = await tx.profileImportJob.updateMany({ where: { id: importJob.id, status: "READY", expiresAt: { gt: new Date() } }, data: { status: "APPLIED" } })
+            if (!claim.count) {
+                const current = await tx.profileImportJob.findUniqueOrThrow({ where: { id: importJob.id } })
+                if (current.status === "APPLIED" && current.appliedProfileId && current.appliedSlug) return { id: current.appliedProfileId, slug: current.appliedSlug }
+                if (current.expiresAt < new Date()) throw new Error("That import expired. Generate a new one.")
+                throw new Error("That import is already being applied.")
+            }
+        }
+
+        const hasDefaultOffering = !importJob && Boolean(defaultService || roleTemplate === "RESTAURANT" || addons.includes("services"))
         if (hasDefaultOffering) await assertAccountLimit(tx, account.id, "offerings", 1)
+        if (wanted && (await tx.profile.findUnique({ where: { slug }, select: { id: true } }))) {
+            if (importJob) {
+                const current = await tx.profileImportJob.findUniqueOrThrow({ where: { id: importJob.id } })
+                if (current.status === "APPLIED" && current.appliedProfileId && current.appliedSlug) return { id: current.appliedProfileId, slug: current.appliedSlug }
+            }
+            throw new TypeError("That username is taken")
+        }
         const created = await tx.profile.create({
             data: {
                 userId: actor.userId,
                 billingAccountId: account.id,
                 slug,
                 displayName,
-                headline: data.headline,
-                bio: data.bio,
-                roleTemplate: data.roleTemplate,
-                primaryGoal: data.primaryGoal,
+                headline: importBlueprint ? importBlueprint.profile.headline : data.headline,
+                bio: importBlueprint ? importBlueprint.profile.bio : data.bio,
+                roleTemplate,
+                primaryGoal,
                 language: data.language || "en",
                 timezone: data.timezone || "UTC",
                 animationStyleId: data.animationStyleId || null,
@@ -171,7 +222,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             },
         })
 
-        if (data.roleTemplate === "RESTAURANT") {
+        if (!importJob && roleTemplate === "RESTAURANT") {
             await tx.serviceOffering.create({
                 data: {
                     profileId: created.id,
@@ -197,7 +248,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             })
         }
 
-        if (defaultService) {
+        if (!importJob && defaultService) {
             await tx.serviceOffering.create({
                 data: {
                     profileId: created.id,
@@ -222,7 +273,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             })
         }
 
-        if (data.addons?.includes("services") && !defaultService && data.roleTemplate !== "RESTAURANT") {
+        if (!importJob && addons.includes("services") && !defaultService && roleTemplate !== "RESTAURANT") {
             await tx.serviceOffering.create({
                 data: {
                     profileId: created.id,
@@ -238,20 +289,23 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             })
         }
 
+        if (importJob && importBlueprint) {
+            await applyProfileBlueprintTx(tx, { ...created, billingAccountId: account.id }, importBlueprint, { overwriteProfile: false, applyFeatures: true })
+            await tx.profileImportJob.update({ where: { id: importJob.id }, data: { draft: importBlueprint as unknown as Prisma.InputJsonValue, appliedProfileId: created.id, appliedSlug: created.slug } })
+        }
+
         return created
     })
 
-
-    revalidatePath("/dashboard")
     if (data.activate) {
         const jar = await cookies()
         jar.set(ACTIVE_PROFILE_COOKIE, profile.id, { path: "/", sameSite: "lax", httpOnly: true })
     }
-    const need = needById(data.needId)
-    const next = data.needId ? need.next : (
-        data.roleTemplate === "DISTRIBUTOR" ? "/dashboard/orders" : data.roleTemplate === "RESTAURANT" || data.roleTemplate === "SHOP" || data.roleTemplate === "JEWELRY_RETAIL" || data.roleTemplate === "JEWELRY_WHOLESALE" || data.roleTemplate === "PHARMACY" || data.roleTemplate === "AUTO_PARTS" ? "/dashboard/products"
-        : data.roleTemplate === "CONSULTANT" || data.roleTemplate === "CA" ? "/dashboard/services"
-        : data.roleTemplate === "COACH" ? "/dashboard/courses"
+    revalidatePath("/dashboard")
+    const next = data.needId || importBlueprint ? effectiveNeed.next : (
+        roleTemplate === "DISTRIBUTOR" ? "/dashboard/orders" : roleTemplate === "RESTAURANT" || roleTemplate === "SHOP" || roleTemplate === "JEWELRY_RETAIL" || roleTemplate === "JEWELRY_WHOLESALE" || roleTemplate === "PHARMACY" || roleTemplate === "AUTO_PARTS" ? "/dashboard/products"
+        : roleTemplate === "CONSULTANT" || roleTemplate === "CA" ? "/dashboard/services"
+        : roleTemplate === "COACH" ? "/dashboard/courses"
         : "/dashboard"
     )
     return { slug: profile.slug, next }

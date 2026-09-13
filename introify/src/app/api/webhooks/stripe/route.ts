@@ -49,6 +49,11 @@ export async function POST(req: Request) {
     const { stampStripeWebhook } = await import("@/lib/admin/capacity")
     await stampStripeWebhook()
 
+    const { recordKnowledgePaymentEvent } = await import("@/lib/knowledge-payments")
+    await recordKnowledgePaymentEvent(event).catch((error) => {
+        console.error("[Stripe] knowledge payment proof failed", error)
+    })
+
     if (event.type === "checkout.session.completed") {
         const session = event.data.object as Stripe.Checkout.Session
         const metadata = session.metadata
