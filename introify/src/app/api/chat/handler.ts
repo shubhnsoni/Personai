@@ -37,8 +37,8 @@ const VISITOR_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
 export function chatProviderTimeoutMs() {
     const n = Number(process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS)
     if (Number.isFinite(n) && n >= 20 && n < 1_000) return n
-    if (Number.isFinite(n) && n >= 1_000) return Math.min(n, 5_000)
-    return 5_000
+    if (Number.isFinite(n) && n >= 1_000) return Math.min(n, 40_000)
+    return 40_000
 }
 
 function raceWithTimeout<T>(work: Promise<T>, ms: number, signal: AbortSignal): Promise<T> {

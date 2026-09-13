@@ -123,7 +123,7 @@ describe("metered public chat", () => {
 
     it("finishes the provider wait inside the hosting proxy window", () => {
         delete process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS
-        expect(chatProviderTimeoutMs()).toBe(5_000)
+        expect(chatProviderTimeoutMs()).toBe(40_000)
     })
 
     it("requires a client id before any reservation", async () => {
