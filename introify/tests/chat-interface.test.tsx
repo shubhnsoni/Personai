@@ -398,7 +398,7 @@ describe("ChatInterface - pending copy and home", () => {
             fireEvent.change(field, { target: { value: "Hello there" } })
             fireEvent.submit(field.closest("form")!)
         })
-        expect(document.body.textContent).toMatch(/thinking/)
+        expect(document.body.textContent).toMatch(/Parsing context/)
         expect(document.querySelector("[data-pending-status]")).toBeTruthy()
     })
 

@@ -578,3 +578,32 @@ iframe[title="Clerk Keyless Prompt"],
 @media (prefers-reduced-motion: reduce) {
   .gold-tape-track { animation: none; }
 }
+
+@keyframes chat-pending-shine {
+  0% { background-position: 120% 0; }
+  100% { background-position: -40% 0; }
+}
+
+.chat-pending-shine {
+  background-image: linear-gradient(
+    105deg,
+    currentColor 0%,
+    currentColor 42%,
+    color-mix(in oklab, currentColor 38%, white) 50%,
+    currentColor 58%,
+    currentColor 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: chat-pending-shine 3.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-pending-shine {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: inherit;
+  }
+}

@@ -46,6 +46,38 @@ beforeEach(() => {
 })
 
 describe("metered public chat", () => {
+    it("streams the first token before the provider finishes", async () => {
+        let resume!: () => void
+        const hold = new Promise<void>(resolve => { resume = resolve })
+        complete.mockResolvedValue({ async *[Symbol.asyncIterator]() {
+            yield chunk({ content: "Hello" })
+            await hold
+            yield chunk({ content: " there" })
+            yield chunk({}, true)
+        } })
+        const response = await handler()(request())
+        expect(response.status).toBe(200)
+        const reader = response.body!.getReader()
+        const decoder = new TextDecoder()
+        let first = ""
+        while (!first.includes("Hello")) {
+            const { done, value } = await reader.read()
+            if (done) break
+            first += decoder.decode(value, { stream: true })
+        }
+        expect(first).toContain("Hello")
+        expect(first).not.toContain(" there")
+        resume()
+        let rest = first
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            rest += decoder.decode(value, { stream: true })
+        }
+        expect(rest).toContain("Hello")
+        expect(rest).toContain(" there")
+    })
+
     it("cancels provider work on disconnect and does not execute a pending business tool", async () => {
         process.env.INTROIFY_CHAT_PROVIDER_TIMEOUT_MS = "40"
         let release!: () => void

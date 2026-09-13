@@ -87,6 +87,25 @@ describe("explicit Codex production provider", () => {
         expect(text).toBe("From grok")
         expect(mocks.stream).toHaveBeenCalledOnce()
     })
+    it("starts yielding Codex tokens before the stream completes", async () => {
+        let resume!: () => void
+        const hold = new Promise<void>(resolve => { resume = resolve })
+        mocks.stream.mockResolvedValue({ async *[Symbol.asyncIterator]() {
+            yield { choices: [{ delta: { content: "Hello" } }] }
+            await hold
+            yield { choices: [{ delta: { content: " there" } }] }
+        } })
+        const recipe = resolveApiRecipe("fast")!
+        const stream = await streamChatWithFailover(boundedChatInput(recipe, "Facts", [{ role: "user", content: "Hello" }], []), recipe)
+        const iterator = stream[Symbol.asyncIterator]()
+        const first = await iterator.next()
+        expect(first.value?.choices[0]?.delta?.content).toBe("Hello")
+        resume()
+        const second = await iterator.next()
+        expect(second.value?.choices[0]?.delta?.content).toBe(" there")
+        await iterator.next()
+    })
+
     it("answers on xAI when Codex returns no tokens", async () => {
         mocks.stream.mockResolvedValue({ async *[Symbol.asyncIterator]() { /* empty */ } })
         vi.stubEnv("XAI_API_KEY", "xai-live-key-abcdefgh")

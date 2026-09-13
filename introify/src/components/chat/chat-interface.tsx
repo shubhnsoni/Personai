@@ -1125,16 +1125,28 @@ function AskAboutLine({ welcome, topics = [] }: { welcome?: string | null; topic
 }
 
 function PendingStatus({ name }: { name: string }) {
+    const reduce = useReducedMotionPreference()
     const [elapsed, setElapsed] = useState(0)
     useEffect(() => {
         const started = Date.now()
         const id = window.setInterval(() => setElapsed(Date.now() - started), ASSISTANT_PENDING_DWELL_MS)
         return () => window.clearInterval(id)
     }, [])
+    const phrase = assistantPendingPhrase(name, elapsed)
     return (
-        <span data-pending-status className="px-1 text-sm font-medium text-profile-mute transition-opacity duration-700" aria-live="polite">
-            {assistantPendingPhrase(name, elapsed)}
-            <span className="inline-block w-[1.1em] animate-pulse">…</span>
+        <span data-pending-status className="relative block min-h-[1.15em] overflow-hidden px-1 text-[11px] font-medium tracking-wide text-profile-mute" aria-live="polite">
+            <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                    key={phrase}
+                    className={cn("inline-block", reduce ? undefined : "chat-pending-shine")}
+                    initial={reduce ? false : { opacity: 0, y: 8, filter: "blur(5px)" }}
+                    animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
+                    exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, filter: "blur(5px)" }}
+                    transition={{ duration: reduce ? 0 : 0.55, ease: [0.22, 1, 0.36, 1] }}
+                >
+                    {phrase}
+                </motion.span>
+            </AnimatePresence>
         </span>
     )
 }

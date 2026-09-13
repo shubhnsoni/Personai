@@ -156,23 +156,50 @@ async function dispatchChatStream(
     return apiClient(recipe).chat.completions.create(input, { signal })
 }
 
+function chunkIsUseful(chunk: OpenAI.Chat.Completions.ChatCompletionChunk): boolean {
+    const delta = chunk.choices[0]?.delta
+    return Boolean(delta?.content || (delta?.tool_calls && delta.tool_calls.length > 0))
+}
+
 async function collectUsefulStream(
     stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> | undefined,
 ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
     if (!stream || typeof (stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>)[Symbol.asyncIterator] !== "function") {
         throw Object.assign(new Error("empty_completed_response"), { status: 503 })
     }
-    const chunks: OpenAI.Chat.Completions.ChatCompletionChunk[] = []
+    const iterator = stream[Symbol.asyncIterator]()
+    const prelude: OpenAI.Chat.Completions.ChatCompletionChunk[] = []
     let useful = false
-    for await (const chunk of stream) {
-        chunks.push(chunk)
-        const delta = chunk.choices[0]?.delta
-        if (delta?.content || (delta?.tool_calls && delta.tool_calls.length > 0)) useful = true
+    try {
+        while (true) {
+            const { done, value } = await iterator.next()
+            if (done) break
+            prelude.push(value)
+            if (chunkIsUseful(value)) {
+                useful = true
+                break
+            }
+        }
+    } catch (error) {
+        await iterator.return?.().catch(() => {})
+        throw error
     }
-    if (!useful) throw Object.assign(new Error("empty_completed_response"), { status: 503 })
+    if (!useful) {
+        await iterator.return?.().catch(() => {})
+        throw Object.assign(new Error("empty_completed_response"), { status: 503 })
+    }
     return {
         async *[Symbol.asyncIterator]() {
-            for (const chunk of chunks) yield chunk
+            try {
+                for (const chunk of prelude) yield chunk
+                while (true) {
+                    const { done, value } = await iterator.next()
+                    if (done) break
+                    yield value
+                }
+            } finally {
+                await iterator.return?.().catch(() => {})
+            }
         },
     }
 }
