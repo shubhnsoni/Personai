@@ -74,6 +74,30 @@ export function mapChatToolsToCodex(tools: ChatParams["tools"]) {
     })
 }
 
+function deltaText(value: unknown): string {
+    if (typeof value === "string") return value
+    if (value && typeof value === "object" && "text" in value && typeof (value as { text?: unknown }).text === "string") {
+        return (value as { text: string }).text
+    }
+    return ""
+}
+
+function textFromItem(item: Record<string, unknown> | null): string {
+    if (!item) return ""
+    if (typeof item.text === "string") return item.text
+    const content = item.content
+    if (typeof content === "string") return content
+    if (!Array.isArray(content)) return ""
+    return content.map((part) => {
+        if (typeof part === "string") return part
+        if (part && typeof part === "object") {
+            const rec = part as Record<string, unknown>
+            if (typeof rec.text === "string") return rec.text
+        }
+        return ""
+    }).join("")
+}
+
 function textOf(content: unknown): string {
     if (typeof content === "string") return content
     if (Array.isArray(content)) {
@@ -111,17 +135,16 @@ function headersFor(credentials: CodexCredentials) {
 export async function streamCodexChat(input: ChatParams, options: { signal?: AbortSignal } = {}): Promise<AsyncIterable<ChatChunk>> {
     const model = (typeof input.model === "string" && input.model.trim()) || DEFAULT_CODEX_MODEL
     const mapped = mapChatMessagesToCodex(input.messages)
+    const tools = mapChatToolsToCodex(input.tools)
     const payload = {
         model,
         instructions: mapped.instructions,
         input: mapped.input,
-        tools: mapChatToolsToCodex(input.tools),
-        tool_choice: "auto",
-        parallel_tool_calls: false,
         store: false,
         stream: true,
         include: ["reasoning.encrypted_content"],
         reasoning: { effort: "low" },
+        ...(tools.length ? { tools, tool_choice: "auto" as const, parallel_tool_calls: false } : {}),
     }
 
     // This subscription endpoint does not accept max_output_tokens. Bound wall time
@@ -210,11 +233,23 @@ async function* parseCodexSse(body: ReadableStream<Uint8Array>, model: string, o
                         ? "Codex chat ended before completing a response."
                         : "Codex chat could not complete the response.")
                 }
-                if (type === "response.output_text.delta") {
-                    const delta = String(event.delta || "")
+                if (type === "response.output_text.delta" || type === "response.content_part.delta") {
+                    const delta = deltaText(event.delta)
                     deliveredBytes += Buffer.byteLength(delta)
                     if (deliveredBytes > outputBytes) throw new CodexAuthError("Codex reply exceeded the response limit.")
                     if (delta) yield chunk(model, { content: delta })
+                    continue
+                }
+                if (type === "response.output_item.done") {
+                    const item = event.item && typeof event.item === "object" ? event.item as Record<string, unknown> : null
+                    if (item?.type === "message" || item?.type === "output_text") {
+                        const text = textFromItem(item)
+                        if (text && deliveredBytes === 0) {
+                            deliveredBytes += Buffer.byteLength(text)
+                            if (deliveredBytes > outputBytes) throw new CodexAuthError("Codex reply exceeded the response limit.")
+                            yield chunk(model, { content: text })
+                        }
+                    }
                     continue
                 }
                 if (type === "response.output_item.added") {

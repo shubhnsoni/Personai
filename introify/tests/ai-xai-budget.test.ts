@@ -28,6 +28,8 @@ describe("xAI total generation budget", () => {
     })
     it("forwards only local function definitions and never provider-hosted search tools", async () => {
         const recipe = resolveApiRecipe("fast")!
+        const hello = boundedChatInput(recipe, "Facts", [{ role: "user", content: "Hi" }], [{ type: "function", function: { name: "collectLead", parameters: { type: "object", properties: {} } } }])
+        expect(hello.tools).toBeUndefined()
         const bounded = boundedChatInput(recipe, "Facts", [{ role: "user", content: "show menu" }], [{ type: "function", function: { name: "showMenu", parameters: { type: "object", properties: {} } } }])
         await boundedXaiChatStream(bounded, recipe)
         expect(mocks.chat.mock.calls[0][0].tools).toEqual([{ type: "function", function: { name: "showMenu", parameters: { type: "object", properties: {} } } }])

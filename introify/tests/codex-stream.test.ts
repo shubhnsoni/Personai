@@ -117,4 +117,11 @@ describe("Codex stream completion status", () => {
         ])
         await expect(readReply()).resolves.toBe("pong")
     })
+    it("reads message text from output_item.done when deltas are missing", async () => {
+        mockEvents([
+            { type: "response.output_item.done", item: { type: "message", content: [{ type: "output_text", text: "Bengaluru" }] } },
+            { type: "response.completed" },
+        ])
+        await expect(readReply()).resolves.toBe("Bengaluru")
+    })
 })

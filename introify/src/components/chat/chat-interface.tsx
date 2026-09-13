@@ -194,7 +194,7 @@ export function ChatInterface({
         const timeout = window.setTimeout(() => {
             timedOut = true
             abort.abort()
-        }, 22_000)
+        }, 45_000)
 
         const userMessage: ChatMessage = {
             id: crypto.randomUUID(),

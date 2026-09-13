@@ -14,6 +14,7 @@ import { resolveKitRole } from "@/lib/role-alias"
 import { createOwnershipFoundation, ownershipRefusalResponse } from "@/lib/security"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { boundedChatInput, clipUtf8, resolveApiRecipe, streamChatWithFailover, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
+import { guestDeskReply } from "@/lib/chat-fallback"
 import { AiAccessError, prepareAiUsage, finishAiUsage, providerRejectedWithoutSpend, type AiReservation } from "@/lib/ai-usage"
 import {
     CONVERSATION_CAPABILITY_TTL_SECONDS,
@@ -814,10 +815,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
 
     function groundedFallback() {
         if (restaurantDesk) return restaurantDeskReply(query)
-        const headline = typeof profileData.headline === "string" && profileData.headline.trim() ? profileData.headline.trim() : ""
-        return headline
-            ? `${profileData.displayName} — ${headline}. Ask about their work, or share your name and email to get in touch.`
-            : `This is ${profileData.displayName}'s page. Ask about their work, or share your name and email to start a conversation.`
+        return guestDeskReply(query, profileData)
     }
 
     if (!providerConfigured()) {
