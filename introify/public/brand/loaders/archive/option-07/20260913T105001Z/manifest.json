@@ -1,0 +1,40 @@
+{
+  "option": 7,
+  "name": "Grounded orbit",
+  "status": "archived",
+  "designRevision": 8,
+  "savedAt": "20260913T105001Z",
+  "geometry": {
+    "sourceOption": 4,
+    "sourceSha256": "e2b441593e9b484a02124245789baf9a5897f1c65c515fab9d2f1767060fd83b",
+    "duration": 2.8,
+    "iconScale": 2,
+    "iconPivot": {
+      "x": 88,
+      "y": 90
+    },
+    "contact": {
+      "frame": 55,
+      "seconds": 1.2833333333333332,
+      "x": 35.471999999999994,
+      "y": 179.154
+    },
+    "ring": {
+      "cx": 35.471999999999994,
+      "cy": 197.154,
+      "rx": 58,
+      "ry": 18
+    },
+    "clock": "single-svg-smil"
+  },
+  "files": {
+    "build-grounded-loader.py": "04525b783aeca41ae79d90b419b0c8f4d937c257226982d770d08d14451adb7e",
+    "geometry-dark.json": "76352c6259f8a5636c467b73b6928fa89f771a629dac1313808a6719187f61ec",
+    "geometry-light.json": "5eaba0b9df98e255fa5ed703965faf675d5c378160b3cae83bae5ab7f4bc75de",
+    "index.html": "7b14a40893ee26a3912b697cab0248ebf84434db2121c273aae6b6634ba5aa69",
+    "loader-dark-still.svg": "0c65f0c4d16d433fd62ff3e15eee64dc3b74de45fa68b4c8f7c3c39ce79322aa",
+    "loader-dark.svg": "bfe78beb067165532dd2745df5c712c5d185045e9003bb1e86028228254bd6f3",
+    "loader-light-still.svg": "2c0b7145fc9ed5b0aeff7d30df3a12c71452be0d238555a205537f7b7b872e06",
+    "loader-light.svg": "8270154158c76f37aa25d3d91484d13f40df95c88be1f05226fbfaae59cb2cc2"
+  }
+}

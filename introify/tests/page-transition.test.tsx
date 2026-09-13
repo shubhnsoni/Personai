@@ -83,7 +83,7 @@ describe("inter-page transition lifecycle", () => {
         expect(screen.getByRole("status").getAttribute("aria-live")).toBe("polite")
         expect(screen.getByText("Loading page")).toBeTruthy()
         expect(screen.getByRole("status").querySelector(".brand-loading-visual")?.getAttribute("aria-hidden")).toBe("true")
-        expect(document.querySelector("[data-loading-option=\"10\"] .brand-loading-circle-progress")).not.toBeNull()
+        expect(document.querySelector("[data-loading-option=\"6\"] .brand-loading-circle-progress")).not.toBeNull()
         expect(screen.queryByRole("dialog")).toBeNull()
     })
     it("finishes the circular loader immediately on commit and removes it after the short exit", () => {
@@ -301,7 +301,7 @@ describe("inter-page transition lifecycle", () => {
         expect(cancelAnimation).toHaveBeenCalledOnce()
         expect(vi.getTimerCount()).toBe(0)
     })
-    it("uses the locked Option 10 symbol and a circular indicator for streamed loading", () => {
+    it("uses the locked Orbit base with Icon 9 and a circular indicator for streamed loading", () => {
         render(<BrandLoading label="Loading your workspace" compact />)
         const status = screen.getByRole("status")
         expect(status.getAttribute("aria-live")).toBe("polite")
@@ -309,12 +309,12 @@ describe("inter-page transition lifecycle", () => {
         expect(status.querySelector(".brand-loading-visual")?.getAttribute("aria-hidden")).toBe("true")
         expect(status.querySelector(".brand-loading-track, .page-transit-progress")).toBeNull()
         expect(status.querySelector(".brand-loading-circle-progress")).not.toBeNull()
-        expect(status.querySelector('image[href="/brand/main/loading-light.svg"]')).not.toBeNull()
+        expect(status.querySelector('image[href="/brand/loaders/main/icon-light.svg"]')).not.toBeNull()
     })
     it.each([RootLoading, DashboardLoading, AdminLoading, AuthLoading])("uses the same viewport loader size across page boundaries: %s", Loading => {
         const { container } = render(<Loading />)
         expect(container.querySelector('.brand-loading--page')).not.toBeNull()
         expect(container.querySelector('.brand-loading-visual--compact')).toBeNull()
-        expect(container.querySelector('[data-loading-option="10"]')).not.toBeNull()
+        expect(container.querySelector('[data-loading-option="6"]')).not.toBeNull()
     })
 })

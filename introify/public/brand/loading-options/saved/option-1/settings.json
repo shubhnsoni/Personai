@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "option": 1,
+  "name": "Fine sun — Option 9 reference",
+  "design": "sun",
+  "iconOption": 9,
+  "iconSourceHash": "d62af062781286916afb9a6cb32a69b6fc9b4260bb5d90d818b950ed606e3315",
+  "iconDuration": 3.194,
+  "size": 100.8,
+  "scale": 0.7,
+  "placement": "viewport-center",
+  "savedAt": "2026-09-13T10:02:57.810Z",
+  "requestId": "2a5fcfff-a3d5-49f9-85fc-22fea4b926af",
+  "files": {
+    "icon-light.svg": "9c4d9a5ad495dfe5ea3c4318a1640ea02e803e21e8e9d3a1617d5ffa35128b9b",
+    "icon-dark.svg": "b571d869408b0530b9a568dbe6914aeb795da52aa9ce32c4ad812728c3db2cfe"
+  }
+}

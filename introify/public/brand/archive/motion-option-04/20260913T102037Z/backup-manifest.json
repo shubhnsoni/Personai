@@ -1,0 +1,23 @@
+{
+  "option": 4,
+  "name": "Motion Studio \u00b7 Take 1",
+  "status": "archived",
+  "kind": "motion",
+  "path": "/brand/archive/motion-option-04/20260913T102037Z/index.html",
+  "sourcePath": "/brand/motion/options/option-4",
+  "savedAt": "20260913T102037Z",
+  "duration": 2.8,
+  "keyframes": 3,
+  "sourceHash": "a0ebc5d927963dc707619d722acbbc093664792441239f2533f46b1c9163ce50",
+  "files": {
+    "index.html": "1e3561e33b5422ada1485954bb534b7c8f982b85baa910ccfe6ef22a29951026",
+    "introify-logo-dark.svg": "c8a9f7df5d5225b18959717ce0f4dd839155524ce08548faf5a966339a4ec274",
+    "introify-logo-light.svg": "4a2bcf113e430542dc0f5cc294067736b3cf3fd32cfdcec60b64b8bcbb157cea",
+    "introify-symbol-dark.svg": "7375578bca64b4e167c0d165d11cd4382fffe44855f39c2b0610aa20a2a8d525",
+    "introify-symbol-light.svg": "e2b441593e9b484a02124245789baf9a5897f1c65c515fab9d2f1767060fd83b",
+    "manifest.json": "86b1ee3a8acd0377a441f1ac6714a52919365eaceac5c59f1ff174f29b91f4ab",
+    "motion-data.json": "a083bd908d9dc6f482909cd74e751e3f3b29a56576665a1947e732d1b2371792",
+    "settings.json": "0e064beb8dc32fc15f30cd38869d78ecac517062a7fca01f67e2f8e8343f7aea",
+    "take.json": "c1d4985dbedf0a993bfd1adc1d826b901fccfbe8efa93860abbd3f1579fc52b9"
+  }
+}

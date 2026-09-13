@@ -1,0 +1,23 @@
+{
+  "sourceOption": 4,
+  "sourceSha256": "e2b441593e9b484a02124245789baf9a5897f1c65c515fab9d2f1767060fd83b",
+  "duration": 2.8,
+  "iconScale": 2,
+  "iconPivot": {
+    "x": 88,
+    "y": 90
+  },
+  "contact": {
+    "frame": 55,
+    "seconds": 1.2833333333333332,
+    "x": 35.471999999999994,
+    "y": 179.154
+  },
+  "ring": {
+    "cx": 35.471999999999994,
+    "cy": 197.154,
+    "rx": 58,
+    "ry": 18
+  },
+  "clock": "single-svg-smil"
+}

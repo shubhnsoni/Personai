@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "option": 2,
+  "name": "Soft frame",
+  "status": "archived",
+  "design": "ring",
+  "designRevision": 6,
+  "savedAt": "20260913T101708Z",
+  "iconOption": 9,
+  "iconSourceHash": "d62af062781286916afb9a6cb32a69b6fc9b4260bb5d90d818b950ed606e3315",
+  "iconDuration": 3.194,
+  "size": 100.8,
+  "scale": 0.7,
+  "placement": "viewport-center",
+  "iconOffset": {
+    "x": -4,
+    "y": -2
+  },
+  "iconScale": 1,
+  "frameScale": 1,
+  "progressCycleMs": 6388,
+  "frameProjection": null,
+  "files": {
+    "icon-dark-still.svg": "370945a7052bca5556a04daee69b2acc235e02e27fdc2fe00061345cd2f0ca53",
+    "icon-dark.svg": "b571d869408b0530b9a568dbe6914aeb795da52aa9ce32c4ad812728c3db2cfe",
+    "icon-light-still.svg": "e114d0f9521c63b6ef218b46af8c875c8ec01060136a6f59e81cf639b81b51b1",
+    "icon-light.svg": "9c4d9a5ad495dfe5ea3c4318a1640ea02e803e21e8e9d3a1617d5ffa35128b9b",
+    "index.html": "174bd0f28a84dbd9595f9e8a6e6b3f2843c62f58750821f7d4bc766da6cd4b56",
+    "player.js": "0cdb7f9cec040a07df7a66bdd87d4c86ec04f7fb4b3352d63430d1e28ebb9383",
+    "preview-source.js": "a7fb8549c58beda30f870457cf84c48d1efb467a98da2bc9d274c00dc1999fb9",
+    "styles.css": "bd0025af0149f4146abcc48b1d2757b8b0781c57dac8bfebdf5aa83e49175c82"
+  }
+}
