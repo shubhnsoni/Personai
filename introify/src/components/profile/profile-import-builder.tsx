@@ -125,6 +125,23 @@ export function ProfileImportBuilder({
             !== JSON.stringify({ links: input.links, text: input.text, discover: input.discover })
     }
 
+    function actionMessage(err: unknown, fallback: string) {
+        if (err instanceof Error) {
+            const message = err.message || ""
+            if (/Minified React error #441|#441|An error occurred in the Server Components render/i.test(message)) {
+                return "Generation did not finish in this request. Use Check saved result before starting a new generation — that keeps the same request and will not charge again if the draft already exists."
+            }
+            if (message && !/digest/i.test(message)) return message
+        }
+        return fallback
+    }
+
+    function showPreview(result: ProfileImportPreview) {
+        setPreview(result)
+        setDraft(result.draft)
+        setError(null)
+    }
+
     async function generate() {
         if (busy || generating.current) return
         const input = currentInput()
@@ -137,10 +154,10 @@ export function ProfileImportBuilder({
         setError(null)
         try {
             const result = await generateProfileImport(context, input)
-            setPreview(result)
-            setDraft(result.draft)
+            if (!result.ok) { setError(result.error); return }
+            showPreview(result.preview)
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Import failed. Your text and links are kept below.")
+            setError(actionMessage(err, "Import failed. Your text and links are kept below. Use Check saved result before starting a new generation."))
         } finally {
             generating.current = false
             setBusy(false)
@@ -153,12 +170,11 @@ export function ProfileImportBuilder({
         setBusy(true)
         try {
             const result = await getProfileImportByRequest(context, requestId.current)
-            if (!result) { setError("No saved result yet — that generation is still running or did not reach the server."); return }
-            setPreview(result)
-            setDraft(result.draft)
-            setError(null)
+            if (!result.ok) { setError(result.error); return }
+            if (!result.preview) { setError("No saved result yet — that generation is still running or did not reach the server."); return }
+            showPreview(result.preview)
         } catch (err) {
-            setError(err instanceof Error ? err.message : "No saved result yet.")
+            setError(actionMessage(err, "No saved result yet."))
         } finally {
             generating.current = false
             setBusy(false)
@@ -206,10 +222,11 @@ export function ProfileImportBuilder({
         setError(null)
         try {
             const result = await applyProfileImport((context as { profileId: string }).profileId, preview.id, reviewed, { overwriteProfile: overwrite, applyFeatures })
-            setApplied(result)
+            if (!result.ok) { setError(result.error); return }
+            setApplied({ profileId: result.profileId, slug: result.slug })
             router.refresh()
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Could not apply the draft.")
+            setError(actionMessage(err, "Could not apply the draft."))
         } finally {
             setBusy(false)
         }

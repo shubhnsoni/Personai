@@ -177,34 +177,34 @@ describe("generateProfileImport metering", () => {
     it("reserves exactly 10 AI credits once, consumes on READY, and replays idempotently", async () => {
         mocks.jobFind.mockResolvedValue(null)
         const preview = await generateProfileImport(context, input)
-        expect(preview.status).toBe("READY")
+        expect(preview).toMatchObject({ ok: true, preview: { status: "READY" } })
         expect(mocks.reserve).toHaveBeenCalledTimes(1)
         expect(mocks.reserve.mock.calls[0][1]).toMatchObject({ unit: "AI", amount: 10, profileId: "prof-1", metadata: expect.objectContaining({ operation: "PROFILE_IMPORT" }) })
         expect(mocks.settle).toHaveBeenCalledWith(expect.anything(), "res-1", "CONSUME", expect.objectContaining({ outputTokens: 120 }))
         const createdHash = (mocks.jobCreate.mock.calls[0][0] as { data: { inputHash: string } }).data.inputHash
         mocks.jobFind.mockResolvedValue(jobRow({ inputHash: createdHash }))
         const replay = await generateProfileImport(context, input)
-        expect(replay.id).toBe("job-1")
+        expect(replay).toMatchObject({ ok: true, preview: { id: "job-1" } })
         expect(mocks.reserve).toHaveBeenCalledTimes(1)
         expect(mocks.completion).toHaveBeenCalledTimes(1)
     })
 
     it("rejects the same requestId with different input and never charges", async () => {
         mocks.jobFind.mockResolvedValue(jobRow({ inputHash: "other" }))
-        await expect(generateProfileImport(context, input)).rejects.toThrow(/different input/i)
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/different input/i) })
         expect(mocks.reserve).not.toHaveBeenCalled()
     })
 
     it("rejects a requestId reused under a different target context", async () => {
         mocks.jobFind.mockResolvedValue(jobRow({ targetProfileId: null }))
-        await expect(generateProfileImport(context, input)).rejects.toThrow(/already used elsewhere/i)
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/already used elsewhere/i) })
         expect(mocks.reserve).not.toHaveBeenCalled()
     })
 
     it("rejects oversized input before a job row or hash exists", async () => {
-        await expect(generateProfileImport(context, { ...input, text: "x".repeat(100_001) })).rejects.toThrow(/at most/)
+        await expect(generateProfileImport(context, { ...input, text: "x".repeat(100_001) })).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/at most/) })
         expect(mocks.jobCreate).not.toHaveBeenCalled()
-        await expect(generateProfileImport(context, { ...input, requestId: "req-not-uuid" })).rejects.toThrow(/invalid/i)
+        await expect(generateProfileImport(context, { ...input, requestId: "req-not-uuid" })).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/invalid/i) })
         expect(mocks.jobCreate).not.toHaveBeenCalled()
     })
 
@@ -213,21 +213,21 @@ describe("generateProfileImport metering", () => {
         mocks.jobCreate.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("unique", { code: "P2002", clientVersion: "5.22.0" }))
         mocks.jobFind.mockResolvedValueOnce(null).mockResolvedValue(jobRow({ status: "READY", inputHash: "any" }))
 
-        await expect(generateProfileImport(context, input)).rejects.toThrow(/different input/i)
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/different input/i) })
         expect(mocks.reserve).not.toHaveBeenCalled()
     })
 
     it("refuses to dispatch when the reservation did not land as RESERVED", async () => {
         mocks.jobFind.mockResolvedValue(null)
         mocks.reserve.mockResolvedValue({ id: "res-1", state: "RESERVED", created: false })
-        await expect(generateProfileImport(context, input)).rejects.toThrow(/already received/i)
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/already received/i) })
         expect(mocks.completion).not.toHaveBeenCalled()
     })
 
     it("releases a known-zero reservation when persisting its id fails pre-dispatch", async () => {
         mocks.jobFind.mockResolvedValue(null)
         mocks.jobUpdate.mockRejectedValueOnce(new Error("db down"))
-        await expect(generateProfileImport(context, input)).rejects.toThrow(/not charged/i)
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/not charged/i) })
         expect(mocks.settle).toHaveBeenCalledWith(expect.anything(), "res-1", "RELEASE", expect.objectContaining({ reason: "reservation_unpersisted" }))
         expect(mocks.completion).not.toHaveBeenCalled()
     })
@@ -235,14 +235,14 @@ describe("generateProfileImport metering", () => {
     it("releases the reservation with a receipt on known-invalid output", async () => {
         mocks.jobFind.mockResolvedValue(null)
         mocks.completion.mockResolvedValue({ model: recipe.model, choices: [{ message: { content: "garbage" }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5 } })
-        await expect(generateProfileImport(context, input)).rejects.toThrow(/could not be used/i)
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/could not be used/i) })
         expect(mocks.settle).toHaveBeenCalledWith(expect.anything(), "res-1", "RELEASE", expect.objectContaining({ reason: "invalid_structured_output", outputTokens: 5 }))
     })
 
     it("holds the reservation on unknown timeout and does not retry", async () => {
         mocks.jobFind.mockResolvedValue(null)
         mocks.completion.mockRejectedValue(new Error("request timed out"))
-        await expect(generateProfileImport(context, input)).rejects.toThrow(/pending reconciliation/i)
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/pending reconciliation/i) })
         expect(mocks.settle).not.toHaveBeenCalled()
         expect(mocks.completion).toHaveBeenCalledTimes(1)
     })
@@ -250,20 +250,20 @@ describe("generateProfileImport metering", () => {
     it("fails without a reservation when no source is usable", async () => {
         mocks.jobFind.mockResolvedValue(null)
         mocks.collect.mockRejectedValue(new Error("No readable source material."))
-        await expect(generateProfileImport(context, input)).rejects.toThrow(/No readable source/i)
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/No readable source/i) })
         expect(mocks.reserve).not.toHaveBeenCalled()
         expect(mocks.completion).not.toHaveBeenCalled()
     })
 
     it("scopes getProfileImport to the exact owner/account/target and TTL", async () => {
         mocks.jobFind.mockResolvedValue(jobRow({ targetProfileId: "prof-1" }))
-        expect((await getProfileImport(context, "job-1"))?.id).toBe("job-1")
+        expect(await getProfileImport(context, "job-1")).toMatchObject({ ok: true, preview: { id: "job-1" } })
         mocks.jobFind.mockResolvedValue(jobRow({ targetProfileId: null }))
-        expect(await getProfileImport(context, "job-1")).toBeNull()
+        expect(await getProfileImport(context, "job-1")).toEqual({ ok: true, preview: null })
         mocks.jobFind.mockResolvedValue(jobRow({ billingAccountId: "acct-2" }))
-        expect(await getProfileImport(context, "job-1")).toBeNull()
+        expect(await getProfileImport(context, "job-1")).toEqual({ ok: true, preview: null })
         mocks.jobFind.mockResolvedValue(jobRow({ expiresAt: new Date(Date.now() - 1000) }))
-        expect(await getProfileImport(context, "job-1")).toBeNull()
+        expect(await getProfileImport(context, "job-1")).toEqual({ ok: true, preview: null })
     })
 
     it("keeps the legacy chat recipe budgets unchanged", () => {

@@ -177,11 +177,11 @@ describe("applyProfileImport action", () => {
 
     it("blocks cross-owner, cross-account and cross-target applies", async () => {
         mocks.jobFind.mockResolvedValue({ ...readyJob, ownerUserId: "other-user" })
-        await expect(applyProfileImport("prof-1", "job-1", draft, { overwriteProfile: false, applyFeatures: true })).rejects.toThrow(/not found/i)
+        await expect(applyProfileImport("prof-1", "job-1", draft, { overwriteProfile: false, applyFeatures: true })).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/not found/i) })
         mocks.jobFind.mockResolvedValue({ ...readyJob, billingAccountId: "acct-2" })
-        await expect(applyProfileImport("prof-1", "job-1", draft, { overwriteProfile: false, applyFeatures: true })).rejects.toThrow(/not found/i)
+        await expect(applyProfileImport("prof-1", "job-1", draft, { overwriteProfile: false, applyFeatures: true })).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/not found/i) })
         mocks.jobFind.mockResolvedValue({ ...readyJob, targetProfileId: "prof-2" })
-        await expect(applyProfileImport("prof-1", "job-1", draft, { overwriteProfile: false, applyFeatures: true })).rejects.toThrow(/not found/i)
+        await expect(applyProfileImport("prof-1", "job-1", draft, { overwriteProfile: false, applyFeatures: true })).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/not found/i) })
     })
 
     it("applies once and replays APPLIED with the saved slug", async () => {
@@ -189,11 +189,11 @@ describe("applyProfileImport action", () => {
         mocks.jobUpdateMany.mockResolvedValue({ count: 1 })
         mocks.profileFind.mockResolvedValue(profile)
         const first = await applyProfileImport("prof-1", "job-1", draft, { overwriteProfile: false, applyFeatures: true })
-        expect(first).toEqual({ profileId: "prof-1", slug: "ada" })
+        expect(first).toEqual({ ok: true, profileId: "prof-1", slug: "ada" })
 
         mocks.jobFind.mockResolvedValue({ ...readyJob, status: "APPLIED", appliedProfileId: "prof-1", appliedSlug: "ada" })
         const second = await applyProfileImport("prof-1", "job-1", draft, { overwriteProfile: false, applyFeatures: true })
-        expect(second).toEqual({ profileId: "prof-1", slug: "ada" })
+        expect(second).toEqual({ ok: true, profileId: "prof-1", slug: "ada" })
         expect(mocks.jobUpdateMany).toHaveBeenCalledTimes(1)
     })
 
@@ -202,7 +202,7 @@ describe("applyProfileImport action", () => {
         mocks.jobFind.mockResolvedValueOnce(readyJob)
         mocks.jobFind.mockResolvedValue({ ...readyJob, status: "APPLIED", appliedProfileId: "prof-1", appliedSlug: "ada" })
         const result = await applyProfileImport("prof-1", "job-1", draft, { overwriteProfile: false, applyFeatures: true })
-        expect(result.slug).toBe("ada")
+        expect(result).toMatchObject({ ok: true, slug: "ada" })
         expect(mocks.profileFind).not.toHaveBeenCalled()
     })
 })

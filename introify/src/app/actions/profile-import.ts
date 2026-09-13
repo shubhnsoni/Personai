@@ -12,11 +12,19 @@ import { resolveApiRecipe } from "@/lib/ai-runtime"
 import { collectProfileSources } from "@/lib/profile-import-sources"
 import { ProfileImportInvalidError, profileImportRecipe, runProfileImportModel } from "@/lib/profile-import-model"
 import { applyProfileBlueprintTx, unsupportedSocialWarnings } from "@/lib/profile-import-apply"
-import { PROFILE_IMPORT_POLICY, profileBlueprintSchema, type ProfileBlueprint, type ProfileImportContext, type ProfileImportInput, type ProfileImportPreview } from "@/lib/profile-import-contract"
+import { PROFILE_IMPORT_POLICY, profileBlueprintSchema, type ProfileBlueprint, type ProfileImportActionResult, type ProfileImportContext, type ProfileImportInput, type ProfileImportPreview } from "@/lib/profile-import-contract"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
+const GENERIC_IMPORT_FAILURE = "Generation did not complete. Credits may still be reserved. Use Check saved result before starting a new generation."
+
+function actionError(error: unknown, fallback = GENERIC_IMPORT_FAILURE): { ok: false; error: string } {
+    if (error instanceof Error && (error.name === "OwnershipRefusalError" || (error.message && !/prisma|sql|econn|etimedout|digest/i.test(error.message)))) {
+        return { ok: false, error: error.message.slice(0, 500) }
+    }
+    return { ok: false, error: fallback }
+}
 
 function inputHash(input: ProfileImportInput): string {
     const canonical = {
@@ -88,7 +96,15 @@ async function failJob(id: string, message: string) {
     await prisma.profileImportJob.update({ where: { id }, data: { status: "FAILED", error: message.slice(0, 500) } }).catch(() => {})
 }
 
-export async function generateProfileImport(context: ProfileImportContext, input: ProfileImportInput): Promise<ProfileImportPreview> {
+export async function generateProfileImport(context: ProfileImportContext, input: ProfileImportInput): Promise<ProfileImportActionResult<{ preview: ProfileImportPreview }>> {
+    try {
+        return { ok: true, preview: await generateProfileImportInner(context, input) }
+    } catch (error) {
+        return actionError(error)
+    }
+}
+
+async function generateProfileImportInner(context: ProfileImportContext, input: ProfileImportInput): Promise<ProfileImportPreview> {
     const { userId, accountId, targetProfileId } = await resolveContext(context)
     validateInput(input)
     const hash = inputHash(input)
@@ -213,28 +229,44 @@ async function appliedProfileStillValid(appliedProfileId: string | null, account
     return Boolean(profile)
 }
 
-export async function getProfileImport(context: ProfileImportContext, id: string): Promise<ProfileImportPreview | null> {
-    const { userId, accountId, targetProfileId } = await resolveContext(context)
-    const job = await loadOwnedJob(userId, accountId, id, targetProfileId)
-    if (!job) return null
-    if (job.status !== "READY" && job.status !== "APPLIED") return null
-    if (job.status === "APPLIED" && !(await appliedProfileStillValid(job.appliedProfileId, accountId, userId))) return null
-    return toPreview(job)
+export async function getProfileImport(context: ProfileImportContext, id: string): Promise<ProfileImportActionResult<{ preview: ProfileImportPreview | null }>> {
+    try {
+        const { userId, accountId, targetProfileId } = await resolveContext(context)
+        const job = await loadOwnedJob(userId, accountId, id, targetProfileId)
+        if (!job) return { ok: true, preview: null }
+        if (job.status !== "READY" && job.status !== "APPLIED") return { ok: true, preview: null }
+        if (job.status === "APPLIED" && !(await appliedProfileStillValid(job.appliedProfileId, accountId, userId))) return { ok: true, preview: null }
+        return { ok: true, preview: toPreview(job) }
+    } catch (error) {
+        return actionError(error, "Could not load that import.")
+    }
 }
 
-export async function getProfileImportByRequest(context: ProfileImportContext, requestId: string): Promise<ProfileImportPreview | null> {
-    if (typeof requestId !== "string" || !UUID.test(requestId)) throw new Error("Invalid import request.")
-    const { userId, accountId, targetProfileId } = await resolveContext(context)
-    const job = await prisma.profileImportJob.findUnique({ where: { ownerUserId_requestId: { ownerUserId: userId, requestId } } })
-    if (!job || job.billingAccountId !== accountId || job.targetProfileId !== targetProfileId) return null
-    if (job.expiresAt < new Date()) throw new Error("That import expired. Start a new one.")
-    if (job.status === "FAILED") throw new Error(job.error || "That import failed.")
-    if (job.status !== "READY" && job.status !== "APPLIED") return null
-    if (job.status === "APPLIED" && !(await appliedProfileStillValid(job.appliedProfileId, accountId, userId))) return null
-    return toPreview(job)
+export async function getProfileImportByRequest(context: ProfileImportContext, requestId: string): Promise<ProfileImportActionResult<{ preview: ProfileImportPreview | null }>> {
+    try {
+        if (typeof requestId !== "string" || !UUID.test(requestId)) throw new Error("Invalid import request.")
+        const { userId, accountId, targetProfileId } = await resolveContext(context)
+        const job = await prisma.profileImportJob.findUnique({ where: { ownerUserId_requestId: { ownerUserId: userId, requestId } } })
+        if (!job || job.billingAccountId !== accountId || job.targetProfileId !== targetProfileId) return { ok: true, preview: null }
+        if (job.expiresAt < new Date()) throw new Error("That import expired. Start a new one.")
+        if (job.status === "FAILED") throw new Error(job.error || "That import failed.")
+        if (job.status !== "READY" && job.status !== "APPLIED") return { ok: true, preview: null }
+        if (job.status === "APPLIED" && !(await appliedProfileStillValid(job.appliedProfileId, accountId, userId))) return { ok: true, preview: null }
+        return { ok: true, preview: toPreview(job) }
+    } catch (error) {
+        return actionError(error, "No saved result yet.")
+    }
 }
 
-export async function applyProfileImport(profileId: string, id: string, draft: ProfileBlueprint, options: { overwriteProfile: boolean; applyFeatures: boolean }): Promise<{ profileId: string; slug: string }> {
+export async function applyProfileImport(profileId: string, id: string, draft: ProfileBlueprint, options: { overwriteProfile: boolean; applyFeatures: boolean }): Promise<ProfileImportActionResult<{ profileId: string; slug: string }>> {
+    try {
+        return { ok: true, ...(await applyProfileImportInner(profileId, id, draft, options)) }
+    } catch (error) {
+        return actionError(error, "Could not apply the draft.")
+    }
+}
+
+async function applyProfileImportInner(profileId: string, id: string, draft: ProfileBlueprint, options: { overwriteProfile: boolean; applyFeatures: boolean }): Promise<{ profileId: string; slug: string }> {
     const parsed = profileBlueprintSchema.parse(draft)
     const { actor, profile: claimed } = unwrapOwnershipResult(await requireProfileAccess({ claimedProfileId: profileId }))
     const accountId = claimed.billingAccountId || (await getProfileBilling(claimed.id)).accountId

@@ -192,9 +192,12 @@ describe("v4 onboarding chat", () => {
             products: [], knowledge: [], introductions: [], frameworks: [], missingInformation: [],
         }
         importMocks.generate.mockResolvedValue({
-            id: "job-9", status: "READY", draft,
-            sources: [{ id: "s1", label: "ada.dev", url: "https://ada.dev/", status: "read", discoveredFrom: null, warning: null }],
-            warnings: [], appliedProfileId: null, slug: null,
+            ok: true,
+            preview: {
+                id: "job-9", status: "READY", draft,
+                sources: [{ id: "s1", label: "ada.dev", url: "https://ada.dev/", status: "read", discoveredFrom: null, warning: null }],
+                warnings: [], appliedProfileId: null, slug: null,
+            },
         })
         start()
         fireEvent.click(screen.getByText("Import my profile"))

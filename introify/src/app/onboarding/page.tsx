@@ -5,6 +5,7 @@ import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard"
 import { userIsAdmin } from "@/lib/admin/allowlist"
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120
 
 export default async function OnboardingPage({
     searchParams,

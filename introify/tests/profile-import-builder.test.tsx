@@ -56,8 +56,8 @@ async function generateDraft(context: Parameters<typeof ProfileImportBuilder>[0]
 
 beforeEach(() => {
     vi.clearAllMocks()
-    mocks.generate.mockResolvedValue(preview)
-    mocks.apply.mockResolvedValue({ profileId: "prof-1", slug: "ada" })
+    mocks.generate.mockResolvedValue({ ok: true, preview })
+    mocks.apply.mockResolvedValue({ ok: true, profileId: "prof-1", slug: "ada" })
 })
 
 describe("ProfileImportBuilder", () => {
@@ -90,7 +90,7 @@ describe("ProfileImportBuilder", () => {
     })
 
     it("keeps inputs and shows the error when generation fails", async () => {
-        mocks.generate.mockRejectedValue(new Error("No readable source material."))
+        mocks.generate.mockResolvedValue({ ok: false, error: "No readable source material." })
         render(<ProfileImportBuilder context={{}} />)
         fireEvent.change(screen.getByLabelText("Pasted page text"), { target: { value: "kept text" } })
         fireEvent.click(screen.getByText("These are my profiles or I have permission to import them."))
@@ -100,8 +100,8 @@ describe("ProfileImportBuilder", () => {
     })
 
     it("recovers via explicit Check saved result and re-keys a changed input", async () => {
-        mocks.generate.mockRejectedValueOnce(new Error("network dropped"))
-        mocks.generate.mockResolvedValue(preview)
+        mocks.generate.mockResolvedValueOnce({ ok: false, error: "network dropped" })
+        mocks.generate.mockResolvedValue({ ok: true, preview })
         render(<ProfileImportBuilder context={{}} />)
         fireEvent.change(screen.getByLabelText("Pasted page text"), { target: { value: "text one" } })
         fireEvent.click(screen.getByText("These are my profiles or I have permission to import them."))
@@ -110,7 +110,7 @@ describe("ProfileImportBuilder", () => {
 
         expect(mocks.generate).toHaveBeenCalledTimes(1)
         const firstId = mocks.generate.mock.calls[0][1].requestId
-        mocks.getByRequest.mockResolvedValue(preview)
+        mocks.getByRequest.mockResolvedValue({ ok: true, preview })
         fireEvent.click(screen.getByText("Check saved result"))
         await waitFor(() => expect(screen.getByLabelText("Headline")).toBeTruthy())
         expect(mocks.generate).toHaveBeenCalledTimes(1)
@@ -118,7 +118,7 @@ describe("ProfileImportBuilder", () => {
 
         cleanup()
         sessionStorage.clear()
-        mocks.generate.mockRejectedValue(new Error("boom"))
+        mocks.generate.mockResolvedValue({ ok: false, error: "boom" })
         render(<ProfileImportBuilder context={{}} />)
         fireEvent.change(screen.getByLabelText("Pasted page text"), { target: { value: "v1" } })
         fireEvent.click(screen.getByText("These are my profiles or I have permission to import them."))
@@ -151,9 +151,20 @@ describe("ProfileImportBuilder", () => {
         expect(onUse).toHaveBeenCalledWith(preview, expect.objectContaining({ knowledge: [expect.objectContaining({ body: "edited confidential outline" })] }))
     })
 
+    it("turns a production React #441 crash into a recoverable Check saved result prompt", async () => {
+        mocks.generate.mockRejectedValue(new Error("Minified React error #441; visit https://react.dev/errors/441 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."))
+        render(<ProfileImportBuilder context={{}} />)
+        fireEvent.change(screen.getByLabelText("Pasted page text"), { target: { value: "kept text" } })
+        fireEvent.click(screen.getByText("These are my profiles or I have permission to import them."))
+        fireEvent.click(screen.getByRole("button", { name: /Generate full profile/ }))
+        await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/Check saved result/))
+        expect(screen.getByText("Check saved result")).toBeTruthy()
+        expect((screen.getByLabelText("Pasted page text") as HTMLTextAreaElement).value).toBe("kept text")
+    })
+
     it("does not double-dispatch while a generation is pending", async () => {
         let resolve: (v: ProfileImportPreview) => void = () => {}
-        mocks.generate.mockImplementation(() => new Promise(r => { resolve = r }))
+        mocks.generate.mockImplementation(() => new Promise(r => { resolve = (value) => r({ ok: true, preview: value }) }))
         render(<ProfileImportBuilder context={{}} />)
         fireEvent.change(screen.getByLabelText("Pasted page text"), { target: { value: "text" } })
         fireEvent.click(screen.getByText("These are my profiles or I have permission to import them."))

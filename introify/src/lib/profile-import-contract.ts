@@ -79,3 +79,7 @@ export type ProfileImportPreview = {
     appliedProfileId: string | null
     slug: string | null
 }
+
+export type ProfileImportActionResult<T> =
+    | ({ ok: true } & T)
+    | { ok: false; error: string }

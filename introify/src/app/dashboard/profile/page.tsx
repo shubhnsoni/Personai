@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { YouStudio } from "@/components/dashboard/you-studio"
 
 export const dynamic = "force-dynamic"
+export const maxDuration = 120
 
 export default async function DashboardProfilePage({
     searchParams,
