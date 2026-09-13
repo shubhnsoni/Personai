@@ -267,6 +267,8 @@ if (context) await context.close(); else process.exitCode = 1;
     $testEnv.PATH = ((Split-Path $node24) + ';' + $env:PATH)
     Write-Host 'Running isolated release tests on Node 24...'
     Invoke-Program -Program $node24 -Arguments (@($runner) + $testFiles) -Directory $snapshot -Environment $testEnv
+    Write-Host 'Checking the real Codex HTTP transport on production Node 20...'
+    Invoke-Program -Program $node20 -Arguments @('scripts/check-codex-runtime.mjs') -Directory $snapshot -Environment $validationEnv
     Write-Host 'Building the exact prospective release on Node 20.20.2 (Webpack)...'
     Invoke-Program -Program $node20 -Arguments @('node_modules/next/dist/bin/next', 'build', '--webpack') -Directory $snapshot -Environment $validationEnv
     Assert-Repository
