@@ -4,6 +4,7 @@ export type SocialLinks = {
     youtube?: string
     maps?: string
     zomato?: string
+    linkedin?: string
 }
 
 function cleanUrl(raw: unknown, hosts?: string[]) {
@@ -25,6 +26,7 @@ export function socialsFromConfig(raw?: string | null): SocialLinks {
             youtube: cleanUrl(bag.youtube, ["youtube.com", "youtu.be"]),
             maps: cleanUrl(bag.maps, ["google.com/maps", "maps.app.goo.gl", "maps.google.com"]),
             zomato: cleanUrl(bag.zomato, ["zomato.com"]),
+            linkedin: cleanUrl(bag.linkedin, ["linkedin.com"]),
         }
     } catch {
         return {}
@@ -40,11 +42,12 @@ export function writeSocials(raw: string | null | undefined, socials: SocialLink
     if (socials.youtube) next.youtube = socials.youtube
     if (socials.maps) next.maps = socials.maps
     if (socials.zomato) next.zomato = socials.zomato
+    if (socials.linkedin) next.linkedin = socials.linkedin
     if (Object.keys(next).length) bag.socials = next
     else delete bag.socials
     return JSON.stringify(bag)
 }
 
 export function hasSocials(links: SocialLinks) {
-    return Boolean(links.instagram || links.facebook || links.youtube || links.maps || links.zomato)
+    return Boolean(links.instagram || links.facebook || links.youtube || links.maps || links.zomato || links.linkedin)
 }

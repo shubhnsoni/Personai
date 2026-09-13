@@ -73,6 +73,8 @@ describe("field demo catalogs", () => {
         expect(shop?.experiences?.some((row) => row.company === "Deel" && /Operation Lead/.test(row.role))).toBe(true)
         expect(shop?.experiences?.some((row) => row.company === "Razorpay")).toBe(true)
         expect(shop?.experiences?.some((row) => row.company === "upGrad Jeet")).toBe(true)
+        expect(shop?.bio).toMatch(/Introify/)
+        expect(shop?.socials?.linkedin).toBe("https://www.linkedin.com/in/neal")
     })
 
     it("includes Churuwala's Upper Bazar with the 1949 counter details", () => {

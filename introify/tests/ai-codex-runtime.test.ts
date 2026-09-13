@@ -78,13 +78,7 @@ describe("explicit Codex production provider", () => {
         mocks.stream.mockRejectedValue(Object.assign(new Error("Codex chat failed (HTTP 401)."), { status: 401 }))
         vi.stubEnv("XAI_API_KEY", "xai-live-key-abcdefgh")
         vi.stubEnv("OPENAI_API_KEY", "")
-        mocks.responses.mockResolvedValue({
-            id: "reply",
-            model: "grok-3-mini",
-            created_at: 1,
-            output: [{ type: "message", content: [{ type: "output_text", text: "From grok" }] }],
-            usage: { input_tokens: 10, output_tokens: 4, total_tokens: 14, output_tokens_details: { reasoning_tokens: 0 } },
-        })
+        mocks.chat.mockResolvedValue({ async *[Symbol.asyncIterator]() { yield { choices: [{ delta: { content: "From grok" } }] } } })
         const recipe = resolveApiRecipe("fast")!
         expect(recipe.provider).toBe("codex")
         const stream = await streamChatWithFailover(boundedChatInput(recipe, "Facts", [{ role: "user", content: "Hello" }], []), recipe)
@@ -92,6 +86,17 @@ describe("explicit Codex production provider", () => {
         for await (const chunk of stream) text += chunk.choices[0]?.delta.content || ""
         expect(text).toBe("From grok")
         expect(mocks.stream).toHaveBeenCalledOnce()
+    })
+    it("answers on xAI when Codex returns no tokens", async () => {
+        mocks.stream.mockResolvedValue({ async *[Symbol.asyncIterator]() { /* empty */ } })
+        vi.stubEnv("XAI_API_KEY", "xai-live-key-abcdefgh")
+        vi.stubEnv("OPENAI_API_KEY", "")
+        mocks.chat.mockResolvedValue({ async *[Symbol.asyncIterator]() { yield { choices: [{ delta: { content: "From grok" } }] } } })
+        const recipe = resolveApiRecipe("fast")!
+        const stream = await streamChatWithFailover(boundedChatInput(recipe, "Facts", [{ role: "user", content: "Hello" }], []), recipe)
+        let text = ""
+        for await (const chunk of stream) text += chunk.choices[0]?.delta.content || ""
+        expect(text).toBe("From grok")
     })
     it("does not switch providers when the visitor cancelled", async () => {
         mocks.stream.mockRejectedValue(Object.assign(new Error("aborted"), { name: "AbortError" }))

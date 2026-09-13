@@ -1,7 +1,9 @@
 "use client"
 
 import NextImage from "next/image"
+import Link from "@/components/navigation/transition-link"
 import { X, ChevronLeft, ChevronRight, ArrowUp, Clock, Calendar, DollarSign } from "lucide-react"
+import { storyPath } from "@/lib/story"
 import { CommunitiesStore, CoursesStore, EventsStore, ProductsStore } from "@/components/profile/store-panel"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -125,7 +127,14 @@ export function ContentPanel({ isOpen, onClose, type, data, onBookService, onPur
                     </Button>
                     <h2 className="text-xl font-semibold text-white drop-shadow-md">{getTitle()}</h2>
                 </div>
-
+                {type === "about" && data.slug ? (
+                    <Link
+                        href={storyPath(data.slug)}
+                        className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/90 hover:bg-white/10"
+                    >
+                        See full about
+                    </Link>
+                ) : null}
             </div>
 
             <div className="flex-1 relative overflow-hidden">
@@ -386,6 +395,14 @@ function AboutView({ data }: { data: ContentPanelProps["data"] }) {
             ) : (
                 <p className="text-sm text-zinc-500">No bio yet.</p>
             )}
+            {data.slug ? (
+                <Link
+                    href={storyPath(data.slug)}
+                    className="inline-flex w-fit items-center rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+                >
+                    See full about
+                </Link>
+            ) : null}
         </div>
     )
 }

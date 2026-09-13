@@ -29,6 +29,8 @@ export default async function StoryPage({ params }: { params: Promise<{ slug: st
             socials={socialsFromConfig(profile.personalityConfig)}
             personalityConfig={profile.personalityConfig}
             hoursLabel={hoursLabel}
+            experiences={profile.workExperiences}
+            projects={profile.projects}
         />
     )
 }

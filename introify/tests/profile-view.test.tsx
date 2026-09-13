@@ -190,13 +190,12 @@ describe("ProfileView - intro chips follow contentDisplayMode", () => {
                 colors={["#52E8FF"]}
             />,
         )
-        const open = vi.spyOn(window, "open").mockImplementation(() => null)
         fireEvent.click(screen.getByRole("button", { name: "About" }))
         act(() => {
             vi.advanceTimersByTime(1)
         })
-        expect(open).toHaveBeenCalledWith("/ada/story", "_self")
-        open.mockRestore()
+        expect(document.querySelector("[data-content-stage]")).toBeTruthy()
+        expect(screen.getAllByRole("link", { name: "See full about" })[0].getAttribute("href")).toBe("/ada/story")
 
         fireEvent.click(screen.getByRole("button", { name: "See services" }))
         act(() => {
@@ -249,7 +248,7 @@ describe("ProfileView - intro chips follow contentDisplayMode", () => {
         expect(screen.queryByRole("button", { name: "WhatsApp" })).toBeNull()
     })
 
-    it("sends About to the dedicated about page instead of a photo wall", () => {
+    it("opens About in a drawer with a link to the full about page", () => {
         render(
             <ProfileView
                 profile={{ ...PROFILE, contentDisplayMode: "POPUP" }}
@@ -262,7 +261,9 @@ describe("ProfileView - intro chips follow contentDisplayMode", () => {
         act(() => {
             vi.advanceTimersByTime(1)
         })
-        expect(open).toHaveBeenCalledWith("/ada/story", "_self")
+        expect(open).not.toHaveBeenCalled()
+        expect(document.querySelector("[data-content-stage]")?.getAttribute("data-desktop-surface")).toBe("popup")
+        expect(screen.getAllByRole("link", { name: "See full about" })[0].getAttribute("href")).toBe("/ada/story")
         open.mockRestore()
     })
 })

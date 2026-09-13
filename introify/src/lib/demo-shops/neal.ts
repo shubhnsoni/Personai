@@ -18,7 +18,11 @@ What he has worked on: sales operations strategy across SME and Enterprise; AI-l
 
 Previously Associate Manager, Business Development at Razorpay, then a short sprint as Sales Manager at upGrad Jeet. School: Rajiv Gandhi Proudyogiki Vishwavidyalaya.
 
-Always open to conversations with ambitious teams building at scale. No phone is published here — reach him on LinkedIn: https://www.linkedin.com/in/neal`,
+Always open to conversations with ambitious teams building at scale.
+
+This page is how Nilesh uses Introify: a public desk that does not sit behind a LinkedIn login. Chat is the first conversation — Deel, Razorpay, GTM, Salesforce, SDR and BDA desks, or a career move. The About drawer is the short read; the full about page is the longer one, with roles and selected work. Book an intro if a longer call is useful. Continue on LinkedIn when you already know you want to talk.
+
+No phone is published here. Reach him on LinkedIn: https://www.linkedin.com/in/neal`,
     welcome: "Ask about Deel, Razorpay, sales ops, or GTM. Contact is LinkedIn — linkedin.com/in/neal.",
     speakerName: "Nilesh",
     speakerRole: "sales and operations leader",
@@ -34,6 +38,9 @@ Always open to conversations with ambitious teams building at scale. No phone is
             country: "IN",
         },
         categories: ["Sales operations", "Revenue operations", "GTM"],
+    },
+    socials: {
+        linkedin: "https://www.linkedin.com/in/neal",
     },
     hours: weekdaysHours("10:00", "18:00"),
     staff: [{ name: "Nilesh Kumar", kind: "STAFF", capacity: 1 }],

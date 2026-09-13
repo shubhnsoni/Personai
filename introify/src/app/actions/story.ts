@@ -180,6 +180,13 @@ export async function publishedStoryForSlug(slug: string) {
                     isEnabled: true,
                 },
             },
+            workExperiences: {
+                select: { company: true, role: true, startDate: true, endDate: true, description: true },
+                orderBy: { startDate: "desc" },
+            },
+            projects: {
+                select: { title: true, description: true, year: true, client: true },
+            },
         },
     })
     if (!profile || !profile.isPublic) return null

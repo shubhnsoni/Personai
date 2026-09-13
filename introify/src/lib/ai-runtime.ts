@@ -156,6 +156,27 @@ async function dispatchChatStream(
     return apiClient(recipe).chat.completions.create(input, { signal })
 }
 
+async function collectUsefulStream(
+    stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> | undefined,
+): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
+    if (!stream || typeof (stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>)[Symbol.asyncIterator] !== "function") {
+        throw Object.assign(new Error("empty_completed_response"), { status: 503 })
+    }
+    const chunks: OpenAI.Chat.Completions.ChatCompletionChunk[] = []
+    let useful = false
+    for await (const chunk of stream) {
+        chunks.push(chunk)
+        const delta = chunk.choices[0]?.delta
+        if (delta?.content || (delta?.tool_calls && delta.tool_calls.length > 0)) useful = true
+    }
+    if (!useful) throw Object.assign(new Error("empty_completed_response"), { status: 503 })
+    return {
+        async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) yield chunk
+        },
+    }
+}
+
 /** Try the reserved provider, then any other live provider, so chat stays up through token expiry. */
 export async function streamChatWithFailover(
     input: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
@@ -175,7 +196,7 @@ export async function streamChatWithFailover(
         if (signal?.aborted) throw lastError instanceof Error ? lastError : Object.assign(new Error("aborted"), { name: "AbortError" })
         const nextInput = { ...input, model: candidate.model, max_completion_tokens: candidate.outputBudget }
         try {
-            return await dispatchChatStream(nextInput, candidate, signal)
+            return await collectUsefulStream(await dispatchChatStream(nextInput, candidate, signal))
         } catch (error) {
             lastError = error
             if (signal?.aborted || !providerFailoverError(error)) throw error

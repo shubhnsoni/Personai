@@ -28,7 +28,8 @@ describe("about magazine", () => {
             />,
         )
         expect(container.querySelector(".about-landor")).toBeTruthy()
-        expect(screen.getByText("About us")).toBeTruthy()
+        expect(container.querySelector(".about-landor")?.className).toMatch(/bg-background/)
+        expect(screen.getByText("About")).toBeTruthy()
         expect(screen.getByAltText("Aura Fitness Ranchi logo")).toBeTruthy()
         expect(screen.getAllByText(/704 Maru Tower/).length).toBeGreaterThan(0)
         expect(container.textContent).not.toMatch(/Step inside/)

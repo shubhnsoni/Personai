@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import Link from "@/components/navigation/transition-link"
-import { Instagram, Facebook, Youtube, MapPin, MessageCircle, Phone } from "lucide-react"
+import { Instagram, Facebook, Youtube, MapPin, MessageCircle, Phone, Linkedin } from "lucide-react"
+import { storyLabel } from "@/lib/story"
 import { Syne, Fraunces } from "next/font/google"
 import { toast } from "sonner"
 import type { StoryFrame } from "@/lib/story"
@@ -100,6 +101,8 @@ export function StoryMagazine({
     personalityConfig,
     hoursLabel,
     venue,
+    experiences,
+    projects,
 }: {
     slug: string
     name: string
@@ -114,6 +117,8 @@ export function StoryMagazine({
     personalityConfig?: string | null
     hoursLabel?: string | null
     venue?: VenueBag | null
+    experiences?: Array<{ company: string; role: string; startDate: string; endDate?: string | null; description?: string | null }>
+    projects?: Array<{ title: string; description?: string | null; year?: string | null; client?: string | null }>
 }) {
     const venueBag = venue || venueFromConfig(personalityConfig)
     const address = formattedAddress(venueBag)
@@ -126,6 +131,7 @@ export function StoryMagazine({
     const restaurant = role === "RESTAURANT"
     const actions = footerActions(role, slug)
     const paras = (bio || "").split(/\n+/).map((p) => p.trim()).filter(Boolean)
+    const aboutEyebrow = storyLabel(role).page
     const [copied, setCopied] = useState(false)
 
     async function share() {
@@ -144,8 +150,8 @@ export function StoryMagazine({
     }
 
     return (
-        <div className={cn("about-landor min-h-dvh bg-[#eceae6] text-[#111]", display.className)}>
-            <header className="sticky top-0 z-30 border-b border-black/10 bg-[#eceae6]/90 backdrop-blur-md">
+        <div className={cn("about-landor min-h-dvh bg-background text-foreground", display.className)}>
+            <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md">
                 <div className="mx-auto flex max-w-5xl items-center gap-3 px-5 py-4">
                     <Link href={restaurant ? `/${slug}/menu` : `/${slug}`} className="flex min-w-0 flex-1 items-center gap-3">
                         {logoUrl ? <img src={logoUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : null}
@@ -157,7 +163,7 @@ export function StoryMagazine({
                             {phone}
                         </a>
                     ) : null}
-                    <button type="button" onClick={share} className="text-[12px] text-black/55">
+                    <button type="button" onClick={share} className="text-[12px] text-muted-foreground">
                         {copied ? "Copied" : "Share"}
                     </button>
                     <ModeToggle />
@@ -166,58 +172,96 @@ export function StoryMagazine({
             </header>
 
             <section className="mx-auto grid max-w-5xl gap-10 px-5 py-16 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)] lg:items-center">
-                <div className="mx-auto w-full max-w-[16rem] overflow-hidden rounded-full bg-[#d8d4cc] aspect-square">
+                <div className="mx-auto w-full max-w-[16rem] overflow-hidden rounded-full bg-muted aspect-square">
                     {logoUrl ? (
                         <img src={logoUrl} alt={`${name} logo`} className="h-full w-full object-cover" />
                     ) : (
-                        <div className="flex h-full w-full items-center justify-center text-5xl font-semibold text-black/20">
+                        <div className="flex h-full w-full items-center justify-center text-5xl font-semibold text-muted-foreground/40">
                             {name.slice(0, 1)}
                         </div>
                     )}
                 </div>
                 <div>
-                    <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-black/45">About us</p>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-muted-foreground">{aboutEyebrow}</p>
                     <h1 className="mt-4 max-w-[16ch] text-[2.4rem] font-semibold leading-[1.05] tracking-[-0.04em] sm:text-6xl">
                         {name}
                     </h1>
                     {headline ? (
-                        <p className={cn("mt-5 max-w-xl text-[1.15rem] leading-snug text-black/70", serif.className)}>
+                        <p className={cn("mt-5 max-w-xl text-[1.15rem] leading-snug text-muted-foreground", serif.className)}>
                             {headline}
                         </p>
                     ) : null}
-                    {paras.slice(0, 2).map((p) => (
-                        <p key={p.slice(0, 40)} className="mt-5 max-w-xl text-[15px] leading-relaxed text-black/65">
+                    {paras.map((p) => (
+                        <p key={p.slice(0, 48)} className="mt-5 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
                             {p}
                         </p>
                     ))}
-                    {wa || tel ? (
+                    {wa || tel || links.linkedin ? (
                         <a
-                            href={wa || tel || `/${slug}`}
-                            className="mt-8 inline-flex items-center gap-3 rounded-full border border-black/20 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.16em]"
+                            href={wa || tel || links.linkedin || `/${slug}`}
+                            className="mt-8 inline-flex items-center gap-3 rounded-full border border-border px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.16em]"
                         >
-                            Get in touch
+                            {links.linkedin && !wa && !tel ? "LinkedIn" : "Get in touch"}
                             <span aria-hidden>↗</span>
                         </a>
                     ) : null}
                 </div>
             </section>
 
-            <section className="mx-auto flex max-w-5xl flex-wrap justify-between gap-8 border-t border-black/10 px-5 py-10">
+            {experiences && experiences.length > 0 ? (
+                <section className="mx-auto max-w-5xl border-t border-border px-5 py-14">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-muted-foreground">Experience</p>
+                    <div className="mt-8 space-y-8">
+                        {experiences.map((row) => (
+                            <div key={`${row.company}-${row.role}-${row.startDate}`}>
+                                <p className="text-lg font-medium">{row.role}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    {row.company} · {row.startDate}{row.endDate ? ` – ${row.endDate}` : " – Present"}
+                                </p>
+                                {row.description ? (
+                                    <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">{row.description}</p>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            ) : null}
+
+            {projects && projects.length > 0 ? (
+                <section className="mx-auto max-w-5xl border-t border-border px-5 py-14">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-muted-foreground">Selected work</p>
+                    <div className="mt-8 grid gap-8 sm:grid-cols-2">
+                        {projects.map((row) => (
+                            <div key={row.title}>
+                                <p className="text-lg font-medium">{row.title}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    {[row.client, row.year].filter(Boolean).join(" · ")}
+                                </p>
+                                {row.description ? (
+                                    <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">{row.description}</p>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            ) : null}
+
+            <section className="mx-auto flex max-w-5xl flex-wrap justify-between gap-8 border-t border-border px-5 py-10">
                 {hoursLabel ? (
                     <div>
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-black/40">Hours</p>
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Hours</p>
                         <p className="mt-2 text-lg font-medium">{hoursLabel}</p>
                     </div>
                 ) : null}
                 {address ? (
                     <div className="max-w-sm">
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-black/40">Visit</p>
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Visit</p>
                         <p className="mt-2 text-lg font-medium leading-snug">{address}</p>
                     </div>
                 ) : null}
                 {phone && tel ? (
                     <div>
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-black/40">Call</p>
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Call</p>
                         <a href={tel} className="mt-2 block text-lg font-medium">{phone}</a>
                     </div>
                 ) : null}
@@ -230,28 +274,33 @@ export function StoryMagazine({
                             <WhatsAppIcon className="h-5 w-5" />
                         </a>
                     ) : null}
+                    {links.linkedin ? (
+                        <a href={links.linkedin} target="_blank" rel="noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted" aria-label="LinkedIn">
+                            <Linkedin className="h-5 w-5" />
+                        </a>
+                    ) : null}
                     {links.instagram ? (
-                        <a href={links.instagram} target="_blank" rel="noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/5" aria-label="Instagram">
+                        <a href={links.instagram} target="_blank" rel="noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted" aria-label="Instagram">
                             <Instagram className="h-5 w-5" />
                         </a>
                     ) : null}
                     {links.facebook ? (
-                        <a href={links.facebook} target="_blank" rel="noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/5" aria-label="Facebook">
+                        <a href={links.facebook} target="_blank" rel="noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted" aria-label="Facebook">
                             <Facebook className="h-5 w-5" />
                         </a>
                     ) : null}
                     {links.youtube ? (
-                        <a href={links.youtube} target="_blank" rel="noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/5" aria-label="YouTube">
+                        <a href={links.youtube} target="_blank" rel="noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted" aria-label="YouTube">
                             <Youtube className="h-5 w-5" />
                         </a>
                     ) : null}
                     {links.maps ? (
-                        <a href={links.maps} target="_blank" rel="noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/5" aria-label="Maps">
+                        <a href={links.maps} target="_blank" rel="noreferrer" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-muted" aria-label="Maps">
                             <MapPin className="h-5 w-5" />
                         </a>
                     ) : null}
                     {links.zomato ? (
-                        <a href={links.zomato} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center rounded-full bg-black/5 px-4 text-[12px] font-medium">
+                        <a href={links.zomato} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center rounded-full bg-muted px-4 text-[12px] font-medium">
                             Zomato
                         </a>
                     ) : null}
@@ -265,8 +314,8 @@ export function StoryMagazine({
                                 className={cn(
                                     "rounded-full py-3 text-center text-[12px] font-semibold uppercase tracking-[0.18em]",
                                     action.primary
-                                        ? "bg-[#111] text-white"
-                                        : "border border-black/15 bg-transparent",
+                                        ? "bg-foreground text-background"
+                                        : "border border-border bg-transparent",
                                 )}
                             >
                                 {action.label}

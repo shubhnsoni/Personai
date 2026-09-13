@@ -1,4 +1,4 @@
-import { Instagram, Facebook, Youtube, MapPin } from "lucide-react"
+import { Instagram, Facebook, Youtube, MapPin, Linkedin } from "lucide-react"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import type { SocialLinks } from "@/lib/socials"
 
@@ -39,6 +39,11 @@ export function ProfileContactRow({
             {socials.youtube ? (
                 <a href={socials.youtube} target="_blank" rel="noreferrer" className={iconClass} aria-label="YouTube">
                     <Youtube className="h-3.5 w-3.5" />
+                </a>
+            ) : null}
+            {socials.linkedin ? (
+                <a href={socials.linkedin} target="_blank" rel="noreferrer" className={iconClass} aria-label="LinkedIn">
+                    <Linkedin className="h-3.5 w-3.5" />
                 </a>
             ) : null}
             {socials.maps ? (
