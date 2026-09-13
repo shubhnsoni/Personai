@@ -218,7 +218,8 @@ async function refreshAndPersist(
     const timeout = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS)
     let refreshed: Record<string, unknown>
     try {
-        const res = await fetch(CODEX_TOKEN_REFRESH_URL, {
+        const { codexFetch } = await import("@/lib/codex-transport")
+        const res = await codexFetch(CODEX_TOKEN_REFRESH_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,

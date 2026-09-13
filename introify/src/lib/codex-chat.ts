@@ -5,6 +5,7 @@ import {
     refreshCodexCredentials,
     type CodexCredentials,
 } from "@/lib/codex-auth"
+import { codexFetch } from "@/lib/codex-transport"
 
 const CODEX_RESPONSES_URL = "https://chatgpt.com/backend-api/codex/responses"
 const CODEX_ORIGINATOR = "codex_cli_rs"
@@ -158,7 +159,7 @@ export async function streamCodexChat(input: ChatParams, options: { signal?: Abo
     try { credentials = await loadCodexCredentials() }
     catch (error) { throw Object.assign(new CodexAuthError("Codex login is unavailable."), { providerNotDispatched: true, cause: error }) }
     if (signal.aborted) throw Object.assign(new CodexAuthError("Codex request was cancelled."), { providerNotDispatched: true })
-    let response = await fetch(CODEX_RESPONSES_URL, {
+    let response = await codexFetch(CODEX_RESPONSES_URL, {
         method: "POST",
         headers: headersFor(credentials),
         body: JSON.stringify(payload),
@@ -169,7 +170,7 @@ export async function streamCodexChat(input: ChatParams, options: { signal?: Abo
         try { credentials = await refreshCodexCredentials(credentials) }
         catch { throw Object.assign(new CodexAuthError("Codex login needs renewal."), { status: 401 }) }
         if (signal.aborted) throw Object.assign(new CodexAuthError("Codex request was cancelled."), { providerNotDispatched: true })
-        response = await fetch(CODEX_RESPONSES_URL, {
+        response = await codexFetch(CODEX_RESPONSES_URL, {
             method: "POST",
             headers: headersFor(credentials),
             body: JSON.stringify(payload),

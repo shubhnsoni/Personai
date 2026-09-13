@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl
     const profileId = searchParams.get("profileId")
     const member = await getMemberFromSession().catch(() => null)
+    void import("@/lib/codex-transport").then(({ wakeCodexConnection }) => wakeCodexConnection()).catch(() => {})
 
     if (!profileId) {
         return withVisitorCookie(
