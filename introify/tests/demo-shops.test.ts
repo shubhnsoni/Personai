@@ -66,6 +66,7 @@ describe("field demo catalogs", () => {
         const shop = demoShopBySlug("neal")
         expect(shop?.name).toBe("Nilesh Kumar")
         expect(shop?.headline).toMatch(/Ex-Razorpay/)
+        expect(shop?.headline).toMatch(/Revenue Operations/)
         expect(shop?.venue.address?.locality).toBe("Bengaluru")
         expect(shop?.whatsapp).toBeUndefined()
         expect(shop?.documents.some((doc) => doc.rawText.includes("linkedin.com/in/neal"))).toBe(true)
@@ -75,6 +76,11 @@ describe("field demo catalogs", () => {
         expect(shop?.experiences?.some((row) => row.company === "upGrad Jeet")).toBe(true)
         expect(shop?.bio).toMatch(/Introify/)
         expect(shop?.socials?.linkedin).toBe("https://www.linkedin.com/in/neal")
+        expect(shop?.services?.some((row) => row.name === "RevOps Diagnostic" && row.priceRupees === 0)).toBe(true)
+        expect(shop?.products?.some((row) => row.title === "RevOps Audit Template" && row.priceRupees === 2999)).toBe(true)
+        expect(shop?.products?.some((row) => row.title === "RevOps Operating System" && row.priceRupees === 24999)).toBe(true)
+        expect(shop?.documents.some((doc) => doc.title === "Ask Nilesh AI")).toBe(true)
+        expect(shop?.documents.some((doc) => /IndiaDeelers/.test(doc.rawText))).toBe(true)
     })
 
     it("includes Churuwala's Upper Bazar with the 1949 counter details", () => {

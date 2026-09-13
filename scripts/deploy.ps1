@@ -198,7 +198,8 @@ try {
     $null = New-Item -ItemType Directory -Path $snapshot
     $archive = Join-Path $runRoot 'source.tar'
     $null = Invoke-Git @('archive', '--format=tar', ('--output=' + $archive), ($tree + ':introify'))
-    $tar = (Get-Command tar.exe -ErrorAction Stop).Source
+    $systemTar = Join-Path $env:SystemRoot 'System32\tar.exe'
+    $tar = if (Test-Path -LiteralPath $systemTar) { $systemTar } else { (Get-Command tar.exe -ErrorAction Stop).Source }
     Invoke-Program -Program $tar -Arguments @('-xf', $archive, '-C', $snapshot)
     # Reject unexpected committed environment files too, before any dependency or app code runs.
     $envFiles = @(Get-ChildItem -LiteralPath $snapshot -File -Recurse -Force | Where-Object { $_.Name -like '.env*' -and $_.Name -ne '.env.example' })
