@@ -152,6 +152,7 @@ export function scopeDocuments(documents: ProfileDocument[], visitorKey?: string
     return documents.filter((d) => {
         if ((d.publicationState ?? "PUBLISHED") !== "PUBLISHED") return false
         if ((d.visibility ?? "PUBLIC") === "PRIVATE") return false
+        if (d.sourceType === "DEMO_SEED") return false
         if (d.type === "VISITOR_MEMORY") return (d.visibility ?? "PUBLIC") === "PUBLIC" && Boolean(visitorKey && conversationId) && d.visitorKey === visitorKey && d.conversationId === conversationId
         if (isPrivateChatDocument(d)) return false
         return canReadKnowledge(d, clientDocumentIds)

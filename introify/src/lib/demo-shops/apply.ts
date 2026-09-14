@@ -151,7 +151,7 @@ export async function applyDemoShop(
             data: shop.documents.map((doc) => ({
                 profileId,
                 type: doc.type,
-                sourceType: "TEXT",
+                sourceType: "DEMO_SEED",
                 title: doc.title,
                 rawText: doc.rawText,
             })),
