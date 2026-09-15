@@ -4,6 +4,7 @@ import {
     marketingMetadata,
     marketingStructuredData,
 } from "@/lib/marketing-seo"
+import { getRequestLocale } from "@/lib/ui-locale-request"
 
 export const metadata = marketingMetadata({
     title: "Introify — Your page. With a voice. | AI business pages",
@@ -12,7 +13,8 @@ export const metadata = marketingMetadata({
     languages: true,
 })
 
-export default function Home() {
+export default async function Home() {
+    const locale = await getRequestLocale()
     return (
         <>
             <script
@@ -24,7 +26,7 @@ export default function Home() {
                     ),
                 }}
             />
-            <HomeLanding locale="en" />
+            <HomeLanding locale={locale} />
         </>
     )
 }

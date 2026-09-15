@@ -2,6 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { tenantFromHost, subdomainRoute } from "@/lib/subdomain-host";
 import { persistLocaleHomeCookie, uiLocaleRequestHeaders } from "@/lib/ui-locale-request";
+import { DEFAULT_UI_LOCALE, isShippedUiLocale, localeHomePath, type UiLocale } from "@/lib/ui-locale";
 
 /**
  * Protected route patterns, exported so tests assert against the REAL patterns
@@ -37,6 +38,14 @@ function apexHostname() {
   }
 }
 
+function browserLocaleFromAcceptLanguage(acceptLanguage: string | null): UiLocale | null {
+  if (!acceptLanguage) return null
+  const first = acceptLanguage.split(",")[0]?.trim().toLowerCase()
+  if (!first) return null
+  const code = first.split(/[-_]/)[0]
+  return isShippedUiLocale(code) ? code : null
+}
+
 export const proxy = clerkMiddleware(async (auth, req) => {
   const requestHeaders = uiLocaleRequestHeaders(req)
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || ""
@@ -54,6 +63,18 @@ export const proxy = clerkMiddleware(async (auth, req) => {
       return persistLocaleHomeCookie(req, NextResponse.rewrite(url, { request: { headers: requestHeaders } }))
     }
   }
+
+  const localeFromBrowser = browserLocaleFromAcceptLanguage(req.headers.get("accept-language"))
+  if (req.nextUrl.pathname === "/" || req.nextUrl.pathname === "") {
+    const target = localeHomePath(localeFromBrowser ?? DEFAULT_UI_LOCALE)
+    if (target !== "/") {
+      const url = req.nextUrl.clone()
+      url.pathname = target
+      const response = NextResponse.redirect(url)
+      return persistLocaleHomeCookie(req, response)
+    }
+  }
+
   if (isProtectedRoute(req)) {
     await auth.protect({
       unauthenticatedUrl: new URL("/sign-in", req.url).toString(),
