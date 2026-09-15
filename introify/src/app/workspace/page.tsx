@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { Plus, Sparkles } from "lucide-react"
 import { syncUser } from "@/lib/auth-sync"
 import { listCreations } from "@/lib/creations"
+import { hiredCreations } from "@/lib/workspace-market"
 
 export const dynamic = "force-dynamic"
 
@@ -10,13 +11,14 @@ export default async function WorkspaceHome() {
     const user = await syncUser()
     if (!user?.activeProfile) redirect("/sign-in")
     const items = await listCreations(user.activeProfile.id)
+    const hired = await hiredCreations(user.activeProfile.id)
 
     return (
         <div className="w-page">
             <div className="w-titlebar">
                 <div>
                     <h1 className="w-h1">My AIs</h1>
-                    <p className="w-lede">Private until you showcase them. Named for the way you work — not a marketplace directory.</p>
+                    <p className="w-lede">Private until you showcase them. Hired work appears here too — you hire the job, you do not own the AI.</p>
                 </div>
                 <Link href="/workspace/create" className="w-btn">
                     <Plus size={16} aria-hidden="true" /> Create
@@ -50,6 +52,24 @@ export default async function WorkspaceHome() {
                     ))}
                 </ul>
             )}
+            {hired.length ? (
+                <section style={{ marginTop: 32 }}>
+                    <h2 className="w-h2">Hired</h2>
+                    <ul className="w-card-grid">
+                        {hired.map((row) => (
+                            <li key={row.id}>
+                                <Link href={`/${row.creation.profile.slug}/ai/${row.creation.slug}`} className="w-creation-card">
+                                    <span className="w-creation-avatar" aria-hidden="true">{row.creation.name.slice(0, 2).toUpperCase()}</span>
+                                    <div>
+                                        <h2>{row.creation.name}</h2>
+                                        <p>{row.creation.purpose || `From ${row.creation.profile.displayName}`}</p>
+                                    </div>
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
         </div>
     )
 }

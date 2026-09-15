@@ -88,6 +88,9 @@ export async function getOwnedCreation(profileId: string, id: string) {
         include: {
             knowledge: { orderBy: { createdAt: "desc" } },
             jobs: { orderBy: { createdAt: "desc" } },
+            messages: { orderBy: { createdAt: "asc" }, take: 40 },
+            schedules: { orderBy: { createdAt: "desc" } },
+            skillUses: { include: { uses: { select: { name: true } } } },
             _count: { select: { runs: true } },
         },
     })
@@ -167,7 +170,11 @@ export async function getPublicCreation(profileSlug: string, creationSlug: strin
             description: true,
             visibility: true,
             allowVisitorChat: true,
+            trialKind: true,
             profileId: true,
+            createdAt: true,
+            jobs: { where: { offered: true }, select: { id: true, name: true, description: true, inputHint: true, outputHint: true, priceCents: true, currency: true } },
+            _count: { select: { runs: true } },
         },
     })
     if (!creation) return null

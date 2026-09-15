@@ -32,6 +32,8 @@ export function CreationStudio({ creation }: { creation: Creation }) {
     const [note, setNote] = useState("")
     const [jobName, setJobName] = useState("")
     const [jobInput, setJobInput] = useState("")
+    const [jobPrice, setJobPrice] = useState("")
+    const [jobOffer, setJobOffer] = useState(false)
     const [chat, setChat] = useState("")
     const [log, setLog] = useState<{ role: "you" | "ai"; text: string }[]>([])
     const [busy, setBusy] = useState<string | null>(null)
@@ -209,8 +211,25 @@ export function CreationStudio({ creation }: { creation: Creation }) {
                 <h2 className="w-h2">Define and run a job</h2>
                 <label className="w-field">Job name<input value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="3 logo motion directions" /></label>
                 <label className="w-field">Input for this run<textarea rows={4} value={jobInput} onChange={(e) => setJobInput(e.target.value)} placeholder="Logo: a forest mark. Brand is quiet, premium, no bounce." /></label>
+                <label className="w-field">Price in ₹ (optional)<input inputMode="numeric" value={jobPrice} onChange={(e) => setJobPrice(e.target.value)} placeholder="499" /></label>
+                <label className="w-check">
+                    <input type="checkbox" checked={jobOffer} onChange={(e) => setJobOffer(e.target.checked)} />
+                    Offer this as a hireable job
+                </label>
                 <button className="w-btn" type="button" disabled={busy === "job"} onClick={async () => {
                     setBusy("job"); flash("")
+                    if (jobOffer) {
+                        await fetch(`/api/workspace/creations/${creation.id}/jobs`, {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({
+                                name: jobName || "Untitled job",
+                                inputHint: jobInput,
+                                offered: true,
+                                priceCents: Math.round(Number(jobPrice || "0") * 100),
+                            }),
+                        })
+                    }
                     const res = await fetch(`/api/workspace/creations/${creation.id}/run`, {
                         method: "POST",
                         headers: { "content-type": "application/json" },

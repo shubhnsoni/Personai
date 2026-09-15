@@ -267,6 +267,10 @@ model Profile {
   knowledgeGapSignals         KnowledgeGapSignal[]
   knowledgePaymentProofs      KnowledgePaymentProof[]
   creations                   Creation[]
+  creationOrdersSold          CreationOrder[] @relation("CreationOrderCreator")
+  creationOrdersBought        CreationOrder[] @relation("CreationOrderBuyer")
+  workspaceConnections        WorkspaceConnection[]
+  creationTeams               CreationTeam[]
 }
 
 model ProfileEvent {
@@ -4343,11 +4347,25 @@ model Creation {
   instructions     String?
   visibility       String   @default("PRIVATE")
   allowVisitorChat Boolean  @default(false)
+  trialKind        String   @default("CHAT")
+  remixPolicy      String   @default("none")
+  versionNote      String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   knowledge        CreationKnowledge[]
   jobs             CreationJob[]
   runs             CreationJobRun[]
+  messages         CreationMessage[]
+  orders           CreationOrder[]
+  reviews          CreationReview[]
+  access           CreationAccess[]
+  permissions      CreationPermission[]
+  schedules        CreationSchedule[]
+  approvals        CreationApproval[]
+  audits           CreationAudit[]
+  skillUses        CreationSkillDep[]  @relation("SkillHost")
+  usedBy           CreationSkillDep[]  @relation("SkillUsed")
+  teamMembers      CreationTeamMember[]
 
   @@unique([profileId, slug])
   @@index([profileId, visibility])
@@ -4371,10 +4389,16 @@ model CreationJob {
   name        String
   description String?
   inputHint   String?
+  outputHint  String?
+  offered     Boolean  @default(false)
+  priceCents  Int?
+  currency    String   @default("INR")
   createdAt   DateTime @default(now())
   runs        CreationJobRun[]
+  orders      CreationOrder[]
+  schedules   CreationSchedule[]
 
-  @@index([creationId])
+  @@index([creationId, offered])
 }
 
 model CreationJobRun {
@@ -4391,4 +4415,185 @@ model CreationJobRun {
   completedAt DateTime?
 
   @@index([creationId, createdAt])
+}
+
+model CreationMessage {
+  id             String   @id @default(cuid())
+  creationId     String
+  creation       Creation @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  role           String
+  body           String
+  actorProfileId String?
+  createdAt      DateTime @default(now())
+
+  @@index([creationId, createdAt])
+}
+
+model CreationOrder {
+  id              String    @id @default(cuid())
+  creationId      String
+  creation        Creation  @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  jobId           String
+  job             CreationJob @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  runId           String?
+  creatorProfileId String
+  creator         Profile   @relation("CreationOrderCreator", fields: [creatorProfileId], references: [id], onDelete: Restrict)
+  buyerProfileId  String?
+  buyer           Profile?  @relation("CreationOrderBuyer", fields: [buyerProfileId], references: [id], onDelete: SetNull)
+  buyerEmail      String?
+  priceCents      Int
+  feeCents        Int
+  creatorCents    Int
+  currency        String    @default("INR")
+  status          String    @default("awaiting_checkout")
+  input           String
+  stripeSessionId String?
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+  refundedAt      DateTime?
+  review          CreationReview?
+
+  @@index([creatorProfileId, createdAt])
+  @@index([buyerProfileId, createdAt])
+  @@index([creationId, status])
+}
+
+model CreationReview {
+  id        String        @id @default(cuid())
+  orderId   String        @unique
+  order     CreationOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  creationId String
+  creation  Creation      @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  rating    Int
+  body      String
+  createdAt DateTime      @default(now())
+
+  @@index([creationId, createdAt])
+}
+
+model CreationAccess {
+  id             String   @id @default(cuid())
+  creationId     String
+  creation       Creation @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  buyerProfileId String
+  lastUsedAt     DateTime @default(now())
+
+  @@unique([creationId, buyerProfileId])
+  @@index([buyerProfileId, lastUsedAt])
+}
+
+model WorkspaceConnection {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  kind      String
+  label     String
+  status    String   @default("unavailable")
+  scopes    String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  grants    CreationPermission[]
+  audits    CreationAudit[]
+
+  @@unique([profileId, kind, label])
+  @@index([profileId, kind])
+}
+
+model CreationPermission {
+  id            String              @id @default(cuid())
+  creationId    String
+  creation      Creation            @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  connectionId  String
+  connection    WorkspaceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  scopes        String[]
+  approvedAt    DateTime            @default(now())
+
+  @@unique([creationId, connectionId])
+}
+
+model CreationSchedule {
+  id         String      @id @default(cuid())
+  creationId String
+  creation   Creation    @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  jobId      String
+  job        CreationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  cadence    String
+  timezone   String      @default("UTC")
+  enabled    Boolean     @default(true)
+  lastRunAt  DateTime?
+  nextRunAt  DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@index([enabled, nextRunAt])
+}
+
+model CreationApproval {
+  id         String   @id @default(cuid())
+  creationId String
+  creation   Creation @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  action     String
+  payload    String
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  decidedAt  DateTime?
+
+  @@index([creationId, status])
+}
+
+model CreationAudit {
+  id           String               @id @default(cuid())
+  creationId   String
+  creation     Creation             @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  connectionId String?
+  connection   WorkspaceConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  actor        String
+  action       String
+  detail       String
+  createdAt    DateTime             @default(now())
+
+  @@index([creationId, createdAt])
+}
+
+model CreationSkillDep {
+  id         String   @id @default(cuid())
+  hostId     String
+  host       Creation @relation("SkillHost", fields: [hostId], references: [id], onDelete: Cascade)
+  usesId     String
+  uses       Creation @relation("SkillUsed", fields: [usesId], references: [id], onDelete: Cascade)
+  extraCost  Boolean  @default(false)
+
+  @@unique([hostId, usesId])
+}
+
+model CreationTeam {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name      String
+  template  String?
+  createdAt DateTime @default(now())
+  members   CreationTeamMember[]
+
+  @@index([profileId])
+}
+
+model CreationTeamMember {
+  id         String       @id @default(cuid())
+  teamId     String
+  team       CreationTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  creationId String
+  creation   Creation     @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  role       String       @default("skill")
+
+  @@unique([teamId, creationId])
+}
+
+model BridgeSession {
+  id        String   @id @default(cuid())
+  profileId String
+  status    String   @default("offline")
+  lastSeen  DateTime @default(now())
+  detail    String   @default("Desktop Bridge is not connected. Cloud jobs still run on Introify servers.")
+
+  @@unique([profileId])
 }

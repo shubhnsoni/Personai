@@ -11,6 +11,9 @@ vi.mock("@/lib/auth-sync", () => ({
 vi.mock("@/lib/creations", () => ({
     listCreations: vi.fn(async () => []),
 }))
+vi.mock("@/lib/workspace-market", () => ({
+    hiredCreations: vi.fn(async () => []),
+}))
 
 describe("workspace home", () => {
     it("does not advertise Phase 1 and gives an empty-state action", async () => {

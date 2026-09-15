@@ -847,7 +847,7 @@ html.dark .w-stickybar { background: rgba(9,9,11,.82); }
 .w-a { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--w-soft); }
 .w-ask { display: grid; gap: 10px; }
 .w-ask label { font-weight: 650; }
-.w-ask textarea, .w-field input, .w-field textarea, .w-inline-actions select { width: 100%; min-height: 44px; border: 1px solid var(--w-line); border-radius: 14px; padding: 10px 12px; font: inherit; background: var(--w-surface); color: inherit; }
+.w-ask textarea, .w-ask input, .w-ask select, .w-field input, .w-field textarea, .w-inline-actions select { width: 100%; min-height: 44px; border: 1px solid var(--w-line); border-radius: 14px; padding: 10px 12px; font: inherit; background: var(--w-surface); color: inherit; }
 .w-field { display: grid; gap: 6px; margin: 12px 0; font-size: 13px; font-weight: 650; }
 .w-inline-actions { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 12px 0; }
 .w-check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 650; }

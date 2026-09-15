@@ -141,7 +141,12 @@ export async function chatWithCreation(profileId: string, creationId: string, me
         include: { knowledge: { orderBy: { createdAt: "desc" }, take: 8 } },
     })
     if (!creation) return null
-    return replyAsCreation(creation, message, "creator-chat")
+    await prisma.creationMessage.create({ data: { creationId, role: "you", body: message.trim(), actorProfileId: profileId } }).catch(() => {})
+    const result = await replyAsCreation(creation, message, "creator-chat")
+    if (result?.reply) {
+        await prisma.creationMessage.create({ data: { creationId, role: "ai", body: result.reply, actorProfileId: profileId } }).catch(() => {})
+    }
+    return result
 }
 
 export async function chatWithPublicCreation(creationId: string, message: string) {
@@ -154,5 +159,15 @@ export async function chatWithPublicCreation(creationId: string, message: string
         include: { knowledge: { orderBy: { createdAt: "desc" }, take: 8 } },
     })
     if (!creation) return null
-    return replyAsCreation(creation, message, "visitor-chat")
+    const used = await prisma.creationMessage.count({ where: { creationId, role: "visitor" } })
+    const { trialAllowsMessage } = await import("@/lib/workspace-economy")
+    if (!trialAllowsMessage(creation.trialKind, used)) {
+        throw new Error("Chat preview is used up. Hire a job to keep going.")
+    }
+    await prisma.creationMessage.create({ data: { creationId, role: "visitor", body: message.trim() } }).catch(() => {})
+    const result = await replyAsCreation(creation, message, "visitor-chat")
+    if (result?.reply) {
+        await prisma.creationMessage.create({ data: { creationId, role: "ai", body: result.reply } }).catch(() => {})
+    }
+    return result
 }
