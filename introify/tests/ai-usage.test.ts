@@ -60,6 +60,14 @@ describe("server AI entitlements", () => {
         vi.stubEnv("INTROIFY_AI_FAST_MODEL", "o3")
         expect(resolveApiRecipe("fast")).toBeNull()
     })
+    it("still connects profile import when the preferred mapping is blank but the key is live", async () => {
+        vi.stubEnv("INTROIFY_AI_FAST_MODEL", "")
+        vi.stubEnv("INTROIFY_AI_SMART_MODEL", "")
+        vi.stubEnv("INTROIFY_AI_REASONING_MODEL", "")
+        expect(resolveApiRecipe("fast")).toBeNull()
+        const { resolveProfileImportRecipe } = await import("@/lib/ai-runtime")
+        expect(resolveProfileImportRecipe()).toMatchObject({ provider: "openai", model: "gpt-5.6-luna" })
+    })
     it.each(["fast", "smart", "reasoning"] as const)("bounds full serialized %s input including escaped text and tool schemas", mode => {
         const recipe = resolveApiRecipe(mode)!
         const input = boundedChatInput(recipe, "facts".repeat(10000), Array.from({length: 50}, () => ({role: "user", content: '\\"'.repeat(10000)})), [{ type: "function", function: { name: "collectLead", parameters: { description: "schema".repeat(10000) } } }])

@@ -105,7 +105,7 @@ function checkLength(text: string, receipt: ProfileImportReceipt): string {
 
 async function dispatch(recipe: ApiRecipe, messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], signal: AbortSignal): Promise<{ text: string; receipt: ProfileImportReceipt }> {
     const options = { signal, timeout: PROFILE_IMPORT_POLICY.providerTimeoutMs }
-    if (recipe.provider === "openai") {
+    if (recipe.provider === "openai" || recipe.provider === "xai") {
         const response = await apiClient(recipe).chat.completions.create({
             model: recipe.model,
             messages,
@@ -119,24 +119,6 @@ async function dispatch(recipe: ApiRecipe, messages: OpenAI.Chat.Completions.Cha
             throw new ProfileImportInvalidError(`Provider finished early (${choice.finish_reason}).`, receipt)
         }
         return { text: checkLength(choice?.message?.content || "", receipt), receipt }
-    }
-    if (recipe.provider === "xai") {
-        const response = await apiClient(recipe).responses.create({
-            model: recipe.model,
-            input: messages.map(message => ({ role: message.role === "system" ? "system" as const : "user" as const, content: typeof message.content === "string" ? message.content : "" })) as unknown as OpenAI.Responses.ResponseInput,
-            text: { format: { type: "json_object" } },
-            max_output_tokens: PROFILE_IMPORT_POLICY.maxOutputTokens,
-            store: false,
-            stream: false,
-            tools: [],
-            parallel_tool_calls: false,
-        }, options)
-        const receipt = receiptFor(recipe, response.usage as { input_tokens?: number; output_tokens?: number } | undefined, response.model)
-        if (response.status && response.status !== "completed") {
-            throw new ProfileImportInvalidError(`Provider response incomplete (${response.status}).`, receipt)
-        }
-        const text = response.output.flatMap(output => output.type === "message" ? output.content.flatMap(content => content.type === "output_text" ? [content.text] : []) : []).join("")
-        return { text: checkLength(text, receipt), receipt }
     }
 
     const stream = await boundedCodexChatStream({

@@ -107,6 +107,21 @@ export function resolveApiRecipe(mode: AiMode): ApiRecipe | null {
     return listApiRecipes(mode)[0] || null
 }
 
+/**
+ * Profile import can use a live key even when the preferred chat mapping is blank.
+ * Chat stays strict (resolveApiRecipe); import should not fail closed on a configured provider.
+ */
+export function resolveProfileImportRecipe(): ApiRecipe | null {
+    const live = listApiRecipes("fast")
+    if (live[0]) return live[0]
+    if (process.env.INTROIFY_AI_DISABLED === "true") return null
+    for (const provider of providerOrder()) {
+        const recipe = recipeForProvider("fast", provider, false)
+        if (recipe) return recipe
+    }
+    return null
+}
+
 export function recipeIsLive(recipe: ApiRecipe): boolean {
     return listApiRecipes(recipe.mode).some(item => item.provider === recipe.provider && item.model === recipe.model)
 }

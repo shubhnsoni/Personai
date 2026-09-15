@@ -99,6 +99,21 @@ describe("ProfileImportBuilder", () => {
         expect((screen.getByLabelText("Pasted page text") as HTMLTextAreaElement).value).toBe("kept text")
     })
 
+    it("issues a new request id after a terminal failure so Generate can retry", async () => {
+        mocks.generate.mockResolvedValueOnce({ ok: false, error: "Profile import is not connected yet." })
+        mocks.generate.mockResolvedValue({ ok: true, preview })
+        render(<ProfileImportBuilder context={{}} />)
+        fireEvent.change(screen.getByLabelText("Pasted page text"), { target: { value: "retry text" } })
+        fireEvent.click(screen.getByText("These are my profiles or I have permission to import them."))
+        fireEvent.click(screen.getByRole("button", { name: /Generate full profile/ }))
+        await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/not connected/i))
+        const firstId = mocks.generate.mock.calls[0][1].requestId
+        fireEvent.click(screen.getByRole("button", { name: /Generate full profile/ }))
+        await waitFor(() => expect(screen.getByLabelText("Headline")).toBeTruthy())
+        expect(mocks.generate.mock.calls[1][1].requestId).not.toBe(firstId)
+        expect(mocks.generate.mock.calls[1][1].text).toBe("retry text")
+    })
+
     it("recovers via explicit Check saved result and re-keys a changed input", async () => {
         mocks.generate.mockResolvedValueOnce({ ok: false, error: "network dropped" })
         mocks.generate.mockResolvedValue({ ok: true, preview })

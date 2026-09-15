@@ -104,6 +104,7 @@ export function ProfileImportBuilder({
     })())
     const submittedInput = useRef<ProfileImportInput | null>(null)
     const generating = useRef(false)
+    const retryWithNewRequest = useRef(false)
     function rotateRequestId() {
         requestId.current = newRequestId()
         try { sessionStorage?.setItem(storageKey, requestId.current) } catch { }
@@ -146,7 +147,10 @@ export function ProfileImportBuilder({
         if (busy || generating.current) return
         const input = currentInput()
 
-        if (inputChanged(input)) rotateRequestId()
+        if (inputChanged(input) || retryWithNewRequest.current) {
+            rotateRequestId()
+            retryWithNewRequest.current = false
+        }
         input.requestId = requestId.current
         submittedInput.current = input
         generating.current = true
@@ -154,9 +158,17 @@ export function ProfileImportBuilder({
         setError(null)
         try {
             const result = await generateProfileImport(context, input)
-            if (!result.ok) { setError(result.error); return }
+            if (!result.ok) {
+                setError(result.error)
+                if (!/already generating|already received|already used elsewhere/i.test(result.error)) {
+                    retryWithNewRequest.current = true
+                }
+                return
+            }
+            retryWithNewRequest.current = false
             showPreview(result.preview)
         } catch (err) {
+            retryWithNewRequest.current = true
             setError(actionMessage(err, "Import failed. Your text and links are kept below. Use Check saved result before starting a new generation."))
         } finally {
             generating.current = false

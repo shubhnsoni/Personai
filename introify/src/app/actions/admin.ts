@@ -16,6 +16,7 @@ import {
     type PlatformAiSettings,
 } from "@/lib/admin/ai-settings"
 import { llmClient, resolveChatModel } from "@/lib/llm"
+import { provisionAdminAccount, type AdminCreateAccountInput } from "@/lib/admin/create-account"
 
 async function audit(actorUserId: string, action: string, profileId?: string | null, meta?: unknown) {
     await prisma.auditEvent.create({
@@ -230,6 +231,34 @@ export async function purgeExpiredAnalytics() {
     await audit(admin.id, "purge_analytics", null, { count: ids.length })
     revalidatePath("/admin/support")
     return ids.length
+}
+
+function accountActionError(error: unknown): { ok: false; error: string } {
+    const message = error instanceof Error ? error.message : "Could not create that account."
+    if (/prisma|sql|econn|etimedout|digest|p2002|constraint failed/i.test(message)) {
+        return { ok: false, error: "Could not create that account. Check the email and try again." }
+    }
+    return { ok: false, error: message.slice(0, 500) }
+}
+
+export async function createAdminAccount(input: AdminCreateAccountInput) {
+    const admin = await requireAdmin()
+    try {
+        const result = await provisionAdminAccount(input)
+        await audit(admin.id, "create_account", result.profileId, {
+            email: result.email,
+            createdUser: result.createdUser,
+            createdProfile: result.createdProfile,
+            slug: result.slug,
+            import: result.import?.status || null,
+        })
+        revalidatePath("/admin/users")
+        revalidatePath(`/admin/users/${result.userId}`)
+        revalidatePath(`/admin/shops/${result.profileId}`)
+        return { ok: true as const, ...result, publicPath: `/${result.slug}` }
+    } catch (error) {
+        return accountActionError(error)
+    }
 }
 
 export async function unsuspendUser(userId: string) {

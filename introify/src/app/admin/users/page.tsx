@@ -48,10 +48,13 @@ export default async function AdminUsersPage({
                 title="People"
                 hint="Shop owners and Introify admins. Visitors live under Traffic."
                 action={(
-                    <form className="flex gap-2">
-                        <input name="q" defaultValue={query} placeholder="Search email" className="h-8 rounded-full border border-white/10 bg-transparent px-3 text-xs" />
-                        <button className="h-8 rounded-full border border-white/10 px-3 text-xs" type="submit">Search</button>
-                    </form>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Link href="/admin/users/new" className="inline-flex h-8 items-center rounded-full border border-white/10 px-3 text-xs">Create account</Link>
+                        <form className="flex gap-2">
+                            <input name="q" defaultValue={query} placeholder="Search email" className="h-8 rounded-full border border-white/10 bg-transparent px-3 text-xs" />
+                            <button className="h-8 rounded-full border border-white/10 px-3 text-xs" type="submit">Search</button>
+                        </form>
+                    </div>
                 )}
             />
             <AdminPanel>

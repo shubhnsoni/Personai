@@ -13,6 +13,7 @@ import { ensureDefaultBillingAccount, withAccountLimit, assertAccountLimit } fro
 import { ACTIVE_PROFILE_COOKIE } from "@/lib/try-kits"
 import { requireAuthenticatedUser, unwrapOwnershipResult } from "@/lib/security"
 import { normalizeUsername, usernameError } from "@/lib/username"
+import { allocateBusinessSlug, slugTaken } from "@/lib/business-slug"
 import { profileBlueprintSchema, type ProfileBlueprint } from "@/lib/profile-import-contract"
 import { applyProfileBlueprintTx } from "@/lib/profile-import-apply"
 
@@ -58,26 +59,6 @@ const DEFAULT_SERVICE_BY_ROLE: Readonly<Record<string, { name: string; descripti
     EVENTS_STUDIO: { name: "Event discovery call", description: "A first conversation about the event brief." },
     REAL_ESTATE_BROKERAGE: { name: "Property consultation", description: "A first conversation about a mandate or viewing." },
     RECRUITMENT_AGENCY: { name: "Hiring brief", description: "A first conversation about the role to fill." },
-}
-
-async function slugTaken(candidate: string, exceptProfileId?: string) {
-    const [profile, workspace] = await Promise.all([
-        prisma.profile.findUnique({ where: { slug: candidate }, select: { id: true } }),
-        prisma.workspace.findUnique({ where: { slug: candidate }, select: { profileId: true } }),
-    ])
-    if (profile && profile.id !== exceptProfileId) return true
-    if (workspace && workspace.profileId !== exceptProfileId) return true
-    return false
-}
-
-async function availableBusinessSlug(displayName: string): Promise<string> {
-    const base = normalizeUsername(displayName) || "page"
-    let candidate = base
-    let suffix = 2
-    while (await slugTaken(candidate) || usernameError(candidate)) {
-        candidate = `${base}-${suffix++}`
-    }
-    return candidate
 }
 
 export async function checkUsername(raw: string) {
@@ -128,7 +109,7 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
             if (await slugTaken(wanted)) throw new TypeError("That username is taken")
             return wanted
         })()
-        : await availableBusinessSlug(displayName)
+        : await allocateBusinessSlug(displayName)
 
     const effectiveNeed = importBlueprint ? needById(importBlueprint.needId) : needById(data.needId)
     const roleTemplate = importBlueprint ? effectiveNeed.role : data.roleTemplate

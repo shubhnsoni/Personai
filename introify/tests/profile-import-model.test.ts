@@ -12,13 +12,16 @@ const mocks = vi.hoisted(() => ({
     jobCreate: vi.fn(),
     jobUpdate: vi.fn(),
     jobUpdateMany: vi.fn(),
+    jobDelete: vi.fn(),
     collect: vi.fn(),
+    resolveApiRecipe: vi.fn(),
+    listApiRecipes: vi.fn(),
 }))
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("@/lib/prisma", () => ({
     prisma: {
-        profileImportJob: { findUnique: mocks.jobFind, create: mocks.jobCreate, update: mocks.jobUpdate, updateMany: mocks.jobUpdateMany },
+        profileImportJob: { findUnique: mocks.jobFind, create: mocks.jobCreate, update: mocks.jobUpdate, updateMany: mocks.jobUpdateMany, delete: mocks.jobDelete },
         billingAccount: { findUnique: vi.fn() },
     },
 }))
@@ -45,7 +48,9 @@ vi.mock("@/lib/profile-import-sources", async original => ({
 const recipe = { mode: "fast" as const, provider: "openai" as const, model: "gpt-4o-mini", inputBudget: 2000, outputBudget: 500, inputUsdPerMillion: null, outputUsdPerMillion: null }
 vi.mock("@/lib/ai-runtime", async original => ({
     ...await original<typeof import("@/lib/ai-runtime")>(),
-    resolveApiRecipe: vi.fn(() => recipe),
+    resolveApiRecipe: mocks.resolveApiRecipe,
+    listApiRecipes: mocks.listApiRecipes,
+    resolveProfileImportRecipe: () => mocks.listApiRecipes()[0] || mocks.resolveApiRecipe() || null,
     apiClient: () => ({ chat: { completions: { create: mocks.completion } }, responses: { create: mocks.responsesCreate } }),
     boundedCodexChatStream: mocks.codexStream,
 }))
@@ -85,10 +90,13 @@ function jobRow(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     vi.clearAllMocks()
+    mocks.resolveApiRecipe.mockReturnValue(recipe)
+    mocks.listApiRecipes.mockReturnValue([recipe])
     mocks.collect.mockResolvedValue({ sources: [{ id: "s1", label: "ada.dev", url: "https://ada.dev/", status: "read", discoveredFrom: null, warning: null }], evidence, warnings: [] })
     mocks.jobCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => jobRow({ status: "PENDING", ...data }))
     mocks.jobUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => jobRow(data as Record<string, unknown>))
     mocks.jobUpdateMany.mockResolvedValue({ count: 1 })
+    mocks.jobDelete.mockResolvedValue(jobRow({ status: "FAILED" }))
     mocks.reserve.mockResolvedValue({ id: "res-1", state: "RESERVED", created: true })
     mocks.completion.mockResolvedValue({ model: recipe.model, choices: [{ message: { content: JSON.stringify(blueprint) }, finish_reason: "stop" }], usage: { prompt_tokens: 300, completion_tokens: 120 } })
 })
@@ -139,16 +147,16 @@ describe("runProfileImportModel", () => {
         expect(ok.blueprint.socials[0].url).toBe("https://github.com/ada")
     })
 
-    it("runs the xAI responses branch with its own budget and status check", async () => {
-        mocks.responsesCreate.mockResolvedValue({
-            model: "grok-x", status: "completed",
-            output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(blueprint) }] }],
-            usage: { input_tokens: 200, output_tokens: 80 },
-        })
+    it("runs xAI through chat completions with the import JSON budget", async () => {
         const result = await runProfileImportModel(profileImportRecipe({ ...recipe, provider: "xai", model: "grok-x" }), evidence)
-        expect(mocks.responsesCreate).toHaveBeenCalledWith(expect.objectContaining({ max_output_tokens: 7000, store: false, stream: false }), expect.objectContaining({ timeout: 90_000 }))
-        expect(result.receipt.returnedModel).toBe("grok-x")
-        mocks.responsesCreate.mockResolvedValue({ model: "grok-x", status: "incomplete", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(blueprint) }] }], usage: {} })
+        expect(mocks.completion).toHaveBeenCalledWith(expect.objectContaining({
+            model: "grok-x",
+            response_format: { type: "json_object" },
+            max_completion_tokens: 7000,
+        }), expect.objectContaining({ timeout: 90_000 }))
+        expect(mocks.responsesCreate).not.toHaveBeenCalled()
+        expect(result.blueprint.profile.displayName).toBe("Ada")
+        mocks.completion.mockResolvedValue({ model: "grok-x", choices: [{ message: { content: JSON.stringify(blueprint) }, finish_reason: "length" }], usage: {} })
         await expect(runProfileImportModel(profileImportRecipe({ ...recipe, provider: "xai", model: "grok-x" }), evidence)).rejects.toBeInstanceOf(ProfileImportInvalidError)
     })
 
@@ -253,6 +261,60 @@ describe("generateProfileImport metering", () => {
         await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/No readable source/i) })
         expect(mocks.reserve).not.toHaveBeenCalled()
         expect(mocks.completion).not.toHaveBeenCalled()
+    })
+
+    it("retries an uncharged FAILED job with the same request instead of replaying the error", async () => {
+        const createdHash = (await (async () => {
+            mocks.jobFind.mockResolvedValue(null)
+            await generateProfileImport(context, input)
+            return (mocks.jobCreate.mock.calls[0][0] as { data: { inputHash: string } }).data.inputHash
+        })())
+        vi.clearAllMocks()
+        mocks.resolveApiRecipe.mockReturnValue(recipe)
+        mocks.listApiRecipes.mockReturnValue([recipe])
+        mocks.collect.mockResolvedValue({ sources: [{ id: "s1", label: "ada.dev", url: "https://ada.dev/", status: "read", discoveredFrom: null, warning: null }], evidence, warnings: [] })
+        mocks.jobCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => jobRow({ status: "PENDING", ...data }))
+        mocks.jobUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => jobRow(data as Record<string, unknown>))
+        mocks.jobUpdateMany.mockResolvedValue({ count: 1 })
+        mocks.reserve.mockResolvedValue({ id: "res-1", state: "RESERVED", created: true })
+        mocks.completion.mockResolvedValue({ model: recipe.model, choices: [{ message: { content: JSON.stringify(blueprint) }, finish_reason: "stop" }], usage: { prompt_tokens: 300, completion_tokens: 120 } })
+        mocks.jobFind.mockResolvedValueOnce(jobRow({
+            status: "FAILED",
+            error: "Profile import is not connected yet.",
+            reservationId: null,
+            inputHash: createdHash,
+        })).mockResolvedValue(null)
+
+        const preview = await generateProfileImport(context, input)
+        expect(preview).toMatchObject({ ok: true, preview: { status: "READY" } })
+        expect(mocks.jobDelete).toHaveBeenCalledWith({ where: { id: "job-1" } })
+        expect(mocks.jobCreate).toHaveBeenCalledTimes(1)
+        expect(mocks.reserve).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not retry a FAILED job whose credits are pending reconciliation", async () => {
+        mocks.jobFind.mockResolvedValue(null)
+        await generateProfileImport(context, input)
+        const createdHash = (mocks.jobCreate.mock.calls[0][0] as { data: { inputHash: string } }).data.inputHash
+        mocks.jobFind.mockResolvedValue(jobRow({
+            status: "FAILED",
+            error: "Generation did not complete. Credits are reserved pending reconciliation; starting a new generation may reserve another 10 credits.",
+            reservationId: "res-held",
+            inputHash: createdHash,
+        }))
+        mocks.jobDelete.mockClear()
+        mocks.reserve.mockClear()
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/pending reconciliation/i) })
+        expect(mocks.jobDelete).not.toHaveBeenCalled()
+        expect(mocks.reserve).not.toHaveBeenCalled()
+    })
+
+    it("returns a clear error when no import provider is connected", async () => {
+        mocks.jobFind.mockResolvedValue(null)
+        mocks.resolveApiRecipe.mockReturnValue(null)
+        mocks.listApiRecipes.mockReturnValue([])
+        await expect(generateProfileImport(context, input)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/not connected/i) })
+        expect(mocks.reserve).not.toHaveBeenCalled()
     })
 
     it("scopes getProfileImport to the exact owner/account/target and TTL", async () => {
