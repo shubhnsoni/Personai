@@ -17,6 +17,13 @@ const nextConfig = {
     "*.trycloudflare.com",
     "*.loca.lt",
   ],
+  async redirects() {
+    return [
+      { source: "/signup", destination: "/sign-up", permanent: true },
+      { source: "/signin", destination: "/sign-in", permanent: true },
+      { source: "/login", destination: "/sign-in", permanent: true },
+    ];
+  },
   async rewrites() {
     return {
       beforeFiles: [
@@ -36,7 +43,6 @@ const nextConfig = {
         "/qa/:path*",
         "/library/:path*",
         "/sign-in/:path*",
-        "/sign-up/:path*",
         "/api/:path*",
         "/o/:path*",
         "/l/:path*",

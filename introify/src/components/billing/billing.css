@@ -14,6 +14,18 @@
 .dark .billing-page-heading h1 em { color:var(--bl-lime); }
 .billing-page-heading > p:last-child { max-width:610px; margin:auto; color:var(--bl-muted); line-height:1.85; font-size:16px; }
 .plan-launch-note { margin:0 auto 28px; max-width:720px; }
+.billing-pack-soon { margin:16px 0 0; color:var(--bl-muted); font-size:12px; font-weight:650; }
+.waitlist-layer { position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; background:rgb(6 16 24 / 55%); }
+.waitlist-dialog { width:min(420px,100%); border:1px solid var(--bl-line); border-radius:20px; background:var(--bl-card); padding:28px 24px 20px; box-shadow:0 24px 80px rgb(0 0 0 / 18%); }
+.waitlist-dialog h2 { font-size:22px; letter-spacing:-.03em; line-height:1.25; margin-bottom:8px; }
+.waitlist-dialog > p { color:var(--bl-muted); font-size:14px; line-height:1.6; margin-bottom:18px; }
+.waitlist-dialog form { display:grid; gap:12px; }
+.waitlist-dialog label { display:grid; gap:6px; font-size:12px; font-weight:650; }
+.waitlist-dialog input[type="email"] { min-height:44px; border:1px solid var(--bl-line); border-radius:12px; padding:0 12px; font:inherit; background:var(--bl-paper); color:var(--bl-ink); }
+.waitlist-honeypot { position:absolute; left:-9999px; height:0; width:0; opacity:0; }
+.waitlist-error { color:#b42318; font-size:13px; }
+.waitlist-success { color:var(--bl-ink); font-size:14px; line-height:1.6; }
+.waitlist-close { margin-top:14px; border:0; background:none; color:var(--bl-muted); font:inherit; font-size:13px; min-height:44px; cursor:pointer; }
 .plan-controls { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px; margin-bottom:12px; }
 .plan-save-hint { margin:0 auto 28px!important; text-align:center; color:var(--bl-muted); font-size:12px; line-height:1.7; }
 .plan-interval { display:inline-flex; padding:5px; gap:3px; border:1px solid var(--bl-line); border-radius:12px; background:var(--bl-soft); }

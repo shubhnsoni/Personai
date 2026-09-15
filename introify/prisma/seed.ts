@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { seedShowcaseProfiles } from '../src/lib/showcase-profiles'
 
 const prisma = new PrismaClient()
 
@@ -370,6 +371,8 @@ async function main() {
         })
         console.log('Updated demo lead magnet')
     }
+
+    await seedShowcaseProfiles(prisma)
 
     console.log('Seeding finished.')
 }

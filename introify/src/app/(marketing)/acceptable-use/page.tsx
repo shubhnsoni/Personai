@@ -8,7 +8,6 @@ export const metadata = marketingMetadata({
     title: document.title,
     description: document.description,
     path: "/acceptable-use",
-    index: false,
 })
 
 export default function AcceptableUsePage() {

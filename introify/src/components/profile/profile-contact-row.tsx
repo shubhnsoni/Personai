@@ -1,3 +1,5 @@
+"use client"
+
 import { Instagram, Facebook, Youtube, MapPin, Linkedin } from "lucide-react"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import type { SocialLinks } from "@/lib/socials"

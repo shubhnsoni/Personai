@@ -8,7 +8,6 @@ export const metadata = marketingMetadata({
     title: document.title,
     description: document.description,
     path: "/contact",
-    index: false,
 })
 
 export default function ContactPage() {

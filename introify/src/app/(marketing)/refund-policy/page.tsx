@@ -8,7 +8,6 @@ export const metadata = marketingMetadata({
     title: document.title,
     description: document.description,
     path: "/refund-policy",
-    index: false,
 })
 
 export default function RefundPolicyPage() {

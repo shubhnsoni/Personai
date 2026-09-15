@@ -1,34 +1,16 @@
-import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
-import { notFound, permanentRedirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
+import { notFound } from "next/navigation"
 import { ProfileView } from "@/components/profile/profile-view"
-import { Metadata } from "next"
-import { isIndexableProfileSlug, marketingMetadata, marketingOrigin, marketingStructuredData } from "@/lib/marketing-seo"
-import { HomeLanding } from "@/components/landing/home-landing"
-import { isLocaleHomeSlug, isReservedUiLocale } from "@/lib/ui-locale"
+import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
 import { messagesFor } from "@/lib/ui-messages"
-import { IntentIntroduction } from "@/components/profile/intent-introduction"
-import Link from "next/link"
+import { listShowcaseCreations } from "@/lib/creations"
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProfilePage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params
-    if (slug === "en") permanentRedirect("/")
-    if (isLocaleHomeSlug(slug)) {
-        return (
-            <>
-                <script
-                    type="application/ld+json"
-                    dangerouslySetInnerHTML={{
-                        __html: JSON.stringify(marketingStructuredData()).replace(/</g, "\\u003c"),
-                    }}
-                />
-                <HomeLanding locale={slug} />
-            </>
-        )
-    }
-    if (isReservedUiLocale(slug)) notFound()
+    if (slug === "en") notFound()
+
     const profile = await prisma.profile.findUnique({
         where: { slug },
         include: {
@@ -87,24 +69,40 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
             where: { profileId: profile.id, status: "PUBLISHED", scoringApproved: true },
         }),
         prisma.profileDocument.count({
-            where: { profileId: profile.id, visibility: "PUBLIC", publicationState: "PUBLISHED" },
+            where: { profileId: profile.id, visibility: "PUBLIC", publicationState: "PUBLISHED", sourceType: { not: "DEMO_SEED" } },
         }),
     ])
-    const expertiseLinks = (introductions.length || frameworkCount || publicKnowledgeCount) ? (
+    const showcase = await listShowcaseCreations(profile.id)
+    const showcaseLinks = showcase.length ? (
+        <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">AIs on this page</div>
+            {showcase.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-border/70 px-3 py-2">
+                    <div className="text-sm font-medium">{item.name}</div>
+                    <div className="text-xs text-muted-foreground">{item.purpose || item.description}</div>
+                    {item.allowVisitorChat ? <div className="text-xs">Ask the guide about this AI.</div> : null}
+                </div>
+            ))}
+        </div>
+    ) : null
+    const expertiseLinks = (introductions.length || frameworkCount || publicKnowledgeCount || showcaseLinks) ? (
         <div className="space-y-2">
             {introductions.length ? (
-                <IntentIntroduction entries={introductions} defaultText={profile.welcomeMessageOverride} />
+                <div className="text-sm text-muted-foreground">
+                    {introductions[0]?.text}
+                </div>
             ) : null}
+            {showcaseLinks}
             <div className="flex flex-wrap gap-1.5">
                 {frameworkCount ? (
-                    <Link href={`/${profile.slug}/frameworks`} className="rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium">
+                    <a href={`/${profile.slug}/frameworks`} className="rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium">
                         Self-assessments ({frameworkCount})
-                    </Link>
+                    </a>
                 ) : null}
                 {publicKnowledgeCount ? (
-                    <Link href={`/${profile.slug}/knowledge`} className="rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium">
+                    <a href={`/${profile.slug}/knowledge`} className="rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium">
                         Knowledge
-                    </Link>
+                    </a>
                 ) : null}
             </div>
         </div>
@@ -116,9 +114,6 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
             profile={{
                 ...profile,
                 hasStory: Boolean(story?.frames.length),
-                // Prisma types Event.startTime/endTime as DateTime (Date). ProfileView and the
-                // ContentPanel it feeds both declare them as `string` and only ever hand them to
-                // `new Date(...)`, so serialise here instead of asserting a type the data does not have.
                 events: profile.events.map((event) => ({
                     ...event,
                     startTime: event.startTime.toISOString(),
@@ -129,56 +124,4 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
             colors={colors}
         />
     )
-}
-
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-    const { slug } = await params
-    if (isLocaleHomeSlug(slug)) {
-        const meta = messagesFor(slug).meta
-        return marketingMetadata({
-            title: meta.homeTitle,
-            description: meta.homeDescription,
-            path: `/${slug}`,
-            languages: true,
-        })
-    }
-    if (isReservedUiLocale(slug)) {
-        return { title: "Not Found", robots: { index: false, follow: false } }
-    }
-    const profile = await prisma.profile.findUnique({
-        where: { slug },
-        select: { displayName: true, headline: true, bio: true, slug: true, isPublic: true }
-    })
-
-    if (!profile || !profile.isPublic) {
-        return {
-            title: "Profile Not Found",
-            robots: { index: false, follow: false },
-        }
-    }
-
-    const description = profile.headline || profile.bio || `Chat with ${profile.displayName}'s AI clone on Introify.`
-    const baseUrl = marketingOrigin()
-    const profileUrl = `${baseUrl}/${profile.slug}`
-
-    return {
-        title: `${profile.displayName} | Introify`,
-        description,
-        robots: { index: isIndexableProfileSlug(profile.slug), follow: true },
-        openGraph: {
-            title: `${profile.displayName} — Introify`,
-            description,
-            url: profileUrl,
-            siteName: "Introify",
-            type: "profile",
-        },
-        twitter: {
-            card: "summary_large_image",
-            title: `${profile.displayName} — Introify`,
-            description,
-        },
-        alternates: {
-            canonical: profileUrl,
-        },
-    }
 }

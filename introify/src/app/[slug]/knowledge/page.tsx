@@ -20,6 +20,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ slug
     const rows = await prisma.profileDocument.findMany({
         where: {
             profileId: profile.id,
+            sourceType: { not: "DEMO_SEED" },
             OR: [
                 { visibility: "PUBLIC", publicationState: "PUBLISHED" },
                 ...(clientIds.size ? [{ visibility: "CLIENT", id: { in: [...clientIds] } }] : []),

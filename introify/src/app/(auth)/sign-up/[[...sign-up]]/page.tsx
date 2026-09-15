@@ -6,7 +6,7 @@ import { AuthLoading } from "@/components/auth/auth-loading"
 export const metadata: Metadata = {
     title: "Create your account | Introify",
     description: "Create an Introify account to bring your profile, offerings and bookings together.",
-    robots: { index: false, follow: true },
+    robots: { index: true, follow: true },
 }
 
 export default function SignUpPage() {

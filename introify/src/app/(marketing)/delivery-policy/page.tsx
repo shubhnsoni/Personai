@@ -8,7 +8,6 @@ export const metadata = marketingMetadata({
     title: document.title,
     description: document.description,
     path: "/delivery-policy",
-    index: false,
 })
 
 export default function DeliveryPolicyPage() {

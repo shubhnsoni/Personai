@@ -1258,6 +1258,19 @@ html[lang="hi-IN"] .mk-page em,
     gap: 7px;
     align-items: center;
 }
+.mk-contact-form { margin:48px 0 0; max-width:640px; padding:28px; border:1px solid var(--mk-line); border-radius:22px; background:color-mix(in srgb, var(--mk-paper) 70%, #fff); }
+.mk-contact-form h2 { font-size:28px; letter-spacing:-.03em; margin-bottom:8px; }
+.mk-contact-form > p { color:var(--mk-muted); margin-bottom:20px; }
+.mk-contact-form form { display:grid; gap:14px; }
+.mk-contact-form label { display:grid; gap:6px; font-size:13px; font-weight:650; }
+.mk-contact-form input, .mk-contact-form textarea { min-height:44px; border:1px solid var(--mk-line); border-radius:14px; padding:10px 12px; font:inherit; background:var(--mk-paper); color:var(--mk-ink); }
+.mk-contact-form textarea { min-height:140px; resize:vertical; }
+.mk-contact-form .mk-button { justify-self:start; min-height:44px; }
+.mk-contact-honeypot { position:absolute; left:-9999px; height:0; width:0; opacity:0; }
+.mk-contact-error { color:#b42318; font-size:13px; }
+.mk-contact-success { font-size:15px; line-height:1.6; }
+.mk-contact-mailto { margin-top:16px; }
+.mk-contact-mailto a { color:var(--mk-accent); text-decoration:underline; text-underline-offset:3px; }
 .mk-draft-notice {
     background: #efefdd;
     border: 1px solid #daddbc;

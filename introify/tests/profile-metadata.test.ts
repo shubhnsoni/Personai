@@ -3,7 +3,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const db = vi.hoisted(() => ({ findUnique: vi.fn() }))
 vi.mock("@/lib/prisma", () => ({ prisma: { profile: { findUnique: db.findUnique } } }))
 vi.mock("@/components/profile/profile-view", () => ({ ProfileView: () => null }))
-import { generateMetadata } from "@/app/[slug]/page"
+vi.mock("@/lib/marketing-seo", () => ({
+    marketingMetadata: (meta: Record<string, unknown>) => meta,
+    marketingOrigin: () => "https://example.test",
+    marketingStructuredData: () => ({}),
+    isIndexableProfileSlug: (slug: string) => slug !== "demo" && !slug.startsWith("try-"),
+}))
+vi.mock("@/lib/ui-locale", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/ui-locale")>()
+    return {
+        ...actual,
+        isLocaleHomeSlug: () => false,
+        isReservedUiLocale: () => false,
+    }
+})
+vi.mock("@/lib/slugs", () => ({
+    isReservedSlug: () => false,
+    RESERVED: [],
+}))
+vi.mock("@/lib/ui-messages", () => ({ messagesFor: () => ({ meta: {} }) }))
+import { generateMetadata } from "@/app/[slug]/layout"
 
 describe("profile metadata privacy", () => {
     beforeEach(() => {

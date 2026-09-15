@@ -16,9 +16,9 @@ export function AiCreditGuide({ locale = "en" }: { locale?: UiLocale }) {
     })}</div><p className="plan-footnote">{copy.foot}</p></section>
 }
 
-export function PublicCreditPacks({ locale = "en" }: { locale?: UiLocale }) {
+export function PublicCreditPacks({ locale = "en", billingAvailable = false }: { locale?: UiLocale; billingAvailable?: boolean }) {
     const copy = messagesFor(locale).pricing.packs
-    return <section className="billing-section" id="photoreal-3d" aria-labelledby="generation-packs"><div className="billing-section-heading"><div><p className="billing-eyebrow">{copy.eyebrow}</p><h2 id="generation-packs">{copy.title}</h2></div><p>{copy.lead}</p></div><div className="billing-pack-grid">{CREDIT_PACKS.map(pack => <article className="billing-pack" key={pack.id}><h3>{copy.names[pack.id as keyof typeof copy.names]}</h3><div className="billing-pack-price"><strong>{dollars(pack.priceCents)}</strong><span>{copy.oneTime}</span></div><p>{pack.unit === "AI" ? copy.aiUse : copy.genUse}</p><Link href="/dashboard/billing" className="billing-button billing-button-secondary">{copy.viewBilling} <ArrowUpRight size={15} aria-hidden="true" /></Link></article>)}</div><p className="plan-footnote">{copy.foot}</p></section>
+    return <section className="billing-section" id="photoreal-3d" aria-labelledby="generation-packs"><div className="billing-section-heading"><div><p className="billing-eyebrow">{copy.eyebrow}</p><h2 id="generation-packs">{copy.title}</h2></div><p>{copy.lead}</p></div><div className="billing-pack-grid">{CREDIT_PACKS.map(pack => <article className="billing-pack" key={pack.id}><h3>{copy.names[pack.id as keyof typeof copy.names]}</h3><div className="billing-pack-price"><strong>{dollars(pack.priceCents)}</strong><span>{copy.oneTime}</span></div><p>{pack.unit === "AI" ? copy.aiUse : copy.genUse}</p>{billingAvailable ? <Link href="/dashboard/billing" className="billing-button billing-button-secondary">{copy.viewBilling} <ArrowUpRight size={15} aria-hidden="true" /></Link> : <p className="billing-pack-soon">{copy.comingSoon}</p>}</article>)}</div><p className="plan-footnote">{copy.foot}</p></section>
 }
 
 export function PricingFaq({ locale = "en" }: { locale?: UiLocale }) {

@@ -24,7 +24,7 @@ export default async function PricingPage() {
         <p className="plan-footnote">{fill(copy.status, { ai: availability.ai ? copy.available : copy.notAvailable, photoreal: availability.photoreal ? copy.availableEligible : copy.notAvailable })}</p>
         <PlanFeatureMatrix locale={locale} />
         <AiCreditGuide locale={locale} />
-        <PublicCreditPacks locale={locale} />
+        <PublicCreditPacks locale={locale} billingAvailable={availability.billing} />
         <PricingFaq locale={locale} />
     </div></main></MarketingShell>
 }

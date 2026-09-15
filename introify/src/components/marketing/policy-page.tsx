@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import Link from "@/components/navigation/transition-link"
 import { ArrowLeft, ArrowUpRight, FileText } from "lucide-react"
 import { MarketingShell } from "./marketing-shell"
@@ -6,7 +7,7 @@ import { fill, localeHomePath, type UiLocale } from "@/lib/ui-locale"
 import { messagesFor } from "@/lib/ui-messages"
 import { CookiePreferenceManager } from "@/components/privacy/cookie-preference"
 
-export function PolicyPage({ document, locale = "en" }: { document: PolicyDocument; locale?: UiLocale }) {
+export function PolicyPage({ document, locale = "en", children }: { document: PolicyDocument; locale?: UiLocale; children?: ReactNode }) {
     const policy = messagesFor(locale).chrome.policy
     return (
         <MarketingShell locale={locale}>
@@ -89,7 +90,13 @@ export function PolicyPage({ document, locale = "en" }: { document: PolicyDocume
                                                 <div key={field.label}>
                                                     <dt>{field.label}</dt>
                                                     <dd>
-                                                        {field.value || (
+                                                        {field.value ? (
+                                                            field.value.includes("@") && !field.value.includes(" ") ? (
+                                                                <a href={`mailto:${field.value}`}>{field.value}</a>
+                                                            ) : (
+                                                                field.value
+                                                            )
+                                                        ) : (
                                                             <span className="mk-blank-field">
                                                                 <span className="sr-only">
                                                                     {policy.notProvided}
@@ -106,6 +113,7 @@ export function PolicyPage({ document, locale = "en" }: { document: PolicyDocume
                             ))}
                         </article>
                     </div>
+                    {children}
                 </div>
             </main>
         </MarketingShell>

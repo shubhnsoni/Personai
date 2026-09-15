@@ -28,20 +28,24 @@ describe("marketing metadata and indexing", () => {
             expect(metadata.openGraph?.url).toBe(expectedUrl)
             expect(metadata.robots).toEqual({ index: route.index, follow: true })
         }
-        expect(MARKETING_ROUTES.filter((route) => route.index).map((route) => route.path)).toEqual(["/", "/hi", "/pricing"])
-        expect(MARKETING_ROUTES.filter((route) => !route.index)).toHaveLength(9)
-        expect([...MARKETING_FOOTER_PATHS].sort()).toEqual(MARKETING_ROUTES.filter((route) => !route.index).map((route) => route.path).sort())
+        expect(MARKETING_ROUTES.filter((route) => route.index).map((route) => route.path)).toEqual([
+            "/", "/hi", "/about", "/contact", "/pricing", "/privacy", "/terms", "/refund-policy",
+            "/delivery-policy", "/cookie-policy", "/acceptable-use", "/demo", "/sign-up",
+        ])
+        expect(MARKETING_ROUTES.filter((route) => !route.index).map((route) => route.path)).toEqual(["/sms-policy"])
         expect(MARKETING_FOOTER_PATHS.every((path) => MARKETING_ROUTES.some((route) => route.path === path))).toBe(true)
         expect(() => marketingMetadata({ title: "Unsafe", description: "", path: "//foreign.example.test" })).toThrow()
     })
 
     it("reserves each new marketing route in both slug validation paths", () => {
-        for (const route of MARKETING_ROUTES.filter((route) => route.path !== "/")) {
+        for (const route of MARKETING_ROUTES.filter((route) => route.path !== "/" && route.path !== "/demo")) {
             const slug = route.path.slice(1)
             expect(isReservedSlug(slug)).toBe(true)
             expect(usernameError(slug)).toMatch(slug.length < 3 ? /3/ : /reserved/)
             expect(isIndexableProfileSlug(slug)).toBe(false)
         }
+        expect(usernameError("demo")).toMatch(/reserved/)
+        expect(isIndexableProfileSlug("demo")).toBe(false)
         expect(usernameError("ada-lovelace")).toBeNull()
         expect(isIndexableProfileSlug("ada-lovelace")).toBe(true)
     })
@@ -87,7 +91,17 @@ describe("marketing metadata and indexing", () => {
         expect(await sitemap()).toEqual([
             { url: "https://example.test/", alternates: { languages } },
             { url: "https://example.test/hi", alternates: { languages } },
+            { url: "https://example.test/about" },
+            { url: "https://example.test/contact" },
             { url: "https://example.test/pricing" },
+            { url: "https://example.test/privacy" },
+            { url: "https://example.test/terms" },
+            { url: "https://example.test/refund-policy" },
+            { url: "https://example.test/delivery-policy" },
+            { url: "https://example.test/cookie-policy" },
+            { url: "https://example.test/acceptable-use" },
+            { url: "https://example.test/demo" },
+            { url: "https://example.test/sign-up" },
             { url: "https://example.test/ada-lovelace", lastModified: updatedAt },
         ])
         expect(db.findMany).toHaveBeenCalledWith({ where: { isPublic: true }, select: { slug: true, updatedAt: true } })
@@ -96,10 +110,10 @@ describe("marketing metadata and indexing", () => {
     it("applies noindex to private route roots and descendants without matching public lookalikes", async () => {
         const rules = (await nextConfig.headers!()).filter((rule) => rule.headers.some((header) => header.key === "X-Robots-Tag"))
         const noindex = (path: string) => rules.some((rule) => getPathMatch(rule.source)(path))
-        for (const path of ["/dashboard", "/dashboard/profile", "/admin", "/qa", "/onboarding", "/library", "/library/login", "/sign-in", "/sign-up", "/api/chat", "/o/order-token", "/l/tracking-token", "/ada/lift/parcel-token"]) {
+        for (const path of ["/dashboard", "/dashboard/profile", "/admin", "/qa", "/onboarding", "/library", "/library/login", "/sign-in", "/api/chat", "/o/order-token", "/l/tracking-token", "/ada/lift/parcel-token"]) {
             expect(noindex(path), path).toBe(true)
         }
-        for (const path of ["/", "/about", "/privacy", "/ada", "/dashboard-coach", "/admin-assistant", "/library-books"]) {
+        for (const path of ["/", "/about", "/privacy", "/sign-up", "/ada", "/dashboard-coach", "/admin-assistant", "/library-books"]) {
             expect(noindex(path), path).toBe(false)
         }
         expect(rules.every((rule) => rule.headers.some((header) => header.value === "noindex, nofollow"))).toBe(true)

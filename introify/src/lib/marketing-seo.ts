@@ -9,16 +9,18 @@ export const BRAND_DESCRIPTION = "Give your shop, service or studio one public p
 export const MARKETING_ROUTES = [
     { path: "/", index: true },
     { path: "/hi", index: true },
-    { path: "/about", index: false },
-    { path: "/contact", index: false },
+    { path: "/about", index: true },
+    { path: "/contact", index: true },
     { path: "/pricing", index: true },
-    { path: "/privacy", index: false },
-    { path: "/terms", index: false },
-    { path: "/refund-policy", index: false },
-    { path: "/delivery-policy", index: false },
-    { path: "/cookie-policy", index: false },
-    { path: "/acceptable-use", index: false },
+    { path: "/privacy", index: true },
+    { path: "/terms", index: true },
+    { path: "/refund-policy", index: true },
+    { path: "/delivery-policy", index: true },
+    { path: "/cookie-policy", index: true },
+    { path: "/acceptable-use", index: true },
     { path: "/sms-policy", index: false },
+    { path: "/demo", index: true },
+    { path: "/sign-up", index: true },
 ] as const
 
 export const MARKETING_FOOTER_PATHS = [

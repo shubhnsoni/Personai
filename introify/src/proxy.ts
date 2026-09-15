@@ -2,7 +2,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { tenantFromHost, subdomainRoute } from "@/lib/subdomain-host";
 import { persistLocaleHomeCookie, uiLocaleRequestHeaders } from "@/lib/ui-locale-request";
-import { DEFAULT_UI_LOCALE, isShippedUiLocale, localeHomePath, type UiLocale } from "@/lib/ui-locale";
+import { DEFAULT_UI_LOCALE, isShippedUiLocale, localeHomePath, UI_LOCALE_COOKIE, type UiLocale, uiLocaleCookieOptions } from "@/lib/ui-locale";
+import { authAliasDestination, deadPublicPath, hiMarketingRewrite, profileSlugFromPath } from "@/lib/reserved-http";
+import { http404Response } from "@/lib/http-404";
 
 /**
  * Protected route patterns, exported so tests assert against the REAL patterns
@@ -29,6 +31,21 @@ export const PROTECTED_ROUTE_PATTERNS = [
 
 const isProtectedRoute = createRouteMatcher([...PROTECTED_ROUTE_PATTERNS]);
 
+const publicSlugCache = new Map<string, { exists: boolean; at: number }>()
+const PUBLIC_SLUG_TTL_MS = 30_000
+
+async function publicSlugExists(origin: string, slug: string, cookie: string) {
+    const cached = publicSlugCache.get(slug)
+    if (cached && Date.now() - cached.at < PUBLIC_SLUG_TTL_MS) return cached.exists
+    const url = new URL("/api/public-slug", origin)
+    url.searchParams.set("slug", slug)
+    const res = await fetch(url, { headers: { cookie }, cache: "no-store" })
+    const data = (await res.json()) as { exists?: boolean }
+    const exists = Boolean(data.exists)
+    publicSlugCache.set(slug, { exists, at: Date.now() })
+    return exists
+}
+
 // Next 16 proxy convention: named proxy (replaces deprecated middleware.ts).
 function apexHostname() {
   try {
@@ -47,6 +64,43 @@ function browserLocaleFromAcceptLanguage(acceptLanguage: string | null): UiLocal
 }
 
 export const proxy = clerkMiddleware(async (auth, req) => {
+  const pathname = req.nextUrl.pathname
+  if (pathname.startsWith("/api/public-slug") || pathname.startsWith("/http-404")) {
+    return persistLocaleHomeCookie(req, NextResponse.next({ request: { headers: uiLocaleRequestHeaders(req) } }))
+  }
+
+  const alias = authAliasDestination(pathname)
+  if (alias) {
+    const url = req.nextUrl.clone()
+    url.pathname = alias
+    return persistLocaleHomeCookie(req, NextResponse.redirect(url, 301))
+  }
+
+  if (deadPublicPath(pathname)) {
+    return persistLocaleHomeCookie(req, http404Response(req.method))
+  }
+
+  const hiPage = hiMarketingRewrite(pathname)
+  if (hiPage) {
+    const requestHeaders = uiLocaleRequestHeaders(req)
+    requestHeaders.set("x-ui-locale", "hi")
+    const url = req.nextUrl.clone()
+    url.pathname = hiPage
+    const response = NextResponse.rewrite(url, { request: { headers: requestHeaders } })
+    response.cookies.set(UI_LOCALE_COOKIE, "hi", uiLocaleCookieOptions())
+    return response
+  }
+
+  const slug = profileSlugFromPath(pathname)
+  if (slug) {
+    try {
+      const exists = await publicSlugExists(req.nextUrl.origin, slug, req.headers.get("cookie") || "")
+      if (!exists) return persistLocaleHomeCookie(req, http404Response(req.method))
+    } catch {
+      // If the existence check fails, the [slug] route still calls notFound().
+    }
+  }
+
   const requestHeaders = uiLocaleRequestHeaders(req)
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || ""
   const tenant = tenantFromHost(host, apexHostname())

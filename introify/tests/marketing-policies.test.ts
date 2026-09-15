@@ -24,7 +24,7 @@ describe("policy wording for implemented controls", () => {
         const status = policyDocuments.refundPolicy.sections.find(section => section.id === "status")
         expect(status?.fields?.filter(field => /window|processing/i.test(field.label)).every(field => field.value === "")).toBe(true)
         expect(status?.paragraphs?.join(" ")).toMatch(/Blank fields do not mean all sales are final/)
-        expect(policyDocuments.refundPolicy.draft).toBe(true)
+        expect(policyDocuments.refundPolicy.draft).toBe(false)
     })
 
     it("connects purchase policies through stable public links and unique section anchors", () => {

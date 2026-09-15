@@ -8,6 +8,7 @@ import { planBenefits, planPositioning } from "@/lib/billing/presentation"
 import { dollars, storageSize } from "./format"
 import { fill, type UiLocale } from "@/lib/ui-locale"
 import { messagesFor } from "@/lib/ui-messages"
+import { PaidWaitlistButton } from "./paid-waitlist"
 import "./billing.css"
 
 type PlanComparisonProps = {
@@ -25,7 +26,7 @@ type PlanComparisonProps = {
 function planActionLabel(plan: Plan, current: boolean, billingAvailable: boolean, managed: boolean, copy: ReturnType<typeof messagesFor>["pricing"]) {
     if (current) return copy.currentPlan
     if (plan.id === "free") return managed ? copy.switchToFree : copy.startFree
-    if (!billingAvailable) return fill(copy.viewPlan, { name: plan.name })
+    if (!billingAvailable) return fill(copy.notifyPlan, { name: plan.name })
     return fill(copy.choosePlan, { name: plan.name })
 }
 
@@ -68,7 +69,7 @@ export function PlanComparison({ initialCadence = "monthly", currentPlanId, curr
                         {planBenefits(plan, locale).map(benefit => <li key={benefit.label}><Check aria-hidden="true" /><span><span>{benefit.label}</span>{benefit.detail && <small>{benefit.detail}</small>}</span></li>)}
                         {!compact && <li><Check aria-hidden="true" /><span><strong>{storageSize(plan.limits.storageBytes)}</strong> {copy.storage}<small>{fill(copy.knowledgeLine, { sources: plan.limits.knowledgeSources.toLocaleString(digits), chars: plan.limits.knowledgeCharacters.toLocaleString(digits) })}</small></span></li>}
                     </ul>
-                    {onChoose ? <button className="billing-button" type="button" disabled={disabled} onClick={() => onChoose(plan.id, cadence)}>{actionLabel}{!current && !free && <ArrowUpRight size={15} aria-hidden="true" />}</button> : <Link className="billing-button" href={free ? "/sign-up" : `/dashboard/billing?plan=${plan.id}&cadence=${cadence}`}>{actionLabel}<ArrowUpRight size={15} aria-hidden="true" /></Link>}
+                    {onChoose ? <button className="billing-button" type="button" disabled={disabled} onClick={() => onChoose(plan.id, cadence)}>{actionLabel}{!current && !free && billingAvailable && <ArrowUpRight size={15} aria-hidden="true" />}</button> : free ? <Link className="billing-button" href="/sign-up">{actionLabel}<ArrowUpRight size={15} aria-hidden="true" /></Link> : billingAvailable ? <Link className="billing-button" href={`/dashboard/billing?plan=${plan.id}&cadence=${cadence}`}>{actionLabel}<ArrowUpRight size={15} aria-hidden="true" /></Link> : <PaidWaitlistButton planId={plan.id} planName={plan.name} cadence={cadence} locale={locale} />}
                     <p className="plan-card-message">{message}</p>
                 </article>
             })}

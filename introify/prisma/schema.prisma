@@ -266,6 +266,7 @@ model Profile {
   profileIntroductions        ProfileIntroduction[]
   knowledgeGapSignals         KnowledgeGapSignal[]
   knowledgePaymentProofs      KnowledgePaymentProof[]
+  creations                   Creation[]
 }
 
 model ProfileEvent {
@@ -4313,4 +4314,81 @@ model PartyLedgerEntry {
 
   @@unique([partyAccountId, idempotencyKey])
   @@index([partyAccountId, at])
+}
+
+model PlatformInquiry {
+  id        String   @id @default(cuid())
+  kind      String
+  email     String
+  name      String?
+  message   String?
+  plan      String?
+  cadence   String?
+  ipHash    String?
+  createdAt DateTime @default(now())
+
+  @@index([kind, createdAt])
+  @@index([email])
+}
+
+model Creation {
+  id               String   @id @default(cuid())
+  profileId        String
+  profile          Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String
+  avatar           String?
+  description      String?
+  purpose          String?
+  instructions     String?
+  visibility       String   @default("PRIVATE")
+  allowVisitorChat Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  knowledge        CreationKnowledge[]
+  jobs             CreationJob[]
+  runs             CreationJobRun[]
+
+  @@unique([profileId, slug])
+  @@index([profileId, visibility])
+}
+
+model CreationKnowledge {
+  id         String   @id @default(cuid())
+  creationId String
+  creation   Creation @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  title      String
+  rawText    String
+  createdAt  DateTime @default(now())
+
+  @@index([creationId])
+}
+
+model CreationJob {
+  id          String   @id @default(cuid())
+  creationId  String
+  creation    Creation @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  inputHint   String?
+  createdAt   DateTime @default(now())
+  runs        CreationJobRun[]
+
+  @@index([creationId])
+}
+
+model CreationJobRun {
+  id          String       @id @default(cuid())
+  creationId  String
+  creation    Creation     @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  jobId       String?
+  job         CreationJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  status      String       @default("queued")
+  input       String
+  output      String?
+  error       String?
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  @@index([creationId, createdAt])
 }

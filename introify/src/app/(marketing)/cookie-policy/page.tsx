@@ -8,7 +8,6 @@ export const metadata = marketingMetadata({
     title: document.title,
     description: document.description,
     path: "/cookie-policy",
-    index: false,
 })
 
 export default function CookiePolicyPage() {

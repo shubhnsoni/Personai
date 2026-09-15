@@ -61,11 +61,12 @@ describe("Introify plan comparison", () => {
         expect(within(pro).getByText("2,000 AI credits/month")).toBeTruthy()
         expect(within(pro).getByText("10 3D generations")).toBeTruthy()
         expect(within(pro).getByText("Every month, including annual plans")).toBeTruthy()
-        expect(within(pro).getByRole("link", { name: "View Pro" }).getAttribute("href")).toBe("/dashboard/billing?plan=pro&cadence=yearly")
+        expect(within(pro).getByRole("button", { name: "Notify me when Pro opens" })).toBeTruthy()
         const business = screen.getByRole("article", { name: "Business" })
         expect(within(business).getByText("$40.83")).toBeTruthy()
         expect(within(business).getByText("$40.83/mo billed annually")).toBeTruthy()
-        expect(within(business).getByRole("link", { name: "View Business" }).getAttribute("href")).toBe("/dashboard/billing?plan=business&cadence=yearly")
+        expect(within(business).getByRole("button", { name: "Notify me when Business opens" })).toBeTruthy()
+        expect(screen.queryByRole("link", { name: "View Pro" })).toBeNull()
     })
 
     it("keeps the Free trial lifetime-only and gives a real no-card signup destination", () => {
@@ -82,7 +83,7 @@ describe("Introify plan comparison", () => {
     it("requires billing availability and permission before a plan can be selected", () => {
         const choose = vi.fn()
         const view = render(<PlanComparison currentPlanId="free" billingAvailable={false} onChoose={choose} />)
-        fireEvent.click(screen.getByRole("button", { name: "View Pro" }))
+        fireEvent.click(screen.getByRole("button", { name: "Notify me when Pro opens" }))
         expect(choose).not.toHaveBeenCalled()
         view.rerender(<PlanComparison currentPlanId="free" billingAvailable canManage={false} onChoose={choose} />)
         expect(screen.getByRole<HTMLButtonElement>("button", { name: "Choose Pro" }).disabled).toBe(true)

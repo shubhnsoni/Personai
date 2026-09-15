@@ -1,8 +1,6 @@
 import Link from "@/components/navigation/transition-link"
 import { Button } from "@/components/ui/button"
 
-export const dynamic = 'force-dynamic'
-
 export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white p-4">

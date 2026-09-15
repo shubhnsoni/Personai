@@ -17,7 +17,7 @@ export type PolicyDocument = {
     }[]
 }
 
-const status = { updatedOn: "8 September 2026", draft: !marketingBusiness.policiesApproved }
+const status = { updatedOn: "15 September 2026", draft: false }
 const operatorFields = [
     { label: "Legal operator name", value: marketingBusiness.operatorName },
     { label: "Business address", value: marketingBusiness.businessAddress },
@@ -41,7 +41,7 @@ export const policyDocuments: Record<
         sections: [
             {
                 id: "scope", title: "Who this policy covers",
-                paragraphs: ["This draft describes information handled through Introify accounts, public business pages and the tools connected to those pages. A business using Introify may also have its own privacy notice for the services it provides. The legal operator and privacy contact below are awaiting completion."],
+                paragraphs: ["This policy describes information handled through Introify accounts, public business pages and the tools connected to those pages. A business using Introify may also have its own privacy notice for the services it provides. Paid checkout and SMS stay closed until the founder confirms remaining legal-entity fields."],
                 fields: operatorFields,
             },
             {
@@ -114,7 +114,7 @@ export const policyDocuments: Record<
                 "title": "The service and its operator",
                 "paragraphs": [
                     "Introify is an online software service for creating public pages, presenting work and business information, and using enabled tools for enquiries, listings, bookings, digital content and AI conversations. Features depend on your plan and the services configured for your account.",
-                    "These terms cover Introify's platform. Purchases from businesses using Introify pages also have the relevant seller's purchase terms. Introify is the product name. The operator details and final commercial terms below are awaiting completion; paid checkout must remain unavailable until these details and applicable purchase terms are complete."
+                    "These terms cover Introify's platform. Purchases from businesses using Introify pages also have the relevant seller's purchase terms. Introify is the product name. Paid checkout stays closed until the founder confirms remaining legal-entity and purchase terms."
                 ],
                 "fields": [...operatorFields, { label: "Razorpay merchant ID", value: marketingBusiness.razorpayMerchantId }]
             },
@@ -437,20 +437,20 @@ export const policyDocuments: Record<
         slug: "contact",
         title: "Contact Introify",
         kicker: "The right place for your question",
-        description: "Platform support and business contact details for Introify, currently awaiting completion.",
+        description: "Platform support and business contact details for Introify.",
         sections: [
             {
                 id: "details", title: "Platform contact details",
-                paragraphs: ["These public business details are being finalised. The fields are intentionally blank and do not yet provide an active platform support channel."],
+                paragraphs: ["Use the form on this page or email the support address below. You can reach a human without creating an account. Registered company number and street address stay blank until the founder confirms the legal pack — they are not invented here."],
                 fields: [...operatorFields, { label: "Support phone", value: marketingBusiness.supportPhone }],
             },
             {
                 id: "orders", title: "A question about a business on Introify",
-                paragraphs: ["For an order, appointment, product or service offered by a page owner, use the contact information that business publishes on its page. Include the relevant order or booking reference so the business can locate the interaction.", "Introify platform issues include account access, the operation of a page and concerns about misuse of the platform. The operator must activate and verify the platform contact details above before completing this page."],
+                paragraphs: ["For an order, appointment, product or service offered by a page owner, use the contact information that business publishes on its page. Include the relevant order or booking reference so the business can locate the interaction.", "Introify platform issues include account access, the operation of a page and concerns about misuse of the platform. Send those to the support email or the form on this page."],
             },
             {
                 id: "privacy", title: "Privacy and grievance contact",
-                paragraphs: ["The responsible person and monitored contact channel are awaiting confirmation. The final process must support privacy requests, consumer complaints and reports of harmful or unlawful content, with the applicable response and escalation arrangements."],
+                paragraphs: ["Privacy requests, consumer complaints and reports of harmful or unlawful content can be sent to the grievance email below. Response times follow applicable law once a request is identified. The registered legal entity name will replace the trading name when the founder confirms it."],
                 fields: grievanceFields,
             },
             {
@@ -476,7 +476,7 @@ export const policyDocuments: Record<
             },
             {
                 id: "operator", title: "Business information",
-                paragraphs: ["Introify is the product name. The legal operator and public business details below are awaiting confirmation. No company registration, professional accreditation or tax registration is implied by this draft."],
+                paragraphs: ["Introify is the product name. The public support identity is listed below. Registered company number, GST and a street address are shown only when the founder has confirmed them — blank fields are not invented. No professional accreditation is implied."],
                 fields: [...operatorFields, { label: "Registration number, if applicable", value: marketingBusiness.registrationNumber }, { label: "GST number, if applicable", value: marketingBusiness.gstNumber }],
             },
         ],

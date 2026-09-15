@@ -29,7 +29,7 @@ describe("standalone Clerk auth pages", () => {
         expect(signInMetadata.title).toBe("Sign in | Introify")
         expect(signUpMetadata.title).toBe("Create your account | Introify")
         expect(signInMetadata.robots).toMatchObject({ index: false })
-        expect(signUpMetadata.robots).toMatchObject({ index: false })
+        expect(signUpMetadata.robots).toMatchObject({ index: true })
     })
 
     it("keeps sign-in path routing, dashboard redirects and the sign-up alternative while applying the scoped theme", () => {
