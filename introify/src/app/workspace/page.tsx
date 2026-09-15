@@ -15,7 +15,6 @@ export default async function WorkspaceHome() {
         <div className="w-page">
             <div className="w-titlebar">
                 <div>
-                    <p className="w-kicker">Phase 1</p>
                     <h1 className="w-h1">My AIs</h1>
                     <p className="w-lede">Private until you showcase them. Named for the way you work — not a marketplace directory.</p>
                 </div>

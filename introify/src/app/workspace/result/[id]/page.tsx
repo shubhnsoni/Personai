@@ -15,9 +15,8 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
     return (
         <div className="w-page">
             <Link href="/workspace/jobs" className="w-back">← Jobs</Link>
-            <p className="w-kicker">{run.creation.name}</p>
             <h1 className="w-h1">{run.job?.name || "Result"}</h1>
-            <p className="w-lede">{run.status} · {new Date(run.createdAt).toLocaleString()}</p>
+            <p className="w-lede">{run.creation.name} · {run.status} · {new Date(run.createdAt).toLocaleString()}</p>
             <section className="w-panel">
                 <h2 className="w-h2">Input</h2>
                 <pre className="w-artifact">{run.input}</pre>

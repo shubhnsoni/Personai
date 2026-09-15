@@ -6,12 +6,12 @@ import Link from "next/link"
 import { ArrowLeft, ArrowUp } from "lucide-react"
 
 const steps = [
-    { key: "goodAt", prompt: "What should this AI be good at?", placeholder: "Logo motion directions, menu notes, brand analysis…" },
-    { key: "process", prompt: "What do you normally do that it should understand?", placeholder: "How you actually work, in a few sentences." },
-    { key: "input", prompt: "What will someone give it?", placeholder: "A logo file, a night’s sales, a brief…" },
-    { key: "output", prompt: "What should it produce?", placeholder: "Three motion directions, a purchase list, a one-page report…" },
-    { key: "examples", prompt: "Any examples or corrections to start from? (optional)", placeholder: "Paste a sample, or skip." },
-    { key: "name", prompt: "What should we call it?", placeholder: "ANI" },
+    { key: "goodAt", prompt: "What should this AI be good at?", placeholder: "Logo motion directions, menu notes, brand analysis…", optional: false },
+    { key: "process", prompt: "What do you normally do that it should understand?", placeholder: "How you actually work, in a few sentences.", optional: false },
+    { key: "input", prompt: "What will someone give it?", placeholder: "A logo file, a night’s sales, a brief…", optional: false },
+    { key: "output", prompt: "What should it produce?", placeholder: "Three motion directions, a purchase list, a one-page report…", optional: false },
+    { key: "examples", prompt: "Any examples or corrections to start from?", placeholder: "Paste a sample, or skip.", optional: true },
+    { key: "name", prompt: "What should we call it?", placeholder: "ANI", optional: false },
 ] as const
 
 type Answers = Record<(typeof steps)[number]["key"], string>
@@ -26,17 +26,15 @@ export default function CreatePage() {
     const step = steps[index]
     const progress = useMemo(() => Array.from({ length: steps.length }, (_, i) => i <= index), [index])
 
-    async function submit(event: React.FormEvent) {
-        event.preventDefault()
-        const value = draft.trim()
-        if (step.key !== "examples" && value.length < 2) return
+    function applyValue(value: string) {
         const nextAnswers = { ...answers, [step.key]: value }
         setAnswers(nextAnswers)
         setDraft("")
-        if (index < steps.length - 1) {
-            setIndex(index + 1)
-            return
-        }
+        setError("")
+        return nextAnswers
+    }
+
+    async function save(nextAnswers: Partial<Answers>) {
         setBusy(true)
         setError("")
         const name = (nextAnswers.name || "My AI").trim()
@@ -68,12 +66,43 @@ export default function CreatePage() {
         router.refresh()
     }
 
+    async function submit(event: React.FormEvent) {
+        event.preventDefault()
+        const value = draft.trim()
+        if (!step.optional && value.length < 2) return
+        const nextAnswers = applyValue(value)
+        if (index < steps.length - 1) {
+            setIndex(index + 1)
+            setDraft(nextAnswers[steps[index + 1].key] || "")
+            return
+        }
+        await save(nextAnswers)
+    }
+
+    function back() {
+        if (index === 0) return
+        const previous = steps[index - 1]
+        setIndex(index - 1)
+        setDraft(answers[previous.key] || "")
+        setError("")
+    }
+
+    async function skip() {
+        if (!step.optional) return
+        const nextAnswers = applyValue("")
+        if (index < steps.length - 1) {
+            setIndex(index + 1)
+            setDraft(nextAnswers[steps[index + 1].key] || "")
+            return
+        }
+        await save(nextAnswers)
+    }
+
     return (
         <div className="w-page w-create">
             <Link href="/workspace" className="w-back"><ArrowLeft size={16} aria-hidden="true" /> My AIs</Link>
-            <p className="w-kicker">Conversational create</p>
             <h1 className="w-h1">Teach a new AI</h1>
-            <p className="w-lede">No temperature sliders. Answer a few outcome questions. It stays private until you showcase it.</p>
+            <p className="w-lede">Answer a few outcome questions. It stays private until you showcase it.</p>
             <div className="w-steps" aria-hidden="true">
                 {progress.map((on, i) => <i key={i} className={on ? "on" : ""} />)}
             </div>
@@ -94,12 +123,26 @@ export default function CreatePage() {
                     placeholder={step.placeholder}
                     rows={4}
                     autoFocus
+                    onKeyDown={(event) => {
+                        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                            event.preventDefault()
+                            event.currentTarget.form?.requestSubmit()
+                        }
+                    }}
                 />
                 {error ? <p className="w-error" role="alert">{error}</p> : null}
-                <button className="w-btn" type="submit" disabled={busy}>
-                    {busy ? "Saving…" : index === steps.length - 1 ? "Save as private" : "Continue"}
-                    <ArrowUp size={16} aria-hidden="true" />
-                </button>
+                <div className="w-inline-actions">
+                    {index > 0 ? (
+                        <button className="w-btn secondary" type="button" onClick={back} disabled={busy}>Back</button>
+                    ) : null}
+                    {step.optional ? (
+                        <button className="w-btn secondary" type="button" onClick={() => void skip()} disabled={busy}>Skip</button>
+                    ) : null}
+                    <button className="w-btn" type="submit" disabled={busy}>
+                        {busy ? "Saving…" : index === steps.length - 1 ? "Save as private" : "Continue"}
+                        <ArrowUp size={16} aria-hidden="true" />
+                    </button>
+                </div>
             </form>
         </div>
     )

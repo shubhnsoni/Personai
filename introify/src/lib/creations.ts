@@ -8,6 +8,34 @@ export function isCreationVisibility(value: string): value is CreationVisibility
     return (CREATION_VISIBILITY as readonly string[]).includes(value)
 }
 
+export function isPubliclyReachable(visibility: string) {
+    return visibility === "UNLISTED" || visibility === "SHOWCASE"
+}
+
+export function visitorChatEnabled(visibility: string, allowVisitorChat: boolean) {
+    return Boolean(allowVisitorChat) && isPubliclyReachable(visibility)
+}
+
+export function publicCreationPath(profileSlug: string, creationSlug: string) {
+    return `/${profileSlug}/ai/${creationSlug}`
+}
+
+export function nextCreationAccess(
+    current: { visibility: string; allowVisitorChat: boolean },
+    patch: { visibility?: string; allowVisitorChat?: boolean },
+) {
+    const visibility = patch.visibility && isCreationVisibility(patch.visibility) ? patch.visibility : current.visibility
+    const wantChat = typeof patch.allowVisitorChat === "boolean" ? patch.allowVisitorChat : current.allowVisitorChat
+    return { visibility, allowVisitorChat: visitorChatEnabled(visibility, wantChat) }
+}
+
+export function knowledgeFromUpload(filename: string, text: string) {
+    const title = filename.replace(/\.[^.]+$/, "").trim().slice(0, 120) || "File"
+    const rawText = text.replace(/^\uFEFF/, "").trim()
+    if (rawText.length < 8) throw new Error("That file had no readable text.")
+    return { title, rawText: rawText.slice(0, 20_000) }
+}
+
 export async function uniqueCreationSlug(profileId: string, name: string) {
     const base = slugify(name) || "ai"
     let slug = base.slice(0, 40)
@@ -104,16 +132,46 @@ export async function updateCreation(profileId: string, id: string, input: {
     if (typeof input.purpose === "string") data.purpose = input.purpose.trim().slice(0, 280)
     if (typeof input.description === "string") data.description = input.description.trim().slice(0, 2000)
     if (typeof input.instructions === "string") data.instructions = input.instructions.trim()
-    if (typeof input.allowVisitorChat === "boolean") data.allowVisitorChat = input.allowVisitorChat
     if (input.avatar !== undefined) data.avatar = input.avatar
-    if (typeof input.visibility === "string") {
-        if (input.visibility === "FOR_HIRE" || !isCreationVisibility(input.visibility)) {
-            throw new Error("For Hire is not available in this phase.")
-        }
-        data.visibility = input.visibility
-        if (input.visibility !== "SHOWCASE") data.allowVisitorChat = false
+    if (typeof input.visibility === "string" && (input.visibility === "FOR_HIRE" || !isCreationVisibility(input.visibility))) {
+        throw new Error("For Hire is not available in this phase.")
+    }
+    const access = nextCreationAccess(
+        { visibility: existing.visibility, allowVisitorChat: existing.allowVisitorChat },
+        { visibility: input.visibility, allowVisitorChat: input.allowVisitorChat },
+    )
+    if (access.visibility !== existing.visibility) data.visibility = access.visibility
+    if (access.allowVisitorChat !== existing.allowVisitorChat || typeof input.allowVisitorChat === "boolean") {
+        data.allowVisitorChat = access.allowVisitorChat
     }
     return prisma.creation.update({ where: { id }, data })
+}
+
+export async function getPublicCreation(profileSlug: string, creationSlug: string) {
+    const profile = await prisma.profile.findFirst({
+        where: { slug: profileSlug, isPublic: true },
+        select: { id: true, slug: true, displayName: true },
+    })
+    if (!profile) return null
+    const creation = await prisma.creation.findFirst({
+        where: {
+            profileId: profile.id,
+            slug: creationSlug,
+            visibility: { in: ["UNLISTED", "SHOWCASE"] },
+        },
+        select: {
+            id: true,
+            name: true,
+            slug: true,
+            purpose: true,
+            description: true,
+            visibility: true,
+            allowVisitorChat: true,
+            profileId: true,
+        },
+    })
+    if (!creation) return null
+    return { profile, creation }
 }
 
 export async function addCreationKnowledge(profileId: string, id: string, title: string, rawText: string) {

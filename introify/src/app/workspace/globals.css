@@ -101,6 +101,17 @@ body {
   margin: 0 auto;
   padding: 32px 24px 96px;
 }
+.w-titlebar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 28px;
+}
+.w-titlebar .w-btn { flex-shrink: 0; }
+@media (max-width: 640px) {
+  .w-titlebar { flex-direction: column; }
+}
 @media (max-width: 740px) {
   .w-page { padding: 24px 16px 88px; }
 }
@@ -135,6 +146,7 @@ body {
   font-family: inherit; font-size: 14.5px; font-weight: 600; line-height: 1.35;
   color: #fff; background: var(--w-grad); border: 0;
   border-radius: var(--w-radius);
+  min-height: 44px;
   padding: 11px 20px; cursor: pointer; text-decoration: none; white-space: nowrap;
   box-shadow: var(--w-shadow-sm);
   transition: transform .15s var(--w-ease), box-shadow .2s var(--w-ease), filter .15s var(--w-ease);
@@ -806,6 +818,10 @@ html.dark .w-stickybar { background: rgba(9,9,11,.82); }
 .w-navlink { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px; color: var(--w-mut); text-decoration: none; font-size: 14px; font-weight: 650; transition: background-color 150ms cubic-bezier(.2,0,0,1), color 150ms cubic-bezier(.2,0,0,1), transform 160ms ease-out; }
 .w-navlink.on { background: var(--w-soft); color: var(--w-fg); }
 .w-navlink:active { transform: scale(.96); }
+.w-btn:focus-visible, .w-btn-out:focus-visible, .w-navlink:focus-visible, .w-ghost:focus-visible, .w-back:focus-visible {
+  outline: 2px solid var(--w-fg);
+  outline-offset: 2px;
+}
 .w-top-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .w-ghost { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--w-mut); text-decoration: none; font-size: 13px; font-weight: 650; }
 .w-avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: #12392d; color: #fff; font-size: 11px; font-weight: 700; text-decoration: none; }
@@ -823,6 +839,7 @@ html.dark .w-stickybar { background: rgba(9,9,11,.82); }
 .w-card-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--w-mut); }
 .w-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: var(--w-soft); font-size: 11px; font-weight: 700; text-transform: lowercase; }
 .w-chip.vis-showcase { background: #dcecba; color: #12392d; }
+.w-chip.vis-unlisted { background: var(--w-soft-strong); color: var(--w-fg); }
 .w-chip.vis-private { background: var(--w-soft); }
 .w-back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--w-mut); text-decoration: none; font-weight: 650; }
 .w-transcript { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 12px; }
@@ -836,6 +853,7 @@ html.dark .w-stickybar { background: rgba(9,9,11,.82); }
 .w-check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 650; }
 .w-btn.secondary { background: transparent; color: var(--w-fg); border: 1px solid var(--w-line); }
 .w-error { color: #b42318; }
+.w-status { color: var(--w-success); font-weight: 650; }
 .w-notes { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
 .w-notes li { padding: 12px 14px; border-radius: 14px; background: var(--w-soft); }
 .w-artifact { white-space: pre-wrap; font: inherit; background: var(--w-soft); padding: 16px; border-radius: 14px; overflow: auto; }
@@ -850,7 +868,7 @@ html.dark .w-stickybar { background: rgba(9,9,11,.82); }
 }
 @media (max-width: 800px) {
   .w-nav { display: none; }
-  .w-bottom-nav { position: fixed; inset: auto 0 0; display: flex; justify-content: space-around; padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--w-line); background: var(--w-surface); }
-  .w-bottom-nav .w-navlink { flex-direction: column; gap: 2px; font-size: 11px; padding: 6px; }
+  .w-bottom-nav { position: fixed; inset: auto 0 0; z-index: 30; display: flex; justify-content: space-around; padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--w-line); background: var(--w-surface); }
+  .w-bottom-nav .w-navlink { flex-direction: column; gap: 2px; min-height: 44px; font-size: 11px; padding: 6px; }
   .w-ghost { display: none; }
 }

@@ -3,17 +3,20 @@
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Play, MessageCircle } from "lucide-react"
+import { ArrowLeft, Link2, MessageCircle, Play, Upload } from "lucide-react"
+import { isPubliclyReachable, knowledgeFromUpload, publicCreationPath } from "@/lib/creations"
 
 type Creation = {
     id: string
     name: string
+    slug: string
     purpose: string | null
     description: string | null
     instructions: string | null
     visibility: string
     allowVisitorChat: boolean
     createdAt: string
+    profileSlug: string
     knowledge: { id: string; title: string; rawText: string }[]
     jobs: { id: string; name: string; description: string | null }[]
     _count: { runs: number }
@@ -33,6 +36,9 @@ export function CreationStudio({ creation }: { creation: Creation }) {
     const [log, setLog] = useState<{ role: "you" | "ai"; text: string }[]>([])
     const [busy, setBusy] = useState<string | null>(null)
     const [message, setMessage] = useState("")
+    const [ok, setOk] = useState(false)
+    const publicPath = publicCreationPath(creation.profileSlug, creation.slug)
+    const shareable = isPubliclyReachable(visibility)
 
     async function patch(body: Record<string, unknown>) {
         const res = await fetch(`/api/workspace/creations/${creation.id}`, {
@@ -45,12 +51,27 @@ export function CreationStudio({ creation }: { creation: Creation }) {
         router.refresh()
     }
 
+    function flash(text: string, success = false) {
+        setMessage(text)
+        setOk(success)
+    }
+
+    async function addKnowledge(title: string, rawText: string) {
+        const res = await fetch(`/api/workspace/creations/${creation.id}/knowledge`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ title, rawText }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error || "Could not save")
+        router.refresh()
+    }
+
     return (
         <div className="w-page">
             <Link href="/workspace" className="w-back"><ArrowLeft size={16} aria-hidden="true" /> My AIs</Link>
             <div className="w-titlebar">
                 <div>
-                    <p className="w-kicker">Creation</p>
                     <h1 className="w-h1">{name}</h1>
                     <p className="w-lede">Created {new Date(creation.createdAt).toLocaleDateString()} · {creation._count.runs} completed jobs</p>
                 </div>
@@ -64,46 +85,102 @@ export function CreationStudio({ creation }: { creation: Creation }) {
                 <label className="w-field">Instructions<textarea rows={6} value={instructions} onChange={(e) => setInstructions(e.target.value)} /></label>
                 <div className="w-inline-actions">
                     <label>Visibility
-                        <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+                        <select value={visibility} onChange={(e) => {
+                            const next = e.target.value
+                            setVisibility(next)
+                            if (next === "PRIVATE") setAllowVisitorChat(false)
+                        }}>
                             <option value="PRIVATE">Private</option>
-                            <option value="UNLISTED">Unlisted</option>
-                            <option value="SHOWCASE">Showcase</option>
+                            <option value="UNLISTED">Unlisted — anyone with the link</option>
+                            <option value="SHOWCASE">Showcase — on your public page</option>
                         </select>
                     </label>
                     <label className="w-check">
-                        <input type="checkbox" checked={allowVisitorChat} disabled={visibility !== "SHOWCASE"} onChange={(e) => setAllowVisitorChat(e.target.checked)} />
-                        Visitors may chat when showcased
+                        <input
+                            type="checkbox"
+                            checked={allowVisitorChat}
+                            disabled={visibility === "PRIVATE"}
+                            onChange={(e) => setAllowVisitorChat(e.target.checked)}
+                            aria-label="People with the link may chat"
+                        />
+                        People with the link may chat
                     </label>
                 </div>
-                <button className="w-btn" type="button" disabled={busy === "save"} onClick={async () => {
-                    setBusy("save"); setMessage("")
-                    try {
-                        await patch({ name, purpose, instructions, visibility, allowVisitorChat })
-                        setMessage("Saved.")
-                    } catch (error) {
-                        setMessage(error instanceof Error ? error.message : "Save failed")
-                    }
-                    setBusy(null)
-                }}>{busy === "save" ? "Saving…" : "Save"}</button>
+                {shareable ? (
+                    <p className="w-lede">
+                        <Link href={publicPath} className="w-ghost" target="_blank" rel="noreferrer">Open public page</Link>
+                    </p>
+                ) : null}
+                <div className="w-inline-actions">
+                    <button className="w-btn" type="button" disabled={busy === "save"} onClick={async () => {
+                        setBusy("save"); flash("")
+                        try {
+                            await patch({ name, purpose, instructions, visibility, allowVisitorChat })
+                            flash("Saved.", true)
+                        } catch (error) {
+                            flash(error instanceof Error ? error.message : "Save failed")
+                        }
+                        setBusy(null)
+                    }}>{busy === "save" ? "Saving…" : "Save"}</button>
+                    {shareable ? (
+                        <button className="w-btn secondary" type="button" onClick={async () => {
+                            const url = `${window.location.origin}${publicPath}`
+                            await navigator.clipboard.writeText(url).catch(() => {})
+                            flash("Link copied.", true)
+                        }}><Link2 size={16} aria-hidden="true" /> Copy link</button>
+                    ) : null}
+                </div>
             </section>
 
             <section className="w-panel">
                 <h2 className="w-h2">Knowledge</h2>
-                <p className="w-lede">Notes, examples, and corrections. This is teaching, not model training.</p>
+                <p className="w-lede">Notes, examples, corrections, or a text file. This is teaching, not model training.</p>
                 <label className="w-field">Add a note<textarea rows={4} value={note} onChange={(e) => setNote(e.target.value)} /></label>
-                <button className="w-btn secondary" type="button" disabled={busy === "note"} onClick={async () => {
-                    setBusy("note")
-                    const res = await fetch(`/api/workspace/creations/${creation.id}/knowledge`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Note", rawText: note }) })
-                    const data = await res.json().catch(() => ({}))
-                    setBusy(null)
-                    if (!res.ok) { setMessage(data.error || "Could not save"); return }
-                    setNote(""); router.refresh()
-                }}>Save note</button>
-                <ul className="w-notes">
-                    {creation.knowledge.map((item) => (
-                        <li key={item.id}><b>{item.title}</b><p>{item.rawText}</p></li>
-                    ))}
-                </ul>
+                <div className="w-inline-actions">
+                    <button className="w-btn secondary" type="button" disabled={busy === "note"} onClick={async () => {
+                        setBusy("note")
+                        try {
+                            await addKnowledge("Note", note)
+                            setNote("")
+                            flash("Note saved.", true)
+                        } catch (error) {
+                            flash(error instanceof Error ? error.message : "Could not save")
+                        }
+                        setBusy(null)
+                    }}>{busy === "note" ? "Saving…" : "Save note"}</button>
+                    <label className="w-btn secondary" style={{ cursor: "pointer" }}>
+                        <Upload size={16} aria-hidden="true" /> Add a text file
+                        <input
+                            type="file"
+                            accept=".txt,.md,.markdown,.csv,.json"
+                            hidden
+                            onChange={async (event) => {
+                                const file = event.target.files?.[0]
+                                event.target.value = ""
+                                if (!file) return
+                                setBusy("file")
+                                try {
+                                    const text = await file.text()
+                                    const item = knowledgeFromUpload(file.name, text)
+                                    await addKnowledge(item.title, item.rawText)
+                                    flash(`Added ${item.title}.`, true)
+                                } catch (error) {
+                                    flash(error instanceof Error ? error.message : "Could not read that file")
+                                }
+                                setBusy(null)
+                            }}
+                        />
+                    </label>
+                </div>
+                {creation.knowledge.length === 0 ? (
+                    <p className="w-lede">No notes yet. Add one example of how you actually work.</p>
+                ) : (
+                    <ul className="w-notes">
+                        {creation.knowledge.map((item) => (
+                            <li key={item.id}><b>{item.title}</b><p>{item.rawText}</p></li>
+                        ))}
+                    </ul>
+                )}
             </section>
 
             <section className="w-panel">
@@ -123,6 +200,7 @@ export function CreationStudio({ creation }: { creation: Creation }) {
                     <button className="w-btn" type="submit" disabled={busy === "chat"}><MessageCircle size={16} aria-hidden="true" />{busy === "chat" ? "Thinking…" : "Send"}</button>
                 </form>
                 <div className="w-transcript">
+                    {log.length === 0 ? <p className="w-q">Try a real brief. This is the same AI visitors will meet if you share the link.</p> : null}
                     {log.map((row, i) => <p key={i} className={row.role === "you" ? "w-a" : "w-q"}>{row.text}</p>)}
                 </div>
             </section>
@@ -132,7 +210,7 @@ export function CreationStudio({ creation }: { creation: Creation }) {
                 <label className="w-field">Job name<input value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="3 logo motion directions" /></label>
                 <label className="w-field">Input for this run<textarea rows={4} value={jobInput} onChange={(e) => setJobInput(e.target.value)} placeholder="Logo: a forest mark. Brand is quiet, premium, no bounce." /></label>
                 <button className="w-btn" type="button" disabled={busy === "job"} onClick={async () => {
-                    setBusy("job"); setMessage("")
+                    setBusy("job"); flash("")
                     const res = await fetch(`/api/workspace/creations/${creation.id}/run`, {
                         method: "POST",
                         headers: { "content-type": "application/json" },
@@ -140,14 +218,14 @@ export function CreationStudio({ creation }: { creation: Creation }) {
                     })
                     const data = await res.json().catch(() => ({}))
                     setBusy(null)
-                    if (!res.ok) { setMessage(data.error || "Run failed"); return }
+                    if (!res.ok) { flash(data.error || "Run failed"); return }
                     router.push(`/workspace/result/${data.run.id}`)
                 }}><Play size={16} aria-hidden="true" />{busy === "job" ? "Running…" : "Run job"}</button>
                 {creation.jobs.length ? (
                     <ul className="w-notes">{creation.jobs.map((job) => <li key={job.id}><b>{job.name}</b></li>)}</ul>
-                ) : null}
+                ) : <p className="w-lede">A job is a concrete piece of work — a report, three directions, a list — not “access to the bot”.</p>}
             </section>
-            {message ? <p className="w-error" role="status">{message}</p> : null}
+            {message ? <p className={ok ? "w-status" : "w-error"} role="status">{message}</p> : null}
         </div>
     )
 }

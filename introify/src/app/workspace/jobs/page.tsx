@@ -22,7 +22,6 @@ export default async function JobsPage() {
         <div className="w-page">
             <div className="w-titlebar">
                 <div>
-                    <p className="w-kicker">Your work</p>
                     <h1 className="w-h1">Jobs</h1>
                     <p className="w-lede">Only real runs for your AIs. No marketplace hires.</p>
                 </div>
@@ -31,7 +30,8 @@ export default async function JobsPage() {
             {items.length === 0 ? (
                 <div className="w-empty">
                     <h2>No jobs yet</h2>
-                    <p>Open an AI, define a concrete job, and run it server-side.</p>
+                    <p>Open an AI, name a concrete job, and run it. You get a result you can copy.</p>
+                    <Link href="/workspace/create" className="w-btn">Create an AI first</Link>
                 </div>
             ) : (
                 <div className="w-joblist">

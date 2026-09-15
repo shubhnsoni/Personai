@@ -35,7 +35,7 @@ export function ShowcaseToggles({ items }: { items: { id: string; name: string; 
                             router.refresh()
                         }}
                     >
-                        {item.visibility === "SHOWCASE" ? "On profile" : "Keep private"}
+                        {item.visibility === "SHOWCASE" ? "On profile" : item.visibility === "UNLISTED" ? "Link only" : "Keep private"}
                     </button>
                 </li>
             ))}

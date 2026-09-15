@@ -111,19 +111,14 @@ export async function runCreationJob(profileId: string, creationId: string, inpu
     }
 }
 
-export async function chatWithCreation(profileId: string, creationId: string, message: string) {
-    const creation = await prisma.creation.findFirst({
-        where: { id: creationId, profileId },
-        include: { knowledge: { orderBy: { createdAt: "desc" }, take: 8 } },
-    })
-    if (!creation) return null
+async function replyAsCreation(creation: { id: string; name: string; instructions: string | null; profileId: string; knowledge: { title: string; rawText: string }[] }, message: string, kind: "creator-chat" | "visitor-chat") {
     const text = message.trim()
     if (text.length < 1) throw new Error("Write a message.")
     const usage = await prepareAiUsage({
-        profileId,
+        profileId: creation.profileId,
         storedModel: "fast",
         operationKey: operationKey(),
-        metadata: { creationId, kind: "creator-chat" },
+        metadata: { creationId: creation.id, kind },
     })
     const knowledge = creation.knowledge.map((item) => `${item.title}:\n${item.rawText}`).join("\n\n")
     const system = [creation.instructions || `You are ${creation.name}.`, knowledge ? `Knowledge:\n${knowledge}` : ""].filter(Boolean).join("\n\n")
@@ -132,10 +127,32 @@ export async function chatWithCreation(profileId: string, creationId: string, me
             { role: "system", content: clipUtf8(system, usage.recipe.inputBudget * 3) },
             { role: "user", content: clipUtf8(text, usage.recipe.inputBudget * 2) },
         ])
-        await finishAiUsage(usage.id, "CONSUME", { reason: "creation_chat_delivered" })
+        await finishAiUsage(usage.id, "CONSUME", { reason: kind === "visitor-chat" ? "creation_visitor_chat_delivered" : "creation_chat_delivered" })
         return { reply }
     } catch (error) {
-        await finishAiUsage(usage.id, "RELEASE", { reason: "creation_chat_failed" }).catch(() => {})
+        await finishAiUsage(usage.id, "RELEASE", { reason: kind === "visitor-chat" ? "creation_visitor_chat_failed" : "creation_chat_failed" }).catch(() => {})
         throw error
     }
+}
+
+export async function chatWithCreation(profileId: string, creationId: string, message: string) {
+    const creation = await prisma.creation.findFirst({
+        where: { id: creationId, profileId },
+        include: { knowledge: { orderBy: { createdAt: "desc" }, take: 8 } },
+    })
+    if (!creation) return null
+    return replyAsCreation(creation, message, "creator-chat")
+}
+
+export async function chatWithPublicCreation(creationId: string, message: string) {
+    const creation = await prisma.creation.findFirst({
+        where: {
+            id: creationId,
+            visibility: { in: ["UNLISTED", "SHOWCASE"] },
+            allowVisitorChat: true,
+        },
+        include: { knowledge: { orderBy: { createdAt: "desc" }, take: 8 } },
+    })
+    if (!creation) return null
+    return replyAsCreation(creation, message, "visitor-chat")
 }

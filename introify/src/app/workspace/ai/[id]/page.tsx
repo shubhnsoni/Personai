@@ -11,5 +11,5 @@ export default async function CreationDetailPage({ params }: { params: Promise<{
     const { id } = await params
     const creation = await getOwnedCreation(user.activeProfile.id, id)
     if (!creation) notFound()
-    return <CreationStudio creation={JSON.parse(JSON.stringify(creation))} />
+    return <CreationStudio creation={JSON.parse(JSON.stringify({ ...creation, profileSlug: user.activeProfile.slug }))} />
 }
