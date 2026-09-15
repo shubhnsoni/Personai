@@ -24,6 +24,30 @@ export function remixPresets() {
     ] as const
 }
 
+export function teamsEmptyCopy(creationCount: number) {
+    if (creationCount === 0) {
+        return { title: "No teams yet", body: "Create AIs first, then group them." }
+    }
+    return { title: "No teams yet", body: "Name a team above and pick the AIs that should work together." }
+}
+
+export function attachSkillInput(hostId: string, usesId: string) {
+    if (hostId === usesId) throw new Error("An AI cannot depend on itself.")
+    return { hostId, usesId }
+}
+
+export function scheduleCadences() {
+    return ["daily", "weekly"] as const
+}
+
+export function scheduleJobInput(input: { creationId: string; jobId: string; cadence: string }) {
+    const cadence = input.cadence.trim().toLowerCase()
+    if (!scheduleCadences().includes(cadence as "daily" | "weekly")) {
+        throw new Error("Use a daily or weekly cadence.")
+    }
+    return { creationId: input.creationId, jobId: input.jobId, cadence }
+}
+
 export function teamTemplates() {
     return [
         { id: "restaurant", name: "Restaurant operations", skills: ["MILO", "BOOK", "STOK", "CHEF", "COST", "ROTA"] },

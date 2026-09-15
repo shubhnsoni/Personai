@@ -37,5 +37,25 @@ export function connectionHealth(status: string) {
     if (status === "connected") return "Connected"
     if (status === "expired") return "Expired"
     if (status === "error") return "Needs attention"
-    return "Unavailable"
+    return "Not connected yet"
+}
+
+export function assistantConnectionItem(row: { label: string; status: string }) {
+    if (row.status === "connected") return null
+    if (row.status === "expired") {
+        return {
+            title: `${row.label} expired.`,
+            detail: "Reconnect when that cloud account is ready. AIs keep working on files already in Introify.",
+        }
+    }
+    if (row.status === "error") {
+        return {
+            title: `${row.label} needs attention.`,
+            detail: "Check the account, then try again. AIs keep working on files already in Introify.",
+        }
+    }
+    return {
+        title: `${row.label} is not connected yet.`,
+        detail: "OAuth is not configured. AIs keep working on files already in Introify.",
+    }
 }

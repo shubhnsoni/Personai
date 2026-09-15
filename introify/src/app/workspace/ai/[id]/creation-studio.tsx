@@ -111,8 +111,13 @@ export function CreationStudio({ creation }: { creation: Creation }) {
                 {shareable ? (
                     <p className="w-lede">
                         <Link href={publicPath} className="w-ghost" target="_blank" rel="noreferrer">Open public page</Link>
+                        <Link href={`/workspace/reputation/${creation.id}`} className="w-ghost">Reputation</Link>
                     </p>
-                ) : null}
+                ) : (
+                    <p className="w-lede">
+                        <Link href={`/workspace/reputation/${creation.id}`} className="w-ghost">Reputation</Link>
+                    </p>
+                )}
                 <div className="w-inline-actions">
                     <button className="w-btn" type="button" disabled={busy === "save"} onClick={async () => {
                         setBusy("save"); flash("")
@@ -218,8 +223,9 @@ export function CreationStudio({ creation }: { creation: Creation }) {
                 </label>
                 <button className="w-btn" type="button" disabled={busy === "job"} onClick={async () => {
                     setBusy("job"); flash("")
+                    let jobId: string | undefined
                     if (jobOffer) {
-                        await fetch(`/api/workspace/creations/${creation.id}/jobs`, {
+                        const offered = await fetch(`/api/workspace/creations/${creation.id}/jobs`, {
                             method: "POST",
                             headers: { "content-type": "application/json" },
                             body: JSON.stringify({
@@ -229,11 +235,18 @@ export function CreationStudio({ creation }: { creation: Creation }) {
                                 priceCents: Math.round(Number(jobPrice || "0") * 100),
                             }),
                         })
+                        const offeredData = await offered.json().catch(() => ({}))
+                        if (!offered.ok) {
+                            setBusy(null)
+                            flash(offeredData.error || "Could not offer that job.")
+                            return
+                        }
+                        jobId = offeredData.job?.id
                     }
                     const res = await fetch(`/api/workspace/creations/${creation.id}/run`, {
                         method: "POST",
                         headers: { "content-type": "application/json" },
-                        body: JSON.stringify({ jobName: jobName || "Untitled job", prompt: jobInput }),
+                        body: JSON.stringify({ jobId, jobName: jobName || "Untitled job", prompt: jobInput }),
                     })
                     const data = await res.json().catch(() => ({}))
                     setBusy(null)

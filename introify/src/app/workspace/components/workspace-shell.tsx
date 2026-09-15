@@ -51,6 +51,7 @@ export function WorkspaceShell({
                 <div className="w-top-actions">
                     <Link href="/workspace/explore" className="w-ghost">Explore</Link>
                     <Link href="/workspace/earnings" className="w-ghost">Earnings</Link>
+                    <Link href="/workspace/more" className="w-ghost w-more">More</Link>
                     <Link href={`/${slug}`} className="w-ghost" target="_blank" rel="noreferrer">
                         Public page <ExternalLink size={14} aria-hidden="true" />
                     </Link>

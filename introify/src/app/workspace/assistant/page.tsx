@@ -15,7 +15,10 @@ export default async function AssistantPage() {
             <p className="w-lede">This is the system helper for connections, expired access, and approvals — not a marketplace skill.</p>
             <ul className="w-notes" style={{ marginTop: 24 }}>
                 {items.map((item) => (
-                    <li key={item.title}><b>{item.title}</b><p>{item.detail}</p></li>
+                    <li key={item.title}>
+                        <b>{item.title}</b>
+                        <p>{item.detail}</p>
+                    </li>
                 ))}
             </ul>
         </div>

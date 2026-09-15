@@ -1,7 +1,8 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
-import { listProfileJobRuns } from "@/lib/creation-jobs"
+import { jobsEmptyCopy, listProfileJobRuns } from "@/lib/creation-jobs"
+import { listCreations } from "@/lib/creations"
 
 export const dynamic = "force-dynamic"
 
@@ -17,6 +18,8 @@ export default async function JobsPage() {
     const user = await syncUser()
     if (!user?.activeProfile) redirect("/sign-in")
     const items = await listProfileJobRuns(user.activeProfile.id)
+    const creations = await listCreations(user.activeProfile.id)
+    const empty = jobsEmptyCopy(creations.length)
 
     return (
         <div className="w-page">
@@ -29,9 +32,9 @@ export default async function JobsPage() {
             </div>
             {items.length === 0 ? (
                 <div className="w-empty">
-                    <h2>No jobs yet</h2>
-                    <p>Open an AI, name a concrete job, and run it. You get a result you can copy.</p>
-                    <Link href="/workspace/create" className="w-btn">Create an AI first</Link>
+                    <h2>{empty.title}</h2>
+                    <p>{empty.body}</p>
+                    <Link href={empty.href} className="w-btn">{empty.cta}</Link>
                 </div>
             ) : (
                 <div className="w-joblist">

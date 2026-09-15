@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { formatInr, jobCheckoutOpen, splitJobPrice } from "@/lib/workspace-economy"
 import { matchesOutcome, publicSignals, rankingScore } from "@/lib/workspace-discover"
-import { connectionCatalog, connectionHealth, defaultManifest } from "@/lib/workspace-connections"
-import { remixPresets, teamTemplates } from "@/lib/workspace-teams"
+import { assistantConnectionItem, connectionCatalog, connectionHealth, defaultManifest } from "@/lib/workspace-connections"
+import { attachSkillInput, remixPresets, scheduleJobInput, teamTemplates } from "@/lib/workspace-teams"
 
 export async function offerCreationJob(profileId: string, creationId: string, input: {
     name: string
@@ -157,10 +157,10 @@ export async function assistantItems(profileId: string) {
         take: 12,
     })
     const items = [
-        ...connections.filter((row) => row.status !== "connected").map((row) => ({
-            title: `${row.label} is ${connectionHealth(row.status).toLowerCase()}.`,
-            detail: "Reconnect when that cloud account is ready. AIs keep working on files already in Introify.",
-        })),
+        ...connections.flatMap((row) => {
+            const item = assistantConnectionItem(row)
+            return item ? [item] : []
+        }),
         ...pending.map((row) => ({
             title: `${row.creation.name} is waiting for approval.`,
             detail: `${row.action}: ${row.payload}`,
@@ -174,6 +174,36 @@ export async function assistantItems(profileId: string) {
 
 export function creationManifest(purpose: string | null) {
     return defaultManifest(purpose || "Complete concrete work")
+}
+
+export async function attachCreationSkill(profileId: string, hostId: string, usesId: string) {
+    const ids = attachSkillInput(hostId, usesId)
+    const owned = await prisma.creation.findMany({
+        where: { profileId, id: { in: [ids.hostId, ids.usesId] } },
+        select: { id: true },
+    })
+    if (owned.length !== 2) return null
+    return prisma.creationSkillDep.upsert({
+        where: { hostId_usesId: { hostId: ids.hostId, usesId: ids.usesId } },
+        update: {},
+        create: ids,
+    })
+}
+
+export async function scheduleCreationJob(profileId: string, input: { creationId: string; jobId: string; cadence: string }) {
+    const data = scheduleJobInput(input)
+    const job = await prisma.creationJob.findFirst({
+        where: { id: data.jobId, creationId: data.creationId, creation: { profileId } },
+        select: { id: true, creationId: true },
+    })
+    if (!job) return null
+    return prisma.creationSchedule.create({
+        data: {
+            creationId: job.creationId,
+            jobId: job.id,
+            cadence: data.cadence,
+        },
+    })
 }
 
 export { remixPresets, teamTemplates, connectionCatalog, connectionHealth }

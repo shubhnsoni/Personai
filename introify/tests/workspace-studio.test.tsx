@@ -49,4 +49,20 @@ describe("creation studio", () => {
         await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/saved/i))
         expect(screen.getByRole("status").className).not.toMatch(/w-error/)
     })
+
+    it("runs an offered job by id instead of creating a second unnamed job", async () => {
+        mocks.fetch
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ job: { id: "job-1" } }) })
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ run: { id: "run-1" } }) })
+        render(<CreationStudio creation={creation} />)
+        fireEvent.change(screen.getByPlaceholderText(/3 logo motion directions/i), { target: { value: "3 logo motion directions" } })
+        fireEvent.change(screen.getByPlaceholderText(/forest mark/i), { target: { value: "Logo: a forest mark." } })
+        fireEvent.change(screen.getByPlaceholderText("499"), { target: { value: "499" } })
+        fireEvent.click(screen.getByLabelText(/offer this as a hireable job/i))
+        fireEvent.click(screen.getByRole("button", { name: /run job/i }))
+        await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(2))
+        const runBody = JSON.parse(mocks.fetch.mock.calls[1][1].body as string)
+        expect(runBody.jobId).toBe("job-1")
+        expect(runBody.prompt).toMatch(/forest mark/)
+    })
 })

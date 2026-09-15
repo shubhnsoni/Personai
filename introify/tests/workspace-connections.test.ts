@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest"
 import {
     actionNeedsApproval,
+    assistantConnectionItem,
     connectionCatalog,
+    connectionHealth,
     defaultManifest,
     permissionAllowed,
 } from "@/lib/workspace-connections"
@@ -27,5 +29,16 @@ describe("Phase 3 connections and safety", () => {
         const manifest = defaultManifest("Restaurant night report")
         expect(manifest.disallowed).toEqual(expect.arrayContaining(["spend_money", "place_order"]))
         expect(manifest.approvalRequired.length).toBeGreaterThan(0)
+    })
+
+    it("does not tell people to reconnect a service that was never connected", () => {
+        expect(connectionHealth("unavailable")).toBe("Not connected yet")
+        expect(connectionHealth("expired")).toBe("Expired")
+        const never = assistantConnectionItem({ label: "Google Drive", status: "unavailable" })
+        expect(never?.title).toMatch(/not connected yet/i)
+        expect(never?.detail).not.toMatch(/reconnect/i)
+        const expired = assistantConnectionItem({ label: "Google Drive", status: "expired" })
+        expect(expired?.title).toMatch(/expired/i)
+        expect(expired?.detail).toMatch(/reconnect/i)
     })
 })

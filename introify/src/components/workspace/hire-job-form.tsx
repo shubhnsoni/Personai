@@ -29,10 +29,10 @@ export function HireJobForm({ creationId, jobId, checkoutOpen }: { creationId: s
                 <textarea className="mt-1 w-full min-h-11 rounded-2xl border border-border/70 bg-background px-3 py-2 text-sm" rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
             </label>
             <button type="submit" disabled={busy} className="inline-flex min-h-11 items-center rounded-full bg-foreground px-4 text-sm font-medium text-background disabled:opacity-40">
-                {busy ? "Checking…" : checkoutOpen ? "Hire this job" : "Hire this job"}
+                {busy ? "Checking…" : "Hire this job"}
             </button>
             {message ? <p className="text-sm text-muted-foreground" role="status">{message}</p> : null}
-            {!checkoutOpen ? <p className="text-xs text-muted-foreground">Paid checkout is not open yet. The job is listed; no charge is taken.</p> : null}
+            {!checkoutOpen ? <p className="text-xs text-muted-foreground">Paid jobs are not open yet. The job is listed; no charge is taken.</p> : null}
         </form>
     )
 }

@@ -1,5 +1,18 @@
 import { maturityLabel } from "@/lib/workspace-economy"
 
+export function workspaceToolLinks() {
+    return [
+        { href: "/workspace/explore", label: "Explore", blurb: "Find a job by outcome, not by model name." },
+        { href: "/workspace/earnings", label: "Earnings", blurb: "Jobs sold, fees, and net. Payouts wait on billing." },
+        { href: "/workspace/connections", label: "Connections", blurb: "Connect a service once. Each AI asks for its own scopes." },
+        { href: "/workspace/automations", label: "Background jobs", blurb: "Nightly Read/Create work. Sending still needs approval." },
+        { href: "/workspace/teams", label: "AI teams", blurb: "Specialists for one event — covers, prep, stock, staffing." },
+        { href: "/workspace/skills", label: "Skills", blurb: "One AI may use another. Dependencies stay visible." },
+        { href: "/workspace/bridge", label: "Desktop Bridge", blurb: "Cloud jobs still run on Introify servers." },
+        { href: "/workspace/assistant", label: "Assistant", blurb: "Expired access and approvals, in plain language." },
+    ]
+}
+
 export function exploreQueryExamples() {
     return [
         "Animate my logo.",
@@ -11,7 +24,7 @@ export function exploreQueryExamples() {
 
 export function matchesOutcome(query: string, item: { name: string; purpose: string | null; description: string | null; jobs: string[] }) {
     const hay = [item.name, item.purpose || "", item.description || "", ...item.jobs].join(" ").toLowerCase()
-    const terms = query.toLowerCase().split(/\s+/).filter((part) => part.length > 2)
+    const terms = query.toLowerCase().split(/\s+/).map((part) => part.replace(/[^a-z0-9]+/g, "")).filter((part) => part.length > 2)
     if (!terms.length) return true
     return terms.some((term) => hay.includes(term))
 }

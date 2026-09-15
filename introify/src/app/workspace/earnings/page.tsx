@@ -13,13 +13,13 @@ export default async function EarningsPage() {
     return (
         <div className="w-page">
             <h1 className="w-h1">Earnings</h1>
-            <p className="w-lede">{earnings.payoutStatus}</p>
-            <ul className="w-card-grid" style={{ marginTop: 24 }}>
-                <li className="w-creation-card"><div><h2>{earnings.jobsSold}</h2><p>Jobs sold</p></div></li>
-                <li className="w-creation-card"><div><h2>{formatInr(earnings.grossCents)}</h2><p>Gross</p></div></li>
-                <li className="w-creation-card"><div><h2>{formatInr(earnings.feeCents)}</h2><p>Introify fee</p></div></li>
-                <li className="w-creation-card"><div><h2>{formatInr(earnings.netCents)}</h2><p>Net</p></div></li>
-            </ul>
+            <p className="w-lede">{earnings.payoutStatus} You hire the job — visitors do not buy the AI.</p>
+            <div className="w-earn-strip">
+                <div className="w-earn-tile"><b>{earnings.jobsSold}</b><span>Jobs sold</span></div>
+                <div className="w-earn-tile"><b>{formatInr(earnings.grossCents)}</b><span>Gross</span></div>
+                <div className="w-earn-tile"><b>{formatInr(earnings.feeCents)}</b><span>Introify fee</span></div>
+                <div className="w-earn-tile"><b>{formatInr(earnings.netCents)}</b><span>Net</span></div>
+            </div>
             {earnings.orders.length === 0 ? (
                 <div className="w-empty" style={{ marginTop: 24 }}>
                     <h2>No sales yet</h2>

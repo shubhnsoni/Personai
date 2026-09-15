@@ -7,6 +7,23 @@ function operationKey() {
     return `creation-job:${randomBytes(12).toString("hex")}`
 }
 
+export function jobsEmptyCopy(creationCount: number) {
+    if (creationCount === 0) {
+        return {
+            title: "No jobs yet",
+            body: "Open an AI, name a concrete job, and run it. You get a result you can copy.",
+            href: "/workspace/create",
+            cta: "Create an AI first",
+        }
+    }
+    return {
+        title: "No jobs yet",
+        body: "Open an AI, name a concrete job, and run it. You get a result you can copy.",
+        href: "/workspace",
+        cta: "Open an AI",
+    }
+}
+
 export async function defineCreationJob(profileId: string, creationId: string, input: { name: string; description?: string; inputHint?: string }) {
     const owned = await prisma.creation.findFirst({ where: { id: creationId, profileId }, select: { id: true } })
     if (!owned) return null

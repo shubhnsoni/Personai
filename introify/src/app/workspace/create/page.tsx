@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ArrowUp } from "lucide-react"
+import { ArrowLeft, ArrowRight } from "lucide-react"
 
 const steps = [
     { key: "goodAt", prompt: "What should this AI be good at?", placeholder: "Logo motion directions, menu notes, brand analysis…", optional: false },
@@ -140,7 +140,7 @@ export default function CreatePage() {
                     ) : null}
                     <button className="w-btn" type="submit" disabled={busy}>
                         {busy ? "Saving…" : index === steps.length - 1 ? "Save as private" : "Continue"}
-                        <ArrowUp size={16} aria-hidden="true" />
+                        {index === steps.length - 1 ? null : <ArrowRight size={16} aria-hidden="true" />}
                     </button>
                 </div>
             </form>

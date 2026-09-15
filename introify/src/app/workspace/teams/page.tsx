@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
-import { teamEventPlan, teamTemplates } from "@/lib/workspace-teams"
+import { teamEventPlan, teamTemplates, teamsEmptyCopy } from "@/lib/workspace-teams"
 import { CreateTeamForm } from "@/components/workspace/create-team-form"
 
 export const dynamic = "force-dynamic"
@@ -35,7 +35,10 @@ export default async function TeamsPage() {
                 <CreateTeamForm creations={creations} templates={teamTemplates()} />
             </section>
             {teams.length === 0 ? (
-                <div className="w-empty"><h2>No teams yet</h2><p>Create AIs first, then group them.</p></div>
+                <div className="w-empty">
+                    <h2>{teamsEmptyCopy(creations.length).title}</h2>
+                    <p>{teamsEmptyCopy(creations.length).body}</p>
+                </div>
             ) : (
                 <ul className="w-notes">{teams.map((team) => (
                     <li key={team.id}><b>{team.name}</b><p>{team.members.map((m) => m.creation.name).join(", ") || "No members"}</p></li>

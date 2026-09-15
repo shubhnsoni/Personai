@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import { Search } from "lucide-react"
 import { syncUser } from "@/lib/auth-sync"
 import { exploreCreations } from "@/lib/workspace-market"
 import { exploreQueryExamples } from "@/lib/workspace-discover"
@@ -12,19 +13,27 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     const { q } = await searchParams
     const query = q?.trim() || ""
     const items = await exploreCreations(query)
+    const examples = exploreQueryExamples()
 
     return (
         <div className="w-page">
             <h1 className="w-h1">What do you need done?</h1>
             <p className="w-lede">Search by outcome — logo motion, restaurant reports, a PR review — not by model name.</p>
-            <form className="w-ask" style={{ marginTop: 20 }}>
+            <form className="w-search-form" role="search">
                 <label htmlFor="explore-q">Search</label>
-                <input id="explore-q" name="q" defaultValue={query} placeholder={exploreQueryExamples()[0]} />
-                <button className="w-btn" type="submit">Search</button>
+                <div className="w-search-row">
+                    <input id="explore-q" name="q" defaultValue={query} placeholder={examples[0]} />
+                    <button className="w-btn" type="submit">Search</button>
+                </div>
             </form>
-            <p className="w-lede">{exploreQueryExamples().join(" ")}</p>
+            <div className="w-chiprow" aria-label="Example outcomes">
+                {examples.map((example) => (
+                    <Link key={example} href={`/workspace/explore?q=${encodeURIComponent(example)}`}>{example}</Link>
+                ))}
+            </div>
             {items.length === 0 ? (
                 <div className="w-empty">
+                    <Search size={28} aria-hidden="true" />
                     <h2>No matching skills yet</h2>
                     <p>Showcase an AI that completes a real job. Explore stays small until there is useful supply.</p>
                 </div>
