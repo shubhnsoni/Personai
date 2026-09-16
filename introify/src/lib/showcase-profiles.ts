@@ -214,3 +214,94 @@ export async function seedShowcaseProfiles(prisma: PrismaClient) {
         console.log(`Showcase profile ready: /${item.slug}`)
     }
 }
+
+export type EnsureShowcaseResult = {
+    created: string[]
+    skipped: string[]
+}
+
+/** Create-only: never overwrite an existing profile slug or conflicting identity. */
+export async function ensureShowcaseProfiles(prisma: PrismaClient): Promise<EnsureShowcaseResult> {
+    const defaultPreset = await prisma.welcomeAnimationPreset.findFirst({ where: { isDefault: true } })
+    const created: string[] = []
+    const skipped: string[] = []
+
+    for (const item of SHOWCASES) {
+        const existingProfile = await prisma.profile.findUnique({ where: { slug: item.slug }, select: { id: true } })
+        if (existingProfile) {
+            skipped.push(item.slug)
+            continue
+        }
+
+        const existingWorkspace = await prisma.workspace.findUnique({ where: { slug: item.slug }, select: { id: true } }).catch(() => null)
+        if (existingWorkspace) {
+            skipped.push(item.slug)
+            continue
+        }
+
+        const byClerkId = await prisma.user.findUnique({ where: { clerkId: item.clerkId } })
+        const byEmail = await prisma.user.findUnique({ where: { email: item.email } })
+        if ((byClerkId && byClerkId.email !== item.email) || (byEmail && byEmail.clerkId !== item.clerkId)) {
+            skipped.push(item.slug)
+            continue
+        }
+
+        const user = byClerkId || await prisma.user.create({
+            data: { clerkId: item.clerkId, email: item.email, name: item.displayName },
+        })
+
+        await prisma.profile.create({
+            data: {
+                userId: user.id,
+                slug: item.slug,
+                displayName: item.displayName,
+                headline: item.headline,
+                bio: item.bio,
+                roleTemplate: item.roleTemplate,
+                primaryGoal: item.primaryGoal,
+                imageUrl: item.imageUrl,
+                isPublic: true,
+                liveChatEnabled: true,
+                welcomeMessageOverride: item.welcome,
+                personalityConfig: JSON.stringify({
+                    tone: item.tone,
+                    language: "en",
+                    responseLength: "medium",
+                    customInstructions: item.customInstructions,
+                }),
+                animationStyleId: defaultPreset?.id,
+                workExperiences: item.experiences.length
+                    ? { create: item.experiences.map((row) => ({ ...row })) }
+                    : undefined,
+                projects: item.projects.length
+                    ? { create: item.projects.map((row) => ({ ...row })) }
+                    : undefined,
+                serviceOfferings: item.services.length
+                    ? {
+                        create: item.services.map((row) => ({
+                            name: row.name,
+                            description: row.description,
+                            priceCents: row.priceCents,
+                            durationMinutes: row.durationMinutes,
+                            isActive: true,
+                        })),
+                    }
+                    : undefined,
+                documents: {
+                    create: item.documents.map((doc) => ({
+                        type: "TEXT",
+                        sourceType: "TEXT",
+                        title: doc.title,
+                        rawText: doc.rawText,
+                        visibility: "PUBLIC",
+                        publicationState: "PUBLISHED",
+                    })),
+                },
+            },
+        })
+        created.push(item.slug)
+        console.log(`Showcase profile created: /${item.slug}`)
+    }
+
+    return { created, skipped }
+}

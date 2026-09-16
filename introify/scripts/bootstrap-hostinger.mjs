@@ -170,6 +170,31 @@ function seedDemoShops() {
     }
 }
 
+
+function seedShowcaseProfilesCreateOnly() {
+    if (process.env.INTROIFY_SEED_SHOWCASE === "false" || process.env.INTROIFY_SEED_SHOWCASE === "0") {
+        console.log("Showcase profile seed skipped.")
+        return
+    }
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+    const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/ensure-showcase-profiles.mjs"], {
+        cwd: root,
+        env: process.env,
+        stdio: "inherit",
+        windowsHide: true,
+        timeout: 120_000,
+        killSignal: "SIGKILL",
+    })
+    if (result.error) {
+        console.error("Showcase seed did not finish:", result.error.message)
+        return
+    }
+    if (result.status !== 0) {
+        console.error(`Showcase seed exited ${result.status ?? "unknown"}; continuing Hostinger build.`)
+    }
+}
+
+
 async function main() {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for database bootstrap")
     const prisma = new PrismaClient()
@@ -177,6 +202,7 @@ async function main() {
         const result = await bootstrapDatabase(prisma)
         console.log(`Database bootstrap: ${result.presetsCreated} presets created; demo ${result.demo}.`)
         seedDemoShops()
+        seedShowcaseProfilesCreateOnly()
     } finally {
         await prisma.$disconnect()
     }
@@ -189,3 +215,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         process.exitCode = 1
     })
 }
+
+
