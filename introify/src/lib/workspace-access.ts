@@ -18,11 +18,20 @@ export function canAccessProfile(access: ProfileAccess | undefined, permission: 
     return false
 }
 
+/**
+ * Pick the dashboard active profile.
+ * An explicit activeId (cookie / switcher) always wins when that profile is accessible —
+ * including owned try-* kits (e.g. Haven Hinoo / try-hotel). Auto-pick still prefers
+ * non-try businesses unless TRY_NOW / trying is set, so guest kits do not steal the desk.
+ */
 export function chooseActiveProfile<P extends { id: string; slug: string; updatedAt: Date }>(
     profiles: readonly P[], activeId?: string, trying = false,
 ): P | null {
     const fromCookie = profiles.find((p) => p.id === activeId)
-    if (fromCookie && (trying || !fromCookie.slug.startsWith("try-"))) return fromCookie
+    if (fromCookie) return fromCookie
+    if (trying) {
+        return [...profiles].sort((a, b) => +b.updatedAt - +a.updatedAt)[0] || null
+    }
     return [...profiles].filter((p) => !p.slug.startsWith("try-"))
-        .sort((a, b) => +b.updatedAt - +a.updatedAt)[0] || fromCookie || profiles[0] || null
+        .sort((a, b) => +b.updatedAt - +a.updatedAt)[0] || profiles[0] || null
 }
