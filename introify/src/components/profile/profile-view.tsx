@@ -12,7 +12,7 @@ import { extrasOf, isDigitalCatalogItem, publicChipAllowed, shopNavLabel } from 
 import { resolveKitRole } from "@/lib/role-alias"
 import { CheckoutSheet, type CheckoutItem } from "@/components/checkout/checkout-sheet"
 import { TipSheet } from "@/components/profile/tip-sheet"
-import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images } from "lucide-react"
+import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, BedDouble, Wifi, UtensilsCrossed, Phone } from "lucide-react"
 import { storyLabel, storyPath } from "@/lib/story"
 import { hasSocials, socialsFromConfig } from "@/lib/socials"
 import { ProfileContactRow } from "@/components/profile/profile-contact-row"
@@ -127,13 +127,15 @@ interface ProfileViewProps {
     animationConfig: PublicAnimationConfig
     colors: string[]
     expertiseLinks?: ReactNode
+    hotelRoom?: string
+    stayToken?: string
 }
 
 type ContentType = "about" | "experience" | "projects" | "services" | "products" | "courses" | "events" | "communities" | null
 
 type ChipDef = ChatChip & { available: boolean }
 
-export function ProfileView({ profile, animationConfig, colors, expertiseLinks }: ProfileViewProps) {
+export function ProfileView({ profile, animationConfig, colors, expertiseLinks, hotelRoom, stayToken }: ProfileViewProps) {
     const [activeContent, setActiveContent] = useState<ContentType>(null)
     const [isBookingOpen, setIsBookingOpen] = useState(false)
     const [selectedService, setSelectedService] = useState<string | null>(null)
@@ -151,7 +153,8 @@ export function ProfileView({ profile, animationConfig, colors, expertiseLinks }
     // have the opposite constraint, which is why this is safe HERE specifically.)
     const [successDismissed, setSuccessDismissed] = useState(false)
     const restaurant = profile.roleTemplate === "RESTAURANT"
-    const [introStage, setIntroStage] = useState<"hi" | "type" | "orb" | "ready">(restaurant ? "ready" : "hi")
+    const hotel = resolveKitRole(profile.roleTemplate) === "HOTEL"
+    const [introStage, setIntroStage] = useState<"hi" | "type" | "orb" | "ready">(restaurant || hotel ? "ready" : "hi")
     const searchParams = useSearchParams()
     const checkoutSucceeded = searchParams.get('checkout') === 'success'
     const showSuccessNotification = checkoutSucceeded && !successDismissed
@@ -166,7 +169,7 @@ export function ProfileView({ profile, animationConfig, colors, expertiseLinks }
     }, [checkoutSucceeded, profile.slug])
 
     useEffect(() => {
-        if (restaurant || introStage === "ready") return
+        if (restaurant || hotel || introStage === "ready") return
         const timer = window.setTimeout(() => setIntroStage("ready"), 4200)
         return () => window.clearTimeout(timer)
     }, [restaurant, introStage])
@@ -204,7 +207,7 @@ export function ProfileView({ profile, animationConfig, colors, expertiseLinks }
             openBooking: () => setIsBookingOpen(true),
             openContent: (type) => setActiveContent(type),
             openTip: () => setTipOpen(true),
-        }),
+        }, hotelRoom),
     ].map((chip) => {
         const href = "href" in chip ? chip.href : undefined
         const select = "onSelect" in chip ? chip.onSelect : undefined
@@ -263,12 +266,14 @@ export function ProfileView({ profile, animationConfig, colors, expertiseLinks }
 
             <Tracker slug={profile.slug} />
             <SessionProbe slug={profile.slug} />
-            {restaurant || themed ? null : <IntroVeil stage={introStage} />}
+            {restaurant || hotel || themed ? null : <IntroVeil stage={introStage} />}
 
             <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
                 <div className="relative mx-auto flex min-h-0 w-full flex-1 overflow-hidden">
                     <ChatInterface
                         profile={profile}
+                        hotelRoom={hotelRoom}
+                        stayToken={stayToken}
                         colors={colors}
                         animationConfig={animationConfig}
                         onShowContent={handleShowContent}
@@ -437,6 +442,9 @@ function welcomeTopics(profile: ProfileViewProps["profile"]) {
     if (role === "RESTAURANT") {
         return ["the menu", "a table", "today's specials"]
     }
+    if (role === "HOTEL") {
+        return ["towels", "Wi-Fi", "restaurants", "reception"]
+    }
     const kitTopics =
         role === "SHOP" ? ["the shop", "orders", "pickup"]
         : role === "PHARMACY" ? ["medicines", "stock", "prescriptions"]
@@ -476,7 +484,8 @@ function buildGoalChips(
         openBooking: () => void
         openContent: (type: Exclude<ContentType, null>) => void
         openTip: () => void
-    }
+    },
+    hotelRoom?: string,
 ): ChatChip[] {
     const name = profile.displayName
     const hasServices = profile.serviceOfferings.some(s => s.isActive)
@@ -619,11 +628,40 @@ function buildGoalChips(
             icon: <UsersRound className="w-3.5 h-3.5" />,
             onSelect: () => actions.openContent("communities"),
         },
+        housekeeping: {
+            id: "housekeeping",
+            label: hotelRoom ? `Towels · ${hotelRoom}` : "Housekeeping",
+            available: resolveKitRole(profile.roleTemplate) === "HOTEL",
+            icon: <BedDouble className="w-3.5 h-3.5" />,
+            prompt: hotelRoom ? `Two towels for room ${hotelRoom}` : "I need two towels",
+        },
+        wifi: {
+            id: "wifi",
+            label: "Wi-Fi",
+            available: resolveKitRole(profile.roleTemplate) === "HOTEL",
+            icon: <Wifi className="w-3.5 h-3.5" />,
+            prompt: "What's the wifi password?",
+        },
+        food: {
+            id: "food",
+            label: "Food",
+            available: resolveKitRole(profile.roleTemplate) === "HOTEL",
+            icon: <UtensilsCrossed className="w-3.5 h-3.5" />,
+            prompt: "What restaurants can I order from?",
+        },
+        reception: {
+            id: "reception",
+            label: "Reception",
+            available: resolveKitRole(profile.roleTemplate) === "HOTEL",
+            icon: <Phone className="w-3.5 h-3.5" />,
+            prompt: "Talk to reception",
+        },
     }
 
     const kitRole = resolveKitRole(profile.roleTemplate) || profile.roleTemplate || ""
     const orderByKit: Record<string, string[]> = {
         RESTAURANT: ["shop", "about", "book", "wa"],
+        HOTEL: ["housekeeping", "wifi", "food", "reception"],
         SHOP: ["shop", "products", "wa", "about"],
         JEWELRY_RETAIL: ["shop", "products", "wa", "about"],
         JEWELRY_WHOLESALE: ["shop", "wa", "about"],
@@ -659,7 +697,9 @@ function buildGoalChips(
     const keys = orderByKit[kitRole] ?? orderByGoal[goal] ?? ["about", "work", "services", "book"]
     const extraKeys = kitRole === "RESTAURANT"
         ? ["about", "wa", "tip"]
-        : ["about", "products", "shop", "wa", "tip", "courses", "events", "communities", "book"]
+        : kitRole === "HOTEL"
+            ? ["about", "wa"]
+            : ["about", "products", "shop", "wa", "tip", "courses", "events", "communities", "book"]
     const extras = extraKeys.filter((k) => !keys.includes(k))
     const allowed = [...keys, ...extras].filter((k) => publicChipAllowed(profile.roleTemplate, k, extrasOf(profile)))
     const chips = allowed

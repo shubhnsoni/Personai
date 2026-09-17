@@ -6,10 +6,12 @@ import { BOOK_SHOPS } from "./book"
 import { FIELD_SHOPS } from "./field"
 import { TEACH_SHOPS } from "./teach"
 import { STUDIO_SHOPS } from "./studio"
+import { STAY_SHOPS } from "./stay"
 import { NILESH_KUMAR } from "./neal"
 
 export const DEMO_SHOPS: DemoShop[] = [
     ...FOOD_SHOPS,
+    ...STAY_SHOPS,
     ...SHOP_SHOPS,
     ...BOOK_SHOPS,
     ...FIELD_SHOPS,

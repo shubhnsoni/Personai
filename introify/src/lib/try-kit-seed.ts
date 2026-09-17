@@ -57,6 +57,10 @@ export async function seedRole(profileId: string, role: string) {
         if (engine === "JEWELRY_RETAIL" || engine === "JEWELRY_WHOLESALE") {
             await writeBoard(profileId, "Ranchi", "ranchi")
         }
+        if (engine === "HOTEL") {
+            const { seedHotelStayDemo } = await import("@/lib/hotels/store")
+            await seedHotelStayDemo(profileId)
+        }
         return
     }
     role = resolveKitRole(role) || role

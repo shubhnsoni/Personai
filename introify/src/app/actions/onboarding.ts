@@ -44,6 +44,17 @@ export interface CreateProfileData {
     distroInviteDesks?: boolean
     seedSample?: boolean
     username?: string
+    hotel?: {
+        checkInTime?: string
+        checkOutTime?: string
+        wifiName?: string
+        wifiPassword?: string
+        roomCount?: number
+        services?: string[]
+        address?: string
+        emergencyContact?: string
+        restaurantProfileIds?: string[]
+    }
 }
 
 export interface CreateProfileResult {
@@ -283,10 +294,29 @@ export async function createProfile(data: CreateProfileData): Promise<CreateProf
         jar.set(ACTIVE_PROFILE_COOKIE, profile.id, { path: "/", sameSite: "lax", httpOnly: true })
     }
     revalidatePath("/dashboard")
+    if (roleTemplate === "HOTEL") {
+        const { ensureHotelProperty, connectRestaurant } = await import("@/lib/hotels/store")
+        await ensureHotelProperty(profile.id, {
+            checkInTime: data.hotel?.checkInTime,
+            checkOutTime: data.hotel?.checkOutTime,
+            wifiName: data.hotel?.wifiName,
+            wifiPassword: data.hotel?.wifiPassword,
+            roomCount: data.hotel?.roomCount,
+            services: data.hotel?.services,
+            address: data.hotel?.address,
+            emergencyContact: data.hotel?.emergencyContact,
+            receptionWhatsapp: data.whatsapp,
+            timezone: data.timezone,
+        })
+        for (const restaurantId of data.hotel?.restaurantProfileIds || []) {
+            await connectRestaurant(profile.id, restaurantId).catch(() => null)
+        }
+    }
     const next = data.needId || importBlueprint ? effectiveNeed.next : (
         roleTemplate === "DISTRIBUTOR" ? "/dashboard/orders" : roleTemplate === "RESTAURANT" || roleTemplate === "SHOP" || roleTemplate === "JEWELRY_RETAIL" || roleTemplate === "JEWELRY_WHOLESALE" || roleTemplate === "PHARMACY" || roleTemplate === "AUTO_PARTS" ? "/dashboard/products"
         : roleTemplate === "CONSULTANT" || roleTemplate === "CA" ? "/dashboard/services"
         : roleTemplate === "COACH" ? "/dashboard/courses"
+        : roleTemplate === "HOTEL" ? "/dashboard"
         : "/dashboard"
     )
     return { slug: profile.slug, next }

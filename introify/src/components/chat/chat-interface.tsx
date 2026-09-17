@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils"
 import { ChatAvatar } from "@/components/chat/chat-avatar"
 import { ChatHeader } from "@/components/chat/chat-header"
 import { ChatMarkdown } from "@/components/chat/chat-markdown"
+import { HotelActionCardView } from "@/components/chat/hotel-action-card"
+import { parseHotelCard, stripHotelCard } from "@/lib/hotels"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { wantsLiveSupport } from "@/lib/live-support"
 import { toast } from "sonner"
@@ -67,6 +69,8 @@ interface ChatInterfaceProps {
     onIntroStage?: (stage: "hi" | "type" | "orb" | "ready") => void
     headerActions?: ReactNode
     contactLinks?: ReactNode
+    hotelRoom?: string
+    stayToken?: string
 }
 
 type RichContentType = "experience" | "projects" | "about" | "services" | "products" | "courses" | "events" | "communities"
@@ -82,6 +86,8 @@ export function ChatInterface({
     onIntroStage,
     headerActions,
     contactLinks,
+    hotelRoom,
+    stayToken,
 }: ChatInterfaceProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState("")
@@ -92,7 +98,8 @@ export function ChatInterface({
     const [conversationId, setConversationId] = useState<string | null>(null)
     const [visitorId, setVisitorId] = useState<string | null>(null)
     const [, setIsLoadingHistory] = useState(true)
-    const [introReady, setIntroReady] = useState(() => profile.roleTemplate === "RESTAURANT")
+    const hotel = profile.roleTemplate === "HOTEL" || profile.roleTemplate === "RESORT" || profile.roleTemplate === "HOSTEL" || profile.roleTemplate === "HOMESTAY" || profile.roleTemplate === "SERVICED_APARTMENT"
+    const [introReady, setIntroReady] = useState(() => profile.roleTemplate === "RESTAURANT" || hotel)
     const [chatMode, setChatMode] = useState("AI")
     const [liveChatEnabled, setLiveChatEnabled] = useState(false)
     const [slaMinutes, setSlaMinutes] = useState(10)
@@ -230,7 +237,9 @@ export function ChatInterface({
                     knowledgeGapConsent,
                     profileId: profile.id,
                     conversationId: openId,
-                    visitorId
+                    visitorId,
+                    hotelRoom,
+                    stayToken,
                 }),
                 signal: abort.signal
             })
@@ -336,7 +345,7 @@ export function ChatInterface({
             window.clearTimeout(timeout)
             setIsLoading(false)
         }
-    }, [messages, profile.id, conversationId, visitorId, isLoading, chatMode, memoryConsent, knowledgeGapConsent])
+    }, [messages, profile.id, conversationId, visitorId, isLoading, chatMode, memoryConsent, knowledgeGapConsent, hotelRoom, stayToken])
 
     const goToChatHome = () => {
         abortControllerRef.current?.abort()
@@ -540,7 +549,7 @@ export function ChatInterface({
                         bare={themedOrb || animationConfig.look === "pixel" || animationConfig.look === "animoji" || animationConfig.look === "bloub" || animationConfig.look === "blob"}
                         onReady={() => setIntroReady(true)}
                         onStage={onIntroStage}
-                        skipIntro={themedOrb || profile.roleTemplate === "RESTAURANT"}
+                        skipIntro={themedOrb || profile.roleTemplate === "RESTAURANT" || hotel}
                     />
                 )}
 
@@ -639,7 +648,10 @@ export function ChatInterface({
                                             isUser ? (
                                                 <span className="whitespace-pre-wrap">{m.content}</span>
                                             ) : (
-                                                <ChatMarkdown text={m.content} />
+                                                <>
+                                                    <ChatMarkdown text={stripHotelCard(m.content) || m.content} />
+                                                    {parseHotelCard(m.content) ? <HotelActionCardView card={parseHotelCard(m.content)!} /> : null}
+                                                </>
                                             )
                                         ) : isLoading ? (
                                             <PendingStatus name={profile.displayName} />

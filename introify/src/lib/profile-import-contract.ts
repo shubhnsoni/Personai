@@ -47,7 +47,7 @@ export const profileBlueprintSchema = z.object({
         welcome: required(500),
         sourceIds: sourceRefsSchema.min(1),
     }).strict(),
-    needId: z.enum(["sell", "dine", "time", "teach", "ca", "hire", "show", "leads", "page", "field", "salon", "eventStudio", "estate", "recruit", "jewelryRetail", "goldWholesale", "distribute", "pharmacy", "autoParts"]),
+    needId: z.enum(["sell", "dine", "hotel", "time", "teach", "ca", "hire", "show", "leads", "page", "field", "salon", "eventStudio", "estate", "recruit", "jewelryRetail", "goldWholesale", "distribute", "pharmacy", "autoParts"]),
     addons: z.array(z.enum(["leads", "shop", "menu", "digital", "services", "calendar", "courses", "events", "portfolio"])).max(9),
     socials: z.array(z.object({ label: required(80), url: required(2048), sourceIds: sourceRefsSchema.min(1) }).strict()).max(12),
     experiences: z.array(z.object({ company: required(160), role: required(160), startDate: text(40), endDate: text(40).nullable(), description: required(2000), sourceIds: sourceRefsSchema.min(1) }).strict()).max(15),

@@ -11,6 +11,11 @@ export const ROLE_ALIAS: Record<string, string> = {
     CLOUD_KITCHEN: "RESTAURANT",
     DHABA: "RESTAURANT",
 
+    RESORT: "HOTEL",
+    HOSTEL: "HOTEL",
+    HOMESTAY: "HOTEL",
+    SERVICED_APARTMENT: "HOTEL",
+
     KIRANA: "SHOP",
     OPTICS: "SHOP",
     BOUTIQUE: "SHOP",

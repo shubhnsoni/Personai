@@ -37,6 +37,7 @@ export const RESERVED = [
     "sms-policy",
     "library",
     "qa",
+    "q",
     "uploads",
     "o",
     "opengraph-image",

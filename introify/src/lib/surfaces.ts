@@ -73,6 +73,10 @@ const KIT: Record<string, { surfaces: Surface[]; packs: FieldPack[] }> = {
         surfaces: [...CORE, "shop", "calendar", "sales"],
         packs: ["menuDish", "ar", "tableBook", "whatsappUpi"],
     },
+    HOTEL: {
+        surfaces: [...CORE, "services"],
+        packs: ["whatsappUpi"],
+    },
     CONSULTANT: {
         surfaces: [...CORE, "leads", "services", "calendar", "sales"],
         packs: ["portfolio"],

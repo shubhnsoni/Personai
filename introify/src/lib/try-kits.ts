@@ -11,9 +11,14 @@ export const TRY_KITS = [
     { category: "new", role: "EVENTS_STUDIO", goal: "COLLECT_LEADS", slug: "try-events-studio", name: "Events studio", blurb: "Briefs, documents, approvals, and event delivery.", next: "/dashboard/events" },
     { category: "new", role: "REAL_ESTATE_BROKERAGE", goal: "COLLECT_LEADS", slug: "try-real-estate", name: "Real-estate brokerage", blurb: "Mandates, viewings, deal stages, and follow-up.", next: "/dashboard/leads" },
     { category: "new", role: "RECRUITMENT_AGENCY", goal: "COLLECT_LEADS", slug: "try-recruitment", name: "Recruitment agency", blurb: "Hiring briefs, candidates, interviews, and placement.", next: "/dashboard/leads" },
+    { category: "new", role: "HOTEL", goal: "TAKE_APPOINTMENTS", slug: "try-hotel", name: "Hotel", blurb: "Concierge, room QR, housekeeping, connected restaurants.", next: "/dashboard" },
     { category: "more", role: "CAFE", goal: "BOOK_TABLE", slug: "try-cafe", name: "Cafe", blurb: "Drinks, snacks, and a few tables.", next: "/dashboard/products" },
     { category: "more", role: "CLOUD_KITCHEN", goal: "BOOK_TABLE", slug: "try-cloud-kitchen", name: "Cloud kitchen", blurb: "Menu and orders. No dining room.", next: "/dashboard/products" },
     { category: "more", role: "DHABA", goal: "BOOK_TABLE", slug: "try-dhaba", name: "Dhaba", blurb: "Highway kitchen. Menu, thalis, tables.", next: "/dashboard/products" },
+    { category: "more", role: "RESORT", goal: "TAKE_APPOINTMENTS", slug: "try-resort", name: "Resort", blurb: "Hotel kit with pool, spa, and stay QRs.", next: "/dashboard" },
+    { category: "more", role: "HOSTEL", goal: "TAKE_APPOINTMENTS", slug: "try-hostel", name: "Hostel", blurb: "Beds, Wi-Fi, and a shared concierge.", next: "/dashboard" },
+    { category: "more", role: "HOMESTAY", goal: "TAKE_APPOINTMENTS", slug: "try-homestay", name: "Homestay", blurb: "A house stay with room QR and requests.", next: "/dashboard" },
+    { category: "more", role: "SERVICED_APARTMENT", goal: "TAKE_APPOINTMENTS", slug: "try-serviced-apartment", name: "Serviced apartment", blurb: "Apartment stays, housekeeping, local food.", next: "/dashboard" },
     { category: "more", role: "CATERER", goal: "COLLECT_LEADS", slug: "try-caterer", name: "Caterer", blurb: "Menus, dates, and event delivery.", next: "/dashboard/events" },
     { category: "more", role: "KIRANA", goal: "SELL_PRODUCTS", slug: "try-kirana", name: "Kirana", blurb: "Neighbourhood grocery. Stock and pickup.", next: "/dashboard/products" },
     { category: "more", role: "BAKERY", goal: "SELL_PRODUCTS", slug: "try-bakery", name: "Bakery", blurb: "Cakes, bread, and counter orders.", next: "/dashboard/products" },
@@ -55,11 +60,12 @@ export const TRY_KITS = [
 
 export type TryKit = (typeof TRY_KITS)[number]
 
-export type KitFamily = "shop" | "food" | "book" | "teach" | "studio"
+export type KitFamily = "shop" | "food" | "stay" | "book" | "teach" | "studio"
 
 export const KIT_FAMILIES: { id: KitFamily; label: string; hint: string }[] = [
     { id: "shop", label: "Shop", hint: "Products, stock, and pickup" },
     { id: "food", label: "Food", hint: "Menus, tables, and catering" },
+    { id: "stay", label: "Stay", hint: "Hotels, rooms, and concierge" },
     { id: "book", label: "Bookings", hint: "Time, visits, and treatments" },
     { id: "teach", label: "Teach", hint: "Courses and classes" },
     { id: "studio", label: "Studio", hint: "Portfolio, briefs, and pages" },
@@ -73,6 +79,7 @@ const FAMILY_BY_ENGINE: Record<string, KitFamily> = {
     PHARMACY: "shop",
     AUTO_PARTS: "shop",
     RESTAURANT: "food",
+    HOTEL: "stay",
     CONSULTANT: "book",
     CA: "book",
     SALON_SPA: "book",

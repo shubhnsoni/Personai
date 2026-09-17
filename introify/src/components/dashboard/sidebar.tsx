@@ -20,7 +20,14 @@ import {
     UserPlus,
     Boxes,
     CreditCard,
+    ClipboardList,
+    BedDouble,
+    QrCode,
+    UtensilsCrossed,
+    Users,
+    BarChart3,
 } from "lucide-react"
+import { isHotelRole } from "@/lib/hotels"
 
 export type NavItem = { name: string; href: string; icon: typeof LayoutDashboard; prefixes?: string[] }
 
@@ -71,7 +78,32 @@ export const navGroups: { label: string | null; items: NavItem[] }[] = [
 
 export const sidebarItems = navGroups.flatMap((g) => g.items)
 
+const HOTEL_NAV: NavItem[] = [
+    { name: "Home", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Requests", href: "/dashboard/requests", icon: ClipboardList },
+    { name: "Rooms", href: "/dashboard/rooms", icon: BedDouble },
+    { name: "QR & Print", href: "/dashboard/qr", icon: QrCode },
+    { name: "Restaurants", href: "/dashboard/restaurants", icon: UtensilsCrossed },
+    { name: "Services", href: "/dashboard/services", icon: Briefcase },
+    { name: "Staff", href: "/dashboard/team", icon: Users },
+    { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+    {
+        name: "Chats",
+        href: "/dashboard/inbox",
+        icon: MessageSquare,
+        prefixes: ["/dashboard/inbox", "/dashboard/conversations"],
+    },
+    {
+        name: "Profile",
+        href: "/dashboard/profile",
+        icon: User,
+        prefixes: ["/dashboard/profile", "/dashboard/content", "/dashboard/import", "/dashboard/links"],
+    },
+    { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
+]
+
 export function visibleNavItems(role?: string | null, extras?: import("@/lib/surfaces").SurfaceExtras | null): NavItem[] {
+    if (isHotelRole(role)) return HOTEL_NAV
     return sidebarItems
         .filter((item) => {
             const surface = navHrefToSurface(item.href)

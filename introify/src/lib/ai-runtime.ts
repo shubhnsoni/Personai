@@ -286,6 +286,10 @@ export function boundedChatInput(
 ): OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming {
     const latest = history[history.length - 1]?.content || ""
     const desired = /@/.test(latest) || /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/i.test(latest) || /\b(book|hire|contact|email me|get in touch)\b/i.test(latest) ? "collectLead"
+        : /towel|toiletr|housekeep|bottled water|extra pillow/i.test(latest) ? "createHotelRequest"
+        : /talk to reception|front desk|human/i.test(latest) ? "talkToReception"
+        : /late\s*check/i.test(latest) ? "requestLateCheckout"
+        : /restaurant|hungry|room service/i.test(latest) ? "showHotelRestaurants"
         : /reserv|table|seat/i.test(latest) ? "bookTable"
         : /menu|dish|food/i.test(latest) ? "showMenu"
         : /product|buy|stock/i.test(latest) ? "showProducts"

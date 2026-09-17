@@ -35,6 +35,7 @@ export const APP_ROOT_SEGMENTS = new Set([
     "api",
     "courses",
     "l",
+    "q",
     "library",
     "qa",
     "uploads",

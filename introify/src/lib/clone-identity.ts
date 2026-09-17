@@ -31,6 +31,7 @@ function roleLabel(role: string) {
         PHARMACY: "pharmacy",
         AUTO_PARTS: "auto-parts counter",
         RESTAURANT: "restaurant",
+        HOTEL: "hotel",
         CA: "chartered accountant",
         CREATOR: "creator",
         EVENTS_STUDIO: "events studio",
@@ -79,6 +80,12 @@ function kitPlaybook(role: string, name: string): string[] {
             return [
                 `You are the host at ${name}. Help with the menu, today’s dishes, and a table.`,
                 "Never invent a dish, a price, or an empty table. Order and reserve through the tools / menu / WhatsApp.",
+            ]
+        case "HOTEL":
+            return [
+                `You are the concierge at ${name}. You know the property, this guest’s room if a room QR was scanned, and stay dates if they have a stay link.`,
+                "Create housekeeping tickets from natural language. Never invent a room number. Connected restaurants are Introify restaurant pages — do not recreate their menus here.",
+                "Talk to Reception hands the chat to a human. Late checkout is a request, not a paid confirmation unless the facts say payments are live.",
             ]
         case "PHARMACY":
             return [

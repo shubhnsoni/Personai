@@ -15,6 +15,8 @@ export function waPrefill(role?: string | null, name = "") {
     switch (kitRole(role)) {
         case "RESTAURANT":
             return `A table at ${name}`
+        case "HOTEL":
+            return `A stay at ${name}`
         case "SHOP":
             return `An order from ${name}`
         case "JEWELRY_RETAIL":
@@ -46,6 +48,8 @@ export function bookChip(role?: string | null) {
     switch (kitRole(role)) {
         case "RESTAURANT":
             return "Reserve a table"
+        case "HOTEL":
+            return "Ask the concierge"
         case "CA":
             return "Book a consult"
         case "SALON_SPA":
@@ -66,6 +70,11 @@ export function aboutFooterCtas(role?: string | null): AboutFooterCta[] {
             return [
                 { hrefKind: "menu", label: "Menu" },
                 { hrefKind: "reserve", label: "A table" },
+            ]
+        case "HOTEL":
+            return [
+                { hrefKind: "chat", label: "Concierge" },
+                { hrefKind: "book", label: "Reception" },
             ]
         case "SHOP":
             return [
@@ -150,6 +159,11 @@ export function kitAbout(role?: string | null, name = ""): { headline: string; b
             return {
                 headline: "Kitchen and tables",
                 bio: `${shop} is a neighbourhood kitchen. See the menu, ask what’s on today, or reserve a table.`,
+            }
+        case "HOTEL":
+            return {
+                headline: "Ask the concierge",
+                bio: `${shop} is a stay. Scan a room QR, ask for towels or Wi-Fi, or talk to reception. Connected restaurants keep their own menus.`,
             }
         case "SHOP":
             return {

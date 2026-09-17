@@ -271,6 +271,14 @@ model Profile {
   creationOrdersBought        CreationOrder[] @relation("CreationOrderBuyer")
   workspaceConnections        WorkspaceConnection[]
   creationTeams               CreationTeam[]
+
+  hotelProperty        HotelProperty?
+  hotelRooms           HotelRoom[]
+  hotelStays           HotelStay[]
+  hotelRequests        HotelRequest[]
+  hotelQrs             HotelQr[]
+  hotelRestaurantLinks HotelRestaurantLink[] @relation("HotelRestaurantHotel")
+  linkedFromHotels     HotelRestaurantLink[] @relation("HotelRestaurantVenue")
 }
 
 model ProfileEvent {
@@ -4596,4 +4604,125 @@ model BridgeSession {
   detail    String   @default("Desktop Bridge is not connected. Cloud jobs still run on Introify servers.")
 
   @@unique([profileId])
+}
+
+model HotelProperty {
+  id                String   @id @default(cuid())
+  profileId         String   @unique
+  profile           Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  address           String?
+  receptionPhone    String?
+  receptionWhatsapp String?
+  website           String?
+  checkInTime       String   @default("14:00")
+  checkOutTime      String   @default("11:00")
+  timezone          String?
+  languagesJson     String   @default("[\"en\"]")
+  roomCount         Int?
+  wifiName          String?
+  wifiPassword      String?
+  policiesSummary   String?
+  amenitiesJson     String   @default("[]")
+  emergencyContact  String?
+  servicesJson      String   @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model HotelRoom {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  number    String
+  floor     String?
+  building  String?
+  category  String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stays    HotelStay[]
+  requests HotelRequest[]
+  qrs      HotelQr[]
+
+  @@unique([profileId, number])
+  @@index([profileId, isActive, sortOrder])
+}
+
+model HotelStay {
+  id         String    @id @default(cuid())
+  profileId  String
+  profile    Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  token      String    @unique
+  guestName  String?
+  roomId     String?
+  room       HotelRoom? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  arrival    DateTime?
+  departure  DateTime?
+  language   String?
+  meta       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  requests HotelRequest[]
+  qrs      HotelQr[]
+
+  @@index([profileId, roomId])
+}
+
+model HotelRestaurantLink {
+  id                  String   @id @default(cuid())
+  hotelProfileId      String
+  hotelProfile        Profile  @relation("HotelRestaurantHotel", fields: [hotelProfileId], references: [id], onDelete: Cascade)
+  restaurantProfileId String
+  restaurantProfile   Profile  @relation("HotelRestaurantVenue", fields: [restaurantProfileId], references: [id], onDelete: Cascade)
+  label               String?
+  createdAt           DateTime @default(now())
+
+  @@unique([hotelProfileId, restaurantProfileId])
+  @@index([restaurantProfileId])
+}
+
+model HotelRequest {
+  id             String    @id @default(cuid())
+  profileId      String
+  profile        Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  type           String
+  roomId         String?
+  room           HotelRoom? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  stayId         String?
+  stay           HotelStay? @relation(fields: [stayId], references: [id], onDelete: SetNull)
+  conversationId String?
+  guestName      String?
+  status         String    @default("REQUESTED")
+  itemsJson      String    @default("[]")
+  department     String?
+  priority       String    @default("NORMAL")
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([profileId, status, createdAt])
+  @@index([profileId, department, status])
+}
+
+model HotelQr {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  code      String   @unique
+  kind      String
+  targetType String
+  targetId  String?
+  roomId    String?
+  room      HotelRoom? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  stayId    String?
+  stay      HotelStay? @relation(fields: [stayId], references: [id], onDelete: SetNull)
+  label     String?
+  scanCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId, kind])
 }

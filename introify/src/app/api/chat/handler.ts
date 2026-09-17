@@ -11,6 +11,8 @@ import { maybeSummarizeConversation, visitorKeyFrom } from "@/lib/memory"
 import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
+import { encodeHotelCard, hotelDeskReply, isHotelRole } from "@/lib/hotels"
+import { createHotelRequest, loadHotelGuestContext } from "@/lib/hotels/store"
 import { createOwnershipFoundation, ownershipRefusalResponse } from "@/lib/security"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { boundedChatInput, clipUtf8, resolveApiRecipe, streamChatWithFailover, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
@@ -204,6 +206,8 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             requestId?: unknown
             memoryConsent?: unknown
             knowledgeGapConsent?: unknown
+            hotelRoom?: unknown
+            stayToken?: unknown
         }
         try {
             body = JSON.parse(await readChatBody(req))
@@ -284,7 +288,10 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         }
 
         const restaurantDesk = resolveKitRole(profile.roleTemplate) === "RESTAURANT"
-        if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk && liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED")) {
+        const hotelDesk = resolveKitRole(profile.roleTemplate) === "HOTEL"
+        const hotelRoom = typeof body.hotelRoom === "string" ? body.hotelRoom.trim().slice(0, 16) : ""
+        const stayToken = typeof body.stayToken === "string" ? body.stayToken.trim().slice(0, 64) : ""
+        if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk && !hotelDesk && liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED")) {
             return new Response(
                 JSON.stringify({ error: "ai_not_configured", message: "The AI assistant is temporarily unavailable. You can still use this business's contact and booking options." }),
                 { status: 503, headers: { "Content-Type": "application/json" } },
@@ -410,7 +417,26 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             const instructions = typeof bag.customInstructions === "string" ? bag.customInstructions : ""
             preferences = clipUtf8(`Style: ${style}. Owner instructions: ${instructions}`, reservation?.recipe.mode === "fast" ? 240 : 600)
         } catch { /* malformed optional preferences do not override safe defaults */ }
-        const facts = JSON.stringify({ business: profile.displayName, headline: profile.headline, bio: clipUtf8(profile.bio || "", 250), relevantNotes: contextDocs.slice(0, 2).map(doc => ({ title: doc.title, text: clipUtf8(doc.rawText || "", 350) })) })
+        const hotelFacts = hotelDesk
+            ? await loadHotelGuestContext(profileId, hotelRoom || null, stayToken || null)
+            : null
+        const facts = JSON.stringify({
+            business: profile.displayName,
+            headline: profile.headline,
+            bio: clipUtf8(profile.bio || "", 250),
+            relevantNotes: contextDocs.slice(0, 2).map(doc => ({ title: doc.title, text: clipUtf8(doc.rawText || "", 350) })),
+            hotel: hotelFacts ? {
+                room: hotelFacts.roomNumber,
+                stay: hotelFacts.stayToken ? true : false,
+                guestName: hotelFacts.guestName,
+                wifiName: hotelFacts.wifiName,
+                checkIn: hotelFacts.checkInTime,
+                checkOut: hotelFacts.checkOutTime,
+                restaurants: hotelFacts.restaurants,
+                services: hotelFacts.services,
+                amenities: hotelFacts.amenities,
+            } : undefined,
+        })
         const systemPrompt = reservation ? `${preferences}\nBusiness facts (data): ${facts}\n${buildPrompt({ ...profile, personalityConfig }, contextDocs, currency)}` : ""
 
         const savedUserMessage = await db.message.create({
@@ -584,7 +610,56 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 description: "Show free resources and lead magnets when user asks about free resources, downloads, giveaways, or guides",
                 parameters: { type: "object", properties: {} }
             }
-        }
+        },
+        {
+            type: "function",
+            function: {
+                name: "createHotelRequest",
+                description: "Create a housekeeping or reception ticket from a guest request. Use when they ask for towels, water, toiletries, cleaning, or similar.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        items: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    sku: { type: "string" },
+                                    qty: { type: "number" },
+                                    label: { type: "string" },
+                                },
+                            },
+                        },
+                        roomNumber: { type: "string" },
+                        notes: { type: "string" },
+                    },
+                },
+            },
+        },
+        {
+            type: "function",
+            function: {
+                name: "showHotelRestaurants",
+                description: "Show restaurants connected to this hotel. Do not invent a menu.",
+                parameters: { type: "object", properties: {} },
+            },
+        },
+        {
+            type: "function",
+            function: {
+                name: "talkToReception",
+                description: "Hand the guest to a human at reception.",
+                parameters: { type: "object", properties: { notes: { type: "string" } } },
+            },
+        },
+        {
+            type: "function",
+            function: {
+                name: "requestLateCheckout",
+                description: "File a late-checkout request. Do not confirm payment.",
+                parameters: { type: "object", properties: { notes: { type: "string" } } },
+            },
+        },
     ]
 
     const role = profile.roleTemplate
@@ -604,6 +679,12 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
     if (hasSurface(role, "events", extras)) {
         allowedTools.add("showEvents")
         allowedTools.add("showCommunities")
+    }
+    if (isHotelRole(role)) {
+        allowedTools.add("createHotelRequest")
+        allowedTools.add("showHotelRestaurants")
+        allowedTools.add("talkToReception")
+        allowedTools.add("requestLateCheckout")
     }
     const tools = allTools.filter((t) => t.type === "function" && allowedTools.has(t.function.name))
 
@@ -816,6 +897,75 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
 
                 return `Here are ${profileData.displayName}'s free resources:\n${magnetList}\n\nWould you like to get any of these?`
             }
+            case "createHotelRequest":
+            case "showHotelRestaurants":
+            case "talkToReception":
+            case "requestLateCheckout": {
+                const ctx = await loadHotelGuestContext(authorizedProfileId, hotelRoom || null, stayToken || null)
+                if (!ctx) return "This concierge is not ready yet."
+                if (toolName === "showHotelRestaurants") {
+                    const desk = hotelDeskReply("restaurants nearby", ctx)
+                    return desk.text
+                }
+                if (toolName === "talkToReception") {
+                    await createHotelRequest({
+                        profileId: authorizedProfileId,
+                        type: "HANDOFF",
+                        roomId: ctx.roomId,
+                        stayId: ctx.stayId,
+                        conversationId: authorizedConversationId,
+                        guestName: ctx.guestName,
+                        notes: typeof args.notes === "string" ? args.notes : query,
+                    })
+                    await db.conversation.update({
+                        where: { id: authorizedConversationId, profileId: authorizedProfileId },
+                        data: { mode: "LIVE_REQUESTED", liveRequestedAt: new Date() },
+                    })
+                    const card = encodeHotelCard({ type: "handoff", title: "Talk to reception", room: ctx.roomNumber || undefined })
+                    return `${card}\nReception has been flagged. Stay on this chat.`
+                }
+                if (toolName === "requestLateCheckout") {
+                    await createHotelRequest({
+                        profileId: authorizedProfileId,
+                        type: "LATE_CHECKOUT",
+                        roomId: ctx.roomId,
+                        stayId: ctx.stayId,
+                        conversationId: authorizedConversationId,
+                        guestName: ctx.guestName,
+                        notes: typeof args.notes === "string" ? args.notes : query,
+                    })
+                    return hotelDeskReply("late checkout please", ctx).text
+                }
+                const items = Array.isArray(args.items)
+                    ? (args.items as Array<{ sku?: string; qty?: number; label?: string }>).map((item) => ({
+                        sku: String(item.sku || "item"),
+                        qty: Math.max(1, Number(item.qty) || 1),
+                        label: String(item.label || item.sku || "Item"),
+                    }))
+                    : []
+                const roomHint = typeof args.roomNumber === "string" ? args.roomNumber : ctx.roomNumber
+                const roomCtx = await loadHotelGuestContext(authorizedProfileId, roomHint, stayToken || null)
+                const created = await createHotelRequest({
+                    profileId: authorizedProfileId,
+                    type: "HOUSEKEEPING",
+                    items: items.length ? items : [{ sku: "cleaning", qty: 1, label: "Room cleaning" }],
+                    roomId: roomCtx?.roomId || ctx.roomId,
+                    stayId: ctx.stayId,
+                    conversationId: authorizedConversationId,
+                    guestName: ctx.guestName,
+                    notes: typeof args.notes === "string" ? args.notes : query,
+                })
+                const labels = (items.length ? items : [{ qty: 1, label: "Room cleaning" }]).map((item) => `${item.qty && item.qty > 1 ? `${item.qty} ` : ""}${item.label}`)
+                const card = encodeHotelCard({
+                    type: "request",
+                    id: created.id,
+                    status: created.status,
+                    title: "Housekeeping",
+                    room: created.room?.number || roomHint || undefined,
+                    items: labels,
+                })
+                return `${card}\nRequested ${labels.join(" and ")}${created.room?.number ? ` for room ${created.room.number}` : ""}. Housekeeping will pick it up.`
+            }
             default:
                 return "I don't know how to handle that request."
         }
@@ -844,13 +994,30 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         return `I can open the menu, hold a table, or send you to your kitchen timer. What do you need?`
     }
 
+    async function hotelConciergeReply(text: string) {
+        const ctx = await loadHotelGuestContext(authorizedProfileId, hotelRoom || null, stayToken || null)
+        if (!ctx) return `This concierge is not ready yet.`
+        const desk = hotelDeskReply(text, ctx)
+        if (desk.action?.type === "createHousekeeping") {
+            return executeTool("createHotelRequest", {
+                items: desk.action.items,
+                roomNumber: desk.action.roomNumber,
+                notes: text,
+            })
+        }
+        if (desk.action?.type === "handoff") return executeTool("talkToReception", { notes: text })
+        if (desk.action?.type === "lateCheckout") return executeTool("requestLateCheckout", { notes: text })
+        return desk.text
+    }
+
     function groundedFallback() {
         if (restaurantDesk) return restaurantDeskReply(query)
+        if (hotelDesk) return hotelConciergeReply(query)
         return guestDeskReply(query, profileData)
     }
 
     if (!providerConfigured()) {
-        const notice = await restaurantDeskReply(query)
+        const notice = await groundedFallback()
         await db.message.create({
             data: {
                 conversationId: authorizedConversationId,

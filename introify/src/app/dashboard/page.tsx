@@ -8,6 +8,9 @@ import { HomePulse } from "@/components/dashboard/home-pulse"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { extrasOf, hasSurface } from "@/lib/surfaces"
+import { isHotelRole } from "@/lib/hotels"
+import { ensureHotelProperty, listLinkedRestaurants } from "@/lib/hotels/store"
+import { HotelHome } from "@/components/dashboard/hotel-home"
 import { buildHomeStats } from "@/lib/analytics"
 import { StudioPageHead, StudioPanel, StudioRow } from "@/components/dashboard/studio-ui"
 import { isJewelryKit, isJewelryWholesale } from "@/lib/metal/math"
@@ -27,6 +30,28 @@ export default async function DashboardPage() {
     const extras = extrasOf(profile)
     const stats = await buildHomeStats(profile)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+
+    if (isHotelRole(profile.roleTemplate)) {
+        const property = await ensureHotelProperty(profile.id, { receptionWhatsapp: profile.whatsapp || undefined, timezone: profile.timezone || undefined })
+        const [rooms, openRequests, restaurants, qrs] = await Promise.all([
+            prisma.hotelRoom.count({ where: { profileId: profile.id, isActive: true } }),
+            prisma.hotelRequest.count({ where: { profileId: profile.id, status: { not: "COMPLETE" } } }),
+            listLinkedRestaurants(profile.id).then((rows) => rows.length),
+            prisma.hotelQr.count({ where: { profileId: profile.id } }),
+        ])
+        return (
+            <HotelHome
+                name={profile.displayName}
+                slug={profile.slug}
+                origin={baseUrl}
+                property={property}
+                rooms={rooms}
+                openRequests={openRequests}
+                restaurants={restaurants}
+                qrs={qrs}
+            />
+        )
+    }
 
     const [recentConversations, recentLeads] = await Promise.all([
         prisma.conversation.findMany({

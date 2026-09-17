@@ -22,6 +22,7 @@ import { checkUsername, createProfile } from "@/app/actions/onboarding"
 import { formatShopLink } from "@/lib/public-url"
 import { normalizeUsername, suggestedUsername, usernameError } from "@/lib/username"
 import { ADDONS, needById, type AddonId, type NeedId } from "@/lib/onboarding-needs"
+import { DEFAULT_HOTEL_SERVICES, HOTEL_SERVICE_OPTIONS } from "@/lib/hotels"
 import {
     BRANCH_NEEDS,
     COPY,
@@ -110,6 +111,12 @@ export function OnboardingWizard({
     const [upi, setUpi] = useState("")
     const [goldCity, setGoldCity] = useState<string>("Ranchi")
     const [inviteDesks, setInviteDesks] = useState(true)
+    const [hotelCheckIn, setHotelCheckIn] = useState("14:00")
+    const [hotelCheckOut, setHotelCheckOut] = useState("11:00")
+    const [hotelWifiName, setHotelWifiName] = useState("")
+    const [hotelWifiPassword, setHotelWifiPassword] = useState("")
+    const [hotelRoomCount, setHotelRoomCount] = useState("28")
+    const [hotelServices, setHotelServices] = useState<string[]>([...DEFAULT_HOTEL_SERVICES])
     const [busy, setBusy] = useState(false)
     const [orb, setOrb] = useState<BloubPick>({ ...DEFAULT_BLOUB_PICK })
     const [importing, setImporting] = useState(false)
@@ -224,6 +231,14 @@ export function OnboardingWizard({
                 upiId: upi.trim() || undefined,
                 goldCity: need === "goldWholesale" ? goldCity : undefined,
                 distroInviteDesks: need === "distribute" ? inviteDesks : undefined,
+                hotel: need === "hotel" ? {
+                    checkInTime: hotelCheckIn,
+                    checkOutTime: hotelCheckOut,
+                    wifiName: hotelWifiName || undefined,
+                    wifiPassword: hotelWifiPassword || undefined,
+                    roomCount: Number(hotelRoomCount) || undefined,
+                    services: hotelServices,
+                } : undefined,
                 personalityConfig: writeOrbBag(undefined, orb, false),
                 seedSample,
             })
@@ -420,7 +435,7 @@ export function OnboardingWizard({
                                     <p className="text-[12px] text-white/45">{COPY.type.elseHint}</p>
                                     <div className="flex flex-wrap gap-2">
                                         {visibleElse.map((k) => (
-                                            <Chip key={k.id} selected={need === k.id} onClick={() => afterType(k.id, k.chip)}>
+                                            <Chip key={`${k.id}-${k.chip}`} selected={need === k.id} onClick={() => afterType(k.id, k.chip)}>
                                                 {k.chip}
                                             </Chip>
                                         ))}
@@ -479,6 +494,43 @@ export function OnboardingWizard({
                                     <Chip selected={!inviteDesks} onClick={() => setInviteDesks(false)}>{COPY.extras.desksJustMe}</Chip>
                                     <Chip selected={inviteDesks} onClick={() => setInviteDesks(true)}>{COPY.extras.desksInvite}</Chip>
                                     <Chip selected>Order flow</Chip>
+                                </div>
+                            ) : null}
+                            {need === "hotel" ? (
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <label className="block space-y-1.5">
+                                            <span className="text-[13px] font-medium text-white/80">Check-in</span>
+                                            <input value={hotelCheckIn} onChange={(e) => setHotelCheckIn(e.target.value)} className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-[15px] text-white" />
+                                        </label>
+                                        <label className="block space-y-1.5">
+                                            <span className="text-[13px] font-medium text-white/80">Checkout</span>
+                                            <input value={hotelCheckOut} onChange={(e) => setHotelCheckOut(e.target.value)} className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-[15px] text-white" />
+                                        </label>
+                                    </div>
+                                    <label className="block space-y-1.5">
+                                        <span className="text-[13px] font-medium text-white/80">Wi-Fi name</span>
+                                        <input value={hotelWifiName} onChange={(e) => setHotelWifiName(e.target.value)} placeholder="haven-guest" className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-[15px] text-white placeholder:text-white/35" />
+                                    </label>
+                                    <label className="block space-y-1.5">
+                                        <span className="text-[13px] font-medium text-white/80">Wi-Fi password</span>
+                                        <input value={hotelWifiPassword} onChange={(e) => setHotelWifiPassword(e.target.value)} className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-[15px] text-white" />
+                                    </label>
+                                    <label className="block space-y-1.5">
+                                        <span className="text-[13px] font-medium text-white/80">Rooms</span>
+                                        <input value={hotelRoomCount} onChange={(e) => setHotelRoomCount(e.target.value)} inputMode="numeric" className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-[15px] text-white" />
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {HOTEL_SERVICE_OPTIONS.map((option) => (
+                                            <Chip
+                                                key={option.id}
+                                                selected={hotelServices.includes(option.id)}
+                                                onClick={() => setHotelServices((cur) => cur.includes(option.id) ? cur.filter((id) => id !== option.id) : [...cur, option.id])}
+                                            >
+                                                {option.label}
+                                            </Chip>
+                                        ))}
+                                    </div>
                                 </div>
                             ) : null}
                             {need === "goldWholesale" ? (

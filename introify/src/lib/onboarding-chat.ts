@@ -5,6 +5,7 @@ import { rupeesPerGramToPaisePer10g } from "@/lib/metal/math"
 export type OnboardBeat = "name" | "username" | "who" | "type" | "features" | "extras" | "look" | "ready"
 
 export const KIT_CHIPS: { id: NeedId; chip: string; line: string }[] = [
+    { id: "hotel", chip: "Hotel", line: "Hotel & stays" },
     { id: "pharmacy", chip: "Pharmacy", line: "Medicines & pharmacy" },
     { id: "autoParts", chip: "Auto parts", line: "Auto parts & spares" },
     { id: "distribute", chip: "Distributor", line: "Wholesale / dealers" },
@@ -15,9 +16,12 @@ export const ELSE_CHIPS: { id: NeedId; chip: string }[] = [
     { id: "sell", chip: "Optics" },
     { id: "time", chip: "Clinic" },
     { id: "salon", chip: "Salon" },
+    { id: "hotel", chip: "Resort" },
+    { id: "hotel", chip: "Hostel" },
+    { id: "hotel", chip: "Homestay" },
 ]
 
-export const BRANCH_NEEDS: NeedId[] = ["pharmacy", "autoParts", "distribute", "goldWholesale"]
+export const BRANCH_NEEDS: NeedId[] = ["pharmacy", "autoParts", "distribute", "goldWholesale", "hotel"]
 
 export const GOLD_CITIES = ["Ranchi", "Jamshedpur", "Dhanbad", "Bokaro", "Hazaribagh"] as const
 
@@ -69,6 +73,10 @@ export const COPY = {
             h: "Gold wholesale extras",
             s: "City rates and try kits for dealers.",
         },
+        hotel: {
+            h: "Hotel extras",
+            s: "Check-in, Wi-Fi, and which guest services are live.",
+        },
         cityLabel: "City for rates",
         cityHint: "Ranchi and nearby boards",
         cityEnter: "Enter city",
@@ -108,6 +116,7 @@ export function extrasCopy(need: NeedId | null) {
     if (need === "autoParts") return COPY.extras.autoParts
     if (need === "distribute") return COPY.extras.distribute
     if (need === "goldWholesale") return COPY.extras.goldWholesale
+    if (need === "hotel") return COPY.extras.hotel
     return COPY.extras.pharmacy
 }
 
@@ -126,6 +135,7 @@ export function matchElseChip(query: string) {
 export function matchNeedFromQuery(query: string): NeedId | null {
     const q = query.trim().toLowerCase()
     if (!q) return null
+    if (/\b(hotel|resort|hostel|homestay|serviced apartment)\b/.test(q) || q === "stay") return "hotel"
     const kit = KIT_CHIPS.find((k) => k.chip.toLowerCase() === q || k.line.toLowerCase().includes(q))
     if (kit) return kit.id
     const elseHit = ELSE_CHIPS.find((k) => k.chip.toLowerCase() === q)
