@@ -167,6 +167,16 @@ describe("ChatInterface - reduced motion", () => {
         expect(document.body.textContent).toContain(INTRO_LINE)
     })
 
+    it("shows a room context strip when the guest scanned a room QR", () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        renderChat({
+            hotelRoom: "101",
+            chips: [{ id: "housekeeping", label: "Towels · 101", prompt: "Two towels for room 101" }],
+        })
+        expect(document.querySelector("[data-hotel-room-context]")?.textContent).toMatch(/Room 101/)
+        expect(document.querySelector("[data-welcome-chips]")?.textContent).toMatch(/Towels · 101/)
+    })
+
     it("shows the first topic in full, with no caret, when Reduce Motion is on", () => {
         installMatchMedia({ [REDUCE_MOTION]: true })
         renderChat({ topics: ["orbital mechanics", "analytical engines"] })

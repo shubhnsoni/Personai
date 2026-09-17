@@ -11,6 +11,8 @@ export {
     HOTEL_REQUEST_STATUSES,
     HOTEL_REQUEST_TYPES,
     nextHotelRequestStatus,
+    hotelRequestStatusLabel,
+    hotelRequestAdvanceLabel,
     parseHotelGuestIntent,
     departmentForType,
     type HotelGuestIntent,
@@ -20,3 +22,4 @@ export {
 } from "./requests"
 export { encodeHotelCard, parseHotelCard, stripHotelCard, type HotelActionCard } from "./cards"
 export { hotelDeskReply, type HotelDeskContext, type HotelDeskResult } from "./desk"
+export { hotelConciergeChips, type HotelConciergeChip } from "./chips"

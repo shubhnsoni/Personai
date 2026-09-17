@@ -13,6 +13,7 @@ import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
 import { encodeHotelCard, hotelDeskReply, isHotelRole } from "@/lib/hotels"
 import { createHotelRequest, loadHotelGuestContext } from "@/lib/hotels/store"
+import { marketingBusiness } from "@/lib/marketing-business"
 import { createOwnershipFoundation, ownershipRefusalResponse } from "@/lib/security"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { boundedChatInput, clipUtf8, resolveApiRecipe, streamChatWithFailover, usageMetadata, type ApiRecipe } from "@/lib/ai-runtime"
@@ -904,7 +905,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 const ctx = await loadHotelGuestContext(authorizedProfileId, hotelRoom || null, stayToken || null)
                 if (!ctx) return "This concierge is not ready yet."
                 if (toolName === "showHotelRestaurants") {
-                    const desk = hotelDeskReply("restaurants nearby", ctx)
+                    const desk = hotelDeskReply("restaurants nearby", { ...ctx, policiesApproved: marketingBusiness.policiesApproved })
                     return desk.text
                 }
                 if (toolName === "talkToReception") {
@@ -934,7 +935,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                         guestName: ctx.guestName,
                         notes: typeof args.notes === "string" ? args.notes : query,
                     })
-                    return hotelDeskReply("late checkout please", ctx).text
+                    return hotelDeskReply("late checkout please", { ...ctx, policiesApproved: marketingBusiness.policiesApproved }).text
                 }
                 const items = Array.isArray(args.items)
                     ? (args.items as Array<{ sku?: string; qty?: number; label?: string }>).map((item) => ({
@@ -997,7 +998,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
     async function hotelConciergeReply(text: string) {
         const ctx = await loadHotelGuestContext(authorizedProfileId, hotelRoom || null, stayToken || null)
         if (!ctx) return `This concierge is not ready yet.`
-        const desk = hotelDeskReply(text, ctx)
+        const desk = hotelDeskReply(text, { ...ctx, policiesApproved: marketingBusiness.policiesApproved })
         if (desk.action?.type === "createHousekeeping") {
             return executeTool("createHotelRequest", {
                 items: desk.action.items,

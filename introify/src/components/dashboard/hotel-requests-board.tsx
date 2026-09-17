@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react"
 import { setHotelRequestStatus } from "@/app/actions/hotels"
-import { nextHotelRequestStatus } from "@/lib/hotels"
+import { hotelRequestAdvanceLabel, hotelRequestStatusLabel, nextHotelRequestStatus } from "@/lib/hotels"
 import { cn } from "@/lib/utils"
 
 type RequestRow = {
@@ -18,7 +18,7 @@ type RequestRow = {
 }
 
 const FILTERS = ["ALL", "HOUSEKEEPING", "MAINTENANCE", "RECEPTION"] as const
-const STATUSES = ["ALL", "REQUESTED", "ACCEPTED", "IN_PROGRESS", "COMPLETE"] as const
+const STATUSES = ["ALL", "REQUESTED", "ACCEPTED", "ON_THE_WAY", "IN_PROGRESS", "COMPLETE"] as const
 
 function itemsLabel(raw: string) {
     try {
@@ -50,7 +50,7 @@ export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
                 ))}
                 {STATUSES.map((item) => (
                     <button key={item} type="button" onClick={() => setStatus(item)} className={cn("min-h-11 rounded-full border px-3 text-xs font-medium transition-transform duration-150 active:scale-[0.96]", status === item ? "border-cyan-400/60 bg-cyan-400/10" : "border-white/10 text-muted-foreground")}>
-                        {item === "ALL" ? "All status" : item.replace("_", " ").toLowerCase()}
+                        {item === "ALL" ? "All status" : hotelRequestStatusLabel(item)}
                     </button>
                 ))}
             </div>
@@ -66,7 +66,7 @@ export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
                                 <p className="text-xs text-muted-foreground">
                                     {row.room ? `Room ${row.room.number}` : "No room"}
                                     {row.guestName ? ` · ${row.guestName}` : ""}
-                                    {` · ${row.status.toLowerCase().replace("_", " ")}`}
+                                    {` · ${hotelRequestStatusLabel(row.status)}`}
                                 </p>
                             </div>
                             {next ? (
@@ -76,7 +76,7 @@ export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
                                     onClick={() => start(async () => { await setHotelRequestStatus(row.id, next) })}
                                     className="min-h-11 rounded-full bg-[#00D7FF] px-4 text-xs font-medium text-[#061018] transition-transform duration-150 active:scale-[0.96]"
                                 >
-                                    {next === "ACCEPTED" ? "Accept" : next === "IN_PROGRESS" ? "In progress" : "Complete"}
+                                    {hotelRequestAdvanceLabel(next)}
                                 </button>
                             ) : (
                                 <span className="text-xs text-muted-foreground">Done</span>

@@ -10,6 +10,7 @@ import { ReserveSheet, type ReserveConfirmLabel } from "@/components/booking/res
 import { bookChip as kitBookChip } from "@/lib/kit-copy"
 import { extrasOf, isDigitalCatalogItem, publicChipAllowed, shopNavLabel } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
+import { hotelConciergeChips } from "@/lib/hotels"
 import { CheckoutSheet, type CheckoutItem } from "@/components/checkout/checkout-sheet"
 import { TipSheet } from "@/components/profile/tip-sheet"
 import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, BedDouble, Wifi, UtensilsCrossed, Phone } from "lucide-react"
@@ -630,38 +631,64 @@ function buildGoalChips(
         },
         housekeeping: {
             id: "housekeeping",
-            label: hotelRoom ? `Towels · ${hotelRoom}` : "Housekeeping",
-            available: resolveKitRole(profile.roleTemplate) === "HOTEL",
+            label: "Housekeeping",
+            available: false,
             icon: <BedDouble className="w-3.5 h-3.5" />,
-            prompt: hotelRoom ? `Two towels for room ${hotelRoom}` : "I need two towels",
+            prompt: "I need two towels",
         },
         wifi: {
             id: "wifi",
             label: "Wi-Fi",
-            available: resolveKitRole(profile.roleTemplate) === "HOTEL",
+            available: false,
             icon: <Wifi className="w-3.5 h-3.5" />,
             prompt: "What's the wifi password?",
         },
         food: {
             id: "food",
             label: "Food",
-            available: resolveKitRole(profile.roleTemplate) === "HOTEL",
+            available: false,
             icon: <UtensilsCrossed className="w-3.5 h-3.5" />,
             prompt: "What restaurants can I order from?",
         },
         reception: {
             id: "reception",
             label: "Reception",
-            available: resolveKitRole(profile.roleTemplate) === "HOTEL",
+            available: false,
             icon: <Phone className="w-3.5 h-3.5" />,
             prompt: "Talk to reception",
         },
+        room: {
+            id: "room",
+            label: hotelRoom ? `Room ${hotelRoom}` : "Room",
+            available: false,
+            icon: <BedDouble className="w-3.5 h-3.5" />,
+        },
+    }
+
+    if (resolveKitRole(profile.roleTemplate) === "HOTEL") {
+        const hotelIcons: Record<string, ReactNode> = {
+            room: <BedDouble className="w-3.5 h-3.5" />,
+            housekeeping: <BedDouble className="w-3.5 h-3.5" />,
+            wifi: <Wifi className="w-3.5 h-3.5" />,
+            food: <UtensilsCrossed className="w-3.5 h-3.5" />,
+            reception: <Phone className="w-3.5 h-3.5" />,
+        }
+        for (const chip of hotelConciergeChips(hotelRoom)) {
+            catalog[chip.id] = {
+                id: chip.id,
+                label: chip.label,
+                available: true,
+                highlighted: chip.highlighted,
+                prompt: chip.prompt,
+                icon: hotelIcons[chip.id],
+            }
+        }
     }
 
     const kitRole = resolveKitRole(profile.roleTemplate) || profile.roleTemplate || ""
     const orderByKit: Record<string, string[]> = {
         RESTAURANT: ["shop", "about", "book", "wa"],
-        HOTEL: ["housekeeping", "wifi", "food", "reception"],
+        HOTEL: hotelRoom ? ["room", "housekeeping", "wifi", "food", "reception"] : ["housekeeping", "wifi", "food", "reception"],
         SHOP: ["shop", "products", "wa", "about"],
         JEWELRY_RETAIL: ["shop", "products", "wa", "about"],
         JEWELRY_WHOLESALE: ["shop", "wa", "about"],

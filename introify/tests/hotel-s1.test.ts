@@ -123,9 +123,10 @@ describe("hotel S1 housekeeping intent", () => {
 })
 
 describe("hotel S1 request status and cards", () => {
-    it("walks Requested → Accepted → In progress → Complete", () => {
+    it("walks Requested → Accepted → On the way → Delivered", () => {
         expect(nextHotelRequestStatus("REQUESTED")).toBe("ACCEPTED")
-        expect(nextHotelRequestStatus("ACCEPTED")).toBe("IN_PROGRESS")
+        expect(nextHotelRequestStatus("ACCEPTED")).toBe("ON_THE_WAY")
+        expect(nextHotelRequestStatus("ON_THE_WAY")).toBe("COMPLETE")
         expect(nextHotelRequestStatus("IN_PROGRESS")).toBe("COMPLETE")
         expect(nextHotelRequestStatus("COMPLETE")).toBeNull()
     })

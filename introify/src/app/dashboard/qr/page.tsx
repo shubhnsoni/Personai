@@ -24,7 +24,7 @@ export default async function HotelQrPage() {
     })
     return (
         <div className="space-y-4">
-            <StudioPageHead kicker="Hotel" title="QR & Print" hint="Dynamic /q/{code} links. CMYK print kits are a later slice." />
+            <StudioPageHead kicker="Hotel" title="QR & Print" hint="Vector QR kit with a quiet zone. Test each code before print. CMYK and crop marks can follow." />
             <HotelQrStudio
                 slug={profile.slug}
                 origin={`${proto}://${host}`}

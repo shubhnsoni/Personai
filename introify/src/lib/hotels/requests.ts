@@ -1,7 +1,7 @@
 import { DEFAULT_HOUSEKEEPING_CATALOGUE } from "./catalogue"
 import { extractRoomNumber } from "./rooms"
 
-export const HOTEL_REQUEST_STATUSES = ["REQUESTED", "ACCEPTED", "IN_PROGRESS", "COMPLETE"] as const
+export const HOTEL_REQUEST_STATUSES = ["REQUESTED", "ACCEPTED", "ON_THE_WAY", "COMPLETE"] as const
 export type HotelRequestStatus = (typeof HOTEL_REQUEST_STATUSES)[number]
 
 export const HOTEL_REQUEST_TYPES = ["HOUSEKEEPING", "MAINTENANCE", "RECEPTION", "LATE_CHECKOUT", "HANDOFF"] as const
@@ -24,9 +24,25 @@ const QTY_WORDS: Record<string, number> = {
 }
 
 export function nextHotelRequestStatus(current: string): HotelRequestStatus | null {
+    if (current === "IN_PROGRESS") return "COMPLETE"
     const i = HOTEL_REQUEST_STATUSES.indexOf(current as HotelRequestStatus)
     if (i < 0 || i >= HOTEL_REQUEST_STATUSES.length - 1) return null
     return HOTEL_REQUEST_STATUSES[i + 1]
+}
+
+export function hotelRequestStatusLabel(status: string): string {
+    if (status === "ON_THE_WAY" || status === "IN_PROGRESS") return "On the way"
+    if (status === "COMPLETE") return "Delivered"
+    if (status === "ACCEPTED") return "Accepted"
+    if (status === "REQUESTED") return "Requested"
+    return status.replace(/_/g, " ").toLowerCase()
+}
+
+export function hotelRequestAdvanceLabel(next: string): string {
+    if (next === "ACCEPTED") return "Accept"
+    if (next === "ON_THE_WAY" || next === "IN_PROGRESS") return "On the way"
+    if (next === "COMPLETE") return "Delivered"
+    return next.replace(/_/g, " ").toLowerCase()
 }
 
 function quantityBefore(text: string, index: number): number {

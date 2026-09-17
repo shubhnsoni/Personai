@@ -270,7 +270,7 @@ export async function createHotelRequest(input: {
 }
 
 export async function advanceHotelRequest(profileId: string, requestId: string, status: string) {
-    const allowed = ["REQUESTED", "ACCEPTED", "IN_PROGRESS", "COMPLETE"]
+    const allowed = ["REQUESTED", "ACCEPTED", "IN_PROGRESS", "ON_THE_WAY", "COMPLETE"]
     if (!allowed.includes(status)) throw new Error("Unknown request status.")
     await prisma.hotelRequest.updateMany({
         where: { id: requestId, profileId },

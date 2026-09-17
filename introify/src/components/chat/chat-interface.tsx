@@ -482,6 +482,11 @@ export function ChatInterface({
                         <span className="font-semibold text-ui text-profile-text truncate min-w-0">
                             {chatMode === "LIVE" ? profile.displayName : `${profile.displayName}'s AI`}
                         </span>
+                        {hotelRoom ? (
+                            <span data-hotel-room-context className="shrink-0 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-cyan-200">
+                                Room {hotelRoom}
+                            </span>
+                        ) : null}
                     </button>}
                     primaryAction={!keyboardOpen && primaryChip ? (
                         <Chip
@@ -520,6 +525,7 @@ export function ChatInterface({
                         welcome={profile.welcomeMessageOverride}
                         topics={topics}
                         chips={emptyChips}
+                        hotelRoom={hotelRoom}
                         contact={contactLinks}
                         compact={keyboardOpen}
                         onChip={handleChip}
@@ -850,6 +856,7 @@ function WelcomeIntro({
     welcome,
     topics,
     chips,
+    hotelRoom,
     contact,
     compact = false,
     onChip,
@@ -864,6 +871,7 @@ function WelcomeIntro({
     welcome?: string | null
     topics?: string[]
     chips: ChatChip[]
+    hotelRoom?: string
     contact?: ReactNode
     compact?: boolean
     onChip: (chip: ChatChip) => void
@@ -1039,6 +1047,11 @@ function WelcomeIntro({
             </div>
 
             {!compact && <div data-welcome-chips className="relative z-[1] flex min-h-[2.75rem] flex-col items-center gap-2.5 max-w-xl">
+                {visibleStage === "ready" && hotelRoom ? (
+                    <p data-hotel-room-context className="text-xs font-medium tracking-[0.06em] text-cyan-200/90">
+                        Room {hotelRoom} · this chat already knows where you are
+                    </p>
+                ) : null}
                 {visibleStage === "ready" && (
                     <div className="flex flex-wrap justify-center gap-2">
                         {chips.map((chip, i) => (

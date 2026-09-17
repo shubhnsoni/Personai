@@ -1,4 +1,5 @@
 import type { HotelActionCard } from "@/lib/hotels"
+import { hotelRequestStatusLabel } from "@/lib/hotels"
 import { cn } from "@/lib/utils"
 
 export function HotelActionCardView({ card }: { card: HotelActionCard }) {
@@ -9,7 +10,7 @@ export function HotelActionCardView({ card }: { card: HotelActionCard }) {
             {card.room ? <p className="text-xs text-muted-foreground">Room {card.room}</p> : null}
             {card.status ? (
                 <p className={cn("mt-1 text-xs", card.status === "COMPLETE" ? "text-emerald-300" : "text-cyan-200")}>
-                    {card.status.replace("_", " ").toLowerCase()}
+                    {hotelRequestStatusLabel(card.status)}
                 </p>
             ) : null}
             {card.items?.length ? (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { generateHotelQrs } from "@/app/actions/hotels"
 import { drawQrCard } from "@/lib/qr-draw"
@@ -19,6 +19,7 @@ export function HotelQrStudio({
     qrs: QrRow[]
 }) {
     const [pending, start] = useTransition()
+    const [printing, setPrinting] = useState(false)
     const base = useMemo(() => origin.replace(/\/$/, ""), [origin])
 
     function dest(row: QrRow) {
@@ -38,6 +39,28 @@ export function HotelQrStudio({
         }
     }
 
+    async function downloadKit() {
+        setPrinting(true)
+        try {
+            const res = await fetch("/api/hotel/print-kit", { credentials: "include" })
+            if (!res.ok) {
+                const body = await res.json().catch(() => null) as { error?: string } | null
+                throw new Error(body?.error || "Print kit is not ready")
+            }
+            const blob = await res.blob()
+            const a = document.createElement("a")
+            a.href = URL.createObjectURL(blob)
+            a.download = `${slug}-print-kit.zip`
+            a.click()
+            URL.revokeObjectURL(a.href)
+            toast.success("Saved print package")
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not build the print kit")
+        } finally {
+            setPrinting(false)
+        }
+    }
+
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -52,10 +75,19 @@ export function HotelQrStudio({
                 >
                     Generate QRs
                 </Button>
+                <Button
+                    type="button"
+                    disabled={printing || qrs.length === 0}
+                    variant="outline"
+                    onClick={() => void downloadKit()}
+                    className="h-11 min-h-11 rounded-2xl border-white/10 transition-transform duration-150 active:scale-[0.96]"
+                >
+                    Download print package
+                </Button>
             </div>
-            <div className="divide-y divide-white/8 overflow-hidden rounded-2xl border border-white/8">
+            <div className="divide-y divide-white/8 overflow-hidden rounded-2xl border border-white/8 studio-panel">
                 {qrs.length === 0 ? (
-                    <p className="px-4 py-8 text-sm text-muted-foreground">Generate a property QR plus one per room. Print kit with bleed is later.</p>
+                    <p className="px-4 py-8 text-sm text-muted-foreground">Generate a property QR plus one per room, then download the print package. Test each QR before print.</p>
                 ) : qrs.map((row) => (
                     <div key={row.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
                         <div className="min-w-0 flex-1">

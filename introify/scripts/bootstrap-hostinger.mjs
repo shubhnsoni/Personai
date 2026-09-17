@@ -194,6 +194,29 @@ function seedShowcaseProfilesCreateOnly() {
     }
 }
 
+function seedTryHotelCreateOnly() {
+    if (process.env.INTROIFY_SEED_SHOWCASE === "false" || process.env.INTROIFY_SEED_SHOWCASE === "0") {
+        console.log("Try-hotel seed skipped.")
+        return
+    }
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+    const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/ensure-try-hotel.mjs"], {
+        cwd: root,
+        env: process.env,
+        stdio: "inherit",
+        windowsHide: true,
+        timeout: 120_000,
+        killSignal: "SIGKILL",
+    })
+    if (result.error) {
+        console.error("Try-hotel seed did not finish:", result.error.message)
+        return
+    }
+    if (result.status !== 0) {
+        console.error(`Try-hotel seed exited ${result.status ?? "unknown"}; continuing Hostinger build.`)
+    }
+}
+
 
 async function main() {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for database bootstrap")
@@ -203,6 +226,7 @@ async function main() {
         console.log(`Database bootstrap: ${result.presetsCreated} presets created; demo ${result.demo}.`)
         seedDemoShops()
         seedShowcaseProfilesCreateOnly()
+        seedTryHotelCreateOnly()
     } finally {
         await prisma.$disconnect()
     }

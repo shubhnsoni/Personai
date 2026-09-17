@@ -11,6 +11,7 @@ export type HotelDeskContext = {
     checkOutTime?: string | null
     roomNumber?: string | null
     restaurants: HotelDeskRestaurant[]
+    policiesApproved?: boolean
 }
 
 export type HotelDeskAction =
@@ -61,13 +62,18 @@ export function hotelDeskReply(query: string, ctx: HotelDeskContext): HotelDeskR
     }
     if (intent.kind === "late_checkout") {
         const out = ctx.checkOutTime || "11:00"
+        const note = ctx.policiesApproved
+            ? `Standard checkout is ${out}. Late checkout is a request — this chat does not charge a fee.`
+            : `Standard checkout is ${out}. Late checkout is a request, not a billed confirmation.`
         const card = encodeHotelCard({
             type: "late_checkout",
             title: "Late checkout",
-            note: `Standard checkout is ${out}. Paid late checkout is not live yet.`,
+            note,
         })
         return {
-            text: `${card}\nCheckout is ${out}. I can ask reception to hold the room — paid late checkout is not on this page yet.`,
+            text: ctx.policiesApproved
+                ? `${card}\nCheckout is ${out}. I’ll file a late-checkout request. This chat does not charge a fee.`
+                : `${card}\nCheckout is ${out}. I can ask reception to hold the room as a request. Late checkout is not billed from this page.`,
             action: { type: "lateCheckout" },
         }
     }
