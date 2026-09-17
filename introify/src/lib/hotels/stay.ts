@@ -25,6 +25,10 @@ export function hotelStayPhase(input: {
     return "during"
 }
 
+export function feedbackRoute(tone: StayFeedbackTone): { internal: true; googleCta: boolean } {
+    return { internal: true, googleCta: tone === "positive" }
+}
+
 export function stayFeedbackTone(text: string): StayFeedbackTone {
     const lower = text.toLowerCase()
     const negative = /\b(poor|bad|terrible|awful|disappoint|loud|worst|never again|rude|dirty)/.test(lower)

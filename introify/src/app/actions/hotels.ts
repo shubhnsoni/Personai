@@ -8,15 +8,20 @@ import { resolveKitRole } from "@/lib/role-alias"
 import {
     addHotelRooms,
     advanceHotelRequest,
+    attachHotelRequestPhoto,
     connectRestaurant,
     connectRestaurantBySlug,
     createHotelStay,
+    deleteHotelKnowledgeRow,
     disconnectRestaurant,
     ensureHotelProperty,
     ensurePropertyQr,
     ensureRoomQrs,
     findHotelRoom,
     listLinkedRestaurants,
+    markAllHotelNoticesRead,
+    markHotelNoticeRead,
+    saveHotelKnowledgeRow,
     saveHotelProperty,
     setHotelRoomActive,
 } from "@/lib/hotels/store"
@@ -34,6 +39,8 @@ function touch() {
     revalidatePath("/dashboard/rooms")
     revalidatePath("/dashboard/qr")
     revalidatePath("/dashboard/restaurants")
+    revalidatePath("/dashboard/knowledge")
+    revalidatePath("/dashboard/analytics")
 }
 
 export async function saveHotelSetup(input: {
@@ -49,6 +56,9 @@ export async function saveHotelSetup(input: {
     amenities?: string[]
     emergencyContact?: string
     services?: string[]
+    quietHours?: string
+    parkingInfo?: string
+    propertyHours?: string
 }) {
     const profile = await hotelOwner()
     await saveHotelProperty(profile.id, {
@@ -64,6 +74,9 @@ export async function saveHotelSetup(input: {
         amenitiesJson: JSON.stringify(input.amenities || []),
         emergencyContact: input.emergencyContact?.trim() || null,
         servicesJson: JSON.stringify(input.services || []),
+        quietHours: input.quietHours?.trim() || null,
+        parkingInfo: input.parkingInfo?.trim() || null,
+        propertyHours: input.propertyHours?.trim() || null,
     })
     if (input.receptionWhatsapp?.trim()) {
         await prisma.profile.update({
@@ -146,4 +159,94 @@ export async function createStayLink(roomId: string, guestName?: string) {
 export async function hotelLinkedRestaurants() {
     const profile = await hotelOwner()
     return listLinkedRestaurants(profile.id)
+}
+
+export async function saveHotelKnowledge(input: {
+    id?: string
+    bucket: string
+    title: string
+    body: string
+    guestVisible: boolean
+}) {
+    const profile = await hotelOwner()
+    await saveHotelKnowledgeRow(profile.id, {
+        id: input.id,
+        bucket: input.bucket.trim().toUpperCase(),
+        title: input.title.trim().slice(0, 80),
+        body: input.body.trim().slice(0, 4000),
+        guestVisible: input.guestVisible,
+    })
+    touch()
+}
+
+export async function removeHotelKnowledge(id: string) {
+    const profile = await hotelOwner()
+    await deleteHotelKnowledgeRow(profile.id, id)
+    touch()
+}
+
+export async function saveHotelMap(input: {
+    mapImageUrl?: string | null
+    markers: Array<{ id: string; kind: string; label: string; x: number; y: number; hint: string; aliases?: string[] }>
+}) {
+    const profile = await hotelOwner()
+    await saveHotelProperty(profile.id, {
+        mapImageUrl: input.mapImageUrl?.trim() || null,
+        mapMarkersJson: JSON.stringify(input.markers.map((row) => ({
+            id: row.id,
+            kind: row.kind,
+            label: row.label,
+            x: Math.max(0, Math.min(100, row.x)),
+            y: Math.max(0, Math.min(100, row.y)),
+            hint: row.hint,
+            aliases: row.aliases || [row.label, row.kind],
+        }))),
+    })
+    touch()
+}
+
+export async function saveHotelSla(sla: Record<string, number>) {
+    const profile = await hotelOwner()
+    const clean: Record<string, number> = {}
+    for (const [key, value] of Object.entries(sla)) {
+        const n = Math.floor(Number(value))
+        if (n > 0) clean[key] = n
+    }
+    await saveHotelProperty(profile.id, { slaJson: JSON.stringify(clean) })
+    touch()
+}
+
+export async function saveHotelUpsells(upsells: Array<{
+    id: string
+    kind: "late_checkout" | "spa" | "transport"
+    prompt: string
+    audience: "during" | "checkout" | "pre_arrival" | "after" | "any"
+    frequency: "once" | "daily"
+}>) {
+    const profile = await hotelOwner()
+    await saveHotelProperty(profile.id, {
+        upsellsJson: JSON.stringify(upsells.map((row) => ({
+            ...row,
+            prompt: row.prompt.trim().slice(0, 240),
+        }))),
+    })
+    touch()
+}
+
+export async function readHotelNotice(id: string) {
+    const profile = await hotelOwner()
+    await markHotelNoticeRead(profile.id, id)
+    touch()
+}
+
+export async function readAllHotelNotices() {
+    const profile = await hotelOwner()
+    await markAllHotelNoticesRead(profile.id)
+    touch()
+}
+
+export async function addHotelRequestPhoto(requestId: string, photoUrl: string) {
+    const profile = await hotelOwner()
+    await attachHotelRequestPhoto(profile.id, requestId, photoUrl)
+    touch()
 }

@@ -277,6 +277,8 @@ model Profile {
   hotelStays           HotelStay[]
   hotelRequests        HotelRequest[]
   hotelQrs             HotelQr[]
+  hotelKnowledge       HotelKnowledge[]
+  hotelStaffNotices    HotelStaffNotice[]
   hotelRestaurantLinks HotelRestaurantLink[] @relation("HotelRestaurantHotel")
   linkedFromHotels     HotelRestaurantLink[] @relation("HotelRestaurantVenue")
 }
@@ -4625,6 +4627,14 @@ model HotelProperty {
   amenitiesJson     String   @default("[]")
   emergencyContact  String?
   servicesJson      String   @default("[]")
+  quietHours        String?
+  parkingInfo       String?
+  propertyHours     String?
+  mapImageUrl       String?
+  mapMarkersJson    String   @default("[]")
+  slaJson           String   @default("{}")
+  upsellsJson       String   @default("[]")
+  staffLanguage     String   @default("en")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -4700,6 +4710,9 @@ model HotelRequest {
   department     String?
   priority       String    @default("NORMAL")
   notes          String?
+  photoUrl       String?
+  guestLanguage  String?
+  staffNotes     String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -4725,4 +4738,33 @@ model HotelQr {
   updatedAt DateTime @updatedAt
 
   @@index([profileId, kind])
+}
+
+model HotelKnowledge {
+  id           String   @id @default(cuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  bucket       String
+  title        String
+  body         String
+  guestVisible Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([profileId, bucket])
+}
+
+model HotelStaffNotice {
+  id        String    @id @default(cuid())
+  profileId String
+  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  requestId String?
+  kind      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([profileId, createdAt])
 }

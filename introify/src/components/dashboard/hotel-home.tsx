@@ -1,6 +1,7 @@
 import Link from "@/components/navigation/transition-link"
 import { StudioKpi, StudioKpiStrip, StudioPageHead, StudioPanel } from "@/components/dashboard/studio-ui"
 import { HotelSetupForm } from "@/components/dashboard/hotel-setup-form"
+import { HotelNotices } from "@/components/dashboard/hotel-notices"
 import { HOTEL_SERVICE_OPTIONS } from "@/lib/hotels"
 
 function parseList(raw: string | null | undefined) {
@@ -21,6 +22,7 @@ export function HotelHome({
     openRequests,
     restaurants,
     qrs,
+    notices,
 }: {
     name: string
     slug: string
@@ -37,11 +39,15 @@ export function HotelHome({
         policiesSummary: string | null
         servicesJson: string
         amenitiesJson: string
+        quietHours: string | null
+        parkingInfo: string | null
+        propertyHours: string | null
     } | null
     rooms: number
     openRequests: number
     restaurants: number
     qrs: number
+    notices: Array<{ id: string; kind: string; title: string; body: string; readAt: string | null; createdAt: string }>
 }) {
     const live = `${origin.replace(/\/$/, "")}/${slug}`
     const services = parseList(property?.servicesJson)
@@ -65,6 +71,7 @@ export function HotelHome({
                     </Link>
                 }
             />
+            <HotelNotices notices={notices} />
             <StudioKpiStrip columns={4}>
                 <StudioKpi title="Open requests" value={openRequests} href="/dashboard/requests" hot={openRequests > 0} />
                 <StudioKpi title="Rooms" value={rooms} href="/dashboard/rooms" />
@@ -96,6 +103,9 @@ export function HotelHome({
                         policiesSummary: property?.policiesSummary || "",
                         services: services.length ? services : HOTEL_SERVICE_OPTIONS.filter((item) => ["restaurant", "housekeeping", "concierge"].includes(item.id)).map((item) => item.id),
                         amenities: parseList(property?.amenitiesJson),
+                        quietHours: property?.quietHours || "",
+                        parkingInfo: property?.parkingInfo || "",
+                        propertyHours: property?.propertyHours || "",
                     }}
                 />
             </StudioPanel>

@@ -1,6 +1,7 @@
 import {
     DEFAULT_HOTEL_EXPERIENCES,
     DEFAULT_HOUSEKEEPING_CATALOGUE,
+    DEFAULT_MAINTENANCE_CATALOGUE,
     DEFAULT_SPA_CATALOGUE,
     DEFAULT_TRANSPORT_OPTIONS,
 } from "./catalogue"
@@ -21,10 +22,11 @@ export const HOTEL_REQUEST_TYPES = [
     "EXPERIENCE",
     "CHECKOUT",
     "FEEDBACK",
+    "EMERGENCY",
 ] as const
 export type HotelRequestType = (typeof HOTEL_REQUEST_TYPES)[number]
 
-export const HOTEL_REQUEST_DESKS = ["HOUSEKEEPING", "SPA", "TRANSPORT", "EXPERIENCES", "RECEPTION", "MAINTENANCE"] as const
+export const HOTEL_REQUEST_DESKS = ["HOUSEKEEPING", "SPA", "TRANSPORT", "EXPERIENCES", "RECEPTION", "MAINTENANCE", "SECURITY"] as const
 
 export type HotelRequestItem = { sku: string; qty: number; label: string }
 
@@ -41,6 +43,10 @@ export type HotelGuestIntent =
     | { kind: "local_guide" }
     | { kind: "checkout"; roomNumber?: string }
     | { kind: "feedback" }
+    | { kind: "maintenance"; sku: string; roomNumber?: string }
+    | { kind: "emergency" }
+    | { kind: "map"; query: string }
+    | { kind: "knowledge"; query: string }
     | { kind: "greeting" }
     | { kind: "unknown" }
 
@@ -60,6 +66,12 @@ export function nextHotelRequestStatus(current: string): HotelRequestStatus | nu
 }
 
 export function hotelRequestStatusLabel(status: string, type?: string): string {
+    if (type === "EMERGENCY") {
+        if (status === "ACCEPTED") return "Acknowledged"
+        if (status === "ON_THE_WAY" || status === "IN_PROGRESS") return "Attending"
+        if (status === "COMPLETE") return "Closed"
+        if (status === "REQUESTED") return "Alerted"
+    }
     const scheduled = type && SCHEDULED_TYPES.has(type)
     if (status === "ON_THE_WAY" || status === "IN_PROGRESS") return scheduled ? "Scheduled" : "On the way"
     if (status === "COMPLETE") return type && DONE_TYPES.has(type) ? "Done" : "Delivered"
@@ -69,6 +81,11 @@ export function hotelRequestStatusLabel(status: string, type?: string): string {
 }
 
 export function hotelRequestAdvanceLabel(next: string, type?: string): string {
+    if (type === "EMERGENCY") {
+        if (next === "ACCEPTED") return "Acknowledge"
+        if (next === "ON_THE_WAY" || next === "IN_PROGRESS") return "Attending"
+        if (next === "COMPLETE") return "Closed"
+    }
     if (next === "ACCEPTED") return "Accept"
     if (next === "ON_THE_WAY" || next === "IN_PROGRESS") {
         return type && SCHEDULED_TYPES.has(type) ? "Scheduled" : "On the way"
@@ -103,6 +120,40 @@ function housekeepingItems(text: string): HotelRequestItem[] {
     return found
 }
 
+function wifiIsBroken(lower: string) {
+    return /\b((wifi|wi-fi|internet).{0,24}(down|not working|broken|dead|off)|no (wifi|wi-fi|internet))\b/.test(lower)
+}
+
+function escapeRe(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function matchSkuBounded<T extends { sku: string; aliases: string[] }>(text: string, catalog: T[]): T | undefined {
+    let best: { item: T; alias: string } | undefined
+    for (const item of catalog) {
+        for (const alias of item.aliases) {
+            if (!new RegExp(`\\b${escapeRe(alias)}\\b`, "i").test(text)) continue
+            if (!best || alias.length > best.alias.length) best = { item, alias }
+        }
+    }
+    return best?.item
+}
+
+function matchMaintenance(lower: string) {
+    if (wifiIsBroken(lower)) return DEFAULT_MAINTENANCE_CATALOGUE.find((row) => row.sku === "wifi")
+    return matchSkuBounded(lower, DEFAULT_MAINTENANCE_CATALOGUE)
+}
+
+function isEmergency(lower: string) {
+    return /\b(emergency|ambulance|i'?m hurt|im hurt|need a doctor|medical emergency)\b/.test(lower)
+        || /\b(fire|smoke) (in|at|on)\b/.test(lower)
+        || /\bthere'?s a fire\b/.test(lower)
+}
+
+function isLocationAsk(lower: string) {
+    return /\b(where'?s|where is|how do i get to|on the map)\b/.test(lower)
+}
+
 function matchSku<T extends { sku: string; aliases: string[] }>(text: string, catalog: T[]): T | undefined {
     let best: { item: T; alias: string } | undefined
     for (const item of catalog) {
@@ -119,6 +170,13 @@ export function parseHotelGuestIntent(query: string): HotelGuestIntent {
     const lower = text.toLowerCase()
     if (!lower) return { kind: "unknown" }
     if (/^(hi|hello|hey|namaste)\b/.test(lower) && lower.length < 24) return { kind: "greeting" }
+    if (isEmergency(lower)) return { kind: "emergency" }
+    if (isLocationAsk(lower)) return { kind: "map", query: text }
+    const maintenance = matchMaintenance(lower)
+    if (maintenance) {
+        return { kind: "maintenance", sku: maintenance.sku, roomNumber: extractRoomNumber(text) }
+    }
+    if (/\b(quiet hours|parking|property hours|policies)\b/.test(lower)) return { kind: "knowledge", query: text }
     if (/\b(wifi|wi-fi|password|network)\b/.test(lower)) return { kind: "wifi" }
     if (/\b(late\s*check[- ]?out|checkout late)\b/.test(lower)) return { kind: "late_checkout" }
     if (/\b(check(?:ing)?\s*out|ready to (?:check\s*out|leave))\b/.test(lower)) {
@@ -164,6 +222,7 @@ export function parseHotelGuestIntent(query: string): HotelGuestIntent {
 
 export function departmentForType(type: HotelRequestType): string {
     if (type === "MAINTENANCE") return "MAINTENANCE"
+    if (type === "EMERGENCY") return "SECURITY"
     if (type === "SPA") return "SPA"
     if (type === "TRANSPORT") return "TRANSPORT"
     if (type === "EXPERIENCE") return "EXPERIENCES"

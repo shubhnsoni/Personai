@@ -285,7 +285,9 @@ export function boundedChatInput(
     tools: OpenAI.Chat.Completions.ChatCompletionTool[],
 ): OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming {
     const latest = history[history.length - 1]?.content || ""
-    const desired = /towel|toiletr|housekeep|bottled water|extra pillow|\b(spa|massage|hot stone|steam and scrub|airport|taxi|scooter|experiences?|lake morning|jagannath)\b/i.test(latest) ? "createHotelRequest"
+    const desired = /towel|toiletr|housekeep|bottled water|extra pillow|\b(spa|massage|hot stone|steam and scrub|airport|taxi|scooter|experiences?|lake morning|jagannath|ac not|tv is broken|tap is leaking)\b/i.test(latest) ? "createHotelRequest"
+        : /\b(emergency|there's a fire|medical emergency)\b/i.test(latest) ? "raiseHotelEmergency"
+        : /\b(where'?s the spa|where is the pool|on the map)\b/i.test(latest) ? "showHotelMap"
         : /talk to reception|front desk|human/i.test(latest) ? "talkToReception"
         : /late\s*check/i.test(latest) ? "requestLateCheckout"
         : /@/.test(latest) || /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/i.test(latest) || /\b(book|hire|contact|email me|get in touch)\b/i.test(latest) ? "collectLead"

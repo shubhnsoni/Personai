@@ -1,7 +1,7 @@
 const CARD_RE = /\[\[hotel-card:(\{[\s\S]*?\})\]\]/
 
 export type HotelActionCard = {
-    type: "request" | "restaurants" | "wifi" | "late_checkout" | "handoff" | "spa" | "transport" | "experiences" | "checkout" | "feedback" | "local_guide"
+    type: "request" | "restaurants" | "wifi" | "late_checkout" | "handoff" | "spa" | "transport" | "experiences" | "checkout" | "feedback" | "local_guide" | "maintenance" | "emergency" | "map" | "knowledge"
     id?: string
     status?: string
     title: string
@@ -12,6 +12,10 @@ export type HotelActionCard = {
     note?: string
     href?: string
     cta?: string
+    photoUrl?: string
+    phones?: { label: string; href: string }[]
+    marker?: { label: string; x: number; y: number; kind: string; hint?: string }
+    mapImageUrl?: string
 }
 
 export function encodeHotelCard(card: HotelActionCard): string {

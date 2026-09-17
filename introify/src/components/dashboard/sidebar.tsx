@@ -26,6 +26,7 @@ import {
     UtensilsCrossed,
     Users,
     BarChart3,
+    BookOpen,
 } from "lucide-react"
 import { isHotelRole } from "@/lib/hotels"
 
@@ -86,6 +87,7 @@ const HOTEL_NAV: NavItem[] = [
     { name: "Restaurants", href: "/dashboard/restaurants", icon: UtensilsCrossed },
     { name: "Services", href: "/dashboard/services", icon: Briefcase },
     { name: "Staff", href: "/dashboard/team", icon: Users },
+    { name: "Knowledge", href: "/dashboard/knowledge", icon: BookOpen },
     { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
     {
         name: "Chats",

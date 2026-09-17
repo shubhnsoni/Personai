@@ -33,11 +33,16 @@ export default async function DashboardPage() {
 
     if (isHotelRole(profile.roleTemplate)) {
         const property = await ensureHotelProperty(profile.id, { receptionWhatsapp: profile.whatsapp || undefined, timezone: profile.timezone || undefined })
-        const [rooms, openRequests, restaurants, qrs] = await Promise.all([
+        const [rooms, openRequests, restaurants, qrs, notices] = await Promise.all([
             prisma.hotelRoom.count({ where: { profileId: profile.id, isActive: true } }),
             prisma.hotelRequest.count({ where: { profileId: profile.id, status: { not: "COMPLETE" } } }),
             listLinkedRestaurants(profile.id).then((rows) => rows.length),
             prisma.hotelQr.count({ where: { profileId: profile.id } }),
+            prisma.hotelStaffNotice.findMany({
+                where: { profileId: profile.id },
+                orderBy: { createdAt: "desc" },
+                take: 12,
+            }),
         ])
         return (
             <HotelHome
@@ -49,6 +54,14 @@ export default async function DashboardPage() {
                 openRequests={openRequests}
                 restaurants={restaurants}
                 qrs={qrs}
+                notices={notices.map((row) => ({
+                    id: row.id,
+                    kind: row.kind,
+                    title: row.title,
+                    body: row.body,
+                    readAt: row.readAt ? row.readAt.toISOString() : null,
+                    createdAt: row.createdAt.toISOString(),
+                }))}
             />
         )
     }

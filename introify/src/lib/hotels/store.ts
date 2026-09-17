@@ -6,6 +6,10 @@ import { hotelStayPhase, type HotelStayPhase } from "./stay"
 import { hotelQrTargetPath } from "./paths"
 import { generateHotelQrCode, generateStayToken } from "./qr-code"
 import { normalizeRoomNumber } from "./rooms"
+import { DEFAULT_HOTEL_KNOWLEDGE, parseHotelMapMarkers, type HotelKnowledgeDoc, type HotelMapMarker } from "./knowledge"
+import { parseHotelSlaJson, summarizeHotelAnalytics } from "./analytics"
+import { DEFAULT_HOTEL_UPSELLS, parseHotelUpsells } from "./upsells"
+import { detectGuestLanguage, staffNoteFromGuest } from "./language"
 
 export type HotelGuestContext = {
     profileId: string
@@ -30,6 +34,16 @@ export type HotelGuestContext = {
     spa: { sku: string; label: string; durationMinutes: number }[]
     transport: { sku: string; label: string }[]
     experiences: { sku: string; label: string; summary: string }[]
+    receptionPhone: string | null
+    receptionWhatsapp: string | null
+    quietHours: string | null
+    parkingInfo: string | null
+    propertyHours: string | null
+    knowledge: HotelKnowledgeDoc[]
+    mapMarkers: HotelMapMarker[]
+    mapImageUrl: string | null
+    upsells: ReturnType<typeof parseHotelUpsells>
+    staffLanguage: string
 }
 
 function parseJsonArray(raw: string | null | undefined): string[] {
@@ -86,11 +100,22 @@ export async function saveHotelProperty(profileId: string, patch: {
     emergencyContact?: string | null
     servicesJson?: string
     timezone?: string | null
+    quietHours?: string | null
+    parkingInfo?: string | null
+    propertyHours?: string | null
+    mapImageUrl?: string | null
+    mapMarkersJson?: string
+    slaJson?: string
+    upsellsJson?: string
+    staffLanguage?: string
 }) {
     await ensureHotelProperty(profileId)
     return prisma.hotelProperty.update({
         where: { profileId },
-        data: patch,
+        data: {
+            ...patch,
+            staffLanguage: patch.staffLanguage || undefined,
+        },
     })
 }
 
@@ -256,8 +281,15 @@ export async function createHotelRequest(input: {
     guestName?: string | null
     notes?: string | null
     priority?: string
+    photoUrl?: string | null
+    guestLanguage?: string | null
+    staffNotes?: string | null
 }) {
-    return prisma.hotelRequest.create({
+    const guestLanguage = input.guestLanguage || (input.notes ? detectGuestLanguage(input.notes) : "en")
+    const staffNotes = input.staffNotes || (input.notes
+        ? staffNoteFromGuest(input.notes, { kind: input.type.toLowerCase(), sku: input.items?.[0]?.sku }, "en")
+        : null)
+    const created = await prisma.hotelRequest.create({
         data: {
             profileId: input.profileId,
             type: input.type,
@@ -268,10 +300,144 @@ export async function createHotelRequest(input: {
             guestName: input.guestName || null,
             notes: input.notes || null,
             department: departmentForType(input.type),
-            priority: input.priority || "NORMAL",
+            priority: input.priority || (input.type === "EMERGENCY" ? "URGENT" : "NORMAL"),
             status: "REQUESTED",
+            photoUrl: input.photoUrl || null,
+            guestLanguage,
+            staffNotes,
         },
         include: { room: { select: { number: true } } },
+    })
+    const roomBit = created.room?.number ? `Room ${created.room.number}` : "No room"
+    await prisma.hotelStaffNotice.create({
+        data: {
+            profileId: input.profileId,
+            requestId: created.id,
+            kind: input.type === "EMERGENCY" ? "EMERGENCY" : "REQUEST",
+            title: input.type === "EMERGENCY" ? `Emergency · ${roomBit}` : `${input.type.replace(/_/g, " ")} · ${roomBit}`,
+            body: staffNotes || input.notes || input.type,
+        },
+    })
+    return created
+}
+
+export async function attachHotelRequestPhoto(profileId: string, requestId: string, photoUrl: string) {
+    await prisma.hotelRequest.updateMany({
+        where: { id: requestId, profileId },
+        data: { photoUrl },
+    })
+}
+
+export async function listHotelKnowledge(profileId: string) {
+    return prisma.hotelKnowledge.findMany({
+        where: { profileId },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    })
+}
+
+export async function upsertHotelKnowledge(profileId: string, docs: HotelKnowledgeDoc[]) {
+    const existing = await prisma.hotelKnowledge.findMany({ where: { profileId }, select: { id: true, bucket: true } })
+    let sort = 0
+    for (const doc of docs) {
+        sort += 1
+        const row = existing.find((item) => item.bucket === doc.bucket)
+        if (row) {
+            await prisma.hotelKnowledge.update({
+                where: { id: row.id },
+                data: { title: doc.title, body: doc.body, guestVisible: doc.guestVisible, sortOrder: sort },
+            })
+        } else {
+            await prisma.hotelKnowledge.create({
+                data: {
+                    profileId,
+                    bucket: doc.bucket,
+                    title: doc.title,
+                    body: doc.body,
+                    guestVisible: doc.guestVisible,
+                    sortOrder: sort,
+                },
+            })
+        }
+    }
+}
+
+export async function saveHotelKnowledgeRow(profileId: string, input: {
+    id?: string
+    bucket: string
+    title: string
+    body: string
+    guestVisible: boolean
+}) {
+    if (input.id) {
+        await prisma.hotelKnowledge.updateMany({
+            where: { id: input.id, profileId },
+            data: { bucket: input.bucket, title: input.title, body: input.body, guestVisible: input.guestVisible },
+        })
+        return
+    }
+    const last = await prisma.hotelKnowledge.findFirst({ where: { profileId }, orderBy: { sortOrder: "desc" }, select: { sortOrder: true } })
+    await prisma.hotelKnowledge.create({
+        data: {
+            profileId,
+            bucket: input.bucket,
+            title: input.title,
+            body: input.body,
+            guestVisible: input.guestVisible,
+            sortOrder: (last?.sortOrder || 0) + 1,
+        },
+    })
+}
+
+export async function deleteHotelKnowledgeRow(profileId: string, id: string) {
+    await prisma.hotelKnowledge.deleteMany({ where: { id, profileId } })
+}
+
+export async function listHotelNotices(profileId: string, take = 20) {
+    return prisma.hotelStaffNotice.findMany({
+        where: { profileId },
+        orderBy: { createdAt: "desc" },
+        take,
+    })
+}
+
+export async function markHotelNoticeRead(profileId: string, id: string) {
+    await prisma.hotelStaffNotice.updateMany({
+        where: { id, profileId, readAt: null },
+        data: { readAt: new Date() },
+    })
+}
+
+export async function markAllHotelNoticesRead(profileId: string) {
+    await prisma.hotelStaffNotice.updateMany({
+        where: { profileId, readAt: null },
+        data: { readAt: new Date() },
+    })
+}
+
+export async function loadHotelAnalytics(profileId: string) {
+    const [requests, qrs, messages, property] = await Promise.all([
+        prisma.hotelRequest.findMany({
+            where: { profileId },
+            select: { type: true, department: true, status: true, createdAt: true, updatedAt: true },
+        }),
+        prisma.hotelQr.findMany({
+            where: { profileId },
+            select: { code: true, label: true, kind: true, scanCount: true },
+        }),
+        prisma.message.findMany({
+            where: { conversation: { profileId }, senderType: "VISITOR" },
+            select: { text: true },
+            orderBy: { createdAt: "desc" },
+            take: 200,
+        }),
+        prisma.hotelProperty.findUnique({ where: { profileId }, select: { slaJson: true } }),
+    ])
+    return summarizeHotelAnalytics({
+        now: new Date(),
+        requests,
+        qrs,
+        questions: messages.map((row) => row.text).filter((text) => text.includes("?")),
+        sla: parseHotelSlaJson(property?.slaJson),
     })
 }
 
@@ -292,12 +458,27 @@ export async function loadHotelGuestContext(profileId: string, roomNumber?: stri
     if (!profile) return null
     const property = await ensureHotelProperty(profileId)
     const restaurants = await listLinkedRestaurants(profileId)
+    const knowledgeRows = await prisma.hotelKnowledge.findMany({
+        where: { profileId },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    })
     let room = roomNumber ? await findHotelRoom(profileId, roomNumber) : null
     let stay = stayToken
         ? await prisma.hotelStay.findUnique({ where: { token: stayToken }, include: { room: true } })
         : null
     if (stay && stay.profileId !== profileId) stay = null
     if (stay?.room && !room) room = stay.room
+    const knowledge: HotelKnowledgeDoc[] = knowledgeRows.map((row) => {
+        const seeded = DEFAULT_HOTEL_KNOWLEDGE.find((item) => item.bucket === row.bucket)
+        return {
+            bucket: row.bucket as HotelKnowledgeDoc["bucket"],
+            title: row.title,
+            body: row.body,
+            guestVisible: row.guestVisible,
+            aliases: seeded?.aliases || [row.title, row.bucket.toLowerCase()],
+        }
+    })
+    const mapMarkers = parseHotelMapMarkers(property.mapMarkersJson)
     return {
         profileId: profile.id,
         slug: profile.slug,
@@ -321,6 +502,16 @@ export async function loadHotelGuestContext(profileId: string, roomNumber?: stri
         spa: defaultSpaCatalogue(),
         transport: defaultTransportOptions(),
         experiences: defaultHotelExperiences(),
+        receptionPhone: property.receptionPhone,
+        receptionWhatsapp: property.receptionWhatsapp,
+        quietHours: property.quietHours,
+        parkingInfo: property.parkingInfo,
+        propertyHours: property.propertyHours,
+        knowledge,
+        mapMarkers,
+        mapImageUrl: property.mapImageUrl,
+        upsells: parseHotelUpsells(property.upsellsJson),
+        staffLanguage: property.staffLanguage || "en",
     }
 }
 

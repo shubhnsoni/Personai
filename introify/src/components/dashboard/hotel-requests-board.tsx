@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react"
 import { setHotelRequestStatus } from "@/app/actions/hotels"
-import { HOTEL_REQUEST_DESKS, hotelRequestAdvanceLabel, hotelRequestStatusLabel, nextHotelRequestStatus } from "@/lib/hotels"
+import { DEFAULT_HOTEL_SLA_MINUTES, HOTEL_REQUEST_DESKS, hotelRequestAdvanceLabel, hotelRequestStatusLabel, nextHotelRequestStatus, slaBadge } from "@/lib/hotels"
 import { cn } from "@/lib/utils"
 
 type RequestRow = {
@@ -13,6 +13,9 @@ type RequestRow = {
     itemsJson: string
     guestName: string | null
     notes: string | null
+    staffNotes: string | null
+    photoUrl: string | null
+    priority: string
     createdAt: string
     room: { number: string } | null
 }
@@ -34,7 +37,7 @@ function deskOf(row: RequestRow) {
     return row.department || row.type
 }
 
-export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
+export function HotelRequestsBoard({ rows, sla }: { rows: RequestRow[]; sla?: Record<string, number> }) {
     const [dept, setDept] = useState<(typeof FILTERS)[number]>("ALL")
     const [status, setStatus] = useState<(typeof STATUSES)[number]>("ALL")
     const [pending, start] = useTransition()
@@ -60,11 +63,16 @@ export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
             </div>
             <div className="divide-y divide-white/8 overflow-hidden rounded-2xl shadow-[0px_0px_0px_1px_oklch(1_0_0_/_0.08)]">
                 {shown.length === 0 ? (
-                    <p className="px-4 py-10 text-sm text-muted-foreground">No tickets in this filter. Guest chat creates housekeeping, spa, transport, and experience requests.</p>
+                    <p className="px-4 py-10 text-sm text-muted-foreground">No tickets in this filter. Guest chat creates housekeeping, maintenance, spa, transport, and experience requests. Emergencies alert this board — guests are told to call.</p>
                 ) : shown.map((row) => {
                     const next = nextHotelRequestStatus(row.status)
+                    const badge = slaBadge({
+                        department: row.department,
+                        status: row.status,
+                        createdAt: new Date(row.createdAt),
+                    }, sla || DEFAULT_HOTEL_SLA_MINUTES, new Date())
                     return (
-                        <div key={row.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
+                        <div key={row.id} className={cn("flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center", row.type === "EMERGENCY" && "bg-red-400/8")}>
                             <div className="min-w-0 flex-1">
                                 <p className="font-medium">{itemsLabel(row.itemsJson)}</p>
                                 <p className="text-xs text-muted-foreground">
@@ -72,7 +80,14 @@ export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
                                     {row.room ? ` · Room ${row.room.number}` : " · No room"}
                                     {row.guestName ? ` · ${row.guestName}` : ""}
                                     {` · ${hotelRequestStatusLabel(row.status, row.type)}`}
+                                    {badge !== "ok" ? ` · ${badge}` : ""}
+                                    {row.priority === "URGENT" ? " · urgent" : ""}
                                 </p>
+                                {row.staffNotes ? <p className="text-xs text-muted-foreground">{row.staffNotes}</p> : null}
+                                {row.photoUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={row.photoUrl} alt="" className="mt-2 max-h-24 rounded-xl object-cover outline outline-1 -outline-offset-1 outline-white/10" />
+                                ) : null}
                             </div>
                             {next ? (
                                 <button

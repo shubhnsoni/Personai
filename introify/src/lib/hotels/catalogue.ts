@@ -89,3 +89,22 @@ export const HOTEL_SERVICE_OPTIONS = [
 ] as const
 
 export const DEFAULT_HOTEL_SERVICES = ["restaurant", "housekeeping", "concierge"] as const
+
+export type MaintenanceCatalogueItem = {
+    sku: string
+    label: string
+    department: "MAINTENANCE"
+    aliases: string[]
+}
+
+export const DEFAULT_MAINTENANCE_CATALOGUE: MaintenanceCatalogueItem[] = [
+    { sku: "ac", label: "Air conditioning", department: "MAINTENANCE", aliases: ["air conditioning", "air conditioner", "air con", "a/c", "ac"] },
+    { sku: "tv", label: "TV", department: "MAINTENANCE", aliases: ["television", "tv"] },
+    { sku: "wifi", label: "Wi-Fi", department: "MAINTENANCE", aliases: ["wi-fi down", "wifi down", "wifi not working", "internet down", "no internet", "no wifi"] },
+    { sku: "plumbing", label: "Plumbing", department: "MAINTENANCE", aliases: ["plumbing", "leaking", "leak", "tap", "drain", "clogged toilet", "toilet leak"] },
+    { sku: "electrical", label: "Electrical", department: "MAINTENANCE", aliases: ["electrical", "power socket", "socket", "light not", "no power"] },
+]
+
+export function defaultMaintenanceCatalogue() {
+    return DEFAULT_MAINTENANCE_CATALOGUE.map((item) => ({ sku: item.sku, label: item.label, department: item.department }))
+}

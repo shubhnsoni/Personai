@@ -13,7 +13,7 @@ import { resolveKitRole } from "@/lib/role-alias"
 import { hotelConciergeChips } from "@/lib/hotels"
 import { CheckoutSheet, type CheckoutItem } from "@/components/checkout/checkout-sheet"
 import { TipSheet } from "@/components/profile/tip-sheet"
-import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, BedDouble, Wifi, UtensilsCrossed, Phone, Sparkles, Car, MapPinned, LogOut, Star } from "lucide-react"
+import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, BedDouble, Wifi, UtensilsCrossed, Phone, Sparkles, Car, MapPinned, LogOut, Star, Wrench, AlertTriangle } from "lucide-react"
 import { storyLabel, storyPath } from "@/lib/story"
 import { hasSocials, socialsFromConfig } from "@/lib/socials"
 import { ProfileContactRow } from "@/components/profile/profile-contact-row"
@@ -681,6 +681,8 @@ function buildGoalChips(
             experiences: <MapPinned className="w-3.5 h-3.5" />,
             checkout: <LogOut className="w-3.5 h-3.5" />,
             feedback: <Star className="w-3.5 h-3.5" />,
+            maintenance: <Wrench className="w-3.5 h-3.5" />,
+            emergency: <AlertTriangle className="w-3.5 h-3.5" />,
         }
         for (const chip of hotelConciergeChips(hotelRoom, { phase: stayPhase })) {
             catalog[chip.id] = {

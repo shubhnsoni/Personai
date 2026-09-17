@@ -2,6 +2,9 @@ import type { PrismaClient } from "@prisma/client"
 import { resolveKitRole } from "@/lib/role-alias"
 import { generateHotelQrCode } from "./qr-code"
 import { HAVEN_HOTEL } from "@/lib/demo-shops/stay"
+import { DEFAULT_HOTEL_KNOWLEDGE, DEFAULT_HOTEL_MAP_MARKERS, HOTEL_KNOWLEDGE_BUCKETS } from "./knowledge"
+import { DEFAULT_HOTEL_SLA_MINUTES } from "./analytics"
+import { DEFAULT_HOTEL_UPSELLS } from "./upsells"
 
 export const TRY_HOTEL = {
     slug: "try-hotel",
@@ -28,6 +31,14 @@ export const TRY_HOTEL_S3 = {
     services: ["restaurant", "housekeeping", "concierge", "spa", "transport", "airportTransfer", "activities"] as const,
 }
 
+export const TRY_HOTEL_S4 = {
+    knowledgeBuckets: HOTEL_KNOWLEDGE_BUCKETS,
+    mapMarkerKinds: DEFAULT_HOTEL_MAP_MARKERS.map((row) => row.kind),
+    sla: DEFAULT_HOTEL_SLA_MINUTES,
+    upsells: DEFAULT_HOTEL_UPSELLS,
+    emergencyContact: "112",
+}
+
 export type SeedRestaurant = { slug: string; roleTemplate: string; isPublic: boolean }
 
 export type TryHotelSeedState = {
@@ -39,6 +50,8 @@ export type TryHotelSeedState = {
     availableRestaurants: SeedRestaurant[]
     services?: string[]
     stayToken?: string | null
+    knowledgeBuckets?: string[]
+    mapMarkerCount?: number
 }
 
 export type TryHotelSeedPlan = {
@@ -49,6 +62,8 @@ export type TryHotelSeedPlan = {
     connectRestaurant: string | null
     needServices: string[]
     needStay: boolean
+    needKnowledge: boolean
+    needMap: boolean
     stayToken: string
     skipReason?: string
 }
@@ -71,6 +86,8 @@ export function tryHotelSeedActions(state: TryHotelSeedState): TryHotelSeedPlan 
             connectRestaurant: null,
             needServices: [],
             needStay: false,
+            needKnowledge: false,
+            needMap: false,
             stayToken: TRY_HOTEL_S3.stayToken,
             skipReason: "foreign-role",
         }
@@ -81,6 +98,7 @@ export function tryHotelSeedActions(state: TryHotelSeedState): TryHotelSeedPlan 
     const afterRooms = [...TRY_HOTEL.rooms]
     const haveRoomQr = new Set(state.roomQrs)
     const haveServices = new Set(state.services || [])
+    const haveBuckets = new Set(state.knowledgeBuckets || [])
     return {
         createProfile,
         addRooms,
@@ -89,6 +107,8 @@ export function tryHotelSeedActions(state: TryHotelSeedState): TryHotelSeedPlan 
         connectRestaurant: state.linkedRestaurantSlug ? null : pickLinkedRestaurant(state.availableRestaurants),
         needServices: TRY_HOTEL_S3.services.filter((id) => !haveServices.has(id)),
         needStay: state.stayToken !== TRY_HOTEL_S3.stayToken,
+        needKnowledge: HOTEL_KNOWLEDGE_BUCKETS.some((bucket) => !haveBuckets.has(bucket)),
+        needMap: (state.mapMarkerCount || 0) < DEFAULT_HOTEL_MAP_MARKERS.length,
         stayToken: TRY_HOTEL_S3.stayToken,
     }
 }
@@ -118,8 +138,11 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
         select: { id: true, slug: true, roleTemplate: true, isPublic: true, displayName: true },
     })
     const propertyRow = existing
-        ? await prisma.hotelProperty.findUnique({ where: { profileId: existing.id }, select: { servicesJson: true } })
+        ? await prisma.hotelProperty.findUnique({ where: { profileId: existing.id }, select: { servicesJson: true, mapMarkersJson: true } })
         : null
+    const knowledgeRows = existing
+        ? await prisma.hotelKnowledge.findMany({ where: { profileId: existing.id }, select: { bucket: true } })
+        : []
     const demoStay = existing
         ? await prisma.hotelStay.findUnique({ where: { token: TRY_HOTEL_S3.stayToken }, select: { profileId: true, token: true } })
         : null
@@ -140,6 +163,15 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
         availableRestaurants: restaurants,
         services,
         stayToken: demoStay && existing && demoStay.profileId === existing.id ? demoStay.token : null,
+        knowledgeBuckets: knowledgeRows.map((row) => row.bucket),
+        mapMarkerCount: (() => {
+            try {
+                const parsed = JSON.parse(propertyRow?.mapMarkersJson || "[]")
+                return Array.isArray(parsed) ? parsed.length : 0
+            } catch {
+                return 0
+            }
+        })(),
     })
 
     if (plan.skipReason) {
@@ -216,7 +248,15 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
                 servicesJson: JSON.stringify([...TRY_HOTEL_S3.services]),
                 address: HAVEN_HOTEL.venue?.address?.formatted || "Hinoo Main Road, Hinoo, Ranchi 834002",
                 receptionWhatsapp: HAVEN_HOTEL.whatsapp,
+                receptionPhone: HAVEN_HOTEL.whatsapp,
+                emergencyContact: TRY_HOTEL_S4.emergencyContact,
                 timezone: "Asia/Kolkata",
+                quietHours: "22:00–07:00",
+                parkingInfo: "Street parking on Hinoo Main Road. No valet.",
+                propertyHours: "Reception 00:00–23:59",
+                mapMarkersJson: JSON.stringify(DEFAULT_HOTEL_MAP_MARKERS),
+                slaJson: JSON.stringify(DEFAULT_HOTEL_SLA_MINUTES),
+                upsellsJson: JSON.stringify(DEFAULT_HOTEL_UPSELLS),
             },
         })
     }
@@ -266,7 +306,7 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
         })
     }
 
-    const liveProperty = await prisma.hotelProperty.findUnique({ where: { profileId }, select: { servicesJson: true } })
+    const liveProperty = await prisma.hotelProperty.findUnique({ where: { profileId }, select: { servicesJson: true, emergencyContact: true, receptionWhatsapp: true, receptionPhone: true } })
     if (plan.needServices.length) {
         let current: string[] = []
         try {
@@ -279,6 +319,49 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
         await prisma.hotelProperty.updateMany({
             where: { profileId },
             data: { servicesJson: JSON.stringify(merged) },
+        })
+    }
+
+    if (plan.needKnowledge) {
+        let sort = 0
+        for (const doc of DEFAULT_HOTEL_KNOWLEDGE) {
+            sort += 1
+            const existingDoc = await prisma.hotelKnowledge.findFirst({ where: { profileId, bucket: doc.bucket } })
+            if (existingDoc) {
+                await prisma.hotelKnowledge.update({
+                    where: { id: existingDoc.id },
+                    data: { title: doc.title, body: doc.body, guestVisible: doc.guestVisible, sortOrder: sort },
+                })
+            } else {
+                await prisma.hotelKnowledge.create({
+                    data: {
+                        profileId,
+                        bucket: doc.bucket,
+                        title: doc.title,
+                        body: doc.body,
+                        guestVisible: doc.guestVisible,
+                        sortOrder: sort,
+                    },
+                })
+            }
+        }
+    }
+
+    if (plan.needMap || !liveProperty?.emergencyContact || !liveProperty?.receptionWhatsapp) {
+        await prisma.hotelProperty.updateMany({
+            where: { profileId },
+            data: {
+                mapMarkersJson: JSON.stringify(DEFAULT_HOTEL_MAP_MARKERS),
+                quietHours: "22:00–07:00",
+                parkingInfo: "Street parking on Hinoo Main Road. No valet.",
+                propertyHours: "Reception 00:00–23:59",
+                emergencyContact: TRY_HOTEL_S4.emergencyContact,
+                receptionWhatsapp: HAVEN_HOTEL.whatsapp,
+                receptionPhone: HAVEN_HOTEL.whatsapp,
+                slaJson: JSON.stringify(DEFAULT_HOTEL_SLA_MINUTES),
+                upsellsJson: JSON.stringify(DEFAULT_HOTEL_UPSELLS),
+                staffLanguage: "en",
+            },
         })
     }
 

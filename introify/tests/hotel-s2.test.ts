@@ -42,7 +42,7 @@ describe("hotel S2 housekeeping path", () => {
 describe("hotel S2 room-context chips", () => {
     it("keeps property chips when there is no room", () => {
         const chips = hotelConciergeChips()
-        expect(chips.map((chip) => chip.id)).toEqual(["housekeeping", "wifi", "food", "reception"])
+        expect(chips.map((chip) => chip.id)).toEqual(["housekeeping", "wifi", "food", "reception", "emergency"])
         expect(chips[0]?.label).toBe("Housekeeping")
         expect(chips.some((chip) => chip.id === "room")).toBe(false)
     })

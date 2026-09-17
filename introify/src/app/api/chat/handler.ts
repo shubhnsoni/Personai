@@ -14,12 +14,15 @@ import { resolveKitRole } from "@/lib/role-alias"
 import {
     catalogRequestItem,
     DEFAULT_HOTEL_EXPERIENCES,
+    DEFAULT_MAINTENANCE_CATALOGUE,
     DEFAULT_SPA_CATALOGUE,
     DEFAULT_TRANSPORT_OPTIONS,
     encodeHotelCard,
     hotelDeskReply,
     isHotelRole,
     parseHotelGuestIntent,
+    detectGuestLanguage,
+    guestMaintenanceCopy,
     type HotelRequestType,
 } from "@/lib/hotels"
 import { createHotelRequest, loadHotelGuestContext } from "@/lib/hotels/store"
@@ -626,11 +629,11 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             type: "function",
             function: {
                 name: "createHotelRequest",
-                description: "Create a hotel ticket: housekeeping, spa, transport, experience, checkout, or feedback. Never confirm payment or post a review.",
+                description: "Create a hotel ticket: housekeeping, maintenance, spa, transport, experience, checkout, or feedback. Never confirm payment or post a review. Do not use this for emergencies — use raiseHotelEmergency.",
                 parameters: {
                     type: "object",
                     properties: {
-                        type: { type: "string", enum: ["HOUSEKEEPING", "SPA", "TRANSPORT", "EXPERIENCE", "CHECKOUT", "FEEDBACK"] },
+                        type: { type: "string", enum: ["HOUSEKEEPING", "MAINTENANCE", "SPA", "TRANSPORT", "EXPERIENCE", "CHECKOUT", "FEEDBACK"] },
                         items: {
                             type: "array",
                             items: {
@@ -720,6 +723,22 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 parameters: { type: "object", properties: { notes: { type: "string" } } },
             },
         },
+        {
+            type: "function",
+            function: {
+                name: "raiseHotelEmergency",
+                description: "Alert staff and tell the guest to call reception or emergency now. Not an ordinary wait-on-ticket path. Never confirm a dispatch time.",
+                parameters: { type: "object", properties: { notes: { type: "string" } } },
+            },
+        },
+        {
+            type: "function",
+            function: {
+                name: "showHotelMap",
+                description: "Show a property map marker. Do not invent indoor navigation.",
+                parameters: { type: "object", properties: { query: { type: "string" } } },
+            },
+        },
     ]
 
     const role = profile.roleTemplate
@@ -751,6 +770,8 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         allowedTools.add("showHotelLocalGuide")
         allowedTools.add("requestHotelCheckout")
         allowedTools.add("submitHotelFeedback")
+        allowedTools.add("raiseHotelEmergency")
+        allowedTools.add("showHotelMap")
     }
     const tools = allTools.filter((t) => t.type === "function" && allowedTools.has(t.function.name))
 
@@ -972,7 +993,9 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             case "talkToReception":
             case "requestLateCheckout":
             case "requestHotelCheckout":
-            case "submitHotelFeedback": {
+            case "submitHotelFeedback":
+            case "raiseHotelEmergency":
+            case "showHotelMap": {
                 const ctx = await loadHotelGuestContext(authorizedProfileId, hotelRoom || null, stayToken || null)
                 if (!ctx) return "This concierge is not ready yet."
                 const deskCtx = { ...ctx, policiesApproved: marketingBusiness.policiesApproved }
@@ -989,6 +1012,24 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 }
                 if (toolName === "showHotelExperiences") return hotelDeskReply("What experiences can I join?", deskCtx).text
                 if (toolName === "showHotelLocalGuide") return hotelDeskReply("what's nearby / local guide", deskCtx).text
+                if (toolName === "showHotelMap") {
+                    const q = typeof args.query === "string" ? args.query : query
+                    return hotelDeskReply(q.includes("where") ? q : `where's the ${q}`, deskCtx).text
+                }
+                if (toolName === "raiseHotelEmergency") {
+                    await createHotelRequest({
+                        profileId: authorizedProfileId,
+                        type: "EMERGENCY",
+                        items: [{ sku: "emergency", qty: 1, label: "Emergency" }],
+                        roomId: ctx.roomId,
+                        stayId: ctx.stayId,
+                        conversationId: authorizedConversationId,
+                        guestName: ctx.guestName,
+                        notes: typeof args.notes === "string" ? args.notes : query,
+                        priority: "URGENT",
+                    })
+                    return hotelDeskReply("emergency", deskCtx).text
+                }
                 if (toolName === "talkToReception") {
                     await createHotelRequest({
                         profileId: authorizedProfileId,
@@ -1045,7 +1086,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                     })
                     return hotelDeskReply(note, deskCtx).text
                 }
-                const guestTypes = ["HOUSEKEEPING", "SPA", "TRANSPORT", "EXPERIENCE", "CHECKOUT", "FEEDBACK"] as const
+                const guestTypes = ["HOUSEKEEPING", "MAINTENANCE", "SPA", "TRANSPORT", "EXPERIENCE", "CHECKOUT", "FEEDBACK"] as const
                 const requestedType = String(args.type || "HOUSEKEEPING").toUpperCase()
                 const type: HotelRequestType = guestTypes.includes(requestedType as typeof guestTypes[number])
                     ? requestedType as typeof guestTypes[number]
@@ -1067,7 +1108,9 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                                 ? [{ sku: "checkout", qty: 1, label: "Checkout" }]
                                 : type === "FEEDBACK"
                                     ? [{ sku: "feedback", qty: 1, label: "Stay feedback" }]
-                                    : [{ sku: "cleaning", qty: 1, label: "Room cleaning" }]
+                                    : type === "MAINTENANCE"
+                                        ? [{ sku: "ac", qty: 1, label: "Air conditioning" }]
+                                        : [{ sku: "cleaning", qty: 1, label: "Room cleaning" }]
                 const usedItems = items.length ? items : fallbackItems
                 const roomHint = typeof args.roomNumber === "string" ? args.roomNumber : ctx.roomNumber
                 const roomCtx = await loadHotelGuestContext(authorizedProfileId, roomHint, stayToken || null)
@@ -1084,6 +1127,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 const labels = usedItems.map((item) => `${item.qty && item.qty > 1 ? `${item.qty} ` : ""}${item.label}`)
                 const titles: Record<string, string> = {
                     HOUSEKEEPING: "Housekeeping",
+                    MAINTENANCE: "Maintenance",
                     SPA: "Spa",
                     TRANSPORT: "Transport",
                     EXPERIENCE: "Experience",
@@ -1091,14 +1135,19 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                     FEEDBACK: "Feedback",
                 }
                 const card = encodeHotelCard({
-                    type: type === "SPA" ? "spa" : type === "TRANSPORT" ? "transport" : type === "EXPERIENCE" ? "experiences" : type === "CHECKOUT" ? "checkout" : type === "FEEDBACK" ? "feedback" : "request",
+                    type: type === "SPA" ? "spa" : type === "TRANSPORT" ? "transport" : type === "EXPERIENCE" ? "experiences" : type === "CHECKOUT" ? "checkout" : type === "FEEDBACK" ? "feedback" : type === "MAINTENANCE" ? "maintenance" : "request",
                     id: created.id,
                     status: created.status,
                     title: titles[type] || "Request",
                     room: created.room?.number || roomHint || undefined,
                     items: labels,
-                    note: type === "HOUSEKEEPING" ? undefined : "Request only — this chat does not charge a fee.",
+                    note: type === "HOUSEKEEPING" ? undefined : type === "MAINTENANCE" ? "Request only — add a photo if you can. This chat does not charge a fee." : "Request only — this chat does not charge a fee.",
                 })
+                if (type === "MAINTENANCE") {
+                    const lang = detectGuestLanguage(query)
+                    const label = usedItems[0]?.label || "Maintenance"
+                    return `${card}\n${guestMaintenanceCopy(lang, label, created.room?.number || roomHint || undefined)}`
+                }
                 const desk = type === "HOUSEKEEPING" ? "Housekeeping will pick it up." : "Staff will pick it up on the requests board."
                 return `${card}\nRequested ${labels.join(" and ")}${created.room?.number ? ` for room ${created.room.number}` : ""}. ${desk}`
             }
@@ -1142,6 +1191,17 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 notes: text,
             })
         }
+        if (desk.action?.type === "createMaintenance") {
+            const action = desk.action
+            const item = DEFAULT_MAINTENANCE_CATALOGUE.find((row) => row.sku === action.sku) || DEFAULT_MAINTENANCE_CATALOGUE[0]
+            return executeTool("createHotelRequest", {
+                type: "MAINTENANCE",
+                items: [catalogRequestItem(item)],
+                roomNumber: action.roomNumber,
+                notes: text,
+            })
+        }
+        if (desk.action?.type === "emergency") return executeTool("raiseHotelEmergency", { notes: text })
         if (desk.action?.type === "createSpa") {
             const action = desk.action
             const item = DEFAULT_SPA_CATALOGUE.find((row) => row.sku === action.sku) || DEFAULT_SPA_CATALOGUE[0]

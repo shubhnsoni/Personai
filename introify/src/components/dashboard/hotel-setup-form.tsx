@@ -23,6 +23,9 @@ export function HotelSetupForm({
         policiesSummary: string
         services: string[]
         amenities: string[]
+        quietHours: string
+        parkingInfo: string
+        propertyHours: string
     }
 }) {
     const [pending, start] = useTransition()
@@ -86,6 +89,18 @@ export function HotelSetupForm({
                 <label className="space-y-1.5 text-sm">
                     <span className="text-muted-foreground">Emergency contact</span>
                     <Input value={form.emergencyContact} onChange={(e) => set("emergencyContact", e.target.value)} className="h-11 rounded-2xl" />
+                </label>
+                <label className="space-y-1.5 text-sm">
+                    <span className="text-muted-foreground">Property hours</span>
+                    <Input value={form.propertyHours} onChange={(e) => set("propertyHours", e.target.value)} className="h-11 rounded-2xl" />
+                </label>
+                <label className="space-y-1.5 text-sm">
+                    <span className="text-muted-foreground">Quiet hours</span>
+                    <Input value={form.quietHours} onChange={(e) => set("quietHours", e.target.value)} className="h-11 rounded-2xl" />
+                </label>
+                <label className="space-y-1.5 text-sm sm:col-span-2">
+                    <span className="text-muted-foreground">Parking</span>
+                    <Input value={form.parkingInfo} onChange={(e) => set("parkingInfo", e.target.value)} className="h-11 rounded-2xl" />
                 </label>
             </div>
             <div>

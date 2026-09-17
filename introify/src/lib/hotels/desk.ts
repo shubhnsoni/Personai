@@ -1,14 +1,18 @@
 import { encodeHotelCard } from "./cards"
 import {
     DEFAULT_HOTEL_EXPERIENCES,
+    DEFAULT_MAINTENANCE_CATALOGUE,
     DEFAULT_SPA_CATALOGUE,
     DEFAULT_TRANSPORT_OPTIONS,
     defaultHotelExperiences,
     defaultSpaCatalogue,
     defaultTransportOptions,
 } from "./catalogue"
+import { findMapMarker, lookupHotelKnowledge, type HotelKnowledgeDoc, type HotelMapMarker } from "./knowledge"
+import { detectGuestLanguage, guestEmergencyCopy, guestMaintenanceCopy } from "./language"
 import { parseHotelGuestIntent } from "./requests"
 import { hotelGoogleReviewSearchUrl, stayFeedbackTone, type HotelStayPhase } from "./stay"
+import { firstUpsellLine, type HotelUpsell } from "./upsells"
 
 export type HotelDeskRestaurant = { name: string; slug: string }
 
@@ -26,6 +30,17 @@ export type HotelDeskContext = {
     experiences?: { sku: string; label: string; summary?: string }[]
     locality?: string | null
     stayPhase?: HotelStayPhase | null
+    emergencyContact?: string | null
+    receptionPhone?: string | null
+    receptionWhatsapp?: string | null
+    quietHours?: string | null
+    parkingInfo?: string | null
+    propertyHours?: string | null
+    knowledge?: HotelKnowledgeDoc[]
+    mapMarkers?: HotelMapMarker[]
+    mapImageUrl?: string | null
+    upsells?: HotelUpsell[]
+    staffLanguage?: string
 }
 
 export type HotelDeskAction =
@@ -37,6 +52,8 @@ export type HotelDeskAction =
     | { type: "createExperience"; sku: string; roomNumber?: string }
     | { type: "checkout"; roomNumber?: string }
     | { type: "feedback"; tone: "positive" | "negative" | "neutral" }
+    | { type: "createMaintenance"; sku: string; roomNumber?: string }
+    | { type: "emergency" }
 
 export type HotelDeskResult = {
     text: string
@@ -47,9 +64,55 @@ function roomOf(intentRoom: string | undefined, ctx: HotelDeskContext) {
     return intentRoom || ctx.roomNumber || undefined
 }
 
+function telHref(raw?: string | null) {
+    if (!raw) return null
+    const digits = raw.replace(/[^\d+]/g, "")
+    if (!digits) return null
+    return `tel:${digits}`
+}
+
+function emergencyPhones(ctx: HotelDeskContext) {
+    const phones: { label: string; href: string }[] = []
+    const reception = telHref(ctx.receptionPhone || ctx.receptionWhatsapp)
+    if (reception) phones.push({ label: "Call reception", href: reception })
+    const emergency = telHref(ctx.emergencyContact) || "tel:112"
+    phones.push({ label: "Emergency", href: emergency })
+    return phones
+}
+
+function knowledgeReply(query: string, ctx: HotelDeskContext): HotelDeskResult | null {
+    const docs = ctx.knowledge || []
+    const hit = lookupHotelKnowledge(docs, query, { guest: true })
+    if (!hit) return null
+    const card = encodeHotelCard({
+        type: "knowledge",
+        title: hit.title,
+        note: hit.bucket.toLowerCase(),
+        items: [hit.body],
+    })
+    return { text: `${card}\n${hit.body}` }
+}
+
+function mapReply(query: string, ctx: HotelDeskContext): HotelDeskResult {
+    const markers = ctx.mapMarkers || []
+    const hit = findMapMarker(markers, query)
+    if (!hit) {
+        return { text: `${ctx.displayName} has no map for that yet. Ask reception — I won’t invent a path.` }
+    }
+    const card = encodeHotelCard({
+        type: "map",
+        title: hit.label,
+        note: hit.hint,
+        marker: { label: hit.label, x: hit.x, y: hit.y, kind: hit.kind, hint: hit.hint },
+        mapImageUrl: ctx.mapImageUrl || undefined,
+    })
+    return { text: `${card}\n${hit.label} is on the property map (${hit.hint}). Marker only — no turn-by-turn path.` }
+}
+
 export function hotelDeskReply(query: string, ctx: HotelDeskContext): HotelDeskResult {
     const intent = parseHotelGuestIntent(query)
-    const room = intent.kind === "housekeeping" || intent.kind === "spa" || intent.kind === "transport" || intent.kind === "experience" || intent.kind === "checkout"
+    const lang = detectGuestLanguage(query)
+    const room = intent.kind === "housekeeping" || intent.kind === "spa" || intent.kind === "transport" || intent.kind === "experience" || intent.kind === "checkout" || intent.kind === "maintenance"
         ? roomOf("roomNumber" in intent ? intent.roomNumber : undefined, ctx)
         : ctx.roomNumber || undefined
     const name = ctx.displayName
@@ -59,13 +122,49 @@ export function hotelDeskReply(query: string, ctx: HotelDeskContext): HotelDeskR
 
     if (intent.kind === "greeting") {
         const where = room ? ` for room ${room}` : ""
+        const extra = firstUpsellLine(ctx.upsells, ctx.stayPhase, ctx.policiesApproved)
         if (ctx.stayPhase === "pre_arrival") {
-            return { text: `Hi — we look forward to seeing you at ${name}. Airport transfer, experiences, or the restaurant next door?` }
+            return { text: `Hi — we look forward to seeing you at ${name}. Airport transfer, experiences, or the restaurant next door?${extra ? ` ${extra}` : ""}` }
         }
         if (ctx.stayPhase === "after") {
             return { text: `Hope the stay at ${name} was good. Share feedback if you like — I only send a Google search after a positive note, and I never post a review.` }
         }
-        return { text: `Hi — I’m the concierge at ${name}${where}. Towels, Wi-Fi, food, spa, transport, or reception?` }
+        return { text: `Hi — I’m the concierge at ${name}${where}. Towels, Wi-Fi, food, spa, transport, or reception?${extra ? ` ${extra}` : ""}` }
+    }
+    if (intent.kind === "emergency") {
+        const phones = emergencyPhones(ctx)
+        const card = encodeHotelCard({
+            type: "emergency",
+            title: "Call now",
+            room,
+            note: "This is not an ordinary ticket. Do not wait on chat.",
+            phones,
+            href: phones[0]?.href,
+            cta: phones[0]?.label || "Call reception",
+        })
+        const numbers = phones.map((row) => `${row.label} ${row.href.replace("tel:", "")}`).join(" · ")
+        return {
+            text: `${card}\n${guestEmergencyCopy(lang)}\n${numbers}`,
+            action: { type: "emergency" },
+        }
+    }
+    if (intent.kind === "maintenance") {
+        const item = DEFAULT_MAINTENANCE_CATALOGUE.find((row) => row.sku === intent.sku) || DEFAULT_MAINTENANCE_CATALOGUE[0]
+        const card = encodeHotelCard({
+            type: "maintenance",
+            title: item.label,
+            room,
+            items: [item.label],
+            note: "Request only — add a photo if you can. This chat does not charge a fee.",
+        })
+        return {
+            text: `${card}\n${guestMaintenanceCopy(lang, item.label, room)}`,
+            action: { type: "createMaintenance", sku: item.sku, roomNumber: room },
+        }
+    }
+    if (intent.kind === "map") return mapReply(intent.query, ctx)
+    if (intent.kind === "knowledge") {
+        return knowledgeReply(intent.query, ctx) || { text: `I don’t have that on the guest board yet. Ask reception.` }
     }
     if (intent.kind === "wifi") {
         if (!ctx.wifiName) {
@@ -237,6 +336,9 @@ export function hotelDeskReply(query: string, ctx: HotelDeskContext): HotelDeskR
             action: { type: "createHousekeeping", items, roomNumber: room },
         }
     }
+    const known = knowledgeReply(query, ctx)
+    if (known) return known
+    if (findMapMarker(ctx.mapMarkers || [], query)) return mapReply(query, ctx)
     const where = room ? ` Room ${room} is on this chat.` : ""
-    return { text: `I can bring towels, share Wi-Fi, show restaurants, request spa or transport, list experiences, or call reception.${where} What do you need?` }
+    return { text: `I can bring towels, file a repair, share Wi-Fi, show restaurants, request spa or transport, list experiences, or call reception.${where} What do you need?` }
 }
