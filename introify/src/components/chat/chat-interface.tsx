@@ -487,6 +487,11 @@ export function ChatInterface({
                                 Room {hotelRoom}
                             </span>
                         ) : null}
+                        {stayToken ? (
+                            <span data-hotel-stay-context className="shrink-0 rounded-full border border-white/12 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                                Stay
+                            </span>
+                        ) : null}
                     </button>}
                     primaryAction={!keyboardOpen && primaryChip ? (
                         <Chip
@@ -526,6 +531,7 @@ export function ChatInterface({
                         topics={topics}
                         chips={emptyChips}
                         hotelRoom={hotelRoom}
+                        stayToken={stayToken}
                         contact={contactLinks}
                         compact={keyboardOpen}
                         onChip={handleChip}
@@ -857,6 +863,7 @@ function WelcomeIntro({
     topics,
     chips,
     hotelRoom,
+    stayToken,
     contact,
     compact = false,
     onChip,
@@ -872,6 +879,7 @@ function WelcomeIntro({
     topics?: string[]
     chips: ChatChip[]
     hotelRoom?: string
+    stayToken?: string
     contact?: ReactNode
     compact?: boolean
     onChip: (chip: ChatChip) => void
@@ -1050,6 +1058,11 @@ function WelcomeIntro({
                 {visibleStage === "ready" && hotelRoom ? (
                     <p data-hotel-room-context className="text-xs font-medium tracking-[0.06em] text-cyan-200/90">
                         Room {hotelRoom} · this chat already knows where you are
+                    </p>
+                ) : null}
+                {visibleStage === "ready" && stayToken ? (
+                    <p data-hotel-stay-context className="text-xs font-medium tracking-[0.06em] text-cyan-200/90">
+                        Stay link · this chat knows your stay
                     </p>
                 ) : null}
                 {visibleStage === "ready" && (

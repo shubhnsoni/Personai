@@ -23,7 +23,7 @@ export default async function HotelRequestsPage() {
 
     return (
         <div className="space-y-4">
-            <StudioPageHead kicker="Hotel" title="Requests" hint="Accept, then On the way, then Delivered. Housekeeping tickets arrive from guest chat." />
+            <StudioPageHead kicker="Hotel" title="Requests" hint="Accept, then On the way or Scheduled, then Done. Spa, transport, and experiences arrive from guest chat as requests — never as charges." />
             <HotelRequestsBoard
                 rows={rows.map((row) => ({
                     id: row.id,

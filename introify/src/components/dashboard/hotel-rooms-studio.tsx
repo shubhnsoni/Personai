@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 
 type Room = { id: string; number: string; floor: string | null; category: string | null; isActive: boolean }
 
-export function HotelRoomsStudio({ rooms }: { rooms: Room[] }) {
+export function HotelRoomsStudio({ rooms, slug }: { rooms: Room[]; slug: string }) {
     const [draft, setDraft] = useState("101, 102, 103")
     const [pending, start] = useTransition()
 
@@ -64,8 +64,9 @@ export function HotelRoomsStudio({ rooms }: { rooms: Room[] }) {
                             onClick={() => start(async () => {
                                 try {
                                     const token = await createStayLink(room.id)
-                                    await navigator.clipboard.writeText(token)
-                                    toast.success("Stay token copied")
+                                    const origin = window.location.origin
+                                    await navigator.clipboard.writeText(`${origin}/${slug}/stay/${token}`)
+                                    toast.success("Stay link copied")
                                 } catch (error) {
                                     toast.error(error instanceof Error ? error.message : "Could not create stay")
                                 }

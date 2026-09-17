@@ -285,10 +285,13 @@ export function boundedChatInput(
     tools: OpenAI.Chat.Completions.ChatCompletionTool[],
 ): OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming {
     const latest = history[history.length - 1]?.content || ""
-    const desired = /@/.test(latest) || /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/i.test(latest) || /\b(book|hire|contact|email me|get in touch)\b/i.test(latest) ? "collectLead"
-        : /towel|toiletr|housekeep|bottled water|extra pillow/i.test(latest) ? "createHotelRequest"
+    const desired = /towel|toiletr|housekeep|bottled water|extra pillow|\b(spa|massage|hot stone|steam and scrub|airport|taxi|scooter|experiences?|lake morning|jagannath)\b/i.test(latest) ? "createHotelRequest"
         : /talk to reception|front desk|human/i.test(latest) ? "talkToReception"
         : /late\s*check/i.test(latest) ? "requestLateCheckout"
+        : /@/.test(latest) || /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/i.test(latest) || /\b(book|hire|contact|email me|get in touch)\b/i.test(latest) ? "collectLead"
+        : /\b(check(?:ing)?\s*out|ready to check\s*out)\b/i.test(latest) ? "requestHotelCheckout"
+        : /\b(feedback|google review|loved the stay)\b/i.test(latest) ? "submitHotelFeedback"
+        : /\b(local guide|what'?s nearby|things to do)\b/i.test(latest) ? "showHotelLocalGuide"
         : /restaurant|hungry|room service/i.test(latest) ? "showHotelRestaurants"
         : /reserv|table|seat/i.test(latest) ? "bookTable"
         : /menu|dish|food/i.test(latest) ? "showMenu"

@@ -1,11 +1,30 @@
-import { DEFAULT_HOUSEKEEPING_CATALOGUE } from "./catalogue"
+import {
+    DEFAULT_HOTEL_EXPERIENCES,
+    DEFAULT_HOUSEKEEPING_CATALOGUE,
+    DEFAULT_SPA_CATALOGUE,
+    DEFAULT_TRANSPORT_OPTIONS,
+} from "./catalogue"
 import { extractRoomNumber } from "./rooms"
+import { stayFeedbackTone } from "./stay"
 
 export const HOTEL_REQUEST_STATUSES = ["REQUESTED", "ACCEPTED", "ON_THE_WAY", "COMPLETE"] as const
 export type HotelRequestStatus = (typeof HOTEL_REQUEST_STATUSES)[number]
 
-export const HOTEL_REQUEST_TYPES = ["HOUSEKEEPING", "MAINTENANCE", "RECEPTION", "LATE_CHECKOUT", "HANDOFF"] as const
+export const HOTEL_REQUEST_TYPES = [
+    "HOUSEKEEPING",
+    "MAINTENANCE",
+    "RECEPTION",
+    "LATE_CHECKOUT",
+    "HANDOFF",
+    "SPA",
+    "TRANSPORT",
+    "EXPERIENCE",
+    "CHECKOUT",
+    "FEEDBACK",
+] as const
 export type HotelRequestType = (typeof HOTEL_REQUEST_TYPES)[number]
+
+export const HOTEL_REQUEST_DESKS = ["HOUSEKEEPING", "SPA", "TRANSPORT", "EXPERIENCES", "RECEPTION", "MAINTENANCE"] as const
 
 export type HotelRequestItem = { sku: string; qty: number; label: string }
 
@@ -15,6 +34,13 @@ export type HotelGuestIntent =
     | { kind: "food" }
     | { kind: "reception" }
     | { kind: "late_checkout" }
+    | { kind: "spa"; sku: string; roomNumber?: string }
+    | { kind: "transport"; sku: string; roomNumber?: string }
+    | { kind: "experience"; sku: string; roomNumber?: string }
+    | { kind: "experiences" }
+    | { kind: "local_guide" }
+    | { kind: "checkout"; roomNumber?: string }
+    | { kind: "feedback" }
     | { kind: "greeting" }
     | { kind: "unknown" }
 
@@ -23,6 +49,9 @@ const QTY_WORDS: Record<string, number> = {
     two: 2, three: 3, four: 4, five: 5, six: 6,
 }
 
+const SCHEDULED_TYPES = new Set(["SPA", "EXPERIENCE"])
+const DONE_TYPES = new Set(["SPA", "EXPERIENCE", "TRANSPORT", "CHECKOUT", "FEEDBACK"])
+
 export function nextHotelRequestStatus(current: string): HotelRequestStatus | null {
     if (current === "IN_PROGRESS") return "COMPLETE"
     const i = HOTEL_REQUEST_STATUSES.indexOf(current as HotelRequestStatus)
@@ -30,18 +59,21 @@ export function nextHotelRequestStatus(current: string): HotelRequestStatus | nu
     return HOTEL_REQUEST_STATUSES[i + 1]
 }
 
-export function hotelRequestStatusLabel(status: string): string {
-    if (status === "ON_THE_WAY" || status === "IN_PROGRESS") return "On the way"
-    if (status === "COMPLETE") return "Delivered"
+export function hotelRequestStatusLabel(status: string, type?: string): string {
+    const scheduled = type && SCHEDULED_TYPES.has(type)
+    if (status === "ON_THE_WAY" || status === "IN_PROGRESS") return scheduled ? "Scheduled" : "On the way"
+    if (status === "COMPLETE") return type && DONE_TYPES.has(type) ? "Done" : "Delivered"
     if (status === "ACCEPTED") return "Accepted"
     if (status === "REQUESTED") return "Requested"
     return status.replace(/_/g, " ").toLowerCase()
 }
 
-export function hotelRequestAdvanceLabel(next: string): string {
+export function hotelRequestAdvanceLabel(next: string, type?: string): string {
     if (next === "ACCEPTED") return "Accept"
-    if (next === "ON_THE_WAY" || next === "IN_PROGRESS") return "On the way"
-    if (next === "COMPLETE") return "Delivered"
+    if (next === "ON_THE_WAY" || next === "IN_PROGRESS") {
+        return type && SCHEDULED_TYPES.has(type) ? "Scheduled" : "On the way"
+    }
+    if (next === "COMPLETE") return type && DONE_TYPES.has(type) ? "Done" : "Delivered"
     return next.replace(/_/g, " ").toLowerCase()
 }
 
@@ -71,6 +103,17 @@ function housekeepingItems(text: string): HotelRequestItem[] {
     return found
 }
 
+function matchSku<T extends { sku: string; aliases: string[] }>(text: string, catalog: T[]): T | undefined {
+    let best: { item: T; alias: string } | undefined
+    for (const item of catalog) {
+        for (const alias of item.aliases) {
+            if (!text.includes(alias)) continue
+            if (!best || alias.length > best.alias.length) best = { item, alias }
+        }
+    }
+    return best?.item
+}
+
 export function parseHotelGuestIntent(query: string): HotelGuestIntent {
     const text = query.trim()
     const lower = text.toLowerCase()
@@ -78,8 +121,28 @@ export function parseHotelGuestIntent(query: string): HotelGuestIntent {
     if (/^(hi|hello|hey|namaste)\b/.test(lower) && lower.length < 24) return { kind: "greeting" }
     if (/\b(wifi|wi-fi|password|network)\b/.test(lower)) return { kind: "wifi" }
     if (/\b(late\s*check[- ]?out|checkout late)\b/.test(lower)) return { kind: "late_checkout" }
+    if (/\b(check(?:ing)?\s*out|ready to (?:check\s*out|leave))\b/.test(lower)) {
+        return { kind: "checkout", roomNumber: extractRoomNumber(text) }
+    }
     if (/\b(talk to (reception|someone|a person|staff|human)|human|receptionist|front desk)\b/.test(lower)) {
         return { kind: "reception" }
+    }
+    if (/\b(spa|massage|hot stone|steam)\b/.test(lower)) {
+        const match = matchSku(lower, DEFAULT_SPA_CATALOGUE)
+        return { kind: "spa", sku: match?.sku || "massage", roomNumber: extractRoomNumber(text) }
+    }
+    if (/\b(airport|taxi|cab|scooter|transfer)\b/.test(lower)) {
+        const match = matchSku(lower, DEFAULT_TRANSPORT_OPTIONS)
+        return { kind: "transport", sku: match?.sku || "taxi", roomNumber: extractRoomNumber(text) }
+    }
+    const experience = matchSku(lower, DEFAULT_HOTEL_EXPERIENCES)
+    if (experience && !/\b(nearby|local guide|things to do)\b/.test(lower)) {
+        return { kind: "experience", sku: experience.sku, roomNumber: extractRoomNumber(text) }
+    }
+    if (/\b(experiences?|activities|tours?)\b/.test(lower)) return { kind: "experiences" }
+    if (/\b(local guide|what'?s nearby|things to do|nearby)\b/.test(lower)) return { kind: "local_guide" }
+    if (/\b(feedback|google review|leave a review)\b/.test(lower) || (/\bstay\b/.test(lower) && stayFeedbackTone(lower) !== "neutral")) {
+        return { kind: "feedback" }
     }
     if (/\b(restaurants?|cafes?|menu|hungry|food|eat|dinner|breakfast|lunch|room service|kitchen)\b/.test(lower)) {
         return { kind: "food" }
@@ -101,6 +164,19 @@ export function parseHotelGuestIntent(query: string): HotelGuestIntent {
 
 export function departmentForType(type: HotelRequestType): string {
     if (type === "MAINTENANCE") return "MAINTENANCE"
-    if (type === "RECEPTION" || type === "LATE_CHECKOUT" || type === "HANDOFF") return "RECEPTION"
+    if (type === "SPA") return "SPA"
+    if (type === "TRANSPORT") return "TRANSPORT"
+    if (type === "EXPERIENCE") return "EXPERIENCES"
+    if (type === "RECEPTION" || type === "LATE_CHECKOUT" || type === "HANDOFF" || type === "CHECKOUT" || type === "FEEDBACK") {
+        return "RECEPTION"
+    }
     return "HOUSEKEEPING"
+}
+
+export function catalogRequestItem(input: { sku: string; label: string; durationMinutes?: number }): HotelRequestItem {
+    return {
+        sku: input.sku,
+        qty: 1,
+        label: input.durationMinutes ? `${input.label} (${input.durationMinutes} min)` : input.label,
+    }
 }

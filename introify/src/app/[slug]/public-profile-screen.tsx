@@ -8,10 +8,12 @@ export async function PublicProfileScreen({
     slug,
     hotelRoom,
     stayToken,
+    stayPhase,
 }: {
     slug: string
     hotelRoom?: string | null
     stayToken?: string | null
+    stayPhase?: "pre_arrival" | "during" | "checkout" | "after" | null
 }) {
     if (slug === "en") notFound()
 
@@ -119,6 +121,7 @@ export async function PublicProfileScreen({
             expertiseLinks={expertiseLinks}
             hotelRoom={hotelRoom || undefined}
             stayToken={stayToken || undefined}
+            stayPhase={stayPhase || undefined}
             profile={{
                 ...profile,
                 hasStory: Boolean(story?.frames.length),

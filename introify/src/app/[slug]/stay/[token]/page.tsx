@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import { isHotelRole } from "@/lib/hotels"
+import { hotelStayPhase, isHotelRole } from "@/lib/hotels"
 import { PublicProfileScreen } from "../../public-profile-screen"
 
 export const dynamic = "force-dynamic"
@@ -14,5 +14,13 @@ export default async function HotelStayPage({ params }: { params: Promise<{ slug
         include: { room: true },
     })
     if (!stay || stay.profileId !== profile.id) notFound()
-    return <PublicProfileScreen slug={slug} hotelRoom={stay.room?.number} stayToken={stay.token} />
+    const phase = hotelStayPhase({ arrival: stay.arrival, departure: stay.departure })
+    return (
+        <PublicProfileScreen
+            slug={slug}
+            hotelRoom={stay.room?.number}
+            stayToken={stay.token}
+            stayPhase={phase}
+        />
+    )
 }

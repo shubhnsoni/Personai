@@ -13,7 +13,7 @@ import { resolveKitRole } from "@/lib/role-alias"
 import { hotelConciergeChips } from "@/lib/hotels"
 import { CheckoutSheet, type CheckoutItem } from "@/components/checkout/checkout-sheet"
 import { TipSheet } from "@/components/profile/tip-sheet"
-import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, BedDouble, Wifi, UtensilsCrossed, Phone } from "lucide-react"
+import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, BedDouble, Wifi, UtensilsCrossed, Phone, Sparkles, Car, MapPinned, LogOut, Star } from "lucide-react"
 import { storyLabel, storyPath } from "@/lib/story"
 import { hasSocials, socialsFromConfig } from "@/lib/socials"
 import { ProfileContactRow } from "@/components/profile/profile-contact-row"
@@ -130,13 +130,14 @@ interface ProfileViewProps {
     expertiseLinks?: ReactNode
     hotelRoom?: string
     stayToken?: string
+    stayPhase?: "pre_arrival" | "during" | "checkout" | "after" | null
 }
 
 type ContentType = "about" | "experience" | "projects" | "services" | "products" | "courses" | "events" | "communities" | null
 
 type ChipDef = ChatChip & { available: boolean }
 
-export function ProfileView({ profile, animationConfig, colors, expertiseLinks, hotelRoom, stayToken }: ProfileViewProps) {
+export function ProfileView({ profile, animationConfig, colors, expertiseLinks, hotelRoom, stayToken, stayPhase }: ProfileViewProps) {
     const [activeContent, setActiveContent] = useState<ContentType>(null)
     const [isBookingOpen, setIsBookingOpen] = useState(false)
     const [selectedService, setSelectedService] = useState<string | null>(null)
@@ -208,7 +209,7 @@ export function ProfileView({ profile, animationConfig, colors, expertiseLinks, 
             openBooking: () => setIsBookingOpen(true),
             openContent: (type) => setActiveContent(type),
             openTip: () => setTipOpen(true),
-        }, hotelRoom),
+        }, hotelRoom, stayPhase),
     ].map((chip) => {
         const href = "href" in chip ? chip.href : undefined
         const select = "onSelect" in chip ? chip.onSelect : undefined
@@ -216,10 +217,12 @@ export function ProfileView({ profile, animationConfig, colors, expertiseLinks, 
             ...chip,
             onSelect: href
                 ? undefined
-                : () => {
-                    track(profile.slug, chip.id === "wa" ? "wa_tap" : "chip", { chip: chip.id })
-                    select?.()
-                },
+                : select
+                    ? () => {
+                        track(profile.slug, chip.id === "wa" ? "wa_tap" : "chip", { chip: chip.id })
+                        select()
+                    }
+                    : undefined,
         }
     })
     const theme = ORB_THEMES[resolveOrbVariant(colors, animationConfig.variant)]
@@ -487,6 +490,7 @@ function buildGoalChips(
         openTip: () => void
     },
     hotelRoom?: string,
+    stayPhase?: ProfileViewProps["stayPhase"],
 ): ChatChip[] {
     const name = profile.displayName
     const hasServices = profile.serviceOfferings.some(s => s.isActive)
@@ -672,8 +676,13 @@ function buildGoalChips(
             wifi: <Wifi className="w-3.5 h-3.5" />,
             food: <UtensilsCrossed className="w-3.5 h-3.5" />,
             reception: <Phone className="w-3.5 h-3.5" />,
+            spa: <Sparkles className="w-3.5 h-3.5" />,
+            transport: <Car className="w-3.5 h-3.5" />,
+            experiences: <MapPinned className="w-3.5 h-3.5" />,
+            checkout: <LogOut className="w-3.5 h-3.5" />,
+            feedback: <Star className="w-3.5 h-3.5" />,
         }
-        for (const chip of hotelConciergeChips(hotelRoom)) {
+        for (const chip of hotelConciergeChips(hotelRoom, { phase: stayPhase })) {
             catalog[chip.id] = {
                 id: chip.id,
                 label: chip.label,
@@ -688,7 +697,7 @@ function buildGoalChips(
     const kitRole = resolveKitRole(profile.roleTemplate) || profile.roleTemplate || ""
     const orderByKit: Record<string, string[]> = {
         RESTAURANT: ["shop", "about", "book", "wa"],
-        HOTEL: hotelRoom ? ["room", "housekeeping", "wifi", "food", "reception"] : ["housekeeping", "wifi", "food", "reception"],
+        HOTEL: hotelConciergeChips(hotelRoom, { phase: stayPhase }).map((chip) => chip.id),
         SHOP: ["shop", "products", "wa", "about"],
         JEWELRY_RETAIL: ["shop", "products", "wa", "about"],
         JEWELRY_WHOLESALE: ["shop", "wa", "about"],

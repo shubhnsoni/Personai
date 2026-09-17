@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react"
 import { setHotelRequestStatus } from "@/app/actions/hotels"
-import { hotelRequestAdvanceLabel, hotelRequestStatusLabel, nextHotelRequestStatus } from "@/lib/hotels"
+import { HOTEL_REQUEST_DESKS, hotelRequestAdvanceLabel, hotelRequestStatusLabel, nextHotelRequestStatus } from "@/lib/hotels"
 import { cn } from "@/lib/utils"
 
 type RequestRow = {
@@ -17,7 +17,7 @@ type RequestRow = {
     room: { number: string } | null
 }
 
-const FILTERS = ["ALL", "HOUSEKEEPING", "MAINTENANCE", "RECEPTION"] as const
+const FILTERS = ["ALL", ...HOTEL_REQUEST_DESKS] as const
 const STATUSES = ["ALL", "REQUESTED", "ACCEPTED", "ON_THE_WAY", "IN_PROGRESS", "COMPLETE"] as const
 
 function itemsLabel(raw: string) {
@@ -30,12 +30,16 @@ function itemsLabel(raw: string) {
     }
 }
 
+function deskOf(row: RequestRow) {
+    return row.department || row.type
+}
+
 export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
     const [dept, setDept] = useState<(typeof FILTERS)[number]>("ALL")
     const [status, setStatus] = useState<(typeof STATUSES)[number]>("ALL")
     const [pending, start] = useTransition()
     const shown = useMemo(() => rows.filter((row) => {
-        if (dept !== "ALL" && (row.department || row.type) !== dept) return false
+        if (dept !== "ALL" && deskOf(row) !== dept) return false
         if (status !== "ALL" && row.status !== status) return false
         return true
     }), [rows, dept, status])
@@ -44,19 +48,19 @@ export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
         <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
                 {FILTERS.map((item) => (
-                    <button key={item} type="button" onClick={() => setDept(item)} className={cn("min-h-11 rounded-full border px-3 text-xs font-medium transition-transform duration-150 active:scale-[0.96]", dept === item ? "border-cyan-400/60 bg-cyan-400/10" : "border-white/10 text-muted-foreground")}>
+                    <button key={item} type="button" onClick={() => setDept(item)} className={cn("min-h-11 rounded-full border px-3 text-xs font-medium transition-transform duration-150 ease-out active:scale-[0.96]", dept === item ? "border-cyan-400/60 bg-cyan-400/10" : "border-white/10 text-muted-foreground")}>
                         {item === "ALL" ? "All desks" : item.toLowerCase()}
                     </button>
                 ))}
                 {STATUSES.map((item) => (
-                    <button key={item} type="button" onClick={() => setStatus(item)} className={cn("min-h-11 rounded-full border px-3 text-xs font-medium transition-transform duration-150 active:scale-[0.96]", status === item ? "border-cyan-400/60 bg-cyan-400/10" : "border-white/10 text-muted-foreground")}>
+                    <button key={item} type="button" onClick={() => setStatus(item)} className={cn("min-h-11 rounded-full border px-3 text-xs font-medium transition-transform duration-150 ease-out active:scale-[0.96]", status === item ? "border-cyan-400/60 bg-cyan-400/10" : "border-white/10 text-muted-foreground")}>
                         {item === "ALL" ? "All status" : hotelRequestStatusLabel(item)}
                     </button>
                 ))}
             </div>
-            <div className="divide-y divide-white/8 overflow-hidden rounded-2xl border border-white/8">
+            <div className="divide-y divide-white/8 overflow-hidden rounded-2xl shadow-[0px_0px_0px_1px_oklch(1_0_0_/_0.08)]">
                 {shown.length === 0 ? (
-                    <p className="px-4 py-10 text-sm text-muted-foreground">No tickets in this filter. Guest chat creates housekeeping requests.</p>
+                    <p className="px-4 py-10 text-sm text-muted-foreground">No tickets in this filter. Guest chat creates housekeeping, spa, transport, and experience requests.</p>
                 ) : shown.map((row) => {
                     const next = nextHotelRequestStatus(row.status)
                     return (
@@ -64,9 +68,10 @@ export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
                             <div className="min-w-0 flex-1">
                                 <p className="font-medium">{itemsLabel(row.itemsJson)}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {row.room ? `Room ${row.room.number}` : "No room"}
+                                    {row.type.replace(/_/g, " ").toLowerCase()}
+                                    {row.room ? ` · Room ${row.room.number}` : " · No room"}
                                     {row.guestName ? ` · ${row.guestName}` : ""}
-                                    {` · ${hotelRequestStatusLabel(row.status)}`}
+                                    {` · ${hotelRequestStatusLabel(row.status, row.type)}`}
                                 </p>
                             </div>
                             {next ? (
@@ -74,9 +79,9 @@ export function HotelRequestsBoard({ rows }: { rows: RequestRow[] }) {
                                     type="button"
                                     disabled={pending}
                                     onClick={() => start(async () => { await setHotelRequestStatus(row.id, next) })}
-                                    className="min-h-11 rounded-full bg-[#00D7FF] px-4 text-xs font-medium text-[#061018] transition-transform duration-150 active:scale-[0.96]"
+                                    className="min-h-11 rounded-full bg-[#00D7FF] px-4 text-xs font-medium text-[#061018] transition-transform duration-150 ease-out active:scale-[0.96]"
                                 >
-                                    {hotelRequestAdvanceLabel(next)}
+                                    {hotelRequestAdvanceLabel(next, row.type)}
                                 </button>
                             ) : (
                                 <span className="text-xs text-muted-foreground">Done</span>

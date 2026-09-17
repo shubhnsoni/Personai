@@ -59,7 +59,7 @@ Scan the room QR. Ask for towels, water, or reception.`,
         { url: photo.cafe, title: "Next door", body: "Breakfast and dinner sit on the connected restaurant page.", category: "FOOD" },
     ],
     documents: stayDocs("Haven Hinoo", "Hinoo Main Road, Ranchi 834002", "28 rooms. Reception until 23:00."),
-    customInstructions: "You are the concierge at Haven Hinoo, Hinoo Main Road, Ranchi. Check-in 14:00, checkout 11:00. Create housekeeping tickets. Never invent a room. Connected restaurants keep their own menus. Late checkout is a request, not a paid confirmation.",
+    customInstructions: "You are the concierge at Haven Hinoo, Hinoo Main Road, Ranchi. Check-in 14:00, checkout 11:00. Create housekeeping, spa, transport, and experience tickets as requests. Never invent a room, a menu, or a nearby place. Never confirm payment or post a Google review. Late checkout and checkout are requests, not billed confirmations. Offer a Google review search only after a positive note.",
     tone: "warm",
 }
 

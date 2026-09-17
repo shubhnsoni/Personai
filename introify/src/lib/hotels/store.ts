@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { resolveKitRole } from "@/lib/role-alias"
-import { DEFAULT_HOTEL_SERVICES } from "./catalogue"
+import { DEFAULT_HOTEL_SERVICES, defaultHotelExperiences, defaultSpaCatalogue, defaultTransportOptions } from "./catalogue"
 import { departmentForType, type HotelRequestItem, type HotelRequestType } from "./requests"
+import { hotelStayPhase, type HotelStayPhase } from "./stay"
 import { hotelQrTargetPath } from "./paths"
 import { generateHotelQrCode, generateStayToken } from "./qr-code"
 import { normalizeRoomNumber } from "./rooms"
@@ -24,6 +25,11 @@ export type HotelGuestContext = {
     amenities: string[]
     services: string[]
     emergencyContact: string | null
+    locality: string | null
+    stayPhase: HotelStayPhase | null
+    spa: { sku: string; label: string; durationMinutes: number }[]
+    transport: { sku: string; label: string }[]
+    experiences: { sku: string; label: string; summary: string }[]
 }
 
 function parseJsonArray(raw: string | null | undefined): string[] {
@@ -310,7 +316,18 @@ export async function loadHotelGuestContext(profileId: string, roomNumber?: stri
         amenities: parseJsonArray(property.amenitiesJson),
         services: parseJsonArray(property.servicesJson),
         emergencyContact: property.emergencyContact,
+        locality: localityFromAddress(property.address),
+        stayPhase: hotelStayPhase({ arrival: stay?.arrival, departure: stay?.departure }),
+        spa: defaultSpaCatalogue(),
+        transport: defaultTransportOptions(),
+        experiences: defaultHotelExperiences(),
     }
+}
+
+function localityFromAddress(address?: string | null) {
+    if (!address) return null
+    if (/\bRanchi\b/i.test(address)) return "Ranchi"
+    return null
 }
 
 export async function createHotelStay(profileId: string, input: { guestName?: string; roomId?: string; arrival?: Date; departure?: Date }) {

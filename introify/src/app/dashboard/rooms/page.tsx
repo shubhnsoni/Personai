@@ -22,7 +22,10 @@ export default async function HotelRoomsPage() {
     return (
         <div className="space-y-4">
             <StudioPageHead kicker="Hotel" title="Rooms" hint="Room numbers become /{slug}/r/{number} with a stored QR." />
-            <HotelRoomsStudio rooms={rooms.map((row) => ({ id: row.id, number: row.number, floor: row.floor, category: row.category, isActive: row.isActive }))} />
+            <HotelRoomsStudio
+                slug={profile.slug}
+                rooms={rooms.map((row) => ({ id: row.id, number: row.number, floor: row.floor, category: row.category, isActive: row.isActive }))}
+            />
         </div>
     )
 }
