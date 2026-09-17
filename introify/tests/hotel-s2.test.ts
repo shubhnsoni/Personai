@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { encodeQr } from "@/lib/qr-encode"
 import {
     hotelConciergeChips,
+    hotelSuggestedReplies,
     hotelRequestAdvanceLabel,
     hotelRequestStatusLabel,
     nextHotelRequestStatus,
@@ -57,6 +58,54 @@ describe("hotel S2 room-context chips", () => {
         expect(chips.find((chip) => chip.id === "wifi")?.label).toBe("Wi-Fi · 101")
         expect(chips.find((chip) => chip.id === "food")?.label).toBe("Food · 101")
         expect(chips.find((chip) => chip.id === "reception")?.label).toBe("Reception · 101")
+    })
+})
+
+describe("hotel suggested replies vs welcome catalog", () => {
+    it("moves room-QR actions into suggested replies and drops the Room chip", () => {
+        const replies = hotelSuggestedReplies("101")
+        expect(replies.map((chip) => chip.id)).toEqual([
+            "housekeeping",
+            "maintenance",
+            "wifi",
+            "food",
+            "spa",
+            "transport",
+            "experiences",
+            "reception",
+            "emergency",
+        ])
+        expect(replies.some((chip) => chip.id === "room")).toBe(false)
+        expect(replies.find((chip) => chip.id === "housekeeping")).toMatchObject({
+            label: "Towels",
+            prompt: "Two towels for room 101",
+        })
+        expect(replies.find((chip) => chip.id === "maintenance")).toMatchObject({
+            label: "Fix",
+            prompt: "AC is broken in room 101",
+        })
+        const source = hotelConciergeChips("101")
+        for (const reply of replies) {
+            expect(source.find((chip) => chip.id === reply.id)?.prompt).toBe(reply.prompt)
+        }
+    })
+
+    it("keeps phase-aware suggested replies without a Room fake action", () => {
+        expect(hotelSuggestedReplies(null, { phase: "pre_arrival" }).map((chip) => chip.id)).toEqual([
+            "transport",
+            "experiences",
+            "food",
+            "reception",
+        ])
+        expect(hotelSuggestedReplies(null, { phase: "after" }).map((chip) => chip.id)).toEqual([
+            "feedback",
+            "food",
+            "reception",
+        ])
+        const leaving = hotelSuggestedReplies("101", { phase: "checkout" })
+        expect(leaving.map((chip) => chip.id)).toEqual(["checkout", "transport", "housekeeping", "reception"])
+        expect(leaving.some((chip) => chip.id === "room")).toBe(false)
+        expect(leaving.find((chip) => chip.id === "checkout")?.prompt).toBe("Ready to checkout of room 101")
     })
 })
 

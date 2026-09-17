@@ -171,10 +171,63 @@ describe("ChatInterface - reduced motion", () => {
         installMatchMedia({ [REDUCE_MOTION]: true })
         renderChat({
             hotelRoom: "101",
-            chips: [{ id: "housekeeping", label: "Towels · 101", prompt: "Two towels for room 101" }],
+            chips: [{ id: "about", label: "About", onSelect: () => {} }],
+            suggestionChips: [{ id: "housekeeping", label: "Towels", prompt: "Two towels for room 101" }],
         })
         expect(document.querySelector("[data-hotel-room-context]")?.textContent).toMatch(/Room 101/)
-        expect(document.querySelector("[data-welcome-chips]")?.textContent).toMatch(/Towels · 101/)
+        expect(document.querySelector("[data-welcome-chips]")?.textContent).toMatch(/About/)
+        expect(document.querySelector("[data-welcome-chips]")?.textContent).not.toMatch(/Towels/)
+        expect(document.querySelector("[data-suggested-replies]")?.textContent).toMatch(/Towels/)
+    })
+
+    it("puts hotel actions in the composer suggested-reply strip before the first message", () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        renderChat({
+            hotelRoom: "101",
+            chips: [{ id: "about", label: "About", onSelect: () => {} }],
+            suggestionChips: [
+                { id: "housekeeping", label: "Towels", prompt: "Two towels for room 101" },
+                { id: "maintenance", label: "Fix", prompt: "AC is broken in room 101" },
+                { id: "emergency", label: "Emergency", prompt: "Emergency" },
+            ],
+        })
+        const welcome = document.querySelector("[data-welcome-chips]")
+        const strip = document.querySelector("[data-suggested-replies]")
+        expect(welcome?.querySelectorAll("[data-slot='chip']")).toHaveLength(1)
+        expect(welcome?.textContent).toMatch(/About/)
+        expect(strip?.textContent).toMatch(/Towels/)
+        expect(strip?.textContent).toMatch(/Fix/)
+        expect(strip?.textContent).toMatch(/Emergency/)
+        expect(strip?.closest("[data-chat-composer]")).toBeTruthy()
+    })
+
+    it("sends the hotel chip prompt, not the short label, from a suggested reply", () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        renderChat({
+            hotelRoom: "101",
+            chips: [{ id: "about", label: "About", onSelect: () => {} }],
+            suggestionChips: [{ id: "housekeeping", label: "Towels", prompt: "Two towels for room 101" }],
+        })
+        fireEvent.click(document.querySelector("[data-suggested-replies] [data-slot='chip']") as HTMLButtonElement)
+        act(() => {
+            vi.advanceTimersByTime(1)
+        })
+        expect(document.body.textContent).toContain("Two towels for room 101")
+        const visitor = document.querySelector('[data-chat-bubble="visitor"]')
+        expect(visitor?.textContent).toBe("Two towels for room 101")
+    })
+
+    it("keeps other kits' welcome chips in the front catalog, not the composer strip", () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        renderChat({
+            chips: [
+                { id: "shop", label: "Menu", href: "/ada/menu" },
+                { id: "about", label: "About", onSelect: () => {} },
+            ],
+        })
+        expect(document.querySelector("[data-welcome-chips]")?.textContent).toMatch(/Menu/)
+        expect(document.querySelector("[data-welcome-chips]")?.textContent).toMatch(/About/)
+        expect(document.querySelector("[data-suggested-replies]")).toBeNull()
     })
 
     it("shows the first topic in full, with no caret, when Reduce Motion is on", () => {

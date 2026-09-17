@@ -10,7 +10,7 @@ import { ReserveSheet, type ReserveConfirmLabel } from "@/components/booking/res
 import { bookChip as kitBookChip } from "@/lib/kit-copy"
 import { extrasOf, isDigitalCatalogItem, publicChipAllowed, shopNavLabel } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
-import { hotelConciergeChips } from "@/lib/hotels"
+import { hotelSuggestedReplies } from "@/lib/hotels"
 import { CheckoutSheet, type CheckoutItem } from "@/components/checkout/checkout-sheet"
 import { TipSheet } from "@/components/profile/tip-sheet"
 import { X, Calendar, DollarSign, User, CheckCircle, Briefcase, FolderKanban, Gift, MessageCircle, GraduationCap, UsersRound, Clock3, Images, BedDouble, Wifi, UtensilsCrossed, Phone, Sparkles, Car, MapPinned, LogOut, Star, Wrench, AlertTriangle } from "lucide-react"
@@ -209,7 +209,7 @@ export function ProfileView({ profile, animationConfig, colors, expertiseLinks, 
             openBooking: () => setIsBookingOpen(true),
             openContent: (type) => setActiveContent(type),
             openTip: () => setTipOpen(true),
-        }, hotelRoom, stayPhase),
+        }),
     ].map((chip) => {
         const href = "href" in chip ? chip.href : undefined
         const select = "onSelect" in chip ? chip.onSelect : undefined
@@ -283,6 +283,7 @@ export function ProfileView({ profile, animationConfig, colors, expertiseLinks, 
                         onShowContent={handleShowContent}
                         isPanelOpen={!!activeContent}
                         chips={chips}
+                        suggestionChips={hotel ? hotelComposerChips(hotelRoom, stayPhase) : []}
                         topics={welcomeTopics(profile)}
                         onIntroStage={setIntroStage}
                         headerActions={<ModeToggle />}
@@ -482,6 +483,28 @@ function welcomeTopics(profile: ProfileViewProps["profile"]) {
     return out
 }
 
+function hotelComposerChips(hotelRoom?: string, stayPhase?: ProfileViewProps["stayPhase"]): ChatChip[] {
+    const icons: Record<string, ReactNode> = {
+        housekeeping: <BedDouble className="w-3.5 h-3.5" />,
+        wifi: <Wifi className="w-3.5 h-3.5" />,
+        food: <UtensilsCrossed className="w-3.5 h-3.5" />,
+        reception: <Phone className="w-3.5 h-3.5" />,
+        spa: <Sparkles className="w-3.5 h-3.5" />,
+        transport: <Car className="w-3.5 h-3.5" />,
+        experiences: <MapPinned className="w-3.5 h-3.5" />,
+        checkout: <LogOut className="w-3.5 h-3.5" />,
+        feedback: <Star className="w-3.5 h-3.5" />,
+        maintenance: <Wrench className="w-3.5 h-3.5" />,
+        emergency: <AlertTriangle className="w-3.5 h-3.5" />,
+    }
+    return hotelSuggestedReplies(hotelRoom, { phase: stayPhase }).map((chip) => ({
+        id: chip.id,
+        label: chip.label,
+        prompt: chip.prompt,
+        icon: icons[chip.id],
+    }))
+}
+
 function buildGoalChips(
     profile: ProfileViewProps["profile"],
     actions: {
@@ -489,8 +512,6 @@ function buildGoalChips(
         openContent: (type: Exclude<ContentType, null>) => void
         openTip: () => void
     },
-    hotelRoom?: string,
-    stayPhase?: ProfileViewProps["stayPhase"],
 ): ChatChip[] {
     const name = profile.displayName
     const hasServices = profile.serviceOfferings.some(s => s.isActive)
@@ -633,73 +654,12 @@ function buildGoalChips(
             icon: <UsersRound className="w-3.5 h-3.5" />,
             onSelect: () => actions.openContent("communities"),
         },
-        housekeeping: {
-            id: "housekeeping",
-            label: "Housekeeping",
-            available: false,
-            icon: <BedDouble className="w-3.5 h-3.5" />,
-            prompt: "I need two towels",
-        },
-        wifi: {
-            id: "wifi",
-            label: "Wi-Fi",
-            available: false,
-            icon: <Wifi className="w-3.5 h-3.5" />,
-            prompt: "What's the wifi password?",
-        },
-        food: {
-            id: "food",
-            label: "Food",
-            available: false,
-            icon: <UtensilsCrossed className="w-3.5 h-3.5" />,
-            prompt: "What restaurants can I order from?",
-        },
-        reception: {
-            id: "reception",
-            label: "Reception",
-            available: false,
-            icon: <Phone className="w-3.5 h-3.5" />,
-            prompt: "Talk to reception",
-        },
-        room: {
-            id: "room",
-            label: hotelRoom ? `Room ${hotelRoom}` : "Room",
-            available: false,
-            icon: <BedDouble className="w-3.5 h-3.5" />,
-        },
-    }
-
-    if (resolveKitRole(profile.roleTemplate) === "HOTEL") {
-        const hotelIcons: Record<string, ReactNode> = {
-            room: <BedDouble className="w-3.5 h-3.5" />,
-            housekeeping: <BedDouble className="w-3.5 h-3.5" />,
-            wifi: <Wifi className="w-3.5 h-3.5" />,
-            food: <UtensilsCrossed className="w-3.5 h-3.5" />,
-            reception: <Phone className="w-3.5 h-3.5" />,
-            spa: <Sparkles className="w-3.5 h-3.5" />,
-            transport: <Car className="w-3.5 h-3.5" />,
-            experiences: <MapPinned className="w-3.5 h-3.5" />,
-            checkout: <LogOut className="w-3.5 h-3.5" />,
-            feedback: <Star className="w-3.5 h-3.5" />,
-            maintenance: <Wrench className="w-3.5 h-3.5" />,
-            emergency: <AlertTriangle className="w-3.5 h-3.5" />,
-        }
-        for (const chip of hotelConciergeChips(hotelRoom, { phase: stayPhase })) {
-            catalog[chip.id] = {
-                id: chip.id,
-                label: chip.label,
-                available: true,
-                highlighted: chip.highlighted,
-                prompt: chip.prompt,
-                icon: hotelIcons[chip.id],
-            }
-        }
     }
 
     const kitRole = resolveKitRole(profile.roleTemplate) || profile.roleTemplate || ""
     const orderByKit: Record<string, string[]> = {
         RESTAURANT: ["shop", "about", "book", "wa"],
-        HOTEL: hotelConciergeChips(hotelRoom, { phase: stayPhase }).map((chip) => chip.id),
+        HOTEL: ["about"],
         SHOP: ["shop", "products", "wa", "about"],
         JEWELRY_RETAIL: ["shop", "products", "wa", "about"],
         JEWELRY_WHOLESALE: ["shop", "wa", "about"],

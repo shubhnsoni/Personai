@@ -248,6 +248,41 @@ describe("ProfileView - intro chips follow contentDisplayMode", () => {
         expect(screen.queryByRole("button", { name: "WhatsApp" })).toBeNull()
     })
 
+    it("keeps the hotel welcome calm and puts concierge actions by the composer", () => {
+        render(
+            <ProfileView
+                profile={{
+                    ...PROFILE,
+                    slug: "try-hotel",
+                    displayName: "Haven Hinoo",
+                    roleTemplate: "HOTEL",
+                }}
+                hotelRoom="101"
+                animationConfig={{}}
+                colors={["#52E8FF"]}
+            />,
+        )
+        const welcome = document.querySelector("[data-welcome-chips]")
+        const strip = document.querySelector("[data-suggested-replies]")
+        const welcomeLabels = Array.from(welcome?.querySelectorAll("[data-slot='chip']") ?? []).map(
+            (node) => node.textContent?.trim(),
+        )
+        expect(welcomeLabels.length).toBeLessThanOrEqual(2)
+        expect(welcomeLabels).toContain("About")
+        expect(welcome?.textContent).not.toMatch(/Towels|Fix|Wi-Fi|Spa|Airport|Emergency/)
+        expect(document.querySelector("[data-hotel-room-context]")?.textContent).toMatch(/Room 101/)
+        expect(strip?.closest("[data-chat-composer]")).toBeTruthy()
+        expect(strip?.textContent).toMatch(/Towels/)
+        expect(strip?.textContent).toMatch(/Fix/)
+        expect(strip?.textContent).toMatch(/Wi-Fi/)
+        expect(strip?.textContent).toMatch(/Food/)
+        expect(strip?.textContent).toMatch(/Spa/)
+        expect(strip?.textContent).toMatch(/Airport/)
+        expect(strip?.textContent).toMatch(/Experiences/)
+        expect(strip?.textContent).toMatch(/Reception/)
+        expect(strip?.textContent).toMatch(/Emergency/)
+    })
+
     it("opens About in a drawer with a link to the full about page", () => {
         render(
             <ProfileView

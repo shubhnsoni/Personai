@@ -57,3 +57,13 @@ export function hotelConciergeChips(roomNumber?: string | null, options?: { phas
         { id: "emergency", label: "Emergency", prompt: "Emergency" },
     ]
 }
+
+/** Composer suggested replies. Room is stay context, not an action chip. */
+export function hotelSuggestedReplies(roomNumber?: string | null, options?: { phase?: HotelStayPhase | null }): HotelConciergeChip[] {
+    return hotelConciergeChips(roomNumber, options)
+        .filter((chip) => Boolean(chip.prompt))
+        .map((chip) => ({
+            ...chip,
+            label: chip.label.replace(/\s·\s.+$/, ""),
+        }))
+}

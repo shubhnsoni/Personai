@@ -62,7 +62,7 @@ export {
 } from "./requests"
 export { encodeHotelCard, parseHotelCard, stripHotelCard, type HotelActionCard } from "./cards"
 export { hotelDeskReply, type HotelDeskContext, type HotelDeskResult } from "./desk"
-export { hotelConciergeChips, type HotelConciergeChip } from "./chips"
+export { hotelConciergeChips, hotelSuggestedReplies, type HotelConciergeChip } from "./chips"
 export {
     hotelStayPhase,
     stayFeedbackTone,

@@ -60,6 +60,8 @@ interface ChatInterfaceProps {
     }
     welcome?: ReactNode
     chips?: ChatChip[]
+    /** In-chat suggested replies by the composer (hotel concierge actions). */
+    suggestionChips?: ChatChip[]
     topics?: string[]
     quickQuestions?: string[]
     onShowContent?: (type: "about" | "experience" | "projects" | "services" | "products" | "courses" | "events" | "communities") => void
@@ -78,6 +80,7 @@ type RichContentType = "experience" | "projects" | "about" | "services" | "produ
 export function ChatInterface({
     profile,
     chips = [],
+    suggestionChips = [],
     topics = [],
     quickQuestions = [],
     onShowContent,
@@ -429,11 +432,27 @@ export function ChatInterface({
                     ? "listening"
                     : "idle"
     const lastAssistant = [...messages].reverse().find(m => m.role === "assistant" && m.content)
-    const suggestionPrompts = hasStarted
-        ? (streamSuggestions.length > 0
-            ? streamSuggestions
-            : contextualSuggestions(profile.displayName, lastAssistant ? getRichContent(lastAssistant.content) : null))
-        : []
+    const streamReplyChips: ChatChip[] = streamSuggestions.map((suggestion) => ({
+        id: suggestion,
+        label: suggestion,
+        prompt: suggestion,
+    }))
+    const hotelReplyChips = suggestionChips.filter((chip) => Boolean(chip.prompt))
+    const contextualReplyChips: ChatChip[] = contextualSuggestions(
+        profile.displayName,
+        lastAssistant ? getRichContent(lastAssistant.content) : null,
+    ).map((suggestion) => ({
+        id: suggestion,
+        label: suggestion,
+        prompt: suggestion,
+    }))
+    const composerReplies = hasStarted && streamReplyChips.length > 0
+        ? streamReplyChips
+        : hotelReplyChips.length > 0
+            ? hotelReplyChips
+            : hasStarted
+                ? contextualReplyChips
+                : []
     const primaryChip = chips.find(c => c.highlighted) ?? chips[0]
     const emptyChips = chips.length > 0
         ? chips
@@ -770,24 +789,32 @@ export function ChatInterface({
                             <span className="mt-0.5 block text-profile-mute">They’ll get a ping. If they join, you can chat directly.</span>
                         </button>
                     )}
-                    {hasStarted && !isLoading && chatMode === "AI" && (
-                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                            {liveChatEnabled && (
+                    {!isLoading && chatMode === "AI" && (composerReplies.length > 0 || (hasStarted && liveChatEnabled)) && (
+                        <div
+                            data-suggested-replies
+                            role="group"
+                            aria-label="Suggested replies"
+                            className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1 scrollbar-hide sm:flex-wrap sm:justify-center sm:overflow-x-visible"
+                        >
+                            {hasStarted && liveChatEnabled && (
                                 <Chip
                                     variant="profile"
                                     size="sm"
+                                    className="shrink-0"
                                     highlighted
                                     label={`Talk live`}
                                     onClick={() => void requestLiveChat()}
                                 />
                             )}
-                            {suggestionPrompts.map((suggestion) => (
+                            {composerReplies.map((chip) => (
                                 <Chip
-                                    key={suggestion}
+                                    key={chip.id}
                                     variant="profile"
                                     size="sm"
-                                    label={suggestion}
-                                    onClick={() => playMouthThen(() => handleSubmit(undefined, suggestion))}
+                                    className="shrink-0"
+                                    icon={chip.icon}
+                                    label={chip.label}
+                                    onClick={() => playMouthThen(() => handleChip(chip))}
                                 />
                             ))}
                         </div>
