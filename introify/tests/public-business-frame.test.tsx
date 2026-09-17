@@ -95,6 +95,30 @@ describe("Public business viewport boundary", () => {
         expect(frame.hasAttribute("data-keyboard")).toBe(false)
     })
 
+    it("keeps hotel room and stay chat inside the profile viewport", () => {
+        installViewport()
+        route.pathname = "/custom/r/101"
+        const room = render(contents())
+        const roomFrame = room.container.firstElementChild as HTMLElement
+        expect(roomFrame.hasAttribute("data-profile-viewport")).toBe(true)
+        expect(roomFrame.className).toMatch(/\bh-dvh\b/)
+        expect(roomFrame.style.height).toBe("780px")
+        room.unmount()
+
+        route.pathname = "/custom/stay/haven-demo"
+        const stay = render(contents())
+        const stayFrame = stay.container.firstElementChild as HTMLElement
+        expect(stayFrame.hasAttribute("data-profile-viewport")).toBe(true)
+        expect(stayFrame.className).toMatch(/\bh-dvh\b/)
+        stay.unmount()
+
+        route.pathname = "/custom/menu"
+        const menu = render(contents())
+        const menuFrame = menu.container.firstElementChild as HTMLElement
+        expect(menuFrame.hasAttribute("data-profile-viewport")).toBe(false)
+        expect(menuFrame.className).not.toMatch(/\bh-dvh\b/)
+    })
+
     it("removes both listeners and the measured height on unmount", () => {
         const { dimensions, viewport, add, remove } = installViewport()
         const windowAdd = vi.spyOn(window, "addEventListener")

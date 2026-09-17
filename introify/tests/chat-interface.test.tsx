@@ -201,6 +201,29 @@ describe("ChatInterface - reduced motion", () => {
         expect(strip?.closest("[data-chat-composer]")).toBeTruthy()
     })
 
+    it("keeps suggested replies by the composer without a flex void under the input", () => {
+        installMatchMedia({ [REDUCE_MOTION]: true })
+        renderChat({
+            hotelRoom: "101",
+            chips: [{ id: "about", label: "About", onSelect: () => {} }],
+            suggestionChips: [
+                { id: "housekeeping", label: "Towels", prompt: "Two towels for room 101" },
+                { id: "spa", label: "Spa", prompt: "I'd like a spa massage for room 101" },
+                { id: "emergency", label: "Emergency", prompt: "Emergency" },
+            ],
+        })
+        const strip = document.querySelector("[data-suggested-replies]")
+        const composer = document.querySelector("[data-chat-composer]")
+        expect(strip?.closest("[data-chat-composer]")).toBeTruthy()
+        expect(strip?.className).toMatch(/(?:^|\s)overflow-x-auto(?:\s|$)/)
+        expect(strip?.className).toMatch(/sm:flex-wrap/)
+        expect(composer?.className).toMatch(/\bshrink-0\b/)
+        expect(composer?.className).not.toMatch(/\bflex-1\b/)
+        expect(composer?.className).not.toMatch(/min-h-\[/)
+        expect(composer?.className).toMatch(/\bpb-2\b/)
+        expect(document.querySelector("[data-welcome-chips]")?.querySelectorAll("[data-slot='chip']")).toHaveLength(1)
+    })
+
     it("sends the hotel chip prompt, not the short label, from a suggested reply", () => {
         installMatchMedia({ [REDUCE_MOTION]: true })
         renderChat({

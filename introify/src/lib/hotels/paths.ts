@@ -27,3 +27,13 @@ export function hotelQrTargetPath(input: {
     if (kind === "STAY" && input.stayToken) return hotelStayPath(input.slug, input.stayToken)
     return hotelPropertyPath(input.slug)
 }
+
+/** Property, room, and stay chat share one viewport; catalogues keep normal page scroll. */
+export function isPublicChatViewportPath(pathname: string, profilePath: string): boolean {
+    const path = pathname.replace(/\/$/, "") || "/"
+    const root = profilePath.replace(/\/$/, "") || "/"
+    if (path === root) return true
+    if (!path.startsWith(`${root}/`)) return false
+    const [kind, id, extra] = path.slice(root.length + 1).split("/")
+    return Boolean(id) && !extra && (kind === "r" || kind === "stay")
+}

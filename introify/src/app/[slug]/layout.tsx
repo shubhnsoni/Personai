@@ -91,7 +91,7 @@ export default async function PublicBusinessLayout({ children, params }: { child
             : canHideIntroifyBrand(entitled, profile.personalityConfig)
     )
     const content = <>{children}{profile?.isPublic && !hideBrand && (
-        <footer className="shrink-0 border-t border-border bg-profile px-4 py-3 text-center text-xs text-muted-foreground">
+        <footer className="shrink-0 border-t border-border bg-profile px-4 py-2 text-center text-xs text-muted-foreground">
             Made with <Link href="/" className="font-semibold text-foreground underline-offset-4 hover:underline">Introify</Link>
         </footer>
     )}</>

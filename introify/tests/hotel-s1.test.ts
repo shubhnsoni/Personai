@@ -15,6 +15,7 @@ import {
     hotelRoomPath,
     hotelStayPath,
     isHotelRole,
+    isPublicChatViewportPath,
     nextHotelRequestStatus,
     normalizeRoomNumber,
     parseHotelCard,
@@ -68,6 +69,17 @@ describe("hotel S1 guest routing", () => {
         expect(hotelQrTargetPath({ kind: "PROPERTY", slug: "haven" })).toBe("/haven")
         expect(hotelQrTargetPath({ kind: "ROOM", slug: "haven", roomNumber: "101" })).toBe("/haven/r/101")
         expect(hotelQrTargetPath({ kind: "STAY", slug: "haven", stayToken: "tok" })).toBe("/haven/stay/tok")
+    })
+
+    it("treats property, room, and stay chat as one viewport and leaves catalogues free", () => {
+        expect(isPublicChatViewportPath("/haven", "/haven")).toBe(true)
+        expect(isPublicChatViewportPath("/haven/", "/haven")).toBe(true)
+        expect(isPublicChatViewportPath("/haven/r/101", "/haven")).toBe(true)
+        expect(isPublicChatViewportPath("/haven/stay/haven-demo", "/haven")).toBe(true)
+        expect(isPublicChatViewportPath("/haven/shop", "/haven")).toBe(false)
+        expect(isPublicChatViewportPath("/haven/menu", "/haven")).toBe(false)
+        expect(isPublicChatViewportPath("/haven/r/101/extra", "/haven")).toBe(false)
+        expect(isPublicChatViewportPath("/other/r/101", "/haven")).toBe(false)
     })
 
     it("normalizes room numbers from guest phrasing", () => {

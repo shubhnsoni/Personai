@@ -30,7 +30,7 @@ export {
 } from "./integrations"
 export { hotelSetupChecklist, hotelConciergeIsLive, type HotelSetupItem } from "./setup"
 export { normalizeRoomNumber, extractRoomNumber } from "./rooms"
-export { hotelPropertyPath, hotelRoomPath, hotelStayPath, hotelQrPath, hotelQrTargetPath } from "./paths"
+export { hotelPropertyPath, hotelRoomPath, hotelStayPath, hotelQrPath, hotelQrTargetPath, isPublicChatViewportPath } from "./paths"
 export {
     DEFAULT_HOUSEKEEPING_CATALOGUE,
     DEFAULT_SPA_CATALOGUE,

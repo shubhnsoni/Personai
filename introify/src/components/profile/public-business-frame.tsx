@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 import { PublicBrowserTheme } from "@/components/profile/public-browser-theme"
 import { visualKeyboardOpen } from "@/lib/visual-keyboard"
+import { isPublicChatViewportPath } from "@/lib/hotels/paths"
 import { cn } from "@/lib/utils"
 import "@/components/profile/public-business-frame.css"
 
@@ -14,14 +15,14 @@ export function PublicBusinessFrame({ children, profilePath, theme }: {
     theme: string
 }) {
     const pathname = usePathname()
-    const isProfile = pathname?.replace(/\/$/, "") === profilePath
-    const isBusiness = isProfile || Boolean(pathname?.startsWith(`${profilePath}/`))
+    const isChatViewport = isPublicChatViewportPath(pathname ?? "", profilePath)
+    const isBusiness = isChatViewport || Boolean(pathname?.startsWith(`${profilePath}/`))
     const frameRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         const frame = frameRef.current
         const viewport = window.visualViewport
-        if (!isProfile || !frame || !viewport) return
+        if (!isChatViewport || !frame || !viewport) return
 
         const resize = () => {
             if (visualKeyboardOpen()) frame.setAttribute("data-keyboard", "")
@@ -39,15 +40,15 @@ export function PublicBusinessFrame({ children, profilePath, theme }: {
             frame.style.removeProperty("height")
             frame.removeAttribute("data-keyboard")
         }
-    }, [isProfile])
+    }, [isChatViewport])
 
     return (
         <div
             ref={frameRef}
             data-public-business-theme={theme}
             data-public-browser-theme={isBusiness ? theme : undefined}
-            data-profile-viewport={isProfile ? "" : undefined}
-            className={cn(isBusiness && "bg-profile", isProfile && "flex h-dvh min-h-0 w-full flex-col overflow-hidden")}
+            data-profile-viewport={isChatViewport ? "" : undefined}
+            className={cn(isBusiness && "bg-profile", isChatViewport && "flex h-dvh min-h-0 w-full flex-col overflow-hidden")}
         >
             <PublicBrowserTheme active={isBusiness} theme={theme} frameRef={frameRef} />
             {children}

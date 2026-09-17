@@ -65,6 +65,7 @@ html.dark body:has([data-public-browser-theme="liquid-chrome"]) {
 }
 
 [data-profile-viewport] [data-chat-composer] {
+  flex-grow: 0;
   padding-bottom: 0.5rem;
 }
 
