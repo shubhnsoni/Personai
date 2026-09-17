@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
 import { MobileSidebar } from "@/components/dashboard/mobile-sidebar"
 import { LiveRequestPopup } from "@/components/dashboard/live-request-popup"
+import { StaffBrowserNotifications } from "@/components/dashboard/staff-browser-notifications"
 import { ExitImpersonateButton } from "@/components/admin/admin-actions"
 import { cn } from "@/lib/utils"
 import type { NavCounts } from "@/lib/nav-counts"
@@ -86,6 +87,7 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
                     </div>
                 )}
                 <Header slug={slug} liveHref={liveHref} role={role} extras={extras} hotelStaffRole={hotelStaffRole} onMenuClick={() => setMobileMenuOpen(true)} flushBottom={pathname === "/dashboard/profile"} />
+                <StaffBrowserNotifications />
                 <main
                     className={cn(
                         "min-h-0 flex-1",

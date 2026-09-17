@@ -1,6 +1,6 @@
 import { hotelDesksForRole, type HotelStaffRole } from "./staff"
 
-export type HotelNotifyChannel = "in_app" | "email" | "sms" | "whatsapp"
+export type HotelNotifyChannel = "in_app" | "browser" | "email" | "sms" | "whatsapp"
 
 export type HotelNotifyStep = {
     channel: HotelNotifyChannel
@@ -20,6 +20,7 @@ export function hotelNotifyPlan(input: {
     const emailReady = Boolean(input.emailConfigured && emailTo)
     return [
         { channel: "in_app", department: input.department, stub: false },
+        { channel: "browser", stub: false },
         {
             channel: "email",
             to: emailTo,

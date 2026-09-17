@@ -123,11 +123,12 @@ describe("hotel S5 notifications", () => {
             ownerEmail: "gm@haven.test",
             emailConfigured: false,
         })
-        expect(plan.map((step) => step.channel)).toEqual(["in_app", "email", "sms", "whatsapp"])
+        expect(plan.map((step) => step.channel)).toEqual(["in_app", "browser", "email", "sms", "whatsapp"])
         expect(plan.find((step) => step.channel === "in_app")).toMatchObject({
             department: "HOUSEKEEPING",
             stub: false,
         })
+        expect(plan.find((step) => step.channel === "browser")).toMatchObject({ stub: false })
         expect(plan.find((step) => step.channel === "email")).toMatchObject({
             to: "gm@haven.test",
             stub: true,

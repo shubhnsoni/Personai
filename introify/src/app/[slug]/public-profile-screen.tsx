@@ -4,6 +4,7 @@ import { ProfileView } from "@/components/profile/profile-view"
 import { AdoptOwnedTryKit } from "@/components/profile/adopt-owned-try-kit"
 import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
 import { listShowcaseCreations } from "@/lib/creations"
+import { guestChatExpertise, guestChatHasExpertiseChrome } from "@/lib/guest-chat-expertise"
 import { syncUser } from "@/lib/auth-sync"
 
 export async function PublicProfileScreen({
@@ -67,19 +68,11 @@ export async function PublicProfileScreen({
     const colors = animationConfig.colors || ["#00D7FF", "#07104D"]
     const story = await import("@/app/actions/story").then((m) => m.publishedStoryForSlug(slug))
 
-    const [introductions, frameworkCount, publicKnowledgeCount] = await Promise.all([
-        prisma.profileIntroduction.findMany({
-            where: { profileId: profile.id, status: "PUBLISHED" },
-            select: { id: true, intent: true, text: true },
-            orderBy: { createdAt: "asc" },
-        }),
-        prisma.profileFramework.count({
-            where: { profileId: profile.id, status: "PUBLISHED", scoringApproved: true },
-        }),
-        prisma.profileDocument.count({
-            where: { profileId: profile.id, visibility: "PUBLIC", publicationState: "PUBLISHED", sourceType: { not: "DEMO_SEED" } },
-        }),
-    ])
+    const introductions = await prisma.profileIntroduction.findMany({
+        where: { profileId: profile.id, status: "PUBLISHED" },
+        select: { id: true, intent: true, text: true },
+        orderBy: { createdAt: "asc" },
+    })
     const showcase = await listShowcaseCreations(profile.id)
     const ownerOnTryKit = profile.slug.startsWith("try-")
         && Boolean((await syncUser())?.profiles.some((item) => item.slug === profile.slug))
@@ -97,26 +90,19 @@ export async function PublicProfileScreen({
             ))}
         </div>
     ) : null
-    const expertiseLinks = (introductions.length || frameworkCount || publicKnowledgeCount || showcaseLinks) ? (
+    const expertiseInput = {
+        introductionCount: introductions.length,
+        showcaseCount: showcase.length,
+    }
+    const chrome = guestChatExpertise(expertiseInput)
+    const expertiseLinks = guestChatHasExpertiseChrome(expertiseInput) ? (
         <div className="space-y-2">
-            {introductions.length ? (
+            {chrome.showIntroduction ? (
                 <div className="text-sm text-muted-foreground">
                     {introductions[0]?.text}
                 </div>
             ) : null}
-            {showcaseLinks}
-            <div className="flex flex-wrap gap-1.5">
-                {frameworkCount ? (
-                    <a href={`/${profile.slug}/frameworks`} className="rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium">
-                        Self-assessments ({frameworkCount})
-                    </a>
-                ) : null}
-                {publicKnowledgeCount ? (
-                    <a href={`/${profile.slug}/knowledge`} className="rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium">
-                        Knowledge
-                    </a>
-                ) : null}
-            </div>
+            {chrome.showShowcase ? showcaseLinks : null}
         </div>
     ) : undefined
 
