@@ -113,3 +113,17 @@ export function profileSlugFromPath(pathname: string): string | null {
     if (!slug || isReservedUiLocale(slug) || isReservedSlug(slug)) return null
     return slug
 }
+
+
+/** Guest hotel room path: /{slug}/r/{roomNumber} */
+export function hotelRoomPathParts(pathname: string): { slug: string; room: string } | null {
+    const match = normalizePathname(pathname).match(/^\/([^/]+)\/r\/([^/]+)$/)
+    if (!match) return null
+    const slug = match[1].toLowerCase()
+    let room = match[2]
+    try { room = decodeURIComponent(room) } catch { /* keep raw */ }
+    if (!slug || slug.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return null
+    if (!room || room.length > 32) return null
+    if (APP_ROOT_SEGMENTS.has(slug)) return null
+    return { slug, room }
+}

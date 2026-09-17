@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { tenantFromHost, subdomainRoute } from "@/lib/subdomain-host";
 import { persistLocaleHomeCookie, uiLocaleRequestHeaders } from "@/lib/ui-locale-request";
 import { DEFAULT_UI_LOCALE, isShippedUiLocale, localeHomePath, UI_LOCALE_COOKIE, type UiLocale, uiLocaleCookieOptions } from "@/lib/ui-locale";
-import { authAliasDestination, deadPublicPath, hiMarketingRewrite, profileSlugFromPath } from "@/lib/reserved-http";
+import { authAliasDestination, deadPublicPath, hiMarketingRewrite, hotelRoomPathParts, profileSlugFromPath } from "@/lib/reserved-http";
 import { http404Response } from "@/lib/http-404";
 
 /**
@@ -65,6 +65,42 @@ async function publicSlugExists(origin: string, slug: string, cookie: string) {
     }
     throw lastError instanceof Error ? lastError : new Error("public-slug unreachable")
 }
+const publicHotelRoomCache = new Map<string, { exists: boolean; at: number }>()
+
+async function publicHotelRoomExists(origin: string, slug: string, room: string, cookie: string) {
+    const key = `${slug}::${room}`
+    const cached = publicHotelRoomCache.get(key)
+    if (cached && Date.now() - cached.at < PUBLIC_SLUG_TTL_MS) return cached.exists
+    const bases: string[] = []
+    const push = (v?: string | null) => {
+      const t = (v || "").trim().replace(/\/$/, "")
+      if (t && !bases.includes(t)) bases.push(t)
+    }
+    push(origin)
+    push(process.env.NEXT_PUBLIC_APP_URL)
+    try {
+      const host = new URL(origin).hostname.replace(/^www\./, "")
+      if (host === "introify.com" || host.endsWith(".introify.com")) push("https://introify.com")
+    } catch { /* ignore */ }
+    let lastError: unknown
+    for (const base of bases) {
+      try {
+        const url = new URL("/api/public-hotel-room", base)
+        url.searchParams.set("slug", slug)
+        url.searchParams.set("room", room)
+        const res = await fetch(url, { headers: { cookie }, cache: "no-store" })
+        if (!res.ok) throw new Error(`public-hotel-room HTTP ${res.status}`)
+        const data = (await res.json()) as { exists?: boolean }
+        const exists = Boolean(data.exists)
+        publicHotelRoomCache.set(key, { exists, at: Date.now() })
+        return exists
+      } catch (err) {
+        lastError = err
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error("public-hotel-room unreachable")
+}
+
 
 // Next 16 proxy convention: named proxy (replaces deprecated middleware.ts).
 function apexHostname() {
@@ -85,7 +121,7 @@ function browserLocaleFromAcceptLanguage(acceptLanguage: string | null): UiLocal
 
 export const proxy = clerkMiddleware(async (auth, req) => {
   const pathname = req.nextUrl.pathname
-  if (pathname.startsWith("/api/public-slug") || pathname.startsWith("/http-404")) {
+  if (pathname.startsWith("/api/public-slug") || pathname.startsWith("/api/public-hotel-room") || pathname.startsWith("/http-404")) {
     return persistLocaleHomeCookie(req, NextResponse.next({ request: { headers: uiLocaleRequestHeaders(req) } }))
   }
 
@@ -135,6 +171,26 @@ export const proxy = clerkMiddleware(async (auth, req) => {
     }
   }
 
+  const hotelRoom = hotelRoomPathParts(pathname)
+  if (hotelRoom) {
+    try {
+      const roomOk = await publicHotelRoomExists(
+        req.nextUrl.origin,
+        hotelRoom.slug,
+        hotelRoom.room,
+        req.headers.get("cookie") || "",
+      )
+      if (!roomOk) return persistLocaleHomeCookie(req, http404Response(req.method))
+    } catch {
+      const url = req.nextUrl.clone()
+      url.pathname = "/http-404"
+      url.search = ""
+      url.searchParams.set("slug", hotelRoom.slug)
+      url.searchParams.set("room", hotelRoom.room)
+      url.searchParams.set("from", pathname)
+      return persistLocaleHomeCookie(req, NextResponse.rewrite(url))
+    }
+  }
   const requestHeaders = uiLocaleRequestHeaders(req)
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || ""
   const tenant = tenantFromHost(host, apexHostname())
