@@ -5,6 +5,7 @@ import { HAVEN_HOTEL } from "@/lib/demo-shops/stay"
 import { DEFAULT_HOTEL_KNOWLEDGE, DEFAULT_HOTEL_MAP_MARKERS, HOTEL_KNOWLEDGE_BUCKETS } from "./knowledge"
 import { DEFAULT_HOTEL_SLA_MINUTES } from "./analytics"
 import { DEFAULT_HOTEL_UPSELLS } from "./upsells"
+import { HOTEL_STAFF_ROLES } from "./staff"
 
 export const TRY_HOTEL = {
     slug: "try-hotel",
@@ -37,6 +38,12 @@ export const TRY_HOTEL_S4 = {
     sla: DEFAULT_HOTEL_SLA_MINUTES,
     upsells: DEFAULT_HOTEL_UPSELLS,
     emergencyContact: "112",
+}
+
+export const TRY_HOTEL_S5 = {
+    groupName: "Haven Collection",
+    staffRoles: HOTEL_STAFF_ROLES,
+    whiteLabel: false,
 }
 
 export type SeedRestaurant = { slug: string; roleTemplate: string; isPublic: boolean }
@@ -257,6 +264,8 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
                 mapMarkersJson: JSON.stringify(DEFAULT_HOTEL_MAP_MARKERS),
                 slaJson: JSON.stringify(DEFAULT_HOTEL_SLA_MINUTES),
                 upsellsJson: JSON.stringify(DEFAULT_HOTEL_UPSELLS),
+                groupJson: JSON.stringify({ name: TRY_HOTEL_S5.groupName, hotelProfileIds: [] }),
+                whiteLabel: TRY_HOTEL_S5.whiteLabel,
             },
         })
     }
@@ -361,9 +370,19 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
                 slaJson: JSON.stringify(DEFAULT_HOTEL_SLA_MINUTES),
                 upsellsJson: JSON.stringify(DEFAULT_HOTEL_UPSELLS),
                 staffLanguage: "en",
+                groupJson: JSON.stringify({ name: TRY_HOTEL_S5.groupName, hotelProfileIds: [] }),
+                whiteLabel: TRY_HOTEL_S5.whiteLabel,
             },
         })
     }
+
+    await prisma.hotelProperty.updateMany({
+        where: { profileId, OR: [{ groupJson: "{}" }, { groupJson: "" }] },
+        data: {
+            groupJson: JSON.stringify({ name: TRY_HOTEL_S5.groupName, hotelProfileIds: [] }),
+            whiteLabel: TRY_HOTEL_S5.whiteLabel,
+        },
+    })
 
     let stayToken: string | null = demoStay?.profileId === profileId ? TRY_HOTEL_S3.stayToken : null
     if (plan.needStay) {

@@ -14,6 +14,7 @@ import Link from "@/components/navigation/transition-link"
 import { Logo } from "@/components/brand/logo"
 import { StudioSignOut } from "@/components/dashboard/studio-sign-out"
 import { BusinessSwitcher, type BusinessOption } from "./business-switcher"
+import type { HotelStaffRole } from "@/lib/hotels"
 
 interface MobileSidebarProps {
     open: boolean
@@ -21,11 +22,12 @@ interface MobileSidebarProps {
     counts?: NavCounts
     role?: string | null
     extras?: import("@/lib/surfaces").SurfaceExtras | null
+    hotelStaffRole?: HotelStaffRole | null
     businesses?: BusinessOption[]
     activeProfileId?: string
 }
 
-export function MobileSidebar({ open, onOpenChange, counts, role, extras, businesses, activeProfileId }: MobileSidebarProps) {
+export function MobileSidebar({ open, onOpenChange, counts, role, extras, hotelStaffRole, businesses, activeProfileId }: MobileSidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
 
@@ -54,7 +56,7 @@ export function MobileSidebar({ open, onOpenChange, counts, role, extras, busine
                         </Link>
                     ) : null}
                     <div className="grid grid-cols-2 gap-2.5">
-                        {visibleNavItems(role, extras).map((item) => {
+                        {visibleNavItems(role, extras, hotelStaffRole).map((item) => {
                             const active = isActivePath(pathname, item)
                             const stat = counts ? countForHref(counts, item.href) : null
                             const value = stat?.value ?? 0

@@ -8,6 +8,9 @@ import { cookies } from "next/headers"
 import { IMPERSONATE_COOKIE } from "@/lib/admin/impersonate"
 import { userIsAdmin } from "@/lib/admin/allowlist"
 import { parseLinkStyle, publicShopUrl } from "@/lib/public-url"
+import { isHotelRole } from "@/lib/hotels"
+import { loadHotelStaffRole } from "@/lib/hotels/desk-access"
+import { prisma } from "@/lib/prisma"
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +31,22 @@ export default async function DashboardLayout({
 
     const counts = await getNavCounts(user.activeProfile.id).catch(() => emptyNavCounts)
     const impersonating = userIsAdmin(user) && Boolean((await cookies()).get(IMPERSONATE_COOKIE)?.value)
+    let hotelStaffRole: import("@/lib/hotels").HotelStaffRole | null = null
+    if (isHotelRole(user.activeProfile.roleTemplate)) {
+        const property = await prisma.hotelProperty.findUnique({
+            where: { profileId: user.activeProfile.id },
+            select: { staffJson: true },
+        })
+        const access = user.profileAccess[user.activeProfile.id]
+        hotelStaffRole = await loadHotelStaffRole({
+            userId: user.id,
+            profileId: user.activeProfile.id,
+            profileUserId: user.activeProfile.userId,
+            workspaceRole: access?.role,
+            owner: access?.owner,
+            staffJson: property?.staffJson,
+        })
+    }
 
     return (
         <DashboardLayoutClient
@@ -41,6 +60,7 @@ export default async function DashboardLayout({
             extras={extrasOf(user.activeProfile)}
             impersonating={impersonating}
             isAdmin={userIsAdmin(user)}
+            hotelStaffRole={hotelStaffRole}
         >
             {children}
         </DashboardLayoutClient>

@@ -30,12 +30,14 @@ export function HotelKnowledgeStudio({
     markers,
     sla,
     upsells,
+    readOnly = false,
 }: {
     docs: KnowledgeRow[]
     mapImageUrl: string | null
     markers: Marker[]
     sla: Record<string, number>
     upsells: HotelUpsell[]
+    readOnly?: boolean
 }) {
     const [pending, start] = useTransition()
     const [draft, setDraft] = useState({ bucket: "POLICIES", title: "", body: "", guestVisible: true })
@@ -57,6 +59,7 @@ export function HotelKnowledgeStudio({
                                     <p className="text-sm font-medium">{row.title}</p>
                                     <p className="text-xs text-muted-foreground">{row.body}</p>
                                 </div>
+                                {readOnly ? null : (
                                 <button
                                     type="button"
                                     className="min-h-11 rounded-full px-3 text-xs text-muted-foreground transition-transform duration-150 ease-out active:scale-[0.96]"
@@ -67,11 +70,12 @@ export function HotelKnowledgeStudio({
                                 >
                                     Remove
                                 </button>
+                                )}
                             </div>
                         </div>
                     ))}
                 </div>
-                <form
+                {readOnly ? null : <form
                     className="mt-4 space-y-3"
                     onSubmit={(event) => {
                         event.preventDefault()
@@ -109,7 +113,7 @@ export function HotelKnowledgeStudio({
                     <Button type="submit" disabled={pending} className="h-11 min-h-11 rounded-2xl bg-[#00D7FF] text-[#061018] transition-transform duration-150 ease-out active:scale-[0.96]">
                         Save bucket
                     </Button>
-                </form>
+                </form>}
             </StudioPanel>
 
             <StudioPanel className="p-4 md:p-5">
@@ -140,6 +144,7 @@ export function HotelKnowledgeStudio({
                         </div>
                     ))}
                 </div>
+                {readOnly ? null : (
                 <Button
                     type="button"
                     disabled={pending}
@@ -151,6 +156,7 @@ export function HotelKnowledgeStudio({
                 >
                     Save map
                 </Button>
+                )}
             </StudioPanel>
 
             <StudioPanel className="p-4 md:p-5">
@@ -168,6 +174,7 @@ export function HotelKnowledgeStudio({
                         </label>
                     ))}
                 </div>
+                {readOnly ? null : (
                 <Button
                     type="button"
                     disabled={pending}
@@ -179,6 +186,7 @@ export function HotelKnowledgeStudio({
                 >
                     Save SLA
                 </Button>
+                )}
             </StudioPanel>
 
             <StudioPanel className="p-4 md:p-5">
@@ -196,6 +204,7 @@ export function HotelKnowledgeStudio({
                         </label>
                     ))}
                 </div>
+                {readOnly ? null : (
                 <Button
                     type="button"
                     disabled={pending}
@@ -207,6 +216,7 @@ export function HotelKnowledgeStudio({
                 >
                     Save upsells
                 </Button>
+                )}
             </StudioPanel>
         </div>
     )

@@ -1,19 +1,13 @@
 import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
-import { isHotelRole } from "@/lib/hotels"
+import { requireHotelPage } from "@/lib/hotels/desk-access"
 import { StudioPageHead } from "@/components/dashboard/studio-ui"
 import { HotelQrStudio } from "@/components/dashboard/hotel-qr-studio"
 
 export const dynamic = "force-dynamic"
 
 export default async function HotelQrPage() {
-    const user = await syncUser()
-    if (!user) redirect("/sign-in")
-    const profile = user.activeProfile
-    if (!profile) redirect("/onboarding")
-    if (!isHotelRole(profile.roleTemplate)) redirect("/dashboard")
+    const { profile } = await requireHotelPage("qr")
     const h = await headers()
     const host = h.get("x-forwarded-host") || h.get("host") || "localhost:3000"
     const proto = h.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https")

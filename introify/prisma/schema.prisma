@@ -4635,6 +4635,11 @@ model HotelProperty {
   slaJson           String   @default("{}")
   upsellsJson       String   @default("[]")
   staffLanguage     String   @default("en")
+  staffJson         String   @default("[]")
+  groupJson         String   @default("{}")
+  whiteLabel        Boolean  @default(false)
+  webhookUrl        String?
+  integrationsJson  String   @default("{}")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -4756,15 +4761,18 @@ model HotelKnowledge {
 }
 
 model HotelStaffNotice {
-  id        String    @id @default(cuid())
-  profileId String
-  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  requestId String?
-  kind      String
-  title     String
-  body      String
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
+  id         String    @id @default(cuid())
+  profileId  String
+  profile    Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  requestId  String?
+  kind       String
+  title      String
+  body       String
+  department String?
+  channel    String    @default("in_app")
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([profileId, createdAt])
+  @@index([profileId, department])
 }

@@ -10,6 +10,8 @@ import { DEFAULT_HOTEL_KNOWLEDGE, parseHotelMapMarkers, type HotelKnowledgeDoc, 
 import { parseHotelSlaJson, summarizeHotelAnalytics } from "./analytics"
 import { DEFAULT_HOTEL_UPSELLS, parseHotelUpsells } from "./upsells"
 import { detectGuestLanguage, staffNoteFromGuest } from "./language"
+import { hotelEmailCopy, hotelNotifyPlan } from "./notifications"
+import { emailCanSend, sendEmail } from "@/lib/email"
 
 export type HotelGuestContext = {
     profileId: string
@@ -108,6 +110,11 @@ export async function saveHotelProperty(profileId: string, patch: {
     slaJson?: string
     upsellsJson?: string
     staffLanguage?: string
+    staffJson?: string
+    groupJson?: string
+    whiteLabel?: boolean
+    webhookUrl?: string | null
+    integrationsJson?: string
 }) {
     await ensureHotelProperty(profileId)
     return prisma.hotelProperty.update({
@@ -309,15 +316,35 @@ export async function createHotelRequest(input: {
         include: { room: { select: { number: true } } },
     })
     const roomBit = created.room?.number ? `Room ${created.room.number}` : "No room"
+    const title = input.type === "EMERGENCY" ? `Emergency · ${roomBit}` : `${input.type.replace(/_/g, " ")} · ${roomBit}`
+    const body = staffNotes || input.notes || input.type
+    const department = created.department || departmentForType(input.type)
     await prisma.hotelStaffNotice.create({
         data: {
             profileId: input.profileId,
             requestId: created.id,
             kind: input.type === "EMERGENCY" ? "EMERGENCY" : "REQUEST",
-            title: input.type === "EMERGENCY" ? `Emergency · ${roomBit}` : `${input.type.replace(/_/g, " ")} · ${roomBit}`,
-            body: staffNotes || input.notes || input.type,
+            title,
+            body,
+            department,
+            channel: "in_app",
         },
     })
+    const owner = await prisma.profile.findUnique({
+        where: { id: input.profileId },
+        select: { displayName: true, user: { select: { email: true } } },
+    })
+    const plan = hotelNotifyPlan({
+        department,
+        type: input.type,
+        ownerEmail: owner?.user.email,
+        emailConfigured: emailCanSend(),
+    })
+    const emailStep = plan.find((step) => step.channel === "email")
+    if (emailStep && !emailStep.stub && emailStep.to) {
+        const copy = hotelEmailCopy({ title, body, hotelName: owner?.displayName })
+        await sendEmail({ to: emailStep.to, subject: copy.subject, html: `<p>${copy.text.replace(/\n/g, "<br/>")}</p>`, text: copy.text }).catch(() => false)
+    }
     return created
 }
 

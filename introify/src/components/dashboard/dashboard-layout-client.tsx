@@ -12,6 +12,7 @@ import { ExitImpersonateButton } from "@/components/admin/admin-actions"
 import { cn } from "@/lib/utils"
 import type { NavCounts } from "@/lib/nav-counts"
 import { fieldOn, hasSurface, surfaceForPath } from "@/lib/surfaces"
+import { hotelPathAllowed, isHotelRole, type HotelStaffRole } from "@/lib/hotels"
 
 interface DashboardLayoutClientProps {
     children: ReactNode
@@ -25,15 +26,17 @@ interface DashboardLayoutClientProps {
     extras?: import("@/lib/surfaces").SurfaceExtras | null
     impersonating?: boolean
     isAdmin?: boolean
+    hotelStaffRole?: HotelStaffRole | null
 }
 
-export function DashboardLayoutClient({ children, slug, liveHref, name, counts, role, extras, impersonating, isAdmin, businesses, activeProfileId }: DashboardLayoutClientProps) {
+export function DashboardLayoutClient({ children, slug, liveHref, name, counts, role, extras, impersonating, isAdmin, businesses, activeProfileId, hotelStaffRole }: DashboardLayoutClientProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const pathname = usePathname()
     const router = useRouter()
     const surface = surfaceForPath(pathname)
     const blocked = Boolean(surface && role && !hasSurface(role, surface, extras))
         || Boolean(role && pathname.startsWith("/dashboard/lead-magnets") && !fieldOn(role, "shopDigital", extras))
+        || Boolean(isHotelRole(role) && hotelStaffRole && !hotelPathAllowed(pathname, hotelStaffRole))
 
     useEffect(() => {
         if (blocked) router.replace("/dashboard")
@@ -44,13 +47,14 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
 
     return (
         <div className="studio-shell flex h-dvh overflow-hidden">
-            <Sidebar counts={counts} role={role} extras={extras} name={name} slug={slug} />
+            <Sidebar counts={counts} role={role} extras={extras} hotelStaffRole={hotelStaffRole} name={name} slug={slug} />
             <MobileSidebar
                 open={mobileMenuOpen}
                 onOpenChange={setMobileMenuOpen}
                 counts={counts}
                 role={role}
                 extras={extras}
+                hotelStaffRole={hotelStaffRole}
                 businesses={businesses}
                 activeProfileId={activeProfileId}
             />
@@ -81,7 +85,7 @@ export function DashboardLayoutClient({ children, slug, liveHref, name, counts, 
                         <BusinessSwitcher businesses={businesses} activeId={activeProfileId} />
                     </div>
                 )}
-                <Header slug={slug} liveHref={liveHref} role={role} extras={extras} onMenuClick={() => setMobileMenuOpen(true)} flushBottom={pathname === "/dashboard/profile"} />
+                <Header slug={slug} liveHref={liveHref} role={role} extras={extras} hotelStaffRole={hotelStaffRole} onMenuClick={() => setMobileMenuOpen(true)} flushBottom={pathname === "/dashboard/profile"} />
                 <main
                     className={cn(
                         "min-h-0 flex-1",

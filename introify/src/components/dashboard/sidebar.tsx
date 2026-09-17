@@ -27,8 +27,10 @@ import {
     Users,
     BarChart3,
     BookOpen,
+    Building2,
+    Plug,
 } from "lucide-react"
-import { isHotelRole } from "@/lib/hotels"
+import { hotelCanOpen, hotelHrefSurface, isHotelRole, type HotelStaffRole } from "@/lib/hotels"
 
 export type NavItem = { name: string; href: string; icon: typeof LayoutDashboard; prefixes?: string[] }
 
@@ -89,6 +91,8 @@ const HOTEL_NAV: NavItem[] = [
     { name: "Staff", href: "/dashboard/team", icon: Users },
     { name: "Knowledge", href: "/dashboard/knowledge", icon: BookOpen },
     { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+    { name: "Group", href: "/dashboard/group", icon: Building2 },
+    { name: "Integrations", href: "/dashboard/integrations", icon: Plug },
     {
         name: "Chats",
         href: "/dashboard/inbox",
@@ -104,8 +108,18 @@ const HOTEL_NAV: NavItem[] = [
     { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
 ]
 
-export function visibleNavItems(role?: string | null, extras?: import("@/lib/surfaces").SurfaceExtras | null): NavItem[] {
-    if (isHotelRole(role)) return HOTEL_NAV
+export function visibleNavItems(
+    role?: string | null,
+    extras?: import("@/lib/surfaces").SurfaceExtras | null,
+    hotelStaffRole?: HotelStaffRole | null,
+): NavItem[] {
+    if (isHotelRole(role)) {
+        const desk = hotelStaffRole || "OWNER"
+        return HOTEL_NAV.filter((item) => {
+            const surface = hotelHrefSurface(item.href)
+            return !surface || hotelCanOpen(desk, surface)
+        })
+    }
     return sidebarItems
         .filter((item) => {
             const surface = navHrefToSurface(item.href)
@@ -137,11 +151,12 @@ interface SidebarNavProps {
     onLinkClick?: () => void
     role?: string | null
     extras?: import("@/lib/surfaces").SurfaceExtras | null
+    hotelStaffRole?: HotelStaffRole | null
 }
 
-export function SidebarNav({ counts, onLinkClick, role, extras }: SidebarNavProps) {
+export function SidebarNav({ counts, onLinkClick, role, extras, hotelStaffRole }: SidebarNavProps) {
     const pathname = usePathname()
-    const items = visibleNavItems(role, extras)
+    const items = visibleNavItems(role, extras, hotelStaffRole)
 
     return (
         <div className="flex-1 overflow-auto py-3">
@@ -184,12 +199,14 @@ export function Sidebar({
     counts,
     role,
     extras,
+    hotelStaffRole,
     name,
     slug,
 }: {
     counts?: NavCounts
     role?: string | null
     extras?: import("@/lib/surfaces").SurfaceExtras | null
+    hotelStaffRole?: HotelStaffRole | null
     name?: string
     slug?: string
 }) {
@@ -199,7 +216,7 @@ export function Sidebar({
                 <Logo href="/dashboard" size="sm" />
                 <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Studio</span>
             </div>
-            <SidebarNav counts={counts} role={role} extras={extras} />
+            <SidebarNav counts={counts} role={role} extras={extras} hotelStaffRole={hotelStaffRole} />
             <div className="flex items-center gap-2 border-t border-white/8 p-3">
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{name || "Studio"}</p>

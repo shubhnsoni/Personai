@@ -8,9 +8,11 @@ import { HomePulse } from "@/components/dashboard/home-pulse"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { extrasOf, hasSurface } from "@/lib/surfaces"
-import { isHotelRole } from "@/lib/hotels"
+import { filterHotelNotices, hotelCanWrite, isHotelRole } from "@/lib/hotels"
 import { ensureHotelProperty, listLinkedRestaurants } from "@/lib/hotels/store"
+import { loadHotelStaffRole } from "@/lib/hotels/desk-access"
 import { HotelHome } from "@/components/dashboard/hotel-home"
+import { lookupProfileEntitlement } from "@/lib/billing/entitlements"
 import { buildHomeStats } from "@/lib/analytics"
 import { StudioPageHead, StudioPanel, StudioRow } from "@/components/dashboard/studio-ui"
 import { isJewelryKit, isJewelryWholesale } from "@/lib/metal/math"
@@ -33,7 +35,16 @@ export default async function DashboardPage() {
 
     if (isHotelRole(profile.roleTemplate)) {
         const property = await ensureHotelProperty(profile.id, { receptionWhatsapp: profile.whatsapp || undefined, timezone: profile.timezone || undefined })
-        const [rooms, openRequests, restaurants, qrs, notices] = await Promise.all([
+        const access = user.profileAccess[profile.id]
+        const staffRole = await loadHotelStaffRole({
+            userId: user.id,
+            profileId: profile.id,
+            profileUserId: profile.userId,
+            workspaceRole: access?.role,
+            owner: access?.owner,
+            staffJson: property.staffJson,
+        })
+        const [rooms, openRequests, restaurants, qrs, notices, entitled] = await Promise.all([
             prisma.hotelRoom.count({ where: { profileId: profile.id, isActive: true } }),
             prisma.hotelRequest.count({ where: { profileId: profile.id, status: { not: "COMPLETE" } } }),
             listLinkedRestaurants(profile.id).then((rows) => rows.length),
@@ -41,9 +52,11 @@ export default async function DashboardPage() {
             prisma.hotelStaffNotice.findMany({
                 where: { profileId: profile.id },
                 orderBy: { createdAt: "desc" },
-                take: 12,
+                take: 24,
             }),
+            lookupProfileEntitlement(profile.id).then((row) => row.features.customBranding).catch(() => false),
         ])
+        const visibleNotices = filterHotelNotices(notices, staffRole)
         return (
             <HotelHome
                 name={profile.displayName}
@@ -54,7 +67,8 @@ export default async function DashboardPage() {
                 openRequests={openRequests}
                 restaurants={restaurants}
                 qrs={qrs}
-                notices={notices.map((row) => ({
+                isPublic={profile.isPublic}
+                notices={visibleNotices.map((row) => ({
                     id: row.id,
                     kind: row.kind,
                     title: row.title,
@@ -62,6 +76,9 @@ export default async function DashboardPage() {
                     readAt: row.readAt ? row.readAt.toISOString() : null,
                     createdAt: row.createdAt.toISOString(),
                 }))}
+                canEdit={hotelCanWrite(staffRole, "edit")}
+                whiteLabel={property.whiteLabel}
+                whiteLabelEntitled={entitled}
             />
         )
     }

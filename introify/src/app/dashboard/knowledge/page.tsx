@@ -1,32 +1,24 @@
-import { redirect } from "next/navigation"
-import { syncUser } from "@/lib/auth-sync"
 import { prisma } from "@/lib/prisma"
-import { isHotelRole } from "@/lib/hotels"
 import { DEFAULT_HOTEL_SLA_MINUTES, DEFAULT_HOTEL_UPSELLS, parseHotelMapMarkers } from "@/lib/hotels"
 import { parseHotelSlaJson } from "@/lib/hotels/analytics"
 import { parseHotelUpsells } from "@/lib/hotels/upsells"
+import { requireHotelPage } from "@/lib/hotels/desk-access"
 import { StudioPageHead } from "@/components/dashboard/studio-ui"
 import { HotelKnowledgeStudio } from "@/components/dashboard/hotel-knowledge-studio"
 
 export const dynamic = "force-dynamic"
 
 export default async function HotelKnowledgePage() {
-    const user = await syncUser()
-    if (!user) redirect("/sign-in")
-    const profile = user.activeProfile
-    if (!profile) redirect("/onboarding")
-    if (!isHotelRole(profile.roleTemplate)) redirect("/dashboard")
-    const [docs, property] = await Promise.all([
-        prisma.hotelKnowledge.findMany({
-            where: { profileId: profile.id },
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        }),
-        prisma.hotelProperty.findUnique({ where: { profileId: profile.id } }),
-    ])
+    const { profile, property, canWrite } = await requireHotelPage("knowledge")
+    const docs = await prisma.hotelKnowledge.findMany({
+        where: { profileId: profile.id },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    })
     return (
         <div className="space-y-4">
-            <StudioPageHead kicker="Hotel" title="Knowledge" hint="Guest-visible vs staff-only. Map markers, SLA minutes, and upsell prompts — never a charge." />
+            <StudioPageHead kicker="Hotel" title="Knowledge" hint={canWrite ? "Guest-visible vs staff-only. Map markers, SLA minutes, and upsell prompts — never a charge." : "Read-only for this desk."} />
             <HotelKnowledgeStudio
+                readOnly={!canWrite}
                 docs={docs.map((row) => ({
                     id: row.id,
                     bucket: row.bucket,

@@ -8,19 +8,21 @@ import { Button } from "@/components/ui/button"
 import { visibleNavItems } from "@/components/dashboard/sidebar"
 import { StudioSignOut } from "@/components/dashboard/studio-sign-out"
 import { cn } from "@/lib/utils"
+import type { HotelStaffRole } from "@/lib/hotels"
 
 interface HeaderProps {
     slug: string
     liveHref?: string
     role?: string | null
     extras?: import("@/lib/surfaces").SurfaceExtras | null
+    hotelStaffRole?: HotelStaffRole | null
     onMenuClick?: () => void
     flushBottom?: boolean
 }
 
-function titleFor(pathname: string, role?: string | null, extras?: import("@/lib/surfaces").SurfaceExtras | null) {
+function titleFor(pathname: string, role?: string | null, extras?: import("@/lib/surfaces").SurfaceExtras | null, hotelStaffRole?: HotelStaffRole | null) {
     if (pathname === "/dashboard") return "Home"
-    const match = visibleNavItems(role, extras).find((item) => {
+    const match = visibleNavItems(role, extras, hotelStaffRole).find((item) => {
         if (item.href === "/dashboard") return false
         const prefixes = item.prefixes || [item.href]
         return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
@@ -28,9 +30,9 @@ function titleFor(pathname: string, role?: string | null, extras?: import("@/lib
     return match?.name ?? "Studio"
 }
 
-export function Header({ slug, liveHref, role, extras, onMenuClick, flushBottom }: HeaderProps) {
+export function Header({ slug, liveHref, role, extras, hotelStaffRole, onMenuClick, flushBottom }: HeaderProps) {
     const pathname = usePathname()
-    const title = titleFor(pathname, role, extras)
+    const title = titleFor(pathname, role, extras, hotelStaffRole)
     const home = pathname === "/dashboard"
     const href = liveHref || `/${slug}`
 

@@ -37,8 +37,9 @@ function deskOf(row: RequestRow) {
     return row.department || row.type
 }
 
-export function HotelRequestsBoard({ rows, sla }: { rows: RequestRow[]; sla?: Record<string, number> }) {
-    const [dept, setDept] = useState<(typeof FILTERS)[number]>("ALL")
+export function HotelRequestsBoard({ rows, sla, lockedDesk }: { rows: RequestRow[]; sla?: Record<string, number>; lockedDesk?: string | null }) {
+    const deskFilters = lockedDesk ? ([lockedDesk] as unknown as typeof FILTERS) : FILTERS
+    const [dept, setDept] = useState<(typeof FILTERS)[number]>((lockedDesk as typeof FILTERS[number]) || "ALL")
     const [status, setStatus] = useState<(typeof STATUSES)[number]>("ALL")
     const [pending, start] = useTransition()
     const shown = useMemo(() => rows.filter((row) => {
@@ -50,8 +51,8 @@ export function HotelRequestsBoard({ rows, sla }: { rows: RequestRow[]; sla?: Re
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
-                {FILTERS.map((item) => (
-                    <button key={item} type="button" onClick={() => setDept(item)} className={cn("min-h-11 rounded-full border px-3 text-xs font-medium transition-transform duration-150 ease-out active:scale-[0.96]", dept === item ? "border-cyan-400/60 bg-cyan-400/10" : "border-white/10 text-muted-foreground")}>
+                {deskFilters.map((item) => (
+                    <button key={item} type="button" onClick={() => setDept(item)} disabled={Boolean(lockedDesk)} className={cn("min-h-11 rounded-full border px-3 text-xs font-medium transition-transform duration-150 ease-out active:scale-[0.96]", dept === item ? "border-cyan-400/60 bg-cyan-400/10" : "border-white/10 text-muted-foreground")}>
                         {item === "ALL" ? "All desks" : item.toLowerCase()}
                     </button>
                 ))}

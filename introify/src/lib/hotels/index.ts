@@ -1,4 +1,34 @@
 export { isHotelRole } from "./role"
+export {
+    HOTEL_STAFF_ROLES,
+    HOTEL_DESK_SURFACES,
+    hotelCanOpen,
+    hotelCanWrite,
+    hotelDesksForRole,
+    hotelHrefSurface,
+    hotelPathAllowed,
+    hotelStaffLabel,
+    isHotelStaffRole,
+    mapWorkspaceRoleToHotel,
+    parseHotelStaffJson,
+    resolveHotelStaffRole,
+    type HotelDeskSurface,
+    type HotelStaffAssignment,
+    type HotelStaffRole,
+} from "./staff"
+export { hotelNotifyPlan, hotelEmailCopy, filterHotelNotices, type HotelNotifyChannel, type HotelNotifyStep } from "./notifications"
+export { parseHotelGroupJson, listHotelGroupMembers, type HotelGroupConfig, type HotelGroupHotel } from "./groups"
+export { hotelHidesIntroifyChrome, hotelGuestPathsUnchanged } from "./white-label"
+export {
+    HOTEL_INTEGRATION_ADAPTERS,
+    parseHotelIntegrations,
+    hotelWebhookReady,
+    stubPms,
+    stubPos,
+    stubWhatsApp,
+    type HotelIntegrationStatus,
+} from "./integrations"
+export { hotelSetupChecklist, hotelConciergeIsLive, type HotelSetupItem } from "./setup"
 export { normalizeRoomNumber, extractRoomNumber } from "./rooms"
 export { hotelPropertyPath, hotelRoomPath, hotelStayPath, hotelQrPath, hotelQrTargetPath } from "./paths"
 export {

@@ -1,17 +1,11 @@
-import { redirect } from "next/navigation"
-import { syncUser } from "@/lib/auth-sync"
-import { isHotelRole } from "@/lib/hotels"
 import { loadHotelAnalytics } from "@/lib/hotels/store"
+import { requireHotelPage } from "@/lib/hotels/desk-access"
 import { StudioPageHead, StudioPanel } from "@/components/dashboard/studio-ui"
 
 export const dynamic = "force-dynamic"
 
 export default async function HotelAnalyticsPage() {
-    const user = await syncUser()
-    if (!user) redirect("/sign-in")
-    const profile = user.activeProfile
-    if (!profile) redirect("/onboarding")
-    if (!isHotelRole(profile.roleTemplate)) redirect("/dashboard")
+    const { profile } = await requireHotelPage("analytics")
     const summary = await loadHotelAnalytics(profile.id)
     const departments = Object.entries(summary.volumeByDepartment)
     return (
