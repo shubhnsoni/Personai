@@ -9,6 +9,29 @@ import { ACTIVE_PROFILE_COOKIE, TRY_KITS, TRY_NOW_COOKIE } from "@/lib/try-kits"
 import { seedRole } from "@/lib/try-kit-seed"
 import { userIsAdmin } from "@/lib/admin/allowlist"
 
+const businessCookie = () => ({
+    path: "/",
+    sameSite: "lax" as const,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+})
+
+/** Owner visiting their own try-* kit (Haven Hinoo / try-hotel) keeps it as the dashboard business. Guests are a no-op. */
+export async function adoptOwnedTryKit(slug: string) {
+    const key = slug.trim().toLowerCase()
+    if (!key.startsWith("try-")) return { adopted: false as const }
+    const user = await syncUser()
+    if (!user) return { adopted: false as const }
+    const profile = user.profiles.find((item) => item.slug === key)
+    if (!profile) return { adopted: false as const }
+    const jar = await cookies()
+    const cookie = businessCookie()
+    jar.set(ACTIVE_PROFILE_COOKIE, profile.id, cookie)
+    jar.set(TRY_NOW_COOKIE, "1", cookie)
+    revalidatePath("/dashboard", "layout")
+    return { adopted: true as const }
+}
+
 export async function openTryKit(formData: FormData) {
     const role = String(formData.get("role") || "")
     const user = await syncUser()

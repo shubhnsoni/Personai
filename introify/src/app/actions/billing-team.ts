@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { syncUser } from "@/lib/auth-sync"
 import { getAccountBilling, getProfileBilling, withAccountLimit } from "@/lib/billing/service"
-import { ACTIVE_PROFILE_COOKIE } from "@/lib/try-kits"
+import { ACTIVE_PROFILE_COOKIE, TRY_NOW_COOKIE } from "@/lib/try-kits"
 import { canAccessProfile } from "@/lib/workspace-access"
 
 const WORKSPACE_ROLES = ["ADMIN", "MANAGER", "STAFF", "VIEWER"] as const
@@ -32,9 +32,13 @@ async function requireAccountOwner(accountId: string) {
 
 export async function switchBusiness(profileId: string) {
     const user = await authenticated()
-    if (!user.accessibleProfiles.some((profile) => profile.id === profileId) || !canAccessProfile(user.profileAccess[profileId], "read")) throw new Error("Business access is unavailable.")
+    const target = user.accessibleProfiles.find((profile) => profile.id === profileId)
+    if (!target || !canAccessProfile(user.profileAccess[profileId], "read")) throw new Error("Business access is unavailable.")
     const jar = await cookies()
-    jar.set(ACTIVE_PROFILE_COOKIE, profileId, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" })
+    const cookie = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/" }
+    jar.set(ACTIVE_PROFILE_COOKIE, profileId, cookie)
+    if (target.slug.startsWith("try-")) jar.set(TRY_NOW_COOKIE, "1", cookie)
+    else jar.delete(TRY_NOW_COOKIE)
     revalidatePath("/dashboard", "layout")
 }
 

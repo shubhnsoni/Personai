@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const state = vi.hoisted(() => ({
     syncUser: vi.fn(), account: vi.fn(), member: vi.fn(), invitation: vi.fn(), createInvitation: vi.fn(), updateInvitation: vi.fn(),
     txUser: vi.fn(), txMember: vi.fn(), workspaceCount: vi.fn(), workspaceList: vi.fn(), memberUpsert: vi.fn(), workspaceUpsert: vi.fn(),
-    cookieSet: vi.fn(), cap: 3, used: 1, delta: -1,
+    cookieSet: vi.fn(), cookieDelete: vi.fn(), cap: 3, used: 1, delta: -1,
 }))
 vi.mock("@/lib/auth-sync", () => ({ syncUser: state.syncUser }))
-vi.mock("next/headers", () => ({ cookies: async () => ({ set: state.cookieSet }) }))
+vi.mock("next/headers", () => ({ cookies: async () => ({ set: state.cookieSet, delete: state.cookieDelete }) }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("@/lib/prisma", () => ({ prisma: {
     billingAccount: { findUnique: state.account }, billingAccountMember: { findUnique: state.member },
@@ -107,5 +107,30 @@ describe("account invitations", () => {
     it("does not write an active-business cookie for a forged profile ID", async () => {
         await expect(switchBusiness("foreign-profile")).rejects.toThrow("unavailable")
         expect(state.cookieSet).not.toHaveBeenCalled()
+    })
+    it("keeps an owned try kit as the active business and marks TRY_NOW", async () => {
+        state.syncUser.mockResolvedValue({
+            id: "owner",
+            email: "owner@example.com",
+            accessibleProfiles: [{ id: "hotel", slug: "try-hotel" }],
+            profileAccess: { hotel: { workspaceId: null, role: "OWNER", owner: true, locationIds: [] } },
+        })
+        await switchBusiness("hotel")
+        expect(state.cookieSet).toHaveBeenCalledWith("pl-active-profile", "hotel", expect.objectContaining({ httpOnly: true, path: "/" }))
+        expect(state.cookieSet).toHaveBeenCalledWith("pl-try-now", "1", expect.objectContaining({ httpOnly: true, path: "/" }))
+    })
+    it("clears TRY_NOW when switching back to a non-try business", async () => {
+        state.syncUser.mockResolvedValue({
+            id: "owner",
+            email: "owner@example.com",
+            accessibleProfiles: [{ id: "neal", slug: "neal" }, { id: "hotel", slug: "try-hotel" }],
+            profileAccess: {
+                neal: { workspaceId: null, role: "OWNER", owner: true, locationIds: [] },
+                hotel: { workspaceId: null, role: "OWNER", owner: true, locationIds: [] },
+            },
+        })
+        await switchBusiness("neal")
+        expect(state.cookieSet).toHaveBeenCalledWith("pl-active-profile", "neal", expect.objectContaining({ path: "/" }))
+        expect(state.cookieDelete).toHaveBeenCalledWith("pl-try-now")
     })
 })

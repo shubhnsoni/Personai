@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { ProfileView } from "@/components/profile/profile-view"
+import { AdoptOwnedTryKit } from "@/components/profile/adopt-owned-try-kit"
 import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile-branding"
 import { listShowcaseCreations } from "@/lib/creations"
+import { syncUser } from "@/lib/auth-sync"
 
 export async function PublicProfileScreen({
     slug,
@@ -79,6 +81,8 @@ export async function PublicProfileScreen({
         }),
     ])
     const showcase = await listShowcaseCreations(profile.id)
+    const ownerOnTryKit = profile.slug.startsWith("try-")
+        && Boolean((await syncUser())?.profiles.some((item) => item.slug === profile.slug))
     const showcaseLinks = showcase.length ? (
         <div className="space-y-2">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">AIs on this page</div>
@@ -117,22 +121,25 @@ export async function PublicProfileScreen({
     ) : undefined
 
     return (
-        <ProfileView
-            expertiseLinks={expertiseLinks}
-            hotelRoom={hotelRoom || undefined}
-            stayToken={stayToken || undefined}
-            stayPhase={stayPhase || undefined}
-            profile={{
-                ...profile,
-                hasStory: Boolean(story?.frames.length),
-                events: profile.events.map((event) => ({
-                    ...event,
-                    startTime: event.startTime.toISOString(),
-                    endTime: event.endTime.toISOString(),
-                })),
-            }}
-            animationConfig={animationConfig}
-            colors={colors}
-        />
+        <>
+            {ownerOnTryKit ? <AdoptOwnedTryKit slug={profile.slug} /> : null}
+            <ProfileView
+                expertiseLinks={expertiseLinks}
+                hotelRoom={hotelRoom || undefined}
+                stayToken={stayToken || undefined}
+                stayPhase={stayPhase || undefined}
+                profile={{
+                    ...profile,
+                    hasStory: Boolean(story?.frames.length),
+                    events: profile.events.map((event) => ({
+                        ...event,
+                        startTime: event.startTime.toISOString(),
+                        endTime: event.endTime.toISOString(),
+                    })),
+                }}
+                animationConfig={animationConfig}
+                colors={colors}
+            />
+        </>
     )
 }
