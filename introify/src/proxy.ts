@@ -37,13 +37,33 @@ const PUBLIC_SLUG_TTL_MS = 30_000
 async function publicSlugExists(origin: string, slug: string, cookie: string) {
     const cached = publicSlugCache.get(slug)
     if (cached && Date.now() - cached.at < PUBLIC_SLUG_TTL_MS) return cached.exists
-    const url = new URL("/api/public-slug", origin)
-    url.searchParams.set("slug", slug)
-    const res = await fetch(url, { headers: { cookie }, cache: "no-store" })
-    const data = (await res.json()) as { exists?: boolean }
-    const exists = Boolean(data.exists)
-    publicSlugCache.set(slug, { exists, at: Date.now() })
-    return exists
+    const bases: string[] = []
+    const push = (v?: string | null) => {
+      const t = (v || "").trim().replace(/\/$/, "")
+      if (t && !bases.includes(t)) bases.push(t)
+    }
+    push(origin)
+    push(process.env.NEXT_PUBLIC_APP_URL)
+    try {
+      const host = new URL(origin).hostname.replace(/^www\./, "")
+      if (host === "introify.com" || host.endsWith(".introify.com")) push("https://introify.com")
+    } catch { /* ignore */ }
+    let lastError: unknown
+    for (const base of bases) {
+      try {
+        const url = new URL("/api/public-slug", base)
+        url.searchParams.set("slug", slug)
+        const res = await fetch(url, { headers: { cookie }, cache: "no-store" })
+        if (!res.ok) throw new Error(`public-slug HTTP ${res.status}`)
+        const data = (await res.json()) as { exists?: boolean }
+        const exists = Boolean(data.exists)
+        publicSlugCache.set(slug, { exists, at: Date.now() })
+        return exists
+      } catch (err) {
+        lastError = err
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error("public-slug unreachable")
 }
 
 // Next 16 proxy convention: named proxy (replaces deprecated middleware.ts).
@@ -93,11 +113,25 @@ export const proxy = clerkMiddleware(async (auth, req) => {
 
   const slug = profileSlugFromPath(pathname)
   if (slug) {
+    const gated = req.cookies.get("introify-slug-gate")?.value
+    if (gated === slug) {
+      const res = NextResponse.next({ request: { headers: uiLocaleRequestHeaders(req) } })
+      res.cookies.set("introify-slug-gate", "", { path: "/", maxAge: 0 })
+      return persistLocaleHomeCookie(req, res)
+    }
     try {
       const exists = await publicSlugExists(req.nextUrl.origin, slug, req.headers.get("cookie") || "")
       if (!exists) return persistLocaleHomeCookie(req, http404Response(req.method))
     } catch {
-      // If the existence check fails, the [slug] route still calls notFound().
+      // Hostinger edge often cannot self-fetch /api/public-slug; [slug] notFound()
+      // then renders as HTTP 200 soft-404 behind hcdn. Rewrite to /http-404?slug=
+      // (Node + Prisma). Real profiles get a short-lived gate cookie + redirect back.
+      const url = req.nextUrl.clone()
+      url.pathname = "/http-404"
+      url.search = ""
+      url.searchParams.set("slug", slug)
+      url.searchParams.set("from", pathname)
+      return persistLocaleHomeCookie(req, NextResponse.rewrite(url))
     }
   }
 
