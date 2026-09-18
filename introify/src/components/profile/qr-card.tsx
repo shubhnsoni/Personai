@@ -27,7 +27,7 @@ export function QrCard({
     // Derived, not state: an explicit user pick wins, otherwise the look follows the resolved
     // theme. This replaces the effect that synchronised `look` to resolvedTheme together with the
     // `picked` ref that made that sync one-shot.
-    const look: QrStyle | null = pickedLook ?? (resolvedTheme ? (resolvedTheme === "light" ? "ink" : "cyan") : null)
+    const look: QrStyle | null = pickedLook ?? (resolvedTheme ? (resolvedTheme === "light" ? "clean-print" : "soft-studio") : null)
 
     // Derived, not state: the url only ever depended on `slug` and the browser origin, and it is
     // never rendered into markup (only read by the draw effect and the copy/share handlers), so
@@ -123,7 +123,7 @@ export function QrCard({
                         {src ? (
                             <img src={src} alt={`${name} QR card`} className="block h-auto w-full" />
                         ) : (
-                            <div className="aspect-[5/4] animate-pulse bg-muted" />
+                            <div className="aspect-[3/4] animate-pulse bg-muted" />
                         )}
                     </div>
                 </div>

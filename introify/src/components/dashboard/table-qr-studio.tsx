@@ -118,7 +118,7 @@ export function TableQrStudio({
 
     async function downloadQr(table: TableRow) {
         try {
-            const canvas = await drawQrCard({ url: tableUrl(table.code), name: table.label, style: "ink", size: 1080 })
+            const canvas = await drawQrCard({ url: tableUrl(table.code), name: table.label, style: "clean-print", size: 1080 })
             const a = document.createElement("a")
             a.href = canvas.toDataURL("image/png")
             a.download = `${slug}-${table.label.replace(/\s+/g, "-").toLowerCase()}-qr.png`

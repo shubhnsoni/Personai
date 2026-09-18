@@ -28,7 +28,7 @@ export function HotelQrStudio({
 
     async function download(row: QrRow) {
         try {
-            const canvas = await drawQrCard({ url: dest(row), name: row.label || row.kind, style: "cyan", size: 1080 })
+            const canvas = await drawQrCard({ url: dest(row), name: row.label || row.kind, style: "soft-studio", size: 1080 })
             const a = document.createElement("a")
             a.href = canvas.toDataURL("image/png")
             a.download = `${slug}-${(row.label || row.code).replace(/\s+/g, "-").toLowerCase()}-qr.png`
