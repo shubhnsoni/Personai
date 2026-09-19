@@ -354,6 +354,7 @@ export function RestaurantMenu({
                 })}
             </div>
 
+            {!(cartOpen || nav || custom) ? (
             <div className="pointer-events-none fixed inset-x-3 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-[70] flex items-end gap-2">
                 {cartCount > 0 && !searchOpen ? (
                     <button
@@ -416,9 +417,10 @@ export function RestaurantMenu({
                     </button>
                 </div>
             </div>
+            ) : null}
 
             {nav ? (
-                <div className={cn("fixed inset-0 z-50 p-3", bottomDrawerShellClassName)}>
+                <div className={cn("fixed inset-0 z-[80] p-3", bottomDrawerShellClassName)}>
                     <button type="button" className="absolute inset-0 bg-black/55" onClick={() => setNav(false)} aria-label="Close menu" />
                     <div className="relative z-10 w-full max-h-[72dvh] overflow-auto rounded-[1.6rem] bg-[#171717] p-4 text-white shadow-2xl md:max-w-lg">
                         <div className="mb-2 flex items-center justify-between px-1">
@@ -623,7 +625,7 @@ function CustomizeSheet({
     }
 
     return (
-        <div className={cn("fixed inset-0 z-50", bottomDrawerShellClassName)}>
+        <div className={cn("fixed inset-0 z-[80]", bottomDrawerShellClassName)}>
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
             <div className={cn("relative z-10 w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl", bottomDrawerPanelClassName)}>
                 <div className="sticky top-0 flex items-center justify-between border-b border-border/50 bg-background px-4 py-3">
@@ -830,14 +832,20 @@ function CartSheet({
                 dish: result.lines[0]?.title || "",
             })
         } catch (e) {
-            setError(e instanceof Error ? e.message : "Could not place that order")
+            const raw = e instanceof Error ? e.message : ""
+            // Production RSC failures surface as minified React #441 — never show that to guests.
+            const friendly =
+                !raw || /Minified React error #441|Server Components render/i.test(raw)
+                    ? "Could not place that order. Please try again."
+                    : raw
+            setError(friendly)
         } finally {
             setBusy(false)
         }
     }
 
     return (
-        <div className={cn("fixed inset-0 z-50", bottomDrawerShellClassName)}>
+        <div className={cn("fixed inset-0 z-[80]", bottomDrawerShellClassName)}>
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close cart" />
             <div className={cn("relative z-10 w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl", bottomDrawerPanelClassName)}>
                 <div className="sticky top-0 flex items-center justify-between border-b border-border/50 bg-background px-4 py-3">

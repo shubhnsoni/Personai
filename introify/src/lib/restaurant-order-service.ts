@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto"
 import { Prisma } from "@prisma/client"
 import { prisma } from "./prisma"
+import { resolveKitRole } from "./role-alias"
 import { defaultPrepMinutesFromConfig } from "./payment-qr"
 import {
     businessDateKey,
@@ -102,7 +103,7 @@ export async function createRestaurantOrderRecord(rawInput: CreateRestaurantOrde
                         personalityConfig: true,
                     },
                 })
-                if (!profile || !profile.isPublic || profile.roleTemplate !== "RESTAURANT") {
+                if (!profile || !profile.isPublic || resolveKitRole(profile.roleTemplate) !== "RESTAURANT") {
                     throw new Error("Restaurant not found.")
                 }
 
