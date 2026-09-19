@@ -4,7 +4,9 @@ export type Diet = "VEG" | "NONVEG" | "EGG" | "VEGAN"
 export type ServeWindow = "ALL" | "BREAKFAST" | "LUNCH" | "DINNER"
 
 export function isRestaurant(role?: string | null) {
-    // CAFE / DHABA / CLOUD_KITCHEN alias to RESTAURANT kit surfaces (see role-alias).
+    // Any food-menu flavor that aliases to the RESTAURANT kit (CAFE, DHABA,
+    // CLOUD_KITCHEN, BAKERY, SWEETS, …) gets RestaurantMenu chrome: bottom
+    // search, MENU sheet, and live-orders when the guest has active tickets.
     return resolveKitRole(role) === "RESTAURANT"
 }
 

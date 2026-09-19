@@ -10,6 +10,8 @@ export const ROLE_ALIAS: Record<string, string> = {
     CAFE: "RESTAURANT",
     CLOUD_KITCHEN: "RESTAURANT",
     DHABA: "RESTAURANT",
+    BAKERY: "RESTAURANT",
+    SWEETS: "RESTAURANT",
 
     RESORT: "HOTEL",
     HOSTEL: "HOTEL",
@@ -20,8 +22,6 @@ export const ROLE_ALIAS: Record<string, string> = {
     OPTICS: "SHOP",
     BOUTIQUE: "SHOP",
     FLORIST: "SHOP",
-    BAKERY: "SHOP",
-    SWEETS: "SHOP",
     PRINT_SHOP: "SHOP",
 
     CLINIC: "CONSULTANT",
