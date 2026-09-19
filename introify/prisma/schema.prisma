@@ -305,6 +305,34 @@ model PlatformConfig {
   updatedAt DateTime @updatedAt
 }
 
+enum WhatsappNumberProvider {
+  TWILIO
+}
+
+enum WhatsappNumberStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// Platform Twilio WhatsApp sender numbers. Admin can link/unlink/rotate without redeploy.
+model WhatsappBusinessNumber {
+  id           String                 @id @default(cuid())
+  e164         String                 @unique
+  label        String
+  provider     WhatsappNumberProvider @default(TWILIO)
+  accountSid   String                 @default("")
+  authToken    String                 @default("")
+  /// Twilio WhatsApp From, e.g. "whatsapp:+917970547297"
+  whatsappFrom String                 @default("")
+  status       WhatsappNumberStatus   @default(ACTIVE)
+  isDefault    Boolean                @default(false)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@index([status, isDefault])
+}
+
+
 model AuditEvent {
   id          String   @id @default(cuid())
   actorUserId String

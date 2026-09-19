@@ -374,6 +374,26 @@ async function main() {
 
     await seedShowcaseProfiles(prisma)
 
+    // WhatsApp shop intake S1 — platform Twilio sender
+    const waE164 = '+917970547297'
+    const existingWa = await prisma.whatsappBusinessNumber.findUnique({ where: { e164: waE164 } })
+    if (!existingWa) {
+        const anyDefault = await prisma.whatsappBusinessNumber.findFirst({ where: { isDefault: true } })
+        await prisma.whatsappBusinessNumber.create({
+            data: {
+                e164: waE164,
+                label: 'Introify primary',
+                provider: 'TWILIO',
+                whatsappFrom: `whatsapp:${waE164}`,
+                status: 'ACTIVE',
+                isDefault: !anyDefault,
+            },
+        })
+        console.log(`Seeded WhatsApp business number: ${waE164}`)
+    } else {
+        console.log(`WhatsApp business number already present: ${waE164}`)
+    }
+
     console.log('Seeding finished.')
 }
 

@@ -5,6 +5,7 @@ import {
     LayoutDashboard,
     MessageSquare,
     ScrollText,
+    Phone,
     Sparkles,
     Store,
     Users,
@@ -58,6 +59,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         items: [
             { name: "Billing", href: "/admin/billing", icon: Wallet },
             { name: "AI", href: "/admin/ai", icon: Sparkles },
+            { name: "WhatsApp", href: "/admin/whatsapp", icon: Phone },
             { name: "Capacity", href: "/admin/capacity", icon: Gauge },
             { name: "Audit", href: "/admin/audit", icon: ScrollText },
         ],
