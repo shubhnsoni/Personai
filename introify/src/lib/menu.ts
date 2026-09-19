@@ -1,8 +1,11 @@
+import { resolveKitRole } from "@/lib/role-alias"
+
 export type Diet = "VEG" | "NONVEG" | "EGG" | "VEGAN"
 export type ServeWindow = "ALL" | "BREAKFAST" | "LUNCH" | "DINNER"
 
 export function isRestaurant(role?: string | null) {
-    return role === "RESTAURANT"
+    // CAFE / DHABA / CLOUD_KITCHEN alias to RESTAURANT kit surfaces (see role-alias).
+    return resolveKitRole(role) === "RESTAURANT"
 }
 
 export function catalogLabel(role?: string | null) {
