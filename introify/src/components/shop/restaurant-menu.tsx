@@ -811,6 +811,10 @@ function CartSheet({
                 channel,
                 tableCode: tableCode || undefined,
             })
+            if (!result.ok) {
+                setError(result.error)
+                return
+            }
             const summary = result.lines
                 .map((line) => `${line.qty}× ${line.title}${line.modifiersLabel ? ` (${line.modifiersLabel})` : ""}`)
                 .join("\n")

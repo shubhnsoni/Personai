@@ -52,19 +52,24 @@ function emitOrderEvents(profileId: string, orderId: string, orderNumber: number
     }
 }
 
-function publicPlaceError(error: unknown): never {
-    if (error instanceof Error && !/Invalid `prisma|does not exist in the current database/i.test(error.message)) {
-        throw error
+function publicPlaceErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message && !/Invalid `prisma|does not exist in the current database/i.test(error.message)) {
+        return error.message
     }
-    throw new Error("Could not place that order. Please try again.")
+    return "Could not place that order. Please try again."
 }
 
-export async function createRestaurantOrder(input: CreateRestaurantOrderInput) {
-    let result
+export type PlaceRestaurantOrderResult =
+    | ({ ok: true } & Awaited<ReturnType<typeof createRestaurantOrderRecord>>)
+    | { ok: false; error: string }
+
+/** Guest place-order: never throw opaque RSC digests — return a readable result. */
+export async function createRestaurantOrder(input: CreateRestaurantOrderInput): Promise<PlaceRestaurantOrderResult> {
+    let result: Awaited<ReturnType<typeof createRestaurantOrderRecord>>
     try {
         result = await createRestaurantOrderRecord(input)
     } catch (error) {
-        publicPlaceError(error)
+        return { ok: false, error: publicPlaceErrorMessage(error) }
     }
 
     // A replay is not a new fact, so it must not re-broadcast.
@@ -84,9 +89,13 @@ export async function createRestaurantOrder(input: CreateRestaurantOrderInput) {
         }
     }
 
-    revalidatePath("/dashboard/orders")
-    revalidatePath("/dashboard/money")
-    return result
+    try {
+        revalidatePath("/dashboard/orders")
+        revalidatePath("/dashboard/money")
+    } catch {
+        // Guest menu must not fail because a dashboard cache touch threw.
+    }
+    return { ok: true, ...result }
 }
 
 async function requireOrderOwner() {
