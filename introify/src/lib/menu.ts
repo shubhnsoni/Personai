@@ -11,6 +11,20 @@ export function isRestaurant(role?: string | null) {
     return resolveKitRole(role) === "RESTAURANT"
 }
 
+/**
+ * Whether guest surfaces should auto-create a TABLE service offering.
+ * Menu chrome covers every food alias (including BAKERY/SWEETS), but counter /
+ * pick-up shops sell products — they must not force a dine-in table, especially
+ * when Free-plan offerings are already filled by the product catalog (that throw
+ * becomes React #441 on the public profile home).
+ */
+export function needsGuestTableOffering(role?: string | null, primaryGoal?: string | null) {
+    if (!isRestaurant(role)) return false
+    if (role === "BAKERY" || role === "SWEETS") return false
+    if (primaryGoal === "SELL_PRODUCTS") return false
+    return true
+}
+
 export function catalogLabel(role?: string | null) {
     if (isRestaurant(role)) return "Menu"
     if (role === "JEWELRY_RETAIL") return "Jewellery"

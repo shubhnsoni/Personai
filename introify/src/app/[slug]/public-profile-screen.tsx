@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { isRestaurant } from "@/lib/menu"
+import { needsGuestTableOffering } from "@/lib/menu"
 import { notFound } from "next/navigation"
 import { ProfileView } from "@/components/profile/profile-view"
 import { AdoptOwnedTryKit } from "@/components/profile/adopt-owned-try-kit"
@@ -59,10 +59,17 @@ export async function PublicProfileScreen({
         notFound()
     }
 
-    if (isRestaurant(profile.roleTemplate) && !profile.serviceOfferings.some((s) => (s as { kind?: string }).kind === "TABLE")) {
-        const { ensureTableService } = await import("@/app/actions/bookings")
-        const table = await ensureTableService(profile.id)
-        profile.serviceOfferings = [table, ...profile.serviceOfferings]
+    if (
+        needsGuestTableOffering(profile.roleTemplate, profile.primaryGoal) &&
+        !profile.serviceOfferings.some((s) => (s as { kind?: string }).kind === "TABLE")
+    ) {
+        try {
+            const { ensureTableService } = await import("@/app/actions/bookings")
+            const table = await ensureTableService(profile.id)
+            profile.serviceOfferings = [table, ...profile.serviceOfferings]
+        } catch {
+            // Never take down the guest landing for billing/offering-limit noise.
+        }
     }
 
     const animationConfig = await publicAnimationConfig(profile.id, configuredProfileAnimation(profile))

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { catalogLabel, catalogPath, isRestaurant } from "@/lib/menu"
+import { catalogLabel, catalogPath, isRestaurant, needsGuestTableOffering } from "@/lib/menu"
 
 describe("isRestaurant role alias", () => {
     it("treats RESTAURANT and every food-menu alias as restaurant menus", () => {
@@ -23,5 +23,24 @@ describe("isRestaurant role alias", () => {
         expect(catalogPath("skydine-cafe", "CAFE")).toBe("/skydine-cafe/menu")
         expect(catalogLabel("BAKERY")).toBe("Menu")
         expect(catalogPath("try-bakery", "BAKERY")).toBe("/try-bakery/menu")
+    })
+})
+
+describe("needsGuestTableOffering", () => {
+    it("keeps dine-in food roles on the table-ensure path", () => {
+        expect(needsGuestTableOffering("RESTAURANT", "BOOK_TABLE")).toBe(true)
+        expect(needsGuestTableOffering("CAFE", "BOOK_TABLE")).toBe(true)
+        expect(needsGuestTableOffering("DHABA", "BOOK_TABLE")).toBe(true)
+        expect(needsGuestTableOffering("CLOUD_KITCHEN", "BOOK_TABLE")).toBe(true)
+        expect(needsGuestTableOffering("CAFE", null)).toBe(true)
+    })
+
+    it("skips bakery/sweets counters so Free-plan catalogs do not trip ensureTableService", () => {
+        expect(needsGuestTableOffering("BAKERY", "SELL_PRODUCTS")).toBe(false)
+        expect(needsGuestTableOffering("SWEETS", "SELL_PRODUCTS")).toBe(false)
+        expect(needsGuestTableOffering("BAKERY", "BOOK_TABLE")).toBe(false)
+        expect(needsGuestTableOffering("RESTAURANT", "SELL_PRODUCTS")).toBe(false)
+        expect(needsGuestTableOffering("SHOP", "SELL_PRODUCTS")).toBe(false)
+        expect(needsGuestTableOffering(null, null)).toBe(false)
     })
 })

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { CatalogHeader } from "@/components/shop/catalog-header"
 import { BookList } from "./book-list"
-import { isRestaurant } from "@/lib/menu"
+import { isRestaurant, needsGuestTableOffering } from "@/lib/menu"
 import { ensureTableService } from "@/app/actions/bookings"
 import { Tracker } from "@/components/profile/tracker"
 
@@ -23,13 +23,20 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
     if (!profile || !profile.isPublic) notFound()
 
     const restaurant = isRestaurant(profile.roleTemplate)
-    if (restaurant && !profile.serviceOfferings.some((s) => (s as { kind?: string }).kind === "TABLE")) {
-        await ensureTableService(profile.id)
-        const again = await prisma.serviceOffering.findMany({
-            where: { profileId: profile.id, isActive: true },
-            orderBy: { createdAt: "desc" },
-        })
-        profile.serviceOfferings = again
+    if (
+        needsGuestTableOffering(profile.roleTemplate, profile.primaryGoal) &&
+        !profile.serviceOfferings.some((s) => (s as { kind?: string }).kind === "TABLE")
+    ) {
+        try {
+            await ensureTableService(profile.id)
+            const again = await prisma.serviceOffering.findMany({
+                where: { profileId: profile.id, isActive: true },
+                orderBy: { createdAt: "desc" },
+            })
+            profile.serviceOfferings = again
+        } catch {
+            // Guest /book must still render when offerings are at plan limit.
+        }
     }
 
     const config = await publicAnimationConfig(profile.id, configuredProfileAnimation(profile))
