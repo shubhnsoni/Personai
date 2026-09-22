@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
-import { Download, Plus } from "lucide-react"
+import { Download, Plus, Printer } from "lucide-react"
 import { toast } from "sonner"
 import {
     createRestaurantTable,
@@ -100,6 +100,7 @@ export function TableQrStudio({
     const [addingFloor, setAddingFloor] = useState(false)
     const [pending, start] = useTransition()
     const [openMore, setOpenMore] = useState<string | null>(null)
+    const [printing, setPrinting] = useState(false)
     const base = useMemo(() => origin.replace(/\/$/, ""), [origin])
     const active = tables.filter((table) => table.isActive)
     const reservedCount = active.filter((table) => table.isReserved).length
@@ -129,6 +130,28 @@ export function TableQrStudio({
         }
     }
 
+    async function downloadKit() {
+        setPrinting(true)
+        try {
+            const res = await fetch("/api/restaurant/print-kit", { credentials: "include" })
+            if (!res.ok) {
+                const body = await res.json().catch(() => null) as { error?: string } | null
+                throw new Error(body?.error || "Print kit is not ready")
+            }
+            const blob = await res.blob()
+            const a = document.createElement("a")
+            a.href = URL.createObjectURL(blob)
+            a.download = `${slug}-print-kit.zip`
+            a.click()
+            URL.revokeObjectURL(a.href)
+            toast.success("Saved print package")
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not build the print kit")
+        } finally {
+            setPrinting(false)
+        }
+    }
+
     return (
         <section className="space-y-4">
             {bookings.length ? (
@@ -142,7 +165,7 @@ export function TableQrStudio({
                 </div>
             ) : null}
 
-            <div className="flex items-end justify-between gap-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
                 <p className="text-[13px] text-muted-foreground">
                     <span className="font-medium text-foreground">{active.length}</span> tables
                     <span className="mx-1.5 text-border">·</span>
@@ -150,6 +173,24 @@ export function TableQrStudio({
                     {reservedCount ? <span className="mx-1.5 text-border">·</span> : null}
                     {reservedCount ? `${reservedCount} reserved` : null}
                 </p>
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={printing || active.length === 0}
+                        onClick={() => void downloadKit()}
+                        className="h-8 rounded-full"
+                    >
+                        Download print package
+                    </Button>
+                    <Button asChild variant="ghost" size="sm" className="h-8 rounded-full">
+                        <a href={`/${slug}/print`} target="_blank" rel="noreferrer">
+                            <Printer className="mr-1 h-3.5 w-3.5" />
+                            Guest print
+                        </a>
+                    </Button>
+                </div>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">

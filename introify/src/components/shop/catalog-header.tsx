@@ -1,5 +1,5 @@
 import Link from "@/components/navigation/transition-link"
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, Share2 } from "lucide-react"
 import { ShopWordmark } from "@/components/shop/shop-cover"
 import { whatsappHref } from "@/lib/commerce"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -96,6 +96,13 @@ export function CatalogHeader({
                 ) : null}
                 {compact ? <LiveOrderHeaderButton slug={slug} /> : null}
                 {themeToggle ? <ModeToggle /> : null}
+                <Link
+                    href={`/${slug}/share`}
+                    aria-label={`Share ${name}`}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted"
+                >
+                    <Share2 className="h-4 w-4" />
+                </Link>
                 <Link
                     href={`/${slug}`}
                     aria-label={`Chat with ${name}`}
