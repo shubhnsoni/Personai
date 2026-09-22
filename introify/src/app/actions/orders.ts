@@ -69,6 +69,7 @@ export async function createRestaurantOrder(input: CreateRestaurantOrderInput): 
     try {
         result = await createRestaurantOrderRecord(input)
     } catch (error) {
+        console.error("[place-order]", error)
         return { ok: false, error: publicPlaceErrorMessage(error) }
     }
 

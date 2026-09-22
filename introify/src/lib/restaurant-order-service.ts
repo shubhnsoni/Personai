@@ -153,7 +153,7 @@ export async function createRestaurantOrderRecord(rawInput: CreateRestaurantOrde
 
                 const now = new Date()
                 const dateKey = businessDateKey(profile.timezone, now)
-                const allocated = await tx.$queryRaw<Array<{ value: number }>>`
+                const allocated = await tx.$queryRaw<Array<{ value: number | bigint }>>`
                     INSERT INTO "OrderCounter" ("profileId", "businessDate", "value", "updatedAt")
                     SELECT ${profile.id}, CAST(${dateKey} AS DATE), COALESCE(MAX("number"), 0) + 1, ${now}
                     FROM "Order"
@@ -165,8 +165,23 @@ export async function createRestaurantOrderRecord(rawInput: CreateRestaurantOrde
                         "updatedAt" = EXCLUDED."updatedAt"
                     RETURNING "value"
                 `
-                const number = allocated[0]?.value
-                if (!number || number < 1) throw new Error("Could not allocate an order number.")
+                const number = Number(allocated[0]?.value)
+                if (!Number.isFinite(number) || number < 1) throw new Error("Could not allocate an order number.")
+
+                const defaultMins = defaultPrepMinutesFromConfig(profile.personalityConfig)
+                let minutes = defaultMins
+                const preps = await tx.$queryRaw<Array<{ id: string; prepMinutes: number | null }>>`
+                    SELECT id, "prepMinutes" FROM "DigitalProduct" WHERE id IN (${Prisma.join(productIds)})
+                `.catch(() => [] as Array<{ id: string; prepMinutes: number | null }>)
+                if (preps.length) {
+                    const byId = new Map(preps.map((row) => [row.id, row.prepMinutes]))
+                    minutes = Math.max(
+                        defaultMins,
+                        ...priced.lines.map((line) => byId.get(line.productId) || defaultMins),
+                    )
+                }
+                minutes = Math.max(1, Math.min(90, minutes))
+                const dueAt = new Date(now.getTime() + minutes * 60 * 1000)
 
                 const order = await tx.order.create({
                     data: {
@@ -187,6 +202,7 @@ export async function createRestaurantOrderRecord(rawInput: CreateRestaurantOrde
                         totalCents: priced.totalCents,
                         currency: priced.currency,
                         payMethod: input.payMethod,
+                        dueAt,
                         lines: {
                             create: priced.lines.map((line) => ({
                                 productId: line.productId,
@@ -223,22 +239,6 @@ export async function createRestaurantOrderRecord(rawInput: CreateRestaurantOrde
                         data: { scans: { increment: 1 } },
                     })
                 }
-
-                const defaultMins = defaultPrepMinutesFromConfig(profile.personalityConfig)
-                let minutes = defaultMins
-                const preps = await tx.$queryRaw<Array<{ id: string; prepMinutes: number | null }>>`
-                    SELECT id, "prepMinutes" FROM "DigitalProduct" WHERE id IN (${Prisma.join(productIds)})
-                `.catch(() => [] as Array<{ id: string; prepMinutes: number | null }>)
-                if (preps.length) {
-                    const byId = new Map(preps.map((row) => [row.id, row.prepMinutes]))
-                    minutes = Math.max(
-                        defaultMins,
-                        ...priced.lines.map((line) => byId.get(line.productId) || defaultMins),
-                    )
-                }
-                minutes = Math.max(1, Math.min(90, minutes))
-                const dueAt = new Date(now.getTime() + minutes * 60 * 1000)
-                await tx.$executeRaw`UPDATE "Order" SET "dueAt" = ${dueAt.toISOString()}::timestamptz WHERE id = ${order.id}`
 
                 return { order, replayed: false }
             }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
