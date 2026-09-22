@@ -2,6 +2,7 @@ import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile
 import { resolveThemedOrb } from "@/lib/bloub/catalog"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
+import { ensureTryFoodShowcase, isTryFoodShowcaseSlug } from "@/lib/demo-shops/ensure-try-food"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { CatalogHeader } from "@/components/shop/catalog-header"
 import { ShopCatalog } from "@/components/shop/shop-catalog"
@@ -29,6 +30,9 @@ export default async function ShopPage({
     searchParams?: Promise<{ t?: string | string[] }>
 }) {
     const { slug } = await params
+    if (isTryFoodShowcaseSlug(slug)) {
+        await ensureTryFoodShowcase(prisma, slug)
+    }
     const query = searchParams ? await searchParams : {}
     const rawTableCode = Array.isArray(query.t) ? query.t[0] : query.t
     const requestedTableCode = rawTableCode?.trim().slice(0, 128) || null
