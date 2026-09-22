@@ -55,6 +55,9 @@ function money(cents: number, stored: string | null | undefined, display: Displa
     return formatStoredPrice(cents, stored, display)
 }
 
+/** Phone column on small screens; desktop food-menu shell from lg up. */
+const MENU_SHELL = "mx-auto w-full max-w-lg lg:max-w-5xl"
+
 /** Weak hints only — applied when these names exist on THIS menu, after unknown cats. */
 const CATEGORY_ORDER = [
     "Breakfast & Combos",
@@ -282,7 +285,7 @@ export function RestaurantMenu({
     return (
         <div className="relative bg-background text-foreground">
             <div className="sticky top-14 z-30 border-b border-border/40 bg-background/95 backdrop-blur-md">
-                <div className="mx-auto flex max-w-lg gap-2 overflow-x-auto px-3 py-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className={cn(MENU_SHELL, "flex gap-2 overflow-x-auto px-3 py-2.5 lg:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}>
                     {[
                         { on: veg, set: () => setVeg((v) => !v), label: "Veg" },
                         { on: nonveg, set: () => setNonveg((v) => !v), label: "Non-Veg" },
@@ -308,12 +311,12 @@ export function RestaurantMenu({
                         )
                     })}
                 </div>
-                <div className="mx-auto max-w-lg border-t border-border/40 px-4 py-2 text-[13px] font-semibold tracking-tight">
+                <div className={cn(MENU_SHELL, "border-t border-border/40 px-4 py-2 text-[13px] font-semibold tracking-tight lg:px-6")}>
                     {activeLabel}
                 </div>
             </div>
 
-            <div className="mx-auto max-w-lg space-y-7 px-3 pb-36 pt-3">
+            <div className={cn(MENU_SHELL, "space-y-7 px-3 pb-36 pt-3 lg:px-6")}>
                 {items.some((p) => p.ar) ? (
                     <Link
                         href={`/${slug}/ar`}
@@ -335,7 +338,7 @@ export function RestaurantMenu({
                                 {(() => { const Icon = categoryIcon(sec.label); return <Icon className="h-4 w-4 text-muted-foreground" /> })()}
                                 {sec.label}
                             </h2>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
                                 {rows.map((p) => (
                                     <DishCard
                                         key={`${sec.id}-${p.id}`}
@@ -355,7 +358,7 @@ export function RestaurantMenu({
             </div>
 
             {!(cartOpen || nav || custom) ? (
-            <div className="pointer-events-none fixed inset-x-3 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-[70] flex items-end gap-2">
+            <div className={cn("pointer-events-none fixed inset-x-3 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-[70] flex items-end gap-2 lg:inset-x-0 lg:mx-auto lg:max-w-5xl lg:px-6")}>
                 {cartCount > 0 && !searchOpen ? (
                     <button
                         type="button"
@@ -422,7 +425,7 @@ export function RestaurantMenu({
             {nav ? (
                 <div className={cn("fixed inset-0 z-[80] p-3", bottomDrawerShellClassName)}>
                     <button type="button" className="absolute inset-0 bg-black/55" onClick={() => setNav(false)} aria-label="Close menu" />
-                    <div className="relative z-10 w-full max-h-[72dvh] overflow-auto rounded-[1.6rem] bg-[#171717] p-4 text-white shadow-2xl md:max-w-lg">
+                    <div className="relative z-10 w-full max-h-[72dvh] overflow-auto rounded-[1.6rem] bg-[#171717] p-4 text-white shadow-2xl md:max-w-lg lg:max-w-xl">
                         <div className="mb-2 flex items-center justify-between px-1">
                             <p className="text-[15px] font-semibold text-white">Menu</p>
                             <button type="button" onClick={() => setNav(false)} className="rounded-full p-1 text-zinc-400" aria-label="Close">
@@ -627,7 +630,7 @@ function CustomizeSheet({
     return (
         <div className={cn("fixed inset-0 z-[80]", bottomDrawerShellClassName)}>
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
-            <div className={cn("relative z-10 w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl", bottomDrawerPanelClassName)}>
+            <div className={cn("relative z-10 w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg lg:max-w-xl md:rounded-2xl", bottomDrawerPanelClassName)}>
                 <div className="sticky top-0 flex items-center justify-between border-b border-border/50 bg-background px-4 py-3">
                     <div className="min-w-0">
                         <p className="truncate text-[15px] font-semibold">{item.title}</p>
@@ -851,7 +854,7 @@ function CartSheet({
     return (
         <div className={cn("fixed inset-0 z-[80]", bottomDrawerShellClassName)}>
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close cart" />
-            <div className={cn("relative z-10 w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl", bottomDrawerPanelClassName)}>
+            <div className={cn("relative z-10 w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-h-[min(80dvh,40rem)] md:max-w-lg lg:max-w-xl md:rounded-2xl", bottomDrawerPanelClassName)}>
                 <div className="sticky top-0 flex items-center justify-between border-b border-border/50 bg-background px-4 py-3">
                     <p className="text-[15px] font-semibold">Your order</p>
                     <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground" aria-label="Close">

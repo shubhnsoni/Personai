@@ -28,7 +28,7 @@ function OrdersSheet({
     return (
         <div className={cn("fixed inset-0 z-[80]", bottomDrawerShellClassName)}>
             <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
-            <div className={cn("relative z-[61] w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-w-lg md:rounded-2xl", bottomDrawerPanelClassName)}>
+            <div className={cn("relative z-[61] w-full overflow-auto overscroll-contain rounded-t-[1.6rem] bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:max-w-lg lg:max-w-xl md:rounded-2xl", bottomDrawerPanelClassName)}>
                 <div className="mb-3 flex items-center justify-between">
                     <p className="text-[15px] font-semibold">Your orders</p>
                     <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground" aria-label="Close">
