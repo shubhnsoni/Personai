@@ -46,3 +46,18 @@ export function phonesMatch(a?: string | null, b?: string | null): boolean {
     const lb = last10Digits(b)
     return Boolean(la && lb && la === lb)
 }
+
+
+/**
+ * Canonical digits for wa.me / guest chat prompts.
+ * Always the full E.164 body without "+", never a truncated local display.
+ */
+export function canonicalWhatsAppDigits(raw?: string | null): string | null {
+    const e164 = normalizeE164(raw)
+    if (e164) return e164.slice(1)
+    const d = digitsOnly(raw)
+    if (!d) return null
+    // Prefer full digit strings already stored as wa.me bodies (e.g. 919262268837).
+    if (d.length >= 10 && d.length <= 15) return d.replace(/^00/, "")
+    return null
+}

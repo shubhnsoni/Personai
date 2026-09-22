@@ -1,6 +1,7 @@
 import { kitAbout, waPrefill } from "@/lib/kit-copy"
 import { tryKitByRole } from "@/lib/try-kits"
 import { resolveKitRole } from "@/lib/role-alias"
+import { chatWhatsAppDigits } from "@/lib/chat-catalog"
 
 export type CloneProfile = {
     displayName: string
@@ -150,7 +151,12 @@ export function cloneOperatingPrompt(profile: CloneProfile): string {
         `Primary job: ${goalLine(profile.primaryGoal)}.`,
         ...kitPlaybook(role, name),
         about.headline ? `If they ask what this place is: ${about.headline}. ${about.bio.replace(/\n+/g, " ")}` : "",
-        profile.whatsapp ? `WhatsApp for a human: ${profile.whatsapp}. Prefill "${waPrefill(role, name)}".` : "If there is no WhatsApp in the facts, do not invent a number.",
+        (() => {
+            const wa = chatWhatsAppDigits(profile.whatsapp) || profile.whatsapp
+            return wa
+                ? `WhatsApp for a human: ${wa} (full number — never shorten or drop digits). Prefill "${waPrefill(role, name)}".`
+                : "If there is no WhatsApp in the facts, do not invent a number."
+        })(),
         profile.upiId ? `UPI: ${profile.upiId}.` : "",
         profile.liveChatEnabled
             ? `If they want a person (live chat, human, owner), tell them they can ask for live chat support on this same thread. Do not pretend you are already a human.`

@@ -122,8 +122,69 @@ export function resolveProfileImportRecipe(): ApiRecipe | null {
     return null
 }
 
+function recipeForApprovedModel(provider: AiProvider, mode: AiMode, model: string): ApiRecipe | null {
+    if (!providerKeyReady(provider)) return null
+    const approved = APPROVED_MODELS[provider][mode] as readonly string[]
+    if (!approved.includes(model)) return null
+    return {
+        mode, provider, model,
+        inputBudget: mode === "fast" ? 2000 : 4000,
+        outputBudget: mode === "fast" ? 500 : 1000,
+        inputUsdPerMillion: provider === "codex" ? null : costSetting(`INTROIFY_AI_${mode.toUpperCase()}_INPUT_USD_PER_MTOK`),
+        outputUsdPerMillion: provider === "codex" ? null : costSetting(`INTROIFY_AI_${mode.toUpperCase()}_OUTPUT_USD_PER_MTOK`),
+    }
+}
+
+/** Add the other approved Fast models for providers already selected, so a missing first-choice model can fail over. */
+export function expandProfileImportRecipes(seed: ApiRecipe[]): ApiRecipe[] {
+    if (process.env.INTROIFY_AI_DISABLED === "true") return []
+    const recipes: ApiRecipe[] = []
+    const seen = new Set<string>()
+    const add = (recipe: ApiRecipe | null) => {
+        if (!recipe) return
+        const key = `${recipe.provider}:${recipe.model}`
+        if (seen.has(key)) return
+        seen.add(key)
+        recipes.push(recipe)
+    }
+    for (const recipe of seed) add(recipe)
+    const providers = new Set(recipes.map(recipe => recipe.provider))
+    for (const provider of providers) {
+        for (const model of APPROVED_MODELS[provider].fast) add(recipeForApprovedModel(provider, "fast", model))
+    }
+    return recipes
+}
+
+export function listProfileImportRecipes(): ApiRecipe[] {
+    const seed: ApiRecipe[] = []
+    const seen = new Set<string>()
+    for (const candidate of [resolveProfileImportRecipe(), ...listApiRecipes("fast")]) {
+        if (!candidate) continue
+        const key = `${candidate.provider}:${candidate.model}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        seed.push(candidate)
+    }
+    return expandProfileImportRecipes(seed)
+}
+
+/** After a request is dispatched, only unknown-model / auth failures may move to the next import recipe. */
+export function profileImportFailoverError(error: unknown): boolean {
+    if (error instanceof Error && error.message === "ai_not_configured") return true
+    if (!error || typeof error !== "object") return false
+    const status = "status" in error ? Number(error.status) : NaN
+    return status === 401 || status === 403 || status === 404
+}
+
 export function recipeIsLive(recipe: ApiRecipe): boolean {
-    return listApiRecipes(recipe.mode).some(item => item.provider === recipe.provider && item.model === recipe.model)
+    if (process.env.INTROIFY_AI_DISABLED === "true") return false
+    if (listApiRecipes(recipe.mode).some(item => item.provider === recipe.provider && item.model === recipe.model)) return true
+    if (recipe.mode !== "fast") return false
+    const fallback = resolveProfileImportRecipe()
+    if (!fallback || fallback.provider !== recipe.provider) return false
+    if (fallback.model === recipe.model) return true
+    const approved = APPROVED_MODELS[recipe.provider].fast as readonly string[]
+    return providerKeyReady(recipe.provider) && approved.includes(recipe.model)
 }
 
 /** Auth, outage and network failures can move to the next live provider. Allowance 402 never does. */
@@ -285,6 +346,8 @@ export function boundedChatInput(
     tools: OpenAI.Chat.Completions.ChatCompletionTool[],
 ): OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming {
     const latest = history[history.length - 1]?.content || ""
+    const hasTool = (name: string) => tools.some(tool => tool.type === "function" && tool.function.name === name)
+    const wantsPrice = /\b(price|cost|how much|rates?)\b/i.test(latest)
     const desired = /towel|toiletr|housekeep|bottled water|extra pillow|\b(spa|massage|hot stone|steam and scrub|airport|taxi|scooter|experiences?|lake morning|jagannath|ac not|tv is broken|tap is leaking)\b/i.test(latest) ? "createHotelRequest"
         : /\b(emergency|there's a fire|medical emergency)\b/i.test(latest) ? "raiseHotelEmergency"
         : /\b(where'?s the spa|where is the pool|on the map)\b/i.test(latest) ? "showHotelMap"
@@ -296,6 +359,8 @@ export function boundedChatInput(
         : /\b(local guide|what'?s nearby|things to do)\b/i.test(latest) ? "showHotelLocalGuide"
         : /restaurant|hungry|room service/i.test(latest) ? "showHotelRestaurants"
         : /reserv|table|seat/i.test(latest) ? "bookTable"
+        : wantsPrice && hasTool("showMenu") ? "showMenu"
+        : wantsPrice && hasTool("showProducts") ? "showProducts"
         : /menu|dish|food/i.test(latest) ? "showMenu"
         : /product|buy|stock/i.test(latest) ? "showProducts"
         : /price|service|consult/i.test(latest) ? "showServices"

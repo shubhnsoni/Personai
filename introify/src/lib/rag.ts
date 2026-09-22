@@ -7,6 +7,7 @@ import { resolveKitRole } from "@/lib/role-alias"
 import { goldBoardFromConfig } from "@/lib/metal/board"
 import { formatRatePerGram } from "@/lib/metal/math"
 import { cloneClosingReminder, cloneOperatingPrompt } from "@/lib/clone-identity"
+import { chatWhatsAppDigits, formatChatCatalogPrice } from "@/lib/chat-catalog"
 import { isPrivateChatDocument } from "@/lib/memory-privacy"
 import { canReadKnowledge } from "@/lib/profile-expertise-policy"
 
@@ -54,6 +55,7 @@ interface ProfileWithRelations {
         description: string | null
         type: string
         priceCents: number
+        currency?: string | null
         fulfillment?: string | null
         stock?: number | null
         category?: string | null
@@ -303,6 +305,7 @@ function buildPersonalitySection(personalityConfigStr?: string | null): string {
 export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: ProfileDocument[], currency: DisplayCurrency = "USD"): string {
     const roleDescription = formatRoleTemplate(profile.roleTemplate)
     const role = profile.roleTemplate
+    const kitRole = resolveKitRole(role) || role
     const extras = extrasOf(profile)
     const showServices = hasSurface(role, "services", extras)
     const showShop = hasSurface(role, "shop", extras)
@@ -359,7 +362,7 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
 
     let productsSection = ""
     if (showShop && profile.digitalProducts && profile.digitalProducts.length > 0) {
-        const restaurant = profile.roleTemplate === "RESTAURANT"
+        const restaurant = resolveKitRole(profile.roleTemplate) === "RESTAURANT"
         const productList = profile.digitalProducts.map(p => {
             const kind = p.fulfillment === "PHYSICAL" ? "physical" : p.fulfillment === "BOTH" ? "physical+digital" : p.type
             const stock =
@@ -368,7 +371,8 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
             const diet = p.diet ? ` · ${p.diet}` : ""
             const spice = p.spiceLevel ? ` · spice ${p.spiceLevel}/3` : ""
             const when = p.serveWindow && p.serveWindow !== "ALL" ? ` · ${p.serveWindow}` : ""
-            return `- ${p.title}${cat} (${restaurant ? "dish" : kind}${diet}${spice}${when}): ${formatMoney(p.priceCents, currency)}${stock}${p.description ? ` - ${p.description}` : ""}`
+            const price = restaurant ? formatChatCatalogPrice(p, profile.roleTemplate, currency) : formatMoney(p.priceCents, currency)
+            return `- ${p.title}${cat} (${restaurant ? "dish" : kind}${diet}${spice}${when}): ${price}${stock}${p.description ? ` - ${p.description}` : ""}`
         }).join('\n')
         productsSection = restaurant
             ? `\n## Menu\nNever invent a dish, price, or sold-out status. If they want to order, send them to the menu or WhatsApp. If they want a table, book it with bookTable after you have party size, date, and time.\n${productList}`
@@ -379,7 +383,8 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
             : role === "PHARMACY"
                 ? `\n## Medicines\nThese are physical pharmacy items (tablets, syrups) with batch and expiry — never digital downloads or files. Never invent stock. Send them to the medicines page or WhatsApp to order for pickup.\n${productList}`
             : `\n## Shop\nNever invent stock. If sold out, say so. If they want to buy, send them to the shop or WhatsApp.\n${productList}`
-        if (profile.whatsapp) productsSection += `\nWhatsApp: ${profile.whatsapp}`
+        const waDigits = chatWhatsAppDigits(profile.whatsapp)
+        if (waDigits) productsSection += `\nWhatsApp: ${waDigits}`
         if (profile.upiId) productsSection += `\nUPI: ${profile.upiId}`
     }
 
@@ -447,7 +452,7 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
         roleTemplate: profile.roleTemplate,
         primaryGoal: profile.primaryGoal,
         language: profile.language,
-        whatsapp: profile.whatsapp,
+        whatsapp: chatWhatsAppDigits(profile.whatsapp) || profile.whatsapp,
         upiId: profile.upiId,
         liveChatEnabled: profile.liveChatEnabled,
         headline: profile.headline,
@@ -487,7 +492,7 @@ ${profile.welcomeMessageOverride ? `Welcome message style: "${profile.welcomeMes
 You have access to these functions that you should use when appropriate:
 - collectLead: Use when the visitor shows interest and provides their contact info
 - showStory: ${showStoryDescription(role)}
-${showServices ? "- showServices: Use when asked about rates, booking, or sessions\n" : ""}${showPortfolio ? "- showWorkExperience: Use when asked about background, CV, or work history\n- showProjects: Use when asked about portfolio or past projects\n" : ""}${showShop && role === "RESTAURANT" ? "- showMenu: Use when asked about the menu or dishes\n- bookTable: Use when they want to reserve a table. Never invent an empty table.\n" : ""}${role === "HOTEL" || role === "RESORT" || role === "HOSTEL" || role === "HOMESTAY" || role === "SERVICED_APARTMENT" ? "- createHotelRequest: Use for towels, maintenance, spa, transport, or experiences. Never confirm payment.\n- raiseHotelEmergency: Call-first. Not an ordinary ticket.\n- showHotelMap: Marker card only. Do not invent indoor navigation.\n- showHotelRestaurants: Use for food. Never invent a menu.\n- showHotelSpa / showHotelTransport / showHotelExperiences: Show catalogues. File a request; do not bill.\n- showHotelLocalGuide: Hotel-curated + linked restaurants only. Stay honest if empty.\n- talkToReception: Use when they want a human\n- requestLateCheckout / requestHotelCheckout: Requests only; do not confirm payment or close a bill.\n- submitHotelFeedback: Google review search only after a positive note. Never post a review.\n" : ""}${showShop && role !== "RESTAURANT" ? "- showProducts: Use when asked about products or the shop\n" : ""}${showCourses ? "- showCourses: Use when asked about courses or training\n" : ""}${showEvents ? "- showEvents: Use when asked about events\n- showCommunities: Use when asked about groups\n" : ""}- showLeadMagnets: Use when asked about free resources, guides, or giveaways
+${showServices ? "- showServices: Use when asked about rates, booking, or sessions\n" : ""}${showPortfolio ? "- showWorkExperience: Use when asked about background, CV, or work history\n- showProjects: Use when asked about portfolio or past projects\n" : ""}${showShop && kitRole === "RESTAURANT" ? "- showMenu: Use when asked about the menu, dishes, or a dish price\n- bookTable: Use when they want to reserve a table. Never invent an empty table.\n" : ""}${role === "HOTEL" || role === "RESORT" || role === "HOSTEL" || role === "HOMESTAY" || role === "SERVICED_APARTMENT" ? "- createHotelRequest: Use for towels, maintenance, spa, transport, or experiences. Never confirm payment.\n- raiseHotelEmergency: Call-first. Not an ordinary ticket.\n- showHotelMap: Marker card only. Do not invent indoor navigation.\n- showHotelRestaurants: Use for food. Never invent a menu.\n- showHotelSpa / showHotelTransport / showHotelExperiences: Show catalogues. File a request; do not bill.\n- showHotelLocalGuide: Hotel-curated + linked restaurants only. Stay honest if empty.\n- talkToReception: Use when they want a human\n- requestLateCheckout / requestHotelCheckout: Requests only; do not confirm payment or close a bill.\n- submitHotelFeedback: Google review search only after a positive note. Never post a review.\n" : ""}${showShop && kitRole !== "RESTAURANT" ? "- showProducts: Use when asked about products or the shop\n" : ""}${showCourses ? "- showCourses: Use when asked about courses or training\n" : ""}${showEvents ? "- showEvents: Use when asked about events\n- showCommunities: Use when asked about groups\n" : ""}- showLeadMagnets: Use when asked about free resources, guides, or giveaways
 
 ${cloneClosingReminder(profile.displayName)}`
 }

@@ -9,6 +9,12 @@ import { getMemberFromSession } from "@/lib/members"
 import { generateSuggestions } from "@/lib/suggestions"
 import { maybeSummarizeConversation, visitorKeyFrom } from "@/lib/memory"
 import { formatMoney, type DisplayCurrency } from "@/lib/pricing"
+import {
+    answerCatalogPriceQuestion,
+    chatWhatsAppDigits,
+    compactCatalogFacts,
+    formatChatCatalogPrice,
+} from "@/lib/chat-catalog"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
 import {
@@ -434,10 +440,13 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         const hotelFacts = hotelDesk
             ? await loadHotelGuestContext(profileId, hotelRoom || null, stayToken || null)
             : null
+        const waDigits = chatWhatsAppDigits(profile.whatsapp)
         const facts = JSON.stringify({
             business: profile.displayName,
             headline: profile.headline,
             bio: clipUtf8(profile.bio || "", 250),
+            whatsapp: waDigits || undefined,
+            catalog: compactCatalogFacts(profile.digitalProducts || [], profile.roleTemplate, currency),
             relevantNotes: contextDocs.slice(0, 2).map(doc => ({ title: doc.title, text: clipUtf8(doc.rawText || "", 350) })),
             hotel: hotelFacts ? {
                 room: hotelFacts.roomNumber,
@@ -750,10 +759,11 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         allowedTools.add("showWorkExperience")
         allowedTools.add("showProjects")
     }
-    if (hasSurface(role, "shop", extras) && (role === "RESTAURANT" || extras?.packs?.includes("menuDish") || role === "CUSTOM")) allowedTools.add("showMenu")
+    const foodKit = resolveKitRole(role) === "RESTAURANT"
+    if (hasSurface(role, "shop", extras) && (foodKit || extras?.packs?.includes("menuDish") || role === "CUSTOM")) allowedTools.add("showMenu")
     allowedTools.add("showStory")
-    if (hasSurface(role, "shop", extras) && role !== "RESTAURANT") allowedTools.add("showProducts")
-    if (fieldOn(role, "tableBook", extras)) allowedTools.add("bookTable")
+    if (hasSurface(role, "shop", extras) && !foodKit) allowedTools.add("showProducts")
+    if (fieldOn(role, "tableBook", extras) || foodKit) allowedTools.add("bookTable")
     if (hasSurface(role, "courses", extras)) allowedTools.add("showCourses")
     if (hasSurface(role, "events", extras)) {
         allowedTools.add("showEvents")
@@ -861,7 +871,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             case "showProducts":
             case "showMenu": {
                 const products = profileData.digitalProducts
-                const restaurant = profileData.roleTemplate === "RESTAURANT" || toolName === "showMenu"
+                const restaurant = resolveKitRole(profileData.roleTemplate) === "RESTAURANT" || toolName === "showMenu"
                 if (products.length === 0) {
                     return restaurant
                         ? `${profileData.displayName} hasn't published a menu yet. Ask to book a table or WhatsApp them.`
@@ -876,7 +886,10 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                         p.spiceLevel ? `spice ${p.spiceLevel}/3` : "",
                         p.stock != null && p.stock <= 0 ? "sold out" : "",
                     ].filter(Boolean).join(" · ")
-                    return `- **${p.title}**: ${formatMoney(p.priceCents, currency)}${extras ? ` · ${extras}` : ""}${p.description ? ` — ${p.description}` : ""}`
+                    const price = restaurant
+                        ? formatChatCatalogPrice(p, profileData.roleTemplate, currency)
+                        : formatMoney(p.priceCents, currency)
+                    return `- **${p.title}**: ${price}${extras ? ` · ${extras}` : ""}${p.description ? ` — ${p.description}` : ""}`
                 }).join('\n')
                 return restaurant
                     ? `Here's the menu at ${profileData.displayName}:\n${productList}\n\nWant a table, or should I pick something?`
@@ -898,7 +911,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 const tableService = profileData.serviceOfferings.find((s: { kind?: string }) => s.kind === "TABLE")
                     || profileData.serviceOfferings[0]
                 if (!tableService) {
-                    return `I don't have table bookings open yet. ${profileData.whatsapp ? "WhatsApp us and we'll seat you." : "Ask the restaurant directly."}`
+                    return `I don't have table bookings open yet. ${chatWhatsAppDigits(profileData.whatsapp) ? `WhatsApp us at ${chatWhatsAppDigits(profileData.whatsapp)} and we'll seat you.` : "Ask the restaurant directly."}`
                 }
                 try {
                     const slots = await getAvailableSlots(authorizedProfileId, date, tableService.durationMinutes, {
@@ -1158,6 +1171,15 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
 
     async function restaurantDeskReply(text: string) {
         const t = text.toLowerCase()
+        const priced = answerCatalogPriceQuestion({
+            query: text,
+            items: profileData.digitalProducts || [],
+            roleTemplate: profileData.roleTemplate,
+            requestCurrency: currency,
+            shopName: profileData.displayName,
+            whatsapp: profileData.whatsapp,
+        })
+        if (priced) return priced
         if (/menu|dish|eat|food|hungry|veg|price|what's on|whats on/.test(t)) {
             const n = profileData.digitalProducts.length
             return n

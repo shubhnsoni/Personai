@@ -23,6 +23,12 @@ import { cn } from "@/lib/utils"
 import { bottomDrawerPanelClassName, bottomDrawerShellClassName } from "@/components/ui/sheet"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { categoryIcon } from "@/lib/category-icons"
+import {
+    emptyMenuCopy,
+    filterMenuItems,
+    menuFiltersActive,
+    nextDietFilter,
+} from "@/lib/restaurant-menu-filters"
 
 type Item = {
     id: string
@@ -172,15 +178,19 @@ export function RestaurantMenu({
         } catch { /* ignore */ }
     }, [cart, slug])
 
-    const filtered = (list: Item[]) =>
-        list.filter((p) => {
-            if (q.trim() && !p.title.toLowerCase().includes(q.trim().toLowerCase())) return false
-            if (veg && p.diet !== "VEG" && p.diet !== "VEGAN") return false
-            if (nonveg && p.diet !== "NONVEG" && p.diet !== "EGG") return false
-            if (best && !(p.sold || 0) && !(p.compareAtCents && p.compareAtCents > (p.priceCents || 0))) return false
-            if (rated && (p.rating || 5) < 4) return false
-            return true
-        })
+    const filterState = { q, veg, nonveg, best, rated }
+    const filtered = (list: Item[]) => filterMenuItems(list, filterState)
+    const visibleCount = buckets.reduce((n, sec) => n + filtered(sec.items).length, 0)
+    const filtersOn = menuFiltersActive(filterState)
+    const emptyCopy = emptyMenuCopy(filterState)
+    function clearMenuFilters() {
+        setQ("")
+        setVeg(false)
+        setNonveg(false)
+        setBest(false)
+        setRated(false)
+        setSearchOpen(false)
+    }
 
     useEffect(() => {
         const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-sec]"))
@@ -290,8 +300,8 @@ export function RestaurantMenu({
             <div className="sticky top-14 z-30 border-b border-border/40 bg-background/95 backdrop-blur-md">
                 <div className={cn(MENU_SHELL, "flex gap-2 overflow-x-auto px-3 py-2.5 lg:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}>
                     {[
-                        { on: veg, set: () => setVeg((v) => !v), label: "Veg" },
-                        { on: nonveg, set: () => setNonveg((v) => !v), label: "Non-Veg" },
+                        { on: veg, set: () => { const next = nextDietFilter("veg", { veg, nonveg }); setVeg(next.veg); setNonveg(next.nonveg) }, label: "Veg" },
+                        { on: nonveg, set: () => { const next = nextDietFilter("nonveg", { veg, nonveg }); setVeg(next.veg); setNonveg(next.nonveg) }, label: "Non-Veg" },
                         { on: best, set: () => setBest((v) => !v), label: "Bestsellers" },
                         { on: rated, set: () => setRated((v) => !v), label: "Ratings 4.0+" },
                     ].map((c) => {
@@ -358,6 +368,25 @@ export function RestaurantMenu({
                         </section>
                     )
                 })}
+                {visibleCount === 0 && (filtersOn || items.length === 0) ? (
+                    <div
+                        role="status"
+                        data-empty-menu="true"
+                        className="rounded-[1.25rem] border border-dashed border-border/70 bg-card/60 px-4 py-10 text-center"
+                    >
+                        <p className="text-[17px] font-semibold tracking-tight text-foreground">{emptyCopy.title}</p>
+                        <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">{emptyCopy.detail}</p>
+                        {filtersOn ? (
+                            <button
+                                type="button"
+                                onClick={clearMenuFilters}
+                                className="mt-5 inline-flex items-center justify-center rounded-full border border-emerald-700 bg-emerald-50 px-4 py-2 text-[13px] font-semibold text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950/50 dark:text-emerald-300"
+                            >
+                                {q.trim() ? "Clear search" : "Clear filters"}
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
             </div>
 
             {!(cartOpen || nav || custom) ? (
