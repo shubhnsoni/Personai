@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { isRestaurant } from "@/lib/menu"
 import { notFound } from "next/navigation"
 import { ProfileView } from "@/components/profile/profile-view"
 import { AdoptOwnedTryKit } from "@/components/profile/adopt-owned-try-kit"
@@ -58,7 +59,7 @@ export async function PublicProfileScreen({
         notFound()
     }
 
-    if (profile.roleTemplate === "RESTAURANT" && !profile.serviceOfferings.some((s) => (s as { kind?: string }).kind === "TABLE")) {
+    if (isRestaurant(profile.roleTemplate) && !profile.serviceOfferings.some((s) => (s as { kind?: string }).kind === "TABLE")) {
         const { ensureTableService } = await import("@/app/actions/bookings")
         const table = await ensureTableService(profile.id)
         profile.serviceOfferings = [table, ...profile.serviceOfferings]

@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client"
+import { resolveKitRole } from "@/lib/role-alias"
 
 type Showcase = {
     slug: string
@@ -57,8 +58,8 @@ const SHOWCASES: Showcase[] = [
         displayName: "Little Hours Café",
         headline: "Good coffee. A warmer welcome.",
         bio: "A neighbourhood café. Oat-milk drinks, dairy-free options, and a menu you can read before you order.",
-        roleTemplate: "RESTAURANT",
-        primaryGoal: "WHATSAPP",
+        roleTemplate: "CAFE",
+        primaryGoal: "BOOK_TABLE",
         imageUrl: "/marketing/cafe-owner.png",
         welcome: "Welcome to Little Hours. Ask about the menu, dairy-free drinks, or when we’re open.",
         tone: "warm",
@@ -304,4 +305,133 @@ export async function ensureShowcaseProfiles(prisma: PrismaClient): Promise<Ensu
     }
 
     return { created, skipped }
+}
+
+export const LITTLEHOURS_SLUG = "littlehours" as const
+
+export type LittleHoursAlignAction =
+    | "noop-unrelated"
+    | "noop-missing"
+    | "ok"
+    | "heal-role-goal"
+    | "skip-foreign-role"
+
+export type LittleHoursAlignState = {
+    slug: string
+    profile: { id: string; roleTemplate: string; primaryGoal: string | null; isPublic: boolean } | null
+}
+
+export type LittleHoursAlignPlan = {
+    action: LittleHoursAlignAction
+    slug: string
+    expectedRole: string | null
+    expectedGoal: string | null
+}
+
+/** Expected café flavor for the landing showcase — resolveKitRole(CAFE) → RESTAURANT engine. */
+export function littleHoursExpectedFlavor() {
+    const item = SHOWCASES.find((row) => row.slug === LITTLEHOURS_SLUG)
+    if (!item) {
+        return { roleTemplate: "CAFE", primaryGoal: "BOOK_TABLE" }
+    }
+    return { roleTemplate: item.roleTemplate, primaryGoal: item.primaryGoal }
+}
+
+/** Pure planner for unit tests — heal legacy RESTAURANT·WHATSAPP (and any drift) on visit. */
+export function planLittleHoursAlign(state: LittleHoursAlignState): LittleHoursAlignPlan {
+    if (state.slug !== LITTLEHOURS_SLUG) {
+        return { action: "noop-unrelated", slug: state.slug, expectedRole: null, expectedGoal: null }
+    }
+    const expected = littleHoursExpectedFlavor()
+    if (!state.profile) {
+        return {
+            action: "noop-missing",
+            slug: state.slug,
+            expectedRole: expected.roleTemplate,
+            expectedGoal: expected.primaryGoal,
+        }
+    }
+    if (
+        state.profile.roleTemplate === expected.roleTemplate
+        && state.profile.primaryGoal === expected.primaryGoal
+    ) {
+        return {
+            action: "ok",
+            slug: state.slug,
+            expectedRole: expected.roleTemplate,
+            expectedGoal: expected.primaryGoal,
+        }
+    }
+    const engine = resolveKitRole(state.profile.roleTemplate) || state.profile.roleTemplate
+    if (engine !== "RESTAURANT") {
+        return {
+            action: "skip-foreign-role",
+            slug: state.slug,
+            expectedRole: expected.roleTemplate,
+            expectedGoal: expected.primaryGoal,
+        }
+    }
+    return {
+        action: "heal-role-goal",
+        slug: state.slug,
+        expectedRole: expected.roleTemplate,
+        expectedGoal: expected.primaryGoal,
+    }
+}
+
+export type EnsureLittleHoursResult = {
+    action: LittleHoursAlignAction
+    profileId: string | null
+    roleTemplate: string | null
+    primaryGoal: string | null
+}
+
+/**
+ * Ensure-on-visit for /littlehours: align roleTemplate + primaryGoal to the café showcase.
+ * Never invents credentials or wipes catalog — only heals the two mismatched fields.
+ */
+export async function ensureLittleHoursShowcase(prisma: PrismaClient, slug: string): Promise<EnsureLittleHoursResult> {
+    if (slug !== LITTLEHOURS_SLUG) {
+        return { action: "noop-unrelated", profileId: null, roleTemplate: null, primaryGoal: null }
+    }
+
+    const existing = await prisma.profile.findUnique({
+        where: { slug },
+        select: { id: true, roleTemplate: true, primaryGoal: true, isPublic: true },
+    })
+
+    const plan = planLittleHoursAlign({ slug, profile: existing })
+    if (plan.action === "noop-missing" || !existing) {
+        return { action: plan.action, profileId: null, roleTemplate: null, primaryGoal: null }
+    }
+    if (plan.action !== "heal-role-goal") {
+        return {
+            action: plan.action,
+            profileId: existing.id,
+            roleTemplate: existing.roleTemplate,
+            primaryGoal: existing.primaryGoal,
+        }
+    }
+
+    const expected = littleHoursExpectedFlavor()
+    const updated = await prisma.profile.update({
+        where: { id: existing.id },
+        data: {
+            roleTemplate: expected.roleTemplate,
+            primaryGoal: expected.primaryGoal,
+            ...(existing.isPublic ? {} : { isPublic: true }),
+        },
+        select: { id: true, roleTemplate: true, primaryGoal: true },
+    })
+
+    return {
+        action: "heal-role-goal",
+        profileId: updated.id,
+        roleTemplate: updated.roleTemplate,
+        primaryGoal: updated.primaryGoal,
+    }
+}
+
+export function isLittleHoursSlug(slug?: string | null): slug is typeof LITTLEHOURS_SLUG {
+    return slug === LITTLEHOURS_SLUG
 }
