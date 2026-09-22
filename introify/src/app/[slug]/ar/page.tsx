@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { formatStoredPrice } from "@/lib/pricing"
-import { isRestaurant, readyLabel, serveLabel } from "@/lib/menu"
+import { catalogDisplayCurrency, isRestaurant, readyLabel, serveLabel } from "@/lib/menu"
 import { arSizeFor } from "@/lib/ar-scale"
 import { ArMenu } from "@/components/shop/ar-menu"
 
@@ -41,7 +41,7 @@ export default async function ArMenuPage({
 }) {
     const { slug } = await params
     const query = await searchParams
-    const currency = await getRequestCurrency()
+    const requestCurrency = await getRequestCurrency()
     const profile = await prisma.profile.findUnique({
         where: { slug },
         include: {
@@ -55,6 +55,12 @@ export default async function ArMenuPage({
         },
     })
     if (!profile || !profile.isPublic) notFound()
+
+    const currency = catalogDisplayCurrency(
+        profile.roleTemplate,
+        profile.digitalProducts.find((p) => p.currency)?.currency || "INR",
+        requestCurrency,
+    )
 
     const items = profile.digitalProducts
         .filter((p) => (p as { arModelUrl?: string | null }).arModelUrl)

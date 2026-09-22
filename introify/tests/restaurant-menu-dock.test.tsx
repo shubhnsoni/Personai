@@ -30,6 +30,11 @@ describe("restaurant menu dock", () => {
         expect(src).toMatch(/lg:max-w-5xl lg:px-6/)
         expect(src).toMatch(/!\(cartOpen \|\| nav \|\| custom\)/)
     })
+
+    it("drops stale cart lines whose products left the live menu", () => {
+        const src = readFileSync(join(process.cwd(), "src/components/shop/restaurant-menu.tsx"), "utf8")
+        expect(src).toMatch(/liveIds\.has\(line\.itemId\)/)
+    })
 })
 
 describe("catalog header compact shell", () => {

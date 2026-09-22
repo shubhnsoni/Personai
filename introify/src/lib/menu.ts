@@ -1,4 +1,5 @@
 import { resolveKitRole } from "@/lib/role-alias"
+import { storedCurrency, type DisplayCurrency } from "@/lib/pricing"
 
 export type Diet = "VEG" | "NONVEG" | "EGG" | "VEGAN"
 export type ServeWindow = "ALL" | "BREAKFAST" | "LUNCH" | "DINNER"
@@ -155,3 +156,14 @@ export function isHoldBooking(metadata?: string | null, email?: string | null) {
         return false
     }
 }
+
+/** Food-menu guest surfaces keep the café stored currency (no geo USD conversion). */
+export function catalogDisplayCurrency(
+    roleTemplate: string | null | undefined,
+    stored: string | null | undefined,
+    request: DisplayCurrency,
+): DisplayCurrency {
+    if (resolveKitRole(roleTemplate) === "RESTAURANT") return storedCurrency(stored)
+    return request
+}
+

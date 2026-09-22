@@ -150,17 +150,20 @@ export function RestaurantMenu({
                 if (raw) {
                     const parsed = JSON.parse(raw) as CartLine[]
                     if (Array.isArray(parsed)) {
-                        setCart(parsed.map((line) => ({
-                            ...line,
-                            modifiers: Array.isArray(line.modifiers) ? line.modifiers : [],
-                        })))
+                        const liveIds = new Set(items.map((item) => item.id))
+                        setCart(parsed
+                            .filter((line) => line && typeof line.itemId === "string" && liveIds.has(line.itemId))
+                            .map((line) => ({
+                                ...line,
+                                modifiers: Array.isArray(line.modifiers) ? line.modifiers : [],
+                            })))
                     }
                 }
             } catch { /* ignore */ }
             cartHydrated.current = true
         }, 0)
         return () => window.clearTimeout(timer)
-    }, [slug])
+    }, [slug, items])
 
     useEffect(() => {
         if (!cartHydrated.current) return

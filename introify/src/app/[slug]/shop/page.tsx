@@ -8,7 +8,7 @@ import { ShopCatalog } from "@/components/shop/shop-catalog"
 import { RestaurantMenu } from "@/components/shop/restaurant-menu"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { parseGallery } from "@/lib/commerce"
-import { catalogLabel, hoursToday, isRestaurant } from "@/lib/menu"
+import { catalogDisplayCurrency, catalogLabel, hoursToday, isRestaurant } from "@/lib/menu"
 import { payModeFromConfig } from "@/lib/payment-qr"
 import { Tracker } from "@/components/profile/tracker"
 import { isJewelryRetail, isJewelryWholesale } from "@/lib/metal/math"
@@ -86,7 +86,7 @@ export default async function ShopPage({
                 <RestaurantMenu
                     slug={slug}
                     shopName={profile.displayName}
-                    currency={profile.digitalProducts.some((p) => p.currency === "INR") ? "INR" : currency}
+                    currency={catalogDisplayCurrency(profile.roleTemplate, profile.digitalProducts.find((p) => p.currency)?.currency || currency, currency)}
                     logoUrl={logo}
                     whatsapp={profile.whatsapp}
                     upiId={profile.upiId}

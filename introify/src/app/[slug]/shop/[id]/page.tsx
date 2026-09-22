@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { parseGallery, parseVariants, whatsappHref } from "@/lib/commerce"
 import { extraDetailPhotos, parsePdpDisplay } from "@/lib/shop/pdp-display"
 import type { PdpRailItem } from "@/components/shop/pdp-light"
-import { catalogLabel, dietLabel, isRestaurant, serveLabel } from "@/lib/menu"
+import { catalogDisplayCurrency, catalogLabel, dietLabel, isRestaurant, serveLabel } from "@/lib/menu"
 import { formatStoredPrice } from "@/lib/pricing"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { extrasOf } from "@/lib/surfaces"
@@ -38,7 +38,7 @@ export default async function ProductSalesPage({
     params: Promise<{ slug: string; id: string }>
 }) {
     const { slug, id } = await params
-    const currency = await getRequestCurrency()
+    const requestCurrency = await getRequestCurrency()
     const product = await prisma.digitalProduct.findFirst({
         where: { id, isActive: true, profile: { slug, isPublic: true } },
         include: { profile: { include: { animationStyle: true } }, reviews: { orderBy: { createdAt: "desc" }, take: 8 } },
@@ -60,6 +60,7 @@ export default async function ProductSalesPage({
     const logo = (product.profile as { shopLogoUrl?: string | null }).shopLogoUrl
     const reviewRows = product.reviews
     const restaurant = isRestaurant(product.profile.roleTemplate)
+    const currency = catalogDisplayCurrency(product.profile.roleTemplate, product.currency, requestCurrency)
     const pharmacy = isPharmacy(product.profile.roleTemplate)
     const photos = parseGallery(product.galleryUrls, product.thumbnailUrl)
     const variants = parseVariants(product.variantsJson)
