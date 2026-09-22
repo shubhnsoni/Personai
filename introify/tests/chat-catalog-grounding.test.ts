@@ -49,6 +49,14 @@ describe("chat catalog grounding (P1-9)", () => {
         expect(handler).toMatch(/compactCatalogFacts/)
         expect(handler).toMatch(/foodKit/)
         expect(handler).toMatch(/answerCatalogPriceQuestion/)
+        // P1-9 short-circuit: restaurant catalog price settles before LLM path
+        expect(handler).toMatch(/restaurantCatalogPrice/)
+        expect(handler).toMatch(/restaurant_catalog_price/)
+        expect(handler).toMatch(/\|\|\s*Boolean\(restaurantCatalogPrice\)/)
+        const priceGate = handler.indexOf("const restaurantCatalogPrice")
+        const llmGate = handler.indexOf('if (!reservation) return Response.json({ error: "ai_allowance_unavailable" }')
+        expect(priceGate).toBeGreaterThan(-1)
+        expect(llmGate).toBeGreaterThan(priceGate)
 
         const rag = readFileSync(join(process.cwd(), "src/lib/rag.ts"), "utf8")
         expect(rag).toMatch(/kitRole === "RESTAURANT"/)
@@ -56,5 +64,20 @@ describe("chat catalog grounding (P1-9)", () => {
 
         const runtime = readFileSync(join(process.cwd(), "src/lib/ai-runtime.ts"), "utf8")
         expect(runtime).toMatch(/wantsPrice && hasTool\("showMenu"\)/)
+    })
+
+    it("matches Iced Latte even with filler words / punctuation", () => {
+        expect(findCatalogItemByQuery(menu, "price of iced latte???" )?.title).toBe("Iced Latte")
+        expect(findCatalogItemByQuery(menu, "How much is an Iced Latte")?.title).toBe("Iced Latte")
+        const answer = answerCatalogPriceQuestion({
+            query: "What's the cost of Iced Latte?",
+            items: menu,
+            roleTemplate: "CAFE",
+            requestCurrency: "USD",
+            shopName: "SkyDine Cafe",
+            whatsapp: "919262268837",
+        })
+        expect(answer).toMatch(/169/)
+        expect(answer).toMatch(/₹/)
     })
 })

@@ -1268,9 +1268,29 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
     }
 
     const hotelIntent = hotelDesk ? parseHotelGuestIntent(query).kind : "unknown"
-    if (!providerConfigured() || (hotelDesk && hotelIntent !== "unknown")) {
-        if (reservation) await settle("RELEASE", { reason: "hotel_desk" })
-        const notice = await groundedFallback()
+    // P1-9: when restaurant/cafe desk has a catalog price hit, answer before the LLM
+    // (groundedFallback alone only runs when !providerConfigured / hotel short-circuit).
+    const restaurantCatalogPrice = restaurantDesk
+        ? answerCatalogPriceQuestion({
+            query,
+            items: profileData.digitalProducts || [],
+            roleTemplate: profileData.roleTemplate,
+            requestCurrency: currency,
+            shopName: profileData.displayName,
+            whatsapp: profileData.whatsapp,
+        })
+        : null
+    if (
+        !providerConfigured()
+        || (hotelDesk && hotelIntent !== "unknown")
+        || Boolean(restaurantCatalogPrice)
+    ) {
+        if (reservation) {
+            await settle("RELEASE", {
+                reason: restaurantCatalogPrice ? "restaurant_catalog_price" : "hotel_desk",
+            })
+        }
+        const notice = restaurantCatalogPrice || await groundedFallback()
         await db.message.create({
             data: {
                 conversationId: authorizedConversationId,
