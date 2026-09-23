@@ -1,12 +1,12 @@
 import { everydayHours, type DemoShop } from "./types"
 
+/** Stay-kit imagery — hotel-honest (P1-5). Never reuse skydine cafe / try-arjun. */
 const photo = {
+    lobby: "/uploads/haven-hinoo/lobby.jpg",
+    mark: "/uploads/haven-hinoo/logo.png",
+    /** Soft exterior stand-in for homestay / hostel (not cafe/creator). */
     store: "/uploads/try-storefront.jpg",
-    interior: "/uploads/skydine-cafe/interior.jpg",
-    table: "/uploads/skydine-cafe/table.jpg",
-    counter: "/uploads/skydine-cafe/counter.jpg",
-    cafe: "/uploads/blu-cafe/cafe.jpg",
-    arjun: "/uploads/try-arjun.jpg",
+    workshop: "/uploads/try-workshop.jpg",
 }
 
 function stayDocs(name: string, place: string, extra: string): DemoShop["documents"] {
@@ -34,8 +34,8 @@ Scan the room QR. Ask for towels, water, or reception.`,
     whatsapp: "919431100221",
     upiId: "havenhinoo@upi",
     deliveryNote: "Housekeeping to the room. Restaurant orders stay on the connected kitchen’s page.",
-    imageUrl: photo.interior,
-    shopLogoUrl: photo.arjun,
+    imageUrl: photo.lobby,
+    shopLogoUrl: photo.mark,
     venue: {
         address: {
             formatted: "Hinoo Main Road, Hinoo, Ranchi 834002",
@@ -54,9 +54,9 @@ Scan the room QR. Ask for towels, water, or reception.`,
         { name: "Reception", description: "Front desk for keys, late checkout, and anything the concierge cannot close.", durationMinutes: 10, priceRupees: 0, kind: "SESSION" },
     ],
     story: [
-        { url: photo.interior, title: "Lobby", body: "A small desk, not a call centre. Reception until 23:00.", category: "INTERIOR" },
-        { url: photo.table, title: "Rooms", body: "Room QR on the nightstand. The concierge already knows the number.", category: "AMBIENCE" },
-        { url: photo.cafe, title: "Next door", body: "Breakfast and dinner sit on the connected restaurant page.", category: "FOOD" },
+        { url: photo.lobby, title: "Lobby", body: "A small desk, not a call centre. Reception until 23:00.", category: "INTERIOR" },
+        { url: photo.lobby, title: "Rooms", body: "Room QR on the nightstand. The concierge already knows the number.", category: "AMBIENCE" },
+        { url: photo.mark, title: "Haven mark", body: "Breakfast and dinner sit on the connected restaurant page.", category: "FOOD" },
     ],
     documents: stayDocs("Haven Hinoo", "Hinoo Main Road, Ranchi 834002", "28 rooms. Reception until 23:00."),
     customInstructions: "You are the concierge at Haven Hinoo, Hinoo Main Road, Ranchi. Check-in 14:00, checkout 11:00. Create housekeeping, spa, transport, and experience tickets as requests. Never invent a room, a menu, or a nearby place. Never confirm payment or post a Google review. Late checkout and checkout are requests, not billed confirmations. Offer a Google review search only after a positive note.",
@@ -80,8 +80,8 @@ Check-in 14:00. Checkout 11:00. Quiet after 22:00.`,
     speakerRole: "concierge",
     whatsapp: "919934112211",
     upiId: "salforest@upi",
-    imageUrl: photo.cafe,
-    shopLogoUrl: photo.arjun,
+    imageUrl: photo.lobby,
+    shopLogoUrl: photo.mark,
     venue: {
         address: {
             formatted: "Ranchi–Bundu Road, Ranchi 835215",
@@ -120,8 +120,8 @@ Check-in 14:00. Checkout 11:00. Shoes off in the dorm.`,
     speakerRole: "concierge",
     whatsapp: "919905501122",
     upiId: "dorandabunks@upi",
-    imageUrl: photo.counter,
-    shopLogoUrl: photo.arjun,
+    imageUrl: photo.workshop,
+    shopLogoUrl: photo.mark,
     venue: {
         address: {
             formatted: "Doranda Market Road, Doranda, Ranchi 834002",
@@ -161,7 +161,7 @@ Check-in 14:00. Checkout 11:00. Quiet after 21:30.`,
     whatsapp: "919934445566",
     upiId: "harmuhouse@upi",
     imageUrl: photo.store,
-    shopLogoUrl: photo.arjun,
+    shopLogoUrl: photo.mark,
     venue: {
         address: {
             formatted: "Harmu Road, Harmu, Ranchi 834002",
@@ -200,8 +200,8 @@ Check-in 14:00. Checkout 11:00. Long stays by the week.`,
     speakerRole: "concierge",
     whatsapp: "919905509988",
     upiId: "lalpursuites@upi",
-    imageUrl: photo.interior,
-    shopLogoUrl: photo.arjun,
+    imageUrl: photo.lobby,
+    shopLogoUrl: photo.mark,
     venue: {
         address: {
             formatted: "Near Lalpur Chowk, Lalpur, Ranchi 834001",

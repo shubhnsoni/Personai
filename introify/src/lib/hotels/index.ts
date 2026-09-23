@@ -34,6 +34,17 @@ export {
     HOTEL_SHARE_CHAT_RECEPTION_LABEL,
 } from "./guest-whatsapp"
 export {
+    isLeakedHotelFixtureImage,
+    hotelImageryBackfillPatch,
+    isHotelHonestFixtureUrl,
+    HAVEN_HONEST_IMAGE_URL,
+    HAVEN_HONEST_LOGO_URL,
+    HAVEN_LEAKED_IMAGE_URL,
+    HAVEN_LEAKED_LOGO_URL,
+    HOTEL_LEAKED_IMAGE_MARKERS,
+    type HotelImageryBackfill,
+} from "./hotel-imagery"
+export {
     HOTEL_STAFF_ROLES,
     HOTEL_DESK_SURFACES,
     hotelCanOpen,

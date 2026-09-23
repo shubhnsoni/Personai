@@ -2,6 +2,11 @@ import type { PrismaClient } from "@prisma/client"
 import { resolveKitRole } from "@/lib/role-alias"
 import { generateHotelQrCode } from "./qr-code"
 import { HAVEN_HOTEL } from "@/lib/demo-shops/stay"
+import {
+    hotelImageryBackfillPatch,
+    HAVEN_HONEST_IMAGE_URL,
+    HAVEN_HONEST_LOGO_URL,
+} from "./hotel-imagery"
 import { DEFAULT_HOTEL_KNOWLEDGE, DEFAULT_HOTEL_MAP_MARKERS, HOTEL_KNOWLEDGE_BUCKETS } from "./knowledge"
 import { DEFAULT_HOTEL_SLA_MINUTES } from "./analytics"
 import { DEFAULT_HOTEL_UPSELLS } from "./upsells"
@@ -281,6 +286,26 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
             where: { id: profileId },
             data: { whatsapp: TRY_HOTEL.whatsapp },
         })
+    }
+
+    // P1-5: replace known cafe/creator leakage on Haven showcase profiles (try-hotel + haven-hinoo).
+    // Only when imageUrl contains skydine or shopLogoUrl contains try-arjun — never wipe custom uploads.
+    const honestImage = TRY_HOTEL.imageUrl || HAVEN_HONEST_IMAGE_URL
+    const honestLogo = TRY_HOTEL.shopLogoUrl || HAVEN_HONEST_LOGO_URL
+    const havenProfiles = await prisma.profile.findMany({
+        where: { slug: { in: [TRY_HOTEL.slug, HAVEN_HOTEL.slug] } },
+        select: { id: true, imageUrl: true, shopLogoUrl: true },
+    })
+    for (const row of havenProfiles) {
+        const patch = hotelImageryBackfillPatch({
+            imageUrl: row.imageUrl,
+            shopLogoUrl: row.shopLogoUrl,
+            honestImageUrl: honestImage,
+            honestLogoUrl: honestLogo,
+        })
+        if (patch) {
+            await prisma.profile.update({ where: { id: row.id }, data: patch })
+        }
     }
 
     const existingRooms = await prisma.hotelRoom.findMany({ where: { profileId }, select: { id: true, number: true, sortOrder: true } })
