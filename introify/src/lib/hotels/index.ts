@@ -1,5 +1,18 @@
 export { isHotelRole } from "./role"
 export {
+    HOTEL_GUEST_MENU_LABEL,
+    HOTEL_GUEST_MENU_EMPTY_TITLE,
+    HOTEL_GUEST_MENU_EMPTY_DETAIL,
+    hotelGuestMenuLabel,
+    resolveHotelBrandLogo,
+    hotelServiceLabels,
+    describeHotelGuestRoom,
+    hotelGuestMenuEmptyCopy,
+    hotelGuestMenuHasContent,
+    type HotelGuestMenuRoom,
+    type HotelGuestMenuRestaurant,
+} from "./guest-menu"
+export {
     HOTEL_STAFF_ROLES,
     HOTEL_DESK_SURFACES,
     hotelCanOpen,
