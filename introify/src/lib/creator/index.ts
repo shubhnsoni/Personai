@@ -26,3 +26,15 @@ export type {
     CreatorDiscoveryAlias,
     CreatorDiscoveryRedirect,
 } from "./discovery-aliases"
+
+export {
+    CREATOR_GUEST_BOOK_LABEL,
+    CREATOR_GUEST_BOOK_EMPTY_TITLE,
+    CREATOR_GUEST_BOOK_EMPTY_DETAIL,
+    CREATOR_GUEST_BOOK_FORBIDDEN_COPY,
+    isCreatorLeadBookSurface,
+    creatorGuestBookLabel,
+    shouldUseCreatorLeadBookEmpty,
+    creatorGuestBookEmptyCopy,
+    creatorBookCopyLooksLikeSessions,
+} from "./guest-book"

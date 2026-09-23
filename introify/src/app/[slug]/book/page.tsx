@@ -13,6 +13,8 @@ import { isHotelRole } from "@/lib/hotels"
 import { resolveHotelBrandLogo } from "@/lib/hotels/guest-menu"
 import { hotelStayOfferingsFromServices } from "@/lib/hotels/guest-book"
 import { HotelGuestBook } from "@/components/hotel/hotel-guest-book"
+import { shouldUseCreatorLeadBookEmpty } from "@/lib/creator/guest-book"
+import { CreatorGuestBook } from "@/components/creator/creator-guest-book"
 
 export const dynamic = "force-dynamic"
 
@@ -104,6 +106,32 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
         } catch {
             // Guest /book must still render when offerings are at plan limit.
         }
+    }
+
+    // CREATOR / COLLECT_LEADS empty → lead Contact surface (never "No sessions to book.")
+    // Populated offerings (e.g. CONSULTANT /demo/book) still use BookList below.
+    if (
+        shouldUseCreatorLeadBookEmpty({
+            role: profile.roleTemplate,
+            primaryGoal: profile.primaryGoal,
+            offeringCount: profile.serviceOfferings.length,
+        })
+    ) {
+        const logo = (profile as { shopLogoUrl?: string | null }).shopLogoUrl
+        return (
+            <>
+                <Tracker slug={slug} name="book_view" />
+                <SessionProbe slug={slug} />
+                <CreatorGuestBook
+                    slug={slug}
+                    name={profile.displayName}
+                    logoUrl={logo}
+                    whatsapp={profile.whatsapp}
+                    role={profile.roleTemplate}
+                    primaryGoal={profile.primaryGoal}
+                />
+            </>
+        )
     }
 
     const config = await publicAnimationConfig(profile.id, configuredProfileAnimation(profile))
