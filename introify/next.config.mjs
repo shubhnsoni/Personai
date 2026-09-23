@@ -79,6 +79,17 @@ const nextConfig = {
       { source: "/try-barber/:path*", destination: "/prince-barber-lalpur/:path*", permanent: false },
       { source: "/barber", destination: "/prince-barber-lalpur", permanent: false },
       { source: "/barber/:path*", destination: "/prince-barber-lalpur/:path*", permanent: false },
+      // GYM P1-1 discovery aliases -> LIVE showcases (Aura / Natraj).
+      { source: "/try-gym", destination: "/aura-fitness-ranchi", permanent: false },
+      { source: "/try-gym/:path*", destination: "/aura-fitness-ranchi/:path*", permanent: false },
+      { source: "/gym", destination: "/aura-fitness-ranchi", permanent: false },
+      { source: "/gym/:path*", destination: "/aura-fitness-ranchi/:path*", permanent: false },
+      { source: "/try-fitness", destination: "/aura-fitness-ranchi", permanent: false },
+      { source: "/try-fitness/:path*", destination: "/aura-fitness-ranchi/:path*", permanent: false },
+      { source: "/try-yoga", destination: "/natraj-yoga-kutchery", permanent: false },
+      { source: "/try-yoga/:path*", destination: "/natraj-yoga-kutchery/:path*", permanent: false },
+      { source: "/yoga", destination: "/natraj-yoga-kutchery", permanent: false },
+      { source: "/yoga/:path*", destination: "/natraj-yoga-kutchery/:path*", permanent: false },
     ];
   },
   async rewrites() {
