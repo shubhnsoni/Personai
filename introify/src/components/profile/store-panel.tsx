@@ -49,6 +49,7 @@ export type StoreData = {
         startTime: string
         endTime: string
         priceCents: number
+        currency?: string | null
         isFree: boolean
         thumbnailUrl?: string | null
     }>
@@ -276,7 +277,7 @@ export function EventsStore({
                                         <p className="mt-2 text-sm text-zinc-400 line-clamp-3">{event.description}</p>
                                     )}
                                 </div>
-                                <p className="shrink-0 font-semibold">{event.isFree ? "Free" : money(event.priceCents)}</p>
+                                <p className="shrink-0 font-semibold">{event.isFree ? "Free" : money(event.priceCents, event.currency)}</p>
                             </div>
                             <div className="flex gap-2">
                                 {data.slug && (
