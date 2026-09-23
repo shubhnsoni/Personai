@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "@/components/navigation/transition-link"
 import { Box, Mic, Minus, Plus, Search, ShoppingBag, UtensilsCrossed, X } from "lucide-react"
 import { formatStoredPrice, type DisplayCurrency } from "@/lib/pricing"
@@ -152,6 +152,28 @@ export function RestaurantMenu({
     const [nonveg, setNonveg] = useState(false)
     const [best, setBest] = useState(false)
     const [rated, setRated] = useState(false)
+    const filterScrollRef = useRef<HTMLDivElement>(null)
+    const [filterOverflow, setFilterOverflow] = useState({ start: false, end: false })
+    const syncFilterOverflow = useCallback(() => {
+        const el = filterScrollRef.current
+        if (!el) return
+        const max = el.scrollWidth - el.clientWidth
+        const start = el.scrollLeft > 2
+        const end = max > 2 && el.scrollLeft < max - 2
+        setFilterOverflow((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
+    }, [])
+    useEffect(() => {
+        const el = filterScrollRef.current
+        if (!el) return
+        syncFilterOverflow()
+        const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => syncFilterOverflow()) : null
+        ro?.observe(el)
+        window.addEventListener("resize", syncFilterOverflow)
+        return () => {
+            ro?.disconnect()
+            window.removeEventListener("resize", syncFilterOverflow)
+        }
+    }, [syncFilterOverflow])
     const [nav, setNav] = useState(false)
     const [active, setActive] = useState(buckets[0]?.id || "")
     const [cart, setCart] = useState<CartLine[]>([])
@@ -309,31 +331,55 @@ export function RestaurantMenu({
     return (
         <div className="relative bg-background text-foreground">
             <div className="sticky top-14 z-30 border-b border-border/40 bg-background/95 backdrop-blur-md">
-                <div className={cn(MENU_SHELL, "flex gap-2 overflow-x-auto px-3 py-2.5 lg:px-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}>
-                    {[
-                        { on: veg, set: () => { const next = nextDietFilter("veg", { veg, nonveg }); setVeg(next.veg); setNonveg(next.nonveg) }, label: "Veg" },
-                        { on: nonveg, set: () => { const next = nextDietFilter("nonveg", { veg, nonveg }); setVeg(next.veg); setNonveg(next.nonveg) }, label: "Non-Veg" },
-                        { on: best, set: () => setBest((v) => !v), label: "Bestsellers" },
-                        { on: rated, set: () => setRated((v) => !v), label: "Ratings 4.0+" },
-                    ].map((c) => {
-                        const Icon = categoryIcon(c.label)
-                        return (
-                        <button
-                            key={c.label}
-                            type="button"
-                            onClick={c.set}
-                            className={cn(
-                                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-[6px] text-[13px] font-medium",
-                                c.on
-                                    ? "border-emerald-700 bg-emerald-50 text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                    : "border-border/70 bg-card text-foreground",
-                            )}
-                        >
-                            <Icon className="h-3.5 w-3.5" />
-                            {c.label}
-                        </button>
-                        )
-                    })}
+                <div className={cn(MENU_SHELL, "relative")}>
+                    <div
+                        ref={filterScrollRef}
+                        role="toolbar"
+                        aria-label="Menu filters"
+                        data-menu-filter-row=""
+                        onScroll={syncFilterOverflow}
+                        className="flex gap-2 overflow-x-auto overscroll-x-contain px-3 py-2.5 [scrollbar-width:thin] lg:px-6"
+                    >
+                        {[
+                            { on: veg, set: () => { const next = nextDietFilter("veg", { veg, nonveg }); setVeg(next.veg); setNonveg(next.nonveg) }, label: "Veg" },
+                            { on: nonveg, set: () => { const next = nextDietFilter("nonveg", { veg, nonveg }); setVeg(next.veg); setNonveg(next.nonveg) }, label: "Non-Veg" },
+                            { on: best, set: () => setBest((v) => !v), label: "Bestsellers" },
+                            { on: rated, set: () => setRated((v) => !v), label: "Ratings 4.0+" },
+                        ].map((c) => {
+                            const Icon = categoryIcon(c.label)
+                            return (
+                            <button
+                                key={c.label}
+                                type="button"
+                                aria-pressed={c.on}
+                                onClick={c.set}
+                                className={cn(
+                                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-[6px] text-[13px] font-medium",
+                                    c.on
+                                        ? "border-emerald-700 bg-emerald-50 text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                        : "border-border/70 bg-card text-foreground",
+                                )}
+                            >
+                                <Icon className="h-3.5 w-3.5" />
+                                {c.label}
+                            </button>
+                            )
+                        })}
+                    </div>
+                    {filterOverflow.start ? (
+                        <div
+                            aria-hidden
+                            data-filter-scroll-fade="start"
+                            className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-8 bg-gradient-to-r from-background to-transparent sm:w-10"
+                        />
+                    ) : null}
+                    {filterOverflow.end ? (
+                        <div
+                            aria-hidden
+                            data-filter-scroll-fade="end"
+                            className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-8 bg-gradient-to-l from-background to-transparent sm:w-10"
+                        />
+                    ) : null}
                 </div>
                 <div className={cn(MENU_SHELL, "border-t border-border/40 px-4 py-2 text-[13px] font-semibold tracking-tight lg:px-6")}>
                     {activeLabel}
