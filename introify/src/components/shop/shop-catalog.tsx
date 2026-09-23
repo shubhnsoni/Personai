@@ -8,6 +8,7 @@ import { whatsappHref } from "@/lib/commerce"
 import { dietDotClass, dietLabel } from "@/lib/menu"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { fitsShopVehicle, yearsInCatalog, type VehicleFitment } from "@/lib/autoparts/fitment"
+import { shopCatalogGuestEmptyCopy } from "@/lib/creator/guest-menu"
 
 type Item = {
     id: string
@@ -40,6 +41,7 @@ export function ShopCatalog({
     upiId,
     shopName,
     restaurant,
+    ownerOps = false,
 }: {
     slug: string
     items: Item[]
@@ -51,6 +53,8 @@ export function ShopCatalog({
     restaurant?: boolean
     hours?: string | null
     bookHref?: string | null
+    /** Owner dashboard / ops empty — public ShopPage must leave this false. */
+    ownerOps?: boolean
 }) {
     const cats = useMemo(() => {
         const set = new Set<string>()
@@ -103,6 +107,7 @@ export function ShopCatalog({
         return true
     })
     const wa = whatsappHref(whatsapp, `Hi ${shopName}, I want to see your shop: `)
+    const guestEmpty = shopCatalogGuestEmptyCopy(shopName)
 
     return (
         <div className="space-y-4">
@@ -187,7 +192,24 @@ export function ShopCatalog({
                 </div>
             ) : null}
             {rows.length === 0 ? (
-                <p className="py-16 text-center text-sm text-muted-foreground">Import a catalog or add a product</p>
+                ownerOps ? (
+                    <p className="py-16 text-center text-sm text-muted-foreground">Import a catalog or add a product</p>
+                ) : (
+                    <div
+                        data-shop-catalog-empty="guest"
+                        data-empty-title={guestEmpty.title}
+                        className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-12 text-center"
+                    >
+                        <p className="text-[17px] font-semibold tracking-tight text-foreground">{guestEmpty.title}</p>
+                        <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">{guestEmpty.detail}</p>
+                        <Link
+                            href={`/${slug}`}
+                            className="mt-5 inline-flex h-10 items-center justify-center rounded-full bg-foreground px-4 text-sm font-medium text-background"
+                        >
+                            {guestEmpty.chatLabel}
+                        </Link>
+                    </div>
+                )
             ) : (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-2.5 lg:grid-cols-4 lg:gap-2">
                     {rows.map((p) => (

@@ -22,6 +22,8 @@ import { isExpiredMedicine, isPharmacy, isRxRequired, shopExpiryLine } from "@/l
 import { fitmentLine, isAutoParts, parseFitment } from "@/lib/autoparts/fitment"
 import { GoldRateStrip } from "@/components/shop/gold-rate-strip"
 import { SessionProbe } from "@/components/profile/session-probe"
+import { CreatorGuestMenu } from "@/components/creator/creator-guest-menu"
+import { isCreatorPortfolioMenuRole } from "@/lib/creator"
 
 export const dynamic = "force-dynamic"
 
@@ -79,6 +81,31 @@ export default async function ShopPage({
             select: { label: true },
         })
         : null
+
+    // CREATOR P0-1: empty DESIGNER / DEVELOPER / SHOW_PORTFOLIO kits get portfolio chrome
+    // + guest-honest empty (never owner import CTA). Populated catalogs fall through.
+    if (
+        !restaurant
+        && isCreatorPortfolioMenuRole(profile.roleTemplate, profile.primaryGoal)
+        && profile.digitalProducts.length === 0
+    ) {
+        return (
+            <div data-public-catalog-theme={catalogTheme ?? undefined} className="min-h-dvh bg-background text-foreground">
+                <Tracker slug={slug} name="creator_menu_view" />
+                <SessionProbe slug={slug} />
+                <CreatorGuestMenu
+                    slug={slug}
+                    name={profile.displayName}
+                    logoUrl={logo}
+                    whatsapp={profile.whatsapp}
+                    aboutHref={aboutHref}
+                    hours={hours}
+                    role={profile.roleTemplate}
+                    primaryGoal={profile.primaryGoal}
+                />
+            </div>
+        )
+    }
 
     if (restaurant) {
         return (
