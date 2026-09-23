@@ -25,6 +25,8 @@ function sessionSheetProps(role?: string | null, durationMinutes?: number): {
     confirmLabel: ReserveConfirmLabel
 } {
     switch (role) {
+        case "CLINIC":
+            return { hideParty: true, confirmLabel: "Book appointment" }
         case "CA":
             return { hideParty: true, confirmLabel: "Book consult" }
         case "SALON_SPA":

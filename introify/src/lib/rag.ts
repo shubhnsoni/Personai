@@ -250,6 +250,7 @@ function showStorySubject(role?: string | null): string {
 function bookChip(role: string): string {
     const raw = (role || "").trim().toUpperCase()
     switch (raw) {
+        case "CLINIC": return "Book an appointment"
         case "GYM": return "Book a session"
         case "YOGA": return "Book a class"
         case "BARBER":

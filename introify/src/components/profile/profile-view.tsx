@@ -426,6 +426,8 @@ function sessionSheetProps(role?: string | null, durationMinutes?: number): {
     confirmLabel: ReserveConfirmLabel
 } {
     switch (role) {
+        case "CLINIC":
+            return { hideParty: true, confirmLabel: "Book appointment" }
         case "CA":
             return { hideParty: true, confirmLabel: "Book consult" }
         case "SALON_SPA":
@@ -456,9 +458,10 @@ function welcomeTopics(profile: ProfileViewProps["profile"]) {
         : role === "PHARMACY" ? ["medicines", "stock", "prescriptions"]
         : role === "AUTO_PARTS" ? ["parts", "fitment", "stock"]
         : role === "CREATOR" ? ["the guide", "files", "tipping"]
-        : role === "CONSULTANT" || role === "CA" ? ["a session", "services", "rates"]
+        : flavor === "CLINIC" ? ["an appointment", "services", "rates"]
         : flavor === "GYM" ? ["a session", "hours", "trainers"]
         : flavor === "YOGA" ? ["a class", "hours", "teachers"]
+        : role === "CONSULTANT" || role === "CA" ? ["a session", "services", "rates"]
         : role === "SALON_SPA" ? ["treatments", "hours"]
         : role === "FIELD_SERVICE" ? ["a visit", "a quote"]
         : role === "DESIGNER" || role === "DEVELOPER" || role === "EDITOR" || role === "JOB_SEEKER"

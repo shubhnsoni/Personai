@@ -42,6 +42,7 @@ function roleLabel(role: string) {
         BARBER: "barber shop",
         GYM: "gym",
         YOGA: "yoga studio",
+        CLINIC: "clinic",
         FIELD_SERVICE: "field-service business",
         CUSTOM: "professional",
     }
@@ -66,7 +67,15 @@ function voice(role: string) {
 
 function kitPlaybook(role: string, name: string): string[] {
     const raw = (role || "").trim().toUpperCase()
-    // Flavor before SALON_SPA kit alias — gym/yoga must not say "treatments".
+    // Flavor before kit alias — clinic must not say "sessions"; gym/yoga must not say "treatments".
+    if (raw === "CLINIC") {
+        return [
+            `You book appointments at ${name}. Consultations and slots live on the in-app Book page.`,
+            "When they ask how to book, appointment/consultation price, or rates: quote honest listed prices and send them to the Book chip or /book path.",
+            "WhatsApp may stay as a secondary CTA for a human — never the only booking path when services or slots are listed.",
+            "Do not diagnose or prescribe in chat. Steer them to book an in-person appointment.",
+        ]
+    }
     if (raw === "GYM") {
         return [
             `You book sessions at ${name}. Services and slots live on the in-app Book page.`,

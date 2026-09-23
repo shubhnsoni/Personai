@@ -14,6 +14,8 @@ function kitRole(role?: string | null) {
 export function waPrefill(role?: string | null, name = "") {
     const raw = (role || "").trim().toUpperCase()
     switch (raw) {
+        case "CLINIC":
+            return `An appointment at ${name}`
         case "GYM":
             return `A session at ${name}`
         case "YOGA":
@@ -59,6 +61,8 @@ export function bookChip(role?: string | null) {
     const raw = (role || "").trim().toUpperCase()
     // Keep salon kit surfaces; honest nouns per flavor roleTemplate.
     switch (raw) {
+        case "CLINIC":
+            return "Book an appointment"
         case "GYM":
             return "Book a session"
         case "YOGA":

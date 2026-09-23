@@ -27,6 +27,7 @@ export function appointmentBookPath(slug: string): string {
 /** Honest book-ask noun for prompt guidance (flavor before salon kit alias). */
 export function appointmentBookAskNoun(role?: string | null): string {
     const raw = (role || "").trim().toUpperCase()
+    if (raw === "CLINIC") return "appointment or consultation"
     if (raw === "GYM") return "session, PT, or class"
     if (raw === "YOGA") return "class or session"
     if (raw === "BARBER") return "haircut/treatment"
