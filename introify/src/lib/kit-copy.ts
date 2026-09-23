@@ -12,6 +12,16 @@ function kitRole(role?: string | null) {
 }
 
 export function waPrefill(role?: string | null, name = "") {
+    const raw = (role || "").trim().toUpperCase()
+    switch (raw) {
+        case "GYM":
+            return `A session at ${name}`
+        case "YOGA":
+            return `A class at ${name}`
+        case "BARBER":
+        case "PET_GROOMING":
+            return `A treatment at ${name}`
+    }
     switch (kitRole(role)) {
         case "RESTAURANT":
             return `A table at ${name}`
@@ -44,7 +54,19 @@ export function waPrefill(role?: string | null, name = "") {
     }
 }
 
+/** Guest Book CTA — flavor-aware before kit alias (GYM/YOGA/BARBER → SALON_SPA kit). */
 export function bookChip(role?: string | null) {
+    const raw = (role || "").trim().toUpperCase()
+    // Keep salon kit surfaces; honest nouns per flavor roleTemplate.
+    switch (raw) {
+        case "GYM":
+            return "Book a session"
+        case "YOGA":
+            return "Book a class"
+        case "BARBER":
+        case "PET_GROOMING":
+            return "Book a treatment"
+    }
     switch (kitRole(role)) {
         case "RESTAURANT":
             return "Reserve a table"

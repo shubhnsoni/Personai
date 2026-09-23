@@ -24,6 +24,16 @@ export function appointmentBookPath(slug: string): string {
     return clean ? `/${clean}/book` : "/book"
 }
 
+/** Honest book-ask noun for prompt guidance (flavor before salon kit alias). */
+export function appointmentBookAskNoun(role?: string | null): string {
+    const raw = (role || "").trim().toUpperCase()
+    if (raw === "GYM") return "session, PT, or class"
+    if (raw === "YOGA") return "class or session"
+    if (raw === "BARBER") return "haircut/treatment"
+    if (resolveKitRole(role) === "SALON_SPA") return "treatment/haircut"
+    return "booking"
+}
+
 export function formatAppointmentServicePrice(
     service: AppointmentChatService,
     roleTemplate: string | null | undefined,
@@ -62,7 +72,7 @@ export function appointmentBookPromptGuidance(opts: {
     const chip = bookChip(opts.role)
     const href = opts.slug ? appointmentBookPath(opts.slug) : "/book"
     const lines = [
-        `When they ask how to book, rates, or a treatment/haircut price: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX).`,
+        `When they ask how to book, rates, or a ${appointmentBookAskNoun(opts.role)} price: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX).`,
         "Never tell them WhatsApp is the only way to book when services or slots are listed.",
     ]
     const wa = appointmentBookSecondaryWa(opts.whatsapp)

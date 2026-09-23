@@ -248,6 +248,13 @@ function showStorySubject(role?: string | null): string {
 }
 
 function bookChip(role: string): string {
+    const raw = (role || "").trim().toUpperCase()
+    switch (raw) {
+        case "GYM": return "Book a session"
+        case "YOGA": return "Book a class"
+        case "BARBER":
+        case "PET_GROOMING": return "Book a treatment"
+    }
     switch (resolveKitRole(role) || role) {
         case "RESTAURANT": return "Reserve a table"
         case "SHOP": return "Shop now"

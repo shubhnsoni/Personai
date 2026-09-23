@@ -450,12 +450,15 @@ function welcomeTopics(profile: ProfileViewProps["profile"]) {
     if (role === "HOTEL") {
         return ["towels", "Wi-Fi", "restaurants", "reception"]
     }
+    const flavor = (profile.roleTemplate || "").trim().toUpperCase()
     const kitTopics =
         role === "SHOP" ? ["the shop", "orders", "pickup"]
         : role === "PHARMACY" ? ["medicines", "stock", "prescriptions"]
         : role === "AUTO_PARTS" ? ["parts", "fitment", "stock"]
         : role === "CREATOR" ? ["the guide", "files", "tipping"]
         : role === "CONSULTANT" || role === "CA" ? ["a session", "services", "rates"]
+        : flavor === "GYM" ? ["a session", "hours", "trainers"]
+        : flavor === "YOGA" ? ["a class", "hours", "teachers"]
         : role === "SALON_SPA" ? ["treatments", "hours"]
         : role === "FIELD_SERVICE" ? ["a visit", "a quote"]
         : role === "DESIGNER" || role === "DEVELOPER" || role === "EDITOR" || role === "JOB_SEEKER"

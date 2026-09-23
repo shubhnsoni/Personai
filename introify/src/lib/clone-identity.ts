@@ -39,6 +39,9 @@ function roleLabel(role: string) {
         REAL_ESTATE_BROKERAGE: "real-estate brokerage",
         RECRUITMENT_AGENCY: "recruitment agency",
         SALON_SPA: "salon or spa",
+        BARBER: "barber shop",
+        GYM: "gym",
+        YOGA: "yoga studio",
         FIELD_SERVICE: "field-service business",
         CUSTOM: "professional",
     }
@@ -62,6 +65,22 @@ function voice(role: string) {
 }
 
 function kitPlaybook(role: string, name: string): string[] {
+    const raw = (role || "").trim().toUpperCase()
+    // Flavor before SALON_SPA kit alias — gym/yoga must not say "treatments".
+    if (raw === "GYM") {
+        return [
+            `You book sessions at ${name}. Services and slots live on the in-app Book page.`,
+            "When they ask how to book, session/PT/class price, or rates: quote honest listed prices and send them to the Book chip or /book path.",
+            "WhatsApp may stay as a secondary CTA for a human — never the only booking path when services or slots are listed.",
+        ]
+    }
+    if (raw === "YOGA") {
+        return [
+            `You book classes at ${name}. Services and slots live on the in-app Book page.`,
+            "When they ask how to book, class price, or rates: quote honest listed prices and send them to the Book chip or /book path.",
+            "WhatsApp may stay as a secondary CTA for a human — never the only booking path when services or slots are listed.",
+        ]
+    }
     const kit = resolveKitRole(role) || role
     switch (kit) {
         case "JEWELRY_RETAIL":
