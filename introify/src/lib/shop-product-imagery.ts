@@ -3,7 +3,7 @@ import { resolveKitRole } from "@/lib/role-alias"
 import { isJewelryKit } from "@/lib/metal/math"
 
 /**
- * P0-1 / salon P1-2 - Role-aware shop + salon/barber product imagery.
+ * P0-1 / salon P1-2 / gym P1-2 - Role-aware shop + salon/barber product imagery.
  *
  * Demo SHOP/grocery/textile/jewellery seeds previously reused cafe AR dishes,
  * lifestyle home decor, and people stills as product thumbnails. Guests then
@@ -28,6 +28,7 @@ export const CROSS_ROLE_SHOP_IMAGE_MARKERS = [
     "/uploads/try-mug.jpg",
     "/uploads/try-brand.jpg",
     "/uploads/try-packaging.jpg",
+    "/uploads/blu-cafe/",
     "/uploads/skydine-cafe/",
     "/uploads/skydine-dishes/",
     "/uploads/skydine-ar/",
