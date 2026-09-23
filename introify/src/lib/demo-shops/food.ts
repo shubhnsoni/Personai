@@ -338,7 +338,7 @@ Ask for a 500g box, a wedding tray, or what came out of the kadhai this morning.
         { title: "Samosa", description: "Two pieces, afternoon fry.", category: "Namkeen", priceRupees: 30, diet: "VEG", stock: 40, thumbnailUrl: photo.plates, sku: "SS-SAM", allowCod: true, shipMode: "PICKUP" },
         { title: "Kachori pack", description: "Four pieces.", category: "Namkeen", priceRupees: 50, diet: "VEG", stock: 30, thumbnailUrl: photo.plates, sku: "SS-KAC", allowCod: true, shipMode: "PICKUP" },
         { title: "Namkeen mix 250g", description: "Bhujia and sev.", category: "Namkeen", priceRupees: 70, diet: "VEG", stock: 25, thumbnailUrl: photo.dal, sku: "SS-NAM", weightGrams: 250, allowCod: true, shipMode: "PICKUP" },
-        { title: "Chocolate brownie", description: "A modern piece next to the katli.", category: "Bakery", priceRupees: 80, diet: "VEG", stock: 10, thumbnailUrl: photo.cookie, sku: "SS-BR", arKey: "chocolate-brownie", allowCod: true, shipMode: "PICKUP" },
+        { title: "Milk cake 500g", description: "Soft, khoya finish. Packed for gifting.", category: "Mithai", priceRupees: 240, diet: "VEG", stock: 14, thumbnailUrl: photo.cookie, sku: "SS-MILK", weightGrams: 500, allowCod: true, shipMode: "PICKUP" },
     ],
     documents: [
         { type: "BIO", title: "About Samriddhi Sweets", rawText: "Samriddhi Sweets, Ranchi mithai counter. Kilos and festive trays. Open 8:30am–9:30pm. Scales at the counter." },

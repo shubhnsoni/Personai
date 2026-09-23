@@ -14,6 +14,8 @@ export const FORCE_REFRESH_SLUGS = new Set([
     "fit24-ranchi",
     "skydine-cafe",
     "churuwala-upper-bazar",
+    // P1-1: drop accidental Bakery/Chocolate brownie leakage from SWEETS demo seed.
+    "samriddhi-sweets",
 ])
 
 export function orderedDemoShops<T extends { slug: string }>(shops: T[]): T[] {

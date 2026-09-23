@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { DEMO_SHOPS } from "@/lib/demo-shops"
 import {
     catalogSize,
+    FORCE_REFRESH_SLUGS,
     orderedDemoShops,
     runPool,
     seedBudgetMs,
@@ -38,5 +39,10 @@ describe("demo shop seed order", () => {
             seen.push(n)
         })
         expect(seen.sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5])
+    })
+
+    it("force-refreshes Samriddhi so P1-1 bakery leakage cannot stick on LIVE", () => {
+        expect(FORCE_REFRESH_SLUGS.has("samriddhi-sweets")).toBe(true)
+        expect(shouldSkipPopulated({ slug: "samriddhi-sweets", products: [{}, {}], services: [] }, 10, 0, false)).toBe(false)
     })
 })
