@@ -3,6 +3,7 @@ import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile
 import { resolveThemedOrb } from "@/lib/bloub/catalog"
 import { prisma } from "@/lib/prisma"
 import { parseGallery, parseVariants, whatsappHref } from "@/lib/commerce"
+import { resolveShopProductImage, isCrossRoleShopProductImage, usesStrictShopProductImagery } from "@/lib/shop-product-imagery"
 import { extraDetailPhotos, parsePdpDisplay } from "@/lib/shop/pdp-display"
 import type { PdpRailItem } from "@/components/shop/pdp-light"
 import { catalogDisplayCurrency, catalogLabel, dietLabel, isRestaurant, serveLabel } from "@/lib/menu"
@@ -62,7 +63,12 @@ export default async function ProductSalesPage({
     const restaurant = isRestaurant(product.profile.roleTemplate)
     const currency = catalogDisplayCurrency(product.profile.roleTemplate, product.currency, requestCurrency)
     const pharmacy = isPharmacy(product.profile.roleTemplate)
-    const photos = parseGallery(product.galleryUrls, product.thumbnailUrl)
+    const rawPhotos = parseGallery(product.galleryUrls, product.thumbnailUrl)
+    const role = product.profile.roleTemplate
+    const photos = usesStrictShopProductImagery(role)
+        ? rawPhotos.filter((url) => !isCrossRoleShopProductImage(url))
+        : rawPhotos
+    // If every gallery entry was cross-role stock, fall through to neutral ShopCover (empty photos).
     const variants = parseVariants(product.variantsJson)
     const extras = extrasOf(product.profile.personalityConfig)
     const menuOrder = restaurant || extras.packs?.includes("menuDish") === true
@@ -138,10 +144,10 @@ export default async function ProductSalesPage({
     const display = parsePdpDisplay(product.variantsJson)
     const extraPhotos = extraDetailPhotos(photos)
     const related = display.showRelated
-        ? await loadRelated(product.profileId, product.id, product.category, slug, currency).catch(() => [])
+        ? await loadRelated(product.profileId, product.id, product.category, slug, currency, product.profile.roleTemplate).catch(() => [])
         : []
     const bestsellers = display.showBestsellers
-        ? await loadBestsellers(product.profileId, product.id, slug, currency).catch(() => [])
+        ? await loadBestsellers(product.profileId, product.id, slug, currency, product.profile.roleTemplate).catch(() => [])
         : []
     const extraLine = metal && board
         ? wholesale
@@ -198,12 +204,13 @@ async function asRailItems(
     rows: { id: string; title: string; thumbnailUrl: string | null; galleryUrls: string | null; priceCents: number; currency: string }[],
     slug: string,
     displayCurrency: Awaited<ReturnType<typeof getRequestCurrency>>,
+    role?: string | null,
 ): Promise<PdpRailItem[]> {
     return rows.map((row) => ({
         id: row.id,
         title: row.title,
         href: `/${slug}/shop/${row.id}`,
-        photo: parseGallery(row.galleryUrls, row.thumbnailUrl)[0] || null,
+        photo: resolveShopProductImage({ role, thumbnailUrl: row.thumbnailUrl, galleryUrls: row.galleryUrls }),
         priceLabel: formatStoredPrice(row.priceCents, row.currency, displayCurrency),
     }))
 }
@@ -214,6 +221,7 @@ async function loadRelated(
     category: string | null,
     slug: string,
     currency: Awaited<ReturnType<typeof getRequestCurrency>>,
+    role?: string | null,
 ) {
     const cat = category?.trim()
     if (!cat) return []
@@ -223,7 +231,7 @@ async function loadRelated(
         take: 8,
         select: { id: true, title: true, thumbnailUrl: true, galleryUrls: true, priceCents: true, currency: true },
     })
-    return asRailItems(rows, slug, currency)
+    return asRailItems(rows, slug, currency, role)
 }
 
 async function loadBestsellers(
@@ -231,6 +239,7 @@ async function loadBestsellers(
     productId: string,
     slug: string,
     currency: Awaited<ReturnType<typeof getRequestCurrency>>,
+    role?: string | null,
 ) {
     const lines = await prisma.orderLine.groupBy({
         by: ["productId"],
@@ -262,7 +271,7 @@ async function loadBestsellers(
         })
         const rank = new Map(bought.map((id, i) => [id, i]))
         rows.sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99))
-        return asRailItems(rows, slug, currency)
+        return asRailItems(rows, slug, currency, role)
     }
     const rows = await prisma.digitalProduct.findMany({
         where: { id: { in: ids } },
@@ -270,5 +279,5 @@ async function loadBestsellers(
     })
     const rank = new Map(ids.map((id, i) => [id, i]))
     rows.sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99))
-    return asRailItems(rows, slug, currency)
+    return asRailItems(rows, slug, currency, role)
 }

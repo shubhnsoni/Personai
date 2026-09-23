@@ -10,6 +10,7 @@ import { ShopCatalog } from "@/components/shop/shop-catalog"
 import { RestaurantMenu } from "@/components/shop/restaurant-menu"
 import { getRequestCurrency } from "@/lib/request-currency"
 import { parseGallery } from "@/lib/commerce"
+import { resolveShopProductImage } from "@/lib/shop-product-imagery"
 import { catalogDisplayCurrency, catalogLabel, hoursToday, isRestaurant } from "@/lib/menu"
 import { payModeFromConfig } from "@/lib/payment-qr"
 import { Tracker } from "@/components/profile/tracker"
@@ -106,7 +107,7 @@ export default async function ShopPage({
                         return {
                             id: p.id,
                             title: p.title,
-                            thumbnailUrl: p.thumbnailUrl || parseGallery(p.galleryUrls)[0] || null,
+                            thumbnailUrl: resolveShopProductImage({ role: profile.roleTemplate, thumbnailUrl: p.thumbnailUrl, galleryUrls: p.galleryUrls }),
                             priceCents: p.priceCents,
                             currency: p.currency,
                             compareAtCents: p.compareAtCents,
@@ -156,7 +157,7 @@ export default async function ShopPage({
                         id: p.id,
                         title: p.title,
                         type: p.type,
-                        thumbnailUrl: p.thumbnailUrl || parseGallery(p.galleryUrls)[0] || null,
+                        thumbnailUrl: resolveShopProductImage({ role: profile.roleTemplate, thumbnailUrl: p.thumbnailUrl, galleryUrls: p.galleryUrls }),
                         priceCents: jewelry
                             ? catalogTicketPaise(p.variantsJson, goldBoard, p.priceCents)
                             : p.priceCents,

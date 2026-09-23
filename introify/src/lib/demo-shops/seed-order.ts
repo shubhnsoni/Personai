@@ -16,6 +16,10 @@ export const FORCE_REFRESH_SLUGS = new Set([
     "churuwala-upper-bazar",
     // P1-1: drop accidental Bakery/Chocolate brownie leakage from SWEETS demo seed.
     "samriddhi-sweets",
+    // P0-1: re-seed shop fixtures so cross-role food/home/people thumbs are cleared.
+    "raghuvanshi-stores",
+    "firayalal-nxt",
+    "mk-jewellers",
 ])
 
 export function orderedDemoShops<T extends { slug: string }>(shops: T[]): T[] {
