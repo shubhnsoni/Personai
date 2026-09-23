@@ -10,3 +10,19 @@ export {
     creatorGuestMenuEmptyCopy,
     shopCatalogGuestEmptyCopy,
 } from "./guest-menu"
+
+export {
+    CREATOR_SHOWCASE,
+    CREATOR_DISCOVERY_ALIAS_MAP,
+    CREATOR_DISCOVERY_ALIASES,
+    CREATOR_DISCOVERY_REQUIRED_ALIASES,
+    creatorDiscoveryRedirects,
+    isCreatorDiscoveryAlias,
+    creatorDiscoveryDestinationSlug,
+    creatorDiscoveryDestinationForPath,
+    isCreatorDiscoveryShowcaseSlug,
+} from "./discovery-aliases"
+export type {
+    CreatorDiscoveryAlias,
+    CreatorDiscoveryRedirect,
+} from "./discovery-aliases"
