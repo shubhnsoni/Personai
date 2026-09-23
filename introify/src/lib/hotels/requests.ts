@@ -42,6 +42,7 @@ export type HotelGuestIntent =
     | { kind: "experiences" }
     | { kind: "local_guide" }
     | { kind: "checkout"; roomNumber?: string }
+    | { kind: "stay_times" }
     | { kind: "feedback" }
     | { kind: "maintenance"; sku: string; roomNumber?: string }
     | { kind: "emergency" }
@@ -144,6 +145,34 @@ function matchMaintenance(lower: string) {
     return matchSkuBounded(lower, DEFAULT_MAINTENANCE_CATALOGUE)
 }
 
+
+/** Guest asks for check-in/checkout clock times (FAQ), not to leave the room. */
+export function isHotelStayTimesFaq(query: string): boolean {
+    const lower = query.toLowerCase()
+    const mentionsIn = /\bcheck[- ]?in\b/.test(lower)
+    const mentionsOut = /\bcheck(?:ing)?[- ]?out\b/.test(lower) || /\bcheckout\b/.test(lower)
+    if (!mentionsIn && !mentionsOut) return false
+    if (isExplicitHotelCheckoutRequest(lower)) return false
+    // Late-checkout *request* phrasing stays an action unless it is clearly a time ask.
+    if (/\b(late\s*check[- ]?out|checkout late)\b/.test(lower)
+        && !/\b(what\s+time|when\s+(?:is|are|do|does)|hours?)\b/.test(lower)) {
+        return false
+    }
+    if (/\b(what\s+time|at\s+what\s+time|when\s+(?:is|are|do|does|can)|hours?)\b/.test(lower)) return true
+    if (/\b(check[- ]?in|checkout|check[- ]?out)\s+times?\b/.test(lower)) return true
+    if (/\btimes?\s+(?:for\s+)?(check[- ]?in|checkout|check[- ]?out)\b/.test(lower)) return true
+    if (/\bwhat(?:'?s| is)\s+(?:the\s+)?(check[- ]?in|checkout|check[- ]?out)\b/.test(lower)) return true
+    // Pair ask without action verbs: "check-in and checkout at Haven…"
+    if (mentionsIn && mentionsOut) return true
+    return false
+}
+
+/** Guest wants reception to process leaving / file a checkout ticket. */
+export function isExplicitHotelCheckoutRequest(query: string): boolean {
+    const lower = query.toLowerCase()
+    return /\b(check\s+me\s+out|checking\s+out|ready\s+to\s+(?:check\s*out|checkout|leave)|file(?:\s+a)?\s+checkout|please\s+check(?:\s+me)?\s*out|want\s+to\s+check\s*out|we\s+are\s+checking\s+out)\b/.test(lower)
+}
+
 function isEmergency(lower: string) {
     return /\b(emergency|ambulance|i'?m hurt|im hurt|need a doctor|medical emergency)\b/.test(lower)
         || /\b(fire|smoke) (in|at|on)\b/.test(lower)
@@ -178,8 +207,10 @@ export function parseHotelGuestIntent(query: string): HotelGuestIntent {
     }
     if (/\b(quiet hours|parking|property hours|policies)\b/.test(lower)) return { kind: "knowledge", query: text }
     if (/\b(wifi|wi-fi|password|network)\b/.test(lower)) return { kind: "wifi" }
+    // P0-1: FAQ about times before any checkout/late-checkout action routing.
+    if (isHotelStayTimesFaq(lower)) return { kind: "stay_times" }
     if (/\b(late\s*check[- ]?out|checkout late)\b/.test(lower)) return { kind: "late_checkout" }
-    if (/\b(check(?:ing)?\s*out|ready to (?:check\s*out|leave))\b/.test(lower)) {
+    if (isExplicitHotelCheckoutRequest(lower)) {
         return { kind: "checkout", roomNumber: extractRoomNumber(text) }
     }
     if (/\b(talk to (reception|someone|a person|staff|human)|human|receptionist|front desk)\b/.test(lower)) {

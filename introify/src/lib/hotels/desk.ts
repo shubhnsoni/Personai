@@ -289,6 +289,16 @@ export function hotelDeskReply(query: string, ctx: HotelDeskContext): HotelDeskR
         ].filter(Boolean)
         return { text: `${card}\nWhat I can actually point to from ${name}:\n${blocks.join("\n")}` }
     }
+    if (intent.kind === "stay_times") {
+        const cin = (ctx.checkInTime || "").trim()
+        const cout = (ctx.checkOutTime || "").trim()
+        const checkInLine = cin ? `Check-in **${cin}**` : "Check-in is not configured"
+        const checkOutLine = cout ? `checkout **${cout}**` : "checkout is not configured"
+        // Facts only — never attach a Checkout Request action/card (P0-1).
+        return {
+            text: `At ${name}: ${checkInLine}; ${checkOutLine}.`,
+        }
+    }
     if (intent.kind === "checkout") {
         const card = encodeHotelCard({
             type: "checkout",

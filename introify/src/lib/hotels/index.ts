@@ -53,6 +53,8 @@ export {
     hotelRequestStatusLabel,
     hotelRequestAdvanceLabel,
     parseHotelGuestIntent,
+    isHotelStayTimesFaq,
+    isExplicitHotelCheckoutRequest,
     departmentForType,
     catalogRequestItem,
     type HotelGuestIntent,

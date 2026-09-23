@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import type { AiMode } from "@/lib/billing/catalog"
 import { hasCodexAuthSource } from "@/lib/codex-auth"
 import { streamCodexChat } from "@/lib/codex-chat"
+import { isExplicitHotelCheckoutRequest, isHotelStayTimesFaq } from "@/lib/hotels"
 
 export type ApiRecipe = {
     mode: AiMode
@@ -354,7 +355,8 @@ export function boundedChatInput(
         : /talk to reception|front desk|human/i.test(latest) ? "talkToReception"
         : /late\s*check/i.test(latest) ? "requestLateCheckout"
         : /@/.test(latest) || /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/i.test(latest) || /\b(book|hire|contact|email me|get in touch)\b/i.test(latest) ? "collectLead"
-        : /\b(check(?:ing)?\s*out|ready to check\s*out)\b/i.test(latest) ? "requestHotelCheckout"
+        : isHotelStayTimesFaq(latest) ? null
+        : isExplicitHotelCheckoutRequest(latest) ? "requestHotelCheckout"
         : /\b(feedback|google review|loved the stay)\b/i.test(latest) ? "submitHotelFeedback"
         : /\b(local guide|what'?s nearby|things to do)\b/i.test(latest) ? "showHotelLocalGuide"
         : /restaurant|hungry|room service/i.test(latest) ? "showHotelRestaurants"

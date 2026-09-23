@@ -38,7 +38,7 @@ export const DEFAULT_HOTEL_KNOWLEDGE: HotelKnowledgeDoc[] = [
         title: "Hours",
         body: "Reception 00:00–23:59. Check-in 14:00. Checkout 11:00.",
         guestVisible: true,
-        aliases: ["hours", "reception hours", "check-in", "checkout time", "property hours"],
+        aliases: ["hours", "reception hours", "check-in", "check-in time", "checkout", "checkout time", "check-out time", "property hours", "what time is check-in", "when is checkout"],
     },
     {
         bucket: "ROOMS",
