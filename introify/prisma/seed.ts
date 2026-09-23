@@ -238,6 +238,9 @@ async function main() {
             description: 'A practical PDF to name your offer, price it, and write the page.',
             type: 'PDF',
             priceCents: 2900,
+            currency: 'USD',
+            thumbnailUrl: '/uploads/try-zine.jpg',
+            fulfillment: 'DIGITAL',
             isActive: true,
         },
         {
@@ -245,9 +248,12 @@ async function main() {
             description: 'A short script your AI (or you) can use to qualify inbound leads.',
             type: 'PDF',
             priceCents: 1900,
+            currency: 'USD',
+            thumbnailUrl: '/uploads/try-course.jpg',
+            fulfillment: 'DIGITAL',
             isActive: true,
         },
-    ], ['title', 'description', 'type', 'priceCents', 'isActive'])
+    ], ['title', 'description', 'type', 'priceCents', 'currency', 'thumbnailUrl', 'fulfillment', 'isActive'])
     console.log('Ensured demo digital products')
 
     const existingCourse = await prisma.course.findFirst({

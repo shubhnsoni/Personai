@@ -32,6 +32,13 @@ describe("catalogDisplayCurrency", () => {
         expect(catalogDisplayCurrency("DESIGNER", "USD", "INR")).toBe("INR")
     })
 
+    it("keeps CONSULTANT stored USD (demo Riley Vale PDFs) under an INR request", () => {
+        expect(catalogDisplayCurrency("CONSULTANT", "USD", "INR")).toBe("USD")
+        expect(catalogDisplayCurrency("CONSULTANT", "USD", "USD")).toBe("USD")
+        expect(formatStoredPrice(2900, "USD", catalogDisplayCurrency("CONSULTANT", "USD", "INR"))).toBe("$29")
+        expect(formatStoredPrice(1900, "USD", catalogDisplayCurrency("CONSULTANT", "USD", "INR"))).toBe("$19")
+    })
+
     it("formats Cream Of Tomato paise as rupees on food PDP, not geo dollars", () => {
         expect(formatStoredPrice(15900, "INR", catalogDisplayCurrency("CAFE", "INR", "USD"))).toMatch(/159/)
         expect(formatStoredPrice(15900, "INR", catalogDisplayCurrency("CAFE", "INR", "USD"))).not.toMatch(/\$/)

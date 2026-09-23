@@ -87,8 +87,8 @@ function demoContent() {
             { name: "Offer review", description: "Fast feedback on your current page, pricing, and call-to-action.", priceCents: 9000, durationMinutes: 30, isActive: true },
         ] },
         digitalProducts: { create: [
-            { title: "Offer stack workbook", description: "A practical PDF to name your offer, price it, and write the page.", type: "PDF", priceCents: 2900, isActive: true },
-            { title: "Discovery call script", description: "A short script your AI (or you) can use to qualify inbound leads.", type: "PDF", priceCents: 1900, isActive: true },
+            { title: "Offer stack workbook", description: "A practical PDF to name your offer, price it, and write the page.", type: "PDF", priceCents: 2900, currency: "USD", thumbnailUrl: "/uploads/try-zine.jpg", fulfillment: "DIGITAL", isActive: true },
+            { title: "Discovery call script", description: "A short script your AI (or you) can use to qualify inbound leads.", type: "PDF", priceCents: 1900, currency: "USD", thumbnailUrl: "/uploads/try-course.jpg", fulfillment: "DIGITAL", isActive: true },
         ] },
     }
 }

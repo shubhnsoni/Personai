@@ -4,6 +4,7 @@ import { resolveThemedOrb } from "@/lib/bloub/catalog"
 import { prisma } from "@/lib/prisma"
 import { parseGallery, parseVariants, whatsappHref } from "@/lib/commerce"
 import { resolveShopProductImage, isCrossRoleShopProductImage, usesStrictShopProductImagery } from "@/lib/shop-product-imagery"
+import { digitalCoverForProduct, pdpAllowsBlisterFallback } from "@/lib/shop/digital-cover"
 import { extraDetailPhotos, parsePdpDisplay } from "@/lib/shop/pdp-display"
 import type { PdpRailItem } from "@/components/shop/pdp-light"
 import { catalogDisplayCurrency, catalogLabel, dietLabel, isRestaurant, serveLabel } from "@/lib/menu"
@@ -65,9 +66,14 @@ export default async function ProductSalesPage({
     const pharmacy = isPharmacy(product.profile.roleTemplate)
     const rawPhotos = parseGallery(product.galleryUrls, product.thumbnailUrl)
     const role = product.profile.roleTemplate
-    const photos = usesStrictShopProductImagery(role)
+    let photos = usesStrictShopProductImagery(role)
         ? rawPhotos.filter((url) => !isCrossRoleShopProductImage(url))
         : rawPhotos
+    // Creator P0-2: PDF/digital with no owner photo get workbook/course art — not pharmacy blister.
+    if (photos.length === 0 && !pharmacy) {
+        const cover = digitalCoverForProduct(product.type, product.title)
+        if (cover) photos = [cover]
+    }
     // If every gallery entry was cross-role stock, fall through to neutral ShopCover (empty photos).
     const variants = parseVariants(product.variantsJson)
     const extras = extrasOf(product.profile.personalityConfig)
@@ -169,6 +175,7 @@ export default async function ProductSalesPage({
             title={product.title}
             content={content}
             photos={photos}
+            blister={pdpAllowsBlisterFallback(product.profile.roleTemplate, pharmacy)}
             priceLabel={priceLabel}
             compareAtLabel={compareAtLabel}
             stockLabel={stockLabel}

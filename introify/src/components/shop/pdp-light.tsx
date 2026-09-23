@@ -57,6 +57,7 @@ export function PdpLight({
     showMore,
     related,
     bestsellers,
+    blister,
 }: {
     slug: string
     shopName: string
@@ -82,11 +83,14 @@ export function PdpLight({
     showMore?: boolean
     related?: PdpRailItem[]
     bestsellers?: PdpRailItem[]
+    /** Pharmacy-only empty-gallery art. Digital/PDF must not use blister packs. */
+    blister?: boolean
 }) {
     const life = lifestyleUrl || photos[1] || photos[0] || PDP_LIFESTYLE
     const moreImages = extraDetailPhotos(photos)
     const showDetails = Boolean(showMore) && moreImages.length > 0
-    const blister = photos.length === 0
+    // Creator P0-2: empty digital catalogs used to fall into pharmacy blister art.
+    const showBlister = Boolean(blister) && photos.length === 0
 
     return (
         <div
@@ -112,7 +116,7 @@ export function PdpLight({
 
             <main className="wrap">
                 <div className="pdp">
-                    <PdpGallery photos={photos} title={title} blister={blister} />
+                    <PdpGallery photos={photos} title={title} blister={showBlister} />
 
                     <section className="info">
                         <div className="kicker">{content.kicker}</div>

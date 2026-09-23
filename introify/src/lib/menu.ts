@@ -180,6 +180,9 @@ const PRESERVE_CATALOG_CURRENCY_KITS = new Set([
     "PHARMACY",
     "AUTO_PARTS",
     "DISTRIBUTOR",
+    // Demo / creator digital catalogs (Riley Vale CONSULTANT) keep stored USD —
+    // geo converting $29 → ₹2,523 made list/detail disagree with Order · $29.
+    "CONSULTANT",
 ])
 
 export function catalogDisplayCurrency(
