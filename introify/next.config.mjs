@@ -66,6 +66,19 @@ const nextConfig = {
       { source: "/try-photographer/:path*", destination: "/lets-click-ratu-road/:path*", permanent: false },
       { source: "/try-ca", destination: "/singh-raushan-doranda", permanent: false },
       { source: "/try-ca/:path*", destination: "/singh-raushan-doranda/:path*", permanent: false },
+      // SALON P1-1 discovery aliases -> LIVE showcases (H Square / Prince).
+      { source: "/try-salon", destination: "/h-square-salon-harmu", permanent: false },
+      { source: "/try-salon/:path*", destination: "/h-square-salon-harmu/:path*", permanent: false },
+      { source: "/salon", destination: "/h-square-salon-harmu", permanent: false },
+      { source: "/salon/:path*", destination: "/h-square-salon-harmu/:path*", permanent: false },
+      { source: "/try-spa", destination: "/h-square-salon-harmu", permanent: false },
+      { source: "/try-spa/:path*", destination: "/h-square-salon-harmu/:path*", permanent: false },
+      { source: "/spa", destination: "/h-square-salon-harmu", permanent: false },
+      { source: "/spa/:path*", destination: "/h-square-salon-harmu/:path*", permanent: false },
+      { source: "/try-barber", destination: "/prince-barber-lalpur", permanent: false },
+      { source: "/try-barber/:path*", destination: "/prince-barber-lalpur/:path*", permanent: false },
+      { source: "/barber", destination: "/prince-barber-lalpur", permanent: false },
+      { source: "/barber/:path*", destination: "/prince-barber-lalpur/:path*", permanent: false },
     ];
   },
   async rewrites() {
