@@ -20,6 +20,9 @@ export const FORCE_REFRESH_SLUGS = new Set([
     "raghuvanshi-stores",
     "firayalal-nxt",
     "mk-jewellers",
+    // Salon P1-2: clear mug/lamp/gift-box thumbs on H Square + Prince retail.
+    "h-square-salon-harmu",
+    "prince-barber-lalpur",
 ])
 
 export function orderedDemoShops<T extends { slug: string }>(shops: T[]): T[] {
