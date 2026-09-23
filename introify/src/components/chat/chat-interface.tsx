@@ -22,7 +22,7 @@ import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { wantsLiveSupport } from "@/lib/live-support"
 import { toast } from "sonner"
 import { resolveBloubTheme, resolveThemedOrb } from "@/lib/bloub/catalog"
-import { ASSISTANT_PENDING_DWELL_MS, assistantPendingPhrase, typingInputGaze } from "@/lib/chat-gaze"
+import { ASSISTANT_PENDING_TICK_MS, assistantPendingElapsedLabel, assistantPendingPhrase, typingInputGaze } from "@/lib/chat-gaze"
 import type { PublicAnimationConfig } from "@/lib/profile-branding"
 import { subscribeVisualKeyboard, visualKeyboardOpen } from "@/lib/visual-keyboard"
 import "@/components/profile/retro-lcd-theme.css"
@@ -1194,10 +1194,12 @@ function PendingStatus({ name }: { name: string }) {
     const [elapsed, setElapsed] = useState(0)
     useEffect(() => {
         const started = Date.now()
-        const id = window.setInterval(() => setElapsed(Date.now() - started), ASSISTANT_PENDING_DWELL_MS)
+        // HOTEL P1-6: tick often so phrase rotation + elapsed seconds feel alive during long grounding.
+        const id = window.setInterval(() => setElapsed(Date.now() - started), ASSISTANT_PENDING_TICK_MS)
         return () => window.clearInterval(id)
     }, [])
     const phrase = assistantPendingPhrase(name, elapsed)
+    const elapsedLabel = assistantPendingElapsedLabel(elapsed)
     return (
         <span data-pending-status className="relative block min-h-[1.15em] overflow-hidden px-1 text-[11px] font-medium tracking-wide text-profile-mute" aria-live="polite">
             <AnimatePresence mode="wait" initial={false}>
@@ -1210,6 +1212,11 @@ function PendingStatus({ name }: { name: string }) {
                     transition={{ duration: reduce ? 0 : 0.55, ease: [0.22, 1, 0.36, 1] }}
                 >
                     {phrase}
+                    {elapsedLabel ? (
+                        <span data-pending-elapsed className="ml-1.5 tabular-nums opacity-70" aria-hidden>
+                            {elapsedLabel}
+                        </span>
+                    ) : null}
                 </motion.span>
             </AnimatePresence>
         </span>

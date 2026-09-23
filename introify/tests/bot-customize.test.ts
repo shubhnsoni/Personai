@@ -37,12 +37,13 @@ describe("blob gaze while typing", () => {
         expect(typingInputGaze(0, false)).toBeNull()
     })
 
-    it("keeps pending chat copy as two-word technical phrases that dwell longer", () => {
-        expect(assistantPendingPhrase("SkyDine", 0)).toBe("Parsing context")
-        expect(assistantPendingPhrase("SkyDine", 8599)).toBe("Parsing context")
-        expect(assistantPendingPhrase("SkyDine", 8600)).toBe("Indexing knowledge")
-        expect(assistantPendingPhrase("SkyDine", 0).split(" ").length).toBe(2)
-        expect(assistantPendingPhrase("SkyDine", 17200).split(" ").length).toBe(2)
+    it("rotates guest-honest pending chat copy on a short dwell (HOTEL P1-6)", () => {
+        expect(assistantPendingPhrase("SkyDine", 0)).toBe("Looking that up…")
+        expect(assistantPendingPhrase("SkyDine", 2499)).toBe("Looking that up…")
+        expect(assistantPendingPhrase("SkyDine", 2500)).toBe("Checking property notes…")
+        expect(assistantPendingPhrase("SkyDine", 8000)).toBe("Still working — almost there…")
+        expect(assistantPendingPhrase("SkyDine", 15000)).toBe("Taking a bit longer — hang tight…")
+        expect(assistantPendingPhrase("SkyDine", 0)).not.toMatch(/Indexing knowledge/i)
     })
 
     it("looks down and tracks left to right as the composer fills", () => {
