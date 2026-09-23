@@ -11,6 +11,7 @@ type Service = {
     name: string
     description: string | null
     priceCents: number
+    currency?: string | null
     isFree: boolean
     durationMinutes: number
     isActive: boolean
@@ -118,7 +119,7 @@ export function BookList({
                                     {s.durationMinutes} min
                                 </p>
                             </div>
-                            <p className="shrink-0 text-lg font-semibold tabular-nums">{money(s.priceCents)}</p>
+                            <p className="shrink-0 text-lg font-semibold tabular-nums">{s.isFree ? "Free" : money(s.priceCents, s.currency)}</p>
                         </div>
                         <Button
                             className="mt-3 h-10 w-full rounded-full bg-brand text-brand-foreground"

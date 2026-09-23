@@ -51,6 +51,7 @@ interface ContentPanelProps {
             name: string
             description: string | null
             priceCents: number
+            currency?: string | null
             isFree: boolean
             durationMinutes: number
             isActive: boolean
@@ -426,7 +427,7 @@ function ServicesView({ data, onBook }: { data: ContentPanelProps["data"]; onBoo
                                 <p className="mt-1 text-sm text-zinc-400">{service.description}</p>
                             ) : null}
                         </div>
-                        <p className="shrink-0 text-sm font-semibold tabular-nums text-white">{money(service.priceCents)}</p>
+                        <p className="shrink-0 text-sm font-semibold tabular-nums text-white">{service.isFree ? "Free" : money(service.priceCents, service.currency)}</p>
                     </div>
                     <div className="flex items-center justify-between gap-3">
                         <span className="flex items-center gap-1.5 text-xs text-zinc-500">

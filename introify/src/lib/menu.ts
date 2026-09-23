@@ -183,6 +183,8 @@ const PRESERVE_CATALOG_CURRENCY_KITS = new Set([
     // Demo / creator digital catalogs (Riley Vale CONSULTANT) keep stored USD —
     // geo converting $29 → ₹2,523 made list/detail disagree with Order · $29.
     "CONSULTANT",
+    // Salon/barber/gym/yoga book kits: INR paise stay INR (no USD×87 FX).
+    "SALON_SPA",
 ])
 
 export function catalogDisplayCurrency(

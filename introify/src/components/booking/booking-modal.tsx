@@ -19,6 +19,7 @@ interface ServiceOffering {
     name: string
     description: string | null
     priceCents: number
+    currency?: string | null
     isFree: boolean
     durationMinutes: number
     isActive: boolean
@@ -239,7 +240,7 @@ export function BookingModal({ isOpen, onClose, profile, selectedServiceId }: Bo
                                                         </div>
                                                         <div className="text-right shrink-0 ml-4">
                                                             <div className="font-semibold text-lg">
-                                                                {money(service.priceCents)}
+                                                                {service.isFree ? "Free" : money(service.priceCents, service.currency)}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -351,7 +352,7 @@ export function BookingModal({ isOpen, onClose, profile, selectedServiceId }: Bo
                                                 <div className="flex justify-between border-t border-zinc-800 pt-2 mt-2">
                                                     <span className="text-zinc-400">Total</span>
                                                     <span className="font-semibold text-lg">
-                                                        {money(selectedService.priceCents)}
+                                                        {selectedService.isFree ? "Free" : money(selectedService.priceCents, selectedService.currency)}
                                                     </span>
                                                 </div>
                                             </div>
