@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { ensureTryFoodShowcase, isTryFoodShowcaseSlug } from "@/lib/demo-shops/ensure-try-food"
+import { ensureTryShopShowcase, isTryShopShowcaseSlug } from "@/lib/demo-shops/ensure-try-shop"
 import { ensureLittleHoursShowcase, isLittleHoursSlug } from "@/lib/showcase-profiles"
 import ShopPage from "../shop/page"
 
@@ -12,6 +13,9 @@ export default async function MenuPage(props: {
     const { slug } = await props.params
     if (isTryFoodShowcaseSlug(slug)) {
         await ensureTryFoodShowcase(prisma, slug)
+    }
+    if (isTryShopShowcaseSlug(slug)) {
+        await ensureTryShopShowcase(prisma, slug)
     }
     if (isLittleHoursSlug(slug)) {
         await ensureLittleHoursShowcase(prisma, slug)

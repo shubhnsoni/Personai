@@ -22,6 +22,14 @@ const nextConfig = {
       { source: "/signup", destination: "/sign-up", permanent: true },
       { source: "/signin", destination: "/sign-in", permanent: true },
       { source: "/login", destination: "/sign-in", permanent: true },
+      // P1-2 SHOP marketing aliases → canonical try-shop (dedicated kits like try-boutique/try-kirana stay).
+      { source: "/try-grocery", destination: "/try-shop", permanent: false },
+      { source: "/try-retail", destination: "/try-shop", permanent: false },
+      { source: "/try-jewellery", destination: "/try-shop", permanent: false },
+      { source: "/try-fashion", destination: "/try-shop", permanent: false },
+      { source: "/try-electronics", destination: "/try-shop", permanent: false },
+      { source: "/try-wholesale", destination: "/try-shop", permanent: false },
+      { source: "/try-market", destination: "/try-shop", permanent: false },
     ];
   },
   async rewrites() {
