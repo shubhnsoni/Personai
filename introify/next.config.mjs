@@ -90,6 +90,19 @@ const nextConfig = {
       { source: "/try-yoga/:path*", destination: "/natraj-yoga-kutchery/:path*", permanent: false },
       { source: "/yoga", destination: "/natraj-yoga-kutchery", permanent: false },
       { source: "/yoga/:path*", destination: "/natraj-yoga-kutchery/:path*", permanent: false },
+      // CLINIC P1-1 discovery aliases -> LIVE showcase (JK Sharma Harmu).
+      { source: "/try-clinic", destination: "/jk-sharma-clinic-harmu", permanent: false },
+      { source: "/try-clinic/:path*", destination: "/jk-sharma-clinic-harmu/:path*", permanent: false },
+      { source: "/clinic", destination: "/jk-sharma-clinic-harmu", permanent: false },
+      { source: "/clinic/:path*", destination: "/jk-sharma-clinic-harmu/:path*", permanent: false },
+      { source: "/try-dental", destination: "/jk-sharma-clinic-harmu", permanent: false },
+      { source: "/try-dental/:path*", destination: "/jk-sharma-clinic-harmu/:path*", permanent: false },
+      { source: "/dental", destination: "/jk-sharma-clinic-harmu", permanent: false },
+      { source: "/dental/:path*", destination: "/jk-sharma-clinic-harmu/:path*", permanent: false },
+      { source: "/try-doctor", destination: "/jk-sharma-clinic-harmu", permanent: false },
+      { source: "/try-doctor/:path*", destination: "/jk-sharma-clinic-harmu/:path*", permanent: false },
+      { source: "/doctor", destination: "/jk-sharma-clinic-harmu", permanent: false },
+      { source: "/doctor/:path*", destination: "/jk-sharma-clinic-harmu/:path*", permanent: false },
     ];
   },
   async rewrites() {
