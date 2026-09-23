@@ -1,8 +1,14 @@
 import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
+import { hotelQrPath, isHotelRole } from "@/lib/hotels"
 import { isRestaurant } from "@/lib/menu"
-import { guestPrintFooterHint } from "@/lib/guest-print-copy"
+import {
+    guestPrintFooterHint,
+    guestPrintKicker,
+    guestPrintScanCopy,
+    hotelGuestPrintEmptyRoomsCopy,
+} from "@/lib/guest-print-copy"
 import { menuUrl, qrSvg } from "@/lib/restaurants/print-kit"
 import { GuestPrintActions } from "@/components/profile/guest-qr-share"
 
@@ -44,11 +50,8 @@ export default async function GuestPrintPage({ params }: { params: Promise<{ slu
     const proto = h.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https")
     const origin = `${proto}://${host}`
     const food = isRestaurant(profile.roleTemplate)
+    const hotel = isHotelRole(profile.roleTemplate)
     const accent = profile.themeColor && profile.themeColor !== "#000000" ? profile.themeColor : "#00D7FF"
-    const target = food
-        ? menuUrl(origin, profile.slug)
-        : `${origin}/${profile.slug}`
-    const qr = qrSvg(target, { dark: "#141311", light: "#fffdf8" })
     const logo = profile.shopLogoUrl || profile.imageUrl
     const tables = food
         ? await prisma.restaurantTable.findMany({
@@ -58,7 +61,25 @@ export default async function GuestPrintPage({ params }: { params: Promise<{ slu
             select: { label: true, code: true },
         })
         : []
+    const hotelQrs = hotel
+        ? await prisma.hotelQr.findMany({
+            where: { profileId: profile.id },
+            include: { room: { select: { number: true } } },
+            orderBy: [{ kind: "asc" }, { createdAt: "asc" }],
+            take: 24,
+        })
+        : []
+    const propertyQr = hotelQrs.find((row) => row.kind.toUpperCase() === "PROPERTY")
+    const roomQrs = hotelQrs.filter((row) => row.kind.toUpperCase() === "ROOM" && row.room?.number)
+    const target = food
+        ? menuUrl(origin, profile.slug)
+        : hotel && propertyQr
+            ? `${origin}${hotelQrPath(propertyQr.code)}`
+            : `${origin}/${profile.slug}`
+    const qr = qrSvg(target, { dark: "#141311", light: "#fffdf8" })
     const footerHint = guestPrintFooterHint(profile.roleTemplate)
+    const kicker = guestPrintKicker(profile.roleTemplate)
+    const scanCopy = guestPrintScanCopy(profile.roleTemplate)
 
     return (
         <div className="min-h-dvh bg-[#fbf7ef] text-[#141311]">
@@ -67,6 +88,7 @@ export default async function GuestPrintPage({ params }: { params: Promise<{ slu
                 <section
                     className="overflow-hidden rounded-[1.5rem] border border-black/10 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none"
                     style={{ borderTopWidth: 6, borderTopColor: accent }}
+                    data-hotel-guest-print={hotel ? "true" : undefined}
                 >
                     <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:p-8">
                         <div className="min-w-0 flex-1 space-y-3">
@@ -77,16 +99,12 @@ export default async function GuestPrintPage({ params }: { params: Promise<{ slu
                                 ) : null}
                                 <div className="min-w-0">
                                     <p className="text-[10px] font-medium uppercase tracking-[0.22em]" style={{ color: accent }}>
-                                        {food ? "Menu QR" : "Page QR"}
+                                        {kicker}
                                     </p>
                                     <h1 className="truncate text-2xl font-semibold tracking-tight">{profile.displayName}</h1>
                                 </div>
                             </div>
-                            <p className="text-sm text-[#3f3a34]">
-                                {food
-                                    ? "Scan for the live menu. Works on any phone — no app."
-                                    : "Scan to open this Introify page."}
-                            </p>
+                            <p className="text-sm text-[#3f3a34]">{scanCopy}</p>
                             <p className="break-all font-mono text-[11px] text-[#6b645b]">{target.replace(/^https?:\/\//, "")}</p>
                         </div>
                         <div
@@ -145,6 +163,35 @@ export default async function GuestPrintPage({ params }: { params: Promise<{ slu
                 {food && !tables.length ? (
                     <p className="rounded-2xl border border-dashed border-black/15 bg-white/70 px-4 py-6 text-center text-sm text-[#6b645b]">
                         No active tables yet — counter / menu QR above still works. Add tables on the floor desk for per-table codes.
+                    </p>
+                ) : null}
+
+                {hotel && roomQrs.length ? (
+                    <section className="space-y-3 break-before-page print:break-before-page" data-hotel-room-tents="true">
+                        <h2 className="text-lg font-semibold tracking-tight">Room tents</h2>
+                        <p className="text-xs text-[#6b645b]">Print and place one per room. Scan opens room-aware concierge.</p>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            {roomQrs.slice(0, 12).map((row) => {
+                                const url = `${origin}${hotelQrPath(row.code)}`
+                                const svg = qrSvg(url, { dark: "#141311", light: "#fffdf8" })
+                                const label = row.label || `Room ${row.room!.number}`
+                                return (
+                                    <article key={row.code} className="rounded-2xl border border-black/10 bg-white p-3 text-center">
+                                        <p className="mb-2 text-sm font-medium">{label}</p>
+                                        <div className="mx-auto w-[78%]" dangerouslySetInnerHTML={{ __html: svg }} />
+                                        <p className="mt-2 break-all font-mono text-[9px] text-[#6b645b]">
+                                            {url.replace(/^https?:\/\//, "")}
+                                        </p>
+                                    </article>
+                                )
+                            })}
+                        </div>
+                    </section>
+                ) : null}
+
+                {hotel && !roomQrs.length ? (
+                    <p className="rounded-2xl border border-dashed border-black/15 bg-white/70 px-4 py-6 text-center text-sm text-[#6b645b]">
+                        {hotelGuestPrintEmptyRoomsCopy()}
                     </p>
                 ) : null}
 
