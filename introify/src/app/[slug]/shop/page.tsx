@@ -23,7 +23,7 @@ import { fitmentLine, isAutoParts, parseFitment } from "@/lib/autoparts/fitment"
 import { GoldRateStrip } from "@/components/shop/gold-rate-strip"
 import { SessionProbe } from "@/components/profile/session-probe"
 import { CreatorGuestMenu } from "@/components/creator/creator-guest-menu"
-import { isCreatorPortfolioMenuRole } from "@/lib/creator"
+import { shouldUseCreatorGuestMenuEmpty } from "@/lib/creator"
 
 export const dynamic = "force-dynamic"
 
@@ -82,11 +82,11 @@ export default async function ShopPage({
         })
         : null
 
-    // CREATOR P0-1: empty DESIGNER / DEVELOPER / SHOW_PORTFOLIO kits get portfolio chrome
-    // + guest-honest empty (never owner import CTA). Populated catalogs fall through.
+    // CREATOR P1-3: empty DESIGNER / CREATOR / COACH / CONSULTANT kits get role-honest
+    // Portfolio / Work / Services chrome (never forced Shop). Populated catalogs fall through.
     if (
         !restaurant
-        && isCreatorPortfolioMenuRole(profile.roleTemplate, profile.primaryGoal)
+        && shouldUseCreatorGuestMenuEmpty(profile.roleTemplate, profile.primaryGoal)
         && profile.digitalProducts.length === 0
     ) {
         return (

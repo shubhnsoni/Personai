@@ -67,7 +67,7 @@ describe("CREATOR P0-1 guest /menu helpers", () => {
 describe("CREATOR P0-1 menu route wiring", () => {
     it("branches empty portfolio kits to CreatorGuestMenu from ShopPage", () => {
         const shopPage = readFileSync(join(root, "src/app/[slug]/shop/page.tsx"), "utf8")
-        expect(shopPage).toMatch(/isCreatorPortfolioMenuRole/)
+        expect(shopPage).toMatch(/shouldUseCreatorGuestMenuEmpty|isCreatorPortfolioMenuRole/)
         expect(shopPage).toMatch(/CreatorGuestMenu/)
         expect(shopPage).toMatch(/digitalProducts\.length === 0/)
         expect(shopPage).toMatch(/ShopCatalog/)

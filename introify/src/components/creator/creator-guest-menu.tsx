@@ -1,12 +1,14 @@
 import Link from "@/components/navigation/transition-link"
 import { CatalogHeader } from "@/components/shop/catalog-header"
 import {
+    CREATOR_GUEST_MENU_LABEL_SERVICES,
+    CREATOR_GUEST_MENU_LABEL_WORK,
     creatorGuestMenuEmptyCopy,
     creatorGuestMenuLabel,
 } from "@/lib/creator/guest-menu"
 
 /**
- * Guest-honest empty catalog for DESIGNER / DEVELOPER / SHOW_PORTFOLIO kits.
+ * Guest-honest empty catalog for DESIGNER / CREATOR / COACH / CONSULTANT kits.
  * Desktop uses the same max-w-5xl catalog shell as Shop — never a phone-shell column.
  */
 export function CreatorGuestMenu({
@@ -30,6 +32,12 @@ export function CreatorGuestMenu({
 }) {
     const label = creatorGuestMenuLabel(role, primaryGoal)
     const empty = creatorGuestMenuEmptyCopy({ displayName: name, role, primaryGoal })
+    const subtitle =
+        label === CREATOR_GUEST_MENU_LABEL_SERVICES
+            ? "Selected services and conversations — not a product import desk."
+            : label === CREATOR_GUEST_MENU_LABEL_WORK
+              ? "Selected work and conversations — not a product import desk."
+              : "Selected work and conversations — not a product import desk."
 
     return (
         <div data-creator-guest-menu="true" className="min-h-dvh bg-background text-foreground">
@@ -51,7 +59,7 @@ export function CreatorGuestMenu({
                     </p>
                     <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{name}</h1>
                     <p className="mt-1.5 text-sm text-muted-foreground">
-                        Selected work and conversations — not a product import desk.
+                        {subtitle}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
                         <Link
