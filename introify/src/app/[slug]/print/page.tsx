@@ -2,6 +2,7 @@ import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { isRestaurant } from "@/lib/menu"
+import { guestPrintFooterHint } from "@/lib/guest-print-copy"
 import { menuUrl, qrSvg } from "@/lib/restaurants/print-kit"
 import { GuestPrintActions } from "@/components/profile/guest-qr-share"
 
@@ -57,6 +58,7 @@ export default async function GuestPrintPage({ params }: { params: Promise<{ slu
             select: { label: true, code: true },
         })
         : []
+    const footerHint = guestPrintFooterHint(profile.roleTemplate)
 
     return (
         <div className="min-h-dvh bg-[#fbf7ef] text-[#141311]">
@@ -146,10 +148,8 @@ export default async function GuestPrintPage({ params }: { params: Promise<{ slu
                     </p>
                 ) : null}
 
-                {!food ? (
-                    <p className="text-center text-sm text-[#6b645b]">
-                        Prefer the downloadable hotel print package? Use Dashboard → QR &amp; Print when this page is a hotel kit.
-                    </p>
+                {footerHint ? (
+                    <p className="text-center text-sm text-[#6b645b]">{footerHint}</p>
                 ) : null}
             </main>
             <style>{`
