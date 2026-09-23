@@ -7,6 +7,11 @@ import { LiveOrderHeaderButton } from "@/components/shop/live-order-button"
 import { GuestShopOrdersButton } from "@/components/shop/guest-shop-orders"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { cn } from "@/lib/utils"
+import {
+    catalogShopBrandNameClassName,
+    catalogShopHoursDesktopChipClassName,
+    catalogShopHoursUnderBrandClassName,
+} from "@/lib/catalog-header-identity"
 
 export function CatalogHeader({
     slug,
@@ -39,8 +44,17 @@ export function CatalogHeader({
     const hoursLabel = [hours, openToday].map((value) => value?.trim()).find(Boolean) || null
     return (
         <header className="sticky top-0 z-40 border-b border-border/70 bg-background/90 backdrop-blur-md">
-            <div className={cn("mx-auto flex h-14 items-center gap-2 px-4", compact ? "max-w-lg lg:max-w-5xl" : "max-w-5xl")}>
-                <Link href={backHref || `/${slug}`} className="flex min-w-0 flex-1 items-center gap-2.5">
+            <div
+                className={cn(
+                    "mx-auto flex min-h-14 items-center gap-2 px-4",
+                    compact ? "max-w-lg lg:max-w-5xl" : "max-w-5xl",
+                )}
+            >
+                <Link
+                    href={backHref || `/${slug}`}
+                    className="flex min-w-0 flex-1 items-center gap-2.5"
+                    title={name}
+                >
                     {compact && logoUrl ? (
                         <>
                             <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full ring-1 ring-border">
@@ -53,12 +67,26 @@ export function CatalogHeader({
                                 ) : null}
                             </span>
                         </>
-                    ) : (
+                    ) : compact ? (
                         <>
                             <ShopWordmark name={name} logoUrl={logoUrl} className="text-lg text-foreground" />
-                            {compact && hoursLabel ? (
+                            {hoursLabel ? (
                                 <span className="min-w-0 truncate text-[11px] font-medium text-cyan-400">{hoursLabel}</span>
                             ) : null}
+                        </>
+                    ) : (
+                        <>
+                            {logoUrl ? (
+                                <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full ring-1 ring-border">
+                                    <img src={logoUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+                                </span>
+                            ) : null}
+                            <span className="min-w-0 flex-1 basis-[7rem]">
+                                <span className={catalogShopBrandNameClassName}>{name}</span>
+                                {hoursLabel ? (
+                                    <span className={catalogShopHoursUnderBrandClassName}>{hoursLabel}</span>
+                                ) : null}
+                            </span>
                         </>
                     )}
                 </Link>
@@ -66,7 +94,7 @@ export function CatalogHeader({
                     <span className="hidden text-[11px] uppercase tracking-[0.18em] text-muted-foreground sm:inline">{label}</span>
                 )}
                 {!compact && hoursLabel ? (
-                    <span className="min-w-0 max-w-[11rem] truncate text-[11px] font-medium text-cyan-400">{hoursLabel}</span>
+                    <span className={catalogShopHoursDesktopChipClassName}>{hoursLabel}</span>
                 ) : null}
                 {aboutHref ? (
                     <Link
@@ -84,33 +112,35 @@ export function CatalogHeader({
                         Reserve
                     </Link>
                 ) : null}
-                {wa ? (
-                    <a
-                        href={wa}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-zinc-950"
-                        aria-label="WhatsApp"
+                <div className="flex shrink-0 items-center gap-2">
+                    {wa ? (
+                        <a
+                            href={wa}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-zinc-950"
+                            aria-label="WhatsApp"
+                        >
+                            <WhatsAppIcon className="h-4 w-4" />
+                        </a>
+                    ) : null}
+                    {compact ? <LiveOrderHeaderButton slug={slug} /> : <GuestShopOrdersButton slug={slug} />}
+                    {themeToggle ? <ModeToggle /> : null}
+                    <Link
+                        href={`/${slug}/share`}
+                        aria-label={`Share ${name}`}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted"
                     >
-                        <WhatsAppIcon className="h-4 w-4" />
-                    </a>
-                ) : null}
-                {compact ? <LiveOrderHeaderButton slug={slug} /> : <GuestShopOrdersButton slug={slug} />}
-                {themeToggle ? <ModeToggle /> : null}
-                <Link
-                    href={`/${slug}/share`}
-                    aria-label={`Share ${name}`}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted"
-                >
-                    <Share2 className="h-4 w-4" />
-                </Link>
-                <Link
-                    href={`/${slug}`}
-                    aria-label={`Chat with ${name}`}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted"
-                >
-                    <MessageCircle className="h-4 w-4" />
-                </Link>
+                        <Share2 className="h-4 w-4" />
+                    </Link>
+                    <Link
+                        href={`/${slug}`}
+                        aria-label={`Chat with ${name}`}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted"
+                    >
+                        <MessageCircle className="h-4 w-4" />
+                    </Link>
+                </div>
             </div>
         </header>
     )
