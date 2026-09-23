@@ -7,6 +7,8 @@ import { configuredProfileAnimation, publicAnimationConfig } from "@/lib/profile
 import { listShowcaseCreations } from "@/lib/creations"
 import { guestChatExpertise, guestChatHasExpertiseChrome } from "@/lib/guest-chat-expertise"
 import { syncUser } from "@/lib/auth-sync"
+import { isHotelRole, resolveGuestWhatsapp } from "@/lib/hotels"
+
 
 export async function PublicProfileScreen({
     slug,
@@ -57,6 +59,17 @@ export async function PublicProfileScreen({
 
     if (!profile || !profile.isPublic) {
         notFound()
+    }
+
+    // HOTEL P1-4: home contact row reads profile.whatsapp — fall back to receptionWhatsapp
+    // so stay kits match /book + /menu (and Haven after seed still works if profile WA lagged).
+    let guestWhatsapp = profile.whatsapp
+    if (isHotelRole(profile.roleTemplate)) {
+        const property = await prisma.hotelProperty.findUnique({
+            where: { profileId: profile.id },
+            select: { receptionWhatsapp: true },
+        })
+        guestWhatsapp = resolveGuestWhatsapp(profile.whatsapp, property?.receptionWhatsapp)
     }
 
     if (
@@ -124,6 +137,7 @@ export async function PublicProfileScreen({
                 stayPhase={stayPhase || undefined}
                 profile={{
                     ...profile,
+                    whatsapp: guestWhatsapp,
                     hasStory: Boolean(story?.frames.length),
                     events: profile.events.map((event) => ({
                         ...event,

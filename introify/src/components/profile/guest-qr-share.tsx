@@ -7,6 +7,10 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { QrCard } from "@/components/profile/qr-card"
 import { whatsappHref } from "@/lib/commerce"
+import {
+    HOTEL_SHARE_CHAT_RECEPTION_LABEL,
+    HOTEL_SHARE_NO_WA_COPY,
+} from "@/lib/hotels/guest-whatsapp"
 import { cn } from "@/lib/utils"
 
 export function GuestQrPanel({
@@ -53,6 +57,7 @@ export function GuestSharePanel({
     menuUrl,
     whatsapp,
     isFood,
+    isHotel = false,
 }: {
     slug: string
     name: string
@@ -60,6 +65,8 @@ export function GuestSharePanel({
     menuUrl: string | null
     whatsapp?: string | null
     isFood: boolean
+    /** Stay kits: never silently omit handoff when WA is unset. */
+    isHotel?: boolean
 }) {
     const [copied, setCopied] = useState<"page" | "menu" | null>(null)
     const shareTarget = menuUrl || pageUrl
@@ -134,8 +141,12 @@ export function GuestSharePanel({
                     Share
                 </Button>
                 {wa ? (
-                    <Button asChild variant="outline" pill className="h-11">
+                    <Button asChild variant="outline" pill className="h-11" data-guest-share-whatsapp="true">
                         <a href={wa} target="_blank" rel="noreferrer">WhatsApp</a>
+                    </Button>
+                ) : isHotel ? (
+                    <Button asChild variant="outline" pill className="h-11" data-guest-share-chat-reception="true">
+                        <Link href={`/${slug}`}>{HOTEL_SHARE_CHAT_RECEPTION_LABEL}</Link>
                     </Button>
                 ) : null}
                 <Button asChild variant="outline" pill className="h-11">
@@ -148,6 +159,11 @@ export function GuestSharePanel({
                     </Link>
                 </Button>
             </div>
+            {!wa && isHotel ? (
+                <p className="text-sm text-muted-foreground" data-guest-share-no-wa="true">
+                    {HOTEL_SHARE_NO_WA_COPY}
+                </p>
+            ) : null}
 
             <div className={cn("pt-2")}>
                 <QrCard name={name} slug={slug} url={shareTarget} compact />

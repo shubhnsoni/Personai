@@ -28,6 +28,12 @@ export {
     type HotelGuestBookOffering,
 } from "./guest-book"
 export {
+    resolveGuestWhatsapp,
+    hotelNeedsExplicitHandoff,
+    HOTEL_SHARE_NO_WA_COPY,
+    HOTEL_SHARE_CHAT_RECEPTION_LABEL,
+} from "./guest-whatsapp"
+export {
     HOTEL_STAFF_ROLES,
     HOTEL_DESK_SURFACES,
     hotelCanOpen,

@@ -15,6 +15,8 @@ export const TRY_HOTEL = {
     headline: HAVEN_HOTEL.headline,
     bio: HAVEN_HOTEL.bio,
     welcome: HAVEN_HOTEL.welcome,
+    /** E.164 digits — same fixture as hotelProperty.receptionWhatsapp / book smoke. */
+    whatsapp: HAVEN_HOTEL.whatsapp,
     rooms: ["101", "102", "103"] as const,
     restaurantSlugs: ["littlehours", "try-restaurant"] as const,
     wifiName: "haven-guest",
@@ -216,6 +218,7 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
                 isPublic: true,
                 liveChatEnabled: true,
                 welcomeMessageOverride: TRY_HOTEL.welcome,
+                whatsapp: TRY_HOTEL.whatsapp,
                 personalityConfig: JSON.stringify({
                     tone: "warm",
                     language: "en",
@@ -267,6 +270,16 @@ export async function ensureTryHotelDemo(prisma: PrismaClient) {
                 groupJson: JSON.stringify({ name: TRY_HOTEL_S5.groupName, hotelProfileIds: [] }),
                 whiteLabel: TRY_HOTEL_S5.whiteLabel,
             },
+        })
+    }
+
+    // P1-4: keep Profile.whatsapp aligned with reception fixture (home + /share read profile.whatsapp).
+    const liveProfileWa = await prisma.profile.findUnique({ where: { id: profileId }, select: { whatsapp: true } })
+    const waDigits = String(liveProfileWa?.whatsapp || "").replace(/\D/g, "")
+    if (!waDigits) {
+        await prisma.profile.update({
+            where: { id: profileId },
+            data: { whatsapp: TRY_HOTEL.whatsapp },
         })
     }
 
