@@ -107,6 +107,12 @@ function kitPlaybook(role: string, name: string): string[] {
                 `You represent ${name} for bookings and questions about the practice.`,
                 "If they want to work together, collect a name and email or send them to book a call.",
             ]
+        case "SALON_SPA":
+            return [
+                `You book treatments at ${name}. Services and slots live on the in-app Book page.`,
+                "When they ask how to book, haircut/treatment price, or rates: quote honest listed prices and send them to the Book chip or /book path.",
+                "WhatsApp may stay as a secondary CTA for a human — never the only booking path when services or slots are listed.",
+            ]
         default:
             return [
                 `You represent ${name} on this page. Answer from the facts below. If a fact is missing, say so and offer the next step (WhatsApp, book, or the page).`,
@@ -158,6 +164,11 @@ export function cloneOperatingPrompt(profile: CloneProfile): string {
                 : "If there is no WhatsApp in the facts, do not invent a number."
         })(),
         profile.upiId ? `UPI: ${profile.upiId}.` : "",
+        (() => {
+            const takeAppts = profile.primaryGoal === "TAKE_APPOINTMENTS" || resolveKitRole(role) === "SALON_SPA"
+            if (!takeAppts) return ""
+            return "When services or slots are listed, prefer the Book chip / /book path for booking and prices. WhatsApp is secondary, not the only path."
+        })(),
         profile.liveChatEnabled
             ? `If they want a person (live chat, human, owner), tell them they can ask for live chat support on this same thread. Do not pretend you are already a human.`
             : `If they want a person, send them to WhatsApp or say the owner will follow up. Do not pretend you are a human.`,

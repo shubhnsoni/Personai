@@ -15,6 +15,10 @@ import {
     compactCatalogFacts,
     formatChatCatalogPrice,
 } from "@/lib/chat-catalog"
+import {
+    answerAppointmentBookOrPrice,
+    formatShowServicesReply,
+} from "@/lib/appointment-chat"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
 import {
@@ -822,16 +826,15 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                 }
             }
             case "showServices": {
-                const services = profileData.serviceOfferings
-                if (services.length === 0) {
-                    return `${profileData.displayName} hasn't listed specific consultation services yet, but you can reach out to discuss your needs.`
-                }
-
-                const serviceList = services.map(s =>
-                    `- **${s.name}**: ${s.isFree ? 'Free' : formatMoney(s.priceCents, currency)} (${s.durationMinutes} min)${s.description ? ` - ${s.description}` : ''}`
-                ).join('\n')
-
-                return `Here are ${profileData.displayName}'s consultation services:\n${serviceList}\n\nWould you like to book any of these?`
+                return formatShowServicesReply({
+                    shopName: profileData.displayName,
+                    slug: profileData.slug,
+                    role: profileData.roleTemplate,
+                    goal: profileData.primaryGoal,
+                    services: profileData.serviceOfferings || [],
+                    requestCurrency: currency,
+                    whatsapp: profileData.whatsapp,
+                })
             }
             case "showWorkExperience": {
                 const experiences = profileData.workExperiences
@@ -1280,17 +1283,35 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             whatsapp: profileData.whatsapp,
         })
         : null
+    // Salon P1-3: TAKE_APPOINTMENTS / salon-spa kits cite Book / /book (+ honest INR) before LLM.
+    const appointmentBookReply = (!restaurantDesk && !hotelDesk)
+        ? answerAppointmentBookOrPrice({
+            query,
+            slug: profileData.slug,
+            shopName: profileData.displayName,
+            roleTemplate: profileData.roleTemplate,
+            primaryGoal: profileData.primaryGoal,
+            services: profileData.serviceOfferings || [],
+            requestCurrency: currency,
+            whatsapp: profileData.whatsapp,
+        })
+        : null
     if (
         !providerConfigured()
         || (hotelDesk && hotelIntent !== "unknown")
         || Boolean(restaurantCatalogPrice)
+        || Boolean(appointmentBookReply)
     ) {
         if (reservation) {
             await settle("RELEASE", {
-                reason: restaurantCatalogPrice ? "restaurant_catalog_price" : "hotel_desk",
+                reason: restaurantCatalogPrice
+                    ? "restaurant_catalog_price"
+                    : appointmentBookReply
+                        ? "appointment_book_path"
+                        : "hotel_desk",
             })
         }
-        const notice = restaurantCatalogPrice || await groundedFallback()
+        const notice = restaurantCatalogPrice || appointmentBookReply || await groundedFallback()
         await db.message.create({
             data: {
                 conversationId: authorizedConversationId,

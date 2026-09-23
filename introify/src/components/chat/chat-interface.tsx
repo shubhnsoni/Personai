@@ -182,7 +182,7 @@ export function ChatInterface({
     const restaurant = profile.roleTemplate === "RESTAURANT"
     const getRichContent = (content: string): RichContentType | null => {
         const lower = content.toLowerCase()
-        if (lower.includes("consultation services") || lower.includes("would you like to book")) return "services"
+        if (lower.includes("consultation services") || lower.includes("would you like to book") || (lower.includes("/book") && lower.includes("services"))) return "services"
         if (lower.includes("work experience") || lower.includes("work history")) return "experience"
         if (lower.includes("project") || lower.includes("portfolio")) return "projects"
         if (lower.includes("about") || lower.includes("who is")) return "about"

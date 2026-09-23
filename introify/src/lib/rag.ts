@@ -8,6 +8,12 @@ import { goldBoardFromConfig } from "@/lib/metal/board"
 import { formatRatePerGram } from "@/lib/metal/math"
 import { cloneClosingReminder, cloneOperatingPrompt } from "@/lib/clone-identity"
 import { chatWhatsAppDigits, formatChatCatalogPrice } from "@/lib/chat-catalog"
+import {
+    appointmentBookPath,
+    appointmentBookPromptGuidance,
+    formatAppointmentServicePrice,
+    prefersAppointmentBookPath,
+} from "@/lib/appointment-chat"
 import { isPrivateChatDocument } from "@/lib/memory-privacy"
 import { canReadKnowledge } from "@/lib/profile-expertise-policy"
 
@@ -43,10 +49,12 @@ interface ProfileWithRelations {
         client: string | null
         year: string | null
     }>
+    slug?: string | null
     serviceOfferings: Array<{
         name: string
         description: string | null
         priceCents: number
+        currency?: string | null
         isFree: boolean
         durationMinutes: number
     }>
@@ -351,13 +359,26 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
 
     let servicesSection = ""
     if (showServices && profile.serviceOfferings && profile.serviceOfferings.length > 0) {
+        const takeBook = prefersAppointmentBookPath(profile.roleTemplate, profile.primaryGoal)
         const serviceList = profile.serviceOfferings.map(s => {
-            const price = s.isFree ? 'Free' : formatMoney(s.priceCents, currency)
+            const price = s.isFree ? "Free" : formatAppointmentServicePrice(s, profile.roleTemplate, currency)
             let entry = `- ${s.name}: ${price} (${s.durationMinutes} min)`
             if (s.description) entry += ` - ${s.description}`
             return entry
         }).join('\n')
-        servicesSection = `\n## Consultation Services\n${serviceList}`
+        if (takeBook) {
+            const href = profile.slug ? appointmentBookPath(profile.slug) : "/book"
+            const guidance = appointmentBookPromptGuidance({
+                slug: profile.slug,
+                role: profile.roleTemplate,
+                goal: profile.primaryGoal,
+                hasServices: true,
+                whatsapp: profile.whatsapp,
+            }).join(" ")
+            servicesSection = `\n## Services & appointments\nNever invent a price. Quote the list below in stored currency (no USD→INR FX). Prefer Book / ${href} for booking; WhatsApp is secondary.\n${serviceList}\n${guidance}`
+        } else {
+            servicesSection = `\n## Consultation Services\n${serviceList}`
+        }
     }
 
     let productsSection = ""
@@ -485,7 +506,7 @@ ${contextSection}
 - End with one clear next question on its own line.
 - Do not use headings (#) or tables.
 
-Preferred next-step chip: ${bookChip(role)}.
+Preferred next-step chip: ${bookChip(role)}${prefersAppointmentBookPath(role, profile.primaryGoal) && profile.slug ? ` → ${appointmentBookPath(profile.slug)} (WhatsApp secondary when services/slots exist)` : ""}.
 ${profile.welcomeMessageOverride ? `Welcome message style: "${profile.welcomeMessageOverride}"\n` : ''}${buildPersonalitySection(profile.personalityConfig)}
 
 ## Tools Available
