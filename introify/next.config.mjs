@@ -30,6 +30,13 @@ const nextConfig = {
       { source: "/try-electronics", destination: "/try-shop", permanent: false },
       { source: "/try-wholesale", destination: "/try-shop", permanent: false },
       { source: "/try-market", destination: "/try-shop", permanent: false },
+      // HOTEL P1-3 stay discovery aliases → canonical try-hotel (Haven Hinoo).
+      { source: "/hotel", destination: "/try-hotel", permanent: false },
+      { source: "/hotel/:path*", destination: "/try-hotel/:path*", permanent: false },
+      { source: "/try-stay", destination: "/try-hotel", permanent: false },
+      { source: "/try-stay/:path*", destination: "/try-hotel/:path*", permanent: false },
+      { source: "/try-bnb", destination: "/try-hotel", permanent: false },
+      { source: "/try-bnb/:path*", destination: "/try-hotel/:path*", permanent: false },
     ];
   },
   async rewrites() {

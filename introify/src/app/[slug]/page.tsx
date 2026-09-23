@@ -5,6 +5,7 @@ import { ensureHotelProperty } from "@/lib/hotels/store"
 import { ensureTryFoodShowcase, isTryFoodShowcaseSlug } from "@/lib/demo-shops/ensure-try-food"
 import { ensureTryShopShowcase, isTryShopShowcaseSlug } from "@/lib/demo-shops/ensure-try-shop"
 import { ensureLittleHoursShowcase, isLittleHoursSlug } from "@/lib/showcase-profiles"
+import { ensureTryHotelShowcase, isTryHotelShowcaseSlug } from "@/lib/hotels/ensure-try-hotel"
 
 export const dynamic = "force-dynamic"
 
@@ -18,6 +19,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
     }
     if (isLittleHoursSlug(slug)) {
         await ensureLittleHoursShowcase(prisma, slug)
+    }
+    if (isTryHotelShowcaseSlug(slug)) {
+        await ensureTryHotelShowcase(prisma, slug)
     }
     const profile = await prisma.profile.findUnique({ where: { slug }, select: { id: true, roleTemplate: true, isPublic: true } })
     if (profile?.isPublic && isHotelRole(profile.roleTemplate)) {

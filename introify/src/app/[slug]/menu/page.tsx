@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { ensureTryFoodShowcase, isTryFoodShowcaseSlug } from "@/lib/demo-shops/ensure-try-food"
 import { ensureTryShopShowcase, isTryShopShowcaseSlug } from "@/lib/demo-shops/ensure-try-shop"
 import { ensureLittleHoursShowcase, isLittleHoursSlug } from "@/lib/showcase-profiles"
+import { ensureTryHotelShowcase, isTryHotelShowcaseSlug } from "@/lib/hotels/ensure-try-hotel"
 import { isHotelRole } from "@/lib/hotels"
 import { hotelServiceLabels, resolveHotelBrandLogo } from "@/lib/hotels/guest-menu"
 import { listLinkedRestaurants } from "@/lib/hotels/store"
@@ -98,6 +99,9 @@ export default async function MenuPage(props: {
     }
     if (isLittleHoursSlug(slug)) {
         await ensureLittleHoursShowcase(prisma, slug)
+    }
+    if (isTryHotelShowcaseSlug(slug)) {
+        await ensureTryHotelShowcase(prisma, slug)
     }
 
     const roleRow = await prisma.profile.findUnique({
