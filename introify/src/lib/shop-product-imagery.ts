@@ -3,7 +3,7 @@ import { resolveKitRole } from "@/lib/role-alias"
 import { isJewelryKit } from "@/lib/metal/math"
 
 /**
- * P0-1 / salon P1-2 / gym P1-2 - Role-aware shop + salon/barber product imagery.
+ * P0-1 / salon P1-2 / gym P1-2 / clinic P1-2 - Role-aware shop + salon/barber + pharmacy product imagery.
  *
  * Demo SHOP/grocery/textile/jewellery seeds previously reused cafe AR dishes,
  * lifestyle home decor, and people stills as product thumbnails. Guests then
@@ -46,6 +46,7 @@ export const STRICT_SHOP_IMAGE_ROLES = new Set([
     "PRINT_SHOP",
     "JEWELRY_RETAIL",
     "JEWELRY_WHOLESALE",
+    "PHARMACY",
 ])
 
 export function isCrossRoleShopProductImage(url: string | null | undefined): boolean {
@@ -62,7 +63,7 @@ export function usesStrictShopProductImagery(roleOrFlavor?: string | null): bool
     if (isJewelryKit(roleOrFlavor)) return true
     const kit = resolveKitRole(roleOrFlavor)
     // Salon/spa/barber (and gym/yoga/pet-grooming aliases) retail on /menu must not
-    // show cafe home-decor / gift-box / gym-tub stock as product art.
+    // show cafe home-decor / gift-box / gym-tub stock as product art. PHARMACY is in STRICT_SHOP_IMAGE_ROLES.
     if (kit === "SALON_SPA" || roleOrFlavor === "SALON_SPA") return true
     return kit === "SHOP"
 }

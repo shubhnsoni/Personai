@@ -25,6 +25,8 @@ export const FORCE_REFRESH_SLUGS = new Set([
     "prince-barber-lalpur",
     // Gym P1-2: clear blu-cafe coffee/muffin + recycled tub/floor thumbs on gym retail.
     "fitness-addiction-doranda",
+    // Clinic P1-2: clear cafe/desk/smoothie thumbs on Sanjivani MEDICINES.
+    "sanjivani-medico",
 ])
 
 export function orderedDemoShops<T extends { slug: string }>(shops: T[]): T[] {
