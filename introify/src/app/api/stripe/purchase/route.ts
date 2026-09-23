@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUncachableStripeClient, StripeNotConfiguredError } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import { headers } from 'next/headers'
-import { convertUsdCents, stripeCurrency } from '@/lib/pricing'
+import { chargeStoredPrice, stripeCurrency } from '@/lib/pricing'
 import { getRequestCurrency } from '@/lib/request-currency'
 
 export async function POST(request: NextRequest) {
@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
 
         let itemName = ''
         let priceCents = 0
+        let itemCurrency: string | null = null
         let profileSlug = ''
         let mode: 'payment' | 'subscription' = 'payment'
 
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
                 }
                 itemName = product.title
                 priceCents = product.priceCents
+                itemCurrency = product.currency
                 profileSlug = product.profile.slug
                 break
             }
@@ -60,6 +62,7 @@ export async function POST(request: NextRequest) {
                 }
                 itemName = course.title
                 priceCents = course.priceCents
+                itemCurrency = course.currency
                 profileSlug = course.profile.slug
                 break
             }
@@ -87,6 +90,7 @@ export async function POST(request: NextRequest) {
                 }
                 itemName = event.title
                 priceCents = event.priceCents
+                itemCurrency = event.currency
                 profileSlug = event.profile.slug
                 break
             }
@@ -100,6 +104,7 @@ export async function POST(request: NextRequest) {
                 }
                 itemName = community.name
                 priceCents = community.priceCents
+                itemCurrency = community.currency
                 profileSlug = community.profile.slug
                 if (community.billingCycle !== 'ONE_TIME') {
                     mode = 'subscription'
@@ -126,19 +131,20 @@ export async function POST(request: NextRequest) {
         }
 
         const stripe = await getUncachableStripeClient()
-        const displayCurrency = await getRequestCurrency()
-        const chargeAmount = convertUsdCents(priceCents, displayCurrency)
+        const requestCurrency = await getRequestCurrency()
+        // INR catalog tickets (jewellery / kirana / boutique) charge as paise — never geo-convert to USD.
+        const charged = chargeStoredPrice(priceCents, itemCurrency, requestCurrency)
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
                 {
                     price_data: {
-                        currency: stripeCurrency(displayCurrency),
+                        currency: stripeCurrency(charged.currency),
                         product_data: {
                             name: itemName,
                         },
-                        unit_amount: chargeAmount,
+                        unit_amount: charged.amountCents,
                         ...(mode === 'subscription' ? { recurring: { interval: 'month' } } : {})
                     },
                     quantity: 1
@@ -153,7 +159,8 @@ export async function POST(request: NextRequest) {
                 itemId,
                 visitorName: visitorName || '',
                 profileSlug,
-                displayCurrency,
+                displayCurrency: charged.currency,
+                storedCurrency: itemCurrency || '',
             }
         })
 

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { X } from "lucide-react"
-import { useMoney } from "@/components/pricing-provider"
+import { usePricing } from "@/components/pricing-provider"
+import { formatCheckoutPrice } from "@/lib/pricing"
 import { isPhysical, whatsappHref } from "@/lib/commerce"
 import { placeManualOrder } from "@/app/actions/products"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
@@ -53,7 +54,7 @@ export function CheckoutSheet({
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [done, setDone] = useState<string | null>(null)
-    const money = useMoney()
+    const { currency: requestCurrency } = usePricing()
     const physical = item.itemType === "product" && isPhysical(item.fulfillment)
     const total = item.priceCents + (physical && (item.shipMode === "DELIVER" || item.shipMode === "BOTH") ? (item.shipFeeCents || 0) : 0)
 
@@ -67,7 +68,8 @@ export function CheckoutSheet({
         } catch {}
     }, [])
 
-    const price = money(total, item.currency)
+    // Preserve catalog currency end-to-end (MK jewellery ₹ ticket must not become $1800).
+    const price = formatCheckoutPrice(total, item.currency, requestCurrency)
     const cta =
         item.soldOut ? "Sold out"
         : item.itemType === "course" ? (item.priceCents === 0 ? "Enroll free" : `Enroll · ${price}`)

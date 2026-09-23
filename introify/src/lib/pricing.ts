@@ -69,6 +69,30 @@ export function formatStoredPrice(
     return formatAmount(usdCents, "USD")
 }
 
+
+/** Charge / display minor units for a catalog price. INR tickets never geo-convert. */
+export function chargeStoredPrice(
+    amountCents: number,
+    stored: string | null | undefined,
+    request: DisplayCurrency,
+    rate = USD_INR_RATE,
+): { amountCents: number; currency: DisplayCurrency } {
+    const src = storedCurrency(stored)
+    if (src === "INR") return { amountCents, currency: "INR" }
+    return { amountCents: convertUsdCents(amountCents, request, rate), currency: request }
+}
+
+/** Format checkout copy using the item's stored currency when set (no silent geo swap). */
+export function formatCheckoutPrice(
+    amountCents: number,
+    stored: string | null | undefined,
+    request: DisplayCurrency,
+    rate = USD_INR_RATE,
+): string {
+    const { currency } = chargeStoredPrice(amountCents, stored, request, rate)
+    return formatStoredPrice(amountCents, stored || currency, currency, rate)
+}
+
 export function stripeCurrency(currency: DisplayCurrency): "usd" | "inr" {
     return currency === "INR" ? "inr" : "usd"
 }

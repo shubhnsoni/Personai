@@ -144,7 +144,13 @@ export default async function ShopPage({
                 <ShopCatalog
                     slug={slug}
                     shopName={profile.displayName}
-                    currency={jewelry || wholesale ? "INR" : currency}
+                    currency={catalogDisplayCurrency(
+                        profile.roleTemplate,
+                        jewelry || wholesale
+                            ? "INR"
+                            : profile.digitalProducts.find((p) => p.currency)?.currency || currency,
+                        currency,
+                    )}
                     accent={catalogTheme ? "var(--pl-aurora)" : theme.mid || theme.accent}
                     whatsapp={profile.whatsapp}
                     upiId={profile.upiId}

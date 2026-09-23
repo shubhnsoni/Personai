@@ -171,13 +171,28 @@ export function isHoldBooking(metadata?: string | null, email?: string | null) {
     }
 }
 
-/** Food-menu guest surfaces keep the café stored currency (no geo USD conversion). */
+/** Local-commerce guest surfaces keep the seller's stored currency (no geo USD conversion). */
+const PRESERVE_CATALOG_CURRENCY_KITS = new Set([
+    "RESTAURANT",
+    "SHOP",
+    "JEWELRY_RETAIL",
+    "JEWELRY_WHOLESALE",
+    "PHARMACY",
+    "AUTO_PARTS",
+    "DISTRIBUTOR",
+])
+
 export function catalogDisplayCurrency(
     roleTemplate: string | null | undefined,
     stored: string | null | undefined,
     request: DisplayCurrency,
 ): DisplayCurrency {
-    if (resolveKitRole(roleTemplate) === "RESTAURANT") return storedCurrency(stored)
+    const kit = resolveKitRole(roleTemplate)
+    if (PRESERVE_CATALOG_CURRENCY_KITS.has(kit)) {
+        // Jewellery tickets are always INR even if a row somehow omitted currency.
+        const fallback = kit === "JEWELRY_RETAIL" || kit === "JEWELRY_WHOLESALE" ? "INR" : stored
+        return storedCurrency(stored || fallback)
+    }
     return request
 }
 
