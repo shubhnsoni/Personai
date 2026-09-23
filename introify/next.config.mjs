@@ -103,6 +103,22 @@ const nextConfig = {
       { source: "/try-doctor/:path*", destination: "/jk-sharma-clinic-harmu/:path*", permanent: false },
       { source: "/doctor", destination: "/jk-sharma-clinic-harmu", permanent: false },
       { source: "/doctor/:path*", destination: "/jk-sharma-clinic-harmu/:path*", permanent: false },
+      // EVENTS P1-2 discovery aliases -> LIVE showcases (Next Level Events / Let's Click).
+      // try-photographer already shipped under CREATOR P1-1 (not duplicated here).
+      { source: "/try-events", destination: "/next-level-events-kanke", permanent: false },
+      { source: "/try-events/:path*", destination: "/next-level-events-kanke/:path*", permanent: false },
+      { source: "/try-event", destination: "/next-level-events-kanke", permanent: false },
+      { source: "/try-event/:path*", destination: "/next-level-events-kanke/:path*", permanent: false },
+      { source: "/events", destination: "/next-level-events-kanke", permanent: false },
+      { source: "/events/:path*", destination: "/next-level-events-kanke/:path*", permanent: false },
+      { source: "/try-studio", destination: "/next-level-events-kanke", permanent: false },
+      { source: "/try-studio/:path*", destination: "/next-level-events-kanke/:path*", permanent: false },
+      { source: "/try-photo", destination: "/lets-click-ratu-road", permanent: false },
+      { source: "/try-photo/:path*", destination: "/lets-click-ratu-road/:path*", permanent: false },
+      { source: "/photo", destination: "/lets-click-ratu-road", permanent: false },
+      { source: "/photo/:path*", destination: "/lets-click-ratu-road/:path*", permanent: false },
+      { source: "/photographer", destination: "/lets-click-ratu-road", permanent: false },
+      { source: "/photographer/:path*", destination: "/lets-click-ratu-road/:path*", permanent: false },
     ];
   },
   async rewrites() {
