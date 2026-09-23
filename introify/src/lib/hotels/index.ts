@@ -13,6 +13,21 @@ export {
     type HotelGuestMenuRestaurant,
 } from "./guest-menu"
 export {
+    HOTEL_GUEST_BOOK_LABEL,
+    HOTEL_GUEST_BOOK_EMPTY_TITLE,
+    HOTEL_GUEST_BOOK_EMPTY_DETAIL,
+    HOTEL_GUEST_BOOK_RATES_NOTE,
+    HOTEL_GUEST_BOOK_FORBIDDEN_COPY,
+    hotelGuestBookLabel,
+    hotelGuestBookHasInventory,
+    hotelGuestBookEmptyCopy,
+    describeHotelGuestBookRoom,
+    hotelBookCopyLooksLikeSessions,
+    hotelStayOfferingsFromServices,
+    type HotelGuestBookRoom,
+    type HotelGuestBookOffering,
+} from "./guest-book"
+export {
     HOTEL_STAFF_ROLES,
     HOTEL_DESK_SURFACES,
     hotelCanOpen,

@@ -5,14 +5,81 @@ import { prisma } from "@/lib/prisma"
 import { ORB_THEMES, resolveOrbVariant } from "@/lib/orb-variants"
 import { CatalogHeader } from "@/components/shop/catalog-header"
 import { BookList } from "./book-list"
-import { isRestaurant, needsGuestTableOffering } from "@/lib/menu"
+import { isRestaurant, needsGuestTableOffering, hoursToday } from "@/lib/menu"
 import { ensureTableService } from "@/app/actions/bookings"
 import { Tracker } from "@/components/profile/tracker"
+import { SessionProbe } from "@/components/profile/session-probe"
+import { isHotelRole } from "@/lib/hotels"
+import { resolveHotelBrandLogo } from "@/lib/hotels/guest-menu"
+import { hotelStayOfferingsFromServices } from "@/lib/hotels/guest-book"
+import { HotelGuestBook } from "@/components/hotel/hotel-guest-book"
 
 export const dynamic = "force-dynamic"
 
+async function HotelBookPage({ slug }: { slug: string }) {
+    const profile = await prisma.profile.findUnique({
+        where: { slug },
+        include: {
+            availability: true,
+            profileImages: { select: { id: true }, take: 1 },
+            hotelProperty: true,
+            serviceOfferings: { where: { isActive: true }, orderBy: { createdAt: "desc" } },
+        },
+    })
+    if (!profile || !profile.isPublic || !isHotelRole(profile.roleTemplate)) notFound()
+
+    const rooms = await prisma.hotelRoom.findMany({
+        where: { profileId: profile.id, isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { number: "asc" }],
+        select: { number: true, floor: true, category: true },
+    })
+
+    const property = profile.hotelProperty
+    const logo = resolveHotelBrandLogo(
+        (profile as { shopLogoUrl?: string | null }).shopLogoUrl,
+        profile.imageUrl,
+    )
+    const aboutHref = profile.profileImages.length ? `/${slug}/story` : undefined
+    const hours = profile.availability.length
+        ? hoursToday(profile.availability)
+        : property?.propertyHours || null
+    const offerings = hotelStayOfferingsFromServices(profile.serviceOfferings)
+    const whatsapp = profile.whatsapp || property?.receptionWhatsapp || null
+
+    return (
+        <>
+            <Tracker slug={slug} name="hotel_book_view" />
+            <SessionProbe slug={slug} />
+            <HotelGuestBook
+                slug={slug}
+                name={profile.displayName}
+                logoUrl={logo}
+                whatsapp={whatsapp}
+                aboutHref={aboutHref}
+                hours={hours}
+                checkInTime={property?.checkInTime || null}
+                checkOutTime={property?.checkOutTime || null}
+                roomCountHint={property?.roomCount ?? null}
+                rooms={rooms}
+                offerings={offerings}
+                receptionPhone={property?.receptionPhone || null}
+            />
+        </>
+    )
+}
+
 export default async function BookPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params
+
+    const roleRow = await prisma.profile.findUnique({
+        where: { slug },
+        select: { roleTemplate: true, isPublic: true },
+    })
+    if (!roleRow || !roleRow.isPublic) notFound()
+    if (isHotelRole(roleRow.roleTemplate)) {
+        return HotelBookPage({ slug })
+    }
+
     const profile = await prisma.profile.findUnique({
         where: { slug },
         include: {
@@ -48,10 +115,18 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
         <div
             data-public-catalog-theme={catalogTheme ?? undefined}
             className={catalogTheme ? "min-h-dvh bg-background text-foreground" : "dark min-h-dvh bg-zinc-950 text-zinc-100"}
-            style={catalogTheme ? undefined : { ["--pl-aurora" as string]: theme.accent, ["--pl-brand-foreground" as string]: theme.onAccent }}
+            style={
+                catalogTheme
+                    ? undefined
+                    : {
+                          ["--pl-aurora" as string]: theme.accent,
+                          ["--pl-brand-foreground" as string]: theme.onAccent,
+                      }
+            }
         >
             <Tracker slug={slug} name={restaurant ? "reserve_open" : "visit"} />
-            <CatalogHeader themeToggle={Boolean(catalogTheme)}
+            <CatalogHeader
+                themeToggle={Boolean(catalogTheme)}
                 slug={slug}
                 name={profile.displayName}
                 logoUrl={logo}
@@ -64,7 +139,12 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
                     </p>
                 ) : (
                     <BookList
-                        profile={{ id: profile.id, displayName: profile.displayName, whatsapp: profile.whatsapp, roleTemplate: profile.roleTemplate }}
+                        profile={{
+                            id: profile.id,
+                            displayName: profile.displayName,
+                            whatsapp: profile.whatsapp,
+                            roleTemplate: profile.roleTemplate,
+                        }}
                         services={profile.serviceOfferings}
                         restaurant={restaurant}
                     />
