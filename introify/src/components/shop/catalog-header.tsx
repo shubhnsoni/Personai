@@ -4,6 +4,7 @@ import { ShopWordmark } from "@/components/shop/shop-cover"
 import { whatsappHref } from "@/lib/commerce"
 import { ModeToggle } from "@/components/mode-toggle"
 import { LiveOrderHeaderButton } from "@/components/shop/live-order-button"
+import { GuestShopOrdersButton } from "@/components/shop/guest-shop-orders"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { cn } from "@/lib/utils"
 
@@ -94,7 +95,7 @@ export function CatalogHeader({
                         <WhatsAppIcon className="h-4 w-4" />
                     </a>
                 ) : null}
-                {compact ? <LiveOrderHeaderButton slug={slug} /> : null}
+                {compact ? <LiveOrderHeaderButton slug={slug} /> : <GuestShopOrdersButton slug={slug} />}
                 {themeToggle ? <ModeToggle /> : null}
                 <Link
                     href={`/${slug}/share`}

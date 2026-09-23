@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import Link from "@/components/navigation/transition-link"
 import { PdpGallery } from "@/components/shop/pdp-gallery"
 import { PdpBuy, type PdpBuyAction } from "@/components/shop/pdp-buy"
+import { GuestShopOrdersButton } from "@/components/shop/guest-shop-orders"
 import { PdpReviewPanel } from "@/components/shop/pdp-review-panel"
 import { PdpMoreDeck } from "@/components/shop/pdp-more-deck"
 import {
@@ -104,9 +105,7 @@ export function PdpLight({
                             <span className="shop-cat">{catalogLabel}</span>
                         </div>
                     </Link>
-                    <Link href={`/${slug}/shop`} className="ghost-btn">
-                        Cart · 0
-                    </Link>
+                    <GuestShopOrdersButton slug={slug} label="text" />
                 </div>
                 {notice ? <div className="notice">{notice}</div> : null}
             </header>

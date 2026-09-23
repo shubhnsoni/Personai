@@ -13,6 +13,15 @@ import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { readBuyerMemory, writeBuyerMemory } from "@/lib/checkout-memory"
 import { confidentialUploadsEnabled } from "@/lib/private-upload-policy"
 import { ProfileStage } from "@/components/profile/profile-stage"
+import {
+    guestOrderReference,
+    payMethodLabel,
+    writeGuestShopOrder,
+    type GuestShopOrder,
+    type GuestShopPayMethod,
+} from "@/lib/guest-shop-orders"
+import { writePriorOrderItemIds } from "@/lib/restaurant-menu-sections"
+import { notifyGuestShopOrdersChanged, GuestShopOrdersButton } from "@/components/shop/guest-shop-orders"
 
 export type CheckoutItem = {
     itemType: "product" | "course" | "event" | "community"
@@ -31,6 +40,11 @@ export type CheckoutItem = {
     soldOut?: boolean
     variants?: string[]
     requiresRx?: boolean
+}
+
+type Confirmation = {
+    order: GuestShopOrder
+    headline: string
 }
 
 export function CheckoutSheet({
@@ -53,7 +67,7 @@ export function CheckoutSheet({
     const [rxBusy, setRxBusy] = useState(false)
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [done, setDone] = useState<string | null>(null)
+    const [confirmation, setConfirmation] = useState<Confirmation | null>(null)
     const { currency: requestCurrency } = usePricing()
     const physical = item.itemType === "product" && isPhysical(item.fulfillment)
     const total = item.priceCents + (physical && (item.shipMode === "DELIVER" || item.shipMode === "BOTH") ? (item.shipFeeCents || 0) : 0)
@@ -79,6 +93,31 @@ export function CheckoutSheet({
         : payMethod === "UPI" ? `Pay UPI · ${price}`
         : payMethod === "COD" ? `Order COD · ${price}`
         : item.priceCents === 0 ? "Get" : `Buy · ${price}`
+
+    const persistGuestOrder = (input: {
+        id: string
+        slug: string
+        method: GuestShopPayMethod
+        status?: GuestShopOrder["status"]
+        headline: string
+    }) => {
+        const order = writeGuestShopOrder({
+            id: input.id,
+            slug: input.slug,
+            title: item.title,
+            itemNames: [item.title + (variant ? ` (${variant})` : "")],
+            totalCents: total,
+            currency: (item.currency || "INR").toUpperCase(),
+            payMethod: input.method,
+            status: input.status,
+        })
+        try {
+            writePriorOrderItemIds(input.slug, [item.itemId])
+        } catch {}
+        notifyGuestShopOrdersChanged()
+        setConfirmation({ order, headline: input.headline })
+        return order
+    }
 
     const submit = async () => {
         if (!name.trim() || !email.includes("@")) {
@@ -112,17 +151,33 @@ export function CheckoutSheet({
                 if (payMethod === "WHATSAPP") {
                     const href = whatsappHref(
                         item.whatsapp || order.whatsapp,
-                        `Hi, I want ${item.title}${variant ? ` (${variant})` : ""} (${price}). Name: ${name.trim()}${item.requiresRx && (rxUrl || rxNote) ? ` · Rx: ${rxUrl || rxNote}${doctorName ? ` (Dr. ${doctorName})` : ""}` : ""}`,
+                        `Hi, I want ${item.title}${variant ? ` (${variant})` : ""} (${price}). Order ${guestOrderReference(order.id)}. Name: ${name.trim()}${item.requiresRx && (rxUrl || rxNote) ? ` · Rx: ${rxUrl || rxNote}${doctorName ? ` (Dr. ${doctorName})` : ""}` : ""}`,
                     )
                     if (href) window.open(href, "_blank")
-                    setDone("WhatsApp opened. The shop has your order.")
+                    persistGuestOrder({
+                        id: order.id,
+                        slug: order.slug,
+                        method: "WHATSAPP",
+                        status: "HANDOFF",
+                        headline: "WhatsApp opened — shop has your request",
+                    })
                     return
                 }
                 if (payMethod === "UPI") {
-                    setDone(`Pay ${price} to ${item.upiId || order.upiId || "the UPI ID on this page"}. They’ll confirm in Sales.`)
+                    persistGuestOrder({
+                        id: order.id,
+                        slug: order.slug,
+                        method: "UPI",
+                        headline: `Pay ${price} via UPI`,
+                    })
                     return
                 }
-                setDone("Order placed. Pay cash when you receive it.")
+                persistGuestOrder({
+                    id: order.id,
+                    slug: order.slug,
+                    method: "COD",
+                    headline: "Order placed",
+                })
                 return
             }
             const res = await fetch("/api/stripe/purchase", {
@@ -140,6 +195,26 @@ export function CheckoutSheet({
                 throw new Error(data.error === "payments_not_configured" ? "Payments are not set up yet." : (data.error || "Checkout failed"))
             }
             if (data.url) {
+                const sessionId = typeof data.sessionId === "string" && data.sessionId
+                    ? data.sessionId
+                    : `card-${Date.now()}`
+                const slugGuess = typeof data.profileSlug === "string" ? data.profileSlug : ""
+                // Best-effort local handoff record before leaving for Stripe.
+                if (slugGuess || item.itemType === "product") {
+                    try {
+                        // Stripe success lands on /{slug}; slug may be absent on older responses.
+                        const metaSlug = slugGuess || (typeof window !== "undefined"
+                            ? window.location.pathname.split("/").filter(Boolean)[0] || "shop"
+                            : "shop")
+                        persistGuestOrder({
+                            id: sessionId,
+                            slug: metaSlug,
+                            method: "CARD",
+                            status: "PENDING_CARD",
+                            headline: "Opening secure card checkout",
+                        })
+                    } catch {}
+                }
                 window.location.href = data.url
                 return
             }
@@ -153,7 +228,12 @@ export function CheckoutSheet({
             }
             throw new Error("No checkout URL returned")
         } catch (e) {
-            setError(e instanceof Error ? e.message : "Checkout failed")
+            const raw = e instanceof Error ? e.message : ""
+            const friendly =
+                !raw || /Minified React error #441|Server Components render/i.test(raw)
+                    ? "Could not place that order. Check your details and try again."
+                    : raw
+            setError(friendly)
         } finally {
             setBusy(false)
         }
@@ -175,11 +255,55 @@ export function CheckoutSheet({
                     </button>
                 </div>
                 <div className="p-4">
-                {item.description && <p className="mb-3 text-sm text-muted-foreground line-clamp-3">{item.description}</p>}
-                <p className="mb-4 text-2xl font-semibold tabular-nums">{price}</p>
-                {item.gstin ? <p className="mb-3 text-[11px] text-muted-foreground">GSTIN {item.gstin}</p> : null}
-                {done ? (
-                    <p className="rounded-2xl bg-muted px-3 py-3 text-sm">{done}</p>
+                {item.description && !confirmation ? <p className="mb-3 text-sm text-muted-foreground line-clamp-3">{item.description}</p> : null}
+                {!confirmation ? <p className="mb-4 text-2xl font-semibold tabular-nums">{price}</p> : null}
+                {item.gstin && !confirmation ? <p className="mb-3 text-[11px] text-muted-foreground">GSTIN {item.gstin}</p> : null}
+                {confirmation ? (
+                    <div className="space-y-3" data-testid="checkout-confirmation">
+                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-3">
+                            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{confirmation.headline}</p>
+                            <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Order reference</p>
+                            <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums" data-testid="checkout-order-ref">
+                                {confirmation.order.reference}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl bg-muted px-3 py-3 text-sm">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="font-medium">{confirmation.order.itemNames[0]}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {payMethodLabel(confirmation.order.payMethod)}
+                                    </p>
+                                </div>
+                                <span className="shrink-0 text-base font-semibold tabular-nums" data-testid="checkout-order-total">
+                                    {formatCheckoutPrice(
+                                        confirmation.order.totalCents,
+                                        confirmation.order.currency,
+                                        confirmation.order.currency === "INR" ? "INR" : requestCurrency,
+                                    )}
+                                </span>
+                            </div>
+                            <p className="mt-3 text-xs text-muted-foreground">{confirmation.order.nextStep}</p>
+                            {confirmation.order.payMethod === "UPI" && (item.upiId) ? (
+                                <p className="mt-2 text-xs font-medium">UPI ID · {item.upiId}</p>
+                            ) : null}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            {confirmation.order.slug ? (
+                                <div className="flex justify-center">
+                                    <GuestShopOrdersButton slug={confirmation.order.slug} label="text" className="!h-10 w-full justify-center rounded-full border border-border bg-background text-sm font-medium" />
+                                </div>
+                            ) : null}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="h-11 w-full rounded-full"
+                                onClick={onClose}
+                            >
+                                Done
+                            </Button>
+                        </div>
+                    </div>
                 ) : (
                 <div className="space-y-3">
                     <div className="space-y-1.5">
@@ -292,7 +416,7 @@ export function CheckoutSheet({
                             })}
                         </div>
                     ) : null}
-                    {error && <p className="text-sm text-red-500">{error}</p>}
+                    {error && <p className="text-sm text-red-500" role="alert">{error}</p>}
                     <Button
                         className="h-11 w-full rounded-full bg-brand text-brand-foreground"
                         disabled={busy || item.soldOut}
@@ -307,3 +431,4 @@ export function CheckoutSheet({
         </ProfileStage>
     )
 }
+
