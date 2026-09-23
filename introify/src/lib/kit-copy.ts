@@ -23,6 +23,11 @@ export function waPrefill(role?: string | null, name = "") {
         case "BARBER":
         case "PET_GROOMING":
             return `A treatment at ${name}`
+        case "EVENTS_STUDIO":
+        case "PHOTOGRAPHER":
+        case "CATERER":
+        case "TRAVEL":
+            return `A call with ${name}`
     }
     switch (kitRole(role)) {
         case "RESTAURANT":
@@ -70,6 +75,11 @@ export function bookChip(role?: string | null) {
         case "BARBER":
         case "PET_GROOMING":
             return "Book a treatment"
+        case "EVENTS_STUDIO":
+        case "PHOTOGRAPHER":
+        case "CATERER":
+        case "TRAVEL":
+            return "Book a call"
     }
     switch (kitRole(role)) {
         case "RESTAURANT":
@@ -228,6 +238,11 @@ export function guestBookEmptyCopy(role?: string | null, primaryGoal?: string | 
         case "BARBER":
         case "PET_GROOMING":
             return "No treatments to book."
+        case "EVENTS_STUDIO":
+        case "PHOTOGRAPHER":
+        case "CATERER":
+        case "TRAVEL":
+            return "No calls to book."
         case "PHARMACY":
             return "This shop sells medicines — browse MEDICINES."
     }

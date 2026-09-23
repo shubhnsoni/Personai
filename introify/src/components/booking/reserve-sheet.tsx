@@ -32,6 +32,7 @@ export type ReserveConfirmLabel =
     | "Book appointment"
     | "Book consult"
     | "Book treatment"
+    | "Book call"
     | "Request visit"
 
 function dayOptions(count = 7) {
@@ -59,6 +60,8 @@ function sessionCopy(confirmLabel?: ReserveConfirmLabel) {
             return { title: "Book a consult", description: "Time and phone. We’ll hold it.", success: "Consult booked", empty: "No times left this day", toast: "Consult booked" }
         case "Book treatment":
             return { title: "Book a treatment", description: "Time and phone. We’ll hold it.", success: "Treatment booked", empty: "No times left this day", toast: "Treatment booked" }
+        case "Book call":
+            return { title: "Book a call", description: "Time and phone. We'll hold it.", success: "Call booked", empty: "No times left this day", toast: "Call booked" }
         case "Request visit":
             return { title: "Request a visit", description: "Time and phone. We’ll request it.", success: "Visit requested", empty: "No times left this day", toast: "Visit requested" }
         default:

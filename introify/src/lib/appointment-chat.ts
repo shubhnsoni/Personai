@@ -31,6 +31,9 @@ export function appointmentBookAskNoun(role?: string | null): string {
     if (raw === "GYM") return "session, PT, or class"
     if (raw === "YOGA") return "class or session"
     if (raw === "BARBER") return "haircut/treatment"
+    if (raw === "EVENTS_STUDIO" || raw === "PHOTOGRAPHER" || raw === "CATERER" || raw === "TRAVEL") {
+        return "call, enquire, or shoot"
+    }
     if (resolveKitRole(role) === "SALON_SPA") return "treatment/haircut"
     return "booking"
 }

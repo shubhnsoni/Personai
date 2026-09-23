@@ -34,6 +34,11 @@ function sessionSheetProps(role?: string | null, durationMinutes?: number): {
                 confirmLabel: "Book treatment",
                 partyLabel: durationMinutes ? `${durationMinutes} min` : "Duration",
             }
+        case "EVENTS_STUDIO":
+        case "PHOTOGRAPHER":
+        case "CATERER":
+        case "TRAVEL":
+            return { hideParty: true, confirmLabel: "Book call" }
         case "FIELD_SERVICE":
             return { confirmLabel: "Request visit" }
         default:
