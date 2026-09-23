@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation"
 import { ChatInterface, type ChatChip } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"
 import { ReserveSheet, type ReserveConfirmLabel } from "@/components/booking/reserve-sheet"
-import { bookChip as kitBookChip } from "@/lib/kit-copy"
+import { appointmentBookHref, bookChip as kitBookChip } from "@/lib/kit-copy"
 import { extrasOf, isDigitalCatalogItem, publicChipAllowed, shopNavLabel } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
 import { hotelSuggestedReplies } from "@/lib/hotels"
@@ -520,13 +520,14 @@ function buildGoalChips(
     const hasWork = hasProjects || hasExperience
     const hasLeadMagnets = (profile.leadMagnets?.length ?? 0) > 0
 
+    const bookHref = appointmentBookHref(profile.slug, profile.roleTemplate, profile.primaryGoal)
     const catalog: Record<string, ChipDef> = {
         book: {
             id: "book",
             label: bookChip(profile.roleTemplate, profile.primaryGoal),
             available: hasServices,
             icon: <Calendar className="w-3.5 h-3.5" />,
-            onSelect: actions.openBooking,
+            ...(bookHref ? { href: bookHref } : { onSelect: actions.openBooking }),
         },
         services: {
             id: "services",

@@ -454,9 +454,24 @@ export function ChatInterface({
                 ? contextualReplyChips
                 : []
     const primaryChip = chips.find(c => c.highlighted) ?? chips[0]
+    // TAKE_APPOINTMENTS / salon-barber Book chip — keep reachable on mobile even when the
+    // visual-keyboard compact path hides welcome chips (desk still uses welcome chips).
+    const homeBookChip = chips.find((chip) => chip.id === "book")
     const emptyChips = chips.length > 0
         ? chips
         : quickQuestions.map((q, i) => ({ id: `q-${i}`, label: q, prompt: q }))
+
+    const renderPrimaryChip = (chip: ChatChip, opts?: { size?: "sm"; homeChrome?: boolean }) => (
+        <Chip
+            variant="profile"
+            size={opts?.size}
+            highlighted={chip.highlighted ?? chip.id === "book"}
+            icon={chip.icon}
+            label={chip.label}
+            data-home-book-cta={opts?.homeChrome || chip.id === "book" ? "" : undefined}
+            onClick={() => handleChip(chip)}
+        />
+    )
 
     return (
         <div
@@ -512,18 +527,31 @@ export function ChatInterface({
                             </span>
                         ) : null}
                     </button>}
-                    primaryAction={!keyboardOpen && primaryChip ? (
-                        <Chip
-                            variant="profile"
-                            size="sm"
-                            highlighted={primaryChip.highlighted}
-                            icon={primaryChip.icon}
-                            label={primaryChip.label}
-                            onClick={() => handleChip(primaryChip)}
-                        />
-                    ) : undefined}
+                    primaryAction={
+                        homeBookChip
+                            ? renderPrimaryChip(homeBookChip, { size: "sm" })
+                            : !keyboardOpen && primaryChip
+                                ? renderPrimaryChip(primaryChip, { size: "sm" })
+                                : undefined
+                    }
                     actions={headerActions}
                 />
+            ) : homeBookChip ? (
+                <>
+                    <ChatHeader
+                        className="md:hidden"
+                        identity={
+                            <span className="min-w-0 truncate text-ui font-semibold text-profile-text">
+                                {profile.displayName}
+                            </span>
+                        }
+                        primaryAction={renderPrimaryChip(homeBookChip, { size: "sm", homeChrome: true })}
+                        actions={headerActions}
+                    />
+                    {headerActions ? (
+                        <div className="absolute right-3 top-3 z-20 hidden md:block">{headerActions}</div>
+                    ) : null}
+                </>
             ) : headerActions ? (
                 <div className="absolute right-3 top-3 z-20">{headerActions}</div>
             ) : null}

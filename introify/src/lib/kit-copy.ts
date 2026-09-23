@@ -64,6 +64,15 @@ export function bookChip(role?: string | null) {
     }
 }
 
+/** Guest home Book CTA for TAKE_APPOINTMENTS / salon-spa kits lands on /book. */
+export function appointmentBookHref(slug: string, role?: string | null, goal?: string | null) {
+    if (!slug) return null
+    if (goal === "TAKE_APPOINTMENTS" || kitRole(role) === "SALON_SPA") {
+        return `/${slug}/book`
+    }
+    return null
+}
+
 export function aboutFooterCtas(role?: string | null): AboutFooterCta[] {
     switch (kitRole(role)) {
         case "RESTAURANT":
