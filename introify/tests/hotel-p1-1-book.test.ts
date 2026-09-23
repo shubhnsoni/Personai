@@ -85,9 +85,8 @@ describe("HOTEL P1-1 book route wiring", () => {
         expect(bookPage).toMatch(/HotelGuestBook|HotelBookPage/)
         expect(bookPage).toMatch(/resolveHotelBrandLogo/)
         expect(bookPage).toMatch(/hotelStayOfferingsFromServices/)
-        // Non-hotel empty still appointment-shaped
-        expect(bookPage).toMatch(/No sessions to book\./)
-        expect(bookPage).toMatch(/Reservations are not open yet\./)
+        // Non-hotel empty uses role-aware kit-copy helper (gym sessions default lives there)
+        expect(bookPage).toMatch(/guestBookEmptyCopy/)
 
         const surface = readFileSync(join(root, "src/components/hotel/hotel-guest-book.tsx"), "utf8")
         expect(surface).toMatch(/HOTEL_GUEST_BOOK_LABEL|Book/)

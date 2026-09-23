@@ -14,6 +14,7 @@ import { resolveHotelBrandLogo } from "@/lib/hotels/guest-menu"
 import { hotelStayOfferingsFromServices } from "@/lib/hotels/guest-book"
 import { HotelGuestBook } from "@/components/hotel/hotel-guest-book"
 import { shouldUseCreatorLeadBookEmpty } from "@/lib/creator/guest-book"
+import { guestBookEmptyCopy } from "@/lib/kit-copy"
 import { CreatorGuestBook } from "@/components/creator/creator-guest-book"
 
 export const dynamic = "force-dynamic"
@@ -163,7 +164,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
             <main className="mx-auto max-w-2xl px-4 py-5 pb-10">
                 {profile.serviceOfferings.length === 0 ? (
                     <p className="py-16 text-center text-sm text-zinc-500">
-                        {restaurant ? "Reservations are not open yet." : "No sessions to book."}
+                        {guestBookEmptyCopy(profile.roleTemplate, profile.primaryGoal)}
                     </p>
                 ) : (
                     <BookList

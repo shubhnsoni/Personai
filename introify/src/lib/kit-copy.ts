@@ -209,3 +209,56 @@ export function kitAbout(role?: string | null, name = ""): { headline: string; b
             return { headline: "", bio: "" }
     }
 }
+
+/** Guest /book empty copy — flavor-before-kit; never leak gym "sessions" onto pharmacy/clinic. */
+export function guestBookEmptyCopy(role?: string | null, primaryGoal?: string | null): string {
+    const raw = (role || "").trim().toUpperCase()
+    // Food / reserve kits
+    if (kitRole(role) === "RESTAURANT") {
+        return "Reservations are not open yet."
+    }
+    // Flavor roles before kit alias (CLINIC→CONSULTANT, GYM→SALON_SPA, …)
+    switch (raw) {
+        case "CLINIC":
+            return "No appointments to book."
+        case "GYM":
+            return "No sessions to book."
+        case "YOGA":
+            return "No classes to book."
+        case "BARBER":
+        case "PET_GROOMING":
+            return "No treatments to book."
+        case "PHARMACY":
+            return "This shop sells medicines — browse MEDICINES."
+    }
+    // Sell-products kits must never show appointment/session empty chrome
+    if (primaryGoal === "SELL_PRODUCTS") {
+        switch (kitRole(role)) {
+            case "PHARMACY":
+                return "This shop sells medicines — browse MEDICINES."
+            case "AUTO_PARTS":
+                return "This shop sells parts — browse the catalogue."
+            case "JEWELRY_RETAIL":
+            case "JEWELRY_WHOLESALE":
+            case "DISTRIBUTOR":
+            case "SHOP":
+                return "Nothing to book online — browse the shop."
+            default:
+                return "Nothing to book online — browse the shop."
+        }
+    }
+    switch (kitRole(role)) {
+        case "PHARMACY":
+            return "This shop sells medicines — browse MEDICINES."
+        case "SALON_SPA":
+            return "No treatments to book."
+        case "CONSULTANT":
+        case "CA":
+        case "FIELD_SERVICE":
+            return "No appointments to book."
+        case "COACH":
+            return "No sessions to book."
+        default:
+            return "No sessions to book."
+    }
+}

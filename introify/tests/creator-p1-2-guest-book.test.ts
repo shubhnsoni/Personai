@@ -91,9 +91,8 @@ describe("CREATOR P1-2 book route wiring", () => {
         expect(bookPage).toMatch(/CreatorGuestBook/)
         expect(bookPage).toMatch(/isHotelRole/)
         expect(bookPage).toMatch(/HotelGuestBook|HotelBookPage/)
-        // Non-lead empty still appointment-shaped
-        expect(bookPage).toMatch(/No sessions to book\./)
-        expect(bookPage).toMatch(/Reservations are not open yet\./)
+        // Non-lead empty uses role-aware kit-copy helper (gym sessions default lives there)
+        expect(bookPage).toMatch(/guestBookEmptyCopy/)
         expect(bookPage).toMatch(/BookList/)
 
         const surface = readFileSync(join(root, "src/components/creator/creator-guest-book.tsx"), "utf8")
