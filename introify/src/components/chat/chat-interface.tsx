@@ -9,7 +9,7 @@ import {
 } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Chip } from "@/components/ui/chip"
+import { Chip, chipVariants } from "@/components/ui/chip"
 import { Input } from "@/components/ui/input"
 import { ArrowDown, ArrowUp, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -461,17 +461,42 @@ export function ChatInterface({
         ? chips
         : quickQuestions.map((q, i) => ({ id: `q-${i}`, label: q, prompt: q }))
 
-    const renderPrimaryChip = (chip: ChatChip, opts?: { size?: "sm"; homeChrome?: boolean }) => (
-        <Chip
-            variant="profile"
-            size={opts?.size}
-            highlighted={chip.highlighted ?? chip.id === "book"}
-            icon={chip.icon}
-            label={chip.label}
-            data-home-book-cta={opts?.homeChrome || chip.id === "book" ? "" : undefined}
-            onClick={() => handleChip(chip)}
-        />
-    )
+    const renderPrimaryChip = (chip: ChatChip, opts?: { size?: "sm"; homeChrome?: boolean }) => {
+        const bookMark = opts?.homeChrome || chip.id === "book" ? "" : undefined
+        const highlighted = chip.highlighted ?? chip.id === "book"
+        if (chip.href) {
+            return (
+                <a
+                    href={chip.href}
+                    data-slot="chip"
+                    data-highlighted={highlighted || undefined}
+                    data-home-book-cta={bookMark}
+                    className={chipVariants({
+                        variant: highlighted ? "profile-brand" : "profile",
+                        size: opts?.size ?? "default",
+                    })}
+                    onClick={(event) => {
+                        event.preventDefault()
+                        handleChip(chip)
+                    }}
+                >
+                    {chip.icon}
+                    <span>{chip.label}</span>
+                </a>
+            )
+        }
+        return (
+            <Chip
+                variant="profile"
+                size={opts?.size}
+                highlighted={highlighted}
+                icon={chip.icon}
+                label={chip.label}
+                data-home-book-cta={bookMark}
+                onClick={() => handleChip(chip)}
+            />
+        )
+    }
 
     return (
         <div

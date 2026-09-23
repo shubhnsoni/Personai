@@ -95,6 +95,9 @@ describe("salon-p0-2 mobile home Book chrome", () => {
         const bookCta = document.querySelector("[data-home-book-cta]")
         expect(bookCta).toBeTruthy()
         expect(bookCta?.textContent).toMatch(/Book a treatment/)
+        expect(bookCta?.closest("a")?.getAttribute("href") || bookCta?.getAttribute("href")).toBe(
+            "/h-square-salon-harmu/book",
+        )
         expect(document.querySelector("[data-chat-primary-action]")?.textContent).toMatch(/Book a treatment/)
     })
 
