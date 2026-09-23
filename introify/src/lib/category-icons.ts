@@ -30,6 +30,7 @@ const MAP: Record<string, LucideIcon> = {
     "non-veg": Drumstick,
     nonveg: Drumstick,
     bestsellers: Flame,
+    popular: Flame,
     "ratings 4.0+": Star,
     "order again": Sparkles,
     "todays offers": Tag,

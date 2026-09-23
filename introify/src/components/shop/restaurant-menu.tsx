@@ -29,6 +29,11 @@ import {
     menuFiltersActive,
     nextDietFilter,
 } from "@/lib/restaurant-menu-filters"
+import {
+    guestHistoryOrPopularSection,
+    readPriorOrderItemIds,
+    writePriorOrderItemIds,
+} from "@/lib/restaurant-menu-sections"
 
 type Item = {
     id: string
@@ -116,8 +121,14 @@ export function RestaurantMenu({
         return [...unknown, ...known]
     }, [items])
 
+    // Prior ordered product ids (localStorage) — empty on a fresh guest session.
+    const [priorItemIds, setPriorItemIds] = useState<string[]>([])
+    useEffect(() => {
+        setPriorItemIds(readPriorOrderItemIds(slug))
+    }, [slug])
+
     const buckets = useMemo(() => {
-        const again = items.filter((p) => (p.sold || 0) > 0).slice(0, 8)
+        const highlight = guestHistoryOrPopularSection(items, priorItemIds)
         const offers = items.filter((p) => p.compareAtCents && p.compareAtCents > p.priceCents).slice(0, 12)
         const recommended = [...items]
             .sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.sold || 0) - (a.sold || 0))
@@ -128,12 +139,12 @@ export function RestaurantMenu({
             items: items.filter((p) => (p.category || "").trim() === label),
         }))
         return [
-            { id: "again", label: "Order Again", items: again.length ? again : items.slice(0, 3) },
+            ...(highlight ? [highlight] : []),
             { id: "offers", label: "Todays Offers", items: offers.length ? offers : items.filter((p) => p.compareAtCents).slice(0, 5) },
             { id: "recommended", label: "Recommended", items: recommended },
             ...byCat,
         ].filter((s) => s.items.length)
-    }, [items, cats])
+    }, [items, cats, priorItemIds])
 
     const [q, setQ] = useState("")
     const [searchOpen, setSearchOpen] = useState(false)
@@ -518,6 +529,7 @@ export function RestaurantMenu({
                         setCartOpen(false)
                         setPlaced(next)
                     }}
+                    onPriorOrdersWritten={() => setPriorItemIds(readPriorOrderItemIds(slug))}
                 />
             ) : null}
 
@@ -736,6 +748,7 @@ function CartSheet({
     onChange,
     onClear,
     onPlaced,
+    onPriorOrdersWritten,
 }: {
     slug: string
     shopName: string
@@ -750,6 +763,7 @@ function CartSheet({
     onChange: (cart: CartLine[]) => void
     onClear: () => void
     onPlaced: (next: { token: string; number: number; dish: string }) => void
+    onPriorOrdersWritten?: () => void
 }) {
     const [name, setName] = useState("")
     const [email, setEmail] = useState("")
@@ -857,6 +871,8 @@ function CartSheet({
             const location = result.tableLabel ? `\nTable: ${result.tableLabel}` : "\nTakeaway"
 
             writeLiveOrderToken(slug, result.publicToken)
+            writePriorOrderItemIds(slug, cart.map((line) => line.itemId))
+            onPriorOrdersWritten?.()
             rotateOrderKey()
             if (pay === "WHATSAPP") {
                 const href = whatsappHref(
