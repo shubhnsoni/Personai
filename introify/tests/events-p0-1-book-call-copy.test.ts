@@ -72,7 +72,8 @@ describe("events-p0-1 chat booking steers", () => {
         expect(appointmentBookAskNoun("SALON_SPA")).toMatch(/treatment/i)
     })
 
-    it("prompt guidance cites Book a call without session", () => {
+    it("prompt guidance cites Book a call without session chrome", () => {
+        // events-p1-1: COLLECT_LEADS events/photo prefer /book — guidance must fire.
         const g = appointmentBookPromptGuidance({
             slug: "next-level-events-kanke",
             role: "EVENTS_STUDIO",
@@ -80,8 +81,13 @@ describe("events-p0-1 chat booking steers", () => {
             hasServices: true,
             whatsapp: "917903133317",
         }).join(" ")
-        // COLLECT_LEADS may not prefer appointment path — guidance can be empty.
-        // Flavor noun path is covered above; when guidance fires (TAKE_APPOINTMENTS), chip must be call.
+        expect(g.length).toBeGreaterThan(0)
+        expect(g).toMatch(/Book a call/)
+        expect(g).toMatch(/\/next-level-events-kanke\/book/)
+        // May mention "session" only inside the "Never say session..." guardrail.
+        expect(g).toMatch(/Never say session, treatment, or appointment/)
+        expect(g).not.toMatch(/Book a session|book a session/i)
+
         const g2 = appointmentBookPromptGuidance({
             slug: "next-level-events-kanke",
             role: "EVENTS_STUDIO",
@@ -91,8 +97,7 @@ describe("events-p0-1 chat booking steers", () => {
         }).join(" ")
         expect(g2).toMatch(/Book a call/)
         expect(g2).toMatch(/\/next-level-events-kanke\/book/)
-        expect(g2).not.toMatch(/session/i)
-        expect(g.length === 0 || !/session/i.test(g)).toBe(true)
+        expect(g2).not.toMatch(/Book a session|book a session/i)
     })
 })
 

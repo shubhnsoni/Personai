@@ -13,10 +13,12 @@ export type AppointmentChatService = {
     durationMinutes?: number | null
 }
 
-/** TAKE_APPOINTMENTS goal or salon/barber/gym kit — prefer in-app /book over WA-only. */
+/** TAKE_APPOINTMENTS, salon/barber/gym, or events/photo kits — prefer in-app /book over WA-only. */
 export function prefersAppointmentBookPath(role?: string | null, goal?: string | null): boolean {
     if (goal === "TAKE_APPOINTMENTS") return true
-    return resolveKitRole(role) === "SALON_SPA"
+    const kit = resolveKitRole(role)
+    // SALON_SPA covers GYM/BARBER/YOGA; EVENTS_STUDIO covers PHOTOGRAPHER/CATERER/TRAVEL (COLLECT_LEADS).
+    return kit === "SALON_SPA" || kit === "EVENTS_STUDIO"
 }
 
 export function appointmentBookPath(slug: string): string {
@@ -54,6 +56,10 @@ export function appointmentBookPrimaryCta(opts: {
 }): string {
     const chip = bookChip(opts.role)
     const href = appointmentBookPath(opts.slug)
+    if (resolveKitRole(opts.role) === "EVENTS_STUDIO") {
+        // Honest COLLECT_LEADS copy — free planning/brief calls, never session/treatment/appointment.
+        return `Tap **${chip}** or open ${href} to pick a free planning/brief call or package.`
+    }
     return `Tap **${chip}** or open ${href} to pick a service and slot.`
 }
 
@@ -75,10 +81,17 @@ export function appointmentBookPromptGuidance(opts: {
     if (!opts.hasServices || !prefersAppointmentBookPath(opts.role, opts.goal)) return []
     const chip = bookChip(opts.role)
     const href = opts.slug ? appointmentBookPath(opts.slug) : "/book"
-    const lines = [
-        `When they ask how to book, rates, or a ${appointmentBookAskNoun(opts.role)} price: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX).`,
-        "Never tell them WhatsApp is the only way to book when services or slots are listed.",
-    ]
+    const events = resolveKitRole(opts.role) === "EVENTS_STUDIO"
+    const lines = events
+        ? [
+            `When they ask how to enquire, get a quote, book a shoot or call, or rates: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX). Prefer free planning/brief calls on /book when listed.`,
+            "Never tell them WhatsApp is the only way to enquire, quote, or book when planning calls or packages are listed.",
+            "Never say session, treatment, or appointment for this events/photo kit.",
+        ]
+        : [
+            `When they ask how to book, rates, or a ${appointmentBookAskNoun(opts.role)} price: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX).`,
+            "Never tell them WhatsApp is the only way to book when services or slots are listed.",
+        ]
     const wa = appointmentBookSecondaryWa(opts.whatsapp)
     if (wa) lines.push(`WhatsApp may stay as a secondary CTA only. ${wa}`)
     return lines
@@ -114,12 +127,14 @@ export function formatShowServicesReply(opts: {
     const primary = appointmentBookPrimaryCta({ slug: opts.slug, role: opts.role })
     const wa = appointmentBookSecondaryWa(opts.whatsapp, name)
     const next = wa ? `${primary}\n\n${wa}` : primary
+    const events = resolveKitRole(opts.role) === "EVENTS_STUDIO"
+    const listLabel = events ? "packages & planning calls" : "services"
     // Keep "would you like to book" so chat-interface still opens the services rich panel.
-    return `Here are ${name}'s services:\n${serviceList}\n\n${next}\n\nWould you like to book any of these?`
+    return `Here are ${name}'s ${listLabel}:\n${serviceList}\n\n${next}\n\nWould you like to book any of these?`
 }
 
 /**
- * Deterministic desk reply for book/price asks on TAKE_APPOINTMENTS kits.
+ * Deterministic desk reply for book/price/enquire asks on TAKE_APPOINTMENTS + salon + events/photo kits.
  * Mirrors restaurant catalog short-circuit — no live LLM required for the Book path cite.
  */
 export function answerAppointmentBookOrPrice(opts: {
@@ -139,7 +154,7 @@ export function answerAppointmentBookOrPrice(opts: {
     if (!q) return null
 
     const bookIntent =
-        /\b(how (do|can|to) (i |we )?(book|appoint|schedule)|book(ing)?|appointment|appointments|slot|slots|schedule)\b/i.test(
+        /\b(how (do|can|to) (i |we )?(book|appoint|schedule|enquire|inquire)|book(ing)?|appointment|appointments|slot|slots|schedule|enquire|inquire|enquiry|inquiry|quote|quotes|shoot|brief|planning call|book a (call|shoot))\b/i.test(
             opts.query,
         )
     const priceIntent =
@@ -160,10 +175,12 @@ export function answerAppointmentBookOrPrice(opts: {
         return `**${hit.name}** is ${price}.\n\n${primary}${waBlock}`
     }
 
-    // General book / rates ask — list a few honest prices then Book path.
+    // General book / rates / enquire ask — list a few honest prices then Book path.
     const listed = opts.services.slice(0, 6).map((s) => {
         const price = formatAppointmentServicePrice(s, opts.roleTemplate, opts.requestCurrency)
         return `- **${s.name}**: ${price}`
     })
-    return `Here are ${opts.shopName}'s services:\n${listed.join("\n")}\n\n${primary}${waBlock}\n\nWould you like to book any of these?`
+    const events = resolveKitRole(opts.roleTemplate) === "EVENTS_STUDIO"
+    const listLabel = events ? "packages & planning calls" : "services"
+    return `Here are ${opts.shopName}'s ${listLabel}:\n${listed.join("\n")}\n\n${primary}${waBlock}\n\nWould you like to book any of these?`
 }
