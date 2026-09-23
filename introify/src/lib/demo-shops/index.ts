@@ -10,7 +10,7 @@ import { STUDIO_SHOPS } from "./studio"
 import { STAY_SHOPS } from "./stay"
 import { NILESH_KUMAR } from "./neal"
 
-/** Base food demos plus try-* showcase clones (try-restaurant, try-bakery). */
+/** Base food demos plus try-* showcase clones (try-restaurant, try-bakery, try-sweets). */
 export const FOOD_SHOPS: DemoShop[] = [...BASE_FOOD_SHOPS, ...TRY_FOOD_SHOPS]
 
 export const DEMO_SHOPS: DemoShop[] = [

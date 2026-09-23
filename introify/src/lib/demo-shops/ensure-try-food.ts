@@ -13,6 +13,7 @@ export {
     TRY_FOOD_SHOPS,
     TRY_RESTAURANT,
     TRY_BAKERY,
+    TRY_SWEETS,
     tryFoodShopBySlug,
 } from "./try-food"
 export type { TryFoodShowcaseSlug } from "./try-food"
@@ -124,7 +125,7 @@ export type EnsureTryFoodResult = {
 }
 
 /**
- * Ensure-on-miss for /try-restaurant and /try-bakery showcases.
+ * Ensure-on-miss for /try-restaurant, /try-bakery, and /try-sweets showcases.
  * If a public (or any matching-role) profile already exists, return it without wiping catalog.
  */
 export async function ensureTryFoodShowcase(prisma: PrismaClient, slug: string): Promise<EnsureTryFoodResult> {
