@@ -8,6 +8,7 @@ import {
     compactCatalogFacts,
     findCatalogItemByQuery,
 } from "@/lib/chat-catalog"
+import { resolveKitRole } from "@/lib/role-alias"
 
 const menu = [
     { title: "Iced Latte", priceCents: 16900, currency: "INR", diet: "VEG", category: "Coffee & Beverages" },
@@ -78,6 +79,68 @@ describe("chat catalog grounding (P1-9)", () => {
             whatsapp: "919262268837",
         })
         expect(answer).toMatch(/169/)
+        expect(answer).toMatch(/₹/)
+    })
+})
+
+describe("P1-3 bakery/sweets catalog price + desk alias", () => {
+    const bakeryMenu = [
+        { title: "Butter croissant", priceCents: 7000, currency: "INR", diet: "VEG", category: "Pastry" },
+        { title: "Chocolate brownie", priceCents: 9000, currency: "INR", diet: "VEG", category: "Cake" },
+    ]
+    const sweetsMenu = [
+        { title: "Gulab jamun 500g", priceCents: 18000, currency: "INR", diet: "VEG", category: "Mithai" },
+    ]
+
+    it("aliases BAKERY and SWEETS to RESTAURANT desk (same short-circuit as cafe)", () => {
+        expect(resolveKitRole("BAKERY")).toBe("RESTAURANT")
+        expect(resolveKitRole("SWEETS")).toBe("RESTAURANT")
+        expect(resolveKitRole("CAFE")).toBe("RESTAURANT")
+        const handler = readFileSync(join(process.cwd(), "src/app/api/chat/handler.ts"), "utf8")
+        expect(handler).toMatch(/const restaurantDesk = resolveKitRole\(profile\.roleTemplate\) === "RESTAURANT"/)
+        expect(handler).toMatch(/restaurantCatalogPrice/)
+    })
+
+    it("answers Butter croissant ₹70 for BAKERY role with full WhatsApp", () => {
+        const answer = answerCatalogPriceQuestion({
+            query: "What is the price of Butter croissant?",
+            items: bakeryMenu,
+            roleTemplate: "BAKERY",
+            requestCurrency: "USD",
+            shopName: "Baker's Fresh",
+            whatsapp: "919934112233",
+        })
+        expect(answer).toMatch(/Butter croissant/)
+        expect(answer).toMatch(/₹\s?70|₹70/)
+        expect(answer).toMatch(/919934112233/)
+        expect(answer).not.toMatch(/919934112(?!233)/)
+    })
+
+    it("answers Gulab jamun 500g ₹180 for SWEETS role with full WhatsApp", () => {
+        const answer = answerCatalogPriceQuestion({
+            query: "What is the price of Gulab jamun 500g?",
+            items: sweetsMenu,
+            roleTemplate: "SWEETS",
+            requestCurrency: "USD",
+            shopName: "Samriddhi Sweets",
+            whatsapp: "+91 94311 88776",
+        })
+        expect(answer).toMatch(/Gulab jamun 500g/)
+        expect(answer).toMatch(/₹\s?180|₹180/)
+        expect(answer).toMatch(/919431188776/)
+    })
+
+    it("answers Chocolate brownie ₹90 on bakers-fresh style query", () => {
+        const answer = answerCatalogPriceQuestion({
+            query: "How much is a Chocolate brownie?",
+            items: bakeryMenu,
+            roleTemplate: "BAKERY",
+            requestCurrency: "INR",
+            shopName: "Baker's Fresh",
+            whatsapp: "919934112233",
+        })
+        expect(answer).toMatch(/Chocolate brownie/)
+        expect(answer).toMatch(/90/)
         expect(answer).toMatch(/₹/)
     })
 })
