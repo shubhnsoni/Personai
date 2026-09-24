@@ -22,6 +22,9 @@ const photo = {
     nleMark: "/uploads/events-studio/mark.png",
     lcShoot: "/uploads/lets-click/shoot.jpg",
     lcMark: "/uploads/lets-click/mark.png",
+    /** REAL_ESTATE P1-4 - brokerage-honest Shakti fixtures (no try-atlas/try-brand). */
+    shaktiDesk: "/uploads/shakti-property/desk.jpg",
+    shaktiMark: "/uploads/shakti-property/mark.png",
 }
 
 export const NEXT_LEVEL_EVENTS: DemoShop = {
@@ -104,8 +107,8 @@ WhatsApp 92949 00041. Desk hours Monday to Saturday.`,
     speakerName: "Navin",
     speakerRole: "realtor",
     whatsapp: "919294900041",
-    imageUrl: photo.atlas,
-    shopLogoUrl: photo.brand,
+    imageUrl: photo.shaktiDesk,
+    shopLogoUrl: photo.shaktiMark,
     venue: {
         address: {
             formatted: "Lalpur, Ranchi 834001",
@@ -132,8 +135,8 @@ WhatsApp 92949 00041. Desk hours Monday to Saturday.`,
         { company: "Ranchi resale desks", role: "Field broker", startDate: "2008", endDate: "2014", description: "Learned papers and viewing hours on Main Road and Bariatu Road." },
     ],
     projects: [
-        { title: "Bariatu 3BHK letting", description: "A 2000 sq ft flat in Bariatu, let to a hospital family. Viewing to keys in three weeks.", year: "2025", imageUrl: photo.atlas, client: "Bariatu owner" },
-        { title: "Lalpur shop floor", description: "Ground-floor commercial on the Lalpur main stretch. Mandate, board, and a tenant who already trades on Circular Road.", year: "2024", imageUrl: photo.brand, client: "Lalpur shop owner" },
+        { title: "Bariatu 3BHK letting", description: "A 2000 sq ft flat in Bariatu, let to a hospital family. Viewing to keys in three weeks.", year: "2025", imageUrl: photo.shaktiDesk, client: "Bariatu owner" },
+        { title: "Lalpur shop floor", description: "Ground-floor commercial on the Lalpur main stretch. Mandate, board, and a tenant who already trades on Circular Road.", year: "2024", imageUrl: photo.shaktiDesk, client: "Lalpur shop owner" },
     ],
     documents: [
         { type: "BIO", title: "About Shakti Property", rawText: "Shakti Property, Lalpur, Ranchi 834001. Navin Jaiswal. Independent realtor, NAR and Jharkhand Association of Realtors. Flats, plots, shop floors. Buy, sell, rent. Desk 10:00–19:00 Monday to Saturday. WhatsApp 92949 00041. shaktiprop01@gmail.com." },
@@ -838,3 +841,4 @@ export const STUDIO_SHOPS: DemoShop[] = [
     PRIYA_MINZ,
     ARGORA_WORKROOM,
 ]
+

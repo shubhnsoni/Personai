@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1B2A3A"/>
+      <stop offset="50%" stop-color="#2A4054"/>
+      <stop offset="100%" stop-color="#121C28"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#C4A574" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#C4A574" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <circle cx="220" cy="140" r="200" fill="url(#warm)"/>
+  <!-- street sill -->
+  <rect x="0" y="560" width="1200" height="240" fill="#0E1620"/>
+  <!-- mid-rise flat block -->
+  <rect x="180" y="220" width="420" height="340" rx="8" fill="#243444"/>
+  <rect x="210" y="250" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.55"/>
+  <rect x="300" y="250" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.4"/>
+  <rect x="390" y="250" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.55"/>
+  <rect x="480" y="250" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.35"/>
+  <rect x="210" y="330" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.4"/>
+  <rect x="300" y="330" width="70" height="55" rx="4" fill="#C4A574" opacity="0.55"/>
+  <rect x="390" y="330" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.45"/>
+  <rect x="480" y="330" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.35"/>
+  <rect x="210" y="410" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.35"/>
+  <rect x="300" y="410" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.5"/>
+  <rect x="390" y="410" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.4"/>
+  <rect x="480" y="410" width="70" height="55" rx="4" fill="#8FB4C8" opacity="0.3"/>
+  <!-- entry -->
+  <rect x="340" y="480" width="100" height="80" rx="4" fill="#1A2836"/>
+  <rect x="355" y="490" width="70" height="8" rx="2" fill="#C4A574" opacity="0.7"/>
+  <!-- adjacent plot / low shop -->
+  <rect x="640" y="380" width="280" height="180" rx="6" fill="#2C3E4E"/>
+  <rect x="670" y="410" width="90" height="70" rx="4" fill="#8FB4C8" opacity="0.35"/>
+  <rect x="780" y="410" width="90" height="70" rx="4" fill="#8FB4C8" opacity="0.45"/>
+  <rect x="720" y="500" width="120" height="60" rx="4" fill="#1A2836"/>
+  <!-- realtor desk silhouette in foreground -->
+  <rect x="820" y="520" width="260" height="70" rx="8" fill="#1E2F3E"/>
+  <rect x="840" y="535" width="160" height="10" rx="3" fill="#C4A574" opacity="0.65"/>
+  <circle cx="1040" cy="555" r="14" fill="#C4A574" opacity="0.5"/>
+  <!-- soft street light -->
+  <ellipse cx="400" cy="620" rx="260" ry="30" fill="#C4A574" opacity="0.12"/>
+  <ellipse cx="900" cy="640" rx="160" ry="22" fill="#8FB4C8" opacity="0.1"/>
+</svg>

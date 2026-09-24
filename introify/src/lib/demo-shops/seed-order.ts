@@ -9,6 +9,8 @@ const PRIORITY_SLUGS = [
     // EVENTS P1-4: reseed NLE/LC heroes before budget can skip them.
     "next-level-events-kanke",
     "lets-click-ratu-road",
+    // REAL_ESTATE P1-4: reseed Shakti heroes before budget can skip them.
+    "shakti-property-lalpur",
 ]
 
 export const FORCE_REFRESH_SLUGS = new Set([
@@ -33,6 +35,8 @@ export const FORCE_REFRESH_SLUGS = new Set([
     // EVENTS P1-4: clear leela/workshop/film/anika heroes on NLE + Let's Click.
     "next-level-events-kanke",
     "lets-click-ratu-road",
+    // REAL_ESTATE P1-4: clear try-atlas/try-brand heroes on Shakti Property.
+    "shakti-property-lalpur",
 ])
 
 export function orderedDemoShops<T extends { slug: string }>(shops: T[]): T[] {
