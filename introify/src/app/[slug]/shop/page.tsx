@@ -24,6 +24,8 @@ import { GoldRateStrip } from "@/components/shop/gold-rate-strip"
 import { SessionProbe } from "@/components/profile/session-probe"
 import { CreatorGuestMenu } from "@/components/creator/creator-guest-menu"
 import { shouldUseCreatorGuestMenuEmpty } from "@/lib/creator"
+import { EventsGuestMenu } from "@/components/events/events-guest-menu"
+import { shouldUseEventsGuestMenuEmpty } from "@/lib/events"
 
 export const dynamic = "force-dynamic"
 
@@ -81,6 +83,31 @@ export default async function ShopPage({
             select: { label: true },
         })
         : null
+
+    // EVENTS P1-3: empty EVENTS_STUDIO / PHOTOGRAPHER COLLECT_LEADS kits get Packages /
+    // Portfolio chrome (never SHOP / "products"). Populated catalogs fall through.
+    if (
+        !restaurant
+        && shouldUseEventsGuestMenuEmpty(profile.roleTemplate, profile.primaryGoal)
+        && profile.digitalProducts.length === 0
+    ) {
+        return (
+            <div data-public-catalog-theme={catalogTheme ?? undefined} className="min-h-dvh bg-background text-foreground">
+                <Tracker slug={slug} name="events_menu_view" />
+                <SessionProbe slug={slug} />
+                <EventsGuestMenu
+                    slug={slug}
+                    name={profile.displayName}
+                    logoUrl={logo}
+                    whatsapp={profile.whatsapp}
+                    aboutHref={aboutHref}
+                    hours={hours}
+                    role={profile.roleTemplate}
+                    primaryGoal={profile.primaryGoal}
+                />
+            </div>
+        )
+    }
 
     // CREATOR P1-3: empty DESIGNER / CREATOR / COACH / CONSULTANT kits get role-honest
     // Portfolio / Work / Services chrome (never forced Shop). Populated catalogs fall through.
