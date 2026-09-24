@@ -88,6 +88,7 @@ export function bookChip(role?: string | null) {
             return "Book a call"
         case "RECRUITMENT_AGENCY":
             return "Book a call"
+            // hostinger retrigger recruit-p0-1 2026-09-24
     }
     switch (kitRole(role)) {
         case "RESTAURANT":
