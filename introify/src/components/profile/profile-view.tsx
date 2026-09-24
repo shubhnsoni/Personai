@@ -438,6 +438,7 @@ function sessionSheetProps(role?: string | null, durationMinutes?: number): {
         case "TRAVEL":
             return { hideParty: true, confirmLabel: "Book call" }
         case "REAL_ESTATE_BROKERAGE":
+        case "RECRUITMENT_AGENCY":
             return { hideParty: true, confirmLabel: "Book call" }
         case "FIELD_SERVICE":
         case "PLUMBER":

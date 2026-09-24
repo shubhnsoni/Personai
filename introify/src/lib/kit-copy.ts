@@ -30,6 +30,8 @@ export function waPrefill(role?: string | null, name = "") {
             return `A call with ${name}`
         case "REAL_ESTATE_BROKERAGE":
             return `A call with ${name}`
+        case "RECRUITMENT_AGENCY":
+            return `A call with ${name}`
     }
     switch (kitRole(role)) {
         case "RESTAURANT":
@@ -83,6 +85,8 @@ export function bookChip(role?: string | null) {
         case "TRAVEL":
             return "Book a call"
         case "REAL_ESTATE_BROKERAGE":
+            return "Book a call"
+        case "RECRUITMENT_AGENCY":
             return "Book a call"
     }
     switch (kitRole(role)) {
@@ -248,6 +252,8 @@ export function guestBookEmptyCopy(role?: string | null, primaryGoal?: string | 
         case "TRAVEL":
             return "No calls to book."
         case "REAL_ESTATE_BROKERAGE":
+            return "No calls to book."
+        case "RECRUITMENT_AGENCY":
             return "No calls to book."
         case "FIELD_SERVICE":
         case "PLUMBER":

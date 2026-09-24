@@ -40,6 +40,9 @@ export function appointmentBookAskNoun(role?: string | null): string {
     if (raw === "REAL_ESTATE_BROKERAGE") {
         return "call, consultation, or viewing"
     }
+    if (raw === "RECRUITMENT_AGENCY") {
+        return "call, interview, or hiring brief"
+    }
     if (
         raw === "FIELD_SERVICE"
         || raw === "PLUMBER"
