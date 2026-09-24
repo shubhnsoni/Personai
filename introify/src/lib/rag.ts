@@ -19,6 +19,12 @@ import {
     jewelryMenuPromptGuidance,
     prefersJewelryMenuPath,
 } from "@/lib/jewelry-chat"
+import {
+    autoPartsMenuPath,
+    autoPartsMenuPromptGuidance,
+    prefersAutoPartsMenuPath,
+} from "@/lib/autoparts-chat"
+import { fitmentLine } from "@/lib/autoparts/fitment"
 import { isPrivateChatDocument } from "@/lib/memory-privacy"
 import { canReadKnowledge } from "@/lib/profile-expertise-policy"
 
@@ -75,6 +81,8 @@ interface ProfileWithRelations {
         diet?: string | null
         spiceLevel?: number | null
         serveWindow?: string | null
+        variantsJson?: string | null
+        sku?: string | null
     }>
     whatsapp?: string | null
     upiId?: string | null
@@ -423,8 +431,10 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
             const diet = p.diet ? ` · ${p.diet}` : ""
             const spice = p.spiceLevel ? ` · spice ${p.spiceLevel}/3` : ""
             const when = p.serveWindow && p.serveWindow !== "ALL" ? ` · ${p.serveWindow}` : ""
+            const fit = role === "AUTO_PARTS" ? (fitmentLine((p as { variantsJson?: string | null }).variantsJson) || null) : null
+            const fitBit = fit ? ` · Fits ${fit}` : ""
             const price = restaurant ? formatChatCatalogPrice(p, profile.roleTemplate, currency) : formatMoney(p.priceCents, currency)
-            return `- ${p.title}${cat} (${restaurant ? "dish" : kind}${diet}${spice}${when}): ${price}${stock}${p.description ? ` - ${p.description}` : ""}`
+            return `- ${p.title}${cat} (${restaurant ? "dish" : kind}${diet}${spice}${when}): ${price}${stock}${fitBit}${p.description ? ` - ${p.description}` : ""}`
         }).join('\n')
         productsSection = restaurant
             ? `\n## Menu\nNever invent a dish, price, or sold-out status. If they want to order, send them to the menu or WhatsApp. If they want a table, book it with bookTable after you have party size, date, and time.\n${productList}`
@@ -434,6 +444,8 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
                 ? `\n## Wholesale stock\nWe supply shops. Bills are on touch against 24K, not the 22K retail board. Never grant udhar from chat. Send them to WhatsApp or the stock page.\n${productList}`
             : role === "PHARMACY"
                 ? `\n## Medicines\nThese are physical pharmacy items (tablets, syrups) with batch and expiry — never digital downloads or files. Never invent stock. Send them to the medicines page or WhatsApp to order for pickup.\n${productList}`
+            : role === "AUTO_PARTS"
+                ? `\n## Parts\nNever invent stock or a fitment year range. When they ask brake pads, oil filters, fitment, or spares for a make/model: cite listed SKUs with published fitment and deep-link ${profile.slug ? autoPartsMenuPath(profile.slug) : "/menu"}. WhatsApp secondary — never phone/WA-only when the Parts menu publishes fitment. Never present a part as fitting a vehicle it is not published for.\n${productList}\n${autoPartsMenuPromptGuidance({ slug: profile.slug, role: profile.roleTemplate, goal: profile.primaryGoal, hasCatalog: true, whatsapp: profile.whatsapp }).join(" ")}`
             : `\n## Shop\nNever invent stock. If sold out, say so. If they want to buy, send them to the shop or WhatsApp.\n${productList}`
         const waDigits = chatWhatsAppDigits(profile.whatsapp)
         if (waDigits) productsSection += `\nWhatsApp: ${waDigits}`
@@ -537,14 +549,14 @@ ${contextSection}
 - End with one clear next question on its own line.
 - Do not use headings (#) or tables.
 
-Preferred next-step chip: ${prefersJewelryMenuPath(role, profile.primaryGoal) && profile.slug ? `Jewellery → ${jewelryMenuPath(profile.slug)} (City Rates + catalogue; WhatsApp/walk-in secondary; never invent visits when /book is empty)` : `${bookChip(role)}${prefersAppointmentBookPath(role, profile.primaryGoal) && profile.slug ? ` → ${appointmentBookPath(profile.slug)} (WhatsApp secondary when ${kitRole === "EVENTS_STUDIO" ? "planning calls/packages" : kitRole === "REAL_ESTATE_BROKERAGE" ? "consultations/viewings" : kitRole === "RECRUITMENT_AGENCY" ? "hiring calls/interview slots" : "services/slots"} exist)` : ""}`}.
+Preferred next-step chip: ${prefersJewelryMenuPath(role, profile.primaryGoal) && profile.slug ? `Jewellery → ${jewelryMenuPath(profile.slug)} (City Rates + catalogue; WhatsApp/walk-in secondary; never invent visits when /book is empty)` : prefersAutoPartsMenuPath(role, profile.primaryGoal) && profile.slug ? `Parts → ${autoPartsMenuPath(profile.slug)} (published fitment; WhatsApp secondary; never invent fitment)` : `${bookChip(role)}${prefersAppointmentBookPath(role, profile.primaryGoal) && profile.slug ? ` → ${appointmentBookPath(profile.slug)} (WhatsApp secondary when ${kitRole === "EVENTS_STUDIO" ? "planning calls/packages" : kitRole === "REAL_ESTATE_BROKERAGE" ? "consultations/viewings" : kitRole === "RECRUITMENT_AGENCY" ? "hiring calls/interview slots" : "services/slots"} exist)` : ""}`}.
 ${profile.welcomeMessageOverride ? `Welcome message style: "${profile.welcomeMessageOverride}"\n` : ''}${buildPersonalitySection(profile.personalityConfig)}
 
 ## Tools Available
 You have access to these functions that you should use when appropriate:
 - collectLead: Use when the visitor shows interest and provides their contact info
 - showStory: ${showStoryDescription(role)}
-${showServices ? (kitRole === "EVENTS_STUDIO" ? "- showServices: Use when asked about rates, enquire, quote, book a shoot, or planning/brief calls\n" : kitRole === "REAL_ESTATE_BROKERAGE" ? "- showServices: Use when asked about rates, enquire, viewing, consultation, or mandate review\n" : kitRole === "RECRUITMENT_AGENCY" ? "- showServices: Use when asked about rates, enquire about roles, schedule interview, hire, or hiring brief\n" : "- showServices: Use when asked about rates, booking, or sessions\n") : ""}${showPortfolio ? "- showWorkExperience: Use when asked about background, CV, or work history\n- showProjects: Use when asked about portfolio or past projects\n" : ""}${showShop && kitRole === "RESTAURANT" ? "- showMenu: Use when asked about the menu, dishes, or a dish price\n- bookTable: Use when they want to reserve a table. Never invent an empty table.\n" : ""}${role === "HOTEL" || role === "RESORT" || role === "HOSTEL" || role === "HOMESTAY" || role === "SERVICED_APARTMENT" ? "- createHotelRequest: Use for towels, maintenance, spa, transport, or experiences. Never confirm payment.\n- raiseHotelEmergency: Call-first. Not an ordinary ticket.\n- showHotelMap: Marker card only. Do not invent indoor navigation.\n- showHotelRestaurants: Use for food. Never invent a menu.\n- showHotelSpa / showHotelTransport / showHotelExperiences: Show catalogues. File a request; do not bill.\n- showHotelLocalGuide: Hotel-curated + linked restaurants only. Stay honest if empty.\n- talkToReception: Use when they want a human\n- requestLateCheckout / requestHotelCheckout: Requests only; do not confirm payment or close a bill.\n- submitHotelFeedback: Google review search only after a positive note. Never post a review.\n" : ""}${showShop && kitRole !== "RESTAURANT" ? (role === "JEWELRY_RETAIL" || role === "JEWELRY_WHOLESALE" ? "- showProducts: Use when asked about bridal, mangalsutra, gold rate, City Rates, jewellery catalogue, or the shop — cite /menu\n" : "- showProducts: Use when asked about products or the shop\n") : ""}${showCourses ? "- showCourses: Use when asked about courses or training\n" : ""}${showEvents ? "- showEvents: Use when asked about events\n- showCommunities: Use when asked about groups\n" : ""}- showLeadMagnets: Use when asked about free resources, guides, or giveaways
+${showServices ? (kitRole === "EVENTS_STUDIO" ? "- showServices: Use when asked about rates, enquire, quote, book a shoot, or planning/brief calls\n" : kitRole === "REAL_ESTATE_BROKERAGE" ? "- showServices: Use when asked about rates, enquire, viewing, consultation, or mandate review\n" : kitRole === "RECRUITMENT_AGENCY" ? "- showServices: Use when asked about rates, enquire about roles, schedule interview, hire, or hiring brief\n" : "- showServices: Use when asked about rates, booking, or sessions\n") : ""}${showPortfolio ? "- showWorkExperience: Use when asked about background, CV, or work history\n- showProjects: Use when asked about portfolio or past projects\n" : ""}${showShop && kitRole === "RESTAURANT" ? "- showMenu: Use when asked about the menu, dishes, or a dish price\n- bookTable: Use when they want to reserve a table. Never invent an empty table.\n" : ""}${role === "HOTEL" || role === "RESORT" || role === "HOSTEL" || role === "HOMESTAY" || role === "SERVICED_APARTMENT" ? "- createHotelRequest: Use for towels, maintenance, spa, transport, or experiences. Never confirm payment.\n- raiseHotelEmergency: Call-first. Not an ordinary ticket.\n- showHotelMap: Marker card only. Do not invent indoor navigation.\n- showHotelRestaurants: Use for food. Never invent a menu.\n- showHotelSpa / showHotelTransport / showHotelExperiences: Show catalogues. File a request; do not bill.\n- showHotelLocalGuide: Hotel-curated + linked restaurants only. Stay honest if empty.\n- talkToReception: Use when they want a human\n- requestLateCheckout / requestHotelCheckout: Requests only; do not confirm payment or close a bill.\n- submitHotelFeedback: Google review search only after a positive note. Never post a review.\n" : ""}${showShop && kitRole !== "RESTAURANT" ? (role === "JEWELRY_RETAIL" || role === "JEWELRY_WHOLESALE" ? "- showProducts: Use when asked about bridal, mangalsutra, gold rate, City Rates, jewellery catalogue, or the shop — cite /menu\n" : role === "AUTO_PARTS" ? "- showProducts: Use when asked about brake pads, oil filters, fitment, spares, or the Parts menu — cite /menu + published fitment\n" : "- showProducts: Use when asked about products or the shop\n") : ""}${showCourses ? "- showCourses: Use when asked about courses or training\n" : ""}${showEvents ? "- showEvents: Use when asked about events\n- showCommunities: Use when asked about groups\n" : ""}- showLeadMagnets: Use when asked about free resources, guides, or giveaways
 
 ${cloneClosingReminder(profile.displayName)}`
 }

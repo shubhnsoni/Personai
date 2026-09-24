@@ -271,7 +271,7 @@ export function guestBookEmptyCopy(role?: string | null, primaryGoal?: string | 
             case "PHARMACY":
                 return "This shop sells medicines — browse MEDICINES."
             case "AUTO_PARTS":
-                return "This shop sells parts — browse the catalogue."
+                return "This shop sells parts — browse Parts on the menu."
             case "JEWELRY_RETAIL":
                 return "This showroom sells jewellery — browse Jewellery on the menu.";
             case "JEWELRY_WHOLESALE":

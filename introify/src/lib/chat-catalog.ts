@@ -9,6 +9,9 @@ export type ChatCatalogItem = {
     diet?: string | null
     category?: string | null
     stock?: number | null
+    variantsJson?: string | null
+    sku?: string | null
+    description?: string | null
 }
 
 /** Digits-only WhatsApp for prompts/chat — same body as wa.me links. Never truncate. */

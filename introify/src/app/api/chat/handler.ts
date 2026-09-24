@@ -20,6 +20,7 @@ import {
     formatShowServicesReply,
 } from "@/lib/appointment-chat"
 import { answerJewelryCatalogOrRate } from "@/lib/jewelry-chat"
+import { answerAutoPartsCatalogOrFitment } from "@/lib/autoparts-chat"
 import { goldBoardFromConfig } from "@/lib/metal/board"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
@@ -316,9 +317,10 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         const restaurantDesk = resolveKitRole(profile.roleTemplate) === "RESTAURANT"
         const hotelDesk = resolveKitRole(profile.roleTemplate) === "HOTEL"
         const jewelryDesk = profile.roleTemplate === "JEWELRY_RETAIL" || profile.roleTemplate === "JEWELRY_WHOLESALE" || resolveKitRole(profile.roleTemplate) === "JEWELRY_RETAIL" || resolveKitRole(profile.roleTemplate) === "JEWELRY_WHOLESALE"
+        const autoPartsDesk = profile.roleTemplate === "AUTO_PARTS" || resolveKitRole(profile.roleTemplate) === "AUTO_PARTS"
         const hotelRoom = typeof body.hotelRoom === "string" ? body.hotelRoom.trim().slice(0, 16) : ""
         const stayToken = typeof body.stayToken === "string" ? body.stayToken.trim().slice(0, 64) : ""
-        if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk && !hotelDesk && !jewelryDesk && liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED")) {
+        if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk && !hotelDesk && !jewelryDesk && !autoPartsDesk && liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED")) {
             return new Response(
                 JSON.stringify({ error: "ai_not_configured", message: "The AI assistant is temporarily unavailable. You can still use this business's contact and booking options." }),
                 { status: 503, headers: { "Content-Type": "application/json" } },
@@ -1302,6 +1304,19 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
             personalityConfig: profile.personalityConfig,
         })
         : null
+    // Auto-parts P1-1: cite published fitment + /menu before LLM (WhatsApp secondary).
+    const autoPartsMenuReply = autoPartsDesk
+        ? answerAutoPartsCatalogOrFitment({
+            query,
+            slug: profileData.slug,
+            shopName: profileData.displayName,
+            roleTemplate: profileData.roleTemplate,
+            primaryGoal: profileData.primaryGoal,
+            items: profileData.digitalProducts || [],
+            requestCurrency: currency,
+            whatsapp: profileData.whatsapp,
+        })
+        : null
     const appointmentBookReply = (!restaurantDesk && !hotelDesk)
         ? answerAppointmentBookOrPrice({
             query,
@@ -1320,6 +1335,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         || Boolean(restaurantCatalogPrice)
         || Boolean(appointmentBookReply)
         || Boolean(jewelryMenuReply)
+        || Boolean(autoPartsMenuReply)
     ) {
         if (reservation) {
             await settle("RELEASE", {
@@ -1329,10 +1345,12 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                         ? "appointment_book_path"
                         : jewelryMenuReply
                             ? "jewelry_menu_path"
-                            : "hotel_desk",
+                            : autoPartsMenuReply
+                                ? "auto_parts_menu_path"
+                                : "hotel_desk",
             })
         }
-        const notice = restaurantCatalogPrice || appointmentBookReply || jewelryMenuReply || await groundedFallback()
+        const notice = restaurantCatalogPrice || appointmentBookReply || jewelryMenuReply || autoPartsMenuReply || await groundedFallback()
         await db.message.create({
             data: {
                 conversationId: authorizedConversationId,

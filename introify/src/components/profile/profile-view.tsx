@@ -632,7 +632,7 @@ function buildGoalChips(
             label: shopNavLabel(profile.roleTemplate),
             available: (profile.digitalProducts?.length ?? 0) > 0,
             icon: <DollarSign className="w-3.5 h-3.5" />,
-            href: (resolveKitRole(profile.roleTemplate) === "RESTAURANT" || profile.roleTemplate === "JEWELRY_RETAIL" || profile.roleTemplate === "JEWELRY_WHOLESALE") ? `/${profile.slug}/menu` : `/${profile.slug}/shop`,
+            href: (resolveKitRole(profile.roleTemplate) === "RESTAURANT" || profile.roleTemplate === "JEWELRY_RETAIL" || profile.roleTemplate === "JEWELRY_WHOLESALE" || profile.roleTemplate === "AUTO_PARTS" || resolveKitRole(profile.roleTemplate) === "AUTO_PARTS") ? `/${profile.slug}/menu` : `/${profile.slug}/shop`,
         },
         story: {
             id: "story",

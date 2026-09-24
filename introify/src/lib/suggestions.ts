@@ -1,7 +1,8 @@
 import { isJewelryKit, isJewelryRetail } from "@/lib/metal/math"
+import { isAutoParts } from "@/lib/autoparts/fitment"
 import { resolveKitRole } from "@/lib/role-alias"
 
-/** Suggested follow-ups after an assistant reply. Role-aware — no hire-desk "working with" on retail jewellery. */
+/** Suggested follow-ups after an assistant reply. Role-aware — no hire-desk "working with" on retail jewellery or auto-parts. */
 export function generateSuggestions(
     lastAssistant: string,
     displayName: string,
@@ -20,6 +21,13 @@ export function generateSuggestions(
             "What's today's board?",
             "What stock is on the menu?",
             "How do I order as a shop?",
+        ]
+    }
+    if (isAutoParts(role) || kit === "AUTO_PARTS") {
+        return [
+            "Do you have Swift brake pads?",
+            "What oil filter fits my car?",
+            "Show parts that fit Maruti Swift",
         ]
     }
 
