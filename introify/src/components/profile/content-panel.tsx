@@ -116,8 +116,8 @@ export function ContentPanel({ isOpen, onClose, type, data, onBookService, onPur
 
     const content = (
         <div className="relative flex h-full min-h-0 flex-1 flex-col">
-            <div className="flex items-center justify-between px-3 py-3 sm:p-5 border-b border-white/8 bg-black/40 backdrop-blur-md z-10">
-                <div className="flex items-center gap-4">
+            <div className="flex min-w-0 items-center justify-between gap-3 px-3 py-3 sm:p-5 border-b border-white/8 bg-black/40 backdrop-blur-md z-10">
+                <div className="flex min-w-0 items-center gap-4">
                     <Button 
                         variant="ghost" 
                         size="icon" 
@@ -126,12 +126,12 @@ export function ContentPanel({ isOpen, onClose, type, data, onBookService, onPur
                     >
                         <X className="h-5 w-5" />
                     </Button>
-                    <h2 className="text-xl font-semibold text-white drop-shadow-md">{getTitle()}</h2>
+                    <h2 className="min-w-0 break-words [overflow-wrap:anywhere] text-xl font-semibold text-white drop-shadow-md">{getTitle()}</h2>
                 </div>
                 {type === "about" && data.slug ? (
                     <Link
                         href={storyPath(data.slug)}
-                        className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/90 hover:bg-white/10"
+                        className="shrink-0 whitespace-nowrap rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/90 hover:bg-white/10"
                     >
                         See full about
                     </Link>
@@ -148,8 +148,11 @@ export function ContentPanel({ isOpen, onClose, type, data, onBookService, onPur
                 )}
                 {type === "projects" && <ProjectsView data={data} />}
                 {type === "about" && (
-                    <ScrollArea className="h-full p-6">
-                        <div className="max-w-3xl mx-auto space-y-8 pb-20">
+                    // plat-p1-1: Radix ScrollArea wraps children in `display: table; min-width: 100%`,
+                    // which grows to the widest nowrap line and clips body copy at the right edge.
+                    // Force that wrapper back to a block so About text wraps at the panel width.
+                    <ScrollArea data-about-scroll="" className={ABOUT_SCROLL_CLASS}>
+                        <div data-about-body="" className={ABOUT_BODY_CLASS}>
                             <AboutView data={data} />
                         </div>
                     </ScrollArea>
@@ -370,13 +373,19 @@ function ProjectsView({ data }: { data: ContentPanelProps["data"] }) {
     )
 }
 
+/** plat-p1-1: About modal must wrap at 1280 and 390 on every kit - no horizontal clip/scroll. */
+export const ABOUT_SCROLL_CLASS =
+    "h-full min-w-0 px-4 py-5 sm:p-6 [&_[data-radix-scroll-area-viewport]]:overflow-x-hidden! [&_[data-radix-scroll-area-viewport]>div]:block! [&_[data-radix-scroll-area-viewport]>div]:min-w-0! [&_[data-radix-scroll-area-viewport]>div]:w-full!"
+export const ABOUT_BODY_CLASS = "mx-auto w-full min-w-0 max-w-3xl space-y-8 pb-20"
+export const ABOUT_WRAP_TEXT = "min-w-0 break-words [overflow-wrap:anywhere]"
+
 function AboutView({ data }: { data: ContentPanelProps["data"] }) {
     const fallback = kitAbout(data.roleTemplate, data.displayName)
     const headline = data.headline?.trim() || fallback.headline || "About"
     const bio = data.bio?.trim() || fallback.bio
     return (
-        <div className="space-y-5">
-            <div className="flex items-center gap-3">
+        <div className="min-w-0 space-y-5">
+            <div className="flex min-w-0 items-center gap-3">
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-white/10 bg-zinc-800">
                     {data.imageUrl ? (
                         <img src={data.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -386,13 +395,13 @@ function AboutView({ data }: { data: ContentPanelProps["data"] }) {
                         </div>
                     )}
                 </div>
-                <div className="min-w-0">
-                    <h2 className="truncate text-base font-semibold text-white">{data.displayName}</h2>
-                    <p className="truncate text-sm text-zinc-400">{headline}</p>
+                <div className="min-w-0 flex-1">
+                    <h2 data-about-name="" className={`${ABOUT_WRAP_TEXT} text-base font-semibold text-white`}>{data.displayName}</h2>
+                    <p data-about-headline="" className={`${ABOUT_WRAP_TEXT} text-sm text-zinc-400`}>{headline}</p>
                 </div>
             </div>
             {bio ? (
-                <p className="text-sm leading-relaxed text-zinc-300 whitespace-pre-wrap">{bio}</p>
+                <p data-about-bio="" className={`${ABOUT_WRAP_TEXT} text-sm leading-relaxed text-zinc-300 whitespace-pre-wrap`}>{bio}</p>
             ) : (
                 <p className="text-sm text-zinc-500">No bio yet.</p>
             )}
