@@ -48,6 +48,23 @@ const nextConfig = {
       { source: "/jeweller/:path*", destination: "/mk-jewellers/:path*", permanent: false },
       { source: "/try-jeweler", destination: "/mk-jewellers", permanent: false },
       { source: "/try-jeweler/:path*", destination: "/mk-jewellers/:path*", permanent: false },
+      // AUTO_PARTS P0-1 discovery aliases -> LIVE showcase (Paras Auto).
+      { source: "/try-auto-parts", destination: "/paras-auto", permanent: false },
+      { source: "/try-auto-parts/:path*", destination: "/paras-auto/:path*", permanent: false },
+      { source: "/auto-parts", destination: "/paras-auto", permanent: false },
+      { source: "/auto-parts/:path*", destination: "/paras-auto/:path*", permanent: false },
+      { source: "/try-autoparts", destination: "/paras-auto", permanent: false },
+      { source: "/try-autoparts/:path*", destination: "/paras-auto/:path*", permanent: false },
+      { source: "/try-parts", destination: "/paras-auto", permanent: false },
+      { source: "/try-parts/:path*", destination: "/paras-auto/:path*", permanent: false },
+      { source: "/parts", destination: "/paras-auto", permanent: false },
+      { source: "/parts/:path*", destination: "/paras-auto/:path*", permanent: false },
+      { source: "/try-auto", destination: "/paras-auto", permanent: false },
+      { source: "/try-auto/:path*", destination: "/paras-auto/:path*", permanent: false },
+      { source: "/try-spare-parts", destination: "/paras-auto", permanent: false },
+      { source: "/try-spare-parts/:path*", destination: "/paras-auto/:path*", permanent: false },
+      { source: "/try-spares", destination: "/paras-auto", permanent: false },
+      { source: "/try-spares/:path*", destination: "/paras-auto/:path*", permanent: false },
 
       // HOTEL P1-3 stay discovery aliases → canonical try-hotel (Haven Hinoo).
       { source: "/hotel", destination: "/try-hotel", permanent: false },
