@@ -79,3 +79,83 @@ export function isLeakedJewelryProductImage(url: string | null | undefined): boo
     if (!lower) return false
     return JEWELRY_LEAKED_PRODUCT_IMAGE_MARKERS.some((marker) => lower.includes(marker))
 }
+
+/**
+ * JEWELRY P1-3 — About / header / print mark honesty for MK Jewellers.
+ *
+ * Demo seed previously reused try-mira (pottery studio + Grok watermark) and
+ * try-brand (stationery flatlay + Grok watermark) as About / header / print
+ * heroes. Guests then saw ceramics / brand-kit chrome on a Ranchi jewellery
+ * counter.
+ *
+ * Policy: prefer jewellery-counter assets under /uploads/mk-jewellers/. Only
+ * backfill when the live profile still carries a known leakage path — never
+ * wipe a custom owner upload that is not a listed marker. Catalogue SKU
+ * thumbs from jewelry-p1-2 stay untouched.
+ */
+
+/** Paths / markers that must never appear as MK About hero or logo. */
+export const JEWELRY_LEAKED_DEMO_IMAGE_MARKERS = [
+    "try-mira",
+    "try-brand",
+    "img-try-mira",
+    "img-try-brand",
+] as const
+
+/** Jewellery-honest MK showcase assets. */
+export const MK_HONEST_IMAGE_URL = "/uploads/mk-jewellers/desk.jpg"
+export const MK_HONEST_LOGO_URL = "/uploads/mk-jewellers/mark.png"
+
+/** Known bad fixture paths still on LIVE MK before P1-3. */
+export const MK_LEAKED_IMAGE_URL = "/uploads/try-mira.jpg"
+export const MK_LEAKED_LOGO_URL = "/uploads/try-brand.jpg"
+
+export function isLeakedJewelryDemoImage(url: string | null | undefined): boolean {
+    if (!url) return false
+    const lower = url.trim().toLowerCase()
+    if (!lower) return false
+    return JEWELRY_LEAKED_DEMO_IMAGE_MARKERS.some((marker) => lower.includes(marker))
+}
+
+export type JewelryImageryBackfill = {
+    imageUrl?: string
+    shopLogoUrl?: string
+}
+
+/**
+ * Pure: replace only known pottery/brand-flatlay leakage paths with
+ * jewellery-honest URLs. Custom owner uploads that are not listed markers are
+ * left alone. Empty fields are left alone.
+ */
+export function jewelryImageryBackfillPatch(input: {
+    imageUrl?: string | null
+    shopLogoUrl?: string | null
+    honestImageUrl?: string
+    honestLogoUrl?: string
+}): JewelryImageryBackfill | null {
+    const honestImage = input.honestImageUrl || MK_HONEST_IMAGE_URL
+    const honestLogo = input.honestLogoUrl || MK_HONEST_LOGO_URL
+    const patch: JewelryImageryBackfill = {}
+
+    if (isLeakedJewelryDemoImage(input.imageUrl)) {
+        patch.imageUrl = honestImage
+    }
+    if (isLeakedJewelryDemoImage(input.shopLogoUrl)) {
+        patch.shopLogoUrl = honestLogo
+    }
+
+    return Object.keys(patch).length ? patch : null
+}
+
+export function isJewelryHonestFixtureUrl(url: string | null | undefined): boolean {
+    if (!url) return false
+    const trimmed = url.trim()
+    if (!trimmed) return false
+    if (isLeakedJewelryDemoImage(trimmed)) return false
+    return (
+        trimmed === MK_HONEST_IMAGE_URL ||
+        trimmed === MK_HONEST_LOGO_URL ||
+        trimmed.startsWith(MK_JEWELLERY_UPLOAD_PREFIX)
+    )
+}
+

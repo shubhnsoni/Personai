@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2A1A12"/>
+      <stop offset="55%" stop-color="#1A100C"/>
+      <stop offset="100%" stop-color="#0C0806"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F5E0A8"/>
+      <stop offset="40%" stop-color="#D4A84B"/>
+      <stop offset="100%" stop-color="#8A6420"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E8F0F4" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#7EB8C9" stop-opacity="0.08"/>
+    </linearGradient>
+    <radialGradient id="lamp" cx="70%" cy="18%" r="45%">
+      <stop offset="0%" stop-color="#F5E0A8" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#F5E0A8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#wall)"/>
+  <circle cx="900" cy="100" r="260" fill="url(#lamp)"/>
+  <!-- wood floor -->
+  <rect x="0" y="560" width="1200" height="240" fill="#120C08"/>
+  <!-- back cabinet / mirror wall -->
+  <rect x="60" y="80" width="420" height="360" rx="10" fill="#241610"/>
+  <rect x="90" y="110" width="160" height="140" rx="6" fill="#3A2418"/>
+  <rect x="280" y="110" width="160" height="140" rx="6" fill="#3A2418"/>
+  <rect x="90" y="270" width="160" height="140" rx="6" fill="#2E1C14"/>
+  <rect x="280" y="270" width="160" height="140" rx="6" fill="#2E1C14"/>
+  <!-- glass reflection -->
+  <rect x="100" y="120" width="140" height="50" rx="3" fill="url(#glass)"/>
+  <rect x="290" y="120" width="140" height="50" rx="3" fill="url(#glass)"/>
+  <!-- jewellery counter -->
+  <rect x="420" y="400" width="680" height="200" rx="12" fill="#1C120C"/>
+  <rect x="440" y="420" width="640" height="14" rx="3" fill="url(#gold)" opacity="0.75"/>
+  <!-- velvet trays -->
+  <rect x="470" y="460" width="170" height="110" rx="10" fill="#3A1818"/>
+  <rect x="670" y="460" width="170" height="110" rx="10" fill="#3A1818"/>
+  <rect x="870" y="460" width="170" height="110" rx="10" fill="#3A1818"/>
+  <!-- tray gold pieces: bangle / chain / coin -->
+  <ellipse cx="555" cy="515" rx="48" ry="28" fill="none" stroke="url(#gold)" stroke-width="10"/>
+  <ellipse cx="555" cy="515" rx="34" ry="18" fill="none" stroke="#F5E0A8" stroke-width="2" opacity="0.45"/>
+  <path d="M700 500 Q755 470 810 500 Q755 530 700 500" fill="none" stroke="url(#gold)" stroke-width="7"/>
+  <circle cx="955" cy="515" r="28" fill="url(#gold)"/>
+  <circle cx="955" cy="515" r="18" fill="#1A100C"/>
+  <circle cx="955" cy="515" r="12" fill="url(#gold)" opacity="0.85"/>
+  <!-- HUID tag on counter -->
+  <rect x="520" y="580" width="70" height="28" rx="4" fill="#F5E0A8"/>
+  <rect x="528" y="586" width="40" height="4" rx="1" fill="#1A100C" opacity="0.55"/>
+  <rect x="528" y="596" width="28" height="3" rx="1" fill="#1A100C" opacity="0.4"/>
+  <text x="575" y="598" font-family="Arial,sans-serif" font-size="11" fill="#1A100C" font-weight="700">HUID</text>
+  <!-- weighing scale silhouette -->
+  <rect x="1020" y="480" width="50" height="8" rx="2" fill="#6A7A84"/>
+  <rect x="1040" y="450" width="10" height="30" fill="#6A7A84"/>
+  <ellipse cx="1045" cy="448" rx="28" ry="8" fill="#8A9AA4"/>
+  <!-- soft glow under trays -->
+  <ellipse cx="755" cy="640" rx="300" ry="28" fill="#D4A84B" opacity="0.12"/>
+</svg>

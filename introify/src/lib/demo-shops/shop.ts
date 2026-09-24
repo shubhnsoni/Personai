@@ -16,6 +16,9 @@ const photo = {
     lassi: "/uploads/try-lassi.jpg",
     cafe: "/uploads/skydine-cafe/storefront.jpg",
     plates: "/uploads/skydine-cafe/plates.jpg",
+    /** JEWELRY P1-3 - jewellery-counter honest MK fixtures (no try-mira/try-brand). */
+    mkDesk: "/uploads/mk-jewellers/desk.jpg",
+    mkMark: "/uploads/mk-jewellers/mark.png",
 }
 
 const K22 = 9160
@@ -506,8 +509,8 @@ Open every day 10:15–21:15. Call 99052 92254. mkjewellersmkj.com. Instagram @m
     speakerRole: "jeweller",
     whatsapp: "919905292254",
     deliveryNote: "Pickup at Shop 2, Baba Tower, opposite the Gurudwara, MG Main Road. Pieces leave with a GST bill. Old gold exchange at the counter.",
-    imageUrl: photo.mira,
-    shopLogoUrl: photo.brand,
+    imageUrl: photo.mkDesk,
+    shopLogoUrl: photo.mkMark,
     venue: {
         address: {
             formatted: "Shop 2, Baba Tower, opposite Gurudwara, Mahatma Gandhi Main Road, Ranchi 834001",
