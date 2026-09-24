@@ -25,11 +25,30 @@ const nextConfig = {
       // P1-2 SHOP marketing aliases → canonical try-shop (dedicated kits like try-boutique/try-kirana stay).
       { source: "/try-grocery", destination: "/try-shop", permanent: false },
       { source: "/try-retail", destination: "/try-shop", permanent: false },
-      { source: "/try-jewellery", destination: "/try-shop", permanent: false },
       { source: "/try-fashion", destination: "/try-shop", permanent: false },
       { source: "/try-electronics", destination: "/try-shop", permanent: false },
       { source: "/try-wholesale", destination: "/try-shop", permanent: false },
       { source: "/try-market", destination: "/try-shop", permanent: false },
+      // JEWELRY P0-1 discovery aliases -> LIVE showcase (MK Jewellers).
+      // try-jewellery used to soft-route to try-shop (Armonia decor) - wrong vertical.
+      // try-shop stays SHOP / Armonia. try-jewelry-retail / try-gold-wholesale stay TRY_KITS create slugs.
+      { source: "/try-jewellery", destination: "/mk-jewellers", permanent: false },
+      { source: "/try-jewellery/:path*", destination: "/mk-jewellers/:path*", permanent: false },
+      { source: "/jewellery", destination: "/mk-jewellers", permanent: false },
+      { source: "/jewellery/:path*", destination: "/mk-jewellers/:path*", permanent: false },
+      { source: "/try-jewelry", destination: "/mk-jewellers", permanent: false },
+      { source: "/try-jewelry/:path*", destination: "/mk-jewellers/:path*", permanent: false },
+      { source: "/jewelry", destination: "/mk-jewellers", permanent: false },
+      { source: "/jewelry/:path*", destination: "/mk-jewellers/:path*", permanent: false },
+      { source: "/try-gold", destination: "/mk-jewellers", permanent: false },
+      { source: "/try-gold/:path*", destination: "/mk-jewellers/:path*", permanent: false },
+      { source: "/try-jeweller", destination: "/mk-jewellers", permanent: false },
+      { source: "/try-jeweller/:path*", destination: "/mk-jewellers/:path*", permanent: false },
+      { source: "/jeweller", destination: "/mk-jewellers", permanent: false },
+      { source: "/jeweller/:path*", destination: "/mk-jewellers/:path*", permanent: false },
+      { source: "/try-jeweler", destination: "/mk-jewellers", permanent: false },
+      { source: "/try-jeweler/:path*", destination: "/mk-jewellers/:path*", permanent: false },
+
       // HOTEL P1-3 stay discovery aliases → canonical try-hotel (Haven Hinoo).
       { source: "/hotel", destination: "/try-hotel", permanent: false },
       { source: "/hotel/:path*", destination: "/try-hotel/:path*", permanent: false },
