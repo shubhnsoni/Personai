@@ -26,6 +26,8 @@ import { CreatorGuestMenu } from "@/components/creator/creator-guest-menu"
 import { shouldUseCreatorGuestMenuEmpty } from "@/lib/creator"
 import { EventsGuestMenu } from "@/components/events/events-guest-menu"
 import { shouldUseEventsGuestMenuEmpty } from "@/lib/events"
+import { RealestateGuestMenu } from "@/components/realestate/realestate-guest-menu"
+import { shouldUseRealestateGuestMenuEmpty } from "@/lib/realestate"
 
 export const dynamic = "force-dynamic"
 
@@ -83,6 +85,31 @@ export default async function ShopPage({
             select: { label: true },
         })
         : null
+
+    // REALESTATE P1-3: empty REAL_ESTATE_BROKERAGE COLLECT_LEADS kits get Listings
+    // chrome (never SHOP / "products"). Populated catalogs fall through.
+    if (
+        !restaurant
+        && shouldUseRealestateGuestMenuEmpty(profile.roleTemplate, profile.primaryGoal)
+        && profile.digitalProducts.length === 0
+    ) {
+        return (
+            <div data-public-catalog-theme={catalogTheme ?? undefined} className="min-h-dvh bg-background text-foreground">
+                <Tracker slug={slug} name="realestate_menu_view" />
+                <SessionProbe slug={slug} />
+                <RealestateGuestMenu
+                    slug={slug}
+                    name={profile.displayName}
+                    logoUrl={logo}
+                    whatsapp={profile.whatsapp}
+                    aboutHref={aboutHref}
+                    hours={hours}
+                    role={profile.roleTemplate}
+                    primaryGoal={profile.primaryGoal}
+                />
+            </div>
+        )
+    }
 
     // EVENTS P1-3: empty EVENTS_STUDIO / PHOTOGRAPHER COLLECT_LEADS kits get Packages /
     // Portfolio chrome (never SHOP / "products"). Populated catalogs fall through.
