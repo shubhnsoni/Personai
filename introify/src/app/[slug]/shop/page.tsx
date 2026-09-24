@@ -30,6 +30,8 @@ import { RealestateGuestMenu } from "@/components/realestate/realestate-guest-me
 import { shouldUseRealestateGuestMenuEmpty } from "@/lib/realestate"
 import { FieldGuestMenu } from "@/components/field/field-guest-menu"
 import { shouldUseFieldGuestMenuEmpty } from "@/lib/fieldjobs/guest-menu"
+import { RecruitmentGuestMenu } from "@/components/recruitment/recruitment-guest-menu"
+import { shouldUseRecruitGuestMenuEmpty } from "@/lib/recruitment"
 
 export const dynamic = "force-dynamic"
 
@@ -102,6 +104,31 @@ export default async function ShopPage({
                 <Tracker slug={slug} name="field_menu_view" />
                 <SessionProbe slug={slug} />
                 <FieldGuestMenu
+                    slug={slug}
+                    name={profile.displayName}
+                    logoUrl={logo}
+                    whatsapp={profile.whatsapp}
+                    aboutHref={aboutHref}
+                    hours={hours}
+                    role={profile.roleTemplate}
+                    primaryGoal={profile.primaryGoal}
+                />
+            </div>
+        )
+    }
+
+    // RECRUIT P1-2: empty RECRUITMENT_AGENCY COLLECT_LEADS kits get Roles chrome
+    // (never SHOP / "products"). Calls live on /book. Populated catalogs fall through.
+    if (
+        !restaurant
+        && shouldUseRecruitGuestMenuEmpty(profile.roleTemplate, profile.primaryGoal)
+        && profile.digitalProducts.length === 0
+    ) {
+        return (
+            <div data-public-catalog-theme={catalogTheme ?? undefined} className="min-h-dvh bg-background text-foreground">
+                <Tracker slug={slug} name="recruit_menu_view" />
+                <SessionProbe slug={slug} />
+                <RecruitmentGuestMenu
                     slug={slug}
                     name={profile.displayName}
                     logoUrl={logo}
