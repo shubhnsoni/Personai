@@ -17,6 +17,8 @@ const PRIORITY_SLUGS = [
     "vicky-electrical",
     "cooling-world-ranchi",
     "bhola-service-centre",
+    // RECRUIT P1-3: reseed Nita heroes before budget can skip them.
+    "nita-recruiters-ashok-nagar",
 ]
 
 export const FORCE_REFRESH_SLUGS = new Set([
@@ -49,6 +51,8 @@ export const FORCE_REFRESH_SLUGS = new Set([
     "vicky-electrical",
     "cooling-world-ranchi",
     "bhola-service-centre",
+    // RECRUIT P1-3: clear try-samir/try-brand heroes on Nita Recruiters.
+    "nita-recruiters-ashok-nagar",
 ])
 
 export function orderedDemoShops<T extends { slug: string }>(shops: T[]): T[] {

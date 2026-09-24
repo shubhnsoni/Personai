@@ -25,6 +25,9 @@ const photo = {
     /** REAL_ESTATE P1-4 - brokerage-honest Shakti fixtures (no try-atlas/try-brand). */
     shaktiDesk: "/uploads/shakti-property/desk.jpg",
     shaktiMark: "/uploads/shakti-property/mark.png",
+    /** RECRUIT P1-3 - hiring-desk honest Nita fixtures (no try-samir/try-brand). */
+    nitaDesk: "/uploads/nita-recruiters/desk.jpg",
+    nitaMark: "/uploads/nita-recruiters/mark.png",
 }
 
 export const NEXT_LEVEL_EVENTS: DemoShop = {
@@ -162,8 +165,8 @@ Call 97088 16511. Monday to Saturday, 10 to 6.`,
     speakerName: "Nita desk",
     speakerRole: "recruiter",
     whatsapp: "919708816511",
-    imageUrl: photo.brand,
-    shopLogoUrl: photo.samir,
+    imageUrl: photo.nitaDesk,
+    shopLogoUrl: photo.nitaMark,
     venue: {
         address: {
             formatted: "Shop No. 33, Cooperative Complex, Road No. 2, Ashok Nagar, Ranchi 834002",

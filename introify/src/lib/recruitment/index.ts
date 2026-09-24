@@ -23,3 +23,15 @@ export {
     recruitGuestMenuLabel,
     recruitGuestMenuEmptyCopy,
 } from "./guest-menu"
+
+export {
+    RECRUIT_LEAKED_IMAGE_MARKERS,
+    NITA_HONEST_IMAGE_URL,
+    NITA_HONEST_LOGO_URL,
+    NITA_LEAKED_IMAGE_URL,
+    NITA_LEAKED_LOGO_URL,
+    isLeakedRecruitFixtureImage,
+    recruitImageryBackfillPatch,
+    isRecruitHonestFixtureUrl,
+} from "./recruit-imagery"
+export type { RecruitImageryBackfill } from "./recruit-imagery"
