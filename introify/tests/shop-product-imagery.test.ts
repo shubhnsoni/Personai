@@ -15,7 +15,7 @@ const LAMP = "/uploads/try-lamp.jpg"
 const MIRA = "/uploads/try-mira.jpg"
 const TOTE = "/uploads/try-tote.jpg"
 const HONEST_GROCERY = "/uploads/shop/kirana/toor-dal.jpg"
-const HONEST_GOLD = "/uploads/shop/jewelry/bangle-22k.jpg"
+const HONEST_GOLD = "/uploads/mk-jewellers/bangle.jpg"
 
 describe("P0-1 role-aware shop product imagery", () => {
     it("marks food AR, cafe, home/decor, and people stock as cross-role", () => {
