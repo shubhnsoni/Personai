@@ -27,6 +27,7 @@ export const CROSS_ROLE_SHOP_IMAGE_MARKERS = [
     "/uploads/try-tote.jpg",
     "/uploads/try-mug.jpg",
     "/uploads/try-brand.jpg",
+    "/uploads/try-storefront.jpg",
     "/uploads/try-packaging.jpg",
     "/uploads/blu-cafe/",
     "/uploads/skydine-cafe/",
@@ -46,6 +47,7 @@ export const STRICT_SHOP_IMAGE_ROLES = new Set([
     "PRINT_SHOP",
     "JEWELRY_RETAIL",
     "JEWELRY_WHOLESALE",
+    "AUTO_PARTS",
     "PHARMACY",
 ])
 

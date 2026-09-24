@@ -6,6 +6,8 @@ const PRIORITY_SLUGS = [
     "churuwala-upper-bazar",
     "kaveri-main-road",
     "mk-jewellers",
+    // AUTO P0-2: clear lamp/mug/tote/storefront/brand/lassi thumbs on Paras catalogue.
+    "paras-auto",
     // EVENTS P1-4: reseed NLE/LC heroes before budget can skip them.
     "next-level-events-kanke",
     "lets-click-ratu-road",
@@ -33,6 +35,8 @@ export const FORCE_REFRESH_SLUGS = new Set([
     "raghuvanshi-stores",
     "firayalal-nxt",
     "mk-jewellers",
+    // AUTO P0-2: clear lamp/mug/tote/storefront/brand/lassi thumbs on Paras catalogue.
+    "paras-auto",
     // Salon P1-2: clear mug/lamp/gift-box thumbs on H Square + Prince retail.
     "h-square-salon-harmu",
     "prince-barber-lalpur",
