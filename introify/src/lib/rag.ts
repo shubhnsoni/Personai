@@ -383,11 +383,19 @@ export function buildSystemPrompt(profile: ProfileWithRelations, contextDocs: Pr
                 hasServices: true,
                 whatsapp: profile.whatsapp,
             }).join(" ")
-            const events = resolveKitRole(profile.roleTemplate) === "EVENTS_STUDIO"
-            const heading = events ? "Planning calls & packages" : "Services & appointments"
+            const kitSvc = resolveKitRole(profile.roleTemplate)
+            const events = kitSvc === "EVENTS_STUDIO"
+            const realEstate = kitSvc === "REAL_ESTATE_BROKERAGE"
+            const heading = events
+                ? "Planning calls & packages"
+                : realEstate
+                  ? "Property consultation & viewings"
+                  : "Services & appointments"
             const preferLine = events
                 ? `Prefer Book / ${href} for enquire, quote, and book-shoot; WhatsApp is secondary. Never say session, treatment, or appointment.`
-                : `Prefer Book / ${href} for booking; WhatsApp is secondary.`
+                : realEstate
+                  ? `Prefer Book / ${href} for enquire, viewing, consultation, and mandate; WhatsApp is secondary. Never say session, treatment, or appointment.`
+                  : `Prefer Book / ${href} for booking; WhatsApp is secondary.`
             servicesSection = `\n## ${heading}\nNever invent a price. Quote the list below in stored currency (no USD→INR FX). ${preferLine}\n${serviceList}\n${guidance}`
         } else {
             servicesSection = `\n## Consultation Services\n${serviceList}`
@@ -519,14 +527,14 @@ ${contextSection}
 - End with one clear next question on its own line.
 - Do not use headings (#) or tables.
 
-Preferred next-step chip: ${bookChip(role)}${prefersAppointmentBookPath(role, profile.primaryGoal) && profile.slug ? ` → ${appointmentBookPath(profile.slug)} (WhatsApp secondary when ${kitRole === "EVENTS_STUDIO" ? "planning calls/packages" : "services/slots"} exist)` : ""}.
+Preferred next-step chip: ${bookChip(role)}${prefersAppointmentBookPath(role, profile.primaryGoal) && profile.slug ? ` → ${appointmentBookPath(profile.slug)} (WhatsApp secondary when ${kitRole === "EVENTS_STUDIO" ? "planning calls/packages" : kitRole === "REAL_ESTATE_BROKERAGE" ? "consultations/viewings" : "services/slots"} exist)` : ""}.
 ${profile.welcomeMessageOverride ? `Welcome message style: "${profile.welcomeMessageOverride}"\n` : ''}${buildPersonalitySection(profile.personalityConfig)}
 
 ## Tools Available
 You have access to these functions that you should use when appropriate:
 - collectLead: Use when the visitor shows interest and provides their contact info
 - showStory: ${showStoryDescription(role)}
-${showServices ? (kitRole === "EVENTS_STUDIO" ? "- showServices: Use when asked about rates, enquire, quote, book a shoot, or planning/brief calls\n" : "- showServices: Use when asked about rates, booking, or sessions\n") : ""}${showPortfolio ? "- showWorkExperience: Use when asked about background, CV, or work history\n- showProjects: Use when asked about portfolio or past projects\n" : ""}${showShop && kitRole === "RESTAURANT" ? "- showMenu: Use when asked about the menu, dishes, or a dish price\n- bookTable: Use when they want to reserve a table. Never invent an empty table.\n" : ""}${role === "HOTEL" || role === "RESORT" || role === "HOSTEL" || role === "HOMESTAY" || role === "SERVICED_APARTMENT" ? "- createHotelRequest: Use for towels, maintenance, spa, transport, or experiences. Never confirm payment.\n- raiseHotelEmergency: Call-first. Not an ordinary ticket.\n- showHotelMap: Marker card only. Do not invent indoor navigation.\n- showHotelRestaurants: Use for food. Never invent a menu.\n- showHotelSpa / showHotelTransport / showHotelExperiences: Show catalogues. File a request; do not bill.\n- showHotelLocalGuide: Hotel-curated + linked restaurants only. Stay honest if empty.\n- talkToReception: Use when they want a human\n- requestLateCheckout / requestHotelCheckout: Requests only; do not confirm payment or close a bill.\n- submitHotelFeedback: Google review search only after a positive note. Never post a review.\n" : ""}${showShop && kitRole !== "RESTAURANT" ? "- showProducts: Use when asked about products or the shop\n" : ""}${showCourses ? "- showCourses: Use when asked about courses or training\n" : ""}${showEvents ? "- showEvents: Use when asked about events\n- showCommunities: Use when asked about groups\n" : ""}- showLeadMagnets: Use when asked about free resources, guides, or giveaways
+${showServices ? (kitRole === "EVENTS_STUDIO" ? "- showServices: Use when asked about rates, enquire, quote, book a shoot, or planning/brief calls\n" : kitRole === "REAL_ESTATE_BROKERAGE" ? "- showServices: Use when asked about rates, enquire, viewing, consultation, or mandate review\n" : "- showServices: Use when asked about rates, booking, or sessions\n") : ""}${showPortfolio ? "- showWorkExperience: Use when asked about background, CV, or work history\n- showProjects: Use when asked about portfolio or past projects\n" : ""}${showShop && kitRole === "RESTAURANT" ? "- showMenu: Use when asked about the menu, dishes, or a dish price\n- bookTable: Use when they want to reserve a table. Never invent an empty table.\n" : ""}${role === "HOTEL" || role === "RESORT" || role === "HOSTEL" || role === "HOMESTAY" || role === "SERVICED_APARTMENT" ? "- createHotelRequest: Use for towels, maintenance, spa, transport, or experiences. Never confirm payment.\n- raiseHotelEmergency: Call-first. Not an ordinary ticket.\n- showHotelMap: Marker card only. Do not invent indoor navigation.\n- showHotelRestaurants: Use for food. Never invent a menu.\n- showHotelSpa / showHotelTransport / showHotelExperiences: Show catalogues. File a request; do not bill.\n- showHotelLocalGuide: Hotel-curated + linked restaurants only. Stay honest if empty.\n- talkToReception: Use when they want a human\n- requestLateCheckout / requestHotelCheckout: Requests only; do not confirm payment or close a bill.\n- submitHotelFeedback: Google review search only after a positive note. Never post a review.\n" : ""}${showShop && kitRole !== "RESTAURANT" ? "- showProducts: Use when asked about products or the shop\n" : ""}${showCourses ? "- showCourses: Use when asked about courses or training\n" : ""}${showEvents ? "- showEvents: Use when asked about events\n- showCommunities: Use when asked about groups\n" : ""}- showLeadMagnets: Use when asked about free resources, guides, or giveaways
 
 ${cloneClosingReminder(profile.displayName)}`
 }

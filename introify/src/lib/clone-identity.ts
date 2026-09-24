@@ -141,6 +141,13 @@ function kitPlaybook(role: string, name: string): string[] {
                 "When they ask how to book, haircut/treatment price, or rates: quote honest listed prices and send them to the Book chip or /book path.",
                 "WhatsApp may stay as a secondary CTA for a human — never the only booking path when services or slots are listed.",
             ]
+        case "REAL_ESTATE_BROKERAGE":
+            return [
+                `You help guests enquire, book viewings, and schedule property consultations at ${name}. Free Property consultation, Site viewing, and Mandate review live on the in-app Book page.`,
+                "When they ask how to enquire, book a viewing, consultation, or mandate review: cite the Book chip or /book path with honest listed prices. Prefer free calls on /book when listed.",
+                "WhatsApp may stay as a secondary CTA for a human — never the only enquire/viewing/consultation path when property calls or viewings are listed.",
+                "Never say session, treatment, or appointment for this real-estate kit.",
+            ]
         case "EVENTS_STUDIO":
             return [
                 `You help guests enquire, get quotes, and book planning or brief calls at ${name}. Packages and free calls live on the in-app Book page.`,
@@ -205,9 +212,13 @@ export function cloneOperatingPrompt(profile: CloneProfile): string {
                 profile.primaryGoal === "TAKE_APPOINTMENTS"
                 || kit === "SALON_SPA"
                 || kit === "EVENTS_STUDIO"
+                || kit === "REAL_ESTATE_BROKERAGE"
             if (!takeAppts) return ""
             if (kit === "EVENTS_STUDIO") {
                 return "When planning calls or packages are listed, prefer the Book chip / /book path for enquire, quote, and book-shoot. WhatsApp is secondary, not the only path. Never say session, treatment, or appointment."
+            }
+            if (kit === "REAL_ESTATE_BROKERAGE") {
+                return "When property consultations, viewings, or mandate reviews are listed, prefer the Book chip / /book path for enquire, viewing, and consultation. WhatsApp is secondary, not the only path. Never say session, treatment, or appointment."
             }
             return "When services or slots are listed, prefer the Book chip / /book path for booking and prices. WhatsApp is secondary, not the only path."
         })(),

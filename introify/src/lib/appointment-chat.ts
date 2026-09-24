@@ -13,12 +13,13 @@ export type AppointmentChatService = {
     durationMinutes?: number | null
 }
 
-/** TAKE_APPOINTMENTS, salon/barber/gym, or events/photo kits — prefer in-app /book over WA-only. */
+/** TAKE_APPOINTMENTS, salon/barber/gym, events/photo, or real-estate kits — prefer in-app /book over WA-only. */
 export function prefersAppointmentBookPath(role?: string | null, goal?: string | null): boolean {
     if (goal === "TAKE_APPOINTMENTS") return true
     const kit = resolveKitRole(role)
-    // SALON_SPA covers GYM/BARBER/YOGA; EVENTS_STUDIO covers PHOTOGRAPHER/CATERER/TRAVEL (COLLECT_LEADS).
-    return kit === "SALON_SPA" || kit === "EVENTS_STUDIO"
+    // SALON_SPA covers GYM/BARBER/YOGA; EVENTS_STUDIO covers PHOTOGRAPHER/CATERER/TRAVEL (COLLECT_LEADS);
+    // REAL_ESTATE_BROKERAGE is its own kit (enquire / viewing / consultation / mandate).
+    return kit === "SALON_SPA" || kit === "EVENTS_STUDIO" || kit === "REAL_ESTATE_BROKERAGE"
 }
 
 export function appointmentBookPath(slug: string): string {
@@ -59,9 +60,14 @@ export function appointmentBookPrimaryCta(opts: {
 }): string {
     const chip = bookChip(opts.role)
     const href = appointmentBookPath(opts.slug)
-    if (resolveKitRole(opts.role) === "EVENTS_STUDIO") {
+    const kit = resolveKitRole(opts.role)
+    if (kit === "EVENTS_STUDIO") {
         // Honest COLLECT_LEADS copy — free planning/brief calls, never session/treatment/appointment.
         return `Tap **${chip}** or open ${href} to pick a free planning/brief call or package.`
+    }
+    if (kit === "REAL_ESTATE_BROKERAGE") {
+        // Honest COLLECT_LEADS copy — free Property consultation / Site viewing / Mandate review.
+        return `Tap **${chip}** or open ${href} to pick a free Property consultation, Site viewing, or Mandate review.`
     }
     return `Tap **${chip}** or open ${href} to pick a service and slot.`
 }
@@ -84,17 +90,24 @@ export function appointmentBookPromptGuidance(opts: {
     if (!opts.hasServices || !prefersAppointmentBookPath(opts.role, opts.goal)) return []
     const chip = bookChip(opts.role)
     const href = opts.slug ? appointmentBookPath(opts.slug) : "/book"
-    const events = resolveKitRole(opts.role) === "EVENTS_STUDIO"
-    const lines = events
-        ? [
-            `When they ask how to enquire, get a quote, book a shoot or call, or rates: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX). Prefer free planning/brief calls on /book when listed.`,
-            "Never tell them WhatsApp is the only way to enquire, quote, or book when planning calls or packages are listed.",
-            "Never say session, treatment, or appointment for this events/photo kit.",
-        ]
-        : [
-            `When they ask how to book, rates, or a ${appointmentBookAskNoun(opts.role)} price: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX).`,
-            "Never tell them WhatsApp is the only way to book when services or slots are listed.",
-        ]
+    const kit = resolveKitRole(opts.role)
+    const lines =
+        kit === "EVENTS_STUDIO"
+            ? [
+                `When they ask how to enquire, get a quote, book a shoot or call, or rates: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX). Prefer free planning/brief calls on /book when listed.`,
+                "Never tell them WhatsApp is the only way to enquire, quote, or book when planning calls or packages are listed.",
+                "Never say session, treatment, or appointment for this events/photo kit.",
+            ]
+            : kit === "REAL_ESTATE_BROKERAGE"
+              ? [
+                  `When they ask how to enquire, book a viewing, consultation, or mandate review, or rates: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX). Prefer free Property consultation / Site viewing / Mandate review on /book when listed.`,
+                  "Never tell them WhatsApp is the only way to enquire, view, or consult when property calls or viewings are listed.",
+                  "Never say session, treatment, or appointment for this real-estate kit.",
+              ]
+              : [
+                  `When they ask how to book, rates, or a ${appointmentBookAskNoun(opts.role)} price: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX).`,
+                  "Never tell them WhatsApp is the only way to book when services or slots are listed.",
+              ]
     const wa = appointmentBookSecondaryWa(opts.whatsapp)
     if (wa) lines.push(`WhatsApp may stay as a secondary CTA only. ${wa}`)
     return lines
@@ -130,14 +143,19 @@ export function formatShowServicesReply(opts: {
     const primary = appointmentBookPrimaryCta({ slug: opts.slug, role: opts.role })
     const wa = appointmentBookSecondaryWa(opts.whatsapp, name)
     const next = wa ? `${primary}\n\n${wa}` : primary
-    const events = resolveKitRole(opts.role) === "EVENTS_STUDIO"
-    const listLabel = events ? "packages & planning calls" : "services"
+    const kit = resolveKitRole(opts.role)
+    const listLabel =
+        kit === "EVENTS_STUDIO"
+            ? "packages & planning calls"
+            : kit === "REAL_ESTATE_BROKERAGE"
+              ? "consultations & viewings"
+              : "services"
     // Keep "would you like to book" so chat-interface still opens the services rich panel.
     return `Here are ${name}'s ${listLabel}:\n${serviceList}\n\n${next}\n\nWould you like to book any of these?`
 }
 
 /**
- * Deterministic desk reply for book/price/enquire asks on TAKE_APPOINTMENTS + salon + events/photo kits.
+ * Deterministic desk reply for book/price/enquire asks on TAKE_APPOINTMENTS + salon + events/photo + real-estate kits.
  * Mirrors restaurant catalog short-circuit — no live LLM required for the Book path cite.
  */
 export function answerAppointmentBookOrPrice(opts: {
@@ -157,7 +175,7 @@ export function answerAppointmentBookOrPrice(opts: {
     if (!q) return null
 
     const bookIntent =
-        /\b(how (do|can|to) (i |we )?(book|appoint|schedule|enquire|inquire)|book(ing)?|appointment|appointments|slot|slots|schedule|enquire|inquire|enquiry|inquiry|quote|quotes|shoot|brief|planning call|book a (call|shoot))\b/i.test(
+        /\b(how (do|can|to) (i |we )?(book|appoint|schedule|enquire|inquire)|book(ing)?|appointment|appointments|slot|slots|schedule|enquire|inquire|enquiry|inquiry|quote|quotes|shoot|brief|planning call|book a (call|shoot)|viewing|viewings|site viewing|consultation|mandate|mandate review|property consultation)\b/i.test(
             opts.query,
         )
     const priceIntent =
@@ -183,7 +201,12 @@ export function answerAppointmentBookOrPrice(opts: {
         const price = formatAppointmentServicePrice(s, opts.roleTemplate, opts.requestCurrency)
         return `- **${s.name}**: ${price}`
     })
-    const events = resolveKitRole(opts.roleTemplate) === "EVENTS_STUDIO"
-    const listLabel = events ? "packages & planning calls" : "services"
+    const kit = resolveKitRole(opts.roleTemplate)
+    const listLabel =
+        kit === "EVENTS_STUDIO"
+            ? "packages & planning calls"
+            : kit === "REAL_ESTATE_BROKERAGE"
+              ? "consultations & viewings"
+              : "services"
     return `Here are ${opts.shopName}'s ${listLabel}:\n${listed.join("\n")}\n\n${primary}${waBlock}\n\nWould you like to book any of these?`
 }
