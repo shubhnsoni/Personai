@@ -249,6 +249,12 @@ export function guestBookEmptyCopy(role?: string | null, primaryGoal?: string | 
             return "No calls to book."
         case "REAL_ESTATE_BROKERAGE":
             return "No calls to book."
+        case "FIELD_SERVICE":
+        case "PLUMBER":
+        case "ELECTRICIAN":
+        case "AC_REPAIR":
+        case "GARAGE":
+            return "No visits to book."
         case "PHARMACY":
             return "This shop sells medicines — browse MEDICINES."
     }
@@ -275,8 +281,9 @@ export function guestBookEmptyCopy(role?: string | null, primaryGoal?: string | 
             return "No treatments to book."
         case "CONSULTANT":
         case "CA":
-        case "FIELD_SERVICE":
             return "No appointments to book."
+        case "FIELD_SERVICE":
+            return "No visits to book."
         case "COACH":
             return "No sessions to book."
         default:

@@ -117,8 +117,8 @@ describe("events-p0-1 modal confirmLabel contract (reserve-sheet)", () => {
                 return { title: "Book a treatment", button: "Book treatment" }
             case "Book call":
                 return { title: "Book a call", button: "Book call" }
-            case "Request visit":
-                return { title: "Request a visit", button: "Request visit" }
+            case "Book visit":
+                return { title: "Book a visit", button: "Book visit" }
             default:
                 return { title: "Book a session", button: "Book session" }
         }
@@ -138,7 +138,11 @@ describe("events-p0-1 modal confirmLabel contract (reserve-sheet)", () => {
             case "TRAVEL":
                 return "Book call"
             case "FIELD_SERVICE":
-                return "Request visit"
+            case "PLUMBER":
+            case "ELECTRICIAN":
+            case "AC_REPAIR":
+            case "GARAGE":
+                return "Book visit"
             default:
                 return "Book session"
         }

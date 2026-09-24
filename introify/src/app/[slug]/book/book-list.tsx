@@ -42,7 +42,11 @@ function sessionSheetProps(role?: string | null, durationMinutes?: number): {
         case "REAL_ESTATE_BROKERAGE":
             return { hideParty: true, confirmLabel: "Book call" }
         case "FIELD_SERVICE":
-            return { confirmLabel: "Request visit" }
+        case "PLUMBER":
+        case "ELECTRICIAN":
+        case "AC_REPAIR":
+        case "GARAGE":
+            return { hideParty: true, confirmLabel: "Book visit" }
         default:
             return { confirmLabel: "Book session", partyLabel: "Attendees" }
     }
