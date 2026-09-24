@@ -13,13 +13,18 @@ export type AppointmentChatService = {
     durationMinutes?: number | null
 }
 
-/** TAKE_APPOINTMENTS, salon/barber/gym, events/photo, or real-estate kits — prefer in-app /book over WA-only. */
+/** TAKE_APPOINTMENTS, salon/barber/gym, events/photo, real-estate, or recruit kits — prefer in-app /book over WA-only. */
 export function prefersAppointmentBookPath(role?: string | null, goal?: string | null): boolean {
     if (goal === "TAKE_APPOINTMENTS") return true
     const kit = resolveKitRole(role)
     // SALON_SPA covers GYM/BARBER/YOGA; EVENTS_STUDIO covers PHOTOGRAPHER/CATERER/TRAVEL (COLLECT_LEADS);
-    // REAL_ESTATE_BROKERAGE is its own kit (enquire / viewing / consultation / mandate).
-    return kit === "SALON_SPA" || kit === "EVENTS_STUDIO" || kit === "REAL_ESTATE_BROKERAGE"
+    // REAL_ESTATE_BROKERAGE + RECRUITMENT_AGENCY are their own COLLECT_LEADS kits (enquire / schedule / hire).
+    return (
+        kit === "SALON_SPA"
+        || kit === "EVENTS_STUDIO"
+        || kit === "REAL_ESTATE_BROKERAGE"
+        || kit === "RECRUITMENT_AGENCY"
+    )
 }
 
 export function appointmentBookPath(slug: string): string {
@@ -82,6 +87,10 @@ export function appointmentBookPrimaryCta(opts: {
         // Honest COLLECT_LEADS copy — free Property consultation / Site viewing / Mandate review.
         return `Tap **${chip}** or open ${href} to pick a free Property consultation, Site viewing, or Mandate review.`
     }
+    if (kit === "RECRUITMENT_AGENCY") {
+        // Honest COLLECT_LEADS copy — free Hiring brief call / Interview slot / Candidate intro.
+        return `Tap **${chip}** or open ${href} to pick a free Hiring brief call, Interview slot, or Candidate intro.`
+    }
     return `Tap **${chip}** or open ${href} to pick a service and slot.`
 }
 
@@ -117,10 +126,16 @@ export function appointmentBookPromptGuidance(opts: {
                   "Never tell them WhatsApp is the only way to enquire, view, or consult when property calls or viewings are listed.",
                   "Never say session, treatment, or appointment for this real-estate kit.",
               ]
-              : [
-                  `When they ask how to book, rates, or a ${appointmentBookAskNoun(opts.role)} price: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX).`,
-                  "Never tell them WhatsApp is the only way to book when services or slots are listed.",
-              ]
+              : kit === "RECRUITMENT_AGENCY"
+                ? [
+                    `When they ask how to enquire about roles, schedule an interview, hire, or book a hiring brief: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX). Prefer free Hiring brief call / Interview slot / Candidate intro on /book when listed.`,
+                    "Never tell them WhatsApp or phone is the only way to enquire, hire, or schedule when hiring calls or interview slots are listed.",
+                    "Never say session, treatment, or appointment for this recruitment kit.",
+                ]
+                : [
+                    `When they ask how to book, rates, or a ${appointmentBookAskNoun(opts.role)} price: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX).`,
+                    "Never tell them WhatsApp is the only way to book when services or slots are listed.",
+                ]
     const wa = appointmentBookSecondaryWa(opts.whatsapp)
     if (wa) lines.push(`WhatsApp may stay as a secondary CTA only. ${wa}`)
     return lines
@@ -162,13 +177,15 @@ export function formatShowServicesReply(opts: {
             ? "packages & planning calls"
             : kit === "REAL_ESTATE_BROKERAGE"
               ? "consultations & viewings"
-              : "services"
+              : kit === "RECRUITMENT_AGENCY"
+                ? "hiring calls & interview slots"
+                : "services"
     // Keep "would you like to book" so chat-interface still opens the services rich panel.
     return `Here are ${name}'s ${listLabel}:\n${serviceList}\n\n${next}\n\nWould you like to book any of these?`
 }
 
 /**
- * Deterministic desk reply for book/price/enquire asks on TAKE_APPOINTMENTS + salon + events/photo + real-estate kits.
+ * Deterministic desk reply for book/price/enquire asks on TAKE_APPOINTMENTS + salon + events/photo + real-estate + recruit kits.
  * Mirrors restaurant catalog short-circuit — no live LLM required for the Book path cite.
  */
 export function answerAppointmentBookOrPrice(opts: {
@@ -188,7 +205,7 @@ export function answerAppointmentBookOrPrice(opts: {
     if (!q) return null
 
     const bookIntent =
-        /\b(how (do|can|to) (i |we )?(book|appoint|schedule|enquire|inquire)|book(ing)?|appointment|appointments|slot|slots|schedule|enquire|inquire|enquiry|inquiry|quote|quotes|shoot|brief|planning call|book a (call|shoot)|viewing|viewings|site viewing|consultation|mandate|mandate review|property consultation)\b/i.test(
+        /\b(how (do|can|to) (i |we )?(book|appoint|schedule|enquire|inquire)|book(ing)?|appointment|appointments|slot|slots|schedule|enquire|inquire|enquiry|inquiry|quote|quotes|shoot|brief|planning call|book a (call|shoot)|viewing|viewings|site viewing|consultation|mandate|mandate review|property consultation|interview|interviews|hiring|hire|recruit|roles?|vacancies|vacancy|schedule (an )?interview|hiring (an? )?(accountant|role|brief)|enquire about roles|candidate intro|hiring brief( call)?)\b/i.test(
             opts.query,
         )
     const priceIntent =
@@ -220,6 +237,8 @@ export function answerAppointmentBookOrPrice(opts: {
             ? "packages & planning calls"
             : kit === "REAL_ESTATE_BROKERAGE"
               ? "consultations & viewings"
-              : "services"
+              : kit === "RECRUITMENT_AGENCY"
+                ? "hiring calls & interview slots"
+                : "services"
     return `Here are ${opts.shopName}'s ${listLabel}:\n${listed.join("\n")}\n\n${primary}${waBlock}\n\nWould you like to book any of these?`
 }
