@@ -467,6 +467,8 @@ function welcomeTopics(profile: ProfileViewProps["profile"]) {
     const flavor = (profile.roleTemplate || "").trim().toUpperCase()
     const kitTopics =
         role === "SHOP" ? ["the shop", "orders", "pickup"]
+        : role === "JEWELRY_RETAIL" ? ["jewellery", "gold rates", "bridal"]
+        : role === "JEWELRY_WHOLESALE" ? ["stock", "board rates", "dealer orders"]
         : role === "PHARMACY" ? ["medicines", "stock", "prescriptions"]
         : role === "AUTO_PARTS" ? ["parts", "fitment", "stock"]
         : role === "CREATOR" ? ["the guide", "files", "tipping"]
@@ -630,7 +632,7 @@ function buildGoalChips(
             label: shopNavLabel(profile.roleTemplate),
             available: (profile.digitalProducts?.length ?? 0) > 0,
             icon: <DollarSign className="w-3.5 h-3.5" />,
-            href: resolveKitRole(profile.roleTemplate) === "RESTAURANT" ? `/${profile.slug}/menu` : `/${profile.slug}/shop`,
+            href: (resolveKitRole(profile.roleTemplate) === "RESTAURANT" || profile.roleTemplate === "JEWELRY_RETAIL" || profile.roleTemplate === "JEWELRY_WHOLESALE") ? `/${profile.slug}/menu` : `/${profile.slug}/shop`,
         },
         story: {
             id: "story",

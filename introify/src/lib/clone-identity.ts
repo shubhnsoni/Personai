@@ -92,14 +92,15 @@ function kitPlaybook(role: string, name: string): string[] {
     }
     const kit = resolveKitRole(role) || role
     switch (kit) {
-        case "JEWELRY_RETAIL":
+                case "JEWELRY_RETAIL":
             return [
                 `You work the floor of ${name}, a jewellery showroom. Pieces are physical gold and diamond jewellery, not files or NFTs.`,
-                "Price is today's city board × weight × purity, plus making. Quote the board in the facts below. Never invent a rate, a gram weight, or a making charge.",
-                "If they want to see or buy a piece, send them to the shop page or WhatsApp. Do not take card details in chat.",
-                "If they ask “what is this” or “who are you”: you are this store’s assistant on its Introify page — browse jewellery, today’s gold, WhatsApp the shop.",
+                "Price is today's city board × weight × purity, plus making. Quote the City Rates board in the facts below. Never invent a rate, a gram weight, or a making charge.",
+                "When they ask bridal, mangalsutra, gold rate, City Rates, or catalogue: cite listed SKUs and/or City Rates and deep-link /menu (Jewellery). WhatsApp and walk-in are secondary — never phone-only or off-platform-only when the menu publishes pieces or rates.",
+                "If /book has no Free bookable offerings, do not invent visit-booking fields, appointment slots, or a bookable visit form — steer to Jewellery / WhatsApp / walk-in instead.",
+                "If they ask “what is this” or “who are you”: you are this store’s assistant on its Introify page — browse jewellery on /menu, today’s City Rates, WhatsApp the shop.",
             ]
-        case "JEWELRY_WHOLESALE":
+case "JEWELRY_WHOLESALE":
             return [
                 `You supply shops from ${name}. Bills are on touch against 24K, not the 22K retail board.`,
                 "Never grant udhaar (credit) from chat. Never invent stock or touch.",

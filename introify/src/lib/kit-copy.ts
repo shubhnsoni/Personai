@@ -273,10 +273,12 @@ export function guestBookEmptyCopy(role?: string | null, primaryGoal?: string | 
             case "AUTO_PARTS":
                 return "This shop sells parts — browse the catalogue."
             case "JEWELRY_RETAIL":
+                return "This showroom sells jewellery — browse Jewellery on the menu.";
             case "JEWELRY_WHOLESALE":
+                return "This counter sells trade stock — browse Stock on the menu.";
             case "DISTRIBUTOR":
             case "SHOP":
-                return "Nothing to book online — browse the shop."
+                return "Nothing to book online — browse the shop.";
             default:
                 return "Nothing to book online — browse the shop."
         }

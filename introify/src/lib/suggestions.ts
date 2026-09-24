@@ -1,4 +1,28 @@
-export function generateSuggestions(lastAssistant: string, displayName: string): string[] {
+import { isJewelryKit, isJewelryRetail } from "@/lib/metal/math"
+import { resolveKitRole } from "@/lib/role-alias"
+
+/** Suggested follow-ups after an assistant reply. Role-aware — no hire-desk "working with" on retail jewellery. */
+export function generateSuggestions(
+    lastAssistant: string,
+    displayName: string,
+    role?: string | null,
+): string[] {
+    const kit = resolveKitRole(role) || (role || "").trim().toUpperCase()
+    if (isJewelryRetail(role) || kit === "JEWELRY_RETAIL") {
+        return [
+            "What's today's gold rate?",
+            "Do you have a 22K mangalsutra?",
+            "Show bridal jewellery",
+        ]
+    }
+    if (isJewelryKit(role) || kit === "JEWELRY_WHOLESALE") {
+        return [
+            "What's today's board?",
+            "What stock is on the menu?",
+            "How do I order as a shop?",
+        ]
+    }
+
     const t = (lastAssistant || "").toLowerCase()
     if (t.includes("book") || t.includes("call") || t.includes("session")) {
         return [`What does a first call with ${displayName} look like?`, "What should I prepare?", "Any openings this week?"]

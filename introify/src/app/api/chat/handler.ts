@@ -19,6 +19,8 @@ import {
     answerAppointmentBookOrPrice,
     formatShowServicesReply,
 } from "@/lib/appointment-chat"
+import { answerJewelryCatalogOrRate } from "@/lib/jewelry-chat"
+import { goldBoardFromConfig } from "@/lib/metal/board"
 import { extrasOf, fieldOn, hasSurface } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
 import {
@@ -313,9 +315,10 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
 
         const restaurantDesk = resolveKitRole(profile.roleTemplate) === "RESTAURANT"
         const hotelDesk = resolveKitRole(profile.roleTemplate) === "HOTEL"
+        const jewelryDesk = profile.roleTemplate === "JEWELRY_RETAIL" || profile.roleTemplate === "JEWELRY_WHOLESALE" || resolveKitRole(profile.roleTemplate) === "JEWELRY_RETAIL" || resolveKitRole(profile.roleTemplate) === "JEWELRY_WHOLESALE"
         const hotelRoom = typeof body.hotelRoom === "string" ? body.hotelRoom.trim().slice(0, 16) : ""
         const stayToken = typeof body.stayToken === "string" ? body.stayToken.trim().slice(0, 64) : ""
-        if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk && !hotelDesk && liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED")) {
+        if (!capabilitySecret() || (!providerConfigured() && !restaurantDesk && !hotelDesk && !jewelryDesk && liveMode !== "LIVE" && liveMode !== "LIVE_REQUESTED")) {
             return new Response(
                 JSON.stringify({ error: "ai_not_configured", message: "The AI assistant is temporarily unavailable. You can still use this business's contact and booking options." }),
                 { status: 503, headers: { "Content-Type": "application/json" } },
@@ -1284,6 +1287,21 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         })
         : null
     // Salon P1-3: TAKE_APPOINTMENTS / salon-spa kits cite Book / /book (+ honest INR) before LLM.
+    const jewelryMenuReply = jewelryDesk
+        ? answerJewelryCatalogOrRate({
+            query,
+            slug: profileData.slug,
+            shopName: profileData.displayName,
+            roleTemplate: profileData.roleTemplate,
+            primaryGoal: profileData.primaryGoal,
+            items: profileData.digitalProducts || [],
+            requestCurrency: currency,
+            whatsapp: profileData.whatsapp,
+            board: goldBoardFromConfig(profile.personalityConfig),
+            hasBookableServices: (profileData.serviceOfferings || []).length > 0,
+            personalityConfig: profile.personalityConfig,
+        })
+        : null
     const appointmentBookReply = (!restaurantDesk && !hotelDesk)
         ? answerAppointmentBookOrPrice({
             query,
@@ -1301,6 +1319,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
         || (hotelDesk && hotelIntent !== "unknown")
         || Boolean(restaurantCatalogPrice)
         || Boolean(appointmentBookReply)
+        || Boolean(jewelryMenuReply)
     ) {
         if (reservation) {
             await settle("RELEASE", {
@@ -1308,10 +1327,12 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                     ? "restaurant_catalog_price"
                     : appointmentBookReply
                         ? "appointment_book_path"
-                        : "hotel_desk",
+                        : jewelryMenuReply
+                            ? "jewelry_menu_path"
+                            : "hotel_desk",
             })
         }
-        const notice = restaurantCatalogPrice || appointmentBookReply || await groundedFallback()
+        const notice = restaurantCatalogPrice || appointmentBookReply || jewelryMenuReply || await groundedFallback()
         await db.message.create({
             data: {
                 conversationId: authorizedConversationId,
@@ -1355,7 +1376,7 @@ export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> 
                     controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`))
                 }
                 const finish = (text: string) => {
-                    controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions: generateSuggestions(text, profile.displayName) })}\n`))
+                    controller.enqueue(encoder.encode(`d:${JSON.stringify({ suggestions: generateSuggestions(text, profile.displayName, profile.roleTemplate) })}\n`))
                     controller.close()
                 }
                 try {
