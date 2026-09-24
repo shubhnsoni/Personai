@@ -1,19 +1,19 @@
 import { everydayHours, weekdaysHours, type DemoShop } from "./types"
 
 const photo = {
-    workshop: "/uploads/try-workshop.jpg",
-    store: "/uploads/try-storefront.jpg",
-    lamp: "/uploads/try-lamp.jpg",
-    arjun: "/uploads/try-arjun.jpg",
-    kabir: "/uploads/try-kabir.jpg",
-    samir: "/uploads/try-samir.jpg",
-    rohan: "/uploads/try-rohan.jpg",
-    atlas: "/uploads/try-atlas.jpg",
-    counter: "/uploads/skydine-cafe/counter.jpg",
-    interior: "/uploads/skydine-cafe/interior.jpg",
-    table: "/uploads/skydine-cafe/table.jpg",
-    cafe: "/uploads/blu-cafe/cafe.jpg",
-    pack: "/uploads/try-packaging.jpg",
+    /** FIELD P1-3 - role-fit fixtures (no try-storefront/arjun/atlas/lamp/workshop/packaging). */
+    goodwillVan: "/uploads/goodwill-plumbing/van.jpg",
+    goodwillMark: "/uploads/goodwill-plumbing/mark.png",
+    jhVan: "/uploads/jharkhand-field/van.jpg",
+    jhMark: "/uploads/jharkhand-field/mark.png",
+    vickyBoard: "/uploads/vicky-electrical/board.jpg",
+    vickyMark: "/uploads/vicky-electrical/mark.png",
+    coolingOutdoor: "/uploads/cooling-world/outdoor.jpg",
+    coolingMark: "/uploads/cooling-world/mark.png",
+    coolingSpare: "/uploads/cooling-world/spare.jpg",
+    bholaBay: "/uploads/bhola-garage/bay.jpg",
+    bholaMark: "/uploads/bhola-garage/mark.png",
+    bholaSpare: "/uploads/bhola-garage/spare.jpg",
 }
 
 export const JHARKHAND_FIELD_CREW: DemoShop = {
@@ -33,8 +33,8 @@ We cover Hinoo, Doranda, and Harmu. Booty Road and Kanke are a next-day slot unl
     speakerRole: "dispatcher",
     upiId: "jharkhandfield@upi",
     deliveryNote: "We come to you in Hinoo, Doranda, and Harmu. Parts billed on the job. Cash and UPI.",
-    imageUrl: photo.workshop,
-    shopLogoUrl: photo.samir,
+    imageUrl: photo.jhVan,
+    shopLogoUrl: photo.jhMark,
     venue: {
         address: {
             formatted: "Hinoo Balmandir, Hinoo, Ranchi 834002",
@@ -65,10 +65,10 @@ We cover Hinoo, Doranda, and Harmu. Booty Road and Kanke are a next-day slot unl
         { name: "Suresh", kind: "STAFF", capacity: 1 },
     ],
     story: [
-        { url: photo.workshop, title: "The van", body: "Tools, pipe, wire, and a job card. We leave Hinoo Balmandir from eight.", category: "INTERIOR" },
-        { url: photo.store, title: "Hinoo", body: "Balmandir side of Hinoo. Landmark the desk if the pin drops on the airport road.", category: "AMBIENCE" },
-        { url: photo.lamp, title: "Jobs", body: "Leaks, boards, fans. Quote on site before we open a wall.", category: "INTERIOR" },
-        { url: photo.samir, title: "Crew", body: "Rakesh, Imran, Suresh. One name on the visit, not a rotating roster.", category: "TEAM" },
+        { url: photo.jhVan, title: "The van", body: "Tools, pipe, wire, and a job card. We leave Hinoo Balmandir from eight.", category: "INTERIOR" },
+        { url: photo.jhVan, title: "Hinoo", body: "Balmandir side of Hinoo. Landmark the desk if the pin drops on the airport road.", category: "AMBIENCE" },
+        { url: photo.vickyBoard, title: "Jobs", body: "Leaks, boards, fans. Quote on site before we open a wall.", category: "INTERIOR" },
+        { url: photo.jhMark, title: "Crew", body: "Rakesh, Imran, Suresh. One name on the visit, not a rotating roster.", category: "TEAM" },
     ],
     documents: [
         { type: "BIO", title: "About the Hinoo crew", rawText: "Jharkhand Plumbing & Electrical Solutions, Hinoo Balmandir, Hinoo, Ranchi 834002. Field crew for plumbing and electrical site visits. Open 8:00–20:00. Service area: Hinoo, Doranda, Harmu. Visit ₹300. Quote before work. Cash and UPI." },
@@ -96,8 +96,8 @@ We cover Lalpur, Kokar, Booty Road, and Kanke. Harmu and Doranda if the morning 
     whatsapp: "919665596519",
     upiId: "goodwillplumbing@upi",
     deliveryNote: "Plumber comes to Lalpur, Kokar, Booty Road, and Kanke. Fittings billed as used. Cash and UPI.",
-    imageUrl: photo.store,
-    shopLogoUrl: photo.arjun,
+    imageUrl: photo.goodwillVan,
+    shopLogoUrl: photo.goodwillMark,
     venue: {
         address: {
             formatted: "Delatoli, near Madan Dhaba, Lalpur Road, Kokar, Ranchi 834001",
@@ -129,10 +129,10 @@ We cover Lalpur, Kokar, Booty Road, and Kanke. Harmu and Doranda if the morning 
         { name: "Pintu", kind: "STAFF", capacity: 1 },
     ],
     story: [
-        { url: photo.store, title: "Lalpur Road", body: "Delatoli, near Madan Dhaba, Kokar. The desk is on Lalpur Road.", category: "AMBIENCE" },
-        { url: photo.workshop, title: "On the job", body: "Tanks, CPVC, and a spring for the drain. Quote before the wall comes off.", category: "FOOD" },
-        { url: photo.arjun, title: "Crew", body: "Manoj, Birendra, Pintu. One plumber on the visit.", category: "TEAM" },
-        { url: photo.table, title: "Calls", body: "WhatsApp the landmark. Lalpur, Kokar, Booty Road, Kanke.", category: "EVENT" },
+        { url: photo.goodwillVan, title: "Lalpur Road", body: "Delatoli, near Madan Dhaba, Kokar. The desk is on Lalpur Road.", category: "AMBIENCE" },
+        { url: photo.jhVan, title: "On the job", body: "Tanks, CPVC, and a spring for the drain. Quote before the wall comes off.", category: "FOOD" },
+        { url: photo.goodwillMark, title: "Crew", body: "Manoj, Birendra, Pintu. One plumber on the visit.", category: "TEAM" },
+        { url: photo.goodwillVan, title: "Calls", body: "WhatsApp the landmark. Lalpur, Kokar, Booty Road, Kanke.", category: "EVENT" },
     ],
     documents: [
         { type: "BIO", title: "About Goodwill Plumbing", rawText: "Goodwill Plumbing Services, Delatoli, near Madan Dhaba, Lalpur Road, Kokar, Ranchi 834001. Independent plumbers since 2014. Phone 96655 96519. Open 8:00–20:00. Visit ₹300. Taps, leaks, drains, closets, tanks, geyser fitting. Service area: Lalpur, Kokar, Booty Road, Kanke." },
@@ -163,8 +163,8 @@ We cover Lalpur, Kokar, and Kanke. Booty Road if the afternoon is free. Hinoo an
     whatsapp: "918340115902",
     upiId: "vickyelectrical@upi",
     deliveryNote: "Electrician comes to Lalpur, Kokar, and Kanke. Wire and fittings billed as used. Cash and UPI.",
-    imageUrl: photo.lamp,
-    shopLogoUrl: photo.kabir,
+    imageUrl: photo.vickyBoard,
+    shopLogoUrl: photo.vickyMark,
     venue: {
         address: {
             formatted: "Kokar Chowk, Ranchi 834001",
@@ -196,10 +196,10 @@ We cover Lalpur, Kokar, and Kanke. Booty Road if the afternoon is free. Hinoo an
         { name: "Ankit", kind: "STAFF", capacity: 1 },
     ],
     story: [
-        { url: photo.lamp, title: "Boards", body: "MCB, points, and a fan hook. Quote the points before we chase plaster.", category: "FOOD" },
-        { url: photo.store, title: "Kokar Chowk", body: "Family crew at Kokar Chowk. Lalpur, Kokar, Kanke on the same day.", category: "AMBIENCE" },
-        { url: photo.kabir, title: "Crew", body: "Vicky, Ravi, Ankit. One electrician on the visit.", category: "TEAM" },
-        { url: photo.counter, title: "The van", body: "Wire, testers, and a drill. We leave Kokar from eight.", category: "INTERIOR" },
+        { url: photo.vickyBoard, title: "Boards", body: "MCB, points, and a fan hook. Quote the points before we chase plaster.", category: "FOOD" },
+        { url: photo.jhVan, title: "Kokar Chowk", body: "Family crew at Kokar Chowk. Lalpur, Kokar, Kanke on the same day.", category: "AMBIENCE" },
+        { url: photo.vickyMark, title: "Crew", body: "Vicky, Ravi, Ankit. One electrician on the visit.", category: "TEAM" },
+        { url: photo.vickyBoard, title: "The van", body: "Wire, testers, and a drill. We leave Kokar from eight.", category: "INTERIOR" },
     ],
     documents: [
         { type: "BIO", title: "About Vicky Electrical", rawText: "Vicky Electrical Services, Kokar Chowk, Ranchi 834001. Family electricians. Phone 83401 15902. Open 8:00–20:00. Fans, switches, concealed points, MCB boards, inverters, geyser wiring. Service area: Lalpur, Kokar, Kanke. Booty Road afternoon if free." },
@@ -229,8 +229,8 @@ We cover Hinoo, Doranda, Harmu, and Lalpur. Kanke and Booty Road if the van is a
     speakerRole: "dispatcher",
     upiId: "coolingworld@upi",
     deliveryNote: "Technician visits Hinoo, Doranda, Harmu, and Lalpur. Gas and filters pickup at 74 Nala Road, Pepee Compound.",
-    imageUrl: photo.workshop,
-    shopLogoUrl: photo.rohan,
+    imageUrl: photo.coolingOutdoor,
+    shopLogoUrl: photo.coolingMark,
     venue: {
         address: {
             formatted: "74, Nala Road, Pepee Compound, Hindpiri, Ranchi 834001",
@@ -257,13 +257,13 @@ We cover Hinoo, Doranda, Harmu, and Lalpur. Kanke and Booty Road if the van is a
         { name: "Water leakage repair", description: "Indoor drain, pipe slope, and a clogged tray. Pipe extra if the PVC is crushed.", durationMinutes: 75, priceRupees: 599, kind: "SESSION" },
     ],
     products: [
-        { title: "R32 refrigerant 1 kg", description: "Pickup at Nala Road. We fill on the job if you book a gas refill visit.", category: "Gas", priceRupees: 1800, sku: "CW-R32", stock: 8, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack, weightGrams: 1000 },
-        { title: "R410A refrigerant 1 kg", description: "For older splits still on 410A. Ask which gas your outdoor says.", category: "Gas", priceRupees: 1600, sku: "CW-R410", stock: 6, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack, weightGrams: 1000 },
-        { title: "Split indoor filter", description: "Washable plastic mesh, common 1–1.5 ton frames. Bring the old one if the size is odd.", category: "Filters", priceRupees: 180, sku: "CW-FIL", stock: 24, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack },
-        { title: "Outdoor fan capacitor", description: "Common 45/50/60 µF. We test the old one on the visit before you buy.", category: "Spares", priceRupees: 220, sku: "CW-CAP", stock: 18, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.lamp },
-        { title: "Drain pipe 3 m", description: "PVC drain for indoor tray. Pickup; we fit it on a leakage visit.", category: "Spares", priceRupees: 90, sku: "CW-DRN", stock: 30, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack },
-        { title: "Copper insulation 3 m", description: "Foam sleeve for suction line. Pickup with a new install.", category: "Spares", priceRupees: 240, sku: "CW-INS", stock: 12, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack },
-        { title: "Universal split remote", description: "Works on most wall splits after the code. Bring the indoor model if you can.", category: "Spares", priceRupees: 350, sku: "CW-REM", stock: 10, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.lamp },
+        { title: "R32 refrigerant 1 kg", description: "Pickup at Nala Road. We fill on the job if you book a gas refill visit.", category: "Gas", priceRupees: 1800, sku: "CW-R32", stock: 8, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.coolingSpare, weightGrams: 1000 },
+        { title: "R410A refrigerant 1 kg", description: "For older splits still on 410A. Ask which gas your outdoor says.", category: "Gas", priceRupees: 1600, sku: "CW-R410", stock: 6, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.coolingSpare, weightGrams: 1000 },
+        { title: "Split indoor filter", description: "Washable plastic mesh, common 1–1.5 ton frames. Bring the old one if the size is odd.", category: "Filters", priceRupees: 180, sku: "CW-FIL", stock: 24, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.coolingSpare },
+        { title: "Outdoor fan capacitor", description: "Common 45/50/60 µF. We test the old one on the visit before you buy.", category: "Spares", priceRupees: 220, sku: "CW-CAP", stock: 18, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.coolingSpare },
+        { title: "Drain pipe 3 m", description: "PVC drain for indoor tray. Pickup; we fit it on a leakage visit.", category: "Spares", priceRupees: 90, sku: "CW-DRN", stock: 30, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.coolingSpare },
+        { title: "Copper insulation 3 m", description: "Foam sleeve for suction line. Pickup with a new install.", category: "Spares", priceRupees: 240, sku: "CW-INS", stock: 12, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.coolingSpare },
+        { title: "Universal split remote", description: "Works on most wall splits after the code. Bring the indoor model if you can.", category: "Spares", priceRupees: 350, sku: "CW-REM", stock: 10, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.coolingSpare },
     ],
     staff: [
         { name: "Irfan", kind: "STAFF", capacity: 1 },
@@ -271,10 +271,10 @@ We cover Hinoo, Doranda, Harmu, and Lalpur. Kanke and Booty Road if the van is a
         { name: "Naushad", kind: "STAFF", capacity: 1 },
     ],
     story: [
-        { url: photo.workshop, title: "Nala Road", body: "74, Pepee Compound, Hindpiri. Gas and filters on the counter.", category: "AMBIENCE" },
-        { url: photo.interior, title: "On site", body: "Wet service, gauges, and a drain flush. We do not refill a leaking coil.", category: "FOOD" },
-        { url: photo.rohan, title: "Crew", body: "Irfan, Deepak, Naushad. One technician, one indoor.", category: "TEAM" },
-        { url: photo.cafe, title: "Van", body: "Gauges, pump, and a nitrogen cylinder when the line needs a hold.", category: "INTERIOR" },
+        { url: photo.coolingOutdoor, title: "Nala Road", body: "74, Pepee Compound, Hindpiri. Gas and filters on the counter.", category: "AMBIENCE" },
+        { url: photo.coolingOutdoor, title: "On site", body: "Wet service, gauges, and a drain flush. We do not refill a leaking coil.", category: "FOOD" },
+        { url: photo.coolingMark, title: "Crew", body: "Irfan, Deepak, Naushad. One technician, one indoor.", category: "TEAM" },
+        { url: photo.jhVan, title: "Van", body: "Gauges, pump, and a nitrogen cylinder when the line needs a hold.", category: "INTERIOR" },
     ],
     documents: [
         { type: "BIO", title: "About Cooling World", rawText: "Cooling World Refrigeration and Electricals, 74 Nala Road, Pepee Compound, Hindpiri, Ranchi 834001. AC and refrigeration field crew. Open 8:00–20:00. Split wet service ₹599. Window service ₹499. Gas refill after a leak check. Filters, R32, R410A, capacitors for pickup at Nala Road. Service area: Hinoo, Doranda, Harmu, Lalpur." },
@@ -302,8 +302,8 @@ We take machines from Harmu, Doranda, and Hinoo. Pickup inside those neighbourho
     whatsapp: "919334486718",
     upiId: "bholaservice@upi",
     deliveryNote: "Drop at Bharat Mata Chowk, Harmu Bypass. Pickup in Harmu, Doranda, and Hinoo if you send the number plate. Spares on the rack.",
-    imageUrl: photo.store,
-    shopLogoUrl: photo.atlas,
+    imageUrl: photo.bholaBay,
+    shopLogoUrl: photo.bholaMark,
     venue: {
         address: {
             formatted: "Bharat Mata Chowk, Harmu Bypass, Harmu, Ranchi 834002",
@@ -330,14 +330,14 @@ We take machines from Harmu, Doranda, and Hinoo. Pickup inside those neighbourho
         { name: "Puncture and wheel", description: "Tube or tubeless plug, balance if the rim is true. Tube on the rack.", durationMinutes: 30, priceRupees: 80, kind: "SESSION" },
     ],
     products: [
-        { title: "Engine oil 10W-30 1 L", description: "Mineral fill for commuter bikes and scooters. Pickup at Bharat Mata Chowk.", category: "Oil", priceRupees: 320, sku: "BH-OIL", stock: 40, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack, weightGrams: 1000 },
-        { title: "Oil filter", description: "Common Hero and Honda commuter sizes. Bring the old one if the bike is uncommon.", category: "Filters", priceRupees: 90, sku: "BH-OF", stock: 28, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack },
-        { title: "Air filter", description: "Paper element, commuter sizes. Foam ones if you say the model.", category: "Filters", priceRupees: 140, sku: "BH-AF", stock: 22, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack },
-        { title: "Chain lube 500 ml", description: "Spray for O-ring and standard chains. Pickup; we use it on the chain job.", category: "Lube", priceRupees: 280, sku: "BH-CL", stock: 16, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack, weightGrams: 500 },
-        { title: "Brake fluid 250 ml", description: "DOT-3/DOT-4 mix for scooters and commuter discs. Do not mix with old unknown fluid if the cup is black.", category: "Brakes", priceRupees: 120, sku: "BH-BF", stock: 14, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack, weightGrams: 250 },
-        { title: "Spark plug", description: "Standard copper plug for 100–125 cc. Iridium if you ask and we have it.", category: "Ignition", priceRupees: 80, sku: "BH-SP", stock: 36, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.lamp },
-        { title: "Clutch cable", description: "Commuter clutch cable, barrel ends. Bring the old cable for length.", category: "Cables", priceRupees: 160, sku: "BH-CC", stock: 12, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack },
-        { title: "Tube 18 inch", description: "Rear commuter tube. Front 17/18 if you say the size at the rack.", category: "Wheels", priceRupees: 220, sku: "BH-TB", stock: 10, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.pack },
+        { title: "Engine oil 10W-30 1 L", description: "Mineral fill for commuter bikes and scooters. Pickup at Bharat Mata Chowk.", category: "Oil", priceRupees: 320, sku: "BH-OIL", stock: 40, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.bholaSpare, weightGrams: 1000 },
+        { title: "Oil filter", description: "Common Hero and Honda commuter sizes. Bring the old one if the bike is uncommon.", category: "Filters", priceRupees: 90, sku: "BH-OF", stock: 28, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.bholaSpare },
+        { title: "Air filter", description: "Paper element, commuter sizes. Foam ones if you say the model.", category: "Filters", priceRupees: 140, sku: "BH-AF", stock: 22, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.bholaSpare },
+        { title: "Chain lube 500 ml", description: "Spray for O-ring and standard chains. Pickup; we use it on the chain job.", category: "Lube", priceRupees: 280, sku: "BH-CL", stock: 16, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.bholaSpare, weightGrams: 500 },
+        { title: "Brake fluid 250 ml", description: "DOT-3/DOT-4 mix for scooters and commuter discs. Do not mix with old unknown fluid if the cup is black.", category: "Brakes", priceRupees: 120, sku: "BH-BF", stock: 14, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.bholaSpare, weightGrams: 250 },
+        { title: "Spark plug", description: "Standard copper plug for 100–125 cc. Iridium if you ask and we have it.", category: "Ignition", priceRupees: 80, sku: "BH-SP", stock: 36, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.bholaSpare },
+        { title: "Clutch cable", description: "Commuter clutch cable, barrel ends. Bring the old cable for length.", category: "Cables", priceRupees: 160, sku: "BH-CC", stock: 12, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.bholaSpare },
+        { title: "Tube 18 inch", description: "Rear commuter tube. Front 17/18 if you say the size at the rack.", category: "Wheels", priceRupees: 220, sku: "BH-TB", stock: 10, type: "PHYSICAL", fulfillment: "PHYSICAL", shipMode: "PICKUP", allowCod: true, thumbnailUrl: photo.bholaSpare },
     ],
     staff: [
         { name: "Bhola", kind: "STAFF", capacity: 1 },
@@ -345,10 +345,10 @@ We take machines from Harmu, Doranda, and Hinoo. Pickup inside those neighbourho
         { name: "Raju", kind: "STAFF", capacity: 1 },
     ],
     story: [
-        { url: photo.store, title: "Harmu Bypass", body: "Bharat Mata Chowk. Drop the bike; collect the next working day.", category: "AMBIENCE" },
-        { url: photo.workshop, title: "The bay", body: "Oil, chain, brakes. Independent workshop — not a company dealer.", category: "INTERIOR" },
-        { url: photo.atlas, title: "Crew", body: "Bhola, Wasim, Raju. One bay, one bike.", category: "TEAM" },
-        { url: photo.pack, title: "Rack", body: "Oil, filters, lube, tubes. Pickup if you service at home.", category: "FOOD" },
+        { url: photo.bholaBay, title: "Harmu Bypass", body: "Bharat Mata Chowk. Drop the bike; collect the next working day.", category: "AMBIENCE" },
+        { url: photo.bholaBay, title: "The bay", body: "Oil, chain, brakes. Independent workshop — not a company dealer.", category: "INTERIOR" },
+        { url: photo.bholaMark, title: "Crew", body: "Bhola, Wasim, Raju. One bay, one bike.", category: "TEAM" },
+        { url: photo.bholaSpare, title: "Rack", body: "Oil, filters, lube, tubes. Pickup if you service at home.", category: "FOOD" },
     ],
     documents: [
         { type: "BIO", title: "About Bhola Service Centre", rawText: "Bhola Service Centre, Bharat Mata Chowk, Harmu Bypass, Harmu, Ranchi 834002. Independent two-wheeler workshop. Phone 93344 86718. Open Monday–Saturday 8:00–20:00. Hero, Honda, Bajaj, TVS, Yamaha. General service ₹650 plus oil. Pickup in Harmu, Doranda, Hinoo. Oil, filters, chain lube, tubes on the rack." },

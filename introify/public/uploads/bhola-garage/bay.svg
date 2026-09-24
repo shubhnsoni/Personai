@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2A2018"/>
+      <stop offset="50%" stop-color="#4A3828"/>
+      <stop offset="100%" stop-color="#14100C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <rect x="0" y="560" width="1200" height="240" fill="#100C08"/>
+  <!-- workshop shed -->
+  <rect x="100" y="200" width="700" height="360" rx="8" fill="#3A2E22"/>
+  <path d="M80 220 L450 80 L820 220 Z" fill="#5A4634"/>
+  <rect x="180" y="280" width="200" height="160" rx="4" fill="#C4A070" opacity="0.25"/>
+  <rect x="440" y="280" width="280" height="280" rx="4" fill="#1A1410"/>
+  <!-- scooter silhouette on stand -->
+  <ellipse cx="580" cy="500" rx="120" ry="18" fill="#C4924A" opacity="0.35"/>
+  <circle cx="500" cy="480" r="48" fill="none" stroke="#D0B090" stroke-width="10"/>
+  <circle cx="680" cy="480" r="48" fill="none" stroke="#D0B090" stroke-width="10"/>
+  <path d="M500 480 L580 360 L680 480 L580 440 Z" fill="#8A7048" opacity="0.85"/>
+  <!-- oil rack -->
+  <rect x="900" y="300" width="200" height="260" rx="10" fill="#2A2218"/>
+  <rect x="930" y="340" width="50" height="90" rx="6" fill="#C4924A"/>
+  <rect x="1010" y="340" width="50" height="90" rx="6" fill="#7A9A58"/>
+  <rect x="930" y="450" width="50" height="70" rx="6" fill="#6A8AB0"/>
+  <rect x="1010" y="450" width="50" height="70" rx="6" fill="#C4924A" opacity="0.7"/>
+  <ellipse cx="580" cy="640" rx="240" ry="22" fill="#C4A070" opacity="0.12"/>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1A2030"/>
+      <stop offset="50%" stop-color="#2A3450"/>
+      <stop offset="100%" stop-color="#0E121C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <rect x="0" y="560" width="1200" height="240" fill="#10141C"/>
+  <!-- wall -->
+  <rect x="200" y="140" width="800" height="420" rx="12" fill="#243044"/>
+  <!-- MCB board -->
+  <rect x="340" y="200" width="520" height="300" rx="10" fill="#1A2434"/>
+  <rect x="370" y="230" width="100" height="50" rx="4" fill="#E8C86A" opacity="0.85"/>
+  <rect x="490" y="230" width="100" height="50" rx="4" fill="#6AD0A0" opacity="0.75"/>
+  <rect x="610" y="230" width="100" height="50" rx="4" fill="#E8C86A" opacity="0.7"/>
+  <rect x="730" y="230" width="100" height="50" rx="4" fill="#6AD0A0" opacity="0.65"/>
+  <rect x="370" y="310" width="100" height="50" rx="4" fill="#6AD0A0" opacity="0.7"/>
+  <rect x="490" y="310" width="100" height="50" rx="4" fill="#E8C86A" opacity="0.6"/>
+  <rect x="610" y="310" width="100" height="50" rx="4" fill="#6AD0A0" opacity="0.8"/>
+  <rect x="730" y="310" width="100" height="50" rx="4" fill="#E8C86A" opacity="0.55"/>
+  <!-- bus bars -->
+  <rect x="370" y="400" width="460" height="12" rx="3" fill="#C4924A" opacity="0.7"/>
+  <rect x="370" y="430" width="460" height="12" rx="3" fill="#C4924A" opacity="0.5"/>
+  <!-- ceiling fan silhouette -->
+  <ellipse cx="600" cy="120" rx="180" ry="18" fill="#8AA0C0" opacity="0.35"/>
+  <circle cx="600" cy="120" r="16" fill="#C8D4E8"/>
+  <ellipse cx="600" cy="640" rx="260" ry="26" fill="#6AD0A0" opacity="0.1"/>
+</svg>

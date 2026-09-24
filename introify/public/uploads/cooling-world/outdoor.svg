@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#183040"/>
+      <stop offset="55%" stop-color="#2A4A58"/>
+      <stop offset="100%" stop-color="#0E1A22"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <rect x="0" y="560" width="1200" height="240" fill="#101820"/>
+  <!-- building wall -->
+  <rect x="80" y="120" width="500" height="440" rx="8" fill="#2A3A44"/>
+  <rect x="120" y="170" width="160" height="120" rx="4" fill="#7EB8C9" opacity="0.3"/>
+  <rect x="320" y="170" width="160" height="120" rx="4" fill="#7EB8C9" opacity="0.22"/>
+  <!-- outdoor condenser -->
+  <rect x="620" y="280" width="420" height="280" rx="16" fill="#3A5560"/>
+  <rect x="660" y="320" width="340" height="200" rx="8" fill="#1E3038"/>
+  <circle cx="830" cy="420" r="70" fill="none" stroke="#7EB8C9" stroke-width="10" opacity="0.7"/>
+  <circle cx="830" cy="420" r="40" fill="none" stroke="#7EB8C9" stroke-width="6" opacity="0.5"/>
+  <circle cx="830" cy="420" r="12" fill="#C8E4EC"/>
+  <!-- copper lines -->
+  <path d="M580 360 C600 360, 600 480, 620 480" fill="none" stroke="#C4924A" stroke-width="8" stroke-linecap="round"/>
+  <path d="M580 400 C605 400, 605 520, 620 520" fill="none" stroke="#C4924A" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <!-- gauge case -->
+  <rect x="200" y="480" width="90" height="70" rx="8" fill="#C4924A" opacity="0.8"/>
+  <ellipse cx="830" cy="640" rx="220" ry="24" fill="#7EB8C9" opacity="0.12"/>
+</svg>

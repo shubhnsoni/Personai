@@ -11,6 +11,12 @@ const PRIORITY_SLUGS = [
     "lets-click-ratu-road",
     // REAL_ESTATE P1-4: reseed Shakti heroes before budget can skip them.
     "shakti-property-lalpur",
+    // FIELD P1-3: reseed plumber/AC/garage heroes before budget can skip them.
+    "goodwill-plumbing",
+    "jharkhand-plumbing-electrical",
+    "vicky-electrical",
+    "cooling-world-ranchi",
+    "bhola-service-centre",
 ]
 
 export const FORCE_REFRESH_SLUGS = new Set([
@@ -37,6 +43,12 @@ export const FORCE_REFRESH_SLUGS = new Set([
     "lets-click-ratu-road",
     // REAL_ESTATE P1-4: clear try-atlas/try-brand heroes on Shakti Property.
     "shakti-property-lalpur",
+    // FIELD P1-3: clear try-storefront/arjun/atlas/lamp/workshop/packaging on field kits.
+    "goodwill-plumbing",
+    "jharkhand-plumbing-electrical",
+    "vicky-electrical",
+    "cooling-world-ranchi",
+    "bhola-service-centre",
 ])
 
 export function orderedDemoShops<T extends { slug: string }>(shops: T[]): T[] {

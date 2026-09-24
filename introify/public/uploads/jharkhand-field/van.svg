@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#243018"/>
+      <stop offset="50%" stop-color="#3A4A28"/>
+      <stop offset="100%" stop-color="#141A10"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <rect x="0" y="560" width="1200" height="240" fill="#10160C"/>
+  <!-- open bay / shop -->
+  <rect x="60" y="280" width="360" height="280" rx="8" fill="#2E3A22"/>
+  <rect x="100" y="320" width="120" height="100" rx="4" fill="#A8C278" opacity="0.35"/>
+  <rect x="250" y="320" width="120" height="100" rx="4" fill="#A8C278" opacity="0.25"/>
+  <rect x="160" y="450" width="140" height="110" rx="4" fill="#1A2214"/>
+  <!-- field van -->
+  <rect x="500" y="360" width="460" height="200" rx="16" fill="#4A6A38"/>
+  <rect x="960" y="410" width="130" height="150" rx="12" fill="#3A5530"/>
+  <rect x="540" y="390" width="150" height="75" rx="6" fill="#C8E090" opacity="0.4"/>
+  <rect x="720" y="390" width="150" height="75" rx="6" fill="#C8E090" opacity="0.3"/>
+  <circle cx="580" cy="580" r="40" fill="#1A2014"/>
+  <circle cx="580" cy="580" r="20" fill="#6A7860"/>
+  <circle cx="900" cy="580" r="40" fill="#1A2014"/>
+  <circle cx="900" cy="580" r="20" fill="#6A7860"/>
+  <!-- pipe + cable reel -->
+  <rect x="420" y="500" width="70" height="55" rx="6" fill="#8A7040"/>
+  <circle cx="1100" cy="500" r="36" fill="none" stroke="#C4924A" stroke-width="10"/>
+  <ellipse cx="720" cy="640" rx="240" ry="22" fill="#A8C278" opacity="0.12"/>
+</svg>
