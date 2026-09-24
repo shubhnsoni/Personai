@@ -27,3 +27,20 @@ export {
     eventsGuestMenuLabel,
     eventsGuestMenuEmptyCopy,
 } from "./guest-menu"
+
+export {
+    EVENTS_LEAKED_IMAGE_MARKERS,
+    NLE_HONEST_IMAGE_URL,
+    NLE_HONEST_LOGO_URL,
+    LC_HONEST_IMAGE_URL,
+    LC_HONEST_LOGO_URL,
+    NLE_LEAKED_IMAGE_URL,
+    NLE_LEAKED_LOGO_URL,
+    LC_LEAKED_IMAGE_URL,
+    LC_LEAKED_LOGO_URL,
+    isLeakedEventsFixtureImage,
+    eventsImageryBackfillPatch,
+    isEventsHonestFixtureUrl,
+} from "./events-imagery"
+export type { EventsImageryBackfill } from "./events-imagery"
+

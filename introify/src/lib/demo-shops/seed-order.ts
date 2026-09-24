@@ -6,6 +6,9 @@ const PRIORITY_SLUGS = [
     "churuwala-upper-bazar",
     "kaveri-main-road",
     "mk-jewellers",
+    // EVENTS P1-4: reseed NLE/LC heroes before budget can skip them.
+    "next-level-events-kanke",
+    "lets-click-ratu-road",
 ]
 
 export const FORCE_REFRESH_SLUGS = new Set([
@@ -27,6 +30,9 @@ export const FORCE_REFRESH_SLUGS = new Set([
     "fitness-addiction-doranda",
     // Clinic P1-2: clear cafe/desk/smoothie thumbs on Sanjivani MEDICINES.
     "sanjivani-medico",
+    // EVENTS P1-4: clear leela/workshop/film/anika heroes on NLE + Let's Click.
+    "next-level-events-kanke",
+    "lets-click-ratu-road",
 ])
 
 export function orderedDemoShops<T extends { slug: string }>(shops: T[]): T[] {

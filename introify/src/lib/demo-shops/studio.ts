@@ -17,6 +17,11 @@ const photo = {
     leela: "/uploads/try-leela.jpg",
     priya: "/uploads/try-priya.jpg",
     rohan: "/uploads/try-rohan.jpg",
+    /** EVENTS P1-4 — wedding-studio / photo-desk honest fixtures (no leela/film/anika/workshop). */
+    nleHall: "/uploads/events-studio/hall.jpg",
+    nleMark: "/uploads/events-studio/mark.png",
+    lcShoot: "/uploads/lets-click/shoot.jpg",
+    lcMark: "/uploads/lets-click/mark.png",
 }
 
 export const NEXT_LEVEL_EVENTS: DemoShop = {
@@ -36,8 +41,8 @@ Call 79031 33317. WhatsApp the date first — we will tell you if the crew is fr
     speakerRole: "studio lead",
     whatsapp: "917903133317",
     upiId: "nextlevelevents@upi",
-    imageUrl: photo.workshop,
-    shopLogoUrl: photo.leela,
+    imageUrl: photo.nleHall,
+    shopLogoUrl: photo.nleMark,
     venue: {
         address: {
             formatted: "SB Complex, First Floor, Kanke Road, near Gokul Restaurant, Ranchi 834002",
@@ -65,15 +70,15 @@ Call 79031 33317. WhatsApp the date first — we will tell you if the crew is fr
         { name: "Decor crew", kind: "STAFF", capacity: 4 },
     ],
     events: [
-        { title: "Saturday hall walk", description: "See a dressed mandap and a birthday backdrop on the Kanke Road floor. Bring the date.", daysFromNow: 12, durationHours: 2, location: "SB Complex, Kanke Road", priceRupees: 0, thumbnailUrl: photo.workshop },
+        { title: "Saturday hall walk", description: "See a dressed mandap and a birthday backdrop on the Kanke Road floor. Bring the date.", daysFromNow: 12, durationHours: 2, location: "SB Complex, Kanke Road", priceRupees: 0, thumbnailUrl: photo.nleHall },
     ],
     experiences: [
         { company: "Next Level Events", role: "Studio lead", startDate: "2016", description: "Weddings, birthdays, and corporate days from Kanke Road across Ranchi." },
         { company: "Ranchi hall circuit", role: "Floor manager", startDate: "2012", endDate: "2016", description: "Learned power, entry, and timing in Lalpur and Harmu banquet halls." },
     ],
     projects: [
-        { title: "Kanke Road sangeet", description: "Entry, stage, and lighting for a 180-guest sangeet. Crew stayed until the last cue.", year: "2025", imageUrl: photo.workshop, client: "Kanke family wedding" },
-        { title: "Harmu birthday floor", description: "Backdrop, balloon line, and a cake table in a Harmu Housing hall. Same-day turnaround.", year: "2025", imageUrl: photo.film, client: "Harmu Housing Colony" },
+        { title: "Kanke Road sangeet", description: "Entry, stage, and lighting for a 180-guest sangeet. Crew stayed until the last cue.", year: "2025", imageUrl: photo.nleHall, client: "Kanke family wedding" },
+        { title: "Harmu birthday floor", description: "Backdrop, balloon line, and a cake table in a Harmu Housing hall. Same-day turnaround.", year: "2025", imageUrl: photo.nleHall, client: "Harmu Housing Colony" },
     ],
     documents: [
         { type: "BIO", title: "About Next Level Events", rawText: "Next Level Events, SB Complex, first floor, Kanke Road, near Gokul Restaurant, Ranchi 834002. Sumit Kumar Varma. Weddings, Haldi, mehendi, sangeet, birthdays, college fests, corporate days. Desk 10:00–18:00 Monday to Saturday. Phone 79031 33317. Instagram nextlevelevents.in. Hold a date after 50% on booking." },
@@ -202,8 +207,8 @@ Call 95257 16666. WhatsApp the date and the hall.`,
     speakerRole: "photographer",
     whatsapp: "919525716666",
     upiId: "letsclickranchi@upi",
-    imageUrl: photo.film,
-    shopLogoUrl: photo.anika,
+    imageUrl: photo.lcShoot,
+    shopLogoUrl: photo.lcMark,
     venue: {
         address: {
             formatted: "Ratu Road, near Ramvilas Petrol Pump, Indrapuri Colony, Ranchi 834001",
@@ -229,15 +234,15 @@ Call 95257 16666. WhatsApp the date and the hall.`,
         { name: "Brief call", description: "Date, functions, photo or photo-plus-film. 20 minutes.", durationMinutes: 20, priceRupees: 0, kind: "SESSION" },
     ],
     events: [
-        { title: "Sunday at Patratu Valley", description: "One pre-wedding slot at the valley. Two hours around dusk. Book the date; we bring the lights.", daysFromNow: 18, durationHours: 2, location: "Patratu Valley", priceRupees: 12000, thumbnailUrl: photo.film },
+        { title: "Sunday at Patratu Valley", description: "One pre-wedding slot at the valley. Two hours around dusk. Book the date; we bring the lights.", daysFromNow: 18, durationHours: 2, location: "Patratu Valley", priceRupees: 12000, thumbnailUrl: photo.lcShoot },
     ],
     experiences: [
         { company: "Let's Click Photography", role: "Lead photographer", startDate: "2015", description: "Weddings and pre-weddings from Ratu Road across Ranchi, Patratu, and home functions." },
         { company: "Ranchi wedding floors", role: "Second shooter", startDate: "2011", endDate: "2015", description: "Learned pheras, baraat light, and album selects in Lalpur and Club weddings." },
     ],
     projects: [
-        { title: "Ranchi Club pheras", description: "Candid stills and a short film from a Club wedding. Crowd, lamps, and the walk back to the lawn.", year: "2025", imageUrl: photo.anika, client: "Ranchi Club wedding" },
-        { title: "Patratu Valley pre-wedding", description: "Dusk at the valley, two outfits, no drone on that date. The stills the family still prints.", year: "2024", imageUrl: photo.film, client: "Patratu pre-wedding" },
+        { title: "Ranchi Club pheras", description: "Candid stills and a short film from a Club wedding. Crowd, lamps, and the walk back to the lawn.", year: "2025", imageUrl: photo.lcShoot, client: "Ranchi Club wedding" },
+        { title: "Patratu Valley pre-wedding", description: "Dusk at the valley, two outfits, no drone on that date. The stills the family still prints.", year: "2024", imageUrl: photo.lcShoot, client: "Patratu pre-wedding" },
     ],
     documents: [
         { type: "BIO", title: "About Let's Click", rawText: "Let's Click Photography, Ratu Road, near Ramvilas Petrol Pump, Indrapuri Colony, Ranchi 834001. Amit Mahato. Weddings, pre-weddings, family days, cinematic film. Desk 10:00–20:00 every day. Phone 95257 16666. Instagram lets_click_photography. Pre-wedding from ₹25,000 a day. Album 40 pages from ₹8,000." },

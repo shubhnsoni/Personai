@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2A1830"/>
+      <stop offset="45%" stop-color="#4A2A38"/>
+      <stop offset="100%" stop-color="#1A1018"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E8B86D" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#E8B86D" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sky)"/>
+  <circle cx="600" cy="180" r="260" fill="url(#glow)"/>
+  <!-- floor -->
+  <rect x="0" y="560" width="1200" height="240" fill="#140E14"/>
+  <!-- mandap canopy -->
+  <path d="M220 520 L600 220 L980 520 Z" fill="#5C3342" opacity="0.95"/>
+  <path d="M280 520 L600 280 L920 520 Z" fill="#7A4554"/>
+  <!-- pillars -->
+  <rect x="300" y="400" width="36" height="160" fill="#C9A06A"/>
+  <rect x="864" y="400" width="36" height="160" fill="#C9A06A"/>
+  <!-- stage sill -->
+  <rect x="240" y="520" width="720" height="28" rx="6" fill="#E8B86D" opacity="0.85"/>
+  <!-- soft aisle light -->
+  <ellipse cx="600" cy="640" rx="220" ry="28" fill="#E8B86D" opacity="0.18"/>
+  <!-- hanging lamps -->
+  <circle cx="420" cy="360" r="10" fill="#F5D9A8"/>
+  <circle cx="600" cy="300" r="12" fill="#F5D9A8"/>
+  <circle cx="780" cy="360" r="10" fill="#F5D9A8"/>
+</svg>
