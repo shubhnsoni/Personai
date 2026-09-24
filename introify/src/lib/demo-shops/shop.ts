@@ -20,6 +20,9 @@ const photo = {
     /** JEWELRY P1-3 - jewellery-counter honest MK fixtures (no try-mira/try-brand). */
     mkDesk: "/uploads/mk-jewellers/desk.jpg",
     mkMark: "/uploads/mk-jewellers/mark.png",
+    /** AUTO P1-2 - parts-counter honest Paras fixtures (no try-storefront/try-brand). */
+    parasDesk: "/uploads/paras-auto/desk.jpg",
+    parasMark: "/uploads/paras-auto/mark.png",
 }
 
 const K22 = 9160
@@ -455,8 +458,8 @@ Open Monday to Saturday 8:00–20:00. Closed Sunday. Call 99391 85887.`,
     speakerRole: "parts",
     whatsapp: "919939185887",
     deliveryNote: "Pickup at Namkum Main Road, Kusai, Doranda. Bring the old part if you can. Closed Sunday. We sell the box; we do not fit it.",
-    imageUrl: photo.store,
-    shopLogoUrl: photo.brand,
+    imageUrl: photo.parasDesk,
+    shopLogoUrl: photo.parasMark,
     venue: {
         address: {
             formatted: "Namkum Main Road, Kusai, Doranda, Ranchi 834002",

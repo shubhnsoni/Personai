@@ -80,3 +80,85 @@ export function isLeakedAutoPartsProductImage(url: string | null | undefined): b
     if (!lower) return false
     return AUTO_PARTS_LEAKED_PRODUCT_IMAGE_MARKERS.some((marker) => lower.includes(marker))
 }
+
+/**
+ * AUTO P1-2 - About / header / print mark honesty for Paras Auto.
+ *
+ * Demo seed previously reused try-storefront (restaurant diner + Grok watermark)
+ * and try-brand (stationery flatlay + Grok watermark) as About / header / print
+ * heroes. Guests then saw cafe / brand-kit chrome on a Doranda parts counter.
+ *
+ * Policy: prefer parts-counter assets under /uploads/paras-auto/. Only backfill
+ * when the live profile still carries a known leakage path - never wipe a custom
+ * owner upload that is not a listed marker. Catalogue SKU thumbs from auto-p0-2
+ * stay untouched.
+ */
+
+/** Paths / markers that must never appear as Paras About hero or logo. */
+export const AUTO_PARTS_LEAKED_DEMO_IMAGE_MARKERS = [
+    "try-storefront",
+    "try-store",
+    "try-brand",
+    "img-try-storefront",
+    "img-try-store",
+    "img-try-brand",
+    "restaurant",
+    "diner",
+] as const
+
+/** Auto-parts-honest Paras showcase assets. */
+export const PARAS_HONEST_IMAGE_URL = "/uploads/paras-auto/desk.jpg"
+export const PARAS_HONEST_LOGO_URL = "/uploads/paras-auto/mark.png"
+
+/** Known bad fixture paths still on LIVE Paras before P1-2. */
+export const PARAS_LEAKED_IMAGE_URL = "/uploads/try-storefront.jpg"
+export const PARAS_LEAKED_LOGO_URL = "/uploads/try-brand.jpg"
+
+export function isLeakedAutoPartsDemoImage(url: string | null | undefined): boolean {
+    if (!url) return false
+    const lower = url.trim().toLowerCase()
+    if (!lower) return false
+    return AUTO_PARTS_LEAKED_DEMO_IMAGE_MARKERS.some((marker) => lower.includes(marker))
+}
+
+export type ParasImageryBackfill = {
+    imageUrl?: string
+    shopLogoUrl?: string
+}
+
+/**
+ * Pure: replace only known diner / brand-flatlay leakage paths with
+ * parts-counter-honest URLs. Custom owner uploads that are not listed markers
+ * are left alone. Empty fields are left alone.
+ */
+export function parasImageryBackfillPatch(input: {
+    imageUrl?: string | null
+    shopLogoUrl?: string | null
+    honestImageUrl?: string
+    honestLogoUrl?: string
+}): ParasImageryBackfill | null {
+    const honestImage = input.honestImageUrl || PARAS_HONEST_IMAGE_URL
+    const honestLogo = input.honestLogoUrl || PARAS_HONEST_LOGO_URL
+    const patch: ParasImageryBackfill = {}
+
+    if (isLeakedAutoPartsDemoImage(input.imageUrl)) {
+        patch.imageUrl = honestImage
+    }
+    if (isLeakedAutoPartsDemoImage(input.shopLogoUrl)) {
+        patch.shopLogoUrl = honestLogo
+    }
+
+    return Object.keys(patch).length ? patch : null
+}
+
+export function isAutoPartsHonestFixtureUrl(url: string | null | undefined): boolean {
+    if (!url) return false
+    const trimmed = url.trim()
+    if (!trimmed) return false
+    if (isLeakedAutoPartsDemoImage(trimmed)) return false
+    return (
+        trimmed === PARAS_HONEST_IMAGE_URL ||
+        trimmed === PARAS_HONEST_LOGO_URL ||
+        trimmed.startsWith(PARAS_AUTO_UPLOAD_PREFIX)
+    )
+}
