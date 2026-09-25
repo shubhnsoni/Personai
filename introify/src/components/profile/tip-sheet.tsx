@@ -4,10 +4,9 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X } from "lucide-react"
 import { placeTip } from "@/app/actions/products"
 import { whatsappHref } from "@/lib/commerce"
-import { ProfileStage } from "@/components/profile/profile-stage"
+import { ProfileStage, ProfileStageClose } from "@/components/profile/profile-stage"
 
 export function TipSheet({
     profileId,
@@ -34,10 +33,8 @@ export function TipSheet({
         <ProfileStage open onClose={onClose} mode={displayMode} zClass="z-[60]">
             <div className="relative min-h-0 flex-1 overflow-y-auto p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
                 <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-sm font-medium">Tip {displayName}</h2>
-                    <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400">
-                        <X className="h-4 w-4" />
-                    </button>
+                    <h2 className="text-sm font-medium text-foreground">Tip {displayName}</h2>
+                    <ProfileStageClose onClose={onClose} className="text-zinc-400 hover:bg-white/10 hover:text-zinc-100" />
                 </div>
                 {done ? (
                     <p className="text-sm text-zinc-200">{done}</p>
@@ -91,7 +88,10 @@ export function TipSheet({
                             <Label>Email</Label>
                             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                         </div>
-                        <Button className="h-11 w-full rounded-full" disabled={busy || !name.trim()}>
+                        <Button
+                            className="h-11 w-full rounded-full bg-white text-zinc-950 hover:bg-zinc-200 disabled:opacity-100 disabled:bg-zinc-800 disabled:text-zinc-300"
+                            disabled={busy || !name.trim()}
+                        >
                             {busy ? "..." : "Send tip"}
                         </Button>
                     </form>

@@ -2,9 +2,46 @@
 
 import { useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
+import { X } from "lucide-react"
 import { parseContentDisplayMode } from "@/lib/content-display"
 import { bottomDrawerPanelClassName, bottomDrawerShellClassName } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+
+/**
+ * plat-p1-2: the stage panel is a dark surface (bg-zinc-950). Scope the dark theme tokens to it
+ * (`dark` + `text-foreground`) so token-based children (Label, Input, Button, headings that inherit
+ * color) never render light-theme ink (dark slate) on the near-black panel.
+ * `surface="theme"` keeps a panel that paints its own theme background (checkout) on page tokens.
+ */
+export type ProfileStageSurface = "dark" | "theme"
+
+export const PROFILE_STAGE_DARK_SURFACE_CLASS = "dark text-foreground"
+
+/** Shared ✕ for every ProfileStage panel — always has an accessible name. */
+export function ProfileStageClose({
+    onClose,
+    className,
+    iconClassName = "h-4 w-4",
+    label = "Close",
+}: {
+    onClose: () => void
+    className?: string
+    iconClassName?: string
+    label?: string
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClose}
+            aria-label={label}
+            title={label}
+            data-stage-close=""
+            className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full", className)}
+        >
+            <X className={iconClassName} aria-hidden />
+        </button>
+    )
+}
 
 export function ProfileStage({
     open,
@@ -12,6 +49,7 @@ export function ProfileStage({
     mode,
     forcePopup,
     zClass = "z-50",
+    surface = "dark",
     className,
     children,
 }: {
@@ -20,6 +58,7 @@ export function ProfileStage({
     mode?: string | null
     forcePopup?: boolean
     zClass?: string
+    surface?: ProfileStageSurface
     className?: string
     children: React.ReactNode
 }) {
@@ -66,11 +105,13 @@ export function ProfileStage({
                     >
                         <motion.div
                             key="stage"
+                            data-stage-surface={surface}
                             initial={{ opacity: 0, y: 24 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 24 }}
                             className={cn(
                                 "relative flex w-full flex-col overflow-hidden rounded-t-3xl border-t border-white/10 bg-zinc-950 shadow-2xl",
+                                surface === "dark" && PROFILE_STAGE_DARK_SURFACE_CLASS,
                                 bottomDrawerPanelClassName,
                                 !sidebar && "md:max-h-[min(80dvh,40rem)] md:max-w-lg md:rounded-2xl md:border",
                                 sidebar &&

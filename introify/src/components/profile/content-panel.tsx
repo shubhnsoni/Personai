@@ -2,7 +2,7 @@
 
 import NextImage from "next/image"
 import Link from "@/components/navigation/transition-link"
-import { X, ChevronLeft, ChevronRight, ArrowUp, Clock, Calendar, DollarSign } from "lucide-react"
+import { ChevronLeft, ChevronRight, ArrowUp, Clock, Calendar, DollarSign } from "lucide-react"
 import { storyPath } from "@/lib/story"
 import { CommunitiesStore, CoursesStore, EventsStore, ProductsStore } from "@/components/profile/store-panel"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,7 @@ import { useState } from "react"
 import { useMoney } from "@/components/pricing-provider"
 import { kitAbout } from "@/lib/kit-copy"
 import { shopNavLabel } from "@/lib/surfaces"
-import { ProfileStage } from "@/components/profile/profile-stage"
+import { ProfileStage, ProfileStageClose } from "@/components/profile/profile-stage"
 
 interface ContentPanelProps {
     isOpen: boolean
@@ -118,14 +118,11 @@ export function ContentPanel({ isOpen, onClose, type, data, onBookService, onPur
         <div className="relative flex h-full min-h-0 flex-1 flex-col">
             <div className="flex min-w-0 items-center justify-between gap-3 px-3 py-3 sm:p-5 border-b border-white/8 bg-black/40 backdrop-blur-md z-10">
                 <div className="flex min-w-0 items-center gap-4">
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={onClose} 
-                        className="rounded-full hover:bg-zinc-800 bg-black/20 backdrop-blur-sm text-white"
-                    >
-                        <X className="h-5 w-5" />
-                    </Button>
+                    <ProfileStageClose
+                        onClose={onClose}
+                        className="h-10 w-10 bg-black/20 text-white backdrop-blur-sm hover:bg-zinc-800"
+                        iconClassName="h-5 w-5"
+                    />
                     <h2 className="min-w-0 break-words [overflow-wrap:anywhere] text-xl font-semibold text-white drop-shadow-md">{getTitle()}</h2>
                 </div>
                 {type === "about" && data.slug ? (

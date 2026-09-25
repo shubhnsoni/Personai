@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X } from "lucide-react"
 import { usePricing } from "@/components/pricing-provider"
 import { formatCheckoutPrice } from "@/lib/pricing"
 import { isPhysical, whatsappHref } from "@/lib/commerce"
@@ -12,7 +11,7 @@ import { placeManualOrder } from "@/app/actions/products"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { readBuyerMemory, writeBuyerMemory } from "@/lib/checkout-memory"
 import { confidentialUploadsEnabled } from "@/lib/private-upload-policy"
-import { ProfileStage } from "@/components/profile/profile-stage"
+import { ProfileStage, ProfileStageClose } from "@/components/profile/profile-stage"
 import {
     guestOrderReference,
     payMethodLabel,
@@ -245,14 +244,13 @@ export function CheckoutSheet({
             onClose={onClose}
             forcePopup
             zClass="z-[60]"
+            surface="theme"
             className="bg-background text-foreground border-border"
         >
             <div className="relative min-h-0 flex-1 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <div className="flex h-12 items-center justify-between gap-2 border-b border-border px-2">
                     <h2 className="min-w-0 truncate px-2 text-sm font-medium">{item.title}</h2>
-                    <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
-                        <X className="h-4 w-4" />
-                    </button>
+                    <ProfileStageClose onClose={onClose} className="h-9 w-9 text-muted-foreground hover:bg-muted" />
                 </div>
                 <div className="p-4">
                 {item.description && !confirmation ? <p className="mb-3 text-sm text-muted-foreground line-clamp-3">{item.description}</p> : null}
