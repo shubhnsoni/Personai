@@ -39,6 +39,7 @@ export function appointmentBookAskNoun(role?: string | null): string {
     if (raw === "GYM") return "session, PT, or class"
     if (raw === "YOGA") return "class or session"
     if (raw === "BARBER") return "haircut/treatment"
+    if (raw === "PET_GROOMING") return "groom, bath, or nails"
     if (raw === "EVENTS_STUDIO" || raw === "PHOTOGRAPHER" || raw === "CATERER" || raw === "TRAVEL") {
         return "call, enquire, or shoot"
     }
@@ -135,6 +136,9 @@ export function appointmentBookPromptGuidance(opts: {
                 : [
                     `When they ask how to book, rates, or a ${appointmentBookAskNoun(opts.role)} price: cite in-app **${chip}** or ${href} with honest listed prices (stored currency — no inventing FX).`,
                     "Never tell them WhatsApp is the only way to book when services or slots are listed.",
+                    ...((opts.role || "").trim().toUpperCase() === "PET_GROOMING"
+                        ? ["Say groom or grooming slot — never session or treatment for this pet grooming kit."]
+                        : []),
                 ]
     const wa = appointmentBookSecondaryWa(opts.whatsapp)
     if (wa) lines.push(`WhatsApp may stay as a secondary CTA only. ${wa}`)

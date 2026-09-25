@@ -21,8 +21,9 @@ export function waPrefill(role?: string | null, name = "") {
         case "YOGA":
             return `A class at ${name}`
         case "BARBER":
-        case "PET_GROOMING":
             return `A treatment at ${name}`
+        case "PET_GROOMING":
+            return `A groom at ${name}`
         case "EVENTS_STUDIO":
         case "PHOTOGRAPHER":
         case "CATERER":
@@ -77,8 +78,10 @@ export function bookChip(role?: string | null) {
         case "YOGA":
             return "Book a class"
         case "BARBER":
-        case "PET_GROOMING":
             return "Book a treatment"
+        case "PET_GROOMING":
+            // pet-p0-1: grooming table — never gym "session" or salon "treatment".
+            return "Book a groom"
         case "EVENTS_STUDIO":
         case "PHOTOGRAPHER":
         case "CATERER":
@@ -106,6 +109,84 @@ export function bookChip(role?: string | null) {
             return "Book a session"
         default:
             return "Book a call"
+    }
+}
+
+export type ReserveConfirmLabel =
+    | "Hold table"
+    | "Book session"
+    | "Book appointment"
+    | "Book consult"
+    | "Book treatment"
+    | "Book call"
+    | "Book visit"
+    | "Book this groom"
+
+export type ReserveSessionCopy = {
+    title: string
+    description: string
+    success: string
+    empty: string
+    toast: string
+}
+
+/** Reserve-sheet session modal copy keyed by confirm label (title / success / toast). */
+export function reserveSessionCopy(confirmLabel?: ReserveConfirmLabel): ReserveSessionCopy {
+    switch (confirmLabel) {
+        case "Book appointment":
+            return { title: "Book an appointment", description: "Time and phone. We’ll hold it.", success: "Appointment booked", empty: "No times left this day", toast: "Appointment booked" }
+        case "Book consult":
+            return { title: "Book a consult", description: "Time and phone. We’ll hold it.", success: "Consult booked", empty: "No times left this day", toast: "Consult booked" }
+        case "Book treatment":
+            return { title: "Book a treatment", description: "Time and phone. We’ll hold it.", success: "Treatment booked", empty: "No times left this day", toast: "Treatment booked" }
+        case "Book call":
+            return { title: "Book a call", description: "Time and phone. We'll hold it.", success: "Call booked", empty: "No times left this day", toast: "Call booked" }
+        case "Book visit":
+            return { title: "Book a visit", description: "Time and phone. We’ll hold it.", success: "Visit booked", empty: "No times left this day", toast: "Visit booked" }
+        case "Book this groom":
+            return { title: "Book a groom", description: "Time and phone. We’ll hold it.", success: "Groom booked", empty: "No times left this day", toast: "Groom booked" }
+        default:
+            return { title: "Book a session", description: "Time and phone. We’ll hold it.", success: "Session booked", empty: "No times left this day", toast: "Session booked" }
+    }
+}
+
+export type SessionSheetProps = {
+    hideParty?: boolean
+    partyLabel?: string
+    confirmLabel: ReserveConfirmLabel
+}
+
+/** Guest /book + profile reserve-sheet props by roleTemplate flavor (book-list + profile-view). */
+export function sessionSheetProps(role?: string | null, durationMinutes?: number): SessionSheetProps {
+    switch (role) {
+        case "CLINIC":
+            return { hideParty: true, confirmLabel: "Book appointment" }
+        case "CA":
+            return { hideParty: true, confirmLabel: "Book consult" }
+        case "SALON_SPA":
+            return {
+                confirmLabel: "Book treatment",
+                partyLabel: durationMinutes ? `${durationMinutes} min` : "Duration",
+            }
+        case "PET_GROOMING":
+            // pet-p0-1: one pet per table slot — no gym "Attendees" picker.
+            return { hideParty: true, confirmLabel: "Book this groom" }
+        case "EVENTS_STUDIO":
+        case "PHOTOGRAPHER":
+        case "CATERER":
+        case "TRAVEL":
+            return { hideParty: true, confirmLabel: "Book call" }
+        case "REAL_ESTATE_BROKERAGE":
+        case "RECRUITMENT_AGENCY":
+            return { hideParty: true, confirmLabel: "Book call" }
+        case "FIELD_SERVICE":
+        case "PLUMBER":
+        case "ELECTRICIAN":
+        case "AC_REPAIR":
+        case "GARAGE":
+            return { hideParty: true, confirmLabel: "Book visit" }
+        default:
+            return { confirmLabel: "Book session", partyLabel: "Attendees" }
     }
 }
 
@@ -245,8 +326,9 @@ export function guestBookEmptyCopy(role?: string | null, primaryGoal?: string | 
         case "YOGA":
             return "No classes to book."
         case "BARBER":
-        case "PET_GROOMING":
             return "No treatments to book."
+        case "PET_GROOMING":
+            return "No grooming slots to book."
         case "EVENTS_STUDIO":
         case "PHOTOGRAPHER":
         case "CATERER":

@@ -14,6 +14,7 @@ import { whatsappHref } from "@/lib/commerce"
 import { cn } from "@/lib/utils"
 import { WhatsAppIcon } from "@/components/brand/whatsapp-icon"
 import { LARGE_PARTY_MIN, PartySizePicker } from "@/components/booking/party-size-picker"
+import { reserveSessionCopy, type ReserveConfirmLabel } from "@/lib/kit-copy"
 
 type TableService = {
     id: string
@@ -26,14 +27,7 @@ type TableService = {
 }
 
 export type ReserveMode = "table" | "session"
-export type ReserveConfirmLabel =
-    | "Hold table"
-    | "Book session"
-    | "Book appointment"
-    | "Book consult"
-    | "Book treatment"
-    | "Book call"
-    | "Book visit"
+export type { ReserveConfirmLabel } from "@/lib/kit-copy"
 
 function dayOptions(count = 7) {
     const out: { key: string; label: string; sub: string }[] = []
@@ -53,20 +47,7 @@ function dayOptions(count = 7) {
 }
 
 function sessionCopy(confirmLabel?: ReserveConfirmLabel) {
-    switch (confirmLabel) {
-        case "Book appointment":
-            return { title: "Book an appointment", description: "Time and phone. We’ll hold it.", success: "Appointment booked", empty: "No times left this day", toast: "Appointment booked" }
-        case "Book consult":
-            return { title: "Book a consult", description: "Time and phone. We’ll hold it.", success: "Consult booked", empty: "No times left this day", toast: "Consult booked" }
-        case "Book treatment":
-            return { title: "Book a treatment", description: "Time and phone. We’ll hold it.", success: "Treatment booked", empty: "No times left this day", toast: "Treatment booked" }
-        case "Book call":
-            return { title: "Book a call", description: "Time and phone. We'll hold it.", success: "Call booked", empty: "No times left this day", toast: "Call booked" }
-        case "Book visit":
-            return { title: "Book a visit", description: "Time and phone. We’ll hold it.", success: "Visit booked", empty: "No times left this day", toast: "Visit booked" }
-        default:
-            return { title: "Book a session", description: "Time and phone. We’ll hold it.", success: "Session booked", empty: "No times left this day", toast: "Session booked" }
-    }
+    return reserveSessionCopy(confirmLabel)
 }
 
 export function ReserveSheet({

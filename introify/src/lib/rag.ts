@@ -266,8 +266,8 @@ function bookChip(role: string): string {
         case "CLINIC": return "Book an appointment"
         case "GYM": return "Book a session"
         case "YOGA": return "Book a class"
-        case "BARBER":
-        case "PET_GROOMING": return "Book a treatment"
+        case "BARBER": return "Book a treatment"
+        case "PET_GROOMING": return "Book a groom"
     }
     switch (resolveKitRole(role) || role) {
         case "RESTAURANT": return "Reserve a table"

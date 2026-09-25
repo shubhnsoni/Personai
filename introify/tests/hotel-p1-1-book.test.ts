@@ -107,7 +107,9 @@ describe("HOTEL P1-1 book route wiring", () => {
 
     it("leaves non-hotel BookList session chrome intact for salon/clinic paths", () => {
         const bookList = readFileSync(join(root, "src/app/[slug]/book/book-list.tsx"), "utf8")
-        expect(bookList).toMatch(/Book session/)
+        // Session sheet props (gym "Book session" default) live in kit-copy since pet-p0-1
+        expect(bookList).toMatch(/sessionSheetProps/)
+        expect(readFileSync(join(root, "src/lib/kit-copy.ts"), "utf8")).toMatch(/Book session/)
         expect(bookList).toMatch(/mode="session"/)
         expect(bookList).not.toMatch(/HotelGuestBook/)
     })

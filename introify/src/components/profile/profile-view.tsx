@@ -6,8 +6,8 @@ import Link from "@/components/navigation/transition-link"
 import { useSearchParams } from "next/navigation"
 import { ChatInterface, type ChatChip } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"
-import { ReserveSheet, type ReserveConfirmLabel } from "@/components/booking/reserve-sheet"
-import { appointmentBookHref, bookChip as kitBookChip } from "@/lib/kit-copy"
+import { ReserveSheet } from "@/components/booking/reserve-sheet"
+import { appointmentBookHref, bookChip as kitBookChip, sessionSheetProps } from "@/lib/kit-copy"
 import { extrasOf, isDigitalCatalogItem, publicChipAllowed, shopNavLabel } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
 import { hotelSuggestedReplies } from "@/lib/hotels"
@@ -418,37 +418,6 @@ function resolveCheckoutItem(
         return c ? { itemType: "community", itemId, title: c.name, priceCents: c.priceCents, description: c.description } : null
     }
     return null
-}
-
-function sessionSheetProps(role?: string | null, durationMinutes?: number): {
-    hideParty?: boolean
-    partyLabel?: string
-    confirmLabel: ReserveConfirmLabel
-} {
-    switch (role) {
-        case "CLINIC":
-            return { hideParty: true, confirmLabel: "Book appointment" }
-        case "CA":
-            return { hideParty: true, confirmLabel: "Book consult" }
-        case "SALON_SPA":
-            return { confirmLabel: "Book treatment", partyLabel: durationMinutes ? `${durationMinutes} min` : "Duration" }
-        case "EVENTS_STUDIO":
-        case "PHOTOGRAPHER":
-        case "CATERER":
-        case "TRAVEL":
-            return { hideParty: true, confirmLabel: "Book call" }
-        case "REAL_ESTATE_BROKERAGE":
-        case "RECRUITMENT_AGENCY":
-            return { hideParty: true, confirmLabel: "Book call" }
-        case "FIELD_SERVICE":
-        case "PLUMBER":
-        case "ELECTRICIAN":
-        case "AC_REPAIR":
-        case "GARAGE":
-            return { hideParty: true, confirmLabel: "Book visit" }
-        default:
-            return { confirmLabel: "Book session", partyLabel: "Attendees" }
-    }
 }
 
 function bookChip(role?: string | null, goal?: string | null) {
