@@ -221,6 +221,17 @@ const nextConfig = {
       { source: "/try-talent/:path*", destination: "/nita-recruiters-ashok-nagar/:path*", permanent: false },
       { source: "/talent", destination: "/nita-recruiters-ashok-nagar", permanent: false },
       { source: "/talent/:path*", destination: "/nita-recruiters-ashok-nagar/:path*", permanent: false },
+      // PET P1-1 discovery aliases -> LIVE showcase (Pluto Pet Grooming Hinoo).
+      { source: "/try-pet", destination: "/pluto-grooming-hinoo", permanent: false },
+      { source: "/try-pet/:path*", destination: "/pluto-grooming-hinoo/:path*", permanent: false },
+      { source: "/try-pets", destination: "/pluto-grooming-hinoo", permanent: false },
+      { source: "/try-pets/:path*", destination: "/pluto-grooming-hinoo/:path*", permanent: false },
+      { source: "/try-grooming", destination: "/pluto-grooming-hinoo", permanent: false },
+      { source: "/try-grooming/:path*", destination: "/pluto-grooming-hinoo/:path*", permanent: false },
+      { source: "/try-pet-grooming", destination: "/pluto-grooming-hinoo", permanent: false },
+      { source: "/try-pet-grooming/:path*", destination: "/pluto-grooming-hinoo/:path*", permanent: false },
+      { source: "/try-dog-grooming", destination: "/pluto-grooming-hinoo", permanent: false },
+      { source: "/try-dog-grooming/:path*", destination: "/pluto-grooming-hinoo/:path*", permanent: false },
     ];
   },
   async rewrites() {
