@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { bookChip, guestBookEmptyCopy, reserveSessionCopy, sessionSheetProps, waPrefill } from "@/lib/kit-copy"
+import { bookChip, guestBookEmptyCopy, reserveSessionCopy, sessionSheetProps, waPrefill, welcomeKitTopics } from "@/lib/kit-copy"
+import { cloneOperatingPrompt } from "@/lib/clone-identity"
 import {
     answerAppointmentBookOrPrice,
     appointmentBookAskNoun,
@@ -69,6 +70,43 @@ describe("pet-p0-1 PET_GROOMING book wording", () => {
         expect(lines.join("\n")).toMatch(/never session or treatment/)
         expect(waPrefill("PET_GROOMING", "Pluto")).toBe("A groom at Pluto")
         expect(guestBookEmptyCopy("PET_GROOMING")).toBe("No grooming slots to book.")
+    })
+})
+
+describe("pet-p0-1b PET_GROOMING home typewriter + chat playbook", () => {
+    it("home typewriter topics are pet-honest (never treatments/session)", () => {
+        const topics = welcomeKitTopics("PET_GROOMING")
+        expect(topics).toEqual(["a groom", "hours", "groomers"])
+        for (const t of topics) expect(t).not.toMatch(NOT_SESSION_OR_TREATMENT)
+    })
+
+    it("salon/barber keep treatments; gym/clinic/yoga/field keep theirs", () => {
+        expect(welcomeKitTopics("SALON_SPA")).toEqual(["treatments", "hours"])
+        expect(welcomeKitTopics("BARBER")).toEqual(["treatments", "hours"])
+        expect(welcomeKitTopics("GYM")).toEqual(["a session", "hours", "trainers"])
+        expect(welcomeKitTopics("CLINIC")).toEqual(["an appointment", "services", "rates"])
+        expect(welcomeKitTopics("YOGA")).toEqual(["a class", "hours", "teachers"])
+        expect(welcomeKitTopics("FIELD_SERVICE")).toEqual(["a visit", "a quote"])
+        expect(welcomeKitTopics("CONSULTANT")).toEqual(["a session", "services", "rates"])
+        expect(welcomeKitTopics("SHOP")).toEqual(["the shop", "orders", "pickup"])
+    })
+
+    it("chat clone playbook for PET_GROOMING books grooming slots, not treatments", () => {
+        const pet = cloneOperatingPrompt({
+            displayName: "Pluto Pet Grooming",
+            roleTemplate: "PET_GROOMING",
+            primaryGoal: "TAKE_APPOINTMENTS",
+            whatsapp: "919934177145",
+        })
+        expect(pet).toMatch(/You book grooming slots at Pluto Pet Grooming/)
+        expect(pet).toMatch(/Book a groom/)
+        expect(pet).not.toMatch(/book treatments|haircut\/treatment|book sessions/i)
+        expect(pet).toMatch(/Prefill "A groom at Pluto Pet Grooming"/)
+
+        const salon = cloneOperatingPrompt({ displayName: "H Square Salon", roleTemplate: "SALON_SPA", primaryGoal: "TAKE_APPOINTMENTS" })
+        expect(salon).toMatch(/You book treatments at H Square Salon/)
+        const barber = cloneOperatingPrompt({ displayName: "Prince Barber", roleTemplate: "BARBER", primaryGoal: "TAKE_APPOINTMENTS" })
+        expect(barber).toMatch(/You book treatments at Prince Barber/)
     })
 })
 

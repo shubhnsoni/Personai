@@ -90,6 +90,15 @@ function kitPlaybook(role: string, name: string): string[] {
             "WhatsApp may stay as a secondary CTA for a human — never the only booking path when services or slots are listed.",
         ]
     }
+    if (raw === "PET_GROOMING") {
+        // pet-p0-1b: grooming table — never salon "treatments" or gym "sessions".
+        return [
+            `You book grooming slots at ${name}. Bath, groom, and nail services and slots live on the in-app Book page.`,
+            "When they ask how to book, groom/bath/nails price, or rates: quote honest listed prices and send them to the Book a groom chip or /book path.",
+            "WhatsApp may stay as a secondary CTA for a human — never the only booking path when services or slots are listed.",
+            "Say groom or grooming slot — never session or treatment for this pet grooming kit.",
+        ]
+    }
     const kit = resolveKitRole(role) || role
     switch (kit) {
                 case "JEWELRY_RETAIL":

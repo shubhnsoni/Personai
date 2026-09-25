@@ -190,6 +190,29 @@ export function sessionSheetProps(role?: string | null, durationMinutes?: number
     }
 }
 
+/** Home typewriter "Ask me about …" kit topics — flavor before kit alias (GYM/YOGA/BARBER/PET_GROOMING → SALON_SPA kit). */
+export function welcomeKitTopics(roleTemplate?: string | null): string[] {
+    const role = kitRole(roleTemplate) || roleTemplate
+    const flavor = (roleTemplate || "").trim().toUpperCase()
+    return role === "SHOP" ? ["the shop", "orders", "pickup"]
+        : role === "JEWELRY_RETAIL" ? ["jewellery", "gold rates", "bridal"]
+        : role === "JEWELRY_WHOLESALE" ? ["stock", "board rates", "dealer orders"]
+        : role === "PHARMACY" ? ["medicines", "stock", "prescriptions"]
+        : role === "AUTO_PARTS" ? ["parts", "fitment", "stock"]
+        : role === "CREATOR" ? ["the guide", "files", "tipping"]
+        : flavor === "CLINIC" ? ["an appointment", "services", "rates"]
+        : flavor === "GYM" ? ["a session", "hours", "trainers"]
+        : flavor === "YOGA" ? ["a class", "hours", "teachers"]
+        // pet-p0-1b: grooming table — never salon "treatments" or gym "session".
+        : flavor === "PET_GROOMING" ? ["a groom", "hours", "groomers"]
+        : role === "CONSULTANT" || role === "CA" ? ["a session", "services", "rates"]
+        : role === "SALON_SPA" ? ["treatments", "hours"]
+        : role === "FIELD_SERVICE" ? ["a visit", "a quote"]
+        : role === "DESIGNER" || role === "DEVELOPER" || role === "EDITOR" || role === "JOB_SEEKER"
+            ? ["the work", "me"]
+            : ["me", "a chat"]
+}
+
 /** Guest home Book CTA for TAKE_APPOINTMENTS / salon-spa kits lands on /book. */
 export function appointmentBookHref(slug: string, role?: string | null, goal?: string | null) {
     if (!slug) return null

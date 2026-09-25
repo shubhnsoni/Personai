@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation"
 import { ChatInterface, type ChatChip } from "@/components/chat/chat-interface"
 import { ContentPanel } from "@/components/profile/content-panel"
 import { ReserveSheet } from "@/components/booking/reserve-sheet"
-import { appointmentBookHref, bookChip as kitBookChip, sessionSheetProps } from "@/lib/kit-copy"
+import { appointmentBookHref, bookChip as kitBookChip, sessionSheetProps, welcomeKitTopics } from "@/lib/kit-copy"
 import { extrasOf, isDigitalCatalogItem, publicChipAllowed, shopNavLabel } from "@/lib/surfaces"
 import { resolveKitRole } from "@/lib/role-alias"
 import { hotelSuggestedReplies } from "@/lib/hotels"
@@ -433,23 +433,7 @@ function welcomeTopics(profile: ProfileViewProps["profile"]) {
     if (role === "HOTEL") {
         return ["towels", "Wi-Fi", "restaurants", "reception"]
     }
-    const flavor = (profile.roleTemplate || "").trim().toUpperCase()
-    const kitTopics =
-        role === "SHOP" ? ["the shop", "orders", "pickup"]
-        : role === "JEWELRY_RETAIL" ? ["jewellery", "gold rates", "bridal"]
-        : role === "JEWELRY_WHOLESALE" ? ["stock", "board rates", "dealer orders"]
-        : role === "PHARMACY" ? ["medicines", "stock", "prescriptions"]
-        : role === "AUTO_PARTS" ? ["parts", "fitment", "stock"]
-        : role === "CREATOR" ? ["the guide", "files", "tipping"]
-        : flavor === "CLINIC" ? ["an appointment", "services", "rates"]
-        : flavor === "GYM" ? ["a session", "hours", "trainers"]
-        : flavor === "YOGA" ? ["a class", "hours", "teachers"]
-        : role === "CONSULTANT" || role === "CA" ? ["a session", "services", "rates"]
-        : role === "SALON_SPA" ? ["treatments", "hours"]
-        : role === "FIELD_SERVICE" ? ["a visit", "a quote"]
-        : role === "DESIGNER" || role === "DEVELOPER" || role === "EDITOR" || role === "JOB_SEEKER"
-            ? ["the work", "me"]
-            : ["me", "a chat"]
+    const kitTopics = welcomeKitTopics(profile.roleTemplate)
     const raw = [
         ...kitTopics,
         ...profile.serviceOfferings.filter((s) => s.isActive).map((s) => s.name),
